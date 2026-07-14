@@ -1,9 +1,4 @@
 # Changelog
 
-## Engine Prototype 0.1
-- Location Engine
-- Single-request Facility Data Engine
-- Strict Classification Engine
-- Routing Engine
-- Offline regression tests
-- Live diagnostic harness
+## Sprint 1 Review Build 1.0
+Clean implementation of the Accessibility Assessment module based on the locked technical specification. This build does not inherit code or caching from the failed experimental repository.

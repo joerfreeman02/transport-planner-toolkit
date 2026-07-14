@@ -1,34 +1,17 @@
-import {NOMINATIM_URL,OVERPASS_ENDPOINTS,ROUTING_BASE,REQUEST_TIMEOUTS,FALLBACK_SPEED_KMH} from './config.js';
-import {withTimeout} from './utils.js';
-
-export async function geocodeAddress(q){
-  const params=new URLSearchParams({format:'jsonv2',countrycodes:'gb',limit:'5',addressdetails:'1',q});
-  const res=await withTimeout(signal=>fetch(`${NOMINATIM_URL}?${params}`,{signal,headers:{Accept:'application/json'}}),REQUEST_TIMEOUTS.geocode,'Geocoding');
-  if(!res.ok)throw new Error(`Geocoding HTTP ${res.status}`);return res.json();
-}
-
-function primaryQuery(lat,lon,radius){return `[out:json][timeout:20];(nwr(around:${radius},${lat},${lon})[amenity];nwr(around:${radius},${lat},${lon})[shop];nwr(around:${radius},${lat},${lon})[leisure];nwr(around:${radius},${lat},${lon})[healthcare];nwr(around:${radius},${lat},${lon})[railway];nwr(around:${radius},${lat},${lon})[public_transport];nwr(around:${radius},${lat},${lon})[education];nwr(around:${radius},${lat},${lon})[childcare];nwr(around:${radius},${lat},${lon})["highway"="bus_stop"];nwr(around:${radius},${lat},${lon})[park_ride];);out center tags;`;}
-function extensionQuery(lat,lon,radius){return `[out:json][timeout:20];(nwr(around:${radius},${lat},${lon})["railway"~"^(station|halt|tram_stop)$"];nwr(around:${radius},${lat},${lon})["public_transport"="station"];nwr(around:${radius},${lat},${lon})["amenity"~"^(school|college|university|hospital|clinic)$"];nwr(around:${radius},${lat},${lon})["healthcare"~"^(hospital|clinic)$"];nwr(around:${radius},${lat},${lon})[park_ride];);out center tags;`;}
-
-export async function fetchFacilities(lat,lon,radius,{extension=false}={}){
-  const q=extension?extensionQuery(lat,lon,radius):primaryQuery(lat,lon,radius);let last;
-  for(const endpoint of OVERPASS_ENDPOINTS){
-    try{
-      const res=await withTimeout(signal=>fetch(endpoint,{method:'POST',signal,headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',Accept:'application/json'},body:`data=${encodeURIComponent(q)}`}),REQUEST_TIMEOUTS.overpass,'Facility download');
-      if(!res.ok)throw new Error(`HTTP ${res.status}`);const data=await res.json();return {elements:data.elements||[],endpoint};
-    }catch(e){last=e;}
-  }
-  throw new Error(`Facility data unavailable: ${last?.message||'all endpoints failed'}`);
-}
-
-export async function routeBetween(from,to,profile){
-  const p=profile==='foot'?'foot':'bike';const url=`${ROUTING_BASE}/routed-${p}/route/v1/${p}/${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson&steps=false`;
-  try{
-    const res=await withTimeout(signal=>fetch(url,{signal,headers:{Accept:'application/json'}}),REQUEST_TIMEOUTS.route,`${profile} routing`);
-    if(!res.ok)throw new Error(`HTTP ${res.status}`);const data=await res.json();if(data.code!=='Ok'||!data.routes?.length)throw new Error('no route returned');
-    const r=data.routes[0];return {distance:r.distance,duration:r.duration,geometry:r.geometry,estimated:false,source:'OSRM'};
-  }catch(error){
-    return {distance:null,duration:null,geometry:null,estimated:true,source:'fallback',error:error.message};
-  }
-}
-export function fallbackRoute(straight,profile){const factor=profile==='foot'?1.2:1.15;const distance=straight*factor;const kmh=FALLBACK_SPEED_KMH[profile];return {distance,duration:(distance/1000)/kmh*3600,geometry:null,estimated:true,source:'estimated'};}
+import {OVERPASS_ENDPOINTS} from './constants.js';
+import {fetchWithTimeout} from './utils.js';
+export async function geocodeUK(query){const url=new URL('https://nominatim.openstreetmap.org/search');url.searchParams.set('format','jsonv2');url.searchParams.set('countrycodes','gb');url.searchParams.set('addressdetails','1');url.searchParams.set('limit','5');url.searchParams.set('q',query);const res=await fetchWithTimeout(url,{headers:{Accept:'application/json'}},12000);if(!res.ok)throw new Error(`Address lookup failed (HTTP ${res.status}).`);const data=await res.json();if(!data.length)throw new Error('No UK address match was returned.');return data.map(x=>({lat:Number(x.lat),lon:Number(x.lon),label:x.display_name,raw:x}));}
+function around(r,lat,lon){return `(around:${Math.round(r)},${lat},${lon})`;}
+export function buildQuery(lat,lon,radius,extensionOnly=false){const a=around(radius,lat,lon);if(extensionOnly)return `[out:json][timeout:25];(nwr["railway"~"^(station|halt|tram_stop)$"]${a};nwr["station"~"^(subway|light_rail)$"]${a};nwr["amenity"~"^(school|college|university|hospital)$"]${a};nwr["healthcare"~"^(hospital|clinic)$"]${a};);out center tags;`;
+return `[out:json][timeout:25];(
+ nwr["highway"="bus_stop"]${a};nwr["public_transport"="platform"]["bus"="yes"]${a};nwr["public_transport"="stop_position"]["bus"="yes"]${a};nwr["amenity"="bicycle_parking"]${a};
+ nwr["railway"~"^(station|halt|tram_stop)$"]${a};nwr["station"~"^(subway|light_rail)$"]${a};
+ nwr["amenity"~"^(kindergarten|childcare|school|college|university)$"]${a};
+ nwr["shop"~"^(supermarket|convenience|post_office|optician)$"]${a};
+ nwr["amenity"~"^(post_office|bank|atm|fuel|pharmacy|doctors|dentist|hospital|clinic|restaurant|cafe|pub|bar|library|community_centre|place_of_worship)$"]${a};
+ nwr["healthcare"~"^(general_practitioner|doctor|pharmacy|dentist|hospital|clinic|optometrist)$"]${a};
+ nwr["leisure"~"^(park|recreation_ground|playground|fitness_centre|sports_centre|sports_hall|pitch)$"]${a};
+);out center tags;`;}
+async function requestEndpoint(endpoint,query){const attempts=[];const encoded=encodeURIComponent(query);if((endpoint.length+encoded.length)<7800){try{const res=await fetchWithTimeout(`${endpoint}?data=${encoded}`,{headers:{Accept:'application/json'}},15000);if(res.ok){const data=await res.json();if(Array.isArray(data.elements))return{data,method:'GET'};}attempts.push(`GET HTTP ${res.status}`);}catch(e){attempts.push(`GET ${e.name==='AbortError'?'timeout':e.message}`);}}
+try{const res=await fetchWithTimeout(endpoint,{method:'POST',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:`data=${encoded}`},18000);if(!res.ok)throw new Error(`HTTP ${res.status}`);const data=await res.json();if(!Array.isArray(data.elements))throw new Error('Invalid response');return{data,method:'POST'};}catch(e){attempts.push(`POST ${e.name==='AbortError'?'timeout':e.message}`);throw new Error(attempts.join('; '));}}
+export async function queryOverpass(query){const failures=[];for(const endpoint of OVERPASS_ENDPOINTS){const started=performance.now();try{const result=await requestEndpoint(endpoint,query);return{ok:true,elements:result.data.elements,endpoint,method:result.method,elapsedMs:Math.round(performance.now()-started),failures};}catch(e){failures.push({endpoint,error:e.message});}}return{ok:false,elements:[],failures,error:'All facility-data endpoints failed.'};}

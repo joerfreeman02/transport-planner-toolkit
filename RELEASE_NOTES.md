@@ -1,13 +1,12 @@
-# Sprint 2A — Rail Intelligence Review
+# Sprint 2B — Assisted Rail Research
 
-## Implemented
-- Reusable local Rail Knowledge Library.
-- Automatic matching of station discoveries to saved verified records.
-- Field-level statuses: Missing, Needs review, Verified and Manual.
-- Source and retrieval date for each station-information field.
-- Knowledge JSON import/export for backup and sharing.
-- Expanded station facilities: ticketing, waiting, toilets and car parking.
-- TS-ready summary continues to use included station records.
+This review build implements the free assisted-research bridge agreed for Sprint 2.
 
-## Important limitation
-This static GitHub Pages build cannot reliably scrape National Rail, TfL or train-operator webpages because those sites generally do not permit browser cross-origin extraction. Official values must therefore be researched/verified and saved into the knowledge library. The app never labels an unverified value as authoritative.
+It does not place an API key in the browser and does not claim to scrape restricted websites automatically. Instead, it exports a structured request for ChatGPT and imports the completed, source-backed station records.
+
+## Review points
+- Export a research request after finding stations.
+- Confirm the JSON contains every included station and walking/cycling results.
+- Import a completed research response.
+- Confirm fields, statuses, sources, retrieval dates and line names populate.
+- Confirm saved stations are reused on a later search.

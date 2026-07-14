@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#164e4b">
+  <title>Accessibility Assessment — 1.0 RC1</title>
+  <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?build=AA-RC1-20260714-1945">
+  <link rel="stylesheet" href="assets/css/app.css?build=AA-RC1-20260714-1945">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <a href="../../" style="display:inline-block;color:white;text-decoration:none;font-weight:700;margin-bottom:.55rem">← Toolkit home</a>
+      <p class="eyebrow">Transport Planner Toolkit</p>
+      <h1>Accessibility Assessment</h1>
+      <p class="subtitle">Accessibility Assessment 1.0 release-candidate build · AA-RC1-20260714-1945</p>
+    </div>
+    <button id="diagnosticsBtn" class="button ghost">Diagnostics</button>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <span class="step">1</span>
+          <h2>Confirm the site</h2>
+        </div>
+        <span id="siteState" class="status-badge neutral">Not confirmed</span>
+      </div>
+
+      <div class="location-grid">
+        <div>
+          <label for="addressInput">UK address or postcode</label>
+          <div class="inline-input">
+            <input id="addressInput" type="text" placeholder="e.g. 100 High Street, Plaistow, London" autocomplete="street-address">
+            <button id="locateBtn" class="button">Locate</button>
+          </div>
+          <p class="hint">Select a result, then drag or click the map to refine the site pin.</p>
+        </div>
+        <div>
+          <label>Coordinates</label>
+          <div class="coordinate-grid">
+            <input id="latInput" type="number" step="0.000001" placeholder="Latitude">
+            <input id="lonInput" type="number" step="0.000001" placeholder="Longitude">
+            <button id="useCoordsBtn" class="button secondary">Use</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="geocodeResults" class="geocode-results" hidden></div>
+      <div id="locationMessage" class="message" hidden></div>
+
+      <div id="map" aria-label="Site and facilities map"></div>
+
+      <div class="confirm-row">
+        <div>
+          <strong id="selectedAddress">No site selected</strong>
+          <span id="selectedCoords" class="muted"></span>
+        </div>
+        <button id="confirmSiteBtn" class="button" disabled>Confirm site location</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div>
+          <span class="step">2</span>
+          <h2>Search and route</h2>
+        </div>
+        <span id="searchState" class="status-badge neutral">Waiting</span>
+      </div>
+
+      <div class="settings-grid">
+        <label>Walking search radius
+          <div class="unit-input"><input id="walkRadius" type="number" min="250" max="5000" step="250" value="2000"><span>m</span></div>
+        </label>
+        <label>Cycling extension radius
+          <div class="unit-input"><input id="cycleRadius" type="number" min="1000" max="10000" step="500" value="5000"><span>m</span></div>
+        </label>
+        <button id="runBtn" class="button large" disabled>Find nearest facilities</button>
+      </div>
+
+      <div id="progressWrap" class="progress-wrap" hidden>
+        <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+        <p id="progressText">Preparing…</p>
+      </div>
+      <div id="searchMessage" class="message" hidden></div>
+    </section>
+
+    <section id="resultsPanel" class="panel" hidden>
+      <div class="panel-heading wrap">
+        <div>
+          <span class="step">3</span>
+          <h2>Results</h2>
+        </div>
+        <div class="actions">
+          <button id="copyTableBtn" class="button secondary">Copy table</button>
+          <button id="csvBtn" class="button secondary">Export CSV</button>
+          <button id="wordingBtn" class="button">Generate wording</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="resultsTable">
+          <thead>
+            <tr>
+              <th>Facility</th>
+              <th>Name</th>
+              <th>Walking distance / time</th>
+              <th>Cycling distance / time</th>
+              <th>Source</th>
+              <th>Review</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="review-tools">
+        <button id="addManualBtn" class="button secondary">Add facility manually</button>
+        <p class="hint">Automatically identified rows are included by default. Estimated or manually added rows require confirmation before report wording.</p>
+      </div>
+
+      <textarea id="wordingOutput" class="wording" hidden></textarea>
+    </section>
+  </main>
+
+  <dialog id="manualDialog">
+    <form method="dialog" id="manualForm">
+      <h2>Add facility manually</h2>
+      <label>Category<select id="manualCategory"></select></label>
+      <label>Name<input id="manualName" required></label>
+      <label>Address<input id="manualAddress"></label>
+      <div class="coordinate-grid">
+        <label>Latitude<input id="manualLat" type="number" step="0.000001" required></label>
+        <label>Longitude<input id="manualLon" type="number" step="0.000001" required></label>
+      </div>
+      <p class="hint">Use the current map centre or enter checked coordinates.</p>
+      <div class="dialog-actions">
+        <button value="cancel" class="button ghost">Cancel</button>
+        <button id="saveManualBtn" value="default" class="button">Add and route</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="diagnosticsDialog">
+    <div class="diagnostic-header">
+      <h2>Diagnostics</h2>
+      <button id="closeDiagnosticsBtn" class="button ghost">Close</button>
+    </div>
+    <pre id="diagnosticsOutput">No search has been run.</pre>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script type="module" src="assets/js/app.js?build=AA-RC1-20260714-1945"></script>
+</body>
+</html>

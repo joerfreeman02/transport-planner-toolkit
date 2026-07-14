@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Collision Record Cards</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+/* ═══════════════════════════════════════════════
+   SCREEN VARIABLES & RESET
+═══════════════════════════════════════════════ */
+:root {
+  --bg:#f1f0ec; --surface:#fff; --border:#d8d5cc; --border-mid:#b0ac9e;
+  --text:#1c1b18; --text2:#5a5750; --text3:#9a9690;
+  --navy:#1a3a5c; --green:#1e4d2b; --brown:#5a1f00;
+  --fatal-bg:#8b0000; --fatal-lt:#fff0f0;
+  --serious-bg:#b34400; --serious-lt:#fff4ed;
+  --slight-bg:#1e5c1e; --slight-lt:#f0f7f0;
+  --mono:'DM Mono',monospace; --sans:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* ═══════════════════════════════════════════════
+   UPLOAD SCREEN
+═══════════════════════════════════════════════ */
+#upload{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem;gap:0;}
+.u-eye{font-family:var(--mono);font-size:.65rem;letter-spacing:.22em;text-transform:uppercase;color:var(--text3);margin-bottom:.5rem;}
+.u-h1{font-size:1.8rem;font-weight:600;color:var(--navy);letter-spacing:-.025em;margin-bottom:.35rem;}
+.u-sub{font-size:.9rem;color:var(--text2);font-weight:300;margin-bottom:2rem;}
+#dropzone{width:100%;max-width:460px;background:var(--surface);border:1.5px dashed var(--border-mid);border-radius:6px;padding:2.5rem 2rem;text-align:center;cursor:pointer;transition:all .18s;position:relative;}
+#dropzone:hover,#dropzone.over{border-color:var(--navy);background:#f0f4f8;}
+#dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.dz-ico{font-size:2rem;margin-bottom:.75rem;display:block;}
+.dz-prim{font-size:.95rem;font-weight:500;color:var(--navy);margin-bottom:.25rem;}
+.dz-hint{font-family:var(--mono);font-size:.72rem;color:var(--text3);}
+#uerr{margin-top:.8rem;max-width:460px;font-size:.82rem;color:#b00;display:none;text-align:center;line-height:1.5;}
+.u-info{margin-top:1.5rem;max-width:460px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1rem 1.3rem;}
+.u-info h4{font-family:var(--mono);font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;color:var(--text3);margin-bottom:.6rem;}
+.u-info p{font-size:.82rem;color:var(--text2);line-height:1.6;}
+
+/* ═══════════════════════════════════════════════
+   APP SHELL (screen only)
+═══════════════════════════════════════════════ */
+#app{display:none;}
+.topbar{background:var(--navy);color:white;height:50px;padding:0 1.25rem;display:flex;align-items:center;gap:.75rem;position:sticky;top:0;z-index:200;box-shadow:0 2px 6px rgba(0,0,0,.2);}
+.tb-brand{font-family:var(--mono);font-size:.65rem;letter-spacing:.18em;text-transform:uppercase;opacity:.7;flex:1;}
+.tb-stat{font-family:var(--mono);font-size:.72rem;background:rgba(255,255,255,.12);padding:.2rem .65rem;border-radius:3px;white-space:nowrap;}
+.tbtn{font-family:var(--sans);font-size:.8rem;font-weight:500;padding:.38rem .9rem;border-radius:3px;border:none;cursor:pointer;white-space:nowrap;}
+.tbtn-g{background:rgba(255,255,255,.12);color:white;border:1px solid rgba(255,255,255,.25);}
+.tbtn-g:hover{background:rgba(255,255,255,.22);}
+.tbtn-w{background:white;color:var(--navy);font-weight:600;}
+.tbtn-w:hover{background:#e8eef4;}
+.meta-toggle{display:flex;align-items:center;gap:.4rem;cursor:pointer;color:rgba(255,255,255,.75);font-size:.78rem;white-space:nowrap;user-select:none;}
+.meta-toggle input{accent-color:#6fa8d4;width:14px;height:14px;cursor:pointer;}
+.meta-toggle:hover{color:white;}
+.tabs{background:#132d47;display:flex;border-bottom:2px solid #0e1f2e;position:sticky;top:50px;z-index:199;}
+.tab{font-family:var(--mono);font-size:.63rem;letter-spacing:.13em;text-transform:uppercase;padding:.6rem 1.1rem;border:none;cursor:pointer;color:rgba(255,255,255,.4);background:transparent;border-bottom:2.5px solid transparent;margin-bottom:-2px;display:flex;align-items:center;gap:.4rem;}
+.tab:hover{color:rgba(255,255,255,.75);}
+.tab.on{color:white;}
+.tab.on-c{border-bottom-color:#6fa8d4;background:rgba(111,168,212,.08);}
+.tab.on-v{border-bottom-color:#7bbf5e;background:rgba(123,191,94,.08);}
+.tab.on-k{border-bottom-color:#d4855a;background:rgba(212,133,90,.08);}
+.tab.on-m{border-bottom-color:#c8b85a;background:rgba(200,184,90,.08);}
+.tab-n{font-size:.6rem;padding:.08rem .3rem;border-radius:2px;background:rgba(255,255,255,.13);}
+.wrap{padding:1.5rem;max-width:860px;margin:0 auto;}
+.panel{display:none;}
+.panel.on{display:block;}
+
+/* ═══════════════════════════════════════════════
+   RECORD CARD (shared screen + print)
+═══════════════════════════════════════════════ */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:5px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.05);margin-bottom:1.25rem;}
+.card:last-child{margin-bottom:0;}
+
+/* coloured left border by severity */
+.sev-fatal   {border-left:4px solid var(--fatal-bg)!important;}
+.sev-serious {border-left:4px solid var(--serious-bg)!important;}
+.sev-slight  {border-left:4px solid var(--slight-bg)!important;}
+
+/* card header */
+.chdr{padding:.85rem 1.2rem;display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;flex-wrap:wrap;color:white;}
+.chdr-crash   {background:var(--navy);}
+.chdr-vehicle {background:var(--green);}
+.chdr-cas     {background:var(--brown);}
+.chdr-left .eyebrow{font-family:var(--mono);font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;opacity:.6;margin-bottom:.15rem;}
+.chdr-left .cref{font-family:var(--mono);font-size:.95rem;font-weight:500;margin-bottom:.18rem;}
+.chdr-left .csub{font-size:.8rem;opacity:.82;font-weight:300;line-height:1.4;max-width:520px;}
+.chdr-right{display:flex;flex-direction:column;align-items:flex-end;gap:.3rem;flex-shrink:0;}
+
+/* severity / info badges */
+.badge{font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;padding:.22rem .6rem;border-radius:3px;font-weight:600;white-space:nowrap;}
+.b-fatal   {background:var(--fatal-bg);color:white;}
+.b-serious {background:var(--serious-bg);color:white;}
+.b-slight  {background:var(--slight-bg);color:white;}
+.b-killed  {background:#4a0000;color:white;}
+.b-unknown {background:rgba(255,255,255,.2);color:white;border:1px solid rgba(255,255,255,.3);}
+.b-info    {background:rgba(255,255,255,.15);color:white;border:1px solid rgba(255,255,255,.25);}
+
+/* summary bar */
+.sumbar{background:#f7f5f1;border-bottom:1px solid var(--border);padding:.55rem 1.2rem;display:flex;gap:1.75rem;flex-wrap:wrap;}
+.sbi{display:flex;flex-direction:column;gap:.05rem;}
+.sbi-l{font-family:var(--mono);font-size:.54rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);}
+.sbi-v{font-size:.8rem;font-weight:500;color:var(--text);}
+
+/* description box */
+.desc-box{background:#f7f5f1;border-left:3px solid var(--navy);padding:.6rem .85rem;margin-bottom:.9rem;font-size:.82rem;line-height:1.6;color:var(--text);}
+.desc-label{font-family:var(--mono);font-size:.56rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);margin-bottom:.25rem;}
+
+/* card body */
+.cbody{padding:.9rem 1.2rem;}
+
+/* sections */
+.sec{margin-bottom:.85rem;}
+.sec:last-child{margin-bottom:0;}
+.sec-hdr{font-family:var(--mono);font-size:.56rem;letter-spacing:.18em;text-transform:uppercase;color:white;background:var(--navy);display:inline-block;padding:.22rem .55rem;border-radius:2px;margin-bottom:.5rem;}
+.sec-hdr.g{background:var(--green);}
+.sec-hdr.b{background:var(--brown);}
+.sec-hdr.d{background:var(--border-mid);}
+
+/* field grid */
+.fg{display:grid;grid-template-columns:repeat(3,1fr);gap:0 .9rem;}
+.fg2{display:grid;grid-template-columns:repeat(2,1fr);gap:0 .9rem;}
+.fgf{display:grid;grid-template-columns:1fr;gap:0;}
+.fd{display:flex;flex-direction:column;gap:.04rem;padding:.25rem 0;border-bottom:1px solid #f0ede7;}
+.fd-l{font-family:var(--mono);font-size:.55rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);line-height:1.3;}
+.fd-v{font-size:.8rem;font-weight:500;color:var(--text);line-height:1.3;}
+.fd-v.nr{color:var(--border-mid);font-weight:400;font-style:italic;font-size:.76rem;}
+
+/* RSF / CF table */
+.ftbl{width:100%;border-collapse:collapse;font-size:.76rem;}
+.ftbl thead tr{background:#e8eef4;}
+.ftbl th{font-family:var(--mono);font-size:.54rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);padding:.32rem .5rem;text-align:left;font-weight:600;border-bottom:1.5px solid var(--border);}
+.ftbl td{padding:.35rem .5rem;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.3;}
+.ftbl tr:last-child td{border-bottom:none;}
+.ftbl tr:nth-child(even) td{background:#fafaf8;}
+.ftbl-n{font-family:var(--mono);font-size:.66rem;color:var(--text3);white-space:nowrap;}
+.prob{display:inline-block;font-family:var(--mono);font-size:.62rem;padding:.1rem .32rem;border-radius:2px;white-space:nowrap;}
+.prob-vl{background:#fde8e8;color:#8b0000;}
+.prob-l {background:#e8eef4;color:#1a3a5c;}
+.prob-p {background:#edf6ed;color:#1e5c1e;}
+.prob-u {background:#f5f3f0;color:var(--text2);}
+
+/* card footer */
+.cftr{background:#f7f5f1;border-top:1px solid var(--border);padding:.45rem 1.2rem;font-family:var(--mono);font-size:.58rem;color:var(--text3);letter-spacing:.06em;display:flex;gap:1.25rem;flex-wrap:wrap;}
+
+/* meta cards */
+.meta-card{background:var(--surface);border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-bottom:1.25rem;}
+.meta-hdr{background:#2c2826;color:white;padding:.65rem 1.1rem;font-family:var(--mono);font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;}
+.meta-body{padding:.75rem 1.2rem;}
+.meta-row{display:flex;gap:.75rem;padding:.35rem 0;border-bottom:1px solid #f0ede7;font-size:.82rem;flex-wrap:wrap;}
+.meta-row:last-child{border-bottom:none;}
+.meta-k{font-family:var(--mono);font-size:.62rem;letter-spacing:.06em;color:var(--text3);min-width:160px;padding-top:.05rem;flex-shrink:0;}
+.meta-v{color:var(--text);flex:1;line-height:1.5;}
+.meta-head{font-weight:600;font-size:.85rem;color:var(--text);padding:.5rem 0 .25rem 0;border-bottom:none;}
+
+/* group header in screen panels */
+.grp-hdr{background:#132d47;color:rgba(255,255,255,.8);padding:.45rem 1rem;font-family:var(--mono);font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;border-radius:4px 4px 0 0;display:flex;align-items:center;gap:.75rem;margin-top:1.25rem;margin-bottom:0;}
+.grp-hdr:first-child{margin-top:0;}
+.grp-ref{font-size:.78rem;font-weight:500;color:white;}
+.grp-badge{background:rgba(255,255,255,.15);padding:.1rem .4rem;border-radius:2px;font-size:.58rem;}
+.grp-body .card{border-radius:0;border-top:none;margin-bottom:0;border-bottom:1px solid var(--border);}
+.grp-body .card:last-child{border-radius:0 0 4px 4px;}
+
+/* ═══════════════════════════════════════════════
+   PRINT STYLES
+   One page per card. No exceptions.
+═══════════════════════════════════════════════ */
+@media print {
+  @page{margin:8mm 10mm 8mm 10mm; size: A4;}
+
+  /* Force all colours to print */
+  *{
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+    color-adjust:exact!important;
+  }
+
+  /* Hide everything except print container */
+  body{background:white!important;}
+  #upload,#app,.topbar,.tabs{display:none!important;}
+  #printroot{display:block!important;}
+
+  /* Each .pg is exactly one printed page */
+  .pg{
+    width:100%;
+    page-break-after:always;
+    break-after:page;
+    page-break-inside:avoid;
+    break-inside:avoid;
+    display:flex;
+    flex-direction:column;
+  }
+  .pg:last-child{
+    page-break-after:avoid;
+    break-after:avoid;
+  }
+
+  /* Scale card to fill the page without overflowing.
+     font-size on .pg cascades to all rem-based children. */
+  .pg .card{
+    border-radius:0!important;
+    box-shadow:none!important;
+    border:1px solid #ccc!important;
+    margin:0!important;
+    flex:1;
+    overflow:hidden;
+  }
+
+  /* Ensure coloured backgrounds print */
+  .chdr-crash   {background:#1a3a5c!important;color:white!important;}
+  .chdr-vehicle {background:#1e4d2b!important;color:white!important;}
+  .chdr-cas     {background:#5a1f00!important;color:white!important;}
+  .meta-hdr     {background:#2c2826!important;color:white!important;}
+
+  .sec-hdr  {background:#1a3a5c!important;color:white!important;}
+  .sec-hdr.g{background:#1e4d2b!important;color:white!important;}
+  .sec-hdr.b{background:#5a1f00!important;color:white!important;}
+  .sec-hdr.d{background:#b0ac9e!important;color:white!important;}
+
+  .badge.b-fatal   {background:#8b0000!important;color:white!important;}
+  .badge.b-killed  {background:#4a0000!important;color:white!important;}
+  .badge.b-serious {background:#b34400!important;color:white!important;}
+  .badge.b-slight  {background:#1e5c1e!important;color:white!important;}
+  .badge.b-unknown {background:rgba(255,255,255,.25)!important;color:white!important;}
+  .badge.b-info    {background:rgba(255,255,255,.2)!important;color:white!important;}
+
+  .sev-fatal   {border-left:4px solid #8b0000!important;}
+  .sev-serious {border-left:4px solid #b34400!important;}
+  .sev-slight  {border-left:4px solid #1e5c1e!important;}
+
+  .sumbar{background:#f7f5f1!important;}
+  .desc-box{background:#f7f5f1!important;}
+  .cftr{background:#f7f5f1!important;}
+  .ftbl thead tr{background:#e8eef4!important;}
+  .ftbl tr:nth-child(even) td{background:#fafaf8!important;}
+
+  .prob-vl{background:#fde8e8!important;color:#8b0000!important;}
+  .prob-l {background:#e8eef4!important;color:#1a3a5c!important;}
+  .prob-p {background:#edf6ed!important;color:#1e5c1e!important;}
+  .prob-u {background:#f5f3f0!important;color:#5a5750!important;}
+
+  /* meta pages */
+  .meta-pg{page-break-after:always;break-after:page;}
+  .meta-pg:last-child{page-break-after:avoid;break-after:avoid;}
+  .meta-card{border-radius:0!important;box-shadow:none!important;border:1px solid #ccc!important;}
+}
+
+/* printroot hidden on screen */
+#printroot{display:none;}
+</style>
+</head>
+<body>
+<a href="../../" style="position:fixed;top:10px;left:10px;z-index:9999;background:#fff;color:#1a3a5c;border:1px solid #b0ac9e;border-radius:4px;padding:7px 10px;font:600 12px Arial,sans-serif;text-decoration:none;box-shadow:0 2px 6px rgba(0,0,0,.12)">← Toolkit home</a>
+
+
+<!-- ═══ UPLOAD ═══ -->
+<div id="upload">
+  <p class="u-eye">STATS19 · Transport Planning</p>
+  <h1 class="u-h1">Collision Record Cards</h1>
+  <p class="u-sub">One page per record · full colour · grouped by collision</p>
+  <div id="dropzone">
+    <input type="file" id="fileinput" accept=".xlsx,.xls">
+    <span class="dz-ico">📂</span>
+    <p class="dz-prim">Drop your Excel file here</p>
+    <p class="dz-hint">.xlsx / .xls &nbsp;·&nbsp; click to browse</p>
+  </div>
+  <p id="uerr"></p>
+  <div class="u-info">
+    <h4>Works with both CCC file formats</h4>
+    <p>Reads Crashes, Vehicles and Casualties sheets automatically. Handles both RSF# and CF# column naming. Print All produces: metadata → crash → vehicles → casualties, one page each, repeating per collision.</p>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div id="app">
+  <div class="topbar">
+    <span class="tb-brand">Collision Record Cards</span>
+    <span class="tb-stat" id="tstat"></span>
+    <button class="tbtn tbtn-g" onclick="resetApp()">← New file</button>
+    <label class="meta-toggle" title="Note: Excel images cannot be extracted — metadata shows text only">
+      <input type="checkbox" id="inclMeta" checked>
+      <span>Include metadata</span>
+    </label>
+    <button class="tbtn tbtn-g" onclick="printTab()">🖨 Print this tab</button>
+    <button class="tbtn tbtn-w" onclick="printAll()">🖨 Print all</button>
+  </div>
+  <div class="tabs">
+    <button class="tab" id="t-meta"  onclick="sw('meta')"> Metadata  <span class="tab-n" id="n-meta"></span></button>
+    <button class="tab" id="t-crash" onclick="sw('crash')">Crashes   <span class="tab-n" id="n-crash">0</span></button>
+    <button class="tab" id="t-veh"   onclick="sw('veh')">  Vehicles  <span class="tab-n" id="n-veh">0</span></button>
+    <button class="tab" id="t-cas"   onclick="sw('cas')">  Casualties<span class="tab-n" id="n-cas">0</span></button>
+  </div>
+  <div class="wrap">
+    <div class="panel" id="p-meta"></div>
+    <div class="panel" id="p-crash"></div>
+    <div class="panel" id="p-veh"></div>
+    <div class="panel" id="p-cas"></div>
+  </div>
+</div>
+
+<!-- ═══ PRINT ROOT (hidden on screen, only rendered just before window.print()) ═══ -->
+<div id="printroot"></div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════
+// VALUE HELPERS
+// ═══════════════════════════════════════════════════
+
+// Pull a value from a row, trying multiple key aliases
+function g(row, ...keys) {
+  for (const k of keys) {
+    const x = row[k];
+    if (x === null || x === undefined || x === '') continue;
+    if (x instanceof Date) return x.toLocaleDateString('en-GB');
+    const s = String(x).trim();
+    if (s && s !== 'nan' && s !== 'NaN' && s.toLowerCase() !== 'nan') return s;
+  }
+  return null;
+}
+
+function e(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Severity: handles 'Crash Severity', 'Collision Severity', 'Casualty Severity', free-text values
+function sevInfo(raw) {
+  const s = (raw||'').toLowerCase();
+  if (s.includes('fatal') || s.includes('killed')) return {cls:'b-fatal',  border:'sev-fatal',   label: raw};
+  if (s.includes('serious'))                        return {cls:'b-serious',border:'sev-serious', label: raw};
+  if (s.includes('slight'))                         return {cls:'b-slight', border:'sev-slight',  label: raw};
+  return {cls:'b-unknown', border:'', label: raw||'Unknown'};
+}
+
+function probCls(p) {
+  const s=(p||'').toLowerCase();
+  if(s.includes('very likely')) return 'prob-vl';
+  if(s.includes('likely'))      return 'prob-l';
+  if(s.includes('possible'))    return 'prob-p';
+  return 'prob-u';
+}
+
+// ═══════════════════════════════════════════════════
+// FIELD / SECTION RENDERERS
+// ═══════════════════════════════════════════════════
+
+function fd(label, val) {
+  const v = val;
+  return `<div class="fd">
+    <span class="fd-l">${e(label)}</span>
+    <span class="fd-v${v?'':' nr'}">${v ? e(v) : 'Not recorded'}</span>
+  </div>`;
+}
+
+// Render a titled section with a 3-col (default), 2-col, or 1-col grid
+function sec(title, cls, gridCls, fields_html) {
+  return `<div class="sec">
+    <div class="sec-hdr${cls?' '+cls:''}">${e(title)}</div>
+    <div class="${gridCls||'fg'}">${fields_html}</div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// CONTRIBUTORY FACTOR TABLE
+// Handles both RSF# (new) and CF# / Contributory Factor # (old) naming
+// ═══════════════════════════════════════════════════
+
+function cfTable(row) {
+  // Detect which naming convention this row uses
+  const isRSF = row['RSF#1 Description'] !== undefined;
+  const keys = [1,2,3,4,5,6].map(n => isRSF
+    ? { desc:`RSF#${n} Description`, type:`RSF#${n} Participant type`, part:`RSF#${n} Participant no.`, prob:`RSF#${n} Probability` }
+    : { desc:`Contributory Factor #${n}`, type:`CF#${n} Participant type`, part:`CF#${n} Participant no.`, prob:`CF#${n} Probability` }
+  );
+
+  let rows = '', has = false;
+  for (let i=0; i<keys.length; i++) {
+    const k = keys[i];
+    const d=g(row,k.desc), t=g(row,k.type), p=g(row,k.part), pr=g(row,k.prob);
+    if(!d&&!t&&!p&&!pr) continue;
+    has = true;
+    const pc = probCls(pr);
+    rows += `<tr>
+      <td class="ftbl-n">${isRSF?'RSF':'CF'} #${i+1}</td>
+      <td>${d?e(d):'<span style="color:#ccc">—</span>'}</td>
+      <td>${t?e(t):'<span style="color:#ccc">—</span>'}</td>
+      <td>${p?e(String(p)):'<span style="color:#ccc">—</span>'}</td>
+      <td>${pr?`<span class="prob ${pc}">${e(pr)}</span>`:'<span style="color:#ccc">—</span>'}</td>
+    </tr>`;
+  }
+
+  if (!has) return `<p style="font-size:.78rem;color:var(--text3);font-style:italic;">No contributory factors recorded.</p>`;
+
+  return `<div style="overflow-x:auto;">
+    <table class="ftbl">
+      <thead><tr>
+        <th>Factor</th><th>Description</th><th>Participant Type</th><th>Participant No.</th><th>Probability</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// CRASH CARD HTML
+// ═══════════════════════════════════════════════════
+
+function crashCardHtml(row, idx, total) {
+  // Severity: try both column name variants
+  const sevRaw = g(row, 'Collision Severity', 'Crash Severity') || '';
+  const {cls:sc, border:sb, label:sl} = sevInfo(sevRaw);
+
+  const ref   = g(row,'Collision Reference No.') || `Crash ${idx+1}`;
+  const loc   = g(row,'Collision Location') || '—';
+  const desc  = g(row,'Collision Description');
+  const date  = g(row,'Date') || '—';
+  const day   = g(row,'Day') || '';
+  const time  = g(row,'Time') || '—';
+  const nveh  = g(row,'No. Vehicles') || '—';
+  const ncas  = g(row,'No. Casualties') || '—';
+  const speed = g(row,'Speed Limit');
+
+  // Pedestrian crossing: try both old and new column names
+  const pedX  = g(row,
+    'Pedestrian Crossing',
+    'Pedestrian Crossing (new field since 2024)',
+    'Pedestrian Crossing - Physical Facilities (no longer used)'
+  );
+  const pedCtrl = g(row,
+    'Pedestrian Crossing - Human Control (no longer used)'
+  );
+
+  // Conditions: try both column name variants
+  const conditions = g(row,
+    'Conditions or Carriageway Hazards',
+    'Conditions or Carriageway Hazards (new field since 2024)',
+    'Carriageway Hazards (no longer used)',
+    'Special Conditions (no longer used)'
+  );
+
+  // Police force: try both variants
+  const force = g(row, 'Reporting Police Force', 'Police Force', 'Geographic Police Force');
+
+  const ocf = g(row, 'Other Contributory Factor (if factor 999 selected)');
+
+  return `<div class="card ${sb}">
+    <div class="chdr chdr-crash">
+      <div class="chdr-left">
+        <div class="eyebrow">Crash ${idx+1} of ${total}</div>
+        <div class="cref">Ref: ${e(String(ref))}</div>
+        <div class="csub">${e(loc)}</div>
+      </div>
+      <div class="chdr-right">
+        <span class="badge ${sc}">${e(sl)}</span>
+        <span style="font-family:var(--mono);font-size:.66rem;opacity:.7;">${e(day?day+' ':'')+ e(date)} · ${e(time)}</span>
+      </div>
+    </div>
+    <div class="sumbar">
+      <div class="sbi"><span class="sbi-l">Date</span><span class="sbi-v">${e(day?day+', '+date:date)}</span></div>
+      <div class="sbi"><span class="sbi-l">Time</span><span class="sbi-v">${e(time)}</span></div>
+      <div class="sbi"><span class="sbi-l">Vehicles</span><span class="sbi-v">${e(String(nveh))}</span></div>
+      <div class="sbi"><span class="sbi-l">Casualties</span><span class="sbi-v">${e(String(ncas))}</span></div>
+      ${speed?`<div class="sbi"><span class="sbi-l">Speed</span><span class="sbi-v">${e(String(speed))} mph</span></div>`:''}
+      <div class="sbi"><span class="sbi-l">Severity</span><span class="sbi-v">${e(sl)}</span></div>
+    </div>
+    <div class="cbody">
+      ${desc?`<div class="desc-box"><div class="desc-label">Collision Description</div>${e(desc)}</div>`:''}
+      ${sec('Collision Identity','','fg2',
+        fd('Collision Reference No.', g(row,'Collision Reference No.')) +
+        fd('Validation Status', g(row,'Validation Status')) +
+        fd('Local Authority (assigned by police)', g(row,'Local Authority (assigned by police)')) +
+        fd('Reporting / Police Force', force) +
+        fd('Geographic Police Force', g(row,'Geographic Police Force'))
+      )}
+      ${sec('Location & Geography','','fg2',
+        fd('Collision Location', loc) +
+        fd('Easting', g(row,'Easting')) +
+        fd('Northing', g(row,'Northing'))
+      )}
+      ${sec('Date, Time & Severity','','fg',
+        fd('Date', date) + fd('Day', day) + fd('Time', time) +
+        fd('Collision / Crash Severity', sevRaw) +
+        fd('Collision Severity (Detailed)', g(row,'Collision Severity (Detailed)')) +
+        fd('No. Vehicles', nveh) + fd('No. Casualties', ncas)
+      )}
+      ${sec('Road & Junction Details','','fg',
+        fd('First Road Class', g(row,'First Road Class')) +
+        fd('First Road Number', g(row,'First Road Number')) +
+        fd('Second Road Class', g(row,'Second Road Class')) +
+        fd('Second Road Number', g(row,'Second Road Number')) +
+        fd('Road Type', g(row,'Road Type')) +
+        fd('Speed Limit', speed) +
+        fd('Junction Detail', g(row,'Junction Detail')) +
+        fd('Junction Control', g(row,'Junction Control')) +
+        fd('Pedestrian Crossing', pedX) +
+        (pedCtrl ? fd('Pedestrian Crossing – Human Control', pedCtrl) : '')
+      )}
+      ${sec('Conditions','','fg',
+        fd('Weather', g(row,'Weather')) +
+        fd('Road Conditions', g(row,'Road Conditions')) +
+        fd('Lighting Conditions', g(row,'Lighting Conditions')) +
+        fd('Conditions / Carriageway Hazards', conditions) +
+        fd('Did a police officer attend?', g(row,'Did a police officer attend the scene?'))
+      )}
+      <div class="sec">
+        <div class="sec-hdr">Contributory / Road Safety Factors</div>
+        ${cfTable(row)}
+      </div>
+      ${sec('Other Contributory Factor','d','fgf',
+        fd('Other Contributory Factor (if factor 999 selected)', ocf)
+      )}
+    </div>
+    <div class="cftr">
+      <span>Ref: ${e(String(ref))}</span>
+      <span>${e(date)} ${e(time)}</span>
+      <span>Severity: ${e(sl)}</span>
+      <span>${e(String(nveh))} vehicle(s) · ${e(String(ncas))} casualty(ies)</span>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// VEHICLE CARD HTML
+// ═══════════════════════════════════════════════════
+
+function vehicleCardHtml(row, idx, total) {
+  const collRef = g(row,'Collision Reference No.') || '—';
+  const vRef    = g(row,'Vehicle Reference No.') || String(idx+1);
+  const make    = g(row,'Vehicle make') || '';
+  const model   = g(row,'Vehicle model') || '';
+  const type    = g(row,'Vehicle Type') || g(row,'Vehicle type group') || '';
+  const name    = [make,model].filter(Boolean).join(' ').trim() || type || 'Vehicle';
+  const impact  = g(row,'Vehicle first point of impact');
+
+  // Drug test: only in newer format
+  const drug = g(row,'Drug Test');
+
+  return `<div class="card">
+    <div class="chdr chdr-vehicle">
+      <div class="chdr-left">
+        <div class="eyebrow">Vehicle ${idx+1} of ${total} · Collision ${e(String(collRef))}</div>
+        <div class="cref">Vehicle Ref: ${e(String(vRef))}</div>
+        <div class="csub">${e(name)}${type&&name!==type?' · '+e(type):''}</div>
+      </div>
+      <div class="chdr-right">
+        <span class="badge b-info">Collision ${e(String(collRef))}</span>
+      </div>
+    </div>
+    <div class="cbody">
+      ${sec('Vehicle Identity','g','fg',
+        fd('Collision Reference No.', collRef) +
+        fd('Vehicle Reference No.', vRef) +
+        fd('Vehicle make', make) +
+        fd('Vehicle model', model) +
+        fd('Vehicle Type', g(row,'Vehicle Type')) +
+        fd('Type / vehicle free text', g(row,'Type of vehicle free text','Vehicle type (if other)')) +
+        fd('Vehicle type group', g(row,'Vehicle type group')) +
+        fd('Tow', g(row,'Tow')) +
+        fd('Left Hand Drive?', g(row,'Left Hand Drive?'))
+      )}
+      ${sec('Driver Details','g','fg',
+        fd('Driver Age', g(row,'Driver Age')) +
+        fd('Driver Sex', g(row,'Driver Sex')) +
+        fd('Driving license', g(row,'Driving license')) +
+        fd('Alcohol breath test', g(row,'Alcohol breath test')) +
+        (drug ? fd('Drug Test', drug) : '') +
+        fd('Hit and run?', g(row,'Hit and run?')) +
+        fd('Journey purpose', g(row,'Journey purpose of driver or rider'))
+      )}
+      ${sec('Manoeuvre & Position','g','fg',
+        fd('Vehicle location at time of collision', g(row,'Vehicle location at time of collision')) +
+        fd('Vehicle near junction?', g(row,'Vehicle near junction?')) +
+        fd('Vehicle Manoeuvre', g(row,'Vehicle Manoeuvre')) +
+        fd('Vehicle moving from', g(row,'Vehicle moving from')) +
+        fd('Vehicle moving to', g(row,'Vehicle moving to'))
+      )}
+      ${sec('Impact & Damage','g','fg',
+        fd('Skidding', g(row,'Skidding')) +
+        fd('Vehicle hit object on carriageway?', g(row,'Vehicle hit object on carriageway?')) +
+        fd('Vehicle left carriageway?', g(row,'Vehicle left carriageway?')) +
+        fd('Vehicle hit object off carriageway?', g(row,'Vehicle hit object off carriageway?')) +
+        fd('Vehicle first point of impact', impact)
+      )}
+    </div>
+    <div class="cftr">
+      <span>Collision: ${e(String(collRef))}</span>
+      <span>Vehicle Ref: ${e(String(vRef))}</span>
+      <span>${e([make,model].filter(Boolean).join(' ')||'—')}</span>
+      <span>Impact: ${e(impact||'—')}</span>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// CASUALTY CARD HTML
+// ═══════════════════════════════════════════════════
+
+function casCardHtml(row, idx, total) {
+  const collRef = g(row,'Collision Reference No.') || '—';
+  const casRef  = g(row,'Casualty reference no.') || String(idx+1);
+  const vRef    = g(row,'Vehicle reference no') || '—';
+  const sevRaw  = g(row,'Casualty Severity') || '';
+  const {cls:sc, border:sb, label:sl} = sevInfo(sevRaw);
+  const age  = g(row,'Casualty age') || '—';
+  const sex  = g(row,'Casualty sex') || '—';
+  const type = g(row,'Casualty type') || '—';
+
+  // Admitted: only in newer format
+  const admitted = g(row,'Admitted to hospital');
+  // Ped direction: older format only
+  const pedDir = g(row,'Pedestrian direction (no longer used)');
+
+  return `<div class="card ${sb}">
+    <div class="chdr chdr-cas">
+      <div class="chdr-left">
+        <div class="eyebrow">Casualty ${idx+1} of ${total} · Collision ${e(String(collRef))}</div>
+        <div class="cref">Casualty Ref: ${e(String(casRef))}</div>
+        <div class="csub">${e(type)} · Age ${e(String(age))} · ${e(sex)} · Vehicle ${e(String(vRef))}</div>
+      </div>
+      <div class="chdr-right">
+        <span class="badge ${sc}">${e(sl)}</span>
+      </div>
+    </div>
+    <div class="cbody">
+      ${sec('Casualty Identity','b','fg',
+        fd('Collision Reference No.', collRef) +
+        fd('Casualty reference no.', casRef) +
+        fd('Vehicle reference no', vRef) +
+        fd('Casualty Vehicle group', g(row,'Casualty Vehicle group')) +
+        fd('Casualty sex', sex) +
+        fd('Casualty age', age) +
+        fd('Casualty type', type) +
+        fd('Police Force', g(row,'Police Force'))
+      )}
+      ${sec('Injury Severity','b','fg',
+        fd('Casualty Severity', sevRaw) +
+        fd('Casualty Severity (Detailed)', g(row,'Casualty Severity (Detailed)')) +
+        (admitted ? fd('Admitted to hospital', admitted) : '')
+      )}
+      ${sec('Occupant Details','b','fg',
+        fd('Vehicle passenger', g(row,'Vehicle passenger')) +
+        fd('Bus/coach passenger?', g(row,'Bus/coach passenger?')) +
+        fd('Seat belt used?', g(row,'Seat belt used?')) +
+        fd('Helmet worn', g(row,'Helmet worn'))
+      )}
+      ${sec('Pedestrian Details','b','fg',
+        fd('Pedestrian location', g(row,'Pedestrian location')) +
+        fd('Pedestrian movement', g(row,'Pedestrian movement')) +
+        (pedDir ? fd('Pedestrian direction (no longer used)', pedDir) : '') +
+        fd('School pupil?', g(row,'School pupil?')) +
+        fd('Pedestrian road maintenance worker', g(row,'Pedestrian road maintenance worker'))
+      )}
+    </div>
+    <div class="cftr">
+      <span>Collision: ${e(String(collRef))}</span>
+      <span>Casualty Ref: ${e(String(casRef))}</span>
+      <span>Vehicle Ref: ${e(String(vRef))}</span>
+      <span>Severity: ${e(sl)}</span>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+// METADATA PANEL
+// ═══════════════════════════════════════════════════
+
+function buildMeta(wb) {
+  // Try all known metadata sheet names
+  const metaSheetNames = [
+    'Query Info','QueryInfo','Query Information',
+    'Data Information','DataInfo','Info',
+    'FAQs','FAQ','Notes','About'
+  ];
+
+  let html = '';
+  for (const name of metaSheetNames) {
+    const sheet = wb.Sheets[wb.SheetNames.find(s => s.toLowerCase() === name.toLowerCase())];
+    if (!sheet) continue;
+    const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+    let bodyHtml = '';
+    for (const row of rows) {
+      const cells = row.map(c => {
+        if (c instanceof Date) return c.toLocaleDateString('en-GB');
+        return String(c||'').trim();
+      }).filter(Boolean);
+      if (!cells.length) continue;
+      if (cells.length === 1) {
+        // Single cell — treat as heading or note
+        bodyHtml += `<div class="meta-row"><div class="meta-v meta-head">${e(cells[0])}</div></div>`;
+      } else {
+        bodyHtml += `<div class="meta-row"><div class="meta-k">${e(cells[0])}</div><div class="meta-v">${e(cells.slice(1).join(' '))}</div></div>`;
+      }
+    }
+    if (bodyHtml) {
+      html += `<div class="meta-card">
+        <div class="meta-hdr">📋 ${e(name)}</div>
+        <div class="meta-body">${bodyHtml}</div>
+      </div>`;
+    }
+  }
+
+  if (!html) html = `<div style="padding:2rem;font-family:var(--mono);font-size:.8rem;color:var(--text3);">No metadata sheets found in this workbook.</div>`;
+  return html;
+}
+
+// ═══════════════════════════════════════════════════
+// SCREEN PANEL BUILDERS
+// ═══════════════════════════════════════════════════
+
+function buildScreenCrashes(crashes) {
+  if (!crashes.length) return `<p style="padding:2rem;font-family:var(--mono);font-size:.8rem;color:var(--text3);">No crash data found.</p>`;
+  return crashes.map((r,i) => crashCardHtml(r,i,crashes.length)).join('');
+}
+
+function buildScreenGrouped(rows, colRef, cardFn, total) {
+  if (!rows.length) return `<p style="padding:2rem;font-family:var(--mono);font-size:.8rem;color:var(--text3);">No data found.</p>`;
+  const groups={}, order=[];
+  rows.forEach(r => {
+    const ref = String(g(r,'Collision Reference No.')||'(Unknown)');
+    if (!groups[ref]) { groups[ref]=[]; order.push(ref); }
+    groups[ref].push(r);
+  });
+  let globalIdx=0;
+  return order.map(ref => {
+    const items = groups[ref];
+    const cards = items.map(r => { const h=cardFn(r,globalIdx,total); globalIdx++; return h; }).join('');
+    return `<div class="grp-hdr">
+      <span>Collision Ref:</span>
+      <span class="grp-ref">${e(ref)}</span>
+      <span class="grp-badge">${items.length} record(s)</span>
+    </div>
+    <div class="grp-body">${cards}</div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// PRINT ALL — crash → vehicles → casualties per collision
+// One .pg wrapper per card = one printed page
+// ═══════════════════════════════════════════════════
+
+function buildPrintAll(wb, crashes, vehicles, casualties, includeMeta) {
+  // Index vehicles + casualties by crash ref
+  const vByRef={}, kByRef={};
+  vehicles.forEach(r => {
+    const ref=String(g(r,'Collision Reference No.')||'');
+    if(!vByRef[ref]) vByRef[ref]=[];
+    vByRef[ref].push(r);
+  });
+  casualties.forEach(r => {
+    const ref=String(g(r,'Collision Reference No.')||'');
+    if(!kByRef[ref]) kByRef[ref]=[];
+    kByRef[ref].push(r);
+  });
+
+  let html = '';
+
+  // Metadata pages — only if includeMeta is true
+  if (includeMeta) {
+    const metaSheetNames = [
+      'Query Info','QueryInfo','Query Information',
+      'Data Information','DataInfo','Info',
+      'FAQs','FAQ','Notes','About'
+    ];
+    for (const name of metaSheetNames) {
+      const found = wb.SheetNames.find(s => s.toLowerCase() === name.toLowerCase());
+      if (!found) continue;
+      const sheet = wb.Sheets[found];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, defval:''});
+      let bodyHtml = '';
+      for (const row of rows) {
+        const cells = row.map(c => {
+          if (c instanceof Date) return c.toLocaleDateString('en-GB');
+          return String(c||'').trim();
+        }).filter(Boolean);
+        if (!cells.length) continue;
+        if (cells.length === 1) {
+          bodyHtml += `<div class="meta-row"><div class="meta-v meta-head">${e(cells[0])}</div></div>`;
+        } else {
+          bodyHtml += `<div class="meta-row"><div class="meta-k">${e(cells[0])}</div><div class="meta-v">${e(cells.slice(1).join(' '))}</div></div>`;
+        }
+      }
+      if (bodyHtml) {
+        html += `<div class="meta-pg">
+          <div class="meta-card" style="border-radius:0;box-shadow:none;">
+            <div class="meta-hdr">📋 ${e(found)}</div>
+            <div class="meta-body">${bodyHtml}</div>
+          </div>
+        </div>`;
+      }
+    }
+  }
+
+  // Per-collision: crash page → vehicle pages → casualty pages
+  crashes.forEach((crash, ci) => {
+    const ref = String(g(crash,'Collision Reference No.')||'');
+    const vehs = vByRef[ref] || [];
+    const cass = kByRef[ref] || [];
+
+    // 1 crash page
+    html += `<div class="pg">${crashCardHtml(crash, ci, crashes.length)}</div>`;
+
+    // N vehicle pages
+    const vTotal = vehs.length;
+    vehs.forEach((veh, vi) => {
+      const globalVi = vehicles.indexOf(veh);
+      html += `<div class="pg">${vehicleCardHtml(veh, globalVi>=0?globalVi:vi, vehicles.length)}</div>`;
+    });
+
+    // M casualty pages
+    const kTotal = cass.length;
+    cass.forEach((cas, ki) => {
+      const globalKi = casualties.indexOf(cas);
+      html += `<div class="pg">${casCardHtml(cas, globalKi>=0?globalKi:ki, casualties.length)}</div>`;
+    });
+  });
+
+  return html;
+}
+
+// ═══════════════════════════════════════════════════
+// TAB MANAGEMENT
+// ═══════════════════════════════════════════════════
+
+let activeTab = 'crash';
+const TABS = ['meta','crash','veh','cas'];
+const TAB_ON = {meta:'on on-m', crash:'on on-c', veh:'on on-v', cas:'on on-k'};
+
+function sw(name) {
+  activeTab = name;
+  TABS.forEach(t => {
+    document.getElementById('p-'+t).classList.toggle('on', t===name);
+    document.getElementById('t-'+t).className = 'tab' + (t===name ? ' '+TAB_ON[name] : '');
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// AUTO-SCALE: shrink font until each .pg fits A4
+// A4 at 96dpi = 1122.5px tall. With 8mm top+bottom
+// margins = ~1061px usable. We measure rendered height
+// and step down font-size until it fits.
+// ═══════════════════════════════════════════════════
+
+function autoScalePages(root, callback) {
+  // Show printroot briefly so we can measure
+  root.style.display = 'block';
+  root.style.visibility = 'hidden';
+  root.style.position = 'fixed';
+  root.style.top = '0';
+  root.style.left = '0';
+  root.style.width = '794px'; // A4 width at 96dpi
+
+  // A4 page height minus margins (8mm top+bottom at 96dpi = ~60.5px each)
+  const MAX_H = 1123 - 61 - 61; // ~1001px usable
+
+  requestAnimationFrame(() => {
+    const pages = root.querySelectorAll('.pg');
+    pages.forEach(pg => {
+      // Start at base font size, step down 0.5px at a time until it fits
+      let fs = 13; // px — base
+      pg.style.fontSize = fs + 'px';
+      // Guard: don't go below 7px (unreadable)
+      while (pg.scrollHeight > MAX_H && fs > 7) {
+        fs -= 0.5;
+        pg.style.fontSize = fs + 'px';
+      }
+    });
+
+    // Restore
+    root.style.display = '';
+    root.style.visibility = '';
+    root.style.position = '';
+    root.style.top = '';
+    root.style.left = '';
+    root.style.width = '';
+
+    callback();
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// PRINT FUNCTIONS
+// ═══════════════════════════════════════════════════
+
+let _wb, _crashes=[], _vehicles=[], _casualties=[];
+
+function printTab() {
+  // Build single-tab print: wrap each card in a .pg
+  const panelHtml = document.getElementById('p-'+activeTab).innerHTML;
+  // Wrap each .card in a .pg
+  const tmp = document.createElement('div');
+  tmp.innerHTML = panelHtml;
+  let printHtml = '';
+  // For meta panel, treat each meta-card as one page
+  if (activeTab === 'meta') {
+    tmp.querySelectorAll('.meta-card').forEach(mc => {
+      printHtml += `<div class="meta-pg">${mc.outerHTML}</div>`;
+    });
+    if (!printHtml) printHtml = panelHtml;
+  } else {
+    tmp.querySelectorAll('.card').forEach(card => {
+      printHtml += `<div class="pg">${card.outerHTML}</div>`;
+    });
+    if (!printHtml) printHtml = panelHtml;
+  }
+  const pr = document.getElementById('printroot');
+  pr.innerHTML = printHtml;
+  autoScalePages(pr, () => {
+    window.print();
+    setTimeout(() => { pr.innerHTML = ''; }, 500);
+  });
+}
+
+function printAll() {
+  const includeMeta = document.getElementById('inclMeta').checked;
+  const pr = document.getElementById('printroot');
+  pr.innerHTML = buildPrintAll(_wb, _crashes, _vehicles, _casualties, includeMeta);
+  // Auto-scale each .pg to fit A4 before printing
+  autoScalePages(pr, () => {
+    window.print();
+    setTimeout(() => { pr.innerHTML = ''; }, 500);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// FILE PROCESSING
+// ═══════════════════════════════════════════════════
+
+function findSheet(wb, names) {
+  for (const n of names) {
+    const m = wb.SheetNames.find(s => s.toLowerCase() === n.toLowerCase());
+    if (m) return wb.Sheets[m];
+  }
+  return null;
+}
+
+function parseSheet(wb, names) {
+  const s = findSheet(wb, names);
+  return s ? XLSX.utils.sheet_to_json(s, {defval:''}) : [];
+}
+
+function showErr(msg) {
+  const el=document.getElementById('uerr');
+  el.innerHTML=msg; el.style.display='block';
+}
+
+function processFile(file) {
+  document.getElementById('uerr').style.display='none';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array', cellDates:true});
+      _wb = wb;
+
+      _crashes    = parseSheet(wb, ['Crashes','Crash','Collisions','Collision','RTCs']);
+      _vehicles   = parseSheet(wb, ['Vehicles','Vehicle']);
+      _casualties = parseSheet(wb, ['Casualties','Casualty']);
+
+      if (!_crashes.length && !_vehicles.length && !_casualties.length) {
+        showErr(`No data found. Sheets: <strong>${wb.SheetNames.join(', ')}</strong>`);
+        return;
+      }
+
+      // Sort crashes chronologically
+      _crashes.sort((a,b) => {
+        const da = a['Date'] instanceof Date ? a['Date'] : new Date(a['Date']||0);
+        const db = b['Date'] instanceof Date ? b['Date'] : new Date(b['Date']||0);
+        return da - db;
+      });
+
+      // Build screen panels
+      document.getElementById('p-meta').innerHTML  = buildMeta(wb);
+      document.getElementById('p-crash').innerHTML = buildScreenCrashes(_crashes);
+      document.getElementById('p-veh').innerHTML   = buildScreenGrouped(_vehicles, 'Collision Reference No.', vehicleCardHtml, _vehicles.length);
+      document.getElementById('p-cas').innerHTML   = buildScreenGrouped(_casualties, 'Collision Reference No.', casCardHtml, _casualties.length);
+
+      // Update counts
+      document.getElementById('n-meta').textContent  = wb.SheetNames.filter(s => ['query info','faqs','data information','info','faq','notes','about'].includes(s.toLowerCase())).length || '—';
+      document.getElementById('n-crash').textContent = _crashes.length;
+      document.getElementById('n-veh').textContent   = _vehicles.length;
+      document.getElementById('n-cas').textContent   = _casualties.length;
+      document.getElementById('tstat').textContent   = `${_crashes.length} crashes · ${_vehicles.length} vehicles · ${_casualties.length} casualties`;
+
+      document.getElementById('upload').style.display = 'none';
+      document.getElementById('app').style.display    = 'block';
+      sw('crash');
+
+    } catch(err) {
+      console.error(err);
+      showErr('Failed to read file: ' + err.message);
+    }
+  };
+  reader.onerror = () => showErr('Could not read file.');
+  reader.readAsArrayBuffer(file);
+}
+
+function resetApp() {
+  document.getElementById('upload').style.display = 'flex';
+  document.getElementById('app').style.display    = 'none';
+  document.getElementById('fileinput').value = '';
+  TABS.forEach(t => { document.getElementById('p-'+t).innerHTML=''; document.getElementById('p-'+t).className='panel'; });
+  _wb=null; _crashes=[]; _vehicles=[]; _casualties=[];
+}
+
+// ═══════════════════════════════════════════════════
+// EVENTS
+// ═══════════════════════════════════════════════════
+const dz = document.getElementById('dropzone');
+const fi = document.getElementById('fileinput');
+fi.addEventListener('change', e => { if(e.target.files[0]) processFile(e.target.files[0]); });
+dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', ()  => dz.classList.remove('over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); if(e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); });
+</script>
+</body>
+</html>

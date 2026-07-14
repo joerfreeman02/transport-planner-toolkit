@@ -1,0 +1,17 @@
+import {OVERPASS_ENDPOINTS} from './constants.js';
+import {fetchWithTimeout} from './utils.js';
+export async function geocodeUK(query){const url=new URL('https://nominatim.openstreetmap.org/search');url.searchParams.set('format','jsonv2');url.searchParams.set('countrycodes','gb');url.searchParams.set('addressdetails','1');url.searchParams.set('limit','5');url.searchParams.set('q',query);const res=await fetchWithTimeout(url,{headers:{Accept:'application/json'}},12000);if(!res.ok)throw new Error(`Address lookup failed (HTTP ${res.status}).`);const data=await res.json();if(!data.length)throw new Error('No UK address match was returned.');return data.map(x=>({lat:Number(x.lat),lon:Number(x.lon),label:x.display_name,raw:x}));}
+function around(r,lat,lon){return `(around:${Math.round(r)},${lat},${lon})`;}
+export function buildQuery(lat,lon,radius,extensionOnly=false){const a=around(radius,lat,lon);if(extensionOnly)return `[out:json][timeout:25];(nwr["railway"~"^(station|halt|tram_stop)$"]${a};nwr["station"~"^(subway|light_rail)$"]${a};nwr["amenity"~"^(school|college|university|hospital)$"]${a};nwr["healthcare"~"^(hospital|clinic)$"]${a};);out center tags;`;
+return `[out:json][timeout:25];(
+ nwr["highway"="bus_stop"]${a};nwr["public_transport"="platform"]["bus"="yes"]${a};nwr["public_transport"="stop_position"]["bus"="yes"]${a};nwr["amenity"="bicycle_parking"]${a};
+ nwr["railway"~"^(station|halt|tram_stop)$"]${a};nwr["station"~"^(subway|light_rail)$"]${a};
+ nwr["amenity"~"^(kindergarten|childcare|school|college|university)$"]${a};
+ nwr["shop"~"^(supermarket|convenience|post_office|optician)$"]${a};
+ nwr["amenity"~"^(post_office|bank|atm|fuel|pharmacy|doctors|dentist|hospital|clinic|restaurant|cafe|pub|bar|library|community_centre|place_of_worship)$"]${a};
+ nwr["healthcare"~"^(general_practitioner|doctor|pharmacy|dentist|hospital|clinic|optometrist)$"]${a};
+ nwr["leisure"~"^(park|recreation_ground|playground|fitness_centre|sports_centre|sports_hall|pitch)$"]${a};
+);out center tags;`;}
+async function requestEndpoint(endpoint,query){const attempts=[];const encoded=encodeURIComponent(query);if((endpoint.length+encoded.length)<7800){try{const res=await fetchWithTimeout(`${endpoint}?data=${encoded}`,{headers:{Accept:'application/json'}},15000);if(res.ok){const data=await res.json();if(Array.isArray(data.elements))return{data,method:'GET'};}attempts.push(`GET HTTP ${res.status}`);}catch(e){attempts.push(`GET ${e.name==='AbortError'?'timeout':e.message}`);}}
+try{const res=await fetchWithTimeout(endpoint,{method:'POST',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:`data=${encoded}`},18000);if(!res.ok)throw new Error(`HTTP ${res.status}`);const data=await res.json();if(!Array.isArray(data.elements))throw new Error('Invalid response');return{data,method:'POST'};}catch(e){attempts.push(`POST ${e.name==='AbortError'?'timeout':e.message}`);throw new Error(attempts.join('; '));}}
+export async function queryOverpass(query){const failures=[];for(const endpoint of OVERPASS_ENDPOINTS){const started=performance.now();try{const result=await requestEndpoint(endpoint,query);return{ok:true,elements:result.data.elements,endpoint,method:result.method,elapsedMs:Math.round(performance.now()-started),failures};}catch(e){failures.push({endpoint,error:e.message});}}return{ok:false,elements:[],failures,error:'All facility-data endpoints failed.'};}

@@ -1,15 +1,12 @@
-# GitHub deployment — Accessibility Assessment 1.0 RC1
+# GitHub Deployment Guide — Sprint 1.5
 
-The correct visible build label is:
-
-`Accessibility Assessment 1.0 release-candidate build · AA-RC1-20260714-1945`
-
-Upload all files and folders inside this extracted release folder to the root of the `transport-planner-toolkit` repository. GitHub does not normally ask to replace matching files; it records matching paths as modifications.
-
-Commit message:
-
-`Deploy Accessibility Assessment 1.0 RC1`
-
-After the Pages Action has a green tick, open:
-
-`https://joerfreeman02.github.io/transport-planner-toolkit/?build=AA-RC1-20260714-1945`
+1. Extract the ZIP.
+2. Open the `transport-planner-toolkit-sprint-1.5` folder.
+3. In GitHub, open `joerfreeman02/transport-planner-toolkit` on the **Code** tab and confirm branch `main`.
+4. Select **Add file → Upload files**.
+5. Drag everything from inside the extracted folder into the upload area: `assets`, `modules`, `index.html`, `.nojekyll`, and the Markdown files.
+6. GitHub does not normally ask to replace matching files; matching paths are automatically recorded as modifications.
+7. Commit message: `Deploy Sprint 1.5 toolkit shell`.
+8. Open **Actions** and wait for `pages build and deployment` to show a green tick.
+9. Open `https://joerfreeman02.github.io/transport-planner-toolkit/?build=TPT-S15-20260714`.
+10. Confirm the page displays `Sprint 1.5 shell · TPT-S15-20260714`.

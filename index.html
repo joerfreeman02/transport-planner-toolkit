@@ -2,156 +2,65 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#164e4b">
-  <title>Accessibility Assessment — 1.0 RC1</title>
-  <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?build=AA-RC1-20260714-1945">
-  <link rel="stylesheet" href="assets/css/app.css?build=AA-RC1-20260714-1945">
+  <title>Transport Planner Toolkit</title>
+  <link rel="stylesheet" href="assets/css/shell.css?build=TPT-S15-20260714">
 </head>
 <body>
-  <header class="app-header">
-    <div>
-      <p class="eyebrow">Transport Planner Toolkit</p>
-      <h1>Accessibility Assessment</h1>
-      <p class="subtitle">Accessibility Assessment 1.0 release-candidate build · AA-RC1-20260714-1945</p>
+  <header class="hero">
+    <div class="hero-inner">
+      <div>
+        <p class="eyebrow">Professional transport planning workflow</p>
+        <h1>Transport Planner Toolkit</h1>
+        <p class="tagline">A growing suite of traceable, report-focused tools designed to remove repetitive work while preserving professional review and engineering judgement.</p>
+      </div>
+      <span class="build">Sprint 1.5 shell · TPT-S15-20260714</span>
     </div>
-    <button id="diagnosticsBtn" class="button ghost">Diagnostics</button>
   </header>
-
-  <main class="layout">
-    <section class="panel">
-      <div class="panel-heading">
-        <div>
-          <span class="step">1</span>
-          <h2>Confirm the site</h2>
-        </div>
-        <span id="siteState" class="status-badge neutral">Not confirmed</span>
+  <main>
+    <section class="project-card">
+      <div class="section-title"><div><h2>Current project</h2><p>Optional at this stage. Saved locally in this browser and shared with compatible modules.</p></div></div>
+      <div class="project-grid">
+        <div><label for="projectName">Project name</label><input id="projectName" placeholder="e.g. Land north of High Street"></div>
+        <div><label for="siteAddress">Site address / postcode</label><input id="siteAddress" placeholder="e.g. CB7 4AH"></div>
+        <div style="display:flex;gap:8px"><button id="saveProject" class="primary">Save</button><button id="clearProject" class="secondary">Clear</button></div>
       </div>
-
-      <div class="location-grid">
-        <div>
-          <label for="addressInput">UK address or postcode</label>
-          <div class="inline-input">
-            <input id="addressInput" type="text" placeholder="e.g. 100 High Street, Plaistow, London" autocomplete="street-address">
-            <button id="locateBtn" class="button">Locate</button>
-          </div>
-          <p class="hint">Select a result, then drag or click the map to refine the site pin.</p>
-        </div>
-        <div>
-          <label>Coordinates</label>
-          <div class="coordinate-grid">
-            <input id="latInput" type="number" step="0.000001" placeholder="Latitude">
-            <input id="lonInput" type="number" step="0.000001" placeholder="Longitude">
-            <button id="useCoordsBtn" class="button secondary">Use</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="geocodeResults" class="geocode-results" hidden></div>
-      <div id="locationMessage" class="message" hidden></div>
-
-      <div id="map" aria-label="Site and facilities map"></div>
-
-      <div class="confirm-row">
-        <div>
-          <strong id="selectedAddress">No site selected</strong>
-          <span id="selectedCoords" class="muted"></span>
-        </div>
-        <button id="confirmSiteBtn" class="button" disabled>Confirm site location</button>
-      </div>
+      <div id="projectStatus" class="project-status"></div>
     </section>
 
-    <section class="panel">
-      <div class="panel-heading">
-        <div>
-          <span class="step">2</span>
-          <h2>Search and route</h2>
-        </div>
-        <span id="searchState" class="status-badge neutral">Waiting</span>
-      </div>
+    <h2 class="modules-title">Modules</h2>
+    <section class="modules">
+      <article class="module">
+        <div class="module-top"><span class="icon">🚶</span><span class="status stable">Stable</span></div>
+        <h3>Accessibility Assessment</h3>
+        <p>Finds nearby facilities and calculates routed walking and cycling distance and time, with mapping, review controls and CSV export.</p>
+        <div class="module-actions"><a class="button primary" href="modules/accessibility/">Open module</a></div>
+      </article>
 
-      <div class="settings-grid">
-        <label>Walking search radius
-          <div class="unit-input"><input id="walkRadius" type="number" min="250" max="5000" step="250" value="2000"><span>m</span></div>
-        </label>
-        <label>Cycling extension radius
-          <div class="unit-input"><input id="cycleRadius" type="number" min="1000" max="10000" step="500" value="5000"><span>m</span></div>
-        </label>
-        <button id="runBtn" class="button large" disabled>Find nearest facilities</button>
-      </div>
+      <article class="module">
+        <div class="module-top"><span class="icon">📊</span><span class="status existing">Existing tool</span></div>
+        <h3>STATS19 Collision Record Cards</h3>
+        <p>Imports collision workbooks and produces structured crash, vehicle and casualty record cards for screen review and printing.</p>
+        <div class="module-actions"><a class="button primary" href="modules/stats19/">Open module</a></div>
+      </article>
 
-      <div id="progressWrap" class="progress-wrap" hidden>
-        <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
-        <p id="progressText">Preparing…</p>
-      </div>
-      <div id="searchMessage" class="message" hidden></div>
-    </section>
+      <article class="module disabled">
+        <div class="module-top"><span class="icon">🚆</span><span class="status development">Sprint 2</span></div>
+        <h3>Railway Assessment</h3>
+        <p>All nearby National Rail, Underground, Overground, DLR and tram stations, with routed access and Transport Statement-ready service summaries.</p>
+        <div class="module-actions"><a class="button secondary" href="modules/railway/">View scope</a></div>
+      </article>
 
-    <section id="resultsPanel" class="panel" hidden>
-      <div class="panel-heading wrap">
-        <div>
-          <span class="step">3</span>
-          <h2>Results</h2>
-        </div>
-        <div class="actions">
-          <button id="copyTableBtn" class="button secondary">Copy table</button>
-          <button id="csvBtn" class="button secondary">Export CSV</button>
-          <button id="wordingBtn" class="button">Generate wording</button>
-        </div>
-      </div>
-
-      <div class="table-wrap">
-        <table id="resultsTable">
-          <thead>
-            <tr>
-              <th>Facility</th>
-              <th>Name</th>
-              <th>Walking distance / time</th>
-              <th>Cycling distance / time</th>
-              <th>Source</th>
-              <th>Review</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-
-      <div class="review-tools">
-        <button id="addManualBtn" class="button secondary">Add facility manually</button>
-        <p class="hint">Automatically identified rows are included by default. Estimated or manually added rows require confirmation before report wording.</p>
-      </div>
-
-      <textarea id="wordingOutput" class="wording" hidden></textarea>
+      <article class="module disabled">
+        <div class="module-top"><span class="icon">🚌</span><span class="status coming">Coming soon</span></div>
+        <h3>Bus Assessment</h3>
+        <p>Nearby stops, paired-stop logic, routes, destinations, operating periods and frequencies for report-ready summaries.</p>
+        <div class="module-actions"><a class="button secondary" href="modules/bus/">View scope</a></div>
+      </article>
     </section>
   </main>
-
-  <dialog id="manualDialog">
-    <form method="dialog" id="manualForm">
-      <h2>Add facility manually</h2>
-      <label>Category<select id="manualCategory"></select></label>
-      <label>Name<input id="manualName" required></label>
-      <label>Address<input id="manualAddress"></label>
-      <div class="coordinate-grid">
-        <label>Latitude<input id="manualLat" type="number" step="0.000001" required></label>
-        <label>Longitude<input id="manualLon" type="number" step="0.000001" required></label>
-      </div>
-      <p class="hint">Use the current map centre or enter checked coordinates.</p>
-      <div class="dialog-actions">
-        <button value="cancel" class="button ghost">Cancel</button>
-        <button id="saveManualBtn" value="default" class="button">Add and route</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="diagnosticsDialog">
-    <div class="diagnostic-header">
-      <h2>Diagnostics</h2>
-      <button id="closeDiagnosticsBtn" class="button ghost">Close</button>
-    </div>
-    <pre id="diagnosticsOutput">No search has been run.</pre>
-  </dialog>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script type="module" src="assets/js/app.js?build=AA-RC1-20260714-1945"></script>
+  <footer>Transport Planner Toolkit · Sprint 1.5 shell · Data remains in the browser unless a module explicitly uses an external mapping or routing service.</footer>
+  <script src="assets/js/shell.js?build=TPT-S15-20260714"></script>
 </body>
 </html>

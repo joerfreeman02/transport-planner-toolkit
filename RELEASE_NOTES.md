@@ -1,3 +1,7 @@
+# Sprint 1 Review Build 1.0.1 — Map Hotfix
+
+Fixes distorted or misaligned OpenStreetMap tiles on some browsers/devices. No search, classification or routing logic has changed.
+
 # Sprint 1 Review Build 1.0 — Release Notes
 
 ## Implemented

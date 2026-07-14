@@ -1,12 +1,11 @@
-# GitHub Deployment Guide — Sprint 2 Review
+# Deployment Guide — Sprint 2A
 
 1. Extract the ZIP.
-2. Open the extracted `transport-planner-toolkit-sprint-2-review` folder.
-3. Open your GitHub repository on the Code tab and confirm branch `main`.
-4. Choose Add file → Upload files.
-5. Drag everything inside the extracted folder into the upload area.
-6. Commit with: `Deploy Sprint 2 Railway review build`.
-7. Open Actions and wait for `pages build and deployment` to show a green tick.
-8. Open `https://joerfreeman02.github.io/transport-planner-toolkit/?build=TPT-S2-20260714`.
-9. Confirm the homepage says `Sprint 2 review · TPT-S2-20260714`.
-10. Open Railway Assessment and confirm it says `RAIL-S2-20260714`.
+2. Open the transport-planner-toolkit repository on GitHub and select Code / main.
+3. Select Add file > Upload files.
+4. Drag all items from inside this extracted folder. GitHub treats matching paths as modifications without asking to replace them.
+5. Commit with: `Deploy Sprint 2A Rail Intelligence review`.
+6. Open Actions and wait for the green Pages deployment tick.
+7. Open `https://joerfreeman02.github.io/transport-planner-toolkit/?build=TPT-S2A-20260714`.
+8. The home page must display `Sprint 2A Rail Intelligence · TPT-S2A-20260714`.
+9. The Railway module must display `RAIL-INTEL-2A-20260714`.

@@ -1,8 +1,8 @@
 # Changelog
 
-## Sprint 2 Review
-- Activated Railway Assessment module
-- Added multi-station discovery and mode classification
-- Added walking/cycling routing and map display
-- Added service-information review fields and exports
-- Updated toolkit shell build identifier
+## Sprint 2A — 2026-07-14
+- Added Rail Knowledge Library and station matching.
+- Added per-field source, retrieval date and verification status.
+- Added JSON import/export.
+- Added ticketing, waiting, toilet and car-parking fields.
+- Preserved station discovery, mode classification and walking/cycling routing.

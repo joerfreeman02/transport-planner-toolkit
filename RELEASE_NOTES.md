@@ -1,37 +1,13 @@
-# Sprint 1 Review Build 1.0.1 — Map Hotfix
+# Sprint 1.1 — Map Engine Review Build
 
-Fixes distorted or misaligned OpenStreetMap tiles on some browsers/devices. No search, classification or routing logic has changed.
+## Scope
+Only the map subsystem changed. Facility discovery, classification, routing and exports are unchanged.
 
-# Sprint 1 Review Build 1.0 — Release Notes
+## Changes
+- Bundled a local Leaflet-compatible stylesheet so map layout does not depend on the external CDN CSS.
+- Retained the Leaflet JavaScript CDN that was already loading successfully.
+- Replaced image marker icons with local CSS markers.
+- Added ResizeObserver-based map resizing and tile-error diagnostics.
 
-## Implemented
-- Address/postcode geocoding and coordinate input
-- Clickable and draggable site pin with mandatory confirmation
-- Editable walking and cycling search radii
-- One primary facility-data request with sequential mirror failover
-- One optional wider-catchment extension
-- Strict category-specific classification
-- One nearest valid result per category
-- Batch walking and cycling routing for speed
-- On-demand route geometry on the map
-- Manual add, edit, reject and include controls
-- CSV export, copyable table and factual draft wording
-- Diagnostics panel and bounded network timeouts
-- No service-worker caching
-
-## Automated checks completed
-- JavaScript syntax check
-- Strict GP classification rules
-- Convenience-store category isolation
-- Adult-learning exclusion from FE/sixth-form results
-- Separation of National Rail, Underground, Overground and DLR
-- Correct map tile convention and Leaflet initialisation order
-
-## Not live-tested in this execution environment
-The execution environment cannot make the same browser-side calls as the deployed GitHub Pages application. The first deployed urban-site test remains required.
-
-## Known limitations
-- OpenStreetMap completeness varies
-- Public APIs can be rate-limited or blocked by corporate networks
-- OS grid reference and What3Words input are deferred
-- DOCX/PDF/map-image exports are deferred until the core result engine passes review
+## Review gate
+The initial map and the geocoded site map must render continuously on macOS Chrome/Safari, iPhone Safari and Windows Chrome.

@@ -3,9 +3,7 @@
     "latitude": "number",
     "longitude": "number",
     "addressLabel": "string",
-    "confirmed": "boolean",
-    "walkRadiusM": "number",
-    "cycleRadiusM": "number"
+    "confirmed": "boolean"
   },
   "FacilityCandidate": {
     "category": "string",
@@ -16,16 +14,13 @@
     "straightLineM": "number",
     "osmType": "node|way|relation",
     "osmId": "number",
-    "evidence": "object",
-    "sourceUrl": "string"
+    "evidence": "object"
   },
   "RouteResult": {
     "mode": "walk|cycle",
     "distanceM": "number|null",
     "durationS": "number|null",
-    "geometry": "object|null",
-    "status": "routed|estimated|manual|failed",
-    "source": "string",
-    "message": "string|null"
+    "status": "routed|estimated|failed",
+    "source": "string"
   }
 }

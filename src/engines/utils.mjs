@@ -1,0 +1,5 @@
+export function haversineM(lat1, lon1, lat2, lon2) { const R=6371000,toRad=d=>d*Math.PI/180; const dLat=toRad(lat2-lat1),dLon=toRad(lon2-lon1); const a=Math.sin(dLat/2)**2+Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
+export function withTimeout(ms, fn) { const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),ms); return Promise.resolve().then(()=>fn(controller.signal)).finally(()=>clearTimeout(timer)); }
+export function centreOfElement(el){ if(el.type==='node'&&Number.isFinite(el.lat)&&Number.isFinite(el.lon))return{lat:el.lat,lon:el.lon}; if(el.center&&Number.isFinite(el.center.lat)&&Number.isFinite(el.center.lon))return{lat:el.center.lat,lon:el.center.lon}; return null; }
+export function formatAddress(tags={}){const out=[];const line=[tags['addr:housenumber'],tags['addr:street']].filter(Boolean).join(' ');if(line)out.push(line);if(tags['addr:city'])out.push(tags['addr:city']);if(tags['addr:postcode'])out.push(tags['addr:postcode']);return out.join(', ')}
+export function sourceUrl(el){return `https://www.openstreetmap.org/${el.type}/${el.id}`;}

@@ -1,0 +1,15 @@
+PASS valid UK coordinates
+PASS invalid coordinates rejected
+PASS primary query grouped
+PASS extension query limited
+PASS GP accepted
+PASS fitness centre rejected as GP
+PASS convenience not reused
+PASS adult learning rejected
+PASS sixth form accepted
+PASS bus stop accepted
+PASS rail modes separate
+PASS nearest selected
+PASS fallback estimated
+
+13 tests passed.

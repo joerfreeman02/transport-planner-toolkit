@@ -1,13 +1,16 @@
-# Sprint 1.1 — Map Engine Review Build
+# Accessibility Assessment 1.0 RC1
 
-## Scope
-Only the map subsystem changed. Facility discovery, classification, routing and exports are unchanged.
+## Purpose
+Final targeted classification correction before the module is considered for Stable release.
 
-## Changes
-- Bundled a local Leaflet-compatible stylesheet so map layout does not depend on the external CDN CSS.
-- Retained the Leaflet JavaScript CDN that was already loading successfully.
-- Replaced image marker icons with local CSS markers.
-- Added ResizeObserver-based map resizing and tile-error diagnostics.
+## Fixed
+An unnamed or outdoor `leisure=sports_centre` polygon can no longer appear as **Gym / leisure centre**. It is retained under **Sports facility**.
 
-## Review gate
-The initial map and the geocoded site map must render continuously on macOS Chrome/Safari, iPhone Safari and Windows Chrome.
+## Acceptance check
+Re-test the rural site, Plaistow and one suburban site. Confirm that:
+- the rural field no longer appears as Gym / leisure centre;
+- a genuine named gym/leisure centre is still returned where mapped;
+- maps, facilities, routes, CSV and wording remain unchanged.
+
+## Build
+`Accessibility Assessment 1.0 RC1 · AA-RC1-20260714-1945`

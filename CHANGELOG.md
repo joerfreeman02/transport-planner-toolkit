@@ -1,10 +1,8 @@
 # Changelog
 
-## Sprint 1 Review Build 1.0
-Clean implementation of the Accessibility Assessment module based on the locked technical specification. This build does not inherit code or caching from the failed experimental repository.
-
-
-## Sprint 1.1
-- Rebuilt Map Engine stylesheet dependency locally.
-- Added CSS-based markers and resilient resize handling.
-- No changes to working facility, classification, routing or export code.
+## Accessibility Assessment 1.0 RC1 — 2026-07-14
+- Tightened Gym / leisure centre classification.
+- `leisure=fitness_centre` remains accepted.
+- `leisure=sports_centre` now requires an explicit gym, fitness, health-club, leisure-centre or sports-centre name to qualify.
+- All sports-centre, sports-hall, pitch, track and stadium features remain available as Sports facility.
+- Retained the verified Map Engine, facility search, routing and export logic unchanged.

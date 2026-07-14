@@ -1,17 +1,5 @@
-# Transport Planner Toolkit — Accessibility Assessment Sprint 1
+# Transport Planner Toolkit — Accessibility Assessment 1.0 RC1
 
-This is the first complete Sprint 1 review build.
+Release candidate for the first stable module. This build contains the verified accessibility search, strict classification, routed walking/cycling results, map engine, review controls and exports.
 
-## Deploy
-Upload the contents of this folder to the root of a public GitHub repository, then enable GitHub Pages from `main` and `/ (root)`.
-
-## Important
-There is deliberately no service worker. During review, the browser must always request the current deployed files.
-
-## Data sources
-- OpenStreetMap / Nominatim: site geocoding
-- OpenStreetMap / Overpass API: facility identification
-- OSRM public routing service: walking and cycling routes
-
-## Professional-use safeguard
-The application automates discovery and routing, but formal submission content still requires user review. Estimated routes are explicitly labelled. Manual/edited records require confirmation before generated wording.
+RC1 makes one narrow correction: outdoor or unnamed sports-centre features are not described as gyms/leisure centres.

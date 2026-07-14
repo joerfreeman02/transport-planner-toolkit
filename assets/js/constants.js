@@ -1,4 +1,4 @@
-export const BUILD = 'Sprint 1.1.1 · AA-MAP-20260714-1915';
+export const BUILD = 'Accessibility Assessment 1.0 RC1 · AA-RC1-20260714-1945';
 export const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',

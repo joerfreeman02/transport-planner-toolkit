@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {classifyElement} from '../assets/js/classify.js';
+const site={lat:51.88,lon:-0.47};
+const el=(id,tags)=>({type:'node',id,lat:51.881,lon:-0.469,tags});
+const cats=x=>new Set(classifyElement(x,site).map(v=>v.key));
+assert(cats(el(1,{leisure:'fitness_centre',name:'Village Gym'})).has('gym_leisure'));
+assert(!cats(el(2,{leisure:'sports_centre'})).has('gym_leisure'));
+assert(cats(el(2,{leisure:'sports_centre'})).has('sports_facility'));
+assert(!cats(el(3,{leisure:'sports_centre',name:'Aley Green Playing Fields'})).has('gym_leisure'));
+assert(cats(el(4,{leisure:'sports_centre',name:'Caddington Sports Centre'})).has('gym_leisure'));
+assert(cats(el(5,{leisure:'track',name:'Athletics Track'})).has('sports_facility'));
+console.log('6 gym/leisure regression assertions passed.');

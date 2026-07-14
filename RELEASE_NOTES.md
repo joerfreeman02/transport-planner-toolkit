@@ -1,12 +1,19 @@
-# Sprint 2B — Assisted Rail Research
+# Release Notes — Project Foundation 1.6
 
-This review build implements the free assisted-research bridge agreed for Sprint 2.
+## Purpose
+This release establishes one canonical Transport Planner Toolkit codebase after the Sprint 2B regression.
 
-It does not place an API key in the browser and does not claim to scrape restricted websites automatically. Instead, it exports a structured request for ChatGPT and imports the completed, source-backed station records.
+## Baseline retained
+- Accessibility Assessment 1.0 stable
+- STATS19 Collision Record Cards existing working tool
+- Railway Assessment Sprint 2A working review baseline
+- Bus Assessment placeholder
 
-## Review points
-- Export a research request after finding stations.
-- Confirm the JSON contains every included station and walking/cycling results.
-- Import a completed research response.
-- Confirm fields, statuses, sources, retrieval dates and line names populate.
-- Confirm saved stations are reused on a later search.
+## Added
+- Central module/version manifest
+- Foundation regression test
+- Decision log
+- Clear rule that Railway changes cannot replace other modules
+
+## Not included
+The broken Sprint 2B assisted-research implementation is not included. Assisted research remains the next Railway-only feature to be rebuilt and tested incrementally.

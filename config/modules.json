@@ -1,0 +1,30 @@
+{
+  "toolkit": {
+    "version": "1.6.0",
+    "build": "TPT-FOUNDATION-160-20260714",
+    "releaseDate": "2026-07-14",
+    "status": "foundation"
+  },
+  "modules": {
+    "accessibility": {
+      "version": "1.0",
+      "status": "stable",
+      "path": "modules/accessibility/index.html"
+    },
+    "stats19": {
+      "version": "existing",
+      "status": "stable-existing-tool",
+      "path": "modules/stats19/index.html"
+    },
+    "railway": {
+      "version": "2A",
+      "status": "working-review-baseline",
+      "path": "modules/railway/index.html"
+    },
+    "bus": {
+      "version": "placeholder",
+      "status": "not-started",
+      "path": "modules/bus/index.html"
+    }
+  }
+}

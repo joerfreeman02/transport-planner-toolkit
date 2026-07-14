@@ -1,12 +1,14 @@
-# Transport Planner Toolkit — Sprint 2B
+# Transport Planner Toolkit — Canonical Foundation 1.6
 
-This release adds the no-cost assisted Rail Intelligence workflow.
+This is the single canonical codebase for future development.
 
-## Workflow
-1. Find and route all nearby stations.
-2. Export `rail_station_research_request.json`.
-3. Upload the request to ChatGPT for authoritative-source research.
-4. Import the completed `tpt-rail-research-response-v1` JSON.
-5. Saved verified station records are reused automatically on future projects.
+## Stable/working modules
+- Accessibility Assessment 1.0
+- STATS19 Collision Record Cards
+- Railway Assessment Sprint 2A working baseline
 
-The station database now includes **Line name(s)** for London Underground, London Overground, DLR, Elizabeth line, tram/light-rail and other named routes where relevant.
+## Development rule
+Future Railway features must be added only inside `modules/railway/` and must pass `tests/regression-check.mjs` before packaging.
+
+## Browser deployment
+Static GitHub Pages deployment; no service worker during active development.

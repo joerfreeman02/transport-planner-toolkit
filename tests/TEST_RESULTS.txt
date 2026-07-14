@@ -1,15 +1,17 @@
-PASS valid UK coordinates
-PASS invalid coordinates rejected
-PASS primary query grouped
-PASS extension query limited
-PASS GP accepted
-PASS fitness centre rejected as GP
-PASS convenience not reused
-PASS adult learning rejected
-PASS sixth form accepted
-PASS bus stop accepted
-PASS rail modes separate
-PASS nearest selected
-PASS fallback estimated
+PASS required file: index.html
+PASS required file: assets/css/shell.css
+PASS required file: assets/js/shell.js
+PASS required file: modules/accessibility/index.html
+PASS required file: modules/stats19/index.html
+PASS required file: modules/railway/index.html
+PASS required file: modules/bus/index.html
+PASS required file: config/modules.json
+PASS railway marker: Railway Assessment
+PASS railway marker: Find and route stations
+PASS railway marker: Rail Knowledge Library
+PASS accessibility marker: Accessibility Assessment
+PASS accessibility marker: Find nearest facilities
+PASS STATS19 marker: Collision Record Cards
+PASS STATS19 marker: fileinput
 
-13 tests passed.
+All foundation regression checks passed.

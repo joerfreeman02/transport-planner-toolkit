@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#123f3b">
+  <title>Accessibility Assessment — Alpha 0.1</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ3ynhUh8gi8f9yyWqHGxnkSxv2h3J8=" crossorigin="">
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Transport Planner Toolkit · Project name TBC</p>
+      <h1>Accessibility Assessment <span class="version">Alpha 0.1</span></h1>
+      <p class="lede">Find the nearest valid local facilities and calculate routed walking and cycling distance and time.</p>
+    </div>
+    <button id="diagnosticsBtn" class="button ghost" type="button">Test live services</button>
+  </header>
+
+  <main class="layout">
+    <section class="card" aria-labelledby="siteHeading">
+      <div class="section-heading">
+        <div><span class="step">1</span><h2 id="siteHeading">Confirm the site</h2></div>
+        <span id="siteState" class="status neutral">Not located</span>
+      </div>
+      <div class="input-row">
+        <label class="grow">Address or postcode
+          <input id="addressInput" type="text" autocomplete="street-address" placeholder="e.g. 100 High Street, Plaistow, London">
+        </label>
+        <button id="locateBtn" class="button" type="button">Locate</button>
+      </div>
+      <details class="advanced">
+        <summary>Use coordinates</summary>
+        <div class="coord-grid">
+          <label>Latitude<input id="latInput" type="number" step="0.000001" placeholder="51.520000"></label>
+          <label>Longitude<input id="lonInput" type="number" step="0.000001" placeholder="0.020000"></label>
+          <button id="useCoordsBtn" class="button secondary" type="button">Use coordinates</button>
+        </div>
+      </details>
+      <p id="siteMessage" class="message">Locate the address, then drag the site marker if adjustment is required.</p>
+      <div id="map" aria-label="Site and facility map"></div>
+      <div class="map-actions">
+        <button id="confirmSiteBtn" class="button secondary" type="button" disabled>Confirm site pin</button>
+        <label class="switch"><input id="showWalkRoutes" type="checkbox" checked> Walking routes</label>
+        <label class="switch"><input id="showCycleRoutes" type="checkbox"> Cycling routes</label>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="searchHeading">
+      <div class="section-heading">
+        <div><span class="step">2</span><h2 id="searchHeading">Search and route</h2></div>
+        <span id="runState" class="status neutral">Waiting</span>
+      </div>
+      <div class="settings-grid">
+        <label>Walking catchment
+          <div class="unit-input"><input id="walkRadius" type="number" min="250" max="10000" step="250" value="2000"><span>m</span></div>
+        </label>
+        <label>Cycling catchment
+          <div class="unit-input"><input id="cycleRadius" type="number" min="500" max="20000" step="500" value="5000"><span>m</span></div>
+        </label>
+      </div>
+      <button id="runBtn" class="button primary-wide" type="button" disabled>Find nearest facilities</button>
+      <div id="progressWrap" class="progress-wrap" hidden>
+        <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+        <p id="progressText">Preparing…</p>
+      </div>
+      <div id="diagnostics" class="diagnostics" hidden></div>
+    </section>
+
+    <section id="resultsCard" class="card" aria-labelledby="resultsHeading" hidden>
+      <div class="section-heading">
+        <div><span class="step">3</span><h2 id="resultsHeading">Results</h2></div>
+        <span id="elapsedBadge" class="status neutral"></span>
+      </div>
+      <p class="result-note">Nearest valid result per category. Distances are routed where available; fallbacks are clearly marked.</p>
+      <div class="table-wrap">
+        <table id="resultsTable">
+          <thead><tr><th>Facility</th><th>Name</th><th>Walking</th><th>Cycling</th><th>Source</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="actions">
+        <button id="exportCsvBtn" class="button secondary" type="button">Export CSV</button>
+        <button id="copyTableBtn" class="button secondary" type="button">Copy table</button>
+        <button id="generateTextBtn" class="button" type="button">Generate draft wording</button>
+      </div>
+      <textarea id="reportText" class="report-text" hidden aria-label="Generated report wording"></textarea>
+      <p class="legal-note"><strong>Alpha notice:</strong> OpenStreetMap is a crowd-sourced dataset. Results and operational status must be reviewed before formal submission.</p>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script type="module" src="assets/js/app.js"></script>
+</body>
+</html>

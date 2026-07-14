@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {CATEGORIES} from '../assets/js/categories.js';
+const byKey=Object.fromEntries(CATEGORIES.map(c=>[c.key,c]));
+assert.equal(byKey.gp.match({amenity:'doctors',name:'Balaam Street Surgery'}),true);
+assert.equal(byKey.gp.match({leisure:'fitness_centre',name:'Nuffield Health Fitness & Wellbeing'}),false);
+assert.equal(byKey.supermarket.match({shop:'convenience',name:'Newmarket'}),false);
+assert.equal(byKey.convenience.match({shop:'convenience',name:'Newmarket'}),true);
+assert.equal(byKey.post_office.match({shop:'convenience',name:'Newmarket'}),false);
+assert.equal(byKey.fe_college.match({amenity:'college',name:'Adult Learning and Skills Centre'}),false);
+assert.equal(byKey.sixth_form.match({amenity:'college',name:'Newham Sixth Form College'}),true);
+assert.equal(byKey.bus_stop.match({highway:'bus_stop',name:'Balaam Street'}),true);
+assert.equal(byKey.underground.match({railway:'station',network:'London Underground'}),true);
+assert.equal(byKey.overground.match({railway:'station',network:'London Overground'}),true);
+assert.equal(byKey.dlr.match({railway:'station',network:'DLR'}),true);
+console.log('Classification tests passed.');

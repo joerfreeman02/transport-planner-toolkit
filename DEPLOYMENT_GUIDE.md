@@ -1,12 +1,12 @@
-# GitHub Deployment Guide — Sprint 1.5
+# GitHub Deployment Guide — Sprint 2 Review
 
 1. Extract the ZIP.
-2. Open the `transport-planner-toolkit-sprint-1.5` folder.
-3. In GitHub, open `joerfreeman02/transport-planner-toolkit` on the **Code** tab and confirm branch `main`.
-4. Select **Add file → Upload files**.
-5. Drag everything from inside the extracted folder into the upload area: `assets`, `modules`, `index.html`, `.nojekyll`, and the Markdown files.
-6. GitHub does not normally ask to replace matching files; matching paths are automatically recorded as modifications.
-7. Commit message: `Deploy Sprint 1.5 toolkit shell`.
-8. Open **Actions** and wait for `pages build and deployment` to show a green tick.
-9. Open `https://joerfreeman02.github.io/transport-planner-toolkit/?build=TPT-S15-20260714`.
-10. Confirm the page displays `Sprint 1.5 shell · TPT-S15-20260714`.
+2. Open the extracted `transport-planner-toolkit-sprint-2-review` folder.
+3. Open your GitHub repository on the Code tab and confirm branch `main`.
+4. Choose Add file → Upload files.
+5. Drag everything inside the extracted folder into the upload area.
+6. Commit with: `Deploy Sprint 2 Railway review build`.
+7. Open Actions and wait for `pages build and deployment` to show a green tick.
+8. Open `https://joerfreeman02.github.io/transport-planner-toolkit/?build=TPT-S2-20260714`.
+9. Confirm the homepage says `Sprint 2 review · TPT-S2-20260714`.
+10. Open Railway Assessment and confirm it says `RAIL-S2-20260714`.

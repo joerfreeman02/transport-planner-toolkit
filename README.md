@@ -1,11 +1,5 @@
-# Transport Planner Toolkit — Sprint 1.5 Shell
+# Transport Planner Toolkit — Sprint 2 Review
 
-This release introduces the toolkit home/navigation shell and integrates:
+Includes the stable Accessibility Assessment, existing STATS19 tool and the first Railway Assessment review build.
 
-- Accessibility Assessment 1.0 RC1 (treated as the frozen Sprint 1 baseline)
-- Existing STATS19 Collision Record Cards tool
-- Railway Assessment placeholder for Sprint 2
-- Bus Assessment placeholder
-- Optional browser-local project name/site address storage
-
-No service worker is included during development.
+The Railway module discovers all nearby mapped National Rail, Underground, Overground, DLR and tram/light-rail stations, routes walking/cycling access, and provides editable report fields for authoritative verification.

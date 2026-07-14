@@ -1,9 +1,8 @@
 # Changelog
 
-## Sprint 1.5 — Toolkit Shell
-- Added professional toolkit home page.
-- Added optional browser-local project details.
-- Integrated Accessibility Assessment as a module.
-- Integrated the existing STATS19 Collision Record Cards tool without changing its processing logic.
-- Added Railway and Bus module placeholders.
-- Added module-to-home navigation.
+## Sprint 2 Review
+- Activated Railway Assessment module
+- Added multi-station discovery and mode classification
+- Added walking/cycling routing and map display
+- Added service-information review fields and exports
+- Updated toolkit shell build identifier

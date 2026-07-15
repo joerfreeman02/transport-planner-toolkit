@@ -19,7 +19,7 @@
     "railway": {
       "version": "4.2.1",
       "build": "RAIL-4.2.1-20260715",
-      "status": "working-assessment-interface",
+      "status": "stable-frozen-baseline",
       "path": "modules/railway/index.html"
     },
     "bus": {

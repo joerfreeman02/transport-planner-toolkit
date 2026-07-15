@@ -1,5 +1,9 @@
 # Release notes — RAIL-4.2.1-20260715
 
+## Acceptance and freeze
+
+This build was accepted after user testing confirmed that map panning, zooming, site-marker dragging, station discovery and walking/cycling route display work as intended. It is the frozen Railway functional baseline for the next cross-module Formatting and Exporting sprint.
+
 ## Map reliability defect release
 
 - Railway now uses the full Leaflet 1.9.4 engine already used by Accessibility. Panning, mouse-wheel and touch zoom, zoom buttons, site-marker dragging and responsive resizing are restored.

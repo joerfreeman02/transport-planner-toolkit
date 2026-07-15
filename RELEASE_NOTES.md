@@ -1,19 +1,25 @@
-# Release Notes — Project Foundation 1.6
+# Release Notes - Sprint 3 Formatting and Exporting 1.7
 
 ## Purpose
-This release establishes one canonical Transport Planner Toolkit codebase after the Sprint 2B regression.
+
+This release aligns the Accessibility and Railway report-table exports with the EAS 2026 Word template while retaining the accepted Railway functional baseline.
 
 ## Baseline retained
-- Accessibility Assessment 1.0 stable
+
+- Accessibility discovery, classification, mapping and routing
 - STATS19 Collision Record Cards existing working tool
-- Railway Assessment Sprint 2A working review baseline
+- Railway 4.2.1 map, movable site marker, walking/cycling routes, station de-duplication, directional TPH, research and Knowledge Library behaviour
 - Bus Assessment placeholder
 
 ## Added
-- Central module/version manifest
-- Foundation regression test
-- Decision log
-- Clear rule that Railway changes cannot replace other modules
 
-## Not included
-The broken Sprint 2B assisted-research implementation is not included. Assisted research remains the next Railway-only feature to be rebuilt and tested incrementally.
+- Shared EAS 2026 table formatter used by both modules
+- Rich Word-table copy with a plain-text fallback
+- Genuine `.docx` downloads with A4 page settings, Roboto typography, orange headers and alternating grey rows
+- Accessibility local-facilities report table
+- Railway station-access and directional service-summary report tables
+- Cross-module export regression tests
+
+## Not changed
+
+This sprint does not alter station discovery, map interaction, route plotting, classification, assisted research or library merge logic.

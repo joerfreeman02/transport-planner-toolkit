@@ -1,5 +1,9 @@
 # Changelog
 
+## Sprint 3 - Formatting and Exporting
+- Added shared EAS 2026 Word-table formatting for Accessibility 1.1 and Railway 4.3.
+- Added rich-copy and Word-compatible download exports while retaining transparent CSV exports.
+
 ## Railway RAIL-4.2.1-20260715
 - Fixed the non-interactive Railway map, route geometry rendering and duplicate mapped stations.
 - Froze Railway 4.2.1 as the accepted functional baseline before the cross-module Formatting and Exporting sprint.

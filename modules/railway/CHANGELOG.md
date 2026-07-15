@@ -1,5 +1,12 @@
 # Changelog
 
+## RAIL-4.3.0-20260715
+
+- Added shared EAS 2026 Word-compatible Access and Service table exports.
+- Added rich clipboard export and genuine downloadable Word `.docx` output.
+- Applied Roboto typography, orange headers, white header text, pale-grey banding and compact black rules derived from the EAS 2026 Word template.
+- Preserved the frozen Railway 4.2.1 discovery, mapping, routing, deduplication, research and Knowledge Library behaviour.
+
 ## RAIL-4.2.1-20260715
 
 - Marked as the stable frozen Railway baseline after successful user acceptance testing.

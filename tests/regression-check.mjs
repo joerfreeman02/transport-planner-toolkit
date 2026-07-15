@@ -8,6 +8,7 @@ const required = [
   'index.html',
   'assets/css/shell.css',
   'assets/js/shell.js',
+  'assets/js/word-export.js',
   'modules/accessibility/index.html',
   'modules/stats19/index.html',
   'modules/railway/index.html',
@@ -21,13 +22,13 @@ for (const rel of required) {
   if (!ok) failures++;
 }
 const rail = fs.readFileSync(path.join(root, 'modules/railway/index.html'), 'utf8');
-for (const marker of ['Railway Assessment', 'Find and route stations', 'Rail Knowledge Library']) {
+for (const marker of ['Railway Assessment', 'Find and route stations', 'Rail Knowledge Library', 'Copy Word tables', 'Download Word tables']) {
   const ok = rail.includes(marker);
   console.log(`${ok ? 'PASS' : 'FAIL'} railway marker: ${marker}`);
   if (!ok) failures++;
 }
 const access = fs.readFileSync(path.join(root, 'modules/accessibility/index.html'), 'utf8');
-for (const marker of ['Accessibility Assessment', 'Find nearest facilities']) {
+for (const marker of ['Accessibility Assessment', 'Find nearest facilities', 'Copy Word table', 'Download Word table']) {
   const ok = access.includes(marker);
   console.log(`${ok ? 'PASS' : 'FAIL'} accessibility marker: ${marker}`);
   if (!ok) failures++;

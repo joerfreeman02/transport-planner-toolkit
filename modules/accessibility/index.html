@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#164e4b">
   <title>Accessibility Assessment — 1.0 RC1</title>
-  <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?build=AA-RC1-20260714-1945">
-  <link rel="stylesheet" href="assets/css/app.css?build=AA-RC1-20260714-1945">
+  <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?build=AA-1.1.0-20260715">
+  <link rel="stylesheet" href="assets/css/app.css?build=AA-1.1.0-20260715">
 </head>
 <body>
   <header class="app-header">
@@ -14,7 +14,7 @@
       <a href="../../" style="display:inline-block;color:white;text-decoration:none;font-weight:700;margin-bottom:.55rem">← Toolkit home</a>
       <p class="eyebrow">Transport Planner Toolkit</p>
       <h1>Accessibility Assessment</h1>
-      <p class="subtitle">Accessibility Assessment 1.0 release-candidate build · AA-RC1-20260714-1945</p>
+      <p class="subtitle">Accessibility Assessment 1.1 · <strong>AA-1.1.0-20260715</strong></p>
     </div>
     <button id="diagnosticsBtn" class="button ghost">Diagnostics</button>
   </header>
@@ -95,7 +95,8 @@
           <h2>Results</h2>
         </div>
         <div class="actions">
-          <button id="copyTableBtn" class="button secondary">Copy table</button>
+          <button id="copyTableBtn" class="button secondary">Copy Word table</button>
+          <button id="downloadWordBtn" class="button secondary">Download Word table</button>
           <button id="csvBtn" class="button secondary">Export CSV</button>
           <button id="wordingBtn" class="button">Generate wording</button>
         </div>
@@ -153,6 +154,6 @@
   </dialog>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script type="module" src="assets/js/app.js?build=AA-RC1-20260714-1945"></script>
+  <script type="module" src="assets/js/app.js?build=AA-1.1.0-20260715"></script>
 </body>
 </html>

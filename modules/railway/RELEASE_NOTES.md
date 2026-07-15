@@ -1,8 +1,15 @@
-# Release notes — RAIL-4.1.0-20260715
+# Release notes — RAIL-4.2.0-20260715
 
-## Assisted-research identifier integrity fix
+## Railway assessment interface
 
-- Completed-research imports now preserve authoritative identifiers supplied at the outer station-record level when the nested completed record still contains blank placeholders.
-- CRS, NaPTAN, TfL, other and OSM identifiers are merged field-by-field, preferring a populated nested value and otherwise retaining the populated outer value.
-- Automated regression coverage now reproduces the blank-nested-identifier case and verifies that every researched identifier survives normalisation.
-- The full RAIL-4.0.1 discovery, mapping, routing, station inclusion, research export/import, Knowledge Library and Transport Statement output functionality is retained.
+- The assessment is now separated into Assessment, Sources, and Research & Library views.
+- Map controls expose walking and cycling routes independently, fit the full assessment, return to the site, and clear displayed routes.
+- Typical weekday frequency by destination is edited as readable directional rows rather than raw JSON. Each row records the direction or destination, trains per hour, and an optional service-pattern note.
+- Source URLs and retrieval details are consolidated in the Sources register, keeping the assessment review concise.
+- The exported research request remains self-instructing: the user only needs to attach it to a new ChatGPT conversation. It explicitly instructs ChatGPT to research every station without asking what action is required and to return the completed import file.
+- Knowledge Library imports retain identifier matching, protected newer verified evidence, conflict tracking, validation, and automatic pre-import backups.
+- Saving an individual station now displays a timestamped confirmation within that station card and in the page status message.
+
+## Compatibility
+
+The research and Knowledge Library schemas remain unchanged at version 2/v3 respectively, so existing completed research and library exports remain compatible.

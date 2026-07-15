@@ -1,6 +1,8 @@
 # Railway Assessment module
 
-Visible build: `RAIL-4.2.0-20260715`.
+Visible build: `RAIL-4.2.1-20260715`.
+
+Status: **stable frozen baseline** following automated regression testing and user acceptance testing on 15 July 2026. Future cross-module formatting and export work must preserve the established discovery, mapping, routing, review, research and Knowledge Library behaviour.
 
 This self-contained module discovers mapped stations, keeps rail modes separate, calculates walking and cycling routes with transparent estimated fallbacks, and stores traceable station research in a browser-local Rail Knowledge Library.
 

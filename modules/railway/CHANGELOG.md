@@ -1,5 +1,14 @@
 # Changelog
 
+## RAIL-4.2.1-20260715
+
+- Marked as the stable frozen Railway baseline after successful user acceptance testing.
+- Replaced the incomplete local Leaflet-compatible substitute with the full Leaflet 1.9.4 runtime already proven in Accessibility.
+- Restored map panning, wheel/touch zooming, zoom controls, draggable site-marker behaviour and responsive map resizing.
+- Corrected route-layer bounds and added explicit feedback when only an estimated distance exists and no route geometry can responsibly be plotted.
+- Deduplicated station features by reliable identifier or normalised station name, mode and 300 m proximity while retaining separate rail modes.
+- Added regression coverage for the map engine, route layers and station deduplication.
+
 ## RAIL-4.2.0-20260715
 
 - Added top-level Assessment, Sources, and Research & Library tabs.

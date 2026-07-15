@@ -5,7 +5,7 @@ This is the single canonical codebase for future development.
 ## Stable/working modules
 - Accessibility Assessment 1.0
 - STATS19 Collision Record Cards
-- Railway Assessment Sprint 2A working baseline
+- Railway Assessment RAIL-4.2.0 working assessment interface
 
 ## Development rule
 Future Railway features must be added only inside `modules/railway/` and must pass `tests/regression-check.mjs` before packaging.

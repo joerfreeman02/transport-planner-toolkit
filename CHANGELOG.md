@@ -1,5 +1,9 @@
 # Changelog
 
+## Sprint 3 map runtime hotfix - 2026-07-15
+- Replaced the unavailable external map-engine script with the repository's local runtime in Accessibility 1.1.1 and Railway 4.3.1.
+- Restored map initialisation and address-control event wiring without changing Sprint 3 exports.
+
 ## Sprint 3 - Formatting and Exporting
 - Added shared EAS 2026 Word-table formatting for Accessibility 1.1 and Railway 4.3.
 - Added rich-copy and Word-compatible download exports while retaining transparent CSV exports.

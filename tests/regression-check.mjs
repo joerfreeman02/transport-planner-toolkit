@@ -39,5 +39,12 @@ for (const marker of ['Collision Record Cards', 'fileinput']) {
   console.log(`${ok ? 'PASS' : 'FAIL'} STATS19 marker: ${marker}`);
   if (!ok) failures++;
 }
+const accessJs = fs.readFileSync(path.join(root, 'modules/accessibility/assets/js/app.js'), 'utf8');
+const railJs = fs.readFileSync(path.join(root, 'modules/railway/assets/js/railway.js'), 'utf8');
+for (const [moduleName, source] of [['Accessibility', accessJs], ['Railway', railJs]]) {
+  const ok = source.includes('../../../../assets/js/word-export.js');
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${moduleName} shared export import resolves from repository root`);
+  if (!ok) failures++;
+}
 if (failures) process.exit(1);
 console.log('\nAll foundation regression checks passed.');

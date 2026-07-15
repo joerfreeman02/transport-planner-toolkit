@@ -1,5 +1,9 @@
 # Accessibility Changelog
 
+## 1.1.1 - 2026-07-15
+
+- Restored map and address controls by using the repository-hosted map runtime instead of an unavailable external CDN script.
+
 ## 1.1.0 - 2026-07-15
 
 - Added a report-ready local-facilities table using the shared EAS 2026 format.

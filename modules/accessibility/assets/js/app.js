@@ -3,7 +3,7 @@ import {geocodeUK,buildQuery,queryOverpass} from './services.js';
 import {classifyAll} from './classify.js';
 import {routeMatrix,routeGeometry} from './routing.js';
 import {downloadText,escapeHtml,formatDistance,formatDuration,haversineM} from './utils.js';
-import {copyWordTables,downloadWordDocument} from '../../../assets/js/word-export.js';
+import {copyWordTables,downloadWordDocument} from '../../../../assets/js/word-export.js';
 const state={site:null,confirmed:false,results:{},map:null,siteMarker:null,facilityMarkers:new Map(),walkLayer:null,cycleLayer:null,walkCircle:null,cycleCircle:null,diagnostics:{build:BUILD,events:[]}};
 const $=id=>document.getElementById(id);const log=(event,data={})=>state.diagnostics.events.push({time:new Date().toISOString(),event,data});
 function setBadge(el,text,type='neutral'){el.textContent=text;el.className=`status-badge ${type}`;}function message(el,text,type=''){el.hidden=false;el.textContent=text;el.className=`message ${type}`;}function clearMessage(el){el.hidden=true;el.textContent='';}

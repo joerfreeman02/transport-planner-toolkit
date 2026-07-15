@@ -7,8 +7,8 @@
   },
   "modules": {
     "accessibility": {
-      "version": "1.1.0",
-      "build": "AA-1.1.0-20260715",
+      "version": "1.1.1",
+      "build": "AA-1.1.1-20260715",
       "status": "stable-word-export",
       "path": "modules/accessibility/index.html"
     },
@@ -18,8 +18,8 @@
       "path": "modules/stats19/index.html"
     },
     "railway": {
-      "version": "4.3.0",
-      "build": "RAIL-4.3.0-20260715",
+      "version": "4.3.1",
+      "build": "RAIL-4.3.1-20260715",
       "status": "stable-frozen-functionality-word-export",
       "path": "modules/railway/index.html"
     },

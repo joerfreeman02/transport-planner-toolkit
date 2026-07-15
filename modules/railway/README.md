@@ -1,6 +1,6 @@
 # Railway Assessment module
 
-Visible build: `RAIL-4.2.0-20260715`.
+Visible build: `RAIL-4.2.1-20260715`.
 
 This self-contained module discovers mapped stations, keeps rail modes separate, calculates walking and cycling routes with transparent estimated fallbacks, and stores traceable station research in a browser-local Rail Knowledge Library.
 

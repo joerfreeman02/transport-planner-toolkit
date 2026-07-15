@@ -17,8 +17,8 @@
       "path": "modules/stats19/index.html"
     },
     "railway": {
-      "version": "4.2.0",
-      "build": "RAIL-4.2.0-20260715",
+      "version": "4.2.1",
+      "build": "RAIL-4.2.1-20260715",
       "status": "working-assessment-interface",
       "path": "modules/railway/index.html"
     },

@@ -4,9 +4,9 @@ This is the single canonical codebase for future development.
 
 ## Stable/working modules
 
-- Accessibility Assessment 1.1 with EAS Word and CSV exports
+- Accessibility Assessment 1.2 with grouped EAS Word and CSV exports
 - STATS19 Collision Record Cards
-- Railway Assessment RAIL-4.3.0 with frozen 4.2.1 functionality and EAS Word and CSV exports
+- Railway Assessment RAIL-4.4.0 with frozen map functionality and final EAS Word and CSV exports
 
 ## Development rule
 

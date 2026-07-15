@@ -1,4 +1,10 @@
-# Release notes — RAIL-4.3.0-20260715
+# Release notes — RAIL-4.4.0-20260715
+
+## Sprint 3 final export refinements
+
+- Added a step-free access tick/cross column to the service summary.
+- Added a service-pattern and journey-opportunities summary row after each station.
+- Added a separate directional trains-per-hour Word export.
 
 ## EAS Word-compatible tables
 

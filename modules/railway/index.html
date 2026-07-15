@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#173f5f">
   <title>Railway Assessment — Transport Planner Toolkit</title>
-  <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?build=RAIL-4.3.1-20260715">
-  <link rel="stylesheet" href="assets/css/railway.css?build=RAIL-4.3.1-20260715">
-  <link rel="stylesheet" href="assets/css/rail-4.2.css?build=RAIL-4.3.1-20260715">
+  <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?build=RAIL-4.4.0-20260715">
+  <link rel="stylesheet" href="assets/css/railway.css?build=RAIL-4.4.0-20260715">
+  <link rel="stylesheet" href="assets/css/rail-4.2.css?build=RAIL-4.4.0-20260715">
 </head>
 <body>
-<header class="app-header"><div><a class="home" href="../../">← Toolkit home</a><p class="eyebrow">Transport Planner Toolkit</p><h1>Railway Assessment</h1><p class="subtitle">Map, service, evidence and Word export · <strong id="buildLabel">RAIL-4.3.1-20260715</strong></p></div><button id="diagBtn" class="button ghost">Diagnostics</button></header>
+<header class="app-header"><div><a class="home" href="../../">← Toolkit home</a><p class="eyebrow">Transport Planner Toolkit</p><h1>Railway Assessment</h1><p class="subtitle">Map, service, evidence and Word export · <strong id="buildLabel">RAIL-4.4.0-20260715</strong></p></div><button id="diagBtn" class="button ghost">Diagnostics</button></header>
 <nav class="tabs" aria-label="Railway module sections">
   <button class="tab active" data-tab="assessment" aria-selected="true">Assessment</button>
   <button class="tab" data-tab="sources" aria-selected="false">Sources</button>
@@ -20,7 +20,7 @@
 <div class="tab-page active" data-page="assessment">
   <section class="panel"><div class="heading"><div><span class="step">1</span><h2>Confirm the site</h2></div><span id="siteState" class="badge neutral">Not confirmed</span></div><div class="grid2"><div><label for="address">UK address or postcode</label><div class="inline"><input id="address" autocomplete="postal-code"><button id="locate" class="button">Look up</button></div><div id="matches" class="matches" hidden></div></div><div><label>Latitude and longitude</label><div class="coords"><input id="lat" type="number" step="0.000001" placeholder="Latitude"><input id="lon" type="number" step="0.000001" placeholder="Longitude"><button id="useCoords" class="button secondary">Use coordinates</button></div></div></div><p class="hint">Pan or zoom freely. Click the map or drag the red site marker, then confirm the location.</p><div class="map-wrap"><div id="map"></div><div class="map-legend"><span><i class="legend-site"></i>Site</span><span><i class="legend-station"></i>Station</span><span><i class="legend-walk"></i>Walking</span><span><i class="legend-cycle"></i>Cycling</span></div></div><div class="map-actions"><button id="fitAssessment" class="button secondary" disabled>Fit assessment</button><button id="returnSite" class="button secondary" disabled>Return to site</button><button id="clearRoutes" class="button secondary" disabled>Clear routes</button></div><div class="confirm"><div><strong id="siteLabel">No site selected</strong><span id="coordLabel"></span></div><button id="confirm" class="button" disabled>Confirm site</button></div></section>
   <section class="panel"><div class="heading"><div><span class="step">2</span><h2>Find nearby stations</h2></div><span id="searchState" class="badge neutral">Waiting</span></div><div class="search-controls"><label>Search radius (km)<input id="radius" type="number" min="0.5" max="30" step="0.5" value="5"></label><label>Maximum stations<input id="maxStations" type="number" min="1" max="50" value="20"></label><button id="run" class="button large" disabled>Find and route stations</button></div><div id="progress" class="progress" hidden><div class="bar"><div id="barFill"></div></div><p id="progressText"></p></div><div id="message" class="message" role="status" aria-live="polite" hidden></div></section>
-  <section id="results" class="panel" hidden><div class="heading wrap"><div><span class="step">3</span><h2>Review assessment</h2></div><div class="actions"><button id="saveBtn" class="button secondary">Save assessment</button><button id="csvBtn" class="button secondary">Export CSV</button><button id="copyBtn" class="button secondary">Copy Word tables</button><button id="downloadWordBtn" class="button secondary">Download Word tables</button><button id="wordingBtn" class="button">Generate wording</button></div></div><p class="note">Review useful evidence only. Directional frequencies describe where trains run and are kept separate from the total departures per hour.</p><div id="modeSummary" class="mode-summary"></div><div id="cards" class="cards"></div></section>
+  <section id="results" class="panel" hidden><div class="heading wrap"><div><span class="step">3</span><h2>Review assessment</h2></div><div class="actions"><button id="saveBtn" class="button secondary">Save assessment</button><button id="csvBtn" class="button secondary">Export CSV</button><button id="copyBtn" class="button secondary">Copy Word tables</button><button id="downloadWordBtn" class="button secondary">Download Word tables</button><button id="downloadTphBtn" class="button secondary">Download directional TPH</button><button id="wordingBtn" class="button">Generate wording</button></div></div><p class="note">Review useful evidence only. Directional frequencies describe where trains run and are kept separate from the total departures per hour.</p><div id="modeSummary" class="mode-summary"></div><div id="cards" class="cards"></div></section>
   <section id="wordingPanel" class="panel" hidden><div class="heading"><h2>Transport Statement wording</h2><button id="copyWording" class="button secondary">Copy wording</button></div><textarea id="wording" rows="14"></textarea></section>
 </div>
 <div class="tab-page" data-page="sources" hidden>
@@ -32,6 +32,6 @@
 </div>
 <dialog id="diag"><div class="dialog-head"><h2>Diagnostics</h2><button id="closeDiag">×</button></div><pre id="diagOut"></pre></dialog>
 </main>
-<script src="assets/vendor/leaflet/leaflet.js?build=RAIL-4.3.1-20260715&amp;runtime=1.9.4-full"></script>
-<script type="module" src="assets/js/railway.js?build=RAIL-4.3.1-20260715"></script>
+<script src="assets/vendor/leaflet/leaflet.js?build=RAIL-4.4.0-20260715&amp;runtime=1.9.4-full"></script>
+<script type="module" src="assets/js/railway.js?build=RAIL-4.4.0-20260715"></script>
 </body></html>

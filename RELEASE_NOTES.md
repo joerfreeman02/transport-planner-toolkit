@@ -13,6 +13,9 @@ This release aligns the Accessibility and Railway report-table exports with the 
 
 ## Added
 
+- Accessibility category heading rows that explain the differing facility-distance groups
+- Railway step-free access ticks/crosses and per-station service/journey summary rows
+- Separate Railway directional-TPH Word export
 - Shared EAS 2026 table formatter used by both modules
 - Rich Word-table copy with a plain-text fallback
 - Genuine `.docx` downloads with A4 page settings, Roboto typography, orange headers and alternating grey rows

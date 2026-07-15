@@ -1,14 +1,14 @@
 {
   "toolkit": {
-    "version": "1.7.0",
-    "build": "TPT-FMT-170-20260715",
+    "version": "1.8.0",
+    "build": "TPT-FMT-180-20260715",
     "releaseDate": "2026-07-15",
     "status": "sprint-3-formatting-exporting"
   },
   "modules": {
     "accessibility": {
-      "version": "1.1.1",
-      "build": "AA-1.1.1-20260715",
+      "version": "1.2.0",
+      "build": "AA-1.2.0-20260715",
       "status": "stable-word-export",
       "path": "modules/accessibility/index.html"
     },
@@ -18,8 +18,8 @@
       "path": "modules/stats19/index.html"
     },
     "railway": {
-      "version": "4.3.1",
-      "build": "RAIL-4.3.1-20260715",
+      "version": "4.4.0",
+      "build": "RAIL-4.4.0-20260715",
       "status": "stable-frozen-functionality-word-export",
       "path": "modules/railway/index.html"
     },

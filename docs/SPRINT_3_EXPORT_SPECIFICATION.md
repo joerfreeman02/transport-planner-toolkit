@@ -36,6 +36,7 @@ Columns:
 5. Cycle time (mins)
 
 Only included and non-rejected results are exported. Distance is the assessed walking-route distance and must retain its routed/estimated qualification in a note when applicable.
+Included facilities are separated by labelled category rows: Transport, Education and childcare, Everyday needs, Healthcare, and Leisure and community. Empty categories are omitted.
 
 ## Railway tables
 
@@ -59,8 +60,10 @@ Two tables are used to avoid an unreadable wide table on A4 portrait pages.
 5. Typical weekday trains per hour by direction
 6. Principal direct destinations served
 7. Cycle storage
+8. Step-free access (tick/cross)
 
 Directional TPH must state the direction/destination. Overlapping destination entries must not be summed. Only included stations are exported.
+Each station is followed by a full-width summary row containing its service pattern and journey opportunities. A separate optional Word export presents each station's directional/destination TPH entries as Direction/destination, TPH and Service note.
 
 ## Export methods
 

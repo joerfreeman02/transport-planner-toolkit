@@ -1,0 +1,524 @@
+{
+  "schema": "tpt-rail-research-request-v2",
+  "version": 2,
+  "build": "RAIL-4.0.1-20260715",
+  "exportedAt": "2026-07-14T21:17:34.422Z",
+  "humanInstruction": "This is an actionable Transport Planner Toolkit research request. Immediately research all listed stations and return a completed import JSON. Do not ask the user what they want done.",
+  "professionalUse": "Data is intended for professional UK Transport Statements and must be accurate, traceable and non-misleading.",
+  "task": {
+    "action": "Research and complete every station record in this file",
+    "instructions": [
+      "Use authoritative primary sources wherever available",
+      "Research all records without asking the user what action is required",
+      "Populate every field that can be reliably verified",
+      "Do not invent or infer unsupported railway information",
+      "Return one completed JSON file matching the required import schema",
+      "Do not return only a prose summary",
+      "Preserve station identifiers, coordinates and route data",
+      "Record source references and retrieval dates for every researched field",
+      "Clearly mark any information that cannot be verified"
+    ],
+    "requiredOutput": "tpt-rail-research-completed-v2"
+  },
+  "authoritativeSourceRules": {
+    "nationalRail": [
+      "National Rail station information",
+      "Official station manager website",
+      "Official train operator timetable/service information",
+      "Official published timetable PDFs",
+      "Other authoritative railway sources only where primary sources do not answer the field"
+    ],
+    "tflModes": [
+      "Transport for London",
+      "Official TfL timetables, line pages and station pages",
+      "Official operator/source where relevant"
+    ],
+    "rules": [
+      "Preserve source URLs or precise references",
+      "Include research date",
+      "Do not use Wikipedia, blogs or crowdsourced sites as the main verification source",
+      "Do not invent missing values",
+      "Mark unverifiable values needs_review or missing",
+      "Keep total TPH as actual departures; do not sum overlapping destination entries",
+      "Distinguish direct services from interchange opportunities"
+    ]
+  },
+  "outputValidation": {
+    "schema": "tpt-rail-research-completed-v2",
+    "version": 2,
+    "recordsArrayRequired": true,
+    "verifiedFieldsRequireSourceAndDate": true,
+    "frequencyByDestinationMustBeArray": true,
+    "numericTphRange": "0 to 100"
+  },
+  "records": [
+    {
+      "stationName": "Example Central",
+      "canonicalName": "Example Central",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.5001,
+        "lon": -0.1201
+      },
+      "osm": {
+        "identifier": "node/1001",
+        "source": "https://www.openstreetmap.org/node/1001"
+      },
+      "identifiers": {
+        "crs": "EXC",
+        "naptan": "",
+        "tfl": "",
+        "other": ""
+      },
+      "routes": {
+        "walking": {
+          "distance": 900,
+          "duration": 720,
+          "status": "routed"
+        },
+        "cycling": {
+          "distance": 1100,
+          "duration": 300,
+          "status": "estimated"
+        }
+      },
+      "existingRecord": {
+        "schema": "tpt-rail-knowledge-v3",
+        "version": 2,
+        "key": "crs:EXC",
+        "canonicalName": "Example Central",
+        "name": "Example Central",
+        "mode": "National Rail",
+        "coordinates": {
+          "lat": 51.5001,
+          "lon": -0.1201
+        },
+        "identifiers": {
+          "crs": "EXC",
+          "naptan": "",
+          "tfl": "",
+          "other": "",
+          "osm": "node/1001"
+        },
+        "fields": {
+          "manager": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "operators": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "lines": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "frequencyTotal": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "frequencyByDestination": {
+            "value": [],
+            "status": "needs_review",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "servicePattern": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "frequency": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "destinations": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "journeyOpportunities": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "cycleParking": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "stepFree": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "ticketing": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "waiting": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "toilets": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "carParking": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "notes": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          }
+        },
+        "createdAt": "2026-07-14T21:17:34.422Z",
+        "updatedAt": "2026-07-14T21:17:34.422Z",
+        "reviewFlags": []
+      },
+      "fieldsRequiringResearch": [
+        "manager",
+        "operators",
+        "lines",
+        "frequencyTotal",
+        "frequencyByDestination",
+        "servicePattern",
+        "frequency",
+        "destinations",
+        "journeyOpportunities",
+        "cycleParking",
+        "stepFree",
+        "ticketing",
+        "waiting",
+        "toilets",
+        "carParking",
+        "notes"
+      ]
+    },
+    {
+      "stationName": "Example Underground",
+      "canonicalName": "Example Underground",
+      "mode": "London Underground",
+      "coordinates": {
+        "lat": 51.501,
+        "lon": -0.121
+      },
+      "osm": {
+        "identifier": "node/1002",
+        "source": "https://www.openstreetmap.org/node/1002"
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "940GZZLUEXU",
+        "tfl": "EXU",
+        "other": ""
+      },
+      "routes": {
+        "walking": {
+          "distance": 900,
+          "duration": 720,
+          "status": "routed"
+        },
+        "cycling": {
+          "distance": 1100,
+          "duration": 300,
+          "status": "estimated"
+        }
+      },
+      "existingRecord": {
+        "schema": "tpt-rail-knowledge-v3",
+        "version": 2,
+        "key": "tfl:EXU",
+        "canonicalName": "Example Underground",
+        "name": "Example Underground",
+        "mode": "London Underground",
+        "coordinates": {
+          "lat": 51.501,
+          "lon": -0.121
+        },
+        "identifiers": {
+          "crs": "",
+          "naptan": "940GZZLUEXU",
+          "tfl": "EXU",
+          "other": "",
+          "osm": "node/1002"
+        },
+        "fields": {
+          "manager": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "operators": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "lines": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "frequencyTotal": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "frequencyByDestination": {
+            "value": [],
+            "status": "needs_review",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "servicePattern": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "frequency": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "destinations": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "journeyOpportunities": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "cycleParking": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "stepFree": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "ticketing": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "waiting": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "toilets": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "carParking": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          },
+          "notes": {
+            "value": "",
+            "status": "missing",
+            "source": "",
+            "retrievalDate": "",
+            "sourceTitle": "",
+            "sourceType": "",
+            "timetablePeriod": "",
+            "notes": ""
+          }
+        },
+        "createdAt": "2026-07-14T21:17:34.422Z",
+        "updatedAt": "2026-07-14T21:17:34.422Z",
+        "reviewFlags": []
+      },
+      "fieldsRequiringResearch": [
+        "manager",
+        "operators",
+        "lines",
+        "frequencyTotal",
+        "frequencyByDestination",
+        "servicePattern",
+        "frequency",
+        "destinations",
+        "journeyOpportunities",
+        "cycleParking",
+        "stepFree",
+        "ticketing",
+        "waiting",
+        "toilets",
+        "carParking",
+        "notes"
+      ]
+    }
+  ],
+  "fixture": true,
+  "fixtureNotice": "Test fixture only. Do not import into a production knowledge library."
+}

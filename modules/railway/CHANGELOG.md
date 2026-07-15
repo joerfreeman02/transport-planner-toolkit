@@ -1,5 +1,9 @@
 # Changelog
 
+## RAIL-4.3.1-20260715
+
+- Restored map and address controls by loading the repository-hosted map runtime instead of the unavailable external CDN script.
+
 ## RAIL-4.3.0-20260715
 
 - Added shared EAS 2026 Word-compatible Access and Service table exports.

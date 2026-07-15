@@ -1,6 +1,6 @@
 import{KNOWLEDGE_SCHEMA,REQUEST_SCHEMA,COMPLETED_SCHEMA,SCHEMA_VERSION,FIELD_KEYS,VALID_STATUSES,makeRecord,loadLibrary,saveLibrary,matchRecord,upsert,summary,validateCompleted,validateKnowledge,buildResearchRequest,completedRecord,distance,deduplicateDiscoveredStations}from'./rail-knowledge.js';
-import{copyWordTables,downloadWordDocument}from'../../../assets/js/word-export.js';
-const BUILD='RAIL-4.3.0-20260715',PROJECT_KEY='tpt.project.v1',SAVE_KEY='tpt.railway.v3';
+import{copyWordTables,downloadWordDocument}from'../../../../assets/js/word-export.js';
+const BUILD='RAIL-4.3.1-20260715',PROJECT_KEY='tpt.project.v1',SAVE_KEY='tpt.railway.v3';
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])),fmtM=m=>m==null?'—':m<1000?`${Math.round(m)} m`:`${(m/1000).toFixed(1)} km`,fmtT=s=>s==null?'—':`${Math.max(1,Math.round(s/60))} min`;
 let map,siteMarker,site,confirmed=false,stations=[],markers=[],routeLayers=[],library=loadLibrary(),events=[];
 const endpoints=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.private.coffee/api/interpreter'];

@@ -1,5 +1,9 @@
 # Accessibility Changelog
 
+## 1.2.0 - 2026-07-15
+
+- Added Transport, Education and childcare, Everyday needs, Healthcare, and Leisure and community heading rows to the Word export when those groups contain included facilities.
+
 ## 1.1.1 - 2026-07-15
 
 - Restored map and address controls by using the repository-hosted map runtime instead of an unavailable external CDN script.

@@ -1,5 +1,11 @@
 # Changelog
 
+## RAIL-4.4.0-20260715
+
+- Added a step-free access tick/cross column to the service-summary export.
+- Added a service-pattern and journey-opportunities summary row after each station.
+- Added a separate directional trains-per-hour Word export.
+
 ## RAIL-4.3.1-20260715
 
 - Restored map and address controls by loading the repository-hosted map runtime instead of the unavailable external CDN script.

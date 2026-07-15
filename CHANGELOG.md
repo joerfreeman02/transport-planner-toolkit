@@ -1,5 +1,9 @@
 # Changelog
 
+## Sprint 3 final export refinements - 2026-07-15
+- Added category heading rows to the Accessibility local-facilities Word table.
+- Added Railway step-free ticks/crosses, station service summary rows and a separate directional-TPH Word export.
+
 ## Sprint 3 map runtime hotfix - 2026-07-15
 - Replaced the unavailable external map-engine script with the repository's local runtime in Accessibility 1.1.1 and Railway 4.3.1.
 - Restored map initialisation and address-control event wiring without changing Sprint 3 exports.

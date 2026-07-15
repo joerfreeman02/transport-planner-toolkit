@@ -1,4 +1,12 @@
-# Release notes — RAIL-4.2.1-20260715
+# Release notes — RAIL-4.3.0-20260715
+
+## EAS Word-compatible tables
+
+- Added separate Railway Access and Railway Service tables designed for A4 portrait reports.
+- Copy Word tables places rich EAS-formatted HTML on the clipboard with a plain-text fallback.
+- Download Word tables creates a genuine Microsoft Word `.docx` containing both tables.
+- Directional TPH is retained in the report-facing service table and estimates remain explicitly labelled.
+- Railway 4.2.1 functional behaviour remains frozen and unchanged.
 
 ## Acceptance and freeze
 

@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {createService,normaliseStops,stopIdentity,validateAssessment} from '../modules/bus/assets/js/bus-domain.js';
+let passed=0;const test=(name,fn)=>{fn();passed++;console.log(`PASS ${name}`)};
+test('source identity is stable',()=>assert.equal(stopIdentity({source:'osm',sourceStopId:'node/1'}),'osm:node/1'));
+test('opposite directional stops remain separate',()=>{const site={latitude:51.5,longitude:-0.1},stops=normaliseStops([{type:'node',id:1,lat:51.501,lon:-0.1,tags:{name:'High Street',direction:'Northbound'}},{type:'node',id:2,lat:51.5009,lon:-0.1001,tags:{name:'High Street',direction:'Southbound'}}],site);assert.equal(stops.length,2);assert.equal(stops[0].pairId,stops[1].pairId);assert.notEqual(stops[0].stopId,stops[1].stopId)});
+test('exact duplicate source stop is removed',()=>{const e={type:'node',id:1,lat:51.5,lon:-0.1,tags:{name:'High Street'}};assert.equal(normaliseStops([e,e],{latitude:51.5,longitude:-0.1}).length,1)});
+test('direction is required for service evidence',()=>assert.throws(()=>createService({stopId:'x',routeNumber:'1',operator:'Op',direction:'',destination:'Town',frequencyType:'unknown'})));
+test('unknown frequency remains unknown',()=>assert.equal(createService({stopId:'x',routeNumber:'1',operator:'Op',direction:'eastbound',destination:'Town',frequencyType:'unknown'}).frequency.value,null));
+test('unsafe source protocol is rejected',()=>assert.throws(()=>createService({stopId:'x',routeNumber:'1',operator:'Op',direction:'eastbound',destination:'Town',frequencyType:'unknown',sourceUrl:'javascript:alert(1)'})));
+test('unconfirmed site blocks controlled save',()=>assert.match(validateAssessment({schemaVersion:'1.0.0',assessmentId:'a',site:{confirmed:false},stops:[],services:[]}).join(' '),/Confirm the site/));
+test('Bus schema parses',()=>assert.equal(JSON.parse(fs.readFileSync(new URL('../docs/schemas/bus-assessment.schema.json',import.meta.url))).schemaVersion,'1.0.0'));
+console.log(`\n${passed} Bus Foundation tests passed.`);

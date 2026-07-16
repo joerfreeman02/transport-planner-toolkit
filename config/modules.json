@@ -1,11 +1,17 @@
 {
   "toolkit": {
-    "version": "1.8.0",
-    "build": "TPT-FMT-180-20260715",
-    "releaseDate": "2026-07-15",
-    "status": "sprint-3-formatting-exporting"
+    "version": "1.9.0",
+    "build": "TPT-BUS-190-20260716",
+    "releaseDate": "2026-07-16",
+    "status": "sprint-4-bus-foundation-release-candidate"
   },
   "modules": {
+    "dashboard": {
+      "version": "1.0.0",
+      "build": "DASH-1.0.0-20260716",
+      "status": "stable-frozen-identity",
+      "path": "index.html"
+    },
     "accessibility": {
       "version": "1.2.0",
       "build": "AA-1.2.0-20260715",
@@ -13,7 +19,8 @@
       "path": "modules/accessibility/index.html"
     },
     "stats19": {
-      "version": "existing",
+      "version": "1.0.0",
+      "build": "STATS-1.0.0-20260716",
       "status": "stable-existing-tool",
       "path": "modules/stats19/index.html"
     },
@@ -24,8 +31,10 @@
       "path": "modules/railway/index.html"
     },
     "bus": {
-      "version": "placeholder",
-      "status": "not-started",
+      "version": "0.1.0",
+      "build": "BUS-FOUNDATION-010-20260716",
+      "schemaVersion": "1.0.0",
+      "status": "release-candidate",
       "path": "modules/bus/index.html"
     }
   }

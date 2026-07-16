@@ -15,3 +15,12 @@ PASS STATS19 marker: Collision Record Cards
 PASS STATS19 marker: fileinput
 
 All foundation regression checks passed.
+Sprint 4 Bus Foundation — 16 July 2026
+Automated foundation: PASS (13/13)
+Word export: PASS (13/13)
+Shared contracts: PASS (6/6)
+Bus domain/schema: PASS (8/8)
+Accessibility regression: PASS (6/6)
+Railway regression: PASS (27/27)
+Browser smoke: PASS — Dashboard, Bus, Accessibility, Railway and STATS19 loaded without console errors
+Release status: release candidate; professional acceptance and Technical Director production approval outstanding

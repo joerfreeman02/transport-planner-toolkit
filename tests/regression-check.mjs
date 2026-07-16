@@ -39,6 +39,18 @@ for (const marker of ['Collision Record Cards', 'fileinput']) {
   console.log(`${ok ? 'PASS' : 'FAIL'} STATS19 marker: ${marker}`);
   if (!ok) failures++;
 }
+const bus = fs.readFileSync(path.join(root, 'modules/bus/index.html'), 'utf8');
+for (const marker of ['Bus Assessment', 'Find nearby stops', 'Directional services', 'Download Word tables', 'BUS-0.1.0']) {
+  const ok = bus.includes(marker);
+  console.log(`${ok ? 'PASS' : 'FAIL'} Bus marker: ${marker}`);
+  if (!ok) failures++;
+}
+const manifest = JSON.parse(fs.readFileSync(path.join(root, 'config/modules.json'), 'utf8'));
+for (const [label,actual,expected] of [['Dashboard',manifest.modules.dashboard.version,'1.0.0'],['Accessibility',manifest.modules.accessibility.version,'1.2.0'],['Railway',manifest.modules.railway.version,'4.4.0'],['STATS19',manifest.modules.stats19.version,'1.0.0']]) {
+  const ok = actual === expected;
+  console.log(`${ok ? 'PASS' : 'FAIL'} frozen identity: ${label} ${actual}`);
+  if (!ok) failures++;
+}
 const accessJs = fs.readFileSync(path.join(root, 'modules/accessibility/assets/js/app.js'), 'utf8');
 const railJs = fs.readFileSync(path.join(root, 'modules/railway/assets/js/railway.js'), 'utf8');
 for (const [moduleName, source] of [['Accessibility', accessJs], ['Railway', railJs]]) {

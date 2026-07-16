@@ -1,0 +1,3 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import{fileURLToPath}from'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),dir=path.join(root,'docs','contracts'),required=['mapping.contract.json','export.contract.json','diagnostics.contract.json','project-context.schema.json','module-output.schema.json','knowledge-record.schema.json'];
+for(const name of required){const value=JSON.parse(fs.readFileSync(path.join(dir,name),'utf8'));assert.equal(value.contractVersion,'1.0.0');console.log(`PASS contract ${name} v1.0.0`)}

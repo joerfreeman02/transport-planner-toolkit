@@ -1,0 +1,10 @@
+{
+  "schema": "tpt.bus-research",
+  "schemaVersion": "1.0.0",
+  "moduleBuild": "BUS-RESET-100-20260716",
+  "task": "Research every selected bus stop; identify every route serving each selected stop or stop pair; use authoritative primary sources; return one completed import JSON; do not ask the user what they want done; do not return only prose; do not invent unavailable information; preserve walking/cycling data and identifiers.",
+  "project": {"name": "Sample Project", "siteAddress": "CB7 4AH", "site": {"latitude": 52.398, "longitude": 0.262}},
+  "selectedStops": [{"naptanCode": "0500EELYY096", "stopName": "Fore Hill", "locality": "Ely", "direction": "near", "pairedStopGroup": "fore hill", "coordinates": {"latitude": 52.397, "longitude": 0.263}, "walking": {"distance": 84, "duration": 60, "status": "routed"}, "cycling": {"distance": 84, "duration": 35, "status": "routed"}}],
+  "authoritativeSourceHierarchy": ["Official operator timetables and route pages.", "TfL official pages for London services.", "Local authority or Traveline/NaPTAN information where authoritative.", "Published timetable PDFs.", "Other reliable sources only where primary sources do not answer the field."],
+  "requiredOutputSchema": {"schema": "tpt.bus-research", "schemaVersion": "1.0.0", "stopRecords": [], "routeRecords": [], "stopRouteRecords": []}
+}

@@ -2,33 +2,48 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Bus Assessment — BUS-0.2.0</title>
-  <link rel="stylesheet" href="../../assets/vendor/leaflet/leaflet.css">
+  <meta name="theme-color" content="#173f5f">
+  <title>Bus Assessment — BUS-1.0.0</title>
+  <link rel="stylesheet" href="../../assets/vendor/leaflet/leaflet.css?build=BUS-1.0.0-20260716">
   <link rel="stylesheet" href="../../assets/css/shell.css">
-  <link rel="stylesheet" href="assets/css/bus.css">
+  <link rel="stylesheet" href="assets/css/bus.css?build=BUS-1.0.0-20260716">
 </head>
 <body>
-  <header class="hero"><div class="hero-inner"><div><p class="eyebrow">Transport Planner Toolkit · Corrective review build</p><h1>Bus Assessment</h1><p class="tagline">Site confirmation, stop discovery and routed walking/cycling access.</p></div><span class="build">BUS-0.2.0 · BUS-CORE-020-20260716</span></div></header>
-  <div id="startupStatus" class="startup-status" role="status" aria-live="assertive">Starting Bus module…</div>
-  <div id="startupFailure" class="startup-failure" role="alert" hidden><strong>Bus module failed to initialise</strong><p id="startupFailureDetail">A required asset or browser function failed.</p><button id="startupDiagnostic">Download startup diagnostic</button></div>
-  <nav class="module-nav" aria-label="Bus module sections"><a href="#assessment">Assessment</a><a href="#diagnostics">Diagnostics</a><a href="../../">Toolkit home</a></nav>
-  <main id="assessment" aria-busy="true">
-    <section class="panel"><div class="section-title"><div><h2>1. Project and site</h2><p>Locate the site, adjust the marker and confirm the correct position.</p></div></div>
-      <div class="form-grid"><label>Project name<input id="projectName" required></label><label>UK address or postcode<input id="siteAddress" required></label><button id="findAddress" class="primary" disabled>Find address</button></div>
-      <div id="searchResults" class="search-results" aria-live="polite"></div><p id="siteStatus" class="status-message" aria-live="polite">Waiting for module startup.</p>
-      <div id="map" class="map" aria-label="Interactive Bus Assessment map"></div><p id="mapSummary" class="assistive-summary">No site or stops are currently shown.</p>
-      <div class="button-row"><button id="confirmSite" class="primary" disabled>Confirm site</button></div>
-    </section>
-
-    <section class="panel"><div class="section-title"><div><h2>2. Nearby bus stops</h2><p>NaPTAN/ATCO identity is preferred where available. Opposite directions remain separate.</p></div></div>
-      <div class="form-grid compact"><label>Search radius (metres)<input id="searchRadius" type="number" min="200" max="3000" step="100" value="800"></label><label>Maximum stops<input id="maximumStops" type="number" min="1" max="50" value="20"></label><button id="findStops" disabled>Find nearby stops</button></div>
-      <p id="stopStatus" class="status-message" aria-live="polite">Confirm a site before searching.</p>
-      <div class="table-wrap"><table><thead><tr><th>Include</th><th>Stop and identity</th><th>Direction</th><th>Straight-line</th><th>Walking</th><th>Cycling</th></tr></thead><tbody id="stopRows"><tr><td colspan="6">No stops loaded.</td></tr></tbody></table></div>
-    </section>
-
-    <section id="diagnostics" class="panel"><div class="section-title"><div><h2>Diagnostics</h2><p>BUS-0.2.0 · self-contained corrective baseline</p></div></div><div id="diagnosticList">No current diagnostics.</div><button id="downloadDiagnostics">Download diagnostics</button></section>
-  </main>
-  <footer>Transport Planner Toolkit · Review build · Provider failure is never interpreted as zero stops.</footer>
-  <script src="assets/js/bus-bootstrap.js"></script>
-</body>
-</html>
+<header class="hero"><div class="hero-inner"><div><a class="home" href="../../">← Toolkit home</a><p class="eyebrow">Transport Planner Toolkit</p><h1>Bus Assessment</h1><p class="tagline">Stop access, assisted service research and Transport Statement outputs.</p></div><span class="build">BUS-1.0.0 · BUS-RESET-100-20260716</span></div></header>
+<div id="startupStatus" class="startup-status" role="status" aria-live="assertive">Starting Bus module…</div>
+<div id="startupFailure" class="startup-failure" role="alert" hidden><strong>Bus module failed to initialise</strong><p id="startupFailureDetail">A required asset or browser function failed.</p><button id="startupDiagnostic">Download startup diagnostic</button></div>
+<nav class="module-nav" aria-label="Bus module sections"><button class="nav-link active" data-page="assessment">Assessment</button><button class="nav-link" data-page="research">Research &amp; Library</button><button class="nav-link" data-page="outputs">Outputs</button><button class="nav-link" data-page="sources">Sources</button><button class="nav-link" data-page="diagnostics">Diagnostics</button></nav>
+<main id="assessment" aria-busy="true">
+ <div class="tab-page active" data-tab-page="assessment">
+  <section class="panel"><div class="section-title"><div><span class="step">1</span><h2>Project and site</h2><p>Enter the project, locate the site, adjust the marker and confirm it.</p></div><span id="siteBadge" class="badge">Not confirmed</span></div>
+   <div class="form-grid"><label>Project/site name<input id="projectName" required></label><label>UK address or postcode<input id="siteAddress" required></label><button id="findAddress" class="primary" disabled>Find address</button></div>
+   <div id="searchResults" class="search-results" aria-live="polite"></div><p id="siteStatus" class="status-message" aria-live="polite">Waiting for module startup.</p>
+   <div id="map" class="map" aria-label="Interactive Bus Assessment map"></div><p id="mapSummary" class="assistive-summary">No site or stops are currently shown.</p>
+   <div class="button-row"><button id="confirmSite" class="primary" disabled>Confirm site</button></div>
+  </section>
+  <section class="panel"><div class="section-title"><div><span class="step">2</span><h2>Find nearby stops</h2><p>NaPTAN/ATCO identity is preferred. Opposite directions remain separate and visibly paired.</p></div><span id="searchBadge" class="badge">Waiting</span></div>
+   <div class="form-grid compact"><label>Search radius (metres)<input id="searchRadius" type="number" min="200" max="3000" step="100" value="800"></label><label>Maximum stops<input id="maximumStops" type="number" min="1" max="50" value="20"></label><button id="findStops" disabled>Find nearby stops</button></div>
+   <p id="stopStatus" class="status-message" aria-live="polite">Confirm a site before searching.</p>
+  </section>
+  <section class="panel"><div class="section-title"><div><span class="step">3</span><h2>Review stop results</h2><p>Results are ordered by shortest straight-line distance. Include only stops relevant to the assessment.</p></div></div>
+   <div class="table-wrap"><table><thead><tr><th>Include</th><th>Stop and identity</th><th>Direction / pair</th><th>Straight-line</th><th>Walking</th><th>Cycling</th></tr></thead><tbody id="stopRows"><tr><td colspan="6">No stops loaded.</td></tr></tbody></table></div>
+  </section>
+ </div>
+ <div class="tab-page" data-tab-page="research" hidden>
+  <section class="panel"><div class="section-title"><div><span class="step">4</span><h2>Research and Knowledge Library</h2><p>Export one self-instructing request, attach it to a fresh ChatGPT conversation, then import the completed JSON.</p></div></div>
+   <div class="button-row"><button id="exportResearch" class="primary" disabled>Export bus research request</button><label class="button-like">Import completed bus research<input id="importResearch" type="file" accept=".json,application/json" hidden></label></div><p id="researchStatus" class="status-message">Select at least one discovered stop.</p>
+  </section>
+  <section class="panel"><h2>Bus Knowledge Library</h2><p id="knowledgeStatus">No saved records.</p><p class="note">Verified newer records are preserved. A downloadable backup is created before every completed-research import.</p><div class="button-row"><button id="exportKnowledge">Export library</button><button id="backupKnowledge">Download backup</button><button id="clearKnowledge" class="danger">Clear library</button></div></section>
+ </div>
+ <div class="tab-page" data-tab-page="outputs" hidden>
+  <section class="panel"><div class="section-title"><div><span class="step">5</span><h2>Outputs</h2><p>EAS-formatted genuine DOCX, CSV tables and editable Transport Statement wording.</p></div></div>
+   <div class="button-row"><button id="wordBtn" class="primary" disabled>Download Word tables</button><button id="csvBtn" disabled>Download CSV tables</button><button id="generateWording" disabled>Generate wording</button></div><p id="outputStatus" class="status-message">Import researched service records to enable complete outputs.</p>
+  </section>
+  <section class="panel"><h2>Transport Statement wording</h2><textarea id="wording" rows="14" placeholder="Generated route-by-route wording will appear here."></textarea><div class="button-row"><button id="copyWording">Copy wording</button></div></section>
+ </div>
+ <div class="tab-page" data-tab-page="sources" hidden><section class="panel"><div class="section-title"><div><span class="step">6</span><h2>Sources</h2><p>Consolidated evidence register for imported stop and route records.</p></div></div><div class="table-wrap"><table><thead><tr><th>Stop / route</th><th>Source</th><th>Retrieved</th><th>Verification</th></tr></thead><tbody id="sourceRows"><tr><td colspan="4">No researched sources loaded.</td></tr></tbody></table></div></section></div>
+ <div class="tab-page" data-tab-page="diagnostics" hidden><section class="panel"><div class="section-title"><div><span class="step">7</span><h2>Diagnostics</h2><p>BUS-1.0.0 · self-contained reset build</p></div></div><div id="diagnosticList">No current diagnostics.</div><button id="downloadDiagnostics">Download diagnostics</button></section></div>
+</main>
+<footer>Transport Planner Toolkit · Sprint 4 review branch · External provider failure is never interpreted as zero stops.</footer>
+<script src="assets/js/bus-bootstrap.js?build=BUS-1.0.0-20260716"></script>
+</body></html>

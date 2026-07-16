@@ -1,6 +1,6 @@
 # Transport Planner Toolkit — Sprint 4 Bus Foundation
 
-Current production release: Toolkit 2.1.0, Bus 1.2.0 and Shared Library 1.1.0.
+Current production release: Toolkit 2.1.0, Bus 1.2.0 and Shared Library 1.1.0. Toolkit 2.2.0 is an unmerged emergency corrective review build.
 
 The Dashboard automatically loads deployed Rail, Bus Stop and Bus Route company masters for read-only use. Authorised editors may enter a fine-grained GitHub token locally to preview and publish deterministic merges to the three approved knowledge files. The token is never part of the repository or application exports.
 

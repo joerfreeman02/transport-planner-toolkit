@@ -10,3 +10,5 @@
 .site-pin{width:18px;height:18px;background:#c62f3b;border:3px solid #fff;}
 .facility-pin{width:14px;height:14px;background:#164e4b;border:2px solid #fff;}
 @media(max-width:780px){#map.leaflet-container{height:360px;}}
+/* Emergency corrective visual alignment: low-risk Bus design tokens only. */
+:root{--brand:#164e4b;--action:#d95300;--surface:#fff;--page:#f5f6f5;--line:#d8dcdb}body{background:var(--page);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}.app-header{background:linear-gradient(135deg,#173f5f,var(--brand))}.panel{border-color:var(--line);border-radius:10px;box-shadow:0 2px 8px #0000000a}.step{background:var(--action);color:#fff}.button{border-radius:5px}#resultsTable th{background:var(--action);color:#fff}.status-badge{border-radius:999px}.google-map-link{font-weight:700}

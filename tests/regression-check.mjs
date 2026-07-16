@@ -40,7 +40,7 @@ for (const marker of ['Collision Record Cards', 'fileinput']) {
   if (!ok) failures++;
 }
 const bus = fs.readFileSync(path.join(root, 'modules/bus/index.html'), 'utf8');
-for (const marker of ['Bus Assessment', 'Find nearby stops', 'Directional services', 'Download Word tables', 'BUS-0.1.0']) {
+for (const marker of ['Bus Assessment', 'Find nearby stops', 'Search radius', 'Walking', 'Cycling', 'BUS-0.2.0']) {
   const ok = bus.includes(marker);
   console.log(`${ok ? 'PASS' : 'FAIL'} Bus marker: ${marker}`);
   if (!ok) failures++;

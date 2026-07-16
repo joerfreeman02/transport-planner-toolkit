@@ -1,0 +1,16 @@
+(function(){
+  'use strict';
+  var BUILD='BUS-CORE-020-20260716',startedAt=new Date().toISOString(),records=[],finished=false;
+  var status=document.getElementById('startupStatus'),failure=document.getElementById('startupFailure'),detail=document.getElementById('startupFailureDetail'),main=document.getElementById('assessment');
+  function record(code,message,asset){records.push({code:code,message:String(message||'Unknown error'),asset:asset||'',at:new Date().toISOString()});}
+  function showFailure(message,asset){if(finished)return;finished=true;record('BUS_STARTUP_FAILED',message,asset);status.textContent='Bus module failed to initialise';status.className='startup-status failed';detail.textContent=String(message)+(asset?' Required asset: '+asset:'');failure.hidden=false;main.setAttribute('aria-busy','false');main.querySelectorAll('button').forEach(function(button){if(button.id!=='startupDiagnostic'&&button.id!=='downloadDiagnostics')button.disabled=true;});}
+  function ready(){if(finished)return;finished=true;status.textContent='Bus module ready';status.className='startup-status ready';main.setAttribute('aria-busy','false');setTimeout(function(){status.hidden=true;},2500);}
+  function download(){var payload={build:BUILD,startedAt:startedAt,url:location.href,userAgent:navigator.userAgent,records:records,resources:performance.getEntriesByType('resource').map(function(x){return{name:x.name,durationMs:Math.round(x.duration),transferSize:x.transferSize||0};})};var url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='bus-startup-diagnostic-'+BUILD+'.json';a.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);}
+  function load(src,label){return new Promise(function(resolve,reject){var script=document.createElement('script');script.src=src;script.async=false;script.onload=resolve;script.onerror=function(){reject(new Error(label+' failed to load'));};document.head.appendChild(script);});}
+  window.addEventListener('error',function(event){record('BUS_WINDOW_ERROR',event.message,event.filename);if(!finished)showFailure(event.message,event.filename);});
+  window.addEventListener('unhandledrejection',function(event){var message=event.reason&&event.reason.message?event.reason.message:String(event.reason);record('BUS_UNHANDLED_REJECTION',message,'');if(!finished)showFailure(message,'');});
+  document.getElementById('startupDiagnostic').addEventListener('click',download);
+  window.BusBootstrap={build:BUILD,record:record,ready:ready,fail:showFailure,download:download,records:records};
+  var watchdog=setTimeout(function(){showFailure('Startup timed out before the core workflow became ready.','bus-core.js');},12000);
+  load('../../assets/vendor/leaflet/leaflet.js','Leaflet').then(function(){if(!window.L)throw new Error('Leaflet loaded without exposing the map API.');return load('assets/js/bus-core.js','Bus core');}).then(function(){clearTimeout(watchdog);if(!window.BusCoreReady)throw new Error('Bus core loaded but did not complete initialisation.');}).catch(function(error){clearTimeout(watchdog);showFailure(error.message,error.asset||'startup dependency');});
+})();

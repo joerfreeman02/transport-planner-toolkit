@@ -24,3 +24,12 @@ Accessibility regression: PASS (6/6)
 Railway regression: PASS (27/27)
 Browser smoke: PASS — Dashboard, Bus, Accessibility, Railway and STATS19 loaded without console errors
 Release status: release candidate; professional acceptance and Technical Director production approval outstanding
+Sprint 4 corrective Bus core — BUS-0.2.0 — 16 July 2026
+Classic bootstrap/static controls: PASS (9/9)
+Automated local Chromium smoke: PASS
+Map/address/site/stop/routing/map-table workflow: PASS
+Deliberate core-asset failure displays startup diagnostic: PASS
+Console errors: 0
+Uncaught JavaScript errors: 0
+Failed requests / HTTP errors: 0
+Deployed review URL retest: pending corrective branch push

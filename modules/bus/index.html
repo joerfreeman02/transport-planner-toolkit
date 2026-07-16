@@ -2,41 +2,33 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Bus Assessment — BUS-0.1.0</title>
+  <title>Bus Assessment — BUS-0.2.0</title>
   <link rel="stylesheet" href="../../assets/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="../../assets/css/shell.css">
   <link rel="stylesheet" href="assets/css/bus.css">
 </head>
 <body>
-  <header class="hero"><div class="hero-inner"><div><p class="eyebrow">Transport Planner Toolkit · Phase 2 Expansion</p><h1>Bus Assessment</h1><p class="tagline">Nearby stops, directional services and source-led professional outputs.</p></div><span class="build">BUS-0.1.0 · BUS-FOUNDATION-010-20260716</span></div></header>
-  <nav class="module-nav" aria-label="Bus module sections"><a href="#assessment">Assessment</a><a href="#sources">Sources</a><a href="#diagnostics">Diagnostics</a><a href="../../">Toolkit home</a></nav>
-  <main id="assessment">
-    <section class="panel"><div class="section-title"><div><h2>1. Project and site</h2><p>Locate the site, check the pin and confirm it before researching stops.</p></div></div>
-      <div class="form-grid"><label>Project name<input id="projectName" required></label><label>Site address or postcode<input id="siteAddress" required></label><button id="searchSite" class="primary">Find address</button></div>
-      <div id="searchResults" class="search-results" aria-live="polite"></div><p id="siteStatus" class="status-message" aria-live="polite"></p>
-      <div id="map" class="map" aria-label="Interactive Bus Assessment map"></div><p id="mapSummary" class="assistive-summary">No candidate bus stops are currently shown.</p>
-      <div class="button-row"><button id="confirmSite" class="primary" disabled>Confirm site</button><button id="findStops" disabled>Find nearby stops</button></div>
+  <header class="hero"><div class="hero-inner"><div><p class="eyebrow">Transport Planner Toolkit · Corrective review build</p><h1>Bus Assessment</h1><p class="tagline">Site confirmation, stop discovery and routed walking/cycling access.</p></div><span class="build">BUS-0.2.0 · BUS-CORE-020-20260716</span></div></header>
+  <div id="startupStatus" class="startup-status" role="status" aria-live="assertive">Starting Bus module…</div>
+  <div id="startupFailure" class="startup-failure" role="alert" hidden><strong>Bus module failed to initialise</strong><p id="startupFailureDetail">A required asset or browser function failed.</p><button id="startupDiagnostic">Download startup diagnostic</button></div>
+  <nav class="module-nav" aria-label="Bus module sections"><a href="#assessment">Assessment</a><a href="#diagnostics">Diagnostics</a><a href="../../">Toolkit home</a></nav>
+  <main id="assessment" aria-busy="true">
+    <section class="panel"><div class="section-title"><div><h2>1. Project and site</h2><p>Locate the site, adjust the marker and confirm the correct position.</p></div></div>
+      <div class="form-grid"><label>Project name<input id="projectName" required></label><label>UK address or postcode<input id="siteAddress" required></label><button id="findAddress" class="primary" disabled>Find address</button></div>
+      <div id="searchResults" class="search-results" aria-live="polite"></div><p id="siteStatus" class="status-message" aria-live="polite">Waiting for module startup.</p>
+      <div id="map" class="map" aria-label="Interactive Bus Assessment map"></div><p id="mapSummary" class="assistive-summary">No site or stops are currently shown.</p>
+      <div class="button-row"><button id="confirmSite" class="primary" disabled>Confirm site</button></div>
     </section>
 
-    <section class="panel"><div class="section-title"><div><h2>2. Candidate stops</h2><p>Opposite directions remain separate stops. Similar names are grouped without silent merging.</p></div></div>
-      <div class="table-wrap"><table><thead><tr><th>Include</th><th>Stop</th><th>Direction</th><th>Distance</th><th>Pair</th><th>Evidence</th></tr></thead><tbody id="stopRows"><tr><td colspan="6">Confirm a site and find nearby stops.</td></tr></tbody></table></div>
+    <section class="panel"><div class="section-title"><div><h2>2. Nearby bus stops</h2><p>NaPTAN/ATCO identity is preferred where available. Opposite directions remain separate.</p></div></div>
+      <div class="form-grid compact"><label>Search radius (metres)<input id="searchRadius" type="number" min="200" max="3000" step="100" value="800"></label><label>Maximum stops<input id="maximumStops" type="number" min="1" max="50" value="20"></label><button id="findStops" disabled>Find nearby stops</button></div>
+      <p id="stopStatus" class="status-message" aria-live="polite">Confirm a site before searching.</p>
+      <div class="table-wrap"><table><thead><tr><th>Include</th><th>Stop and identity</th><th>Direction</th><th>Straight-line</th><th>Walking</th><th>Cycling</th></tr></thead><tbody id="stopRows"><tr><td colspan="6">No stops loaded.</td></tr></tbody></table></div>
     </section>
 
-    <section class="panel"><div class="section-title"><div><h2>3. Directional services</h2><p>Every frequency identifies its direction, destination, day type and representative period.</p></div></div>
-      <form id="serviceForm" class="form-grid service-form">
-        <label>Stop<select id="serviceStop" required></select></label><label>Route<input id="routeNumber" required></label><label>Operator<input id="operator" required></label><label>Direction<input id="serviceDirection" required placeholder="e.g. eastbound"></label><label>Destination<input id="destination" required></label><label>Operating hours<input id="operatingHours" placeholder="e.g. 05:30–00:30"></label><label>Frequency type<select id="frequencyType"><option value="buses-per-hour">Buses per hour</option><option value="interval-minutes">Minutes between buses</option><option value="irregular">Irregular</option><option value="unknown">Unknown</option></select></label><label>Frequency value<input id="frequencyValue" type="number" min="0.1" step="0.1"></label><label>Day type<input id="dayType" value="Typical weekday"></label><label>Representative period<input id="period" value="10:00–16:00"></label><label class="wide">Qualification<input id="qualification" placeholder="Peak-only, school-day or irregular pattern"></label><label>Source title<input id="sourceTitle"></label><label>Source URL<input id="sourceUrl" type="url"></label><label class="wide">Notes<textarea id="serviceNotes"></textarea></label><button class="primary" type="submit">Add service</button>
-      </form>
-      <div class="table-wrap"><table><thead><tr><th>Route</th><th>Stop/direction</th><th>Destination</th><th>Frequency</th><th>Source state</th><th></th></tr></thead><tbody id="serviceRows"><tr><td colspan="6">No services recorded.</td></tr></tbody></table></div>
-    </section>
-
-    <section id="sources" class="panel"><div class="section-title"><div><h2>Sources</h2><p>Source links and retrieval dates used in this assessment.</p></div></div><ul id="sourceList"><li>No sources recorded.</li></ul></section>
-
-    <section class="panel"><div class="section-title"><div><h2>4. Save and export</h2><p>Exports are editable professional drafts and require planner review.</p></div></div><div class="button-row"><button id="saveRecord" class="primary">Save record</button><button id="downloadCsv">Download CSV</button><button id="downloadWord">Download Word tables</button></div><p id="saveStatus" class="status-message" aria-live="polite"></p></section>
-
-    <section id="diagnostics" class="panel"><div class="section-title"><div><h2>Diagnostics</h2><p>BUS-0.1.0 · schema 1.0.0 · mapping/export/diagnostics contracts 1.0.0</p></div></div><div id="diagnosticList">No current diagnostics.</div><button id="downloadDiagnostics">Download diagnostics</button></section>
+    <section id="diagnostics" class="panel"><div class="section-title"><div><h2>Diagnostics</h2><p>BUS-0.2.0 · self-contained corrective baseline</p></div></div><div id="diagnosticList">No current diagnostics.</div><button id="downloadDiagnostics">Download diagnostics</button></section>
   </main>
-  <footer>Transport Planner Toolkit · Commercial-grade internal platform · Professional draft outputs require planner review.</footer>
-  <script src="../../assets/vendor/leaflet/leaflet.js"></script>
-  <script type="module" src="assets/js/bus-app.js"></script>
+  <footer>Transport Planner Toolkit · Review build · Provider failure is never interpreted as zero stops.</footer>
+  <script src="assets/js/bus-bootstrap.js"></script>
 </body>
 </html>

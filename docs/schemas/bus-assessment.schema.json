@@ -1,28 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://eas.local/tpt/schemas/bus-assessment/1.0.0",
-  "title": "TPT Bus Assessment",
-  "schemaVersion": "1.0.0",
+  "$id": "https://eas.local/tpt/schemas/bus-assessment/1.1.0",
+  "title": "TPT Bus Core Assessment",
+  "schemaVersion": "1.1.0",
   "type": "object",
-  "required": ["schemaVersion", "assessmentId", "projectContext", "site", "stops", "services", "reviewState", "updatedAt"],
+  "required": ["schemaVersion", "assessmentId", "projectName", "site", "search", "stops", "updatedAt"],
   "properties": {
-    "schemaVersion": { "const": "1.0.0" },
+    "schemaVersion": { "const": "1.1.0" },
     "assessmentId": { "type": "string", "minLength": 1 },
-    "projectContext": { "type": "object", "required": ["projectId", "projectName"], "properties": { "projectId": { "type": "string", "minLength": 1 }, "projectName": { "type": "string", "minLength": 1 } }, "additionalProperties": false },
+    "projectName": { "type": "string", "minLength": 1 },
     "site": { "$ref": "#/$defs/site" },
+    "search": { "type": "object", "required": ["radiusM", "maximumStops"], "properties": { "radiusM": { "type": "number", "minimum": 200, "maximum": 3000 }, "maximumStops": { "type": "integer", "minimum": 1, "maximum": 50 }, "provider": { "type": ["string", "null"] } }, "additionalProperties": false },
     "stops": { "type": "array", "items": { "$ref": "#/$defs/stop" } },
-    "services": { "type": "array", "items": { "$ref": "#/$defs/service" } },
     "limitations": { "type": "array", "items": { "type": "string" } },
-    "reviewState": { "enum": ["unreviewed", "planner-reviewed"] },
     "updatedAt": { "type": "string", "format": "date-time" }
   },
   "$defs": {
     "coordinate": { "type": "object", "required": ["latitude", "longitude", "crs"], "properties": { "latitude": { "type": "number", "minimum": -90, "maximum": 90 }, "longitude": { "type": "number", "minimum": -180, "maximum": 180 }, "crs": { "const": "EPSG:4326" } }, "additionalProperties": false },
-    "site": { "type": "object", "required": ["address", "coordinate", "confirmed"], "properties": { "address": { "type": "string", "minLength": 1 }, "coordinate": { "$ref": "#/$defs/coordinate" }, "confirmed": { "type": "boolean" } }, "additionalProperties": false },
-    "source": { "type": "object", "required": ["title", "url", "retrievedAt"], "properties": { "title": { "type": "string", "minLength": 1 }, "url": { "type": "string", "format": "uri" }, "retrievedAt": { "type": "string", "format": "date-time" } }, "additionalProperties": false },
-    "stop": { "type": "object", "required": ["stopId", "name", "coordinate", "direction", "included", "verificationState", "sources"], "properties": { "stopId": { "type": "string", "minLength": 1 }, "sourceStopId": { "type": ["string", "null"] }, "pairId": { "type": ["string", "null"] }, "name": { "type": "string", "minLength": 1 }, "locality": { "type": "string" }, "coordinate": { "$ref": "#/$defs/coordinate" }, "direction": { "type": "string", "minLength": 1 }, "bearing": { "type": ["number", "null"], "minimum": 0, "exclusiveMaximum": 360 }, "included": { "type": "boolean" }, "inclusionReason": { "type": "string" }, "verificationState": { "enum": ["draft", "researched", "verified", "stale", "conflicting"] }, "sources": { "type": "array", "items": { "$ref": "#/$defs/source" } } }, "additionalProperties": false },
-    "frequency": { "type": "object", "required": ["type", "dayType", "period", "qualification"], "properties": { "type": { "enum": ["buses-per-hour", "interval-minutes", "irregular", "unknown"] }, "value": { "type": ["number", "null"], "minimum": 0 }, "dayType": { "type": "string", "minLength": 1 }, "period": { "type": "string", "minLength": 1 }, "qualification": { "type": "string" } }, "additionalProperties": false },
-    "service": { "type": "object", "required": ["serviceId", "stopId", "routeNumber", "operator", "direction", "destination", "frequency", "verificationState", "sources"], "properties": { "serviceId": { "type": "string", "minLength": 1 }, "stopId": { "type": "string", "minLength": 1 }, "routeNumber": { "type": "string", "minLength": 1 }, "operator": { "type": "string", "minLength": 1 }, "direction": { "type": "string", "minLength": 1 }, "destination": { "type": "string", "minLength": 1 }, "operatingHours": { "type": "string" }, "frequency": { "$ref": "#/$defs/frequency" }, "notes": { "type": "string" }, "verificationState": { "enum": ["draft", "researched", "verified", "stale", "conflicting"] }, "sources": { "type": "array", "items": { "$ref": "#/$defs/source" } } }, "additionalProperties": false }
+    "site": { "type": "object", "required": ["address", "coordinate", "confirmed"], "properties": { "address": { "type": "string", "minLength": 1 }, "coordinate": { "$ref": "#/$defs/coordinate" }, "confirmed": { "const": true } }, "additionalProperties": false },
+    "route": { "type": "object", "required": ["distanceM", "durationS", "status", "source"], "properties": { "distanceM": { "type": "number", "minimum": 0 }, "durationS": { "type": "number", "minimum": 0 }, "status": { "enum": ["routed", "estimated"] }, "source": { "type": "string", "minLength": 1 } }, "additionalProperties": false },
+    "stop": { "type": "object", "required": ["stopId", "identitySource", "name", "coordinate", "direction", "included", "straightLineM", "walk", "cycle"], "properties": { "stopId": { "type": "string", "minLength": 1 }, "naptanAtcoCode": { "type": ["string", "null"] }, "identitySource": { "enum": ["naptan", "osm-fallback"] }, "name": { "type": "string", "minLength": 1 }, "coordinate": { "$ref": "#/$defs/coordinate" }, "direction": { "type": "string", "minLength": 1 }, "included": { "type": "boolean" }, "straightLineM": { "type": "number", "minimum": 0 }, "walk": { "$ref": "#/$defs/route" }, "cycle": { "$ref": "#/$defs/route" } }, "additionalProperties": false }
   },
   "additionalProperties": false
 }

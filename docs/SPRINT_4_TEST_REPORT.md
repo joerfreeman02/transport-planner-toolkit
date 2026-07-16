@@ -1,4 +1,6 @@
-# Sprint 4 Bus Foundation — Test Report
+# Sprint 4 Bus Foundation — Superseded BUS-0.1.0 Test Report
+
+> BUS-0.1.0 was rejected by the Technical Director. This report is retained as historical evidence and is superseded by `SPRINT_4_CORRECTIVE_REPORT.md`.
 
 **Build:** TPT-BUS-190-20260716  
 **Bus module:** BUS-0.1.0 / BUS-FOUNDATION-010-20260716  
@@ -60,4 +62,3 @@ Environment: Codex in-app Chromium browser, local HTTP build.
 ## Release recommendation
 
 The implementation is suitable for controlled planner acceptance testing. It must remain a release candidate until the outstanding professional, browser/accessibility and Technical Director release gates are completed.
-

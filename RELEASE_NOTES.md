@@ -1,4 +1,14 @@
-# Release Notes — Sprint 4 Bus Foundation 1.9.0 release candidate
+# Release Notes — Sprint 4 corrective Bus core 1.9.0 review build
+
+## Corrective status
+
+BUS-0.1.0 was rejected and must not be approved or merged. BUS-0.2.0 replaces it with a self-contained startup and core stop/routing workflow. Service, Knowledge Library, assisted-research and reporting features are suspended.
+
+BUS-0.2.0 remains a review build until the exact deployed review URL passes the automated browser smoke test and the Technical Director reviews the corrective evidence.
+
+---
+
+# Superseded release notes — Sprint 4 Bus Foundation 1.9.0
 
 ## Sprint 4 purpose
 

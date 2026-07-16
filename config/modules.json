@@ -31,10 +31,10 @@
       "path": "modules/railway/index.html"
     },
     "bus": {
-      "version": "0.1.0",
-      "build": "BUS-FOUNDATION-010-20260716",
-      "schemaVersion": "1.0.0",
-      "status": "release-candidate",
+      "version": "0.2.0",
+      "build": "BUS-CORE-020-20260716",
+      "schemaVersion": "1.1.0",
+      "status": "corrective-review-build",
       "path": "modules/bus/index.html"
     }
   }

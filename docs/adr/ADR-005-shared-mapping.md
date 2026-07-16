@@ -10,7 +10,7 @@ Accessibility and Railway have confirmed working maps. Rewriting them would brea
 
 ## Decision
 
-Define a provider-neutral shared mapping contract and implement its first adapter for Bus. Do not migrate frozen modules during Sprint 4. The contract owns lifecycle, layers, marker events, attribution and accessible equivalents; Bus owns stop selection and assessment rules.
+Retain the provider-neutral shared mapping contract, but implement BUS-0.2.0 through a self-contained classic-script bootstrap and core until real-browser startup is proven. Do not migrate frozen modules during Sprint 4. Shared runtime adoption follows accepted browser evidence rather than preceding it.
 
 ## Consequences
 

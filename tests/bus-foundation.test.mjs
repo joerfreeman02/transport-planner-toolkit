@@ -9,5 +9,6 @@ test('opposite directions are preserved',()=>assert.match(core,/naptan:Indicator
 test('Overpass has sequential failover',()=>assert.ok((core.match(/api\/interpreter/g)||[]).length>=3));
 test('walking and cycling routing are explicit',()=>{assert.match(core,/routeMatrix\('walk'\)/);assert.match(core,/routeMatrix\('cycle'\)/);assert.match(core,/status:'estimated'/)});
 test('provider failure is distinct from zero results',()=>{assert.match(core,/BUS_STOP_DISCOVERY_FAILED/);assert.match(core,/BUS_ZERO_RESULTS/)});
-test('suspended service and Word features are absent',()=>{assert.doesNotMatch(html,/Directional services/);assert.doesNotMatch(html,/Download Word/)});
-console.log(`\n${passed} corrective Bus baseline tests passed.`);
+test('automatic wording and polished outputs are present',()=>{assert.doesNotMatch(html,/Generate wording/);assert.match(html,/Download Word tables/);assert.doesNotMatch(core,/'Typical weekday frequency'/);assert.match(core,/'Service pattern'/)});
+test('shared publishing uses approved client',()=>{assert.match(html,/shared-library\.js/);assert.match(html,/Publish to Shared Library/)});
+console.log(`\n${passed} Bus production baseline tests passed.`);

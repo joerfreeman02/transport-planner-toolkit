@@ -1,24 +1,14 @@
-# BUS-1.0.0 test results
+# BUS-1.1.0 production test results
 
 Date: 16 July 2026  
-Build: `BUS-RESET-100-20260716`  
-Branch: `sprint-4-bus-foundation`
+Build: `BUS-PROD-110-20260716`
 
-## Exact deployed review URL
-
-`https://raw.githack.com/joerfreeman02/transport-planner-toolkit/sprint-4-bus-foundation/modules/bus/index.html`
-
-Real-browser result using `CB7 4AH`: BUS-1.0.0 initialised, map rendered, address returned, confirmed draggable marker enabled discovery, and 20 stop rows/markers completed walking and cycling processing. No console warnings or errors were recorded.
-
-Automated deployed smoke result: map, confirmation gate, opposite-direction separation, walking/cycling routing, self-instructing export, completed import, linked Knowledge Library, DOCX and CSV all passed. Console and uncaught error collections were empty. Controlled stop/routing fixtures make this workflow test deterministic; the separate real-browser result above verifies live providers.
-
-## Static and regression results
-
-- JavaScript syntax checks: passed.
-- Bus reset assertions: 9/9 passed.
-- Bus HTML path audit: passed.
-- Accessibility classification regression: 6/6 passed.
-- Railway regression: 27/27 passed.
-- Accepted shared Word export formatter: 13/13 passed.
-- Protected-path diff against `91b856f`: no changes outside `modules/bus/`.
-
+- Static Bus production checks: 10/10 passed.
+- Bus polish checks: 13/13 passed.
+- Browser workflow: optional project name, address, confirm gate, opposite directions, transparent unnamed stop, routing, export/import, automatic wording, DOCX and CSV passed.
+- Ambiguous weekday-frequency column absent; Operating period and Service pattern present.
+- Shared-library browser tests: read-only loading, valid/invalid tokens, session/remembered storage, Rail/Bus publication, stale protection and conflict retry passed.
+- Token absent from DOM, console, diagnostics, exports and tracked source.
+- Genuine DOCX package, A4 portrait, EAS margins, table captions, column geometry and non-duplication passed structural QA.
+- LibreOffice was unavailable and installed Word did not complete reliable headless PDF conversion; rendered-page visual QA could not be completed on this workstation.
+- Accessibility: 6/6; Railway: 27/27; shared Word formatter: 13/13; contracts: 6/6; foundation regression: passed.

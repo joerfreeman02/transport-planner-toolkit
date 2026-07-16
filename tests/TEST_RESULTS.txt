@@ -1,35 +1,12 @@
-PASS required file: index.html
-PASS required file: assets/css/shell.css
-PASS required file: assets/js/shell.js
-PASS required file: modules/accessibility/index.html
-PASS required file: modules/stats19/index.html
-PASS required file: modules/railway/index.html
-PASS required file: modules/bus/index.html
-PASS required file: config/modules.json
-PASS railway marker: Railway Assessment
-PASS railway marker: Find and route stations
-PASS railway marker: Rail Knowledge Library
-PASS accessibility marker: Accessibility Assessment
-PASS accessibility marker: Find nearest facilities
-PASS STATS19 marker: Collision Record Cards
-PASS STATS19 marker: fileinput
-
-All foundation regression checks passed.
-Sprint 4 Bus Foundation — 16 July 2026
-Automated foundation: PASS (13/13)
-Word export: PASS (13/13)
-Shared contracts: PASS (6/6)
-Bus domain/schema: PASS (8/8)
+Toolkit 2.0.0 / BUS-1.1.0 / Shared Library 1.0.0 — 16 July 2026
+Core engine: PASS (13/13)
 Accessibility regression: PASS (6/6)
 Railway regression: PASS (27/27)
-Browser smoke: PASS — Dashboard, Bus, Accessibility, Railway and STATS19 loaded without console errors
-Release status: release candidate; professional acceptance and Technical Director production approval outstanding
-Sprint 4 corrective Bus core — BUS-0.2.0 — 16 July 2026
-Classic bootstrap/static controls: PASS (9/9)
-Automated local Chromium smoke: PASS
-Map/address/site/stop/routing/map-table workflow: PASS
-Deliberate core-asset failure displays startup diagnostic: PASS
-Console errors: 0
-Uncaught JavaScript errors: 0
-Failed requests / HTTP errors: 0
-Deployed review URL retest: pending corrective branch push
+Shared Word formatter: PASS (13/13)
+Shared contracts: PASS (6/6)
+Bus production static: PASS (10/10)
+Bus polish: PASS (13/13)
+Bus browser workflow: PASS (14 checks; console errors 0; uncaught errors 0)
+Shared Library browser/security: PASS (read-only, token lifecycle, Rail/Bus publishing, stale protection, conflict retry, audit commits)
+DOCX: PASS structural A4/EAS/geometry/content checks; visual conversion unavailable on engineering workstation
+Frozen foundation regression: PASS

@@ -1,57 +1,20 @@
-# Release Notes — Sprint 4 corrective Bus core 1.9.0 review build
+# Toolkit 2.0.0 production release candidate
 
-## Corrective status
+Builds:
 
-BUS-0.1.0 was rejected and must not be approved or merged. BUS-0.2.0 replaces it with a self-contained startup and core stop/routing workflow. Service, Knowledge Library, assisted-research and reporting features are suspended.
+- Toolkit `TPT-SHARED-200-20260716`
+- Bus `BUS-PROD-110-20260716`
+- Shared Library `SHARED-LIB-1.0.0-20260716`
 
-BUS-0.2.0 remains a review build until the exact deployed review URL passes the automated browser smoke test and the Technical Director reviews the corrective evidence.
+This release completes Sprint 4 Bus polish and introduces the approved interim shared-company-library architecture. Shared masters are readable without authentication. A locally entered fine-grained GitHub token enables allowlisted publication to the three approved knowledge files only.
 
----
+Bus wording now refreshes automatically. The Bus Service Summary contains Route, Operator, Origin / destination, Principal locations, Operating period and Service pattern; it does not export a bare weekday-frequency column.
 
-# Superseded release notes — Sprint 4 Bus Foundation 1.9.0
+Accessibility AA-1.2.0, Railway RAIL-4.4.0, STATS19 STATS-1.0.0 and Dashboard DASH-1.0.0 behaviour remain protected.
 
-## Sprint 4 purpose
+Known limitations:
 
-Establish Bus Assessment as the reference architecture for future transport modes while formalising shared contracts and protecting frozen baselines.
-
-## Sprint 4 additions
-
-- BUS-0.1.0 release-candidate workflow for site confirmation, mapped stop discovery, directional stop/service evidence, local save and professional-draft exports.
-- Shared contract version 1.0.0 for mapping, export, diagnostics, Project Data Model context, module outputs and Knowledge Library records.
-- Bus schema 1.0.0 and ADR-001 to ADR-007.
-- Controlled identities DASH-1.0.0 and STATS-1.0.0.
-
-## Review status
-
-This is not approved for production until automated tests, frozen-baseline browser regression, professional acceptance and Technical Director release approval are recorded.
-
----
-
-# Previous release — Sprint 3 Formatting and Exporting 1.7
-
-## Purpose
-
-This release aligns the Accessibility and Railway report-table exports with the EAS 2026 Word template while retaining the accepted Railway functional baseline.
-
-## Baseline retained
-
-- Accessibility discovery, classification, mapping and routing
-- STATS19 Collision Record Cards existing working tool
-- Railway 4.2.1 map, movable site marker, walking/cycling routes, station de-duplication, directional TPH, research and Knowledge Library behaviour
-- Bus Assessment placeholder
-
-## Added
-
-- Accessibility category heading rows that explain the differing facility-distance groups
-- Railway step-free access ticks/crosses and per-station service/journey summary rows
-- Separate Railway directional-TPH Word export
-- Shared EAS 2026 table formatter used by both modules
-- Rich Word-table copy with a plain-text fallback
-- Genuine `.docx` downloads with A4 page settings, Roboto typography, orange headers and alternating grey rows
-- Accessibility local-facilities report table
-- Railway station-access and directional service-summary report tables
-- Cross-module export regression tests
-
-## Not changed
-
-This sprint does not alter station discovery, map interaction, route plotting, classification, assisted research or library merge logic.
+- The fine-grained token approach is an approved interim no-backend design; connected editors must protect and periodically review their token.
+- Stop discovery continues to use controlled OSM fallback where direct NaPTAN infrastructure is unavailable; assisted research verifies identifiers.
+- Local drafts remain browser-scoped until successfully published or manually exported.
+- Automated DOCX structural and download testing passed. LibreOffice was unavailable and the installed Word COM renderer did not complete reliable headless visual conversion on the engineering workstation.

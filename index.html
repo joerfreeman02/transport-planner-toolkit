@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#164e4b">
-  <title>Transport Planner Toolkit — TPT 1.9.0</title>
-  <link rel="stylesheet" href="assets/css/shell.css?build=TPT-FOUNDATION-160-20260714">
+  <title>Transport Planner Toolkit — TPT 2.0.0</title>
+  <link rel="stylesheet" href="assets/css/shell.css?build=TPT-SHARED-200-20260716">
 </head>
 <body>
   <header class="hero">
@@ -15,7 +15,7 @@
         <h1>Transport Planner Toolkit</h1>
         <p class="tagline">A growing suite of traceable, report-focused tools designed to remove repetitive work while preserving professional review and engineering judgement.</p>
       </div>
-      <span class="build">TPT 1.9.0 · TPT-BUS-190-20260716 · Dashboard DASH-1.0.0</span>
+      <span class="build">TPT 2.0.0 · TPT-SHARED-200-20260716 · Dashboard DASH-1.0.0</span>
     </div>
   </header>
   <main>
@@ -27,6 +27,18 @@
         <div style="display:flex;gap:8px"><button id="saveProject" class="primary">Save</button><button id="clearProject" class="secondary">Clear</button></div>
       </div>
       <div id="projectStatus" class="project-status"></div>
+    </section>
+
+    <section class="project-card" id="sharedLibrarySettings">
+      <div class="section-title"><div><h2>Shared Company Knowledge Library</h2><p>Everyone can read the deployed company masters. Authorised editors can publish reviewed local proposals using a fine-grained GitHub token.</p></div><span id="sharedConnectionBadge" class="status existing">Read only</span></div>
+      <p><strong>Treat the access token like a password.</strong> It is stored only in this browser when requested, cleared from the field after connection, and never included in diagnostics or exports.</p>
+      <div class="project-grid">
+        <div><label for="sharedEditor">Editor/display name</label><input id="sharedEditor" autocomplete="name"></div>
+        <div><label for="sharedToken">GitHub access token</label><input id="sharedToken" type="password" autocomplete="off" spellcheck="false"></div>
+        <div><label class="check-label"><input id="sharedRemember" type="checkbox"> Remember on this device</label></div>
+      </div>
+      <div class="module-actions"><button id="sharedConnect" class="primary">Connect and test</button><button id="sharedDisconnect" class="secondary">Disconnect / forget token</button><button id="sharedRefresh" class="secondary">Refresh shared masters</button><button id="publishRail" class="secondary" disabled>Publish local Rail proposals</button></div>
+      <div id="sharedStatus" class="project-status" aria-live="polite">Loading shared masters…</div>
     </section>
 
     <h2 class="modules-title">Modules</h2>
@@ -61,6 +73,7 @@
     </section>
   </main>
   <footer>Transport Planner Toolkit · Commercial-grade internal platform · Data remains in the browser unless a module explicitly uses an external mapping, geocoding or routing service.</footer>
-  <script src="assets/js/shell.js?build=TPT-FOUNDATION-160-20260714"></script>
+  <script src="assets/js/shared-library.js?build=SHARED-LIB-100-20260716"></script>
+  <script src="assets/js/shell.js?build=TPT-SHARED-200-20260716"></script>
 </body>
 </html>

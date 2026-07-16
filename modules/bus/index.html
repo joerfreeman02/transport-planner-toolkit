@@ -3,20 +3,20 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#173f5f">
-  <title>Bus Assessment — BUS-1.0.0</title>
-  <link rel="stylesheet" href="../../assets/vendor/leaflet/leaflet.css?build=BUS-1.0.0-20260716">
+  <title>Bus Assessment — BUS-1.1.0</title>
+  <link rel="stylesheet" href="../../assets/vendor/leaflet/leaflet.css?build=BUS-1.1.0-20260716">
   <link rel="stylesheet" href="../../assets/css/shell.css">
-  <link rel="stylesheet" href="assets/css/bus.css?build=BUS-1.0.0-20260716">
+  <link rel="stylesheet" href="assets/css/bus.css?build=BUS-1.1.0-20260716">
 </head>
 <body>
-<header class="hero"><div class="hero-inner"><div><a class="home" href="../../">← Toolkit home</a><p class="eyebrow">Transport Planner Toolkit</p><h1>Bus Assessment</h1><p class="tagline">Stop access, assisted service research and Transport Statement outputs.</p></div><span class="build">BUS-1.0.0 · BUS-RESET-100-20260716</span></div></header>
+<header class="hero"><div class="hero-inner"><div><a class="home" href="../../">← Toolkit home</a><p class="eyebrow">Transport Planner Toolkit</p><h1>Bus Assessment</h1><p class="tagline">Stop access, assisted service research and Transport Statement outputs.</p></div><span class="build">BUS-1.1.0 · BUS-PROD-110-20260716</span></div></header>
 <div id="startupStatus" class="startup-status" role="status" aria-live="assertive">Starting Bus module…</div>
 <div id="startupFailure" class="startup-failure" role="alert" hidden><strong>Bus module failed to initialise</strong><p id="startupFailureDetail">A required asset or browser function failed.</p><button id="startupDiagnostic">Download startup diagnostic</button></div>
 <nav class="module-nav" aria-label="Bus module sections"><button class="nav-link active" data-page="assessment">Assessment</button><button class="nav-link" data-page="research">Research &amp; Library</button><button class="nav-link" data-page="outputs">Outputs</button><button class="nav-link" data-page="sources">Sources</button><button class="nav-link" data-page="diagnostics">Diagnostics</button></nav>
 <main id="assessment" aria-busy="true">
  <div class="tab-page active" data-tab-page="assessment">
   <section class="panel"><div class="section-title"><div><span class="step">1</span><h2>Project and site</h2><p>Enter the project, locate the site, adjust the marker and confirm it.</p></div><span id="siteBadge" class="badge">Not confirmed</span></div>
-   <div class="form-grid"><label>Project/site name<input id="projectName" required></label><label>UK address or postcode<input id="siteAddress" required></label><button id="findAddress" class="primary" disabled>Find address</button></div>
+   <div class="form-grid"><label>Project name (optional)<input id="projectName"></label><label>UK address or postcode<input id="siteAddress" required></label><button id="findAddress" class="primary" disabled>Find address</button></div>
    <div id="searchResults" class="search-results" aria-live="polite"></div><p id="siteStatus" class="status-message" aria-live="polite">Waiting for module startup.</p>
    <div id="map" class="map" aria-label="Interactive Bus Assessment map"></div><p id="mapSummary" class="assistive-summary">No site or stops are currently shown.</p>
    <div class="button-row"><button id="confirmSite" class="primary" disabled>Confirm site</button></div>
@@ -31,19 +31,20 @@
  </div>
  <div class="tab-page" data-tab-page="research" hidden>
   <section class="panel"><div class="section-title"><div><span class="step">4</span><h2>Research and Knowledge Library</h2><p>Export one self-instructing request, attach it to a fresh ChatGPT conversation, then import the completed JSON.</p></div></div>
-   <div class="button-row"><button id="exportResearch" class="primary" disabled>Export bus research request</button><label class="button-like">Import completed bus research<input id="importResearch" type="file" accept=".json,application/json" hidden></label></div><p id="researchStatus" class="status-message">Select at least one discovered stop.</p>
+   <div class="button-row"><button id="exportResearch" class="primary" disabled>Export bus research request</button><label class="button-like">Import completed bus research<input id="importResearch" type="file" accept=".json,application/json" hidden></label><button id="publishShared" disabled>Publish to Shared Library</button></div><p id="researchStatus" class="status-message">Select at least one discovered stop.</p><aside id="researchSummary" class="research-summary" aria-live="polite"><strong>Research pending</strong><ul><li>No selected stops</li><li>No verified routes</li><li>Shared library loading</li></ul></aside>
   </section>
   <section class="panel"><h2>Bus Knowledge Library</h2><p id="knowledgeStatus">No saved records.</p><p class="note">Verified newer records are preserved. A downloadable backup is created before every completed-research import.</p><div class="button-row"><button id="exportKnowledge">Export library</button><button id="backupKnowledge">Download backup</button><button id="clearKnowledge" class="danger">Clear library</button></div></section>
  </div>
  <div class="tab-page" data-tab-page="outputs" hidden>
   <section class="panel"><div class="section-title"><div><span class="step">5</span><h2>Outputs</h2><p>EAS-formatted genuine DOCX, CSV tables and editable Transport Statement wording.</p></div></div>
-   <div class="button-row"><button id="wordBtn" class="primary" disabled>Download Word tables</button><button id="csvBtn" disabled>Download CSV tables</button><button id="generateWording" disabled>Generate wording</button></div><p id="outputStatus" class="status-message">Import researched service records to enable complete outputs.</p>
+   <div class="button-row"><button id="wordBtn" class="primary" disabled>Download Word tables</button><button id="csvBtn" disabled>Download CSV tables</button></div><p id="outputStatus" class="status-message">Import researched service records to enable complete outputs.</p>
   </section>
   <section class="panel"><h2>Transport Statement wording</h2><textarea id="wording" rows="14" placeholder="Generated route-by-route wording will appear here."></textarea><div class="button-row"><button id="copyWording">Copy wording</button></div></section>
  </div>
  <div class="tab-page" data-tab-page="sources" hidden><section class="panel"><div class="section-title"><div><span class="step">6</span><h2>Sources</h2><p>Consolidated evidence register for imported stop and route records.</p></div></div><div class="table-wrap"><table><thead><tr><th>Stop / route</th><th>Source</th><th>Retrieved</th><th>Verification</th></tr></thead><tbody id="sourceRows"><tr><td colspan="4">No researched sources loaded.</td></tr></tbody></table></div></section></div>
- <div class="tab-page" data-tab-page="diagnostics" hidden><section class="panel"><div class="section-title"><div><span class="step">7</span><h2>Diagnostics</h2><p>BUS-1.0.0 · self-contained reset build</p></div></div><div id="diagnosticList">No current diagnostics.</div><button id="downloadDiagnostics">Download diagnostics</button></section></div>
+ <div class="tab-page" data-tab-page="diagnostics" hidden><section class="panel"><div class="section-title"><div><span class="step">7</span><h2>Diagnostics</h2><p>BUS-1.1.0 · production release candidate</p></div></div><div id="diagnosticList">No current diagnostics.</div><button id="downloadDiagnostics">Download diagnostics</button></section></div>
 </main>
 <footer>Transport Planner Toolkit · Sprint 4 review branch · External provider failure is never interpreted as zero stops.</footer>
-<script src="assets/js/bus-bootstrap.js?build=BUS-1.0.0-20260716"></script>
+<script src="../../assets/js/shared-library.js?build=SHARED-LIB-100-20260716"></script>
+<script src="assets/js/bus-bootstrap.js?build=BUS-1.1.0-20260716"></script>
 </body></html>

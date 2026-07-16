@@ -1,9 +1,9 @@
 {
   "toolkit": {
-    "version": "1.9.0",
-    "build": "TPT-BUS-190-20260716",
+    "version": "2.0.0",
+    "build": "TPT-SHARED-200-20260716",
     "releaseDate": "2026-07-16",
-    "status": "sprint-4-bus-foundation-release-candidate"
+    "status": "sprint-4-bus-production-release-candidate"
   },
   "modules": {
     "dashboard": {
@@ -31,11 +31,16 @@
       "path": "modules/railway/index.html"
     },
     "bus": {
-      "version": "0.2.0",
-      "build": "BUS-CORE-020-20260716",
-      "schemaVersion": "1.1.0",
-      "status": "corrective-review-build",
+      "version": "1.1.0",
+      "build": "BUS-PROD-110-20260716",
+      "schemaVersion": "1.0.0",
+      "status": "production-release-candidate",
       "path": "modules/bus/index.html"
     }
+  },
+  "sharedLibrary": {
+    "version": "1.0.0",
+    "build": "SHARED-LIB-1.0.0-20260716",
+    "status": "production-release-candidate-interim-no-backend"
   }
 }

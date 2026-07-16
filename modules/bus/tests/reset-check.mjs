@@ -12,6 +12,10 @@ const checks=[
  ['NaPTAN-first matching',js.includes("return x.naptanCode?'naptan:'")],
  ['backup before import',js.includes("downloadBackup('pre-import')")],
  ['accepted Word formatter',js.includes("assets/js/word-export.js")],
- ['Word and CSV outputs',js.includes('downloadWordDocument')&&js.includes("'.csv'")]
+ ['Word and CSV outputs',js.includes('downloadWordDocument')&&js.includes("'.csv'")],
+ ['project name optional',!html.includes('id="projectName" required')&&!js.includes('Enter a project name before confirming')],
+ ['automatic wording',!html.includes('Generate wording')&&js.includes('generateWording();renderResearchSummary()')],
+ ['plain service table',!js.includes("'Typical weekday frequency'")&&js.includes("'Service pattern'")&&js.includes("'Operating period'")],
+ ['transparent unnamed stop',js.includes('Name unavailable — research required')]
 ];
 let failed=0;for(const [name,...values] of checks){const ok=values.every(Boolean);console.log((ok?'PASS ':'FAIL ')+name);if(!ok)failed++;}if(failed)process.exit(1);console.log('\n'+checks.length+' Bus reset checks passed.');

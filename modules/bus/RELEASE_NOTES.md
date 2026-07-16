@@ -1,13 +1,7 @@
-# BUS-1.0.0 review release
+# BUS-1.1.0 production release candidate
 
-Build: `BUS-RESET-100-20260716`
+Build: `BUS-PROD-110-20260716`
 
-This Sprint 4 review build provides the first complete Bus Assessment vertical workflow. It remains isolated to `modules/bus/` and is not approved for `main`.
+BUS-1.1.0 is the polished Sprint 4 production candidate. Project name is optional; wording refreshes automatically; service frequencies are presented as qualified planning language; operating periods are readable; and shared verified stop/route records are loaded for reuse.
 
-Known limitations:
-
-- Browser stop discovery uses OSM with mapped NaPTAN/ATCO identifiers when present. Assisted research must verify identifiers before permanent reuse.
-- External address, stop and routing providers can be unavailable or throttled; failure is visible and routing falls back to clearly labelled estimates.
-- Knowledge Library data is stored in the current browser and should be exported for controlled backup/transfer.
-- Research quality remains dependent on primary-source availability and completed JSON validation.
-
+The accepted EAS DOCX/CSV framework is unchanged. Stop–route relationships remain local/project-specific while reusable Bus Stop and Bus Route records can be published to the shared masters by authorised editors.

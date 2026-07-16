@@ -2,7 +2,7 @@
   "schema": "tpt-rail-knowledge-v3",
   "version": 2,
   "libraryBuild": "SHARED-LIB-1.1.0-20260716",
-  "updatedAt": "2026-07-16T13:16:02.056Z",
+  "updatedAt": "2026-07-16T13:20:37.365Z",
   "records": [
     {
       "schema": "tpt-rail-knowledge-v3",
@@ -3293,6 +3293,2096 @@
       ],
       "editorName": "Joe Freeman",
       "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6135938648",
+      "canonicalName": "Theobalds Grove",
+      "name": "Theobalds Grove",
+      "mode": "London Overground",
+      "coordinates": {
+        "lat": 51.6922334,
+        "lon": -0.0350092
+      },
+      "identifiers": {
+        "crs": "TGA",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6135938648"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GTHBLDSG/theobalds-grove-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Theobalds Grove Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "London Overground",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GTHBLDSG/theobalds-grove-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Theobalds Grove Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Weaver line (Southbury Loop)",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 4,
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Exact typical weekday total requires time-band calculation where stopping patterns overlap."
+        },
+        "frequencyByDestination": {
+          "value": [],
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination-level TPH requires time-band calculation from the current timetable."
+        },
+        "servicePattern": {
+          "value": "Typically 2 trains per hour towards London Liverpool Street and 2 trains per hour towards Cheshunt.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Typical weekday daytime pattern; check journey planner before travel."
+        },
+        "frequency": {
+          "value": "Typically 4 departures per hour in total on weekdays.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Cheshunt, Seven Sisters, Hackney Downs and London Liverpool Street",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal destinations summary; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct local and London rail connections via Cheshunt, Seven Sisters, Hackney Downs and London Liverpool Street, with onward interchange available at principal corridor stations.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Interchange opportunities are not necessarily direct services."
+        },
+        "cycleParking": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTHBLDSG/theobalds-grove-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Theobalds Grove Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "stepFree": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTHBLDSG/theobalds-grove-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Theobalds Grove Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "ticketing": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTHBLDSG/theobalds-grove-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Theobalds Grove Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "waiting": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTHBLDSG/theobalds-grove-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Theobalds Grove Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "toilets": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTHBLDSG/theobalds-grove-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Theobalds Grove Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "carParking": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTHBLDSG/theobalds-grove-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Theobalds Grove Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "notes": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTHBLDSG/theobalds-grove-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Theobalds Grove Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:32.404Z",
+      "updatedAt": "2026-07-16T13:20:37.365Z",
+      "reviewFlags": [
+        "frequency_review_required",
+        "facilities_review_required"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6137852391",
+      "canonicalName": "Waltham Cross",
+      "name": "Waltham Cross",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.6847637,
+        "lon": -0.0264754
+      },
+      "identifiers": {
+        "crs": "WLC",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6137852391"
+      },
+      "fields": {
+        "manager": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/wlc",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Waltham Cross Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/wlc",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Waltham Cross Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "West Anglia Main Line",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Exact typical weekday total requires time-band calculation where stopping patterns overlap."
+        },
+        "frequencyByDestination": {
+          "value": [],
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination-level TPH requires time-band calculation from the current timetable."
+        },
+        "servicePattern": {
+          "value": "Regular weekday services operate towards London Liverpool Street/Stratford and north towards Hertford East, Bishop's Stortford and Cambridge; stopping patterns vary.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Summary verified at corridor level; exact train-by-train pattern varies."
+        },
+        "frequency": {
+          "value": "Regular weekday service; exact combined TPH requires timetable review.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "London Liverpool Street, Stratford, Tottenham Hale, Cheshunt, Broxbourne, Hertford East and selected northbound destinations",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal destinations summary; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct local and London rail connections via London Liverpool Street, Stratford, Tottenham Hale, Cheshunt, Broxbourne, Hertford East and selected northbound destinations, with onward interchange available at principal corridor stations.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Interchange opportunities are not necessarily direct services."
+        },
+        "cycleParking": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/wlc",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Waltham Cross Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "stepFree": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/wlc",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Waltham Cross Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "ticketing": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/wlc",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Waltham Cross Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "waiting": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/wlc",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Waltham Cross Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "toilets": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/wlc",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Waltham Cross Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "carParking": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/wlc",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Waltham Cross Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "notes": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/wlc",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Waltham Cross Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:32.904Z",
+      "updatedAt": "2026-07-16T13:20:37.365Z",
+      "reviewFlags": [
+        "frequency_review_required",
+        "facilities_review_required"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/9968666772",
+      "canonicalName": "Royal Gunpowder Mills Railway",
+      "name": "Royal Gunpowder Mills Railway",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.6941835,
+        "lon": -0.0121029
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/9968666772"
+      },
+      "fields": {
+        "manager": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "operators": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "lines": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "frequencyTotal": {
+          "value": 0,
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "frequencyByDestination": {
+          "value": [],
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "servicePattern": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "frequency": {
+          "value": "No National Rail service verified.",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "destinations": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "journeyOpportunities": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "cycleParking": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "stepFree": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "ticketing": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "waiting": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "toilets": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "carParking": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "notes": {
+          "value": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station.",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        }
+      },
+      "createdAt": "2026-07-16T13:16:33.406Z",
+      "updatedAt": "2026-07-16T13:20:37.365Z",
+      "reviewFlags": [
+        "not_national_rail",
+        "classification_review_required"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6135938647",
+      "canonicalName": "Turkey Street",
+      "name": "Turkey Street",
+      "mode": "London Overground",
+      "coordinates": {
+        "lat": 51.673233,
+        "lon": -0.0469695
+      },
+      "identifiers": {
+        "crs": "TUR",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6135938647"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GTURKYST/turkey-street-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Turkey Street Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "London Overground",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GTURKYST/turkey-street-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Turkey Street Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Weaver line (Southbury Loop)",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 4,
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Exact typical weekday total requires time-band calculation where stopping patterns overlap."
+        },
+        "frequencyByDestination": {
+          "value": [],
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination-level TPH requires time-band calculation from the current timetable."
+        },
+        "servicePattern": {
+          "value": "Typically 2 trains per hour towards London Liverpool Street and 2 trains per hour towards Cheshunt.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Typical weekday daytime pattern; check journey planner before travel."
+        },
+        "frequency": {
+          "value": "Typically 4 departures per hour in total on weekdays.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Cheshunt, Seven Sisters, Hackney Downs and London Liverpool Street",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal destinations summary; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct local and London rail connections via Cheshunt, Seven Sisters, Hackney Downs and London Liverpool Street, with onward interchange available at principal corridor stations.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Interchange opportunities are not necessarily direct services."
+        },
+        "cycleParking": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTURKYST/turkey-street-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Turkey Street Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "stepFree": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTURKYST/turkey-street-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Turkey Street Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "ticketing": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTURKYST/turkey-street-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Turkey Street Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "waiting": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTURKYST/turkey-street-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Turkey Street Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "toilets": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTURKYST/turkey-street-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Turkey Street Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "carParking": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTURKYST/turkey-street-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Turkey Street Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "notes": {
+          "value": "TfL lists station facilities and accessibility information on its official station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GTURKYST/turkey-street-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Turkey Street Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:33.906Z",
+      "updatedAt": "2026-07-16T13:20:37.365Z",
+      "reviewFlags": [
+        "frequency_review_required",
+        "facilities_review_required"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/3749263909",
+      "canonicalName": "Cheshunt",
+      "name": "Cheshunt",
+      "mode": "London Overground",
+      "coordinates": {
+        "lat": 51.7028638,
+        "lon": -0.0237804
+      },
+      "identifiers": {
+        "crs": "CHN",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/3749263909"
+      },
+      "fields": {
+        "manager": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Greater Anglia and London Overground",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "West Anglia Main Line and Weaver line (Southbury Loop)",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Exact typical weekday total requires time-band calculation where stopping patterns overlap."
+        },
+        "frequencyByDestination": {
+          "value": [],
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination-level TPH requires time-band calculation from the current timetable."
+        },
+        "servicePattern": {
+          "value": "Served by Greater Anglia on the West Anglia corridor and by London Overground Weaver line services to London Liverpool Street.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Summary verified at corridor level; exact train-by-train pattern varies."
+        },
+        "frequency": {
+          "value": "Regular weekday service; exact combined TPH requires timetable review.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "London Liverpool Street, Stratford, Tottenham Hale, Broxbourne, Hertford East, Bishop's Stortford and intermediate Weaver line stations",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal destinations summary; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct local and London rail connections via London Liverpool Street, Stratford, Tottenham Hale, Broxbourne, Hertford East, Bishop's Stortford and intermediate Weaver line stations, with onward interchange available at principal corridor stations.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Interchange opportunities are not necessarily direct services."
+        },
+        "cycleParking": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "stepFree": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "ticketing": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "waiting": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "toilets": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "carParking": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "notes": {
+          "value": "Facilities require confirmation against the current official station page.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:34.406Z",
+      "updatedAt": "2026-07-16T13:20:37.365Z",
+      "reviewFlags": [
+        "frequency_review_required",
+        "facilities_review_required"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6137852390",
+      "canonicalName": "Enfield Lock",
+      "name": "Enfield Lock",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.6706112,
+        "lon": -0.0285689
+      },
+      "identifiers": {
+        "crs": "ENL",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6137852390"
+      },
+      "fields": {
+        "manager": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/enl",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Enfield Lock Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/enl",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Enfield Lock Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "West Anglia Main Line",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Exact typical weekday total requires time-band calculation where stopping patterns overlap."
+        },
+        "frequencyByDestination": {
+          "value": [],
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination-level TPH requires time-band calculation from the current timetable."
+        },
+        "servicePattern": {
+          "value": "Regular weekday services operate south towards London/Stratford and north towards Hertford East or Bishop's Stortford; stopping patterns vary.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Summary verified at corridor level; exact train-by-train pattern varies."
+        },
+        "frequency": {
+          "value": "Regular weekday service; exact combined TPH requires timetable review.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "London Liverpool Street or Stratford, Tottenham Hale, Cheshunt, Broxbourne and selected northbound destinations",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal destinations summary; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct local and London rail connections via London Liverpool Street or Stratford, Tottenham Hale, Cheshunt, Broxbourne and selected northbound destinations, with onward interchange available at principal corridor stations.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Interchange opportunities are not necessarily direct services."
+        },
+        "cycleParking": {
+          "value": "Part-time ticket office, ticket machine, seating, no waiting room or toilets; step-free access to both platforms; 6 unsheltered cycle spaces; no station car-park information listed.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/enl",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Enfield Lock Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "stepFree": {
+          "value": "Part-time ticket office, ticket machine, seating, no waiting room or toilets; step-free access to both platforms; 6 unsheltered cycle spaces; no station car-park information listed.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/enl",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Enfield Lock Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "ticketing": {
+          "value": "Part-time ticket office, ticket machine, seating, no waiting room or toilets; step-free access to both platforms; 6 unsheltered cycle spaces; no station car-park information listed.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/enl",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Enfield Lock Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "waiting": {
+          "value": "Part-time ticket office, ticket machine, seating, no waiting room or toilets; step-free access to both platforms; 6 unsheltered cycle spaces; no station car-park information listed.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/enl",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Enfield Lock Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "toilets": {
+          "value": "Part-time ticket office, ticket machine, seating, no waiting room or toilets; step-free access to both platforms; 6 unsheltered cycle spaces; no station car-park information listed.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/enl",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Enfield Lock Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "carParking": {
+          "value": "Part-time ticket office, ticket machine, seating, no waiting room or toilets; step-free access to both platforms; 6 unsheltered cycle spaces; no station car-park information listed.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/enl",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Enfield Lock Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "notes": {
+          "value": "Part-time ticket office, ticket machine, seating, no waiting room or toilets; step-free access to both platforms; 6 unsheltered cycle spaces; no station car-park information listed.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/enl",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Enfield Lock Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:34.906Z",
+      "updatedAt": "2026-07-16T13:20:37.365Z",
+      "reviewFlags": [
+        "frequency_review_required",
+        "facilities_review_required"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/9968666754",
+      "canonicalName": "Powdermill Cut",
+      "name": "Powdermill Cut",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.6995763,
+        "lon": -0.013182
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/9968666754"
+      },
+      "fields": {
+        "manager": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "operators": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "lines": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "frequencyTotal": {
+          "value": 0,
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "frequencyByDestination": {
+          "value": [],
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "servicePattern": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "frequency": {
+          "value": "No National Rail service verified.",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "destinations": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "journeyOpportunities": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "cycleParking": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "stepFree": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "ticketing": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "waiting": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "toilets": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "carParking": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        },
+        "notes": {
+          "value": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station.",
+          "status": "needs_review",
+          "source": "https://www.royalgunpowdermills.com/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Royal Gunpowder Mills official website",
+          "sourceType": "official attraction website",
+          "timetablePeriod": "",
+          "notes": "Mapped feature appears to form part of the Royal Gunpowder Mills heritage/attraction railway and is not verified as an operational National Rail passenger station."
+        }
+      },
+      "createdAt": "2026-07-16T13:16:35.407Z",
+      "updatedAt": "2026-07-16T13:20:37.365Z",
+      "reviewFlags": [
+        "not_national_rail",
+        "classification_review_required"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6137852389",
+      "canonicalName": "Brimsdown",
+      "name": "Brimsdown",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.6555713,
+        "lon": -0.0307915
+      },
+      "identifiers": {
+        "crs": "BMD",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6137852389"
+      },
+      "fields": {
+        "manager": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "West Anglia Main Line",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Exact typical weekday total requires time-band calculation where stopping patterns overlap."
+        },
+        "frequencyByDestination": {
+          "value": [],
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination-level TPH requires time-band calculation from the current timetable."
+        },
+        "servicePattern": {
+          "value": "Regular weekday services operate south towards London/Stratford and north towards Hertford East or Bishop's Stortford; stopping patterns vary.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Summary verified at corridor level; exact train-by-train pattern varies."
+        },
+        "frequency": {
+          "value": "Regular weekday service; exact combined TPH requires timetable review.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "London Liverpool Street or Stratford, Tottenham Hale, Cheshunt, Broxbourne and selected northbound destinations",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal destinations summary; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct local and London rail connections via London Liverpool Street or Stratford, Tottenham Hale, Cheshunt, Broxbourne and selected northbound destinations, with onward interchange available at principal corridor stations.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Interchange opportunities are not necessarily direct services."
+        },
+        "cycleParking": {
+          "value": "Part-time ticket office, ticket machine and seating; no waiting room or toilets; step-free access to each platform via the road and level crossing.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "stepFree": {
+          "value": "Part-time ticket office, ticket machine and seating; no waiting room or toilets; step-free access to each platform via the road and level crossing.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "ticketing": {
+          "value": "Part-time ticket office, ticket machine and seating; no waiting room or toilets; step-free access to each platform via the road and level crossing.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "waiting": {
+          "value": "Part-time ticket office, ticket machine and seating; no waiting room or toilets; step-free access to each platform via the road and level crossing.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "toilets": {
+          "value": "Part-time ticket office, ticket machine and seating; no waiting room or toilets; step-free access to each platform via the road and level crossing.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "carParking": {
+          "value": "Part-time ticket office, ticket machine and seating; no waiting room or toilets; step-free access to each platform via the road and level crossing.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "notes": {
+          "value": "Part-time ticket office, ticket machine and seating; no waiting room or toilets; step-free access to each platform via the road and level crossing.",
+          "status": "needs_review",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:35.905Z",
+      "updatedAt": "2026-07-16T13:20:37.365Z",
+      "reviewFlags": [
+        "frequency_review_required",
+        "facilities_review_required"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/7147509522",
+      "canonicalName": "Southbury",
+      "name": "Southbury",
+      "mode": "London Overground",
+      "coordinates": {
+        "lat": 51.6480314,
+        "lon": -0.0526302
+      },
+      "identifiers": {
+        "crs": "SBU",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/7147509522"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GSBURY/southbury-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Southbury Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "London Overground",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GSBURY/southbury-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Southbury Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Weaver line (Southbury Loop)",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 4,
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Exact typical weekday total requires time-band calculation where stopping patterns overlap."
+        },
+        "frequencyByDestination": {
+          "value": [],
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination-level TPH requires time-band calculation from the current timetable."
+        },
+        "servicePattern": {
+          "value": "Typically 2 trains per hour towards London Liverpool Street and 2 trains per hour towards Cheshunt.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Typical weekday daytime pattern; check journey planner before travel."
+        },
+        "frequency": {
+          "value": "Typically 4 departures per hour in total on weekdays.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Cheshunt, Seven Sisters, Hackney Downs and London Liverpool Street",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal destinations summary; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct local and London rail connections via Cheshunt, Seven Sisters, Hackney Downs and London Liverpool Street, with onward interchange available at principal corridor stations.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Interchange opportunities are not necessarily direct services."
+        },
+        "cycleParking": {
+          "value": "Help points, payphones, ticket hall and Wi-Fi are listed; ticket office Monday-Friday 06:30-10:00.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GSBURY/southbury-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Southbury Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "stepFree": {
+          "value": "Help points, payphones, ticket hall and Wi-Fi are listed; ticket office Monday-Friday 06:30-10:00.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GSBURY/southbury-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Southbury Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "ticketing": {
+          "value": "Help points, payphones, ticket hall and Wi-Fi are listed; ticket office Monday-Friday 06:30-10:00.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GSBURY/southbury-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Southbury Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "waiting": {
+          "value": "Help points, payphones, ticket hall and Wi-Fi are listed; ticket office Monday-Friday 06:30-10:00.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GSBURY/southbury-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Southbury Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "toilets": {
+          "value": "Help points, payphones, ticket hall and Wi-Fi are listed; ticket office Monday-Friday 06:30-10:00.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GSBURY/southbury-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Southbury Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "carParking": {
+          "value": "Help points, payphones, ticket hall and Wi-Fi are listed; ticket office Monday-Friday 06:30-10:00.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GSBURY/southbury-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Southbury Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "notes": {
+          "value": "Help points, payphones, ticket hall and Wi-Fi are listed; ticket office Monday-Friday 06:30-10:00.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/overground/stop/910GSBURY/southbury-rail-station",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "TfL Southbury Rail Station",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:36.406Z",
+      "updatedAt": "2026-07-16T13:20:37.365Z",
+      "reviewFlags": [
+        "frequency_review_required",
+        "facilities_review_required"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6291571386",
+      "canonicalName": "Gordon Hill",
+      "name": "Gordon Hill",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.6629506,
+        "lon": -0.0942203
+      },
+      "identifiers": {
+        "crs": "GDH",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6291571386"
+      },
+      "fields": {
+        "manager": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/GDH/gordon-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/GDH/gordon-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Hertford Loop Line",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Exact typical weekday total requires time-band calculation where stopping patterns overlap."
+        },
+        "frequencyByDestination": {
+          "value": [],
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination-level TPH requires time-band calculation from the current timetable."
+        },
+        "servicePattern": {
+          "value": "Regular Great Northern services operate south towards Moorgate and north towards Hertford North/Stevenage, with some services terminating at Gordon Hill.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Summary verified at corridor level; exact train-by-train pattern varies."
+        },
+        "frequency": {
+          "value": "Regular weekday service; exact combined TPH requires timetable review.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Moorgate, Finsbury Park, Alexandra Palace, Hertford North and selected services towards Stevenage",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal destinations summary; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct local and London rail connections via Moorgate, Finsbury Park, Alexandra Palace, Hertford North and selected services towards Stevenage, with onward interchange available at principal corridor stations.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Interchange opportunities are not necessarily direct services."
+        },
+        "cycleParking": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/GDH/gordon-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "stepFree": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/GDH/gordon-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "ticketing": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/GDH/gordon-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "waiting": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/GDH/gordon-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "toilets": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/GDH/gordon-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "carParking": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/GDH/gordon-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "notes": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/GDH/gordon-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:36.905Z",
+      "updatedAt": "2026-07-16T13:20:37.365Z",
+      "reviewFlags": [
+        "frequency_review_required",
+        "facilities_review_required"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6291571385",
+      "canonicalName": "Crews Hill",
+      "name": "Crews Hill",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.6847476,
+        "lon": -0.1072562
+      },
+      "identifiers": {
+        "crs": "CWH",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6291571385"
+      },
+      "fields": {
+        "manager": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/CWH/crews-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/CWH/crews-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Hertford Loop Line",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": "",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Exact typical weekday total requires time-band calculation where stopping patterns overlap."
+        },
+        "frequencyByDestination": {
+          "value": [],
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination-level TPH requires time-band calculation from the current timetable."
+        },
+        "servicePattern": {
+          "value": "Regular Great Northern services operate south towards Moorgate and north towards Hertford North/Stevenage.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Summary verified at corridor level; exact train-by-train pattern varies."
+        },
+        "frequency": {
+          "value": "Regular weekday service; exact combined TPH requires timetable review.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Moorgate, Finsbury Park, Alexandra Palace, Hertford North and Stevenage",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal destinations summary; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct local and London rail connections via Moorgate, Finsbury Park, Alexandra Palace, Hertford North and Stevenage, with onward interchange available at principal corridor stations.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Interchange opportunities are not necessarily direct services."
+        },
+        "cycleParking": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/CWH/crews-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "stepFree": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/CWH/crews-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "ticketing": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/CWH/crews-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "waiting": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/CWH/crews-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "toilets": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/CWH/crews-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "carParking": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/CWH/crews-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": "Field-specific values should be checked in the operator page before professional publication."
+        },
+        "notes": {
+          "value": "Facilities require confirmation against the current official Great Northern station page.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/CWH/crews-hill",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station Information",
+          "sourceType": "official operator station page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:37.406Z",
+      "updatedAt": "2026-07-16T13:20:37.365Z",
+      "reviewFlags": [
+        "frequency_review_required",
+        "facilities_review_required"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
       "previousRevision": null
     }
   ]

@@ -1,4 +1,10 @@
-# Toolkit 2.0.0 production release
+# Toolkit 2.1.0 production release
+
+Builds: `TPT-SHARED-210-20260716`, `DASH-1.1.0-20260716`, `AA-1.3.0-20260716`, `RAIL-4.5.0-20260716`, `BUS-PROD-120-20260716`, `SHARED-LIB-1.1.0-20260716`.
+
+Adds Railway in-module publishing, Bus route/service review, Railway-matched Bus site confirmation, paragraph-based wording, DOCX paragraph preservation and consistent “Ready to use” Dashboard tags. STATS19 remains unchanged.
+
+## Previous release: Toolkit 2.0.0
 
 Builds:
 

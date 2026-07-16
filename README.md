@@ -1,6 +1,6 @@
 # Transport Planner Toolkit — Sprint 4 Bus Foundation
 
-Current production release: Toolkit 2.0.0, Bus 1.1.0 and Shared Library 1.0.0.
+Current production release: Toolkit 2.1.0, Bus 1.2.0 and Shared Library 1.1.0.
 
 The Dashboard automatically loads deployed Rail, Bus Stop and Bus Route company masters for read-only use. Authorised editors may enter a fine-grained GitHub token locally to preview and publish deterministic merges to the three approved knowledge files. The token is never part of the repository or application exports.
 
@@ -10,9 +10,10 @@ The Toolkit is a **commercial-grade internal platform**. Phase names are Core Pl
 
 ## Stable/working modules
 
-- Accessibility Assessment 1.2 with grouped EAS Word and CSV exports
+- Accessibility Assessment 1.3 with grouped paragraph wording and EAS Word and CSV exports
 - STATS19 Collision Record Cards
-- Railway Assessment RAIL-4.4.0 with frozen map functionality and final EAS Word and CSV exports
+- Railway Assessment RAIL-4.5.0 with accepted map functionality, shared publishing and EAS Word and CSV exports
+- Bus Assessment 1.2 with accepted stop discovery/routing and planner-visible route/service review
 
 ## Development rule
 

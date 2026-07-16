@@ -1,5 +1,10 @@
 # Bus Assessment changelog
 
+## BUS-1.2.0 — 16 July 2026
+
+- Added address, coordinate, empty-map click and draggable-marker site confirmation.
+- Added the Bus Route and Service Review table, shared refresh and paragraph DOCX wording.
+
 ## BUS-1.1.0 — 16 July 2026
 
 - Made project name optional.

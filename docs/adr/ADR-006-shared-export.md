@@ -15,3 +15,7 @@ Retain the working formatter and place a versioned export-envelope contract in f
 ## Consequences
 
 Existing exports remain frozen while Bus adopts the complete contract. Formatter changes require regression across every consumer.
+
+## 2.1 implementation amendment
+
+The formatter accepts optional Transport Statement wording and writes every blank-line-delimited item as a separate Word paragraph after the module tables. This preserves screen and copy paragraph structure in DOCX without changing accepted table formatting.

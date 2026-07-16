@@ -18,3 +18,7 @@ The client fetches the latest SHA, protects newer verified records, previews cha
 ## Consequences
 
 This enables company-wide reuse without a backend but places credential stewardship on authorised users. A backend or GitHub App remains the preferred future commercial architecture.
+
+## 2.1 implementation amendment
+
+Railway and Bus expose in-context publish and refresh controls, but both delegate authentication, preview, merge protection and GitHub writes to this single shared service. Modules must not duplicate token storage. Dashboard controls remain available for administration.

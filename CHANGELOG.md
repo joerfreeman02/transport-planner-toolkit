@@ -1,5 +1,14 @@
 # Changelog
 
+## Toolkit 2.2.0 emergency corrective review — 2026-07-16
+
+- Corrected direct shared-master consumption in Railway and Bus on clean browsers.
+- Added schema validation, cache busting, last-valid offline cache and visible failure states to the shared-library client.
+- Added Bus staged progress, cancellation, provider diagnostics and shared route-review reuse.
+- Added Google Maps verification links to Accessibility results, popups and exports.
+- Applied low-risk Bus-style visual tokens to Accessibility; STATS19 remains unchanged.
+- Added clean-profile, cache/failure and Accessibility browser acceptance tests.
+
 ## Toolkit 2.1.0 — 2026-07-16
 
 - Added Railway in-module shared publishing, Railway-style Bus site controls and a Bus route/service review table.

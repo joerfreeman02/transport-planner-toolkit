@@ -1,5 +1,7 @@
 # Toolkit 2.1.0 production release
 
+> A Toolkit 2.2.0 emergency corrective build is available on its review branch only. It must not be merged until Product Owner acceptance. See `docs/EMERGENCY_SHARED_LIBRARY_CORRECTIVE_REPORT.md`.
+
 Builds: `TPT-SHARED-210-20260716`, `DASH-1.1.0-20260716`, `AA-1.3.0-20260716`, `RAIL-4.5.0-20260716`, `BUS-PROD-120-20260716`, `SHARED-LIB-1.1.0-20260716`.
 
 Adds Railway in-module publishing, Bus route/service review, Railway-matched Bus site confirmation, paragraph-based wording, DOCX paragraph preservation and consistent “Ready to use” Dashboard tags. STATS19 remains unchanged.

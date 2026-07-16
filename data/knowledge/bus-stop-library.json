@@ -1,8 +1,8 @@
 {
   "schema": "tpt.bus-stop-library",
   "version": "1.0.0",
-  "libraryBuild": "SHARED-LIB-1.0.0-20260716",
-  "updatedAt": "2026-07-16T12:26:09.926Z",
+  "libraryBuild": "SHARED-LIB-1.1.0-20260716",
+  "updatedAt": "2026-07-16T13:39:56.506Z",
   "records": [
     {
       "naptanCode": "490011045S",
@@ -30,10 +30,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -66,10 +66,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -100,10 +100,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -136,10 +136,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -170,10 +170,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -203,10 +203,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -237,10 +237,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -270,10 +270,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -304,10 +304,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -338,10 +338,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -371,10 +371,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -403,10 +403,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -437,10 +437,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -469,10 +469,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -502,10 +502,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -534,10 +534,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -567,10 +567,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -600,10 +600,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -635,10 +635,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -668,10 +668,10 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "updatedAt": "2026-07-16T12:26:09.926Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -702,9 +702,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:26:09.926Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "210021303480",
@@ -733,9 +736,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:26:09.926Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "210021303500",
@@ -764,9 +770,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:26:09.926Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "210021309320",
@@ -795,9 +804,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:26:09.926Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "210021309360",
@@ -826,9 +838,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:26:09.926Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "210021303460",
@@ -857,9 +872,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:26:09.926Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "210021303520",
@@ -886,9 +904,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:26:09.926Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "210021309300",
@@ -915,9 +936,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:26:09.926Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "210021309370",
@@ -945,9 +969,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:26:09.926Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "210021303440",
@@ -975,8 +1002,215 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:26:09.926Z",
-      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:26:09.926Z",
+        "editorName": "Joe Freeman"
+      }
+    },
+    {
+      "naptanCode": "210021703440",
+      "fallbackIdentity": "",
+      "stopName": "Waltham Cross Bus Station",
+      "locality": "Waltham Cross",
+      "direction": "adj",
+      "pairedStopGroup": "waltham cross bus station",
+      "coordinates": {
+        "latitude": 51.6857285,
+        "longitude": -0.0313757
+      },
+      "routesServed": [],
+      "sources": [
+        {
+          "title": "Waltham Cross Bus Station (adj) stop and departures",
+          "url": "https://journeyplanner.nationalpti.co.uk/sl3p-efa/XML_DM_REQUEST?outputFormat=rapidJSON&type_dm=stop&name_dm=210021703440",
+          "publisher": "National Public Transport Information",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified-no-current-scheduled-service",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021703425",
+      "fallbackIdentity": "",
+      "stopName": "Waltham Cross Bus Station",
+      "locality": "Waltham Cross",
+      "direction": "Stop B",
+      "pairedStopGroup": "B",
+      "coordinates": {
+        "latitude": 51.6856651,
+        "longitude": -0.031313
+      },
+      "routesServed": [
+        "279",
+        "491",
+        "N279"
+      ],
+      "sources": [
+        {
+          "title": "Waltham Cross Bus Station (Stop B) stop and departures",
+          "url": "https://journeyplanner.nationalpti.co.uk/sl3p-efa/XML_DM_REQUEST?outputFormat=rapidJSON&type_dm=stop&name_dm=210021703425",
+          "publisher": "National Public Transport Information",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021703420",
+      "fallbackIdentity": "",
+      "stopName": "Waltham Cross Bus Station",
+      "locality": "Waltham Cross",
+      "direction": "Stop A",
+      "pairedStopGroup": "A",
+      "coordinates": {
+        "latitude": 51.6856538,
+        "longitude": -0.0310782
+      },
+      "routesServed": [
+        "217",
+        "317",
+        "327"
+      ],
+      "sources": [
+        {
+          "title": "Waltham Cross Bus Station (Stop A) stop and departures",
+          "url": "https://journeyplanner.nationalpti.co.uk/sl3p-efa/XML_DM_REQUEST?outputFormat=rapidJSON&type_dm=stop&name_dm=210021703420",
+          "publisher": "National Public Transport Information",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021703430",
+      "fallbackIdentity": "",
+      "stopName": "Waltham Cross Bus Station",
+      "locality": "Waltham Cross",
+      "direction": "Stop C",
+      "pairedStopGroup": "C",
+      "coordinates": {
+        "latitude": 51.68552,
+        "longitude": -0.0311232
+      },
+      "routesServed": [],
+      "sources": [
+        {
+          "title": "Waltham Cross Bus Station (Stop C) stop and departures",
+          "url": "https://journeyplanner.nationalpti.co.uk/sl3p-efa/XML_DM_REQUEST?outputFormat=rapidJSON&type_dm=stop&name_dm=210021703430",
+          "publisher": "National Public Transport Information",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified-no-current-scheduled-service",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021703435",
+      "fallbackIdentity": "",
+      "stopName": "Waltham Cross Bus Station",
+      "locality": "Waltham Cross",
+      "direction": "Stop D",
+      "pairedStopGroup": "D",
+      "coordinates": {
+        "latitude": 51.6854652,
+        "longitude": -0.0311315
+      },
+      "routesServed": [],
+      "sources": [
+        {
+          "title": "Waltham Cross Bus Station (Stop D) stop and departures",
+          "url": "https://journeyplanner.nationalpti.co.uk/sl3p-efa/XML_DM_REQUEST?outputFormat=rapidJSON&type_dm=stop&name_dm=210021703435",
+          "publisher": "National Public Transport Information",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified-no-current-scheduled-service",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490003378G",
+      "fallbackIdentity": "",
+      "stopName": "Arlington Crescent",
+      "locality": "Waltham Cross",
+      "direction": "Stop H",
+      "pairedStopGroup": "H",
+      "coordinates": {
+        "latitude": 51.6821684,
+        "longitude": -0.0333965
+      },
+      "routesServed": [
+        "217",
+        "279",
+        "317",
+        "327",
+        "491",
+        "N279"
+      ],
+      "sources": [
+        {
+          "title": "Arlington Crescent (Stop H) stop and departures",
+          "url": "https://tfl.gov.uk/bus/stop/490003378G/arlington-crescent",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021700220",
+      "fallbackIdentity": "",
+      "stopName": "The Vine PH",
+      "locality": "Waltham Cross",
+      "direction": "nr",
+      "pairedStopGroup": "NR",
+      "coordinates": {
+        "latitude": 51.6903633,
+        "longitude": -0.0338436
+      },
+      "routesServed": [],
+      "sources": [
+        {
+          "title": "The Vine PH (nr) stop and departures",
+          "url": "https://journeyplanner.nationalpti.co.uk/sl3p-efa/XML_DM_REQUEST?outputFormat=rapidJSON&type_dm=stop&name_dm=210021700220",
+          "publisher": "National Public Transport Information",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified-no-current-scheduled-service",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T13:39:56.506Z",
+      "originatingModuleBuild": "BUS-PROD-120-20260716",
       "previousRevision": null
     }
   ]

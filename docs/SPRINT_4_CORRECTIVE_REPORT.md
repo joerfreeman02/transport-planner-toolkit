@@ -3,7 +3,7 @@
 **Decision:** Original BUS-0.1.0 review build rejected  
 **Corrected build:** BUS-0.2.0 / BUS-CORE-020-20260716  
 **Branch:** `sprint-4-bus-foundation`  
-**Status:** Local corrective build passed; deployed review URL testing pending branch push  
+**Status:** Corrective build passed locally and at the exact deployed review URL
 **Date:** 16 July 2026
 
 ## 1. Root-cause report
@@ -31,7 +31,7 @@ Corrective local build testing deliberately uncovered two real defects:
 1. Dynamic script paths were initially resolved relative to the HTML document rather than `bus-bootstrap.js`. The independent bootstrap visibly reported `Bus core failed to load` and enabled diagnostic download. Paths were corrected.
 2. Leaflet attempted two missing image assets (`leafletmarker-icon.png` and `leafletmarker-shadow.png`), both returning HTTP 404. The corrective build now uses self-contained accessible `divIcon` markers. The final smoke run recorded no console, HTTP, failed-request or uncaught-runtime errors.
 
-The full workflow test also showed that double GET/POST attempts across three Overpass providers could exceed the loading limit. Discovery now makes one firm 12-second POST attempt per provider, sequentially, with a bounded worst-case failover and visible final failure.
+The full workflow test also showed that double GET/POST attempts across three Overpass providers could exceed the loading limit. Discovery now makes one firm 12-second GET attempt per provider, sequentially, with a bounded worst-case failover and visible final failure.
 
 ## 2. Corrective architecture
 
@@ -93,7 +93,19 @@ Local corrected-build result:
 - failed requests: none;
 - HTTP errors: none.
 
-The same test must pass against the exact deployed review URL after the corrective commit is pushed.
+Exact deployed RawGitHack result (engineering in-app Chromium, `CB7 4AH`):
+
+- BUS-0.2.0 initialised and the Leaflet map rendered: pass;
+- address lookup returned a selectable result: pass;
+- selecting the result enabled Confirm site: pass;
+- confirmed draggable site marker enabled Find nearby stops: pass;
+- stop discovery returned 20 rows and 20 synchronised stop markers: pass;
+- first stop used NaPTAN/ATCO identity `0500EELYY096`: pass;
+- walking and cycling values were both labelled routed: pass;
+- focusing the stop drew two route geometries: pass;
+- console errors and warnings: none.
+
+The deployed automated headless run also passed startup, map, handler, address, confirmation, visible provider-failure handling and no-uncaught-error checks. Its hosted-network route to the Overpass providers received a 504 followed by bounded timeouts, so it exercised and passed the required visible-failure path rather than reporting a false zero-result state. The exact same deployment completed stop discovery successfully in the real in-app browser test above.
 
 ## 6. Files changed in the corrective build
 
@@ -132,6 +144,5 @@ Dashboard changes remain limited to the previously approved Bus review entry and
 - NaPTAN coverage and OSM tag completeness vary; direction may remain “Direction not stated”.
 - Nominatim, Overpass and OSRM are external services and can be unavailable or throttled.
 - Estimated walking/cycling values are approximations and are never labelled routed.
-- The corrected deployed RawGitHack URL requires a fresh automated pass after push.
+- External provider availability can differ between hosted/headless and user-browser networks; bounded failover and downloadable diagnostics remain necessary.
 - Wider browser, accessibility and planner acceptance remain release gates.
-

@@ -2,7 +2,7 @@
   "schema": "tpt.bus-route-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.0.0-20260716",
-  "updatedAt": "2026-07-16T12:12:25.154Z",
+  "updatedAt": "2026-07-16T12:26:18.779Z",
   "records": [
     {
       "routeNumber": "69",
@@ -27,9 +27,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:25.154Z",
+      "updatedAt": "2026-07-16T12:26:18.779Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:25.154Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "routeNumber": "241",
@@ -55,9 +58,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:25.154Z",
+      "updatedAt": "2026-07-16T12:26:18.779Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:25.154Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "routeNumber": "262",
@@ -82,9 +88,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:25.154Z",
+      "updatedAt": "2026-07-16T12:26:18.779Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:25.154Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "routeNumber": "325",
@@ -109,9 +118,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:25.154Z",
+      "updatedAt": "2026-07-16T12:26:18.779Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:25.154Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "routeNumber": "473",
@@ -137,9 +149,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:25.154Z",
+      "updatedAt": "2026-07-16T12:26:18.779Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:25.154Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "routeNumber": "678",
@@ -164,7 +179,132 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:25.154Z",
+      "updatedAt": "2026-07-16T12:26:18.779Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:25.154Z",
+        "editorName": "Joe Freeman"
+      }
+    },
+    {
+      "routeNumber": "33",
+      "operator": "Central Connect",
+      "routeOrigin": "Hoddesdon",
+      "routeDestination": "Bishop's Stortford",
+      "principalLocationsServed": [
+        "Hoddesdon",
+        "Stanstead Abbotts",
+        "Gilston",
+        "High Wych",
+        "Sawbridgeworth",
+        "Thorley Park",
+        "Bishop's Stortford"
+      ],
+      "sources": [
+        {
+          "title": "33 route and timetable",
+          "url": "https://www.central-connect.co.uk/services/TMSB/33",
+          "publisher": "Central Connect / Intalink",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:18.779Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "310",
+      "operator": "Arriva Kent Thameside Ltd",
+      "routeOrigin": "Hertford",
+      "routeDestination": "Waltham Cross",
+      "principalLocationsServed": [
+        "Hertford",
+        "Ware",
+        "St Margarets",
+        "Hoddesdon",
+        "Broxbourne",
+        "Wormley",
+        "Turnford",
+        "Cheshunt",
+        "Waltham Cross"
+      ],
+      "sources": [
+        {
+          "title": "310 route and timetable",
+          "url": "https://www.intalink.org.uk/services/f10c605e-2b81-4759-b515-ce7c2869e67e",
+          "publisher": "Intalink / Arriva",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:18.779Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "25/25B",
+      "operator": "Central Connect",
+      "routeOrigin": "Harlow Town Centre",
+      "routeDestination": "Cheshunt / Brookfield Centre or Broxbourne",
+      "principalLocationsServed": [
+        "Harlow",
+        "Stanstead Abbotts",
+        "St Margarets",
+        "Rye Park",
+        "Hoddesdon",
+        "Broxbourne",
+        "Wormley",
+        "Cheshunt",
+        "Brookfield Centre"
+      ],
+      "sources": [
+        {
+          "title": "25/25B route and timetable",
+          "url": "https://www.intalink.org.uk/services",
+          "publisher": "Central Connect / Intalink",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:18.779Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "35/35B/35C",
+      "operator": "Central Connect",
+      "routeOrigin": "Hertford",
+      "routeDestination": "Bishop's Stortford",
+      "principalLocationsServed": [
+        "Hertford",
+        "Ware",
+        "St Margarets",
+        "Stanstead Abbotts",
+        "Hunsdon",
+        "Widford",
+        "Much Hadham",
+        "Little Hadham",
+        "Bishop's Stortford"
+      ],
+      "sources": [
+        {
+          "title": "35/35B/35C route and timetable",
+          "url": "https://www.intalink.org.uk/services/a462c109-1f5c-413a-bfee-dc61d8ad0819",
+          "publisher": "Central Connect / Intalink",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:18.779Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
       "previousRevision": null
     }

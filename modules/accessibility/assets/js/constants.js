@@ -1,4 +1,4 @@
-export const BUILD = 'Accessibility Assessment 1.2 · AA-1.2.0-20260715';
+export const BUILD = 'Accessibility Assessment 1.3 · AA-1.3.0-20260716';
 export const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',

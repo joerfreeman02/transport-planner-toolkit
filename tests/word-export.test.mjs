@@ -18,7 +18,11 @@ assert.match(fragment,/width:70%/);
 assert.match(plainTables(tables),/Facility\tDistance/);
 assert.equal(EAS_WORD_THEME.caption,'#B3B3B3');
 assert.doesNotMatch(html,/<script/i);
-const bytes=new Uint8Array(await docxBlob('Test export',tables).arrayBuffer());
+const bytes=new Uint8Array(await docxBlob('Test export',tables,'Access wording\n\nFirst access paragraph.\n\nService wording\n\nFirst service paragraph.').arrayBuffer());
 assert.deepEqual([...bytes.slice(0,4)],[0x50,0x4b,0x03,0x04]);
+const packageText=new TextDecoder().decode(bytes);
+assert.match(packageText,/First access paragraph/);
+assert.match(packageText,/First service paragraph/);
+assert.ok((packageText.match(/<w:p>/g)||[]).length>=4,'wording uses separate Word paragraphs');
 
-console.log('13 Word export formatting assertions passed.');
+console.log('16 Word export formatting assertions passed.');

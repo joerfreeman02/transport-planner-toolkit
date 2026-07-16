@@ -1,5 +1,9 @@
 # Accessibility Changelog
 
+## AA-1.3.0-20260716
+
+- Grouped wording into copy-ready paragraphs, added Copy all wording and preserved paragraphs in DOCX.
+
 ## 1.2.0 - 2026-07-15
 
 - Added Transport, Education and childcare, Everyday needs, Healthcare, and Leisure and community heading rows to the Word export when those groups contain included facilities.

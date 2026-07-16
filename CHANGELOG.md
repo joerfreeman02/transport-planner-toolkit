@@ -1,5 +1,11 @@
 # Changelog
 
+## Toolkit 2.1.0 — 2026-07-16
+
+- Added Railway in-module shared publishing, Railway-style Bus site controls and a Bus route/service review table.
+- Added paragraph-based Accessibility, Railway and Bus wording preserved in DOCX.
+- Standardised Dashboard module tags to “Ready to use”.
+
 ## Toolkit 2.0.0 / BUS-1.1.0 / Shared Library 1.0.0 — 2026-07-16
 
 - Promoted the accepted Bus workflow to the production release candidate.

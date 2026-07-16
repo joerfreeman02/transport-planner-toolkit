@@ -1,5 +1,10 @@
 # Changelog
 
+## RAIL-4.5.0-20260716
+
+- Added in-module shared publication, refresh and status reporting.
+- Split access/service wording into copy-ready paragraphs preserved in DOCX.
+
 ## RAIL-4.4.0-20260715
 
 - Added a step-free access tick/cross column to the service-summary export.

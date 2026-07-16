@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eas.local/tpt/contracts/project-context/1.0.0",
+  "title": "TPT Project Data Model — Context",
+  "contractVersion": "1.0.0",
+  "type": "object",
+  "required": ["schemaVersion", "projectId", "projectName", "site", "createdAt", "updatedAt"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "projectId": { "type": "string", "minLength": 1 },
+    "projectName": { "type": "string", "minLength": 1 },
+    "clientReference": { "type": "string" },
+    "site": {
+      "type": "object",
+      "required": ["address", "coordinate"],
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string", "minLength": 1 },
+        "coordinate": {
+          "type": "object",
+          "required": ["latitude", "longitude", "crs"],
+          "properties": {
+            "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+            "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+            "crs": { "const": "EPSG:4326" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';
+const html=fs.readFileSync(new URL('../modules/bus/index.html',import.meta.url),'utf8'),bootstrap=fs.readFileSync(new URL('../modules/bus/assets/js/bus-bootstrap.js',import.meta.url),'utf8'),core=fs.readFileSync(new URL('../modules/bus/assets/js/bus-core.js',import.meta.url),'utf8');
+let passed=0;const test=(name,fn)=>{fn();passed++;console.log(`PASS ${name}`)};
+test('classic bootstrap loads without module imports',()=>{assert.match(html,/bus-bootstrap\.js/);assert.doesNotMatch(html,/type="module"/);assert.doesNotMatch(bootstrap,/\bimport\b/)});
+test('startup failure is visible and downloadable',()=>{assert.match(html,/Bus module failed to initialise/);assert.match(bootstrap,/startupDiagnostic/);assert.match(bootstrap,/BUS_STARTUP_FAILED/)});
+test('editable search radius is present',()=>assert.match(html,/id="searchRadius"/));
+test('NaPTAN identity is preferred',()=>assert.match(core,/naptan:AtcoCode/));
+test('opposite directions are preserved',()=>assert.match(core,/naptan:Indicator/));
+test('Overpass has sequential failover',()=>assert.ok((core.match(/api\/interpreter/g)||[]).length>=3));
+test('walking and cycling routing are explicit',()=>{assert.match(core,/routeMatrix\('walk'\)/);assert.match(core,/routeMatrix\('cycle'\)/);assert.match(core,/status:'estimated'/)});
+test('provider failure is distinct from zero results',()=>{assert.match(core,/BUS_STOP_DISCOVERY_FAILED/);assert.match(core,/BUS_ZERO_RESULTS/)});
+test('automatic wording and polished outputs are present',()=>{assert.doesNotMatch(html,/Generate wording/);assert.match(html,/Download Word tables/);assert.doesNotMatch(core,/'Typical weekday frequency'/);assert.match(core,/'Service pattern'/)});
+test('shared publishing uses approved client',()=>{assert.match(html,/shared-library\.js/);assert.match(html,/Publish to Shared Library/)});
+console.log(`\n${passed} Bus production baseline tests passed.`);

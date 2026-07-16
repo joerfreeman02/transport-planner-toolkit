@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eas.local/tpt/contracts/diagnostics/1.0.0",
+  "title": "TPT Diagnostic Record",
+  "contractVersion": "1.0.0",
+  "type": "object",
+  "required": ["code", "severity", "message", "recoverable", "action", "context", "occurredAt"],
+  "properties": {
+    "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$" },
+    "severity": { "enum": ["critical", "high", "medium", "warning"] },
+    "message": { "type": "string", "minLength": 1 },
+    "affectedInformation": { "type": "string" },
+    "recoverable": { "type": "boolean" },
+    "action": { "type": "string", "minLength": 1 },
+    "context": {
+      "type": "object",
+      "required": ["platformBuild", "moduleId", "moduleBuild"],
+      "properties": {
+        "platformBuild": { "type": "string" },
+        "moduleId": { "type": "string" },
+        "moduleBuild": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "occurredAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

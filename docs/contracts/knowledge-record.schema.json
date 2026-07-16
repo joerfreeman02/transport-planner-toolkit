@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eas.local/tpt/contracts/knowledge-record/1.0.0",
+  "title": "TPT Knowledge Library Record Envelope",
+  "contractVersion": "1.0.0",
+  "type": "object",
+  "required": ["schemaVersion", "recordId", "recordType", "lifecycle", "data", "sources", "history"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "recordId": { "type": "string", "minLength": 1 },
+    "recordType": { "type": "string", "minLength": 1 },
+    "lifecycle": { "enum": ["draft", "researched", "verified", "stale", "superseded"] },
+    "data": { "type": "object" },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["title", "url", "retrievedAt"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1 },
+          "url": { "type": "string", "format": "uri" },
+          "retrievedAt": { "type": "string", "format": "date-time" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "verifiedBy": { "type": ["string", "null"] },
+    "verifiedAt": { "type": ["string", "null"], "format": "date-time" },
+    "history": { "type": "array", "items": { "type": "object" } },
+    "supersedes": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

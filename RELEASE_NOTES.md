@@ -1,28 +1,20 @@
-# Release Notes - Sprint 3 Formatting and Exporting 1.7
+# Toolkit 2.0.0 production release
 
-## Purpose
+Builds:
 
-This release aligns the Accessibility and Railway report-table exports with the EAS 2026 Word template while retaining the accepted Railway functional baseline.
+- Toolkit `TPT-SHARED-200-20260716`
+- Bus `BUS-PROD-110-20260716`
+- Shared Library `SHARED-LIB-1.0.0-20260716`
 
-## Baseline retained
+This release completes Sprint 4 Bus polish and introduces the approved interim shared-company-library architecture. Shared masters are readable without authentication. A locally entered fine-grained GitHub token enables allowlisted publication to the three approved knowledge files only.
 
-- Accessibility discovery, classification, mapping and routing
-- STATS19 Collision Record Cards existing working tool
-- Railway 4.2.1 map, movable site marker, walking/cycling routes, station de-duplication, directional TPH, research and Knowledge Library behaviour
-- Bus Assessment placeholder
+Bus wording now refreshes automatically. The Bus Service Summary contains Route, Operator, Origin / destination, Principal locations, Operating period and Service pattern; it does not export a bare weekday-frequency column.
 
-## Added
+Accessibility AA-1.2.0, Railway RAIL-4.4.0, STATS19 STATS-1.0.0 and Dashboard DASH-1.0.0 behaviour remain protected.
 
-- Accessibility category heading rows that explain the differing facility-distance groups
-- Railway step-free access ticks/crosses and per-station service/journey summary rows
-- Separate Railway directional-TPH Word export
-- Shared EAS 2026 table formatter used by both modules
-- Rich Word-table copy with a plain-text fallback
-- Genuine `.docx` downloads with A4 page settings, Roboto typography, orange headers and alternating grey rows
-- Accessibility local-facilities report table
-- Railway station-access and directional service-summary report tables
-- Cross-module export regression tests
+Known limitations:
 
-## Not changed
-
-This sprint does not alter station discovery, map interaction, route plotting, classification, assisted research or library merge logic.
+- The fine-grained token approach is an approved interim no-backend design; connected editors must protect and periodically review their token.
+- Stop discovery continues to use controlled OSM fallback where direct NaPTAN infrastructure is unavailable; assisted research verifies identifiers.
+- Local drafts remain browser-scoped until successfully published or manually exported.
+- Automated DOCX structural and download testing passed. Final visual review in Microsoft Word is explicitly deferred to planner acceptance testing.

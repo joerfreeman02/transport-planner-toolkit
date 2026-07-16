@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://eas.local/tpt/contracts/mapping/1.0.0",
+  "title": "TPT Shared Mapping Contract",
+  "contractVersion": "1.0.0",
+  "type": "object",
+  "required": ["containerId", "centre", "provider", "accessibleSummaryId"],
+  "properties": {
+    "containerId": { "type": "string", "minLength": 1 },
+    "accessibleSummaryId": { "type": "string", "minLength": 1 },
+    "centre": { "$ref": "#/$defs/coordinate" },
+    "provider": {
+      "type": "object",
+      "required": ["id", "attribution"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "attribution": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "siteMarker": {
+      "type": "object",
+      "required": ["coordinate", "draggable"],
+      "properties": {
+        "coordinate": { "$ref": "#/$defs/coordinate" },
+        "draggable": { "type": "boolean" },
+        "label": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "coordinate": {
+      "type": "object",
+      "required": ["latitude", "longitude"],
+      "properties": {
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+        "crs": { "const": "EPSG:4326" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

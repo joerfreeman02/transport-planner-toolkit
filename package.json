@@ -1,0 +1,12 @@
+{
+  "name": "transport-planner-toolkit",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:bus": "node tests/bus-foundation.test.mjs",
+    "test:browser": "node tests/bus-browser-smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.58.2"
+  }
+}

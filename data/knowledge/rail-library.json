@@ -2,6 +2,3302 @@
   "schema": "tpt-rail-knowledge-v3",
   "version": 2,
   "libraryBuild": "SHARED-LIB-1.0.0-20260716",
-  "updatedAt": "2026-07-16T00:00:00Z",
-  "records": []
+  "updatedAt": "2026-07-16T12:05:19.928Z",
+  "records": [
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6137915989",
+      "canonicalName": "St Margarets",
+      "name": "St Margarets",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.7881973,
+        "lon": 0.0009329
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6137915989"
+      },
+      "fields": {
+        "manager": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Hertford East branch line",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Operational route/line description."
+        },
+        "frequencyTotal": {
+          "value": 4,
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": ""
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London Liverpool Street",
+              "tph": 2,
+              "direct": true
+            },
+            {
+              "destination": "Hertford East",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": ""
+        },
+        "servicePattern": {
+          "value": "Typically 2 trains per hour in each direction between Hertford East and London Liverpool Street via Broxbourne, Cheshunt, Tottenham Hale and Hackney Downs.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "4 total departures per hour (typically 2 in each direction).",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Hertford East, Ware, Rye House, Broxbourne, Cheshunt, Tottenham Hale, Hackney Downs and London Liverpool Street.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "Provides regular direct local and London-bound rail services, with interchange opportunities at Broxbourne, Cheshunt and Tottenham Hale.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "Bicycle storage is listed as available; exact type and capacity were not exposed on the National Rail summary page.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Confirm exact cycle parking spaces and storage type from Greater Anglia station data before quoting a capacity."
+        },
+        "stepFree": {
+          "value": "Step-free category B3: some step-free access to platforms, potentially in one direction only; no lifts.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office Monday-Friday 06:20-13:30 and Saturday 07:45-15:00; no Sunday opening. National Rail currently lists ticket machines as unavailable.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting area and seating available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Availability not reliably exposed in the parsed National Rail station summary.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "The page contains toilet headings but the availability value was not reliably retrievable."
+        },
+        "carParking": {
+          "value": "36 parking spaces; no accessible parking spaces.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Station facilities verified from National Rail on 15 July 2026. Frequency values describe a typical weekday off-peak pattern and should be rechecked for the specific assessment date, especially where marked needs_review.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/st-margarets-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "St Margarets (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T07:32:01.078Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "cycleParking",
+        "toilets"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6137915990",
+      "canonicalName": "Rye House",
+      "name": "Rye House",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.7693606,
+        "lon": 0.0055221
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6137915990"
+      },
+      "fields": {
+        "manager": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Hertford East branch line",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Operational route/line description."
+        },
+        "frequencyTotal": {
+          "value": 4,
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": ""
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London Liverpool Street",
+              "tph": 2,
+              "direct": true
+            },
+            {
+              "destination": "Hertford East",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": ""
+        },
+        "servicePattern": {
+          "value": "Typically 2 trains per hour in each direction between Hertford East and London Liverpool Street via Broxbourne, Cheshunt, Tottenham Hale and Hackney Downs.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "4 total departures per hour (typically 2 in each direction).",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Hertford East, St Margarets, Ware, Broxbourne, Cheshunt, Tottenham Hale, Hackney Downs and London Liverpool Street.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "Provides regular direct local and London-bound rail services, with interchange opportunities at Broxbourne, Cheshunt and Tottenham Hale.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "Bicycle storage is listed as available; exact type and capacity were not exposed on the National Rail summary page.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Confirm exact cycle parking spaces and storage type from Greater Anglia station data before quoting a capacity."
+        },
+        "stepFree": {
+          "value": "Step-free category B3: some step-free access to platforms, potentially in one direction only; no lifts.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office Monday-Friday 06:15-13:00 and Saturday 07:45-14:30; closed Sunday. Ticket machines available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting area and seating available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Availability not reliably exposed in the parsed National Rail station summary.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "The page contains toilet headings but the availability value was not reliably retrievable."
+        },
+        "carParking": {
+          "value": "No station parking spaces and no accessible parking spaces.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Station facilities verified from National Rail on 15 July 2026. Frequency values describe a typical weekday off-peak pattern and should be rechecked for the specific assessment date, especially where marked needs_review.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/rye-house/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Rye House Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T07:32:01.329Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "cycleParking",
+        "toilets"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6137852393",
+      "canonicalName": "Roydon",
+      "name": "Roydon",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.7754392,
+        "lon": 0.0365138
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6137852393"
+      },
+      "fields": {
+        "manager": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "West Anglia Main Line",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Operational route/line description."
+        },
+        "frequencyTotal": {
+          "value": 4,
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Stratford / London",
+              "tph": 2,
+              "direct": true
+            },
+            {
+              "destination": "Bishop's Stortford / Harlow direction",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+        },
+        "servicePattern": {
+          "value": "Regular Greater Anglia stopping services operate in both directions on the West Anglia Main Line. Exact destination mix varies by timetable and stopping pattern.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+        },
+        "frequency": {
+          "value": "4 total departures per hour (typically 2 in each direction).",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+        },
+        "destinations": {
+          "value": "Harlow Town, Bishop's Stortford, Broxbourne, Cheshunt, Tottenham Hale, Stratford and London connections.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+        },
+        "journeyOpportunities": {
+          "value": "Provides regular direct services along the West Anglia corridor, including access toward London and Harlow/Bishop's Stortford, with wider interchange opportunities at Broxbourne, Cheshunt, Tottenham Hale and Stratford.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+        },
+        "cycleParking": {
+          "value": "Bicycle storage is listed as available; exact type and capacity were not exposed on the National Rail summary page.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Confirm exact cycle parking spaces and storage type from Greater Anglia station data before quoting a capacity."
+        },
+        "stepFree": {
+          "value": "Step-free category B1: step-free access to all platforms, which may involve long or steep ramps or access via streets; no lifts.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "No ticket office. Ticket machines available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting area and seating available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Availability not reliably exposed in the parsed National Rail station summary.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "The page contains toilet headings but the availability value was not reliably retrievable."
+        },
+        "carParking": {
+          "value": "27 parking spaces; no accessible parking spaces.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Station facilities verified from National Rail on 15 July 2026. Frequency values describe a typical weekday off-peak pattern and should be rechecked for the specific assessment date, especially where marked needs_review.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/roydon/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Roydon Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T07:32:00.329Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "frequencyTotal",
+        "frequencyByDestination",
+        "servicePattern",
+        "frequency",
+        "destinations",
+        "journeyOpportunities",
+        "cycleParking",
+        "toilets"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6137915988",
+      "canonicalName": "Ware",
+      "name": "Ware",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.8079808,
+        "lon": -0.0287596
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6137915988"
+      },
+      "fields": {
+        "manager": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Hertford East branch line",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Operational route/line description."
+        },
+        "frequencyTotal": {
+          "value": 4,
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": ""
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London Liverpool Street",
+              "tph": 2,
+              "direct": true
+            },
+            {
+              "destination": "Hertford East",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": ""
+        },
+        "servicePattern": {
+          "value": "Typically 2 trains per hour in each direction between Hertford East and London Liverpool Street via Broxbourne, Cheshunt, Tottenham Hale and Hackney Downs.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "4 total departures per hour (typically 2 in each direction).",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Hertford East, St Margarets, Rye House, Broxbourne, Cheshunt, Tottenham Hale, Hackney Downs and London Liverpool Street.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "Provides regular direct local and London-bound rail services, with interchange opportunities at Broxbourne, Cheshunt and Tottenham Hale.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "Bicycle storage is listed as available; exact type and capacity were not exposed on the National Rail summary page.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Confirm exact cycle parking spaces and storage type from Greater Anglia station data before quoting a capacity."
+        },
+        "stepFree": {
+          "value": "Step-free category A: step-free access to all platforms; no lifts are required.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office Monday-Friday 06:15-19:45, Saturday 07:15-19:45 and Sunday 09:15-16:30. Ticket machines available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting area and seating available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Availability not reliably exposed in the parsed National Rail station summary.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "The page contains toilet headings but the availability value was not reliably retrievable."
+        },
+        "carParking": {
+          "value": "94 parking spaces, including 3 accessible spaces.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Station facilities verified from National Rail on 15 July 2026. Frequency values describe a typical weekday off-peak pattern and should be rechecked for the specific assessment date, especially where marked needs_review.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Ware (Herts) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T07:32:01.829Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "cycleParking",
+        "toilets"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6137852392",
+      "canonicalName": "Broxbourne",
+      "name": "Broxbourne",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.7468257,
+        "lon": -0.0106258
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6137852392"
+      },
+      "fields": {
+        "manager": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "West Anglia Main Line and Hertford East branch line",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Operational route/line description."
+        },
+        "frequencyTotal": {
+          "value": 8,
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London Liverpool Street / Stratford",
+              "tph": 4,
+              "direct": true
+            },
+            {
+              "destination": "Hertford East",
+              "tph": 2,
+              "direct": true
+            },
+            {
+              "destination": "Harlow Town / Bishop's Stortford / Cambridge corridor",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+        },
+        "servicePattern": {
+          "value": "A high-frequency Greater Anglia interchange station served by Hertford East branch trains and West Anglia Main Line services. The precise weekday stopping pattern varies by train and timetable.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+        },
+        "frequency": {
+          "value": "8 total departures per hour (typically 4 in each direction).",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
+          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+        },
+        "destinations": {
+          "value": "London Liverpool Street, Stratford, Tottenham Hale, Cheshunt, Hertford East, Harlow Town, Bishop's Stortford, Stansted Airport and Cambridge corridor destinations.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+        },
+        "journeyOpportunities": {
+          "value": "Provides high-frequency local, London, airport and regional journey opportunities, with direct services on both the Hertford East branch and West Anglia Main Line.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+        },
+        "cycleParking": {
+          "value": "Bicycle storage is listed as available; exact type and capacity were not exposed on the National Rail summary page.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Confirm exact cycle parking spaces and storage type from Greater Anglia station data before quoting a capacity."
+        },
+        "stepFree": {
+          "value": "Step-free category A: step-free access to all platforms; lifts available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office Monday-Friday 06:15-20:15, Saturday 07:15-18:45 and Sunday 08:15-17:45.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting area and seating available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Availability not reliably exposed in the parsed National Rail station summary.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "The page contains toilet headings but the availability value was not reliably retrievable."
+        },
+        "carParking": {
+          "value": "674 parking spaces, including 33 accessible spaces.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Station facilities verified from National Rail on 15 July 2026. Frequency values describe a typical weekday off-peak pattern and should be rechecked for the specific assessment date, especially where marked needs_review.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Broxbourne Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T07:32:02.333Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "frequencyTotal",
+        "frequencyByDestination",
+        "servicePattern",
+        "frequency",
+        "destinations",
+        "journeyOpportunities",
+        "cycleParking",
+        "toilets"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:way/1074162561",
+      "canonicalName": "Stevenage Interchange",
+      "name": "Stevenage Interchange",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.9011285,
+        "lon": -0.2048998
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "way/1074162561"
+      },
+      "fields": {
+        "manager": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Great Northern; Thameslink; London North Eastern Railway (LNER); Lumo",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "",
+          "notes": "Lumo calls are subject to advertised pick-up/set-down restrictions."
+        },
+        "lines": {
+          "value": "East Coast Main Line; Hertford Loop Line",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Great Northern timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "",
+          "notes": "The Hertford Loop service uses the Stevenage–Hertford North–Moorgate route."
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Representative Monday-Friday inter-peak service level, not a guarantee for every clock hour. Destination entries overlap and must not be summed. Engineering work, seasonal amendments and individual train restrictions can alter the service; check the journey planner for the date of travel."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London King's Cross",
+              "tph": 3,
+              "direct": true,
+              "notes": "Approximate typical weekday inter-peak frequency, including Great Northern and LNER; individual hours vary."
+            },
+            {
+              "destination": "London St Pancras International",
+              "tph": 2,
+              "direct": true,
+              "notes": "Thameslink services continuing through central London."
+            },
+            {
+              "destination": "Moorgate",
+              "tph": 2,
+              "direct": true,
+              "notes": "Great Northern via Hertford North and the Hertford Loop."
+            },
+            {
+              "destination": "Hertford North",
+              "tph": 2,
+              "direct": true,
+              "notes": "Great Northern Hertford Loop service."
+            },
+            {
+              "destination": "Cambridge",
+              "tph": 2,
+              "direct": true,
+              "notes": "Great Northern; approximately one train per hour normally continues to King’s Lynn."
+            },
+            {
+              "destination": "King's Lynn",
+              "tph": 1,
+              "direct": true,
+              "notes": "Typical through service via Cambridge; individual hours vary."
+            },
+            {
+              "destination": "Peterborough",
+              "tph": 2,
+              "direct": true,
+              "notes": "Core Thameslink frequency; additional intercity calls occur in some hours."
+            },
+            {
+              "destination": "London Bridge",
+              "tph": 2,
+              "direct": true,
+              "notes": "Overlapping Thameslink services already included in total departures."
+            },
+            {
+              "destination": "Gatwick Airport",
+              "tph": 2,
+              "direct": true,
+              "notes": "Overlapping Thameslink services; southern terminal and stopping pattern vary by train."
+            },
+            {
+              "destination": "York / Leeds / Newcastle / Edinburgh and other East Coast destinations",
+              "tph": 1,
+              "direct": true,
+              "notes": "Indicative combined intercity opportunity; the direct destination served varies by individual LNER/Lumo train and not every destination has an hourly service."
+            }
+          ],
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Representative Monday-Friday inter-peak service level, not a guarantee for every clock hour. Destination entries overlap and must not be summed. Engineering work, seasonal amendments and individual train restrictions can alter the service; check the journey planner for the date of travel."
+        },
+        "servicePattern": {
+          "value": "Frequent weekday service: fast and semi-fast trains to London King’s Cross; Thameslink trains through London St Pancras and London Bridge towards Gatwick Airport and destinations south of London; Great Northern services north to Cambridge/King’s Lynn and via Hertford North to Moorgate; Thameslink services north to Peterborough; selected LNER and Lumo intercity calls on the East Coast Main Line.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Representative Monday-Friday inter-peak service level, not a guarantee for every clock hour. Destination entries overlap and must not be summed. Engineering work, seasonal amendments and individual train restrictions can alter the service; check the journey planner for the date of travel."
+        },
+        "frequency": {
+          "value": "Approximately 12 total departures per hour in a representative weekday inter-peak hour, comprising multiple London, Hertford Loop, Cambridge/King’s Lynn, Peterborough and selected intercity services.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Representative Monday-Friday inter-peak service level, not a guarantee for every clock hour. Destination entries overlap and must not be summed. Engineering work, seasonal amendments and individual train restrictions can alter the service; check the journey planner for the date of travel."
+        },
+        "destinations": {
+          "value": "London King's Cross, London St Pancras International, Finsbury Park, Moorgate, Hertford North, London Bridge, Gatwick Airport, Cambridge, King's Lynn and Peterborough, with selected direct LNER/Lumo services to East Coast destinations including York, Leeds, Newcastle and Edinburgh depending on the train.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Principal direct destinations only; stopping patterns and intercity calls vary by train."
+        },
+        "journeyOpportunities": {
+          "value": "Stevenage provides high-frequency local, regional and intercity rail opportunities, including direct access to central London, Cambridge, Peterborough, the Hertford Loop and selected East Coast Main Line destinations. Thameslink services provide direct cross-London connectivity, while interchange at London, Cambridge and Peterborough broadens onward national connections.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "General accessibility wording; always use date-specific journey planning for a proposed trip."
+        },
+        "cycleParking": {
+          "value": "266 cycle-storage spaces; cycle storage is covered by CCTV.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/SVG/stevenage",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage station information | Great Northern",
+          "sourceType": "official_station_manager_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free category B1: step-free access is available to all platforms, but access may involve long or steep ramps or streets. Lifts are provided.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office and ticket machines available. Ticket office: Monday-Thursday 06:15-20:30; Friday 06:15-21:45; Saturday 06:30-21:30; Sunday 08:00-20:15.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting area and seating available; heated waiting areas are provided on all platforms.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/ | https://www.greatnorthernrail.com/travel-information/station-information/SVG/stevenage",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "National Rail and Great Northern station information",
+          "sourceType": "official_station_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Toilets, accessible toilets, Changing Places toilet and baby-changing facilities available; the main toilets are located within the booking hall.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/ | https://www.greatnorthernrail.com/travel-information/station-information/SVG/stevenage",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "National Rail and Great Northern station information",
+          "sourceType": "official_station_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "Station parking: 17 spaces, including 4 accessible spaces; drop-off/pick-up point available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "This records the parking provision stated on the National Rail station page and does not include any separate town-centre public car parks."
+        },
+        "notes": {
+          "value": "CRS code SVG. Address: Stevenage station, Lytton Way, Stevenage, Hertfordshire, SG1 1XT. Bus and taxi interchange available. This OSM feature is the Stevenage interchange/station complex and duplicates National Rail station SVG; it is not a separately served National Rail station.",
+          "status": "needs_review",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Duplicate candidate: retain identifiers and route data, but consolidate with the canonical Stevenage (SVG) station record before publishing nearby-station results."
+        }
+      },
+      "createdAt": "2026-07-15T11:08:16.308Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "duplicate_candidate: Same physical National Rail station as Stevenage (CRS SVG)."
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "crs:SVG",
+      "canonicalName": "Stevenage",
+      "name": "Stevenage",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.9018356,
+        "lon": -0.207144
+      },
+      "identifiers": {
+        "crs": "SVG",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/7140195250"
+      },
+      "fields": {
+        "manager": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Great Northern; Thameslink; London North Eastern Railway (LNER); Lumo",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "",
+          "notes": "Lumo calls are subject to advertised pick-up/set-down restrictions."
+        },
+        "lines": {
+          "value": "East Coast Main Line; Hertford Loop Line",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Great Northern timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "",
+          "notes": "The Hertford Loop service uses the Stevenage–Hertford North–Moorgate route."
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Representative Monday-Friday inter-peak service level, not a guarantee for every clock hour. Destination entries overlap and must not be summed. Engineering work, seasonal amendments and individual train restrictions can alter the service; check the journey planner for the date of travel."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London King's Cross",
+              "tph": 3,
+              "direct": true,
+              "notes": "Approximate typical weekday inter-peak frequency, including Great Northern and LNER; individual hours vary."
+            },
+            {
+              "destination": "London St Pancras International",
+              "tph": 2,
+              "direct": true,
+              "notes": "Thameslink services continuing through central London."
+            },
+            {
+              "destination": "Moorgate",
+              "tph": 2,
+              "direct": true,
+              "notes": "Great Northern via Hertford North and the Hertford Loop."
+            },
+            {
+              "destination": "Hertford North",
+              "tph": 2,
+              "direct": true,
+              "notes": "Great Northern Hertford Loop service."
+            },
+            {
+              "destination": "Cambridge",
+              "tph": 2,
+              "direct": true,
+              "notes": "Great Northern; approximately one train per hour normally continues to King’s Lynn."
+            },
+            {
+              "destination": "King's Lynn",
+              "tph": 1,
+              "direct": true,
+              "notes": "Typical through service via Cambridge; individual hours vary."
+            },
+            {
+              "destination": "Peterborough",
+              "tph": 2,
+              "direct": true,
+              "notes": "Core Thameslink frequency; additional intercity calls occur in some hours."
+            },
+            {
+              "destination": "London Bridge",
+              "tph": 2,
+              "direct": true,
+              "notes": "Overlapping Thameslink services already included in total departures."
+            },
+            {
+              "destination": "Gatwick Airport",
+              "tph": 2,
+              "direct": true,
+              "notes": "Overlapping Thameslink services; southern terminal and stopping pattern vary by train."
+            },
+            {
+              "destination": "York / Leeds / Newcastle / Edinburgh and other East Coast destinations",
+              "tph": 1,
+              "direct": true,
+              "notes": "Indicative combined intercity opportunity; the direct destination served varies by individual LNER/Lumo train and not every destination has an hourly service."
+            }
+          ],
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Representative Monday-Friday inter-peak service level, not a guarantee for every clock hour. Destination entries overlap and must not be summed. Engineering work, seasonal amendments and individual train restrictions can alter the service; check the journey planner for the date of travel."
+        },
+        "servicePattern": {
+          "value": "Frequent weekday service: fast and semi-fast trains to London King’s Cross; Thameslink trains through London St Pancras and London Bridge towards Gatwick Airport and destinations south of London; Great Northern services north to Cambridge/King’s Lynn and via Hertford North to Moorgate; Thameslink services north to Peterborough; selected LNER and Lumo intercity calls on the East Coast Main Line.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Representative Monday-Friday inter-peak service level, not a guarantee for every clock hour. Destination entries overlap and must not be summed. Engineering work, seasonal amendments and individual train restrictions can alter the service; check the journey planner for the date of travel."
+        },
+        "frequency": {
+          "value": "Approximately 12 total departures per hour in a representative weekday inter-peak hour, comprising multiple London, Hertford Loop, Cambridge/King’s Lynn, Peterborough and selected intercity services.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Representative Monday-Friday inter-peak service level, not a guarantee for every clock hour. Destination entries overlap and must not be summed. Engineering work, seasonal amendments and individual train restrictions can alter the service; check the journey planner for the date of travel."
+        },
+        "destinations": {
+          "value": "London King's Cross, London St Pancras International, Finsbury Park, Moorgate, Hertford North, London Bridge, Gatwick Airport, Cambridge, King's Lynn and Peterborough, with selected direct LNER/Lumo services to East Coast destinations including York, Leeds, Newcastle and Edinburgh depending on the train.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Principal direct destinations only; stopping patterns and intercity calls vary by train."
+        },
+        "journeyOpportunities": {
+          "value": "Stevenage provides high-frequency local, regional and intercity rail opportunities, including direct access to central London, Cambridge, Peterborough, the Hertford Loop and selected East Coast Main Line destinations. Thameslink services provide direct cross-London connectivity, while interchange at London, Cambridge and Peterborough broadens onward national connections.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "General accessibility wording; always use date-specific journey planning for a proposed trip."
+        },
+        "cycleParking": {
+          "value": "266 cycle-storage spaces; cycle storage is covered by CCTV.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/SVG/stevenage",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage station information | Great Northern",
+          "sourceType": "official_station_manager_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free category B1: step-free access is available to all platforms, but access may involve long or steep ramps or streets. Lifts are provided.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office and ticket machines available. Ticket office: Monday-Thursday 06:15-20:30; Friday 06:15-21:45; Saturday 06:30-21:30; Sunday 08:00-20:15.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting area and seating available; heated waiting areas are provided on all platforms.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/ | https://www.greatnorthernrail.com/travel-information/station-information/SVG/stevenage",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "National Rail and Great Northern station information",
+          "sourceType": "official_station_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Toilets, accessible toilets, Changing Places toilet and baby-changing facilities available; the main toilets are located within the booking hall.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/ | https://www.greatnorthernrail.com/travel-information/station-information/SVG/stevenage",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "National Rail and Great Northern station information",
+          "sourceType": "official_station_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "Station parking: 17 spaces, including 4 accessible spaces; drop-off/pick-up point available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "This records the parking provision stated on the National Rail station page and does not include any separate town-centre public car parks."
+        },
+        "notes": {
+          "value": "CRS code SVG. Address: Stevenage station, Lytton Way, Stevenage, Hertfordshire, SG1 1XT. Bus and taxi interchange available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T11:08:16.308Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "duplicate_candidate: Same physical National Rail station as Stevenage (CRS SVG)."
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/7140195250",
+      "canonicalName": "Stevenage",
+      "name": "Stevenage",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.9018356,
+        "lon": -0.207144
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/7140195250"
+      },
+      "fields": {
+        "manager": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Great Northern; Thameslink; London North Eastern Railway (LNER); Lumo",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "",
+          "notes": "Lumo calls are subject to advertised pick-up/set-down restrictions."
+        },
+        "lines": {
+          "value": "East Coast Main Line; Hertford Loop Line",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Great Northern timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "",
+          "notes": "The Hertford Loop service uses the Stevenage–Hertford North–Moorgate route."
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Representative Monday-Friday inter-peak service level, not a guarantee for every clock hour. Destination entries overlap and must not be summed. Engineering work, seasonal amendments and individual train restrictions can alter the service; check the journey planner for the date of travel."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London King's Cross",
+              "tph": 3,
+              "direct": true,
+              "notes": "Approximate typical weekday inter-peak frequency, including Great Northern and LNER; individual hours vary."
+            },
+            {
+              "destination": "London St Pancras International",
+              "tph": 2,
+              "direct": true,
+              "notes": "Thameslink services continuing through central London."
+            },
+            {
+              "destination": "Moorgate",
+              "tph": 2,
+              "direct": true,
+              "notes": "Great Northern via Hertford North and the Hertford Loop."
+            },
+            {
+              "destination": "Hertford North",
+              "tph": 2,
+              "direct": true,
+              "notes": "Great Northern Hertford Loop service."
+            },
+            {
+              "destination": "Cambridge",
+              "tph": 2,
+              "direct": true,
+              "notes": "Great Northern; approximately one train per hour normally continues to King’s Lynn."
+            },
+            {
+              "destination": "King's Lynn",
+              "tph": 1,
+              "direct": true,
+              "notes": "Typical through service via Cambridge; individual hours vary."
+            },
+            {
+              "destination": "Peterborough",
+              "tph": 2,
+              "direct": true,
+              "notes": "Core Thameslink frequency; additional intercity calls occur in some hours."
+            },
+            {
+              "destination": "London Bridge",
+              "tph": 2,
+              "direct": true,
+              "notes": "Overlapping Thameslink services already included in total departures."
+            },
+            {
+              "destination": "Gatwick Airport",
+              "tph": 2,
+              "direct": true,
+              "notes": "Overlapping Thameslink services; southern terminal and stopping pattern vary by train."
+            },
+            {
+              "destination": "York / Leeds / Newcastle / Edinburgh and other East Coast destinations",
+              "tph": 1,
+              "direct": true,
+              "notes": "Indicative combined intercity opportunity; the direct destination served varies by individual LNER/Lumo train and not every destination has an hourly service."
+            }
+          ],
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Representative Monday-Friday inter-peak service level, not a guarantee for every clock hour. Destination entries overlap and must not be summed. Engineering work, seasonal amendments and individual train restrictions can alter the service; check the journey planner for the date of travel."
+        },
+        "servicePattern": {
+          "value": "Frequent weekday service: fast and semi-fast trains to London King’s Cross; Thameslink trains through London St Pancras and London Bridge towards Gatwick Airport and destinations south of London; Great Northern services north to Cambridge/King’s Lynn and via Hertford North to Moorgate; Thameslink services north to Peterborough; selected LNER and Lumo intercity calls on the East Coast Main Line.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Representative Monday-Friday inter-peak service level, not a guarantee for every clock hour. Destination entries overlap and must not be summed. Engineering work, seasonal amendments and individual train restrictions can alter the service; check the journey planner for the date of travel."
+        },
+        "frequency": {
+          "value": "Approximately 12 total departures per hour in a representative weekday inter-peak hour, comprising multiple London, Hertford Loop, Cambridge/King’s Lynn, Peterborough and selected intercity services.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Representative Monday-Friday inter-peak service level, not a guarantee for every clock hour. Destination entries overlap and must not be summed. Engineering work, seasonal amendments and individual train restrictions can alter the service; check the journey planner for the date of travel."
+        },
+        "destinations": {
+          "value": "London King's Cross, London St Pancras International, Finsbury Park, Moorgate, Hertford North, London Bridge, Gatwick Airport, Cambridge, King's Lynn and Peterborough, with selected direct LNER/Lumo services to East Coast destinations including York, Leeds, Newcastle and Edinburgh depending on the train.",
+          "status": "needs_review",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Principal direct destinations only; stopping patterns and intercity calls vary by train."
+        },
+        "journeyOpportunities": {
+          "value": "Stevenage provides high-frequency local, regional and intercity rail opportunities, including direct access to central London, Cambridge, Peterborough, the Hertford Loop and selected East Coast Main Line destinations. Thameslink services provide direct cross-London connectivity, while interchange at London, Cambridge and Peterborough broadens onward national connections.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables | https://www.lner.co.uk/travel-information/timetables/ | https://www.lumo.co.uk/plan-your-journey/our-timetable",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Official Great Northern/Thameslink, LNER and Lumo timetables",
+          "sourceType": "official_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "General accessibility wording; always use date-specific journey planning for a proposed trip."
+        },
+        "cycleParking": {
+          "value": "266 cycle-storage spaces; cycle storage is covered by CCTV.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/travel-information/station-information/SVG/stevenage",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage station information | Great Northern",
+          "sourceType": "official_station_manager_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free category B1: step-free access is available to all platforms, but access may involve long or steep ramps or streets. Lifts are provided.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office and ticket machines available. Ticket office: Monday-Thursday 06:15-20:30; Friday 06:15-21:45; Saturday 06:30-21:30; Sunday 08:00-20:15.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting area and seating available; heated waiting areas are provided on all platforms.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/ | https://www.greatnorthernrail.com/travel-information/station-information/SVG/stevenage",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "National Rail and Great Northern station information",
+          "sourceType": "official_station_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Toilets, accessible toilets, Changing Places toilet and baby-changing facilities available; the main toilets are located within the booking hall.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/ | https://www.greatnorthernrail.com/travel-information/station-information/SVG/stevenage",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "National Rail and Great Northern station information",
+          "sourceType": "official_station_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "Station parking: 17 spaces, including 4 accessible spaces; drop-off/pick-up point available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "This records the parking provision stated on the National Rail station page and does not include any separate town-centre public car parks."
+        },
+        "notes": {
+          "value": "CRS code SVG. Address: Stevenage station, Lytton Way, Stevenage, Hertfordshire, SG1 1XT. Bus and taxi interchange available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/stevenage/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stevenage Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T11:08:16.308Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "duplicate_candidate: Same physical National Rail station as Stevenage (CRS SVG)."
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/5178413114",
+      "canonicalName": "Plaistow",
+      "name": "Plaistow",
+      "mode": "London Underground",
+      "coordinates": {
+        "lat": 51.5311544,
+        "lon": 0.0166833
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/5178413114"
+      },
+      "fields": {
+        "manager": {
+          "value": "London Underground",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Plaistow Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "London Underground",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Plaistow Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "District line; Hammersmith & City line",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Plaistow Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 36,
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service derived from the published line pattern. District and Hammersmith & City destination entries overlap and must not be summed. Actual intervals and terminal allocations vary by time of day and disruption."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Hammersmith",
+              "tph": 6,
+              "direct": true,
+              "notes": "Hammersmith & City line; representative daytime frequency."
+            },
+            {
+              "destination": "Richmond",
+              "tph": 6,
+              "direct": true,
+              "notes": "District line; representative allocation varies by working timetable."
+            },
+            {
+              "destination": "Ealing Broadway",
+              "tph": 3,
+              "direct": true,
+              "notes": "District line; representative allocation varies by working timetable."
+            },
+            {
+              "destination": "Wimbledon",
+              "tph": 3,
+              "direct": true,
+              "notes": "District line; representative allocation varies by working timetable."
+            },
+            {
+              "destination": "Barking",
+              "tph": 6,
+              "direct": true,
+              "notes": "Hammersmith & City trains terminate at Barking; all eastbound trains also call there."
+            },
+            {
+              "destination": "Upminster",
+              "tph": 12,
+              "direct": true,
+              "notes": "District line; representative daytime frequency."
+            }
+          ],
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service derived from the published line pattern. District and Hammersmith & City destination entries overlap and must not be summed. Actual intervals and terminal allocations vary by time of day and disruption."
+        },
+        "servicePattern": {
+          "value": "Frequent District and Hammersmith & City line services operate westbound through central London. Eastbound District line trains continue to Upminster, while Hammersmith & City line trains terminate at Barking.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 36 total train departures per hour in a representative weekday daytime period (about 18 in each direction).",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service derived from the published line pattern. District and Hammersmith & City destination entries overlap and must not be summed. Actual intervals and terminal allocations vary by time of day and disruption."
+        },
+        "destinations": {
+          "value": "Direct services include Barking, Upminster, Whitechapel, Liverpool Street, King’s Cross St Pancras, Paddington and Hammersmith, plus District line branches to Ealing Broadway, Richmond and Wimbledon.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": "Principal destinations only; not every train serves every western branch."
+        },
+        "journeyOpportunities": {
+          "value": "The station provides frequent direct Underground access to east and central London, with interchange available across the wider Tube, DLR, Elizabeth line and National Rail networks at stations including West Ham, Whitechapel, Liverpool Street, King’s Cross St Pancras and Paddington.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "TfL does not list cycle parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that cycle parking is unavailable; confirm locally if material to the assessment."
+        },
+        "stepFree": {
+          "value": "Not shown as step-free on TfL’s current step-free network guide. Step-free access should therefore not be assumed.",
+          "status": "verified",
+          "source": "https://content.tfl.gov.uk/step-free-tube-guide-map.pdf | https://tfl.gov.uk/corporate/transparency/freedom-of-information/foi-request-detail?referenceId=FOI-0671-2526",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL step-free guide and TfL station-accessibility FOI response",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": "TfL lists the station among candidates considered for a future step-free upgrade; this does not constitute a committed scheme."
+        },
+        "ticketing": {
+          "value": "Ticket hall, ticket gates and self-service ticket machines; Oyster and contactless payment are supported.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/lu-accessible-travel-policy.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and London Underground Accessible Travel Policy",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "TfL does not list a dedicated waiting room on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that a dedicated waiting room is unavailable; confirm locally if material to the assessment."
+        },
+        "toilets": {
+          "value": "TfL does not list toilets on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that toilets is unavailable; confirm locally if material to the assessment."
+        },
+        "carParking": {
+          "value": "TfL does not list station car parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that station car parking is unavailable; confirm locally if material to the assessment."
+        },
+        "notes": {
+          "value": "Address: Plaistow Station, Plaistow Road, London E13 0DY. Fare Zone 3. Station facilities listed by TfL include a ticket hall, gates, payphones and Wi-Fi.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Plaistow Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T11:45:38.895Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "facility_review: Confirm unlisted ancillary facilities locally if material to the assessment."
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/4451063672",
+      "canonicalName": "Upton Park",
+      "name": "Upton Park",
+      "mode": "London Underground",
+      "coordinates": {
+        "lat": 51.5351062,
+        "lon": 0.0339842
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/4451063672"
+      },
+      "fields": {
+        "manager": {
+          "value": "London Underground",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Upton Park Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "London Underground",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Upton Park Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "District line; Hammersmith & City line",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Upton Park Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 36,
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service derived from the published line pattern. District and Hammersmith & City destination entries overlap and must not be summed. Actual intervals and terminal allocations vary by time of day and disruption."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Hammersmith",
+              "tph": 6,
+              "direct": true,
+              "notes": "Hammersmith & City line; representative daytime frequency."
+            },
+            {
+              "destination": "Richmond",
+              "tph": 6,
+              "direct": true,
+              "notes": "District line; representative allocation varies by working timetable."
+            },
+            {
+              "destination": "Ealing Broadway",
+              "tph": 3,
+              "direct": true,
+              "notes": "District line; representative allocation varies by working timetable."
+            },
+            {
+              "destination": "Wimbledon",
+              "tph": 3,
+              "direct": true,
+              "notes": "District line; representative allocation varies by working timetable."
+            },
+            {
+              "destination": "Barking",
+              "tph": 6,
+              "direct": true,
+              "notes": "Hammersmith & City trains terminate at Barking; all eastbound trains also call there."
+            },
+            {
+              "destination": "Upminster",
+              "tph": 12,
+              "direct": true,
+              "notes": "District line; representative daytime frequency."
+            }
+          ],
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service derived from the published line pattern. District and Hammersmith & City destination entries overlap and must not be summed. Actual intervals and terminal allocations vary by time of day and disruption."
+        },
+        "servicePattern": {
+          "value": "Frequent District and Hammersmith & City line services operate westbound through central London. Eastbound District line trains continue to Upminster, while Hammersmith & City line trains terminate at Barking.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 36 total train departures per hour in a representative weekday daytime period (about 18 in each direction).",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service derived from the published line pattern. District and Hammersmith & City destination entries overlap and must not be summed. Actual intervals and terminal allocations vary by time of day and disruption."
+        },
+        "destinations": {
+          "value": "Direct services include Barking, Upminster, Whitechapel, Liverpool Street, King’s Cross St Pancras, Paddington and Hammersmith, plus District line branches to Ealing Broadway, Richmond and Wimbledon.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": "Principal destinations only; not every train serves every western branch."
+        },
+        "journeyOpportunities": {
+          "value": "The station provides frequent direct Underground access to east and central London, with interchange available across the wider Tube, DLR, Elizabeth line and National Rail networks at stations including West Ham, Whitechapel, Liverpool Street, King’s Cross St Pancras and Paddington.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "TfL does not list cycle parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that cycle parking is unavailable; confirm locally if material to the assessment."
+        },
+        "stepFree": {
+          "value": "Not shown as step-free on TfL’s current step-free network guide. Step-free access should therefore not be assumed.",
+          "status": "verified",
+          "source": "https://content.tfl.gov.uk/step-free-tube-guide-map.pdf | https://tfl.gov.uk/corporate/transparency/freedom-of-information/foi-request-detail?referenceId=FOI-0671-2526",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL step-free guide and TfL station-accessibility FOI response",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": "TfL lists the station among candidates considered for a future step-free upgrade; this does not constitute a committed scheme."
+        },
+        "ticketing": {
+          "value": "Ticket hall, ticket gates and self-service ticket machines; Oyster and contactless payment are supported.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/ | https://content.tfl.gov.uk/lu-accessible-travel-policy.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information and London Underground Accessible Travel Policy",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "TfL does not list a dedicated waiting room on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that a dedicated waiting room is unavailable; confirm locally if material to the assessment."
+        },
+        "toilets": {
+          "value": "TfL does not list toilets on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that toilets is unavailable; confirm locally if material to the assessment."
+        },
+        "carParking": {
+          "value": "TfL does not list station car parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that station car parking is unavailable; confirm locally if material to the assessment."
+        },
+        "notes": {
+          "value": "Address: Upton Park Station, Green Street, London E13 9AP. Fare Zone 3. Station facilities listed by TfL include a ticket hall, gates, payphones and Wi-Fi.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUUPK/upton-park-underground-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Upton Park Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T11:45:39.392Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "facility_review: Confirm unlisted ancillary facilities locally if material to the assessment."
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/5252083983",
+      "canonicalName": "West Ham",
+      "name": "West Ham",
+      "mode": "DLR",
+      "coordinates": {
+        "lat": 51.5280966,
+        "lon": 0.0045685
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/5252083983"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London – Docklands Light Railway",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLWHM/west-ham-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "West Ham DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Docklands Light Railway (operated for TfL by KeolisAmey Docklands 2025 Limited)",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/corporate/transparency/freedom-of-information/foi-request-detail?referenceId=FOI-3758-2526",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL FOI response: DLR station operations",
+          "sourceType": "official_tfl_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Docklands Light Railway: Stratford International–Woolwich Arsenal branch",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLWHM/west-ham-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Stratford International",
+              "tph": 6,
+              "direct": true,
+              "notes": "Northbound terminal; approximately every 10 minutes."
+            },
+            {
+              "destination": "Woolwich Arsenal",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound terminal; approximately every 10 minutes."
+            },
+            {
+              "destination": "Canning Town",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound intermediate destination; overlaps with Woolwich Arsenal services."
+            },
+            {
+              "destination": "London City Airport",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound intermediate destination; overlaps with Woolwich Arsenal services."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Destination entries overlap and must not be summed. Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "servicePattern": {
+          "value": "DLR trains operate northbound to Stratford International and southbound via Canning Town and London City Airport to Woolwich Arsenal.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLWHM/west-ham-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 12 total departures per hour during a typical weekday daytime period, comprising about 6 trains per hour in each direction.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "destinations": {
+          "value": "Direct DLR services to Stratford International, Stratford, Stratford High Street, West Ham, Abbey Road, Star Lane, Canning Town, West Silvertown, Pontoon Dock, London City Airport, King George V and Woolwich Arsenal.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLWHM/west-ham-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "West Ham is a major interchange. In addition to the DLR, passengers can interchange with the Jubilee, District and Hammersmith & City lines and c2c National Rail services, providing direct access towards central London, Stratford, Canary Wharf, Barking and South Essex.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLWHM/west-ham-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/stop/HUBWEH/west-ham-station/",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "West Ham station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "The frequency fields in this record count DLR departures only, in line with the record mode."
+        },
+        "cycleParking": {
+          "value": "TfL does not list cycle parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLWHM/west-ham-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that cycle parking is unavailable; confirm locally if material to the assessment."
+        },
+        "stepFree": {
+          "value": "Step-free access from street to train. TfL confirms that all DLR stations are step-free.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/travel-information/improvements-and-projects/step-free-access | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL step-free access information and DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Oyster and contactless accepted. A ticket machine is available for Oyster top-up and season-ticket products; passengers should touch in and out.",
+          "status": "verified",
+          "source": "https://foi.tfl.gov.uk/FOI-3904-2425/Book%202%20Ways%20to%20Pay%20-%20March%202025_Redacted.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL Types of Tickets and Ways to Pay",
+          "sourceType": "official_tfl_document",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Ticket hall and interchange circulation areas are provided; TfL does not list a dedicated waiting room.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLWHM/west-ham-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "West Ham DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "TfL does not list toilets on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLWHM/west-ham-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that toilets is unavailable; confirm locally if material to the assessment."
+        },
+        "carParking": {
+          "value": "TfL does not list station car parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLWHM/west-ham-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that station car parking is unavailable; confirm locally if material to the assessment."
+        },
+        "notes": {
+          "value": "TfL stop identifier 940GZZDLWHM; Fare Zone 2/3. Interchange with Jubilee, District and Hammersmith & City lines and c2c National Rail. TfL lists ticket halls, boarding ramps, lifts, escalators, bridge, gates, payphones and Wi-Fi.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLWHM/west-ham-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "West Ham DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T11:45:39.142Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "facility_review: Confirm unlisted ancillary facilities locally if material to the assessment."
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:way/542928489",
+      "canonicalName": "Abbey Road",
+      "name": "Abbey Road",
+      "mode": "DLR",
+      "coordinates": {
+        "lat": 51.5325043,
+        "lon": 0.0036791
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "way/542928489"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London – Docklands Light Railway",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Abbey Road DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Docklands Light Railway (operated for TfL by KeolisAmey Docklands 2025 Limited)",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/corporate/transparency/freedom-of-information/foi-request-detail?referenceId=FOI-3758-2526",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL FOI response: DLR station operations",
+          "sourceType": "official_tfl_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Docklands Light Railway: Stratford International–Woolwich Arsenal branch",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Stratford International",
+              "tph": 6,
+              "direct": true,
+              "notes": "Northbound terminal; approximately every 10 minutes."
+            },
+            {
+              "destination": "Woolwich Arsenal",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound terminal; approximately every 10 minutes."
+            },
+            {
+              "destination": "Canning Town",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound intermediate destination; overlaps with Woolwich Arsenal services."
+            },
+            {
+              "destination": "London City Airport",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound intermediate destination; overlaps with Woolwich Arsenal services."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Destination entries overlap and must not be summed. Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "servicePattern": {
+          "value": "DLR trains operate northbound to Stratford International and southbound via Canning Town and London City Airport to Woolwich Arsenal.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 12 total departures per hour during a typical weekday daytime period, comprising about 6 trains per hour in each direction.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "destinations": {
+          "value": "Direct DLR services to Stratford International, Stratford, Stratford High Street, West Ham, Abbey Road, Star Lane, Canning Town, West Silvertown, Pontoon Dock, London City Airport, King George V and Woolwich Arsenal.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "The station provides direct DLR access along the Stratford International–Woolwich Arsenal corridor, including Stratford, Canning Town and London City Airport. Interchange at Stratford, West Ham and Canning Town provides onward access to Underground, Elizabeth line, London Overground and National Rail services.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "TfL does not list cycle parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that cycle parking is unavailable; confirm locally if material to the assessment."
+        },
+        "stepFree": {
+          "value": "Step-free access from street to train. TfL confirms that all DLR stations are step-free.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/travel-information/improvements-and-projects/step-free-access | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL step-free access information and DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Oyster and contactless accepted. A ticket machine is available for Oyster top-up and season-ticket products; passengers should touch in and out.",
+          "status": "verified",
+          "source": "https://foi.tfl.gov.uk/FOI-3904-2425/Book%202%20Ways%20to%20Pay%20-%20March%202025_Redacted.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL Types of Tickets and Ways to Pay",
+          "sourceType": "official_tfl_document",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "TfL does not list a dedicated waiting room on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that a dedicated waiting room is unavailable; confirm locally if material to the assessment."
+        },
+        "toilets": {
+          "value": "TfL does not list toilets on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that toilets is unavailable; confirm locally if material to the assessment."
+        },
+        "carParking": {
+          "value": "TfL does not list station car parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that station car parking is unavailable; confirm locally if material to the assessment."
+        },
+        "notes": {
+          "value": "TfL stop identifier 940GZZDLABR; Fare Zone 2/3.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Abbey Road DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T11:45:39.892Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "facility_review: Confirm unlisted ancillary facilities locally if material to the assessment."
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "tfl:940GZZDLABR",
+      "canonicalName": "Abbey Road",
+      "name": "Abbey Road",
+      "mode": "DLR",
+      "coordinates": {
+        "lat": 51.5325414,
+        "lon": 0.0036092
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "940GZZDLABR",
+        "other": "",
+        "osm": "node/5469584669"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London – Docklands Light Railway",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Abbey Road DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Docklands Light Railway (operated for TfL by KeolisAmey Docklands 2025 Limited)",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/corporate/transparency/freedom-of-information/foi-request-detail?referenceId=FOI-3758-2526",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL FOI response: DLR station operations",
+          "sourceType": "official_tfl_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Docklands Light Railway: Stratford International–Woolwich Arsenal branch",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Stratford International",
+              "tph": 6,
+              "direct": true,
+              "notes": "Northbound terminal; approximately every 10 minutes."
+            },
+            {
+              "destination": "Woolwich Arsenal",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound terminal; approximately every 10 minutes."
+            },
+            {
+              "destination": "Canning Town",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound intermediate destination; overlaps with Woolwich Arsenal services."
+            },
+            {
+              "destination": "London City Airport",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound intermediate destination; overlaps with Woolwich Arsenal services."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Destination entries overlap and must not be summed. Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "servicePattern": {
+          "value": "DLR trains operate northbound to Stratford International and southbound via Canning Town and London City Airport to Woolwich Arsenal.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 12 total departures per hour during a typical weekday daytime period, comprising about 6 trains per hour in each direction.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "destinations": {
+          "value": "Direct DLR services to Stratford International, Stratford, Stratford High Street, West Ham, Abbey Road, Star Lane, Canning Town, West Silvertown, Pontoon Dock, London City Airport, King George V and Woolwich Arsenal.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "The station provides direct DLR access along the Stratford International–Woolwich Arsenal corridor, including Stratford, Canning Town and London City Airport. Interchange at Stratford, West Ham and Canning Town provides onward access to Underground, Elizabeth line, London Overground and National Rail services.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "TfL does not list cycle parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that cycle parking is unavailable; confirm locally if material to the assessment."
+        },
+        "stepFree": {
+          "value": "Step-free access from street to train. TfL confirms that all DLR stations are step-free.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/travel-information/improvements-and-projects/step-free-access | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL step-free access information and DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Oyster and contactless accepted. A ticket machine is available for Oyster top-up and season-ticket products; passengers should touch in and out.",
+          "status": "verified",
+          "source": "https://foi.tfl.gov.uk/FOI-3904-2425/Book%202%20Ways%20to%20Pay%20-%20March%202025_Redacted.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL Types of Tickets and Ways to Pay",
+          "sourceType": "official_tfl_document",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "TfL does not list a dedicated waiting room on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that a dedicated waiting room is unavailable; confirm locally if material to the assessment."
+        },
+        "toilets": {
+          "value": "TfL does not list toilets on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that toilets is unavailable; confirm locally if material to the assessment."
+        },
+        "carParking": {
+          "value": "TfL does not list station car parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that station car parking is unavailable; confirm locally if material to the assessment."
+        },
+        "notes": {
+          "value": "TfL stop identifier 940GZZDLABR; Fare Zone 2/3.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Abbey Road DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T11:45:39.892Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "facility_review: Confirm unlisted ancillary facilities locally if material to the assessment.",
+        "notes: unverified import did not replace verified value"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/7147489878",
+      "canonicalName": "Star Lane",
+      "name": "Star Lane",
+      "mode": "DLR",
+      "coordinates": {
+        "lat": 51.5205083,
+        "lon": 0.0043357
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/7147489878"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London – Docklands Light Railway",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTL/star-lane-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Star Lane DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Docklands Light Railway (operated for TfL by KeolisAmey Docklands 2025 Limited)",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/corporate/transparency/freedom-of-information/foi-request-detail?referenceId=FOI-3758-2526",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL FOI response: DLR station operations",
+          "sourceType": "official_tfl_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Docklands Light Railway: Stratford International–Woolwich Arsenal branch",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTL/star-lane-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Stratford International",
+              "tph": 6,
+              "direct": true,
+              "notes": "Northbound terminal; approximately every 10 minutes."
+            },
+            {
+              "destination": "Woolwich Arsenal",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound terminal; approximately every 10 minutes."
+            },
+            {
+              "destination": "Canning Town",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound intermediate destination; overlaps with Woolwich Arsenal services."
+            },
+            {
+              "destination": "London City Airport",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound intermediate destination; overlaps with Woolwich Arsenal services."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Destination entries overlap and must not be summed. Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "servicePattern": {
+          "value": "DLR trains operate northbound to Stratford International and southbound via Canning Town and London City Airport to Woolwich Arsenal.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTL/star-lane-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 12 total departures per hour during a typical weekday daytime period, comprising about 6 trains per hour in each direction.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "destinations": {
+          "value": "Direct DLR services to Stratford International, Stratford, Stratford High Street, West Ham, Abbey Road, Star Lane, Canning Town, West Silvertown, Pontoon Dock, London City Airport, King George V and Woolwich Arsenal.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTL/star-lane-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "The station provides direct DLR access along the Stratford International–Woolwich Arsenal corridor, including Stratford, Canning Town and London City Airport. Interchange at Stratford, West Ham and Canning Town provides onward access to Underground, Elizabeth line, London Overground and National Rail services.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTL/star-lane-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "TfL does not list cycle parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTL/star-lane-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that cycle parking is unavailable; confirm locally if material to the assessment."
+        },
+        "stepFree": {
+          "value": "Step-free access from street to train. TfL confirms that all DLR stations are step-free.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/travel-information/improvements-and-projects/step-free-access | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL step-free access information and DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Oyster and contactless accepted. A ticket machine is available for Oyster top-up and season-ticket products; passengers should touch in and out.",
+          "status": "verified",
+          "source": "https://foi.tfl.gov.uk/FOI-3904-2425/Book%202%20Ways%20to%20Pay%20-%20March%202025_Redacted.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL Types of Tickets and Ways to Pay",
+          "sourceType": "official_tfl_document",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "TfL does not list a dedicated waiting room on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTL/star-lane-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that a dedicated waiting room is unavailable; confirm locally if material to the assessment."
+        },
+        "toilets": {
+          "value": "TfL does not list toilets on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTL/star-lane-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that toilets is unavailable; confirm locally if material to the assessment."
+        },
+        "carParking": {
+          "value": "TfL does not list station car parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTL/star-lane-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that station car parking is unavailable; confirm locally if material to the assessment."
+        },
+        "notes": {
+          "value": "TfL stop identifier 940GZZDLSTL; Fare Zone 2/3.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTL/star-lane-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Star Lane DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T11:45:40.890Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "facility_review: Confirm unlisted ancillary facilities locally if material to the assessment."
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/5469588771",
+      "canonicalName": "Stratford High Street",
+      "name": "Stratford High Street",
+      "mode": "DLR",
+      "coordinates": {
+        "lat": 51.5376469,
+        "lon": -0.0001288
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/5469588771"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London – Docklands Light Railway",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSHS/stratford-high-street-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stratford High Street DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Docklands Light Railway (operated for TfL by KeolisAmey Docklands 2025 Limited)",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/corporate/transparency/freedom-of-information/foi-request-detail?referenceId=FOI-3758-2526",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL FOI response: DLR station operations",
+          "sourceType": "official_tfl_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Docklands Light Railway: Stratford International–Woolwich Arsenal branch",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSHS/stratford-high-street-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Stratford International",
+              "tph": 6,
+              "direct": true,
+              "notes": "Northbound terminal; approximately every 10 minutes."
+            },
+            {
+              "destination": "Woolwich Arsenal",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound terminal; approximately every 10 minutes."
+            },
+            {
+              "destination": "Canning Town",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound intermediate destination; overlaps with Woolwich Arsenal services."
+            },
+            {
+              "destination": "London City Airport",
+              "tph": 6,
+              "direct": true,
+              "notes": "Southbound intermediate destination; overlaps with Woolwich Arsenal services."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Destination entries overlap and must not be summed. Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "servicePattern": {
+          "value": "DLR trains operate northbound to Stratford International and southbound via Canning Town and London City Airport to Woolwich Arsenal.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSHS/stratford-high-street-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 12 total departures per hour during a typical weekday daytime period, comprising about 6 trains per hour in each direction.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday-Friday daytime service",
+          "notes": "Representative Monday-Friday daytime service on the Stratford International–Woolwich Arsenal branch. The TfL timetable shows a broadly 10-minute interval; engineering work and time-of-day changes can alter the service."
+        },
+        "destinations": {
+          "value": "Direct DLR services to Stratford International, Stratford, Stratford High Street, West Ham, Abbey Road, Star Lane, Canning Town, West Silvertown, Pontoon Dock, London City Airport, King George V and Woolwich Arsenal.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSHS/stratford-high-street-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "The station provides direct DLR access along the Stratford International–Woolwich Arsenal corridor, including Stratford, Canning Town and London City Airport. Interchange at Stratford, West Ham and Canning Town provides onward access to Underground, Elizabeth line, London Overground and National Rail services.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSHS/stratford-high-street-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL DLR station information, timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "TfL does not list cycle parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSHS/stratford-high-street-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that cycle parking is unavailable; confirm locally if material to the assessment."
+        },
+        "stepFree": {
+          "value": "Step-free access from street to train. TfL confirms that all DLR stations are step-free.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/travel-information/improvements-and-projects/step-free-access | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL step-free access information and DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Oyster and contactless accepted. A ticket machine is available for Oyster top-up and season-ticket products; passengers should touch in and out.",
+          "status": "verified",
+          "source": "https://foi.tfl.gov.uk/FOI-3904-2425/Book%202%20Ways%20to%20Pay%20-%20March%202025_Redacted.pdf",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL Types of Tickets and Ways to Pay",
+          "sourceType": "official_tfl_document",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "TfL does not list a dedicated waiting room on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSHS/stratford-high-street-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that a dedicated waiting room is unavailable; confirm locally if material to the assessment."
+        },
+        "toilets": {
+          "value": "TfL does not list toilets on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSHS/stratford-high-street-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that toilets is unavailable; confirm locally if material to the assessment."
+        },
+        "carParking": {
+          "value": "TfL does not list station car parking on the station page.",
+          "status": "needs_review",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSHS/stratford-high-street-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "TfL station information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Absence from TfL's facility list is not treated as proof that station car parking is unavailable; confirm locally if material to the assessment."
+        },
+        "notes": {
+          "value": "TfL stop identifier 940GZZDLSHS; Fare Zone 2/3.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSHS/stratford-high-street-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-15",
+          "sourceTitle": "Stratford High Street DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-15T11:45:41.394Z",
+      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "reviewFlags": [
+        "facility_review: Confirm unlisted ancillary facilities locally if material to the assessment."
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.4.0",
+      "previousRevision": null
+    }
+  ]
 }

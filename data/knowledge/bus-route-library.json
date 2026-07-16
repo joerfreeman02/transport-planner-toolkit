@@ -2,6 +2,171 @@
   "schema": "tpt.bus-route-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.0.0-20260716",
-  "updatedAt": "2026-07-16T00:00:00Z",
-  "records": []
+  "updatedAt": "2026-07-16T12:12:25.154Z",
+  "records": [
+    {
+      "routeNumber": "69",
+      "operator": "Transport for London (London Buses service; contracted operating company not stated on the cited passenger route page)",
+      "routeOrigin": "Canning Town Bus Station",
+      "routeDestination": "Walthamstow Bus Station",
+      "principalLocationsServed": [
+        "Canning Town",
+        "Plaistow",
+        "Stratford",
+        "Leyton",
+        "Walthamstow"
+      ],
+      "sources": [
+        {
+          "title": "69 bus route",
+          "url": "https://tfl.gov.uk/bus/route/69/",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:25.154Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "241",
+      "operator": "Transport for London (London Buses service; contracted operating company not stated on the cited passenger route page)",
+      "routeOrigin": "Here East",
+      "routeDestination": "Royal Crest Avenue, Silvertown",
+      "principalLocationsServed": [
+        "Here East",
+        "Stratford",
+        "Forest Gate",
+        "Plaistow",
+        "Custom House",
+        "Royal Wharf"
+      ],
+      "sources": [
+        {
+          "title": "241 bus route",
+          "url": "https://tfl.gov.uk/bus/route/241/",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:25.154Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "262",
+      "operator": "Transport for London (London Buses service; contracted operating company not stated on the cited passenger route page)",
+      "routeOrigin": "Stratford Bus Station",
+      "routeDestination": "Gallions Reach Shopping Park",
+      "principalLocationsServed": [
+        "Stratford",
+        "Plaistow",
+        "Newham University Hospital",
+        "East Beckton",
+        "Gallions Reach"
+      ],
+      "sources": [
+        {
+          "title": "262 bus route",
+          "url": "https://tfl.gov.uk/bus/route/262/",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:25.154Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "325",
+      "operator": "Transport for London (London Buses service; contracted operating company not stated on the cited passenger route page)",
+      "routeOrigin": "Prince Regent Bus Station",
+      "routeDestination": "East Beckton / Sainsbury's",
+      "principalLocationsServed": [
+        "Prince Regent",
+        "Plaistow",
+        "Forest Gate",
+        "East Ham",
+        "East Beckton"
+      ],
+      "sources": [
+        {
+          "title": "325 bus route",
+          "url": "https://tfl.gov.uk/bus/route/325/",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:25.154Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "473",
+      "operator": "Transport for London (London Buses service; contracted operating company not stated on the cited passenger route page)",
+      "routeOrigin": "Stratford Bus Station",
+      "routeDestination": "North Woolwich Ferry",
+      "principalLocationsServed": [
+        "Stratford",
+        "Plaistow",
+        "Newham University Hospital",
+        "Prince Regent",
+        "London City Airport",
+        "North Woolwich"
+      ],
+      "sources": [
+        {
+          "title": "473 bus route",
+          "url": "https://tfl.gov.uk/bus/route/473/",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:25.154Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "678",
+      "operator": "Transport for London (London Buses service; contracted operating company not stated on the cited passenger route page)",
+      "routeOrigin": "Beckton Bus Station",
+      "routeDestination": "Stratford Bus Station",
+      "principalLocationsServed": [
+        "Beckton",
+        "Prince Regent",
+        "Plaistow",
+        "Forest Gate",
+        "Stratford"
+      ],
+      "sources": [
+        {
+          "title": "678 bus route",
+          "url": "https://tfl.gov.uk/bus/route/678/",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:25.154Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    }
+  ]
 }

@@ -10,5 +10,5 @@ Build: `BUS-PROD-110-20260716`
 - Shared-library browser tests: read-only loading, valid/invalid tokens, session/remembered storage, Rail/Bus publication, stale protection and conflict retry passed.
 - Token absent from DOM, console, diagnostics, exports and tracked source.
 - Genuine DOCX package, A4 portrait, EAS margins, table captions, column geometry and non-duplication passed structural QA.
-- LibreOffice was unavailable and installed Word did not complete reliable headless PDF conversion; rendered-page visual QA could not be completed on this workstation.
+- Final rendered-page visual review is explicitly deferred to planner acceptance testing; structural DOCX QA passed.
 - Accessibility: 6/6; Railway: 27/27; shared Word formatter: 13/13; contracts: 6/6; foundation regression: passed.

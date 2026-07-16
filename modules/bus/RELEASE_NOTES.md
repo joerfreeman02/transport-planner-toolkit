@@ -1,4 +1,4 @@
-# BUS-1.1.0 production release candidate
+# BUS-1.1.0 production baseline
 
 Build: `BUS-PROD-110-20260716`
 

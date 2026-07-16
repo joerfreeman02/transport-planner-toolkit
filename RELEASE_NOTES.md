@@ -1,4 +1,4 @@
-# Toolkit 2.0.0 production release candidate
+# Toolkit 2.0.0 production release
 
 Builds:
 
@@ -17,4 +17,4 @@ Known limitations:
 - The fine-grained token approach is an approved interim no-backend design; connected editors must protect and periodically review their token.
 - Stop discovery continues to use controlled OSM fallback where direct NaPTAN infrastructure is unavailable; assisted research verifies identifiers.
 - Local drafts remain browser-scoped until successfully published or manually exported.
-- Automated DOCX structural and download testing passed. LibreOffice was unavailable and the installed Word COM renderer did not complete reliable headless visual conversion on the engineering workstation.
+- Automated DOCX structural and download testing passed. Final visual review in Microsoft Word is explicitly deferred to planner acceptance testing.

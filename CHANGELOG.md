@@ -1,5 +1,11 @@
 # Changelog
 
+## Toolkit 2.3.0 corporate-theme review — 2026-07-16
+
+- Standardised Dashboard, Accessibility, Railway and Bus on the EAS orange, grey and white export colourway.
+- Added coordinate-only Google Maps links and Copy coordinates controls across all three assessment modules.
+- Preserved STATS19 and all accepted assessment/shared-library workflows.
+
 ## Toolkit 2.2.0 emergency corrective review — 2026-07-16
 
 - Corrected direct shared-master consumption in Railway and Bus on clean browsers.

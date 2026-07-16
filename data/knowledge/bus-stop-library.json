@@ -2,6 +2,618 @@
   "schema": "tpt.bus-stop-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.0.0-20260716",
-  "updatedAt": "2026-07-16T00:00:00Z",
-  "records": []
+  "updatedAt": "2026-07-16T12:12:22.539Z",
+  "records": [
+    {
+      "naptanCode": "490011045S",
+      "fallbackIdentity": "",
+      "stopName": "Balaam Street",
+      "locality": "",
+      "direction": "Stop S",
+      "pairedStopGroup": "S",
+      "coordinates": {
+        "latitude": 51.5296166,
+        "longitude": 0.0241103
+      },
+      "routesServed": [
+        "262",
+        "473"
+      ],
+      "sources": [
+        {
+          "title": "Balaam Street bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490011045S/balaam-street",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490011045N",
+      "fallbackIdentity": "",
+      "stopName": "Balaam Street",
+      "locality": "",
+      "direction": "Stop T",
+      "pairedStopGroup": "T",
+      "coordinates": {
+        "latitude": 51.5296486,
+        "longitude": 0.0236645
+      },
+      "routesServed": [
+        "241",
+        "262",
+        "325",
+        "473",
+        "678"
+      ],
+      "sources": [
+        {
+          "title": "Balaam Street bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490011045N/balaam-street",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490011042S",
+      "fallbackIdentity": "",
+      "stopName": "Plaistow Broadway",
+      "locality": "",
+      "direction": "Direction not stated",
+      "pairedStopGroup": "plaistow broadway",
+      "coordinates": {
+        "latitude": 51.5289682,
+        "longitude": 0.0242365
+      },
+      "routesServed": [
+        "241",
+        "325",
+        "678"
+      ],
+      "sources": [
+        {
+          "title": "Plaistow Broadway bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490011042S/plaistow-broadway",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490008637E",
+      "fallbackIdentity": "",
+      "stopName": "Kennedy Close",
+      "locality": "",
+      "direction": "E",
+      "pairedStopGroup": "E",
+      "coordinates": {
+        "latitude": 51.5302511,
+        "longitude": 0.0223016
+      },
+      "routesServed": [
+        "241",
+        "262",
+        "325",
+        "473",
+        "678"
+      ],
+      "sources": [
+        {
+          "title": "Kennedy Close bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490008637E/kennedy-close",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490008637F",
+      "fallbackIdentity": "",
+      "stopName": "Kennedy Close",
+      "locality": "",
+      "direction": "F",
+      "pairedStopGroup": "F",
+      "coordinates": {
+        "latitude": 51.5302271,
+        "longitude": 0.0218979
+      },
+      "routesServed": [
+        "241",
+        "262",
+        "473"
+      ],
+      "sources": [
+        {
+          "title": "Kennedy Close bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490008637F/kennedy-close",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490010953S",
+      "fallbackIdentity": "",
+      "stopName": "Perth Road",
+      "locality": "",
+      "direction": "Stop GP",
+      "pairedStopGroup": "GP",
+      "coordinates": {
+        "latitude": 51.5281734,
+        "longitude": 0.0268492
+      },
+      "routesServed": [
+        "262",
+        "473"
+      ],
+      "sources": [
+        {
+          "title": "Perth Road bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490010953S/perth-road",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490012011N",
+      "fallbackIdentity": "",
+      "stopName": "Sewell Street",
+      "locality": "",
+      "direction": "Stop AK",
+      "pairedStopGroup": "AK",
+      "coordinates": {
+        "latitude": 51.527262,
+        "longitude": 0.0238904
+      },
+      "routesServed": [
+        "241",
+        "325",
+        "678"
+      ],
+      "sources": [
+        {
+          "title": "Sewell Street bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490012011N/sewell-street",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490005387D",
+      "fallbackIdentity": "",
+      "stopName": "Clegg Street",
+      "locality": "",
+      "direction": "Stop D",
+      "pairedStopGroup": "D",
+      "coordinates": {
+        "latitude": 51.5310836,
+        "longitude": 0.0215992
+      },
+      "routesServed": [
+        "325",
+        "678"
+      ],
+      "sources": [
+        {
+          "title": "Clegg Street bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490005387D/clegg-street",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490012011S",
+      "fallbackIdentity": "",
+      "stopName": "Sewell Street",
+      "locality": "",
+      "direction": "Stop AA",
+      "pairedStopGroup": "AA",
+      "coordinates": {
+        "latitude": 51.5269952,
+        "longitude": 0.0240486
+      },
+      "routesServed": [
+        "241",
+        "325",
+        "678"
+      ],
+      "sources": [
+        {
+          "title": "Sewell Street bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490012011S/sewell-street",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490014059G",
+      "fallbackIdentity": "",
+      "stopName": "Victoria Road",
+      "locality": "",
+      "direction": "G",
+      "pairedStopGroup": "G",
+      "coordinates": {
+        "latitude": 51.5310369,
+        "longitude": 0.0203211
+      },
+      "routesServed": [
+        "241",
+        "262",
+        "473"
+      ],
+      "sources": [
+        {
+          "title": "Victoria Road bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490014059G/victoria-road",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490010953N",
+      "fallbackIdentity": "",
+      "stopName": "Gad Close",
+      "locality": "",
+      "direction": "Stop GV",
+      "pairedStopGroup": "GV",
+      "coordinates": {
+        "latitude": 51.5274834,
+        "longitude": 0.0274036
+      },
+      "routesServed": [
+        "262",
+        "473"
+      ],
+      "sources": [
+        {
+          "title": "Gad Close bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490010953N/gad-close",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490013944H",
+      "fallbackIdentity": "",
+      "stopName": "High Street Plaistow",
+      "locality": "",
+      "direction": "H",
+      "pairedStopGroup": "H",
+      "coordinates": {
+        "latitude": 51.5307242,
+        "longitude": 0.0192276
+      },
+      "routesServed": [
+        "69"
+      ],
+      "sources": [
+        {
+          "title": "High Street Plaistow bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490013944H/high-street-plaistow",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490006106N",
+      "fallbackIdentity": "",
+      "stopName": "Balaam Park Health Centre",
+      "locality": "",
+      "direction": "Stop AJ",
+      "pairedStopGroup": "AJ",
+      "coordinates": {
+        "latitude": 51.5261307,
+        "longitude": 0.0240968
+      },
+      "routesServed": [
+        "241",
+        "325",
+        "678"
+      ],
+      "sources": [
+        {
+          "title": "Balaam Park Health Centre bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490006106N/balaam-park-health-centre",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490006878N1",
+      "fallbackIdentity": "",
+      "stopName": "Florence Road",
+      "locality": "",
+      "direction": "Stop N",
+      "pairedStopGroup": "N",
+      "coordinates": {
+        "latitude": 51.5294268,
+        "longitude": 0.0183956
+      },
+      "routesServed": [
+        "69"
+      ],
+      "sources": [
+        {
+          "title": "Florence Road bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490006878N1/florence-road",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490013197E",
+      "fallbackIdentity": "",
+      "stopName": "Stopford Road",
+      "locality": "",
+      "direction": "Stop P",
+      "pairedStopGroup": "P",
+      "coordinates": {
+        "latitude": 51.5329251,
+        "longitude": 0.0223985
+      },
+      "routesServed": [
+        "325",
+        "678"
+      ],
+      "sources": [
+        {
+          "title": "Stopford Road bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490013197E/stopford-road",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490006878N2",
+      "fallbackIdentity": "",
+      "stopName": "Florence Road",
+      "locality": "",
+      "direction": "Stop M",
+      "pairedStopGroup": "M",
+      "coordinates": {
+        "latitude": 51.5287074,
+        "longitude": 0.018165
+      },
+      "routesServed": [
+        "69"
+      ],
+      "sources": [
+        {
+          "title": "Florence Road bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490006878N2/florence-road",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490011040S",
+      "fallbackIdentity": "",
+      "stopName": "Barking Road",
+      "locality": "",
+      "direction": "Stop GR",
+      "pairedStopGroup": "GR",
+      "coordinates": {
+        "latitude": 51.5268355,
+        "longitude": 0.0284958
+      },
+      "routesServed": [
+        "262",
+        "473"
+      ],
+      "sources": [
+        {
+          "title": "Barking Road bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490011040S/barking-road",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490013197S",
+      "fallbackIdentity": "",
+      "stopName": "Terrace Road",
+      "locality": "",
+      "direction": "Stop R",
+      "pairedStopGroup": "R",
+      "coordinates": {
+        "latitude": 51.5333246,
+        "longitude": 0.0226641
+      },
+      "routesServed": [
+        "325",
+        "678"
+      ],
+      "sources": [
+        {
+          "title": "Terrace Road bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490013197S/terrace-road",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490000182A",
+      "fallbackIdentity": "",
+      "stopName": "Plaistow Station",
+      "locality": "",
+      "direction": "Stop A",
+      "pairedStopGroup": "A",
+      "coordinates": {
+        "latitude": 51.5312219,
+        "longitude": 0.0181524
+      },
+      "routesServed": [
+        "69",
+        "241",
+        "262",
+        "473"
+      ],
+      "sources": [
+        {
+          "title": "Plaistow Station bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490000182A/plaistow-station",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490011040N",
+      "fallbackIdentity": "",
+      "stopName": "Barking Road",
+      "locality": "",
+      "direction": "Stop GU",
+      "pairedStopGroup": "GU",
+      "coordinates": {
+        "latitude": 51.526324,
+        "longitude": 0.0288099
+      },
+      "routesServed": [
+        "262",
+        "473"
+      ],
+      "sources": [
+        {
+          "title": "Barking Road bus stop",
+          "url": "https://tfl.gov.uk/bus/stop/490011040N/barking-road",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    }
+  ]
 }

@@ -2,7 +2,7 @@
   "schema": "tpt.bus-stop-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.0.0-20260716",
-  "updatedAt": "2026-07-16T12:12:22.539Z",
+  "updatedAt": "2026-07-16T12:26:09.926Z",
   "records": [
     {
       "naptanCode": "490011045S",
@@ -30,9 +30,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490011045N",
@@ -63,9 +66,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490011042S",
@@ -94,9 +100,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490008637E",
@@ -127,9 +136,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490008637F",
@@ -158,9 +170,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490010953S",
@@ -188,9 +203,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490012011N",
@@ -219,9 +237,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490005387D",
@@ -249,9 +270,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490012011S",
@@ -280,9 +304,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490014059G",
@@ -311,9 +338,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490010953N",
@@ -341,9 +371,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490013944H",
@@ -370,9 +403,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490006106N",
@@ -401,9 +437,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490006878N1",
@@ -430,9 +469,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490013197E",
@@ -460,9 +502,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490006878N2",
@@ -489,9 +534,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490011040S",
@@ -519,9 +567,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490013197S",
@@ -549,9 +600,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490000182A",
@@ -581,9 +635,12 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "naptanCode": "490011040N",
@@ -611,7 +668,314 @@
       "retrievalDate": "2026-07-16",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-16T12:12:22.539Z",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:12:22.539Z",
+        "editorName": "Joe Freeman"
+      }
+    },
+    {
+      "naptanCode": "210021309340",
+      "fallbackIdentity": "",
+      "stopName": "Abbotts Court",
+      "locality": "Stanstead Abbotts",
+      "direction": "W-bound",
+      "pairedStopGroup": "abbotts court",
+      "coordinates": {
+        "latitude": 51.7885605,
+        "longitude": 0.0074363
+      },
+      "routesServed": [
+        "25/25B",
+        "33",
+        "35/35B/35C"
+      ],
+      "sources": [
+        {
+          "title": "Abbotts Court (W-bound)",
+          "url": "https://www.intalink.org.uk/stops/210021309340",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021303480",
+      "fallbackIdentity": "",
+      "stopName": "Abbotts Court",
+      "locality": "Stanstead Abbotts",
+      "direction": "E-bound",
+      "pairedStopGroup": "abbotts court",
+      "coordinates": {
+        "latitude": 51.7885904,
+        "longitude": 0.0070198
+      },
+      "routesServed": [
+        "25/25B",
+        "33",
+        "35/35B/35C"
+      ],
+      "sources": [
+        {
+          "title": "Abbotts Court (E-bound)",
+          "url": "https://www.intalink.org.uk/stops/210021303480",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021303500",
+      "fallbackIdentity": "",
+      "stopName": "Abbotts Rise",
+      "locality": "Stanstead Abbotts",
+      "direction": "adj",
+      "pairedStopGroup": "abbotts rise",
+      "coordinates": {
+        "latitude": 51.787016,
+        "longitude": 0.0113048
+      },
+      "routesServed": [
+        "25/25B",
+        "33",
+        "35/35B/35C"
+      ],
+      "sources": [
+        {
+          "title": "Abbotts Rise (adj)",
+          "url": "https://www.intalink.org.uk/stops/210021303500",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021309320",
+      "fallbackIdentity": "",
+      "stopName": "Abbotts Rise",
+      "locality": "Stanstead Abbotts",
+      "direction": "opp",
+      "pairedStopGroup": "abbotts rise",
+      "coordinates": {
+        "latitude": 51.7868904,
+        "longitude": 0.0112847
+      },
+      "routesServed": [
+        "25/25B",
+        "33",
+        "35/35B/35C"
+      ],
+      "sources": [
+        {
+          "title": "Abbotts Rise (opp)",
+          "url": "https://www.intalink.org.uk/stops/210021309320",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021309360",
+      "fallbackIdentity": "",
+      "stopName": "St Margarets Railway Station",
+      "locality": "St Margarets",
+      "direction": "Stop B",
+      "pairedStopGroup": "B",
+      "coordinates": {
+        "latitude": 51.7878087,
+        "longitude": 0.0022945
+      },
+      "routesServed": [
+        "25/25B",
+        "33",
+        "35/35B/35C"
+      ],
+      "sources": [
+        {
+          "title": "St Margarets Railway Station (Stop B)",
+          "url": "https://www.intalink.org.uk/stops/210021309360",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021303460",
+      "fallbackIdentity": "",
+      "stopName": "St Margarets Railway Station",
+      "locality": "St Margarets",
+      "direction": "Stop A",
+      "pairedStopGroup": "A",
+      "coordinates": {
+        "latitude": 51.7878012,
+        "longitude": 0.0016647
+      },
+      "routesServed": [
+        "25/25B",
+        "33",
+        "35/35B/35C"
+      ],
+      "sources": [
+        {
+          "title": "St Margarets Railway Station (Stop A)",
+          "url": "https://www.intalink.org.uk/stops/210021303460",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021303520",
+      "fallbackIdentity": "",
+      "stopName": "Roydon Road",
+      "locality": "Stanstead Abbotts",
+      "direction": "N-bound",
+      "pairedStopGroup": "roydon road",
+      "coordinates": {
+        "latitude": 51.7862396,
+        "longitude": 0.0156782
+      },
+      "routesServed": [
+        "35/35B/35C"
+      ],
+      "sources": [
+        {
+          "title": "Roydon Road (N-bound)",
+          "url": "https://www.intalink.org.uk/stops/210021303520",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021309300",
+      "fallbackIdentity": "",
+      "stopName": "Roydon Road",
+      "locality": "Stanstead Abbotts",
+      "direction": "S-bound",
+      "pairedStopGroup": "roydon road",
+      "coordinates": {
+        "latitude": 51.7865282,
+        "longitude": 0.016155
+      },
+      "routesServed": [
+        "35/35B/35C"
+      ],
+      "sources": [
+        {
+          "title": "Roydon Road (S-bound)",
+          "url": "https://www.intalink.org.uk/stops/210021309300",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021309370",
+      "fallbackIdentity": "",
+      "stopName": "St Mary's Church",
+      "locality": "St Margarets",
+      "direction": "opp",
+      "pairedStopGroup": "st mary s church",
+      "coordinates": {
+        "latitude": 51.7859996,
+        "longitude": 0.0001496
+      },
+      "routesServed": [
+        "25/25B",
+        "310"
+      ],
+      "sources": [
+        {
+          "title": "St Mary's Church (opp)",
+          "url": "https://www.intalink.org.uk/stops/210021309370",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
+      "originatingModuleBuild": "BUS-PROD-110-20260716",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "210021303440",
+      "fallbackIdentity": "",
+      "stopName": "St Mary's Church",
+      "locality": "St Margarets",
+      "direction": "nr",
+      "pairedStopGroup": "NR",
+      "coordinates": {
+        "latitude": 51.7867902,
+        "longitude": -0.0004015
+      },
+      "routesServed": [
+        "25/25B",
+        "310"
+      ],
+      "sources": [
+        {
+          "title": "St Mary's Church (nr)",
+          "url": "https://www.intalink.org.uk/stops/210021303440",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-16"
+        }
+      ],
+      "retrievalDate": "2026-07-16",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-16T12:26:09.926Z",
       "originatingModuleBuild": "BUS-PROD-110-20260716",
       "previousRevision": null
     }

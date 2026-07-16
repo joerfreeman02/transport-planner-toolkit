@@ -2,14 +2,14 @@
   "schema": "tpt-rail-knowledge-v3",
   "version": 2,
   "libraryBuild": "SHARED-LIB-1.1.0-20260716",
-  "updatedAt": "2026-07-16T13:30:55.190Z",
+  "updatedAt": "2026-07-16T13:37:04.549Z",
   "records": [
     {
       "schema": "tpt-rail-knowledge-v3",
       "version": 2,
       "key": "osm:node/6137915989",
-      "canonicalName": "St Margarets",
-      "name": "St Margarets",
+      "canonicalName": "St Margarets (Herts)",
+      "name": "St Margarets (Herts)",
       "mode": "National Rail",
       "coordinates": {
         "lat": 51.7881973,
@@ -29,7 +29,7 @@
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/smt",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "St Margarets (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
@@ -39,39 +39,41 @@
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/smt",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "St Margarets (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "Current station operator and passenger train operator for the regular services described."
         },
         "lines": {
-          "value": "Hertford East branch of the West Anglia Main Line",
+          "value": "Hertford East line (West Anglia route)",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": ""
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Route description checked against the applicable official timetable tables."
         },
         "frequencyTotal": {
           "value": 4,
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": "Typical weekday daytime departures, both directions combined; peak and late-evening patterns vary."
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Typical weekday daytime actual departures in both directions combined; overlapping destination descriptions are not double-counted."
         },
         "frequencyByDestination": {
           "value": [
             {
               "destination": "London Liverpool Street",
+              "direction": "southbound",
               "tph": 2,
               "direct": true
             },
             {
               "destination": "Hertford East",
+              "direction": "northbound",
               "tph": 2,
               "direct": true
             }
@@ -79,130 +81,130 @@
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": "Typical weekday daytime pattern; individual trains and peak-period destinations may vary."
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Direct-service TPH. A service appearing against an intermediate and final destination represents one departure and must not be added twice."
         },
         "servicePattern": {
-          "value": "Typically 2 trains per hour towards London Liverpool Street and 2 trains per hour towards Hertford East on weekdays.",
+          "value": "Typical Monday-Friday daytime: 2 tph direct to London Liverpool Street and 2 tph direct to Hertford East (4 departures per hour in total). Peak, evening and weekend patterns vary.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
           "notes": ""
         },
         "frequency": {
-          "value": "Typically 4 departures per hour in total on weekdays (2 in each direction).",
+          "value": "4 tph total (typical Monday-Friday daytime, both directions combined)",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": ""
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Actual station departures, not a sum of overlapping destination opportunities."
         },
         "destinations": {
-          "value": "Direct weekday services include Hertford East, Ware, Rye House, Broxbourne, Cheshunt, Tottenham Hale and London Liverpool Street; stopping patterns vary.",
+          "value": "Direct typical daytime services to London Liverpool Street southbound and Hertford East northbound, serving intermediate West Anglia/Hertford East line stations as shown in the current timetable.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
           "notes": ""
         },
         "journeyOpportunities": {
-          "value": "Provides regular direct rail access to Hertford East, the Lea Valley corridor, Tottenham Hale and central London, with interchange opportunities at Broxbourne, Cheshunt, Tottenham Hale and London Liverpool Street.",
+          "value": "Direct London Liverpool Street and Hertford East services. Interchange opportunities include Tottenham Hale for the London Underground Victoria line and Broxbourne for Cambridge/Bishop’s Stortford corridor services; these are interchange opportunities and are not counted as direct destination TPH.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": "Interchange destinations are not represented as direct services."
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Direct services are explicitly distinguished from interchange opportunities."
         },
         "cycleParking": {
-          "value": "12 spaces; stands on the forecourt; unsheltered; no CCTV.",
+          "value": "12 cycle spaces; stands on the forecourt; not sheltered; no cycle-storage CCTV.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/smt",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "St Margarets (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "stepFree": {
-          "value": "Step-free access to both platforms from the Station Road level crossing; platforms are approximately 30 m apart. Category A.",
+          "value": "Step-free access to both platforms from the Station Road level crossing; platforms are approximately 30 m apart. ORR category A. Assistance meeting point: ticket office.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/smt",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "St Margarets (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "ticketing": {
-          "value": "Part-time ticket office; ticket machine; pre-purchase collection; Oyster top-up; Greater Anglia Smartcard issue, top-up and validation.",
+          "value": "Part-time staffed ticket office: Monday-Friday 06:20-13:30; Saturday 07:45-15:00; Sunday unavailable. Ticket machine and pre-purchase collection available. Oyster top-up, smartcard issue/top-up and smartcard validation available.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/smt",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "St Margarets (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "waiting": {
-          "value": "Seated area and waiting room. Waiting room: Monday-Friday 06:00-13:30; Saturday 07:30-15:00; Sunday 09:00-16:00.",
+          "value": "Seated area available. Waiting room: Monday-Friday 06:00-13:30; Saturday 07:30-15:00; Sunday 09:00-16:00. Wi-Fi available; no station buffet.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/smt",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "St Margarets (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "toilets": {
-          "value": "No toilets.",
+          "value": "No toilets; no National Key toilets; no baby-changing facilities.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/smt",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "St Margarets (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "carParking": {
-          "value": "Station car park operated by NCP; 36 spaces; open 24 hours daily.",
+          "value": "Station Car Park operated by National Car Parks Ltd: 36 spaces; open 24 hours Monday-Sunday.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/smt",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "St Margarets (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "notes": {
-          "value": "Part-time staffed station. Select 10-coach trains have selective door opening; passengers should follow Greater Anglia's coach-position advice.",
+          "value": "Station staffing level is part time. Selective door opening applies to 10-coach Greater Anglia trains: from Cambridge North/London use the rear six coaches; from Hertford East/Ware use the front seven coaches. Rail-replacement stop is by St Mary’s Church in Hoddesdon Road.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/smt",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "St Margarets (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         }
       },
-      "createdAt": "2026-07-16T12:17:30.558Z",
-      "updatedAt": "2026-07-16T12:24:34.703Z",
+      "createdAt": "2026-07-16T13:31:41.741Z",
+      "updatedAt": "2026-07-16T13:37:04.549Z",
       "reviewFlags": [],
-      "editorName": "Joe",
-      "originatingModuleBuild": "RAIL-4.4.0",
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:05:19.928Z",
-        "editorName": "Joe Freeman"
+        "updatedAt": "2026-07-16T12:24:34.703Z",
+        "editorName": "Joe"
       }
     },
     {
@@ -230,7 +232,7 @@
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryh",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Rye House Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
@@ -240,39 +242,41 @@
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryh",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Rye House Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "Current station operator and passenger train operator for the regular services described."
         },
         "lines": {
-          "value": "Hertford East branch of the West Anglia Main Line",
+          "value": "Hertford East line (West Anglia route)",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": ""
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Route description checked against the applicable official timetable tables."
         },
         "frequencyTotal": {
           "value": 4,
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": "Typical weekday daytime departures, both directions combined."
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Typical weekday daytime actual departures in both directions combined; overlapping destination descriptions are not double-counted."
         },
         "frequencyByDestination": {
           "value": [
             {
               "destination": "London Liverpool Street",
+              "direction": "southbound",
               "tph": 2,
               "direct": true
             },
             {
               "destination": "Hertford East",
+              "direction": "northbound",
               "tph": 2,
               "direct": true
             }
@@ -280,132 +284,130 @@
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": "Typical weekday daytime pattern; individual trains and peak-period destinations may vary."
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Direct-service TPH. A service appearing against an intermediate and final destination represents one departure and must not be added twice."
         },
         "servicePattern": {
-          "value": "Typically 2 trains per hour towards London Liverpool Street and 2 trains per hour towards Hertford East on weekdays.",
+          "value": "Typical Monday-Friday daytime: 2 tph direct to London Liverpool Street and 2 tph direct to Hertford East (4 departures per hour in total). Peak, evening and weekend patterns vary.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
           "notes": ""
         },
         "frequency": {
-          "value": "Typically 4 departures per hour in total on weekdays (2 in each direction).",
+          "value": "4 tph total (typical Monday-Friday daytime, both directions combined)",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": ""
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Actual station departures, not a sum of overlapping destination opportunities."
         },
         "destinations": {
-          "value": "Direct weekday services include Hertford East, Ware, St Margarets, Broxbourne, Cheshunt, Tottenham Hale and London Liverpool Street; stopping patterns vary.",
+          "value": "Direct typical daytime services to London Liverpool Street southbound and Hertford East northbound, serving intermediate Hertford East line stations as shown in the current timetable.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
           "notes": ""
         },
         "journeyOpportunities": {
-          "value": "Provides regular direct rail access to Hertford East, the Lea Valley corridor, Tottenham Hale and central London, with interchange opportunities at Broxbourne, Cheshunt, Tottenham Hale and London Liverpool Street.",
+          "value": "Direct London Liverpool Street and Hertford East services. Interchange opportunities include Tottenham Hale for the London Underground Victoria line and Broxbourne for Cambridge/Bishop’s Stortford corridor services; these are not counted as direct destination TPH.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": "Interchange destinations are not represented as direct services."
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Direct services are explicitly distinguished from interchange opportunities."
         },
         "cycleParking": {
-          "value": "8 spaces; stands on the platform; unsheltered; no CCTV.",
+          "value": "8 cycle spaces; stands on the platform; not sheltered; no cycle-storage CCTV.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryh",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Rye House Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "stepFree": {
-          "value": "Step-free access is available to the London-bound platform only. Category B3.",
+          "value": "Step-free access is available only to the London-bound platform. ORR category B3; the opposite platform is not step-free.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryh",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Rye House Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "ticketing": {
-          "value": "Part-time ticket office; ticket machine; pre-purchase collection; Oyster top-up; Greater Anglia Smartcard issue and validation.",
+          "value": "Part-time staffed ticket office: Monday-Friday 06:15-13:00; Saturday 07:45-14:30; Sunday unavailable. Ticket machine and pre-purchase collection available; Oyster and smartcard facilities are listed by the operator.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryh",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Rye House Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "waiting": {
-          "value": "Seated area and waiting room. Waiting room: Monday-Friday 06:00-13:30; Saturday 07:30-15:00; Sunday 09:00-16:00.",
+          "value": "Seated area available. Waiting room: Monday-Friday 06:00-13:30; Saturday 07:30-15:00; Sunday 09:00-16:00.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryh",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Rye House Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "toilets": {
-          "value": "No toilets.",
+          "value": "No toilets; no National Key toilets.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryh",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Rye House Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "carParking": {
-          "value": "No car park information is listed by Greater Anglia.",
-          "status": "needs_review",
-          "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryh",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Rye House Train Station Information",
-          "sourceType": "official operator station page",
-          "timetablePeriod": "",
-          "notes": "This does not establish that no third-party parking exists nearby."
-        },
-        "notes": {
-          "value": "Part-time staffed station; departure screens, Wi-Fi and seating are available.",
+          "value": "No station car park is listed on the current official station page.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryh",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Rye House Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Station is part-time staffed. Accessibility is direction-dependent: only the London-bound platform has step-free access.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryh",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Rye House Train Station Information",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         }
       },
-      "createdAt": "2026-07-16T12:17:30.559Z",
-      "updatedAt": "2026-07-16T12:24:34.703Z",
-      "reviewFlags": [
-        "carParking"
-      ],
-      "editorName": "Joe",
-      "originatingModuleBuild": "RAIL-4.4.0",
+      "createdAt": "2026-07-16T13:31:42.493Z",
+      "updatedAt": "2026-07-16T13:37:04.549Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:05:19.928Z",
-        "editorName": "Joe Freeman"
+        "updatedAt": "2026-07-16T12:24:34.703Z",
+        "editorName": "Joe"
       }
     },
     {
@@ -433,7 +435,7 @@
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryn",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Roydon Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
@@ -443,178 +445,180 @@
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryn",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Roydon Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "Current station operator and passenger train operator for the regular services described."
         },
         "lines": {
-          "value": "West Anglia Main Line",
+          "value": "West Anglia route (Bishop’s Stortford–Stratford stopping service)",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/media/42386/download?inline=",
+          "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Bishop's Stortford to Stratford train timetable",
-          "sourceType": "official operator timetable PDF",
-          "timetablePeriod": "Valid from 17 May 2026",
-          "notes": ""
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Route description checked against the applicable official timetable tables."
         },
         "frequencyTotal": {
           "value": 4,
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/media/42386/download?inline=",
+          "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Bishop's Stortford to Stratford train timetable",
-          "sourceType": "official operator timetable PDF",
-          "timetablePeriod": "Valid from 17 May 2026",
-          "notes": "Typical weekday daytime departures, both directions combined."
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Typical weekday daytime actual departures in both directions combined; overlapping destination descriptions are not double-counted."
         },
         "frequencyByDestination": {
           "value": [
             {
-              "destination": "Stratford",
+              "destination": "Stratford (London)",
+              "direction": "southbound",
               "tph": 2,
               "direct": true
             },
             {
-              "destination": "Bishop's Stortford",
+              "destination": "Bishop’s Stortford",
+              "direction": "northbound",
               "tph": 2,
               "direct": true
             }
           ],
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/media/42386/download?inline=",
+          "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Bishop's Stortford to Stratford train timetable",
-          "sourceType": "official operator timetable PDF",
-          "timetablePeriod": "Valid from 17 May 2026",
-          "notes": "Typical weekday daytime pattern; peak and late-evening services vary."
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Direct-service TPH. A service appearing against an intermediate and final destination represents one departure and must not be added twice."
         },
         "servicePattern": {
-          "value": "Typically 2 trains per hour towards Stratford and 2 trains per hour towards Bishop's Stortford on weekdays.",
+          "value": "Typical Monday-Friday daytime: 2 tph direct to Stratford (London) and 2 tph direct to Bishop’s Stortford (4 departures per hour in total). Peak, evening and weekend patterns vary.",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/media/42386/download?inline=",
+          "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Bishop's Stortford to Stratford train timetable",
-          "sourceType": "official operator timetable PDF",
-          "timetablePeriod": "Valid from 17 May 2026",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
           "notes": ""
         },
         "frequency": {
-          "value": "Typically 4 departures per hour in total on weekdays (2 in each direction).",
+          "value": "4 tph total (typical Monday-Friday daytime, both directions combined)",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/media/42386/download?inline=",
+          "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Bishop's Stortford to Stratford train timetable",
-          "sourceType": "official operator timetable PDF",
-          "timetablePeriod": "Valid from 17 May 2026",
-          "notes": ""
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Actual station departures, not a sum of overlapping destination opportunities."
         },
         "destinations": {
-          "value": "Direct weekday services include Harlow Town, Harlow Mill, Sawbridgeworth and Bishop's Stortford northbound, and Broxbourne, Cheshunt, Tottenham Hale, Lea Bridge and Stratford southbound; stopping patterns vary.",
+          "value": "Direct typical daytime services to Stratford (London) southbound and Bishop’s Stortford northbound, serving intermediate West Anglia stations shown in the current timetable.",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/media/42386/download?inline=",
+          "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Bishop's Stortford to Stratford train timetable",
-          "sourceType": "official operator timetable PDF",
-          "timetablePeriod": "Valid from 17 May 2026",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
           "notes": ""
         },
         "journeyOpportunities": {
-          "value": "Provides regular direct rail access to Harlow, Bishop's Stortford, the Lea Valley corridor, Tottenham Hale and Stratford, with onward interchange opportunities at Broxbourne, Cheshunt, Tottenham Hale and Stratford.",
+          "value": "Direct Stratford and Bishop’s Stortford services. Interchange opportunities include Broxbourne for Hertford East/London Liverpool Street/Cambridge services and Stratford for Elizabeth line, London Underground, DLR, London Overground and National Rail connections; interchange services are not counted as direct destination TPH.",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/media/42386/download?inline=",
+          "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Bishop's Stortford to Stratford train timetable",
-          "sourceType": "official operator timetable PDF",
-          "timetablePeriod": "Valid from 17 May 2026",
-          "notes": "Interchange destinations are not represented as direct services."
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Direct services are explicitly distinguished from interchange opportunities."
         },
         "cycleParking": {
-          "value": "20 spaces; stands on platform 1; unsheltered; CCTV.",
+          "value": "20 cycle spaces; stands on platform 1; not sheltered; cycle-storage CCTV available.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryn",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Roydon Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "stepFree": {
-          "value": "Step-free access to both platforms via the High Street level crossing; platforms are approximately 50 m apart. Category B1.",
+          "value": "Step-free access to both platforms via the High Street level crossing; platforms are approximately 50 m apart. ORR category B1.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryn",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Roydon Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "ticketing": {
-          "value": "No ticket office; ticket machine; pre-purchase collection; Greater Anglia Smartcard top-up and validation.",
+          "value": "Unstaffed station with no ticket office. Ticket machine and pre-purchase collection available; smartcard top-up and validation available.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryn",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Roydon Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "waiting": {
-          "value": "Seated area and waiting room. Waiting room: Monday-Sunday 05:15-19:00.",
+          "value": "Seated area available. Waiting room open daily 05:15-19:00.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryn",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Roydon Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "toilets": {
-          "value": "No toilets.",
+          "value": "No toilets; no National Key toilets.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryn",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Roydon Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "carParking": {
-          "value": "Station car park operated by NCP; 27 spaces; open 24 hours daily.",
+          "value": "Station Car Park operated by National Car Parks Ltd: 27 spaces; open 24 hours Monday-Sunday.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryn",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Roydon Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "notes": {
-          "value": "Unstaffed station; departure screens, announcements, Wi-Fi and seating are available. Greater Anglia states that Roydon is not served by rail-replacement transport.",
+          "value": "Station is unstaffed. The official station page states that Roydon is not served by rail-replacement buses.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/ryn",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Roydon Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         }
       },
-      "createdAt": "2026-07-16T12:17:30.044Z",
-      "updatedAt": "2026-07-16T12:24:34.703Z",
+      "createdAt": "2026-07-16T13:31:42.742Z",
+      "updatedAt": "2026-07-16T13:37:04.549Z",
       "reviewFlags": [],
-      "editorName": "Joe",
-      "originatingModuleBuild": "RAIL-4.4.0",
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:05:19.928Z",
-        "editorName": "Joe Freeman"
+        "updatedAt": "2026-07-16T12:24:34.703Z",
+        "editorName": "Joe"
       }
     },
     {
       "schema": "tpt-rail-knowledge-v3",
       "version": 2,
       "key": "osm:node/6137915988",
-      "canonicalName": "Ware",
-      "name": "Ware",
+      "canonicalName": "Ware (Herts)",
+      "name": "Ware (Herts)",
       "mode": "National Rail",
       "coordinates": {
         "lat": 51.8079808,
@@ -634,7 +638,7 @@
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Ware (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
@@ -644,39 +648,41 @@
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Ware (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "Current station operator and passenger train operator for the regular services described."
         },
         "lines": {
-          "value": "Hertford East branch of the West Anglia Main Line",
+          "value": "Hertford East line (West Anglia route)",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": ""
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Route description checked against the applicable official timetable tables."
         },
         "frequencyTotal": {
           "value": 4,
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": "Typical weekday daytime departures, both directions combined."
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Typical weekday daytime actual departures in both directions combined; overlapping destination descriptions are not double-counted."
         },
         "frequencyByDestination": {
           "value": [
             {
               "destination": "London Liverpool Street",
+              "direction": "southbound",
               "tph": 2,
               "direct": true
             },
             {
               "destination": "Hertford East",
+              "direction": "northbound",
               "tph": 2,
               "direct": true
             }
@@ -684,130 +690,130 @@
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": "Typical weekday daytime pattern; individual trains and peak-period destinations may vary."
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Direct-service TPH. A service appearing against an intermediate and final destination represents one departure and must not be added twice."
         },
         "servicePattern": {
-          "value": "Typically 2 trains per hour towards London Liverpool Street and 2 trains per hour towards Hertford East on weekdays.",
+          "value": "Typical Monday-Friday daytime: 2 tph direct to London Liverpool Street and 2 tph direct to Hertford East (4 departures per hour in total). Peak, evening and weekend patterns vary.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
           "notes": ""
         },
         "frequency": {
-          "value": "Typically 4 departures per hour in total on weekdays (2 in each direction).",
+          "value": "4 tph total (typical Monday-Friday daytime, both directions combined)",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": ""
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Actual station departures, not a sum of overlapping destination opportunities."
         },
         "destinations": {
-          "value": "Direct weekday services include Hertford East, St Margarets, Rye House, Broxbourne, Cheshunt, Tottenham Hale and London Liverpool Street; stopping patterns vary.",
+          "value": "Direct typical daytime services to London Liverpool Street southbound and Hertford East northbound, serving intermediate Hertford East line stations shown in the current timetable.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
           "notes": ""
         },
         "journeyOpportunities": {
-          "value": "Provides regular direct rail access to Hertford East, the Lea Valley corridor, Tottenham Hale and central London, with interchange opportunities at Broxbourne, Cheshunt, Tottenham Hale and London Liverpool Street.",
+          "value": "Direct London Liverpool Street and Hertford East services. Interchange opportunities include Tottenham Hale for the London Underground Victoria line and Broxbourne for Cambridge/Bishop’s Stortford corridor services; these are not counted as direct destination TPH.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/timetables",
           "retrievalDate": "2026-07-16",
-          "sourceTitle": "Hertford East and Broxbourne to London Liverpool Street timetable",
-          "sourceType": "official operator timetable",
-          "timetablePeriod": "17 May to 12 December 2026",
-          "notes": "Interchange destinations are not represented as direct services."
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Direct services are explicitly distinguished from interchange opportunities."
         },
         "cycleParking": {
-          "value": "30 spaces; racks; unsheltered; CCTV.",
+          "value": "30 cycle spaces; racks; not sheltered; cycle-storage CCTV available.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Ware (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "stepFree": {
-          "value": "Single platform with step-free access. Category A.",
+          "value": "Step-free access to the single platform. ORR category A.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Ware (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "ticketing": {
-          "value": "Ticket office open daily; ticket machine; pre-purchase collection; Oyster top-up; Greater Anglia Smartcard issue, top-up and validation.",
+          "value": "Ticket office: Monday-Friday 06:15-19:45; Saturday 07:15-19:45; Sunday 09:15-16:30. Ticket machine and pre-purchase collection available. Oyster and smartcard facilities are listed by the operator.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Ware (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "waiting": {
-          "value": "Seated area and heated waiting room on platform 1, with accessible-height seating. Waiting room: Monday-Saturday 06:00-19:30; Sunday 09:00-16:30.",
+          "value": "Heated waiting room on platform 1 with accessible seating: Monday-Saturday 06:00-19:30; Sunday 09:00-16:30. Coffee shop/vending facilities are listed.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Ware (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "toilets": {
-          "value": "No toilets.",
+          "value": "No toilets; no National Key toilets.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Ware (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "carParking": {
-          "value": "Station car park operated by NCP; 94 spaces; open 24 hours daily. A separate premium-bay facility is also listed, without a stated space count.",
+          "value": "Station Car Park operated by National Car Parks Ltd: 94 spaces; open 24 hours Monday-Sunday. A separately listed premium-bay area is also shown on the official page.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Ware (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "notes": {
-          "value": "Part-time staffed station with departure and arrival screens, announcements, Wi-Fi, a coffee shop/vending provision and seating.",
+          "value": "Single-platform station. Coffee shop and vending facilities are listed on the current official station page.",
           "status": "verified",
           "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
           "retrievalDate": "2026-07-16",
           "sourceTitle": "Ware (Herts) Train Station Information",
-          "sourceType": "official operator station page",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         }
       },
-      "createdAt": "2026-07-16T12:17:30.000Z",
-      "updatedAt": "2026-07-16T12:24:34.703Z",
+      "createdAt": "2026-07-16T13:31:43.243Z",
+      "updatedAt": "2026-07-16T13:37:04.549Z",
       "reviewFlags": [],
-      "editorName": "Joe",
-      "originatingModuleBuild": "RAIL-4.4.0",
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:05:19.928Z",
-        "editorName": "Joe Freeman"
+        "updatedAt": "2026-07-16T12:24:34.703Z",
+        "editorName": "Joe"
       }
     },
     {
@@ -822,7 +828,7 @@
         "lon": -0.0106258
       },
       "identifiers": {
-        "crs": "",
+        "crs": "BXB",
         "naptan": "",
         "tfl": "",
         "other": "",
@@ -832,9 +838,9 @@
         "manager": {
           "value": "Greater Anglia",
           "status": "verified",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bxb",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Broxbourne Train Station Information",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
@@ -842,185 +848,197 @@
         "operators": {
           "value": "Greater Anglia",
           "status": "verified",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bxb",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Broxbourne Train Station Information",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "Current station operator and passenger train operator for the regular services described."
         },
         "lines": {
-          "value": "West Anglia Main Line and Hertford East branch line",
+          "value": "West Anglia Main Line and Hertford East branch",
           "status": "verified",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
-          "sourceType": "official_station_page",
-          "timetablePeriod": "",
-          "notes": "Operational route/line description."
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Route description checked against the applicable official timetable tables."
         },
         "frequencyTotal": {
-          "value": 8,
-          "status": "needs_review",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
-          "sourceType": "official_station_page",
-          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
-          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+          "value": 12,
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Typical weekday daytime actual departures in both directions combined; overlapping destination descriptions are not double-counted."
         },
         "frequencyByDestination": {
           "value": [
             {
-              "destination": "London Liverpool Street / Stratford",
+              "destination": "London Liverpool Street",
+              "direction": "southbound",
               "tph": 4,
               "direct": true
             },
             {
-              "destination": "Hertford East",
+              "destination": "Stratford (London)",
+              "direction": "southbound",
               "tph": 2,
               "direct": true
             },
             {
-              "destination": "Harlow Town / Bishop's Stortford / Cambridge corridor",
+              "destination": "Cambridge North",
+              "direction": "northbound",
+              "tph": 2,
+              "direct": true,
+              "notes": "Services run via Cambridge; Cambridge and Cambridge North are on the same through trains and must not be double-counted."
+            },
+            {
+              "destination": "Bishop’s Stortford",
+              "direction": "northbound",
+              "tph": 2,
+              "direct": true
+            },
+            {
+              "destination": "Hertford East",
+              "direction": "northbound",
               "tph": 2,
               "direct": true
             }
           ],
-          "status": "needs_review",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
-          "sourceType": "official_station_page",
-          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
-          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Direct-service TPH. A service appearing against an intermediate and final destination represents one departure and must not be added twice."
         },
         "servicePattern": {
-          "value": "A high-frequency Greater Anglia interchange station served by Hertford East branch trains and West Anglia Main Line services. The precise weekday stopping pattern varies by train and timetable.",
-          "status": "needs_review",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
-          "sourceType": "official_station_page",
-          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
-          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+          "value": "Typical Monday-Friday daytime: 6 southbound departures per hour (4 direct to London Liverpool Street plus 2 direct to Stratford) and 6 northbound departures per hour (2 each toward Cambridge North, Bishop’s Stortford and Hertford East), giving 12 actual station departures per hour. Destination entries describe the same 12 departures and are not summed where a train serves more than one listed intermediate destination. Peak, evening and weekend patterns vary.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": ""
         },
         "frequency": {
-          "value": "8 total departures per hour (typically 4 in each direction).",
-          "status": "needs_review",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
-          "sourceType": "official_station_page",
-          "timetablePeriod": "Typical weekday off-peak, July 2026 research",
-          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+          "value": "12 tph total (typical Monday-Friday daytime, both directions combined)",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Actual station departures, not a sum of overlapping destination opportunities."
         },
         "destinations": {
-          "value": "London Liverpool Street, Stratford, Tottenham Hale, Cheshunt, Hertford East, Harlow Town, Bishop's Stortford, Stansted Airport and Cambridge corridor destinations.",
-          "status": "needs_review",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
-          "sourceType": "official_station_page",
-          "timetablePeriod": "",
-          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+          "value": "Direct typical daytime services include London Liverpool Street, Stratford (London), Hertford East, Bishop’s Stortford, Cambridge and Cambridge North, with intermediate West Anglia stations as shown in the current timetables.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": ""
         },
         "journeyOpportunities": {
-          "value": "Provides high-frequency local, London, airport and regional journey opportunities, with direct services on both the Hertford East branch and West Anglia Main Line.",
-          "status": "needs_review",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
-          "sourceType": "official_station_page",
-          "timetablePeriod": "",
-          "notes": "Typical total and destination split require confirmation against the current working timetable before formal use."
+          "value": "Direct services provide access to London Liverpool Street, Stratford, Hertford East, Bishop’s Stortford and Cambridge/Cambridge North. Interchange opportunities include Tottenham Hale for the Victoria line, Stratford for Elizabeth line/Underground/DLR/Overground/National Rail, and Cambridge for onward regional services. Interchange opportunities are not represented as direct TPH.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia current timetables",
+          "sourceType": "official_timetable",
+          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
+          "notes": "Direct services are explicitly distinguished from interchange opportunities."
         },
         "cycleParking": {
-          "value": "Bicycle storage is listed as available; exact type and capacity were not exposed on the National Rail summary page.",
+          "value": "Official page headline lists 52 cycle-storage spaces, sheltered and covered by CCTV, located on the forecourt and behind the station building. The same page’s location narrative states 40 two-tier rack spaces plus 20 other spaces (60), which conflicts with the headline total.",
           "status": "needs_review",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bxb",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Broxbourne Train Station Information",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": "Confirm exact cycle parking spaces and storage type from Greater Anglia station data before quoting a capacity."
+          "notes": "Authoritative-source inconsistency: Greater Anglia’s headline figure is 52 spaces, while its descriptive breakdown totals 60 (40 + 20). The discrepancy is recorded without choosing an unsupported replacement figure."
         },
         "stepFree": {
-          "value": "Step-free category A: step-free access to all platforms; lifts available.",
+          "value": "Step-free access to all platforms via lifts. ORR category A.",
           "status": "verified",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bxb",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Broxbourne Train Station Information",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "ticketing": {
-          "value": "Ticket office Monday-Friday 06:15-20:15, Saturday 07:15-18:45 and Sunday 08:15-17:45.",
+          "value": "Full-time staffed station. Ticket office: Monday-Friday 06:15-20:15; Saturday 07:15-18:45; Sunday 08:15-17:45. Ticket machine and pre-purchase collection available; Oyster and smartcard facilities are listed.",
           "status": "verified",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bxb",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Broxbourne Train Station Information",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "waiting": {
-          "value": "Sheltered waiting area and seating available.",
+          "value": "Seated area available. Waiting room is on the overbridge. Café, vending facilities and Wi-Fi are listed.",
           "status": "verified",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bxb",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Broxbourne Train Station Information",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "toilets": {
-          "value": "Availability not reliably exposed in the parsed National Rail station summary.",
-          "status": "needs_review",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
+          "value": "Toilets, including accessible National Key (RADAR) toilets, are on the overbridge and available during staffing hours. No baby-changing facilities.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bxb",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Broxbourne Train Station Information",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": "The page contains toilet headings but the availability value was not reliably retrievable."
+          "notes": ""
         },
         "carParking": {
-          "value": "674 parking spaces, including 33 accessible spaces.",
+          "value": "674 spaces in total across the official listings: 669-space main Station Car Park plus 5 premium-bay spaces; main car park open 24 hours Monday-Sunday. Operated by National Car Parks Ltd.",
           "status": "verified",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bxb",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Broxbourne Train Station Information",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "notes": {
-          "value": "Station facilities verified from National Rail on 15 July 2026. Frequency values describe a typical weekday off-peak pattern and should be rechecked for the specific assessment date, especially where marked needs_review.",
+          "value": "Important interchange station. Station staffing level is full time. The official cycle-parking page contains an unresolved internal capacity discrepancy (headline 52; narrative breakdown 60), separately flagged for review.",
           "status": "verified",
-          "source": "https://www.nationalrail.co.uk/stations/broxbourne/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Broxbourne Station | National Rail",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bxb",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Broxbourne Train Station Information",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         }
       },
-      "createdAt": "2026-07-15T07:32:02.333Z",
-      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "createdAt": "2026-07-16T13:31:43.743Z",
+      "updatedAt": "2026-07-16T13:37:04.549Z",
       "reviewFlags": [
-        "frequencyTotal",
-        "frequencyByDestination",
-        "servicePattern",
-        "frequency",
-        "destinations",
-        "journeyOpportunities",
-        "cycleParking",
-        "toilets"
+        "cycleParking: official Greater Anglia page gives conflicting totals (52 headline; 60 from 40+20 narrative breakdown)"
       ],
       "editorName": "Joe Freeman",
-      "originatingModuleBuild": "RAIL-4.4.0",
-      "previousRevision": null
+      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:05:19.928Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "schema": "tpt-rail-knowledge-v3",

@@ -1,8 +1,8 @@
 {
   "schema": "tpt-rail-knowledge-v3",
   "version": 2,
-  "libraryBuild": "SHARED-LIB-1.0.0-20260716",
-  "updatedAt": "2026-07-16T12:29:26.053Z",
+  "libraryBuild": "SHARED-LIB-1.1.0-20260716",
+  "updatedAt": "2026-07-16T13:16:02.056Z",
   "records": [
     {
       "schema": "tpt-rail-knowledge-v3",

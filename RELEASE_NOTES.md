@@ -28,3 +28,6 @@ Known limitations:
 - Stop discovery continues to use controlled OSM fallback where direct NaPTAN infrastructure is unavailable; assisted research verifies identifiers.
 - Local drafts remain browser-scoped until successfully published or manually exported.
 - Automated DOCX structural and download testing passed. Final visual review in Microsoft Word is explicitly deferred to planner acceptance testing.
+# Toolkit 2.4.0 — Library Manager
+
+The Dashboard now opens a minimum safe Library Manager for the three shared transport libraries. Shared records remain readable without a token; maintenance stays local until reviewed and published using the existing Toolkit GitHub connection. Bus Stop records link directly to unambiguous composite Bus Route records. Research requests are mode-specific and generic “check website/timetable” responses are blocked from verified imports.

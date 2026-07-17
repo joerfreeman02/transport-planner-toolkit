@@ -73,3 +73,8 @@
 - Added automated foundation regression check.
 - Added architecture decision log.
 - Excluded rejected Sprint 2B regression.
+# 2.4.0 — 2026-07-17
+
+- Added the Dashboard Library Manager for read-only shared Rail, Bus Stop and Bus Route browsing, complete record inspection, search/filter, CSV/JSON export, local edit/clear/import review, controlled publishing and single-record deletion.
+- Added exact-stop route navigation with composite Bus route identity and ambiguity protection for duplicate route numbers.
+- Strengthened Railway and Bus research instructions and rejected generic placeholder research during completed Rail import and Library Manager review.

@@ -2,7 +2,7 @@
   "schema": "tpt-rail-knowledge-v3",
   "version": 2,
   "libraryBuild": "SHARED-LIB-1.3.0-20260717",
-  "updatedAt": "2026-07-17T09:15:49.182Z",
+  "updatedAt": "2026-07-17T09:19:36.928Z",
   "records": [
     {
       "schema": "tpt-rail-knowledge-v3",
@@ -2591,14 +2591,14 @@
           "notes": ""
         },
         "cycleParking": {
-          "value": "TfL does not list cycle parking on the station page.",
+          "value": "Not confirmed",
           "status": "needs_review",
-          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "TfL station information",
-          "sourceType": "official_station_page",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/modes/cycling/cycle-parking?intcmp=2369",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Abbey Road DLR Station | TfL; TfL Cycle parking",
+          "sourceType": "official_tfl_sources",
           "timetablePeriod": "",
-          "notes": "Absence from TfL's facility list is not treated as proof that cycle parking is unavailable; confirm locally if material to the assessment."
+          "notes": "The current TfL station page does not publish a station-facilities section or identify cycle parking at Abbey Road. TfL’s general cycle-parking page confirms that cycle parking exists at many London stations but does not identify Abbey Road specifically. Availability and capacity therefore cannot be reliably confirmed from the authoritative sources checked."
         },
         "stepFree": {
           "value": "Step-free access from street to train. TfL confirms that all DLR stations are step-free.",
@@ -2621,34 +2621,34 @@
           "notes": ""
         },
         "waiting": {
-          "value": "TfL does not list a dedicated waiting room on the station page.",
+          "value": "Not confirmed",
           "status": "needs_review",
           "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "TfL station information",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Abbey Road DLR Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": "Absence from TfL's facility list is not treated as proof that a dedicated waiting room is unavailable; confirm locally if material to the assessment."
+          "notes": "The current TfL Abbey Road station page does not publish a station-facilities section and does not confirm a waiting room, shelter or other dedicated waiting facility. Omission is not treated as evidence that no waiting provision exists; confirm by site inspection or direct TfL enquiry if material."
         },
         "toilets": {
-          "value": "TfL does not list toilets on the station page.",
+          "value": "Not confirmed",
           "status": "needs_review",
           "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "TfL station information",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Abbey Road DLR Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": "Absence from TfL's facility list is not treated as proof that toilets is unavailable; confirm locally if material to the assessment."
+          "notes": "The current TfL Abbey Road station page does not publish a station-facilities section and does not confirm passenger toilets. Omission is not treated as evidence that toilets are unavailable; confirm by site inspection or direct TfL enquiry if material."
         },
         "carParking": {
-          "value": "TfL does not list station car parking on the station page.",
+          "value": "Not confirmed",
           "status": "needs_review",
           "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "TfL station information",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Abbey Road DLR Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": "Absence from TfL's facility list is not treated as proof that station car parking is unavailable; confirm locally if material to the assessment."
+          "notes": "The current TfL Abbey Road station page does not publish a station-facilities section and does not confirm a station car park. Omission is not treated as evidence that no parking exists nearby; confirm station-dedicated provision by site inspection or direct TfL enquiry if material."
         },
         "notes": {
           "value": "TfL stop identifier 940GZZDLABR; Fare Zone 2/3.",
@@ -2662,14 +2662,19 @@
         }
       },
       "createdAt": "2026-07-15T11:45:39.892Z",
-      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "updatedAt": "2026-07-17T09:19:36.928Z",
       "reviewFlags": [
-        "facility_review: Confirm unlisted ancillary facilities locally if material to the assessment.",
-        "notes: unverified import did not replace verified value"
+        "cycleParking: Not confirmed from current official TfL sources; local confirmation required if material.",
+        "waiting: Not confirmed from current official TfL station information; local confirmation required if material.",
+        "toilets: Not confirmed from current official TfL station information; local confirmation required if material.",
+        "carParking: Not confirmed from current official TfL station information; local confirmation required if material."
       ],
       "editorName": "Joe Freeman",
-      "originatingModuleBuild": "RAIL-4.4.0",
-      "previousRevision": null
+      "originatingModuleBuild": "LIB-1.0.0-20260717",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:05:19.928Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "schema": "tpt-rail-knowledge-v3",

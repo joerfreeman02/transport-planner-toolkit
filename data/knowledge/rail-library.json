@@ -2,7 +2,7 @@
   "schema": "tpt-rail-knowledge-v3",
   "version": 2,
   "libraryBuild": "SHARED-LIB-1.3.0-20260717",
-  "updatedAt": "2026-07-17T09:31:51.585Z",
+  "updatedAt": "2026-07-17T09:42:28.964Z",
   "records": [
     {
       "schema": "tpt-rail-knowledge-v3",
@@ -6780,89 +6780,85 @@
           "notes": ""
         },
         "cycleParking": {
-          "value": "Refer to the current official station page for cycle parking.",
-          "status": "needs_review",
-          "source": "https://tfl.gov.uk/overground/stop/910GENFLDTN/enfield-town-rail-station",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Enfield Town Rail Station | TfL",
-          "sourceType": "official_station_or_operator_page",
+          "value": "A secure, covered Cycle Hub is available near Enfield Town station. National Rail's station data records no conventional cycle storage at the station itself.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GENFLDTN/enfield-town-rail-station?lineId=weaver | https://tfl.gov.uk/modes/cycling/cycle-parking | https://www.nationalrail.co.uk/stations/enfield-town/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "TfL Enfield Town station page; TfL Cycle Parking; National Rail Enfield Town",
+          "sourceType": "official_tfl_and_national_rail_sources",
           "timetablePeriod": "",
-          "notes": "Exact facility detail was not safely reproduced without a field-level confirmation from the live station page."
+          "notes": "The TfL cycle-parking page specifically identifies an Enfield Town secure Cycle Hub. National Rail separately records cycle storage at the station as unavailable; the distinction between the nearby secure hub and conventional station cycle storage has been retained."
         },
         "stepFree": {
-          "value": "Refer to the current official station page for step-free access.",
-          "status": "needs_review",
-          "source": "https://tfl.gov.uk/overground/stop/910GENFLDTN/enfield-town-rail-station",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Enfield Town Rail Station | TfL",
-          "sourceType": "official_station_or_operator_page",
+          "value": "Step-free category A: step-free access is available to all platforms. Boarding ramps and passenger assistance are available; there are no lifts.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GENFLDTN/enfield-town-rail-station?lineId=weaver | https://www.nationalrail.co.uk/stations/enfield-town/ | https://railmap.nationalrail.co.uk/backend/public/station/ENF",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "TfL Enfield Town station page and National Rail station accessibility information",
+          "sourceType": "official_tfl_and_national_rail_sources",
           "timetablePeriod": "",
-          "notes": "Exact facility detail was not safely reproduced without a field-level confirmation from the live station page."
+          "notes": "National Rail classifies the station as Category A. Help points are available on the concourse and platforms 1 and 3, with an emergency-only help point at the entrance."
         },
         "ticketing": {
-          "value": "Refer to the current official station page for ticketing facilities.",
-          "status": "needs_review",
-          "source": "https://tfl.gov.uk/overground/stop/910GENFLDTN/enfield-town-rail-station",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Enfield Town Rail Station | TfL",
-          "sourceType": "official_station_or_operator_page",
+          "value": "Ticket office and ticket machines available, with collection of tickets bought online. Ticket office hours: Monday-Friday 06:45-20:00; Saturday 06:45-19:10; Sunday 07:45-15:15. A low-level accessible ticket counter is provided.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GENFLDTN/enfield-town-rail-station?lineId=weaver | https://www.nationalrail.co.uk/stations/enfield-town/ | https://railmap.nationalrail.co.uk/backend/public/station/ENF",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "TfL and National Rail Enfield Town station information",
+          "sourceType": "official_tfl_and_national_rail_sources",
           "timetablePeriod": "",
-          "notes": "Exact facility detail was not safely reproduced without a field-level confirmation from the live station page."
+          "notes": "TfL also lists a ticket hall. National Rail states that wheelchair manoeuvring space is available in front of the ticket machine."
         },
         "waiting": {
-          "value": "Refer to the current official station page for waiting facilities.",
-          "status": "needs_review",
-          "source": "https://tfl.gov.uk/overground/stop/910GENFLDTN/enfield-town-rail-station",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Enfield Town Rail Station | TfL",
-          "sourceType": "official_station_or_operator_page",
+          "value": "Waiting room, sheltered waiting area and seating are available.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GENFLDTN/enfield-town-rail-station?lineId=weaver | https://www.nationalrail.co.uk/stations/enfield-town/ | https://railmap.nationalrail.co.uk/backend/public/station/ENF",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "TfL and National Rail Enfield Town station information",
+          "sourceType": "official_tfl_and_national_rail_sources",
           "timetablePeriod": "",
-          "notes": "Exact facility detail was not safely reproduced without a field-level confirmation from the live station page."
+          "notes": "TfL lists a Waiting Room; National Rail confirms sheltered waiting and seating."
         },
         "toilets": {
-          "value": "Refer to the current official station page for toilets.",
-          "status": "needs_review",
-          "source": "https://tfl.gov.uk/overground/stop/910GENFLDTN/enfield-town-rail-station",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Enfield Town Rail Station | TfL",
-          "sourceType": "official_station_or_operator_page",
+          "value": "Male toilets and an accessible toilet are available on the station concourse. Baby-changing facilities are available. No Changing Places toilet is provided.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GENFLDTN/enfield-town-rail-station?lineId=weaver | https://www.nationalrail.co.uk/stations/enfield-town/ | https://railmap.nationalrail.co.uk/backend/public/station/ENF",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "TfL and National Rail Enfield Town station information",
+          "sourceType": "official_tfl_and_national_rail_sources",
           "timetablePeriod": "",
-          "notes": "Exact facility detail was not safely reproduced without a field-level confirmation from the live station page."
+          "notes": "TfL lists toilets. National Rail's detailed station data identifies the accessible toilet within the gender-specific toilets on the concourse and confirms baby-changing provision."
         },
         "carParking": {
-          "value": "Refer to the current official station page for car parking.",
-          "status": "needs_review",
-          "source": "https://tfl.gov.uk/overground/stop/910GENFLDTN/enfield-town-rail-station",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Enfield Town Rail Station | TfL",
-          "sourceType": "official_station_or_operator_page",
+          "value": "No station car park is provided: National Rail records 0 parking spaces and 0 accessible parking spaces. A drop-off/pick-up point is available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/enfield-town/ | https://railmap.nationalrail.co.uk/backend/public/station/ENF",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "National Rail Enfield Town station information",
+          "sourceType": "official_national_rail_source",
           "timetablePeriod": "",
-          "notes": "Exact facility detail was not safely reproduced without a field-level confirmation from the live station page."
+          "notes": "The TfL station-facilities list does not identify a car park. National Rail explicitly records no station parking spaces."
         },
         "notes": {
-          "value": "Core station identity, operator, route and typical service pattern researched on 15 July 2026. Facility fields marked needs_review must be confirmed from the live official station page before formal use.",
+          "value": "Weaver line terminus. Published facilities include boarding ramps, cash machine, help points, payphones, ticket hall, toilets, waiting room, Wi-Fi, CCTV, refreshments and shops. A secure Cycle Hub is available near the station.",
           "status": "verified",
-          "source": "https://tfl.gov.uk/overground/stop/910GENFLDTN/enfield-town-rail-station",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "Enfield Town Rail Station | TfL",
-          "sourceType": "official_station_or_operator_page",
+          "source": "https://tfl.gov.uk/overground/stop/910GENFLDTN/enfield-town-rail-station?lineId=weaver | https://tfl.gov.uk/modes/cycling/cycle-parking | https://www.nationalrail.co.uk/stations/enfield-town/ | https://railmap.nationalrail.co.uk/backend/public/station/ENF",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "TfL and National Rail Enfield Town station information",
+          "sourceType": "official_tfl_and_national_rail_sources",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "Facility summary consolidates the official TfL and National Rail listings."
         }
       },
       "createdAt": "2026-07-15T16:12:27.508Z",
-      "updatedAt": "2026-07-16T16:02:23.982Z",
-      "reviewFlags": [
-        "cycleParking",
-        "stepFree",
-        "ticketing",
-        "waiting",
-        "toilets",
-        "carParking"
-      ],
-      "editorName": "Joe Freeman Home",
-      "originatingModuleBuild": "RAIL-4.7.0-20260716",
-      "previousRevision": null
+      "updatedAt": "2026-07-17T09:42:28.964Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "LIB-1.0.0-20260717",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T16:02:23.982Z",
+        "editorName": "Joe Freeman Home"
+      }
     },
     {
       "schema": "tpt-rail-knowledge-v3",

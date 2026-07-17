@@ -2,7 +2,7 @@
   "schema": "tpt.bus-stop-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.3.0-20260717",
-  "updatedAt": "2026-07-17T14:35:01.626Z",
+  "updatedAt": "2026-07-17T14:43:38.267Z",
   "records": [
     {
       "naptanCode": "490011045S",
@@ -1233,41 +1233,6 @@
         "updatedAt": "2026-07-16T14:12:12.622Z",
         "editorName": "Joe Freeman"
       }
-    },
-    {
-      "naptanCode": "0500EHADM014",
-      "fallbackIdentity": "",
-      "stopName": "Hinton View",
-      "locality": "Haddenham",
-      "direction": "near",
-      "pairedStopGroup": "hinton view",
-      "coordinates": {
-        "latitude": 52.3564083,
-        "longitude": 0.1522453
-      },
-      "routesServed": [
-        "ZIP"
-      ],
-      "sources": [
-        {
-          "title": "Hinton View bus stop",
-          "url": "https://bustimes.org/stops/0500EHADM014",
-          "publisher": "Bus Times / NaPTAN and Bus Open Data Service",
-          "retrievalDate": "2026-07-17"
-        },
-        {
-          "title": "Ely Zipper 1 local bus service timetable",
-          "url": "https://dews-coaches.com/local-bus-service.php",
-          "publisher": "Dews Coaches",
-          "retrievalDate": "2026-07-17"
-        }
-      ],
-      "retrievalDate": "2026-07-17",
-      "verificationStatus": "verified",
-      "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-17T14:35:01.626Z",
-      "originatingModuleBuild": "BUS-PROD-150-20260717",
-      "previousRevision": null
     },
     {
       "naptanCode": "0500EHADM009",

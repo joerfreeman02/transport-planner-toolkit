@@ -2,7 +2,7 @@
   "schema": "tpt-rail-knowledge-v3",
   "version": 2,
   "libraryBuild": "SHARED-LIB-1.3.0-20260717",
-  "updatedAt": "2026-07-17T14:24:04.656Z",
+  "updatedAt": "2026-07-17T14:54:06.498Z",
   "records": [
     {
       "schema": "tpt-rail-knowledge-v3",
@@ -198,13 +198,13 @@
         }
       },
       "createdAt": "2026-07-16T13:31:41.741Z",
-      "updatedAt": "2026-07-16T13:37:04.549Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
       "reviewFlags": [],
       "editorName": "Joe Freeman",
-      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:24:34.703Z",
-        "editorName": "Joe"
+        "updatedAt": "2026-07-16T13:37:04.549Z",
+        "editorName": "Joe Freeman"
       }
     },
     {
@@ -401,13 +401,13 @@
         }
       },
       "createdAt": "2026-07-16T13:31:42.493Z",
-      "updatedAt": "2026-07-16T13:37:04.549Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
       "reviewFlags": [],
       "editorName": "Joe Freeman",
-      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:24:34.703Z",
-        "editorName": "Joe"
+        "updatedAt": "2026-07-16T13:37:04.549Z",
+        "editorName": "Joe Freeman"
       }
     },
     {
@@ -604,13 +604,13 @@
         }
       },
       "createdAt": "2026-07-16T13:31:42.742Z",
-      "updatedAt": "2026-07-16T13:37:04.549Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
       "reviewFlags": [],
       "editorName": "Joe Freeman",
-      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:24:34.703Z",
-        "editorName": "Joe"
+        "updatedAt": "2026-07-16T13:37:04.549Z",
+        "editorName": "Joe Freeman"
       }
     },
     {
@@ -807,13 +807,13 @@
         }
       },
       "createdAt": "2026-07-16T13:31:43.243Z",
-      "updatedAt": "2026-07-16T13:37:04.549Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
       "reviewFlags": [],
       "editorName": "Joe Freeman",
-      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:24:34.703Z",
-        "editorName": "Joe"
+        "updatedAt": "2026-07-16T13:37:04.549Z",
+        "editorName": "Joe Freeman"
       }
     },
     {
@@ -1029,14 +1029,14 @@
         }
       },
       "createdAt": "2026-07-16T13:31:43.743Z",
-      "updatedAt": "2026-07-16T13:37:04.549Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
       "reviewFlags": [
         "cycleParking: official Greater Anglia page gives conflicting totals (52 headline; 60 from 40+20 narrative breakdown)"
       ],
       "editorName": "Joe Freeman",
-      "originatingModuleBuild": "RAIL-4.5.0-20260716",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:05:19.928Z",
+        "updatedAt": "2026-07-16T13:37:04.549Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -9311,6 +9311,2039 @@
       "reviewFlags": [],
       "editorName": "Joe Freeman Home",
       "originatingModuleBuild": "RAIL-4.7.0-20260716",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6135938648",
+      "canonicalName": "Theobalds Grove",
+      "name": "Theobalds Grove",
+      "mode": "London Overground",
+      "coordinates": {
+        "lat": 51.6922334,
+        "lon": -0.0350092
+      },
+      "identifiers": {
+        "crs": "TEO",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6135938648"
+      },
+      "fields": {
+        "manager": {
+          "value": "London Overground",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/theobalds-grove/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Theobalds Grove Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "London Overground",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/theobalds-grove/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Theobalds Grove Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Weaver line (Southbury Loop)",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 4,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Typical weekday daytime departures; peak, evening and disruption patterns vary."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London Liverpool Street",
+              "tph": 2,
+              "direct": true
+            },
+            {
+              "destination": "Cheshunt",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination groupings are mutually described service groups; exact terminal varies where stated."
+        },
+        "servicePattern": {
+          "value": "Typically 2 tph to London Liverpool Street and 2 tph to Cheshunt.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Typically 4 weekday daytime departures per hour in total.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Cheshunt, Turkey Street, Southbury, Edmonton Green, Seven Sisters, Hackney Downs and London Liverpool Street",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal direct destinations; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct access to Cheshunt, Turkey Street, Southbury, Edmonton Green, Seven Sisters, Hackney Downs and London Liverpool Street, with onward interchange at principal London and corridor stations.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Onward interchange locations are not represented as direct destinations."
+        },
+        "cycleParking": {
+          "value": "Bicycle storage is available; the official page does not state a space count.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/theobalds-grove/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Theobalds Grove Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "No step-free access to platforms (category C); no lifts.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/theobalds-grove/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Theobalds Grove Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "No ticket office; ticket machines available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/theobalds-grove/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Theobalds Grove Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting area and seating available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/theobalds-grove/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Theobalds Grove Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "No station toilets are listed by TfL/National Rail.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/theobalds-grove/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Theobalds Grove Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "140 parking spaces; no accessible parking spaces.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/theobalds-grove/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Theobalds Grove Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Managed by London Overground; staffed assistance is available during published operating hours; Wi-Fi and refreshments are available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/theobalds-grove/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Theobalds Grove Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:32.404Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6135938647",
+      "canonicalName": "Turkey Street",
+      "name": "Turkey Street",
+      "mode": "London Overground",
+      "coordinates": {
+        "lat": 51.673233,
+        "lon": -0.0469695
+      },
+      "identifiers": {
+        "crs": "TUR",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6135938647"
+      },
+      "fields": {
+        "manager": {
+          "value": "London Overground",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/turkey-street/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Turkey Street Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "London Overground",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/turkey-street/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Turkey Street Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Weaver line (Southbury Loop)",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 4,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Typical weekday daytime departures; peak, evening and disruption patterns vary."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London Liverpool Street",
+              "tph": 2,
+              "direct": true
+            },
+            {
+              "destination": "Cheshunt",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination groupings are mutually described service groups; exact terminal varies where stated."
+        },
+        "servicePattern": {
+          "value": "Typically 2 tph to London Liverpool Street and 2 tph to Cheshunt.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Typically 4 weekday daytime departures per hour in total.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Cheshunt, Theobalds Grove, Southbury, Edmonton Green, Seven Sisters, Hackney Downs and London Liverpool Street",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal direct destinations; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct access to Cheshunt, Theobalds Grove, Southbury, Edmonton Green, Seven Sisters, Hackney Downs and London Liverpool Street, with onward interchange at principal London and corridor stations.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Onward interchange locations are not represented as direct destinations."
+        },
+        "cycleParking": {
+          "value": "Bicycle storage is available; the official page does not state a space count.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/turkey-street/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Turkey Street Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "No step-free access to platforms (category C); no lifts.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/turkey-street/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Turkey Street Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office Monday-Friday 06:30-10:00 and Saturday 09:45-13:00; ticket machines available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/turkey-street/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Turkey Street Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Seating available; no sheltered waiting area.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/turkey-street/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Turkey Street Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "No station toilets are listed by TfL/National Rail.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/turkey-street/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Turkey Street Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "No general parking spaces; 1 accessible parking space is listed.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/turkey-street/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Turkey Street Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Managed by London Overground; CCTV and Wi-Fi are available; refreshments are unavailable.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/turkey-street/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Turkey Street Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:33.906Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/3749263909",
+      "canonicalName": "Cheshunt",
+      "name": "Cheshunt",
+      "mode": "London Overground",
+      "coordinates": {
+        "lat": 51.7028638,
+        "lon": -0.0237804
+      },
+      "identifiers": {
+        "crs": "CHN",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/3749263909"
+      },
+      "fields": {
+        "manager": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Greater Anglia and London Overground",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "West Anglia Main Line and Weaver line (Southbury Loop)",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 16,
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Typical weekday daytime departures; peak, evening and disruption patterns vary."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London Liverpool Street or Stratford",
+              "tph": 8,
+              "direct": true
+            },
+            {
+              "destination": "Broxbourne/Hertford East/Bishop's Stortford/Cambridge corridor",
+              "tph": 6,
+              "direct": true
+            },
+            {
+              "destination": "London Liverpool Street via Southbury Loop",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination groupings are mutually described service groups; exact terminal varies where stated."
+        },
+        "servicePattern": {
+          "value": "Typical weekday daytime service combines approximately 6 Greater Anglia tph in each direction with 2 London Overground tph to/from London Liverpool Street via the Southbury Loop; exact stopping patterns vary.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Typically 16 weekday daytime departures per hour in total.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "London Liverpool Street, Stratford, Seven Sisters, Tottenham Hale, Waltham Cross, Broxbourne, Hertford East, Bishop's Stortford, Cambridge and Stansted Airport on selected services",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal direct destinations; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct access to London Liverpool Street, Stratford, Seven Sisters, Tottenham Hale, Waltham Cross, Broxbourne, Hertford East, Bishop's Stortford, Cambridge and Stansted Airport on selected services, with onward interchange at principal London and corridor stations.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Onward interchange locations are not represented as direct destinations."
+        },
+        "cycleParking": {
+          "value": "78 spaces; sheltered stands and racks on the platform; CCTV.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free access to both platforms from either side of Windmill Lane level crossing; approximately 75 m between platforms; category B1.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office Monday-Friday and Saturday 06:15-19:45, Sunday 08:15-15:40; ticket machines, Oyster and smartcard facilities.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Seating and a waiting room on platform 1; Monday-Saturday 06:00-19:00 and Sunday 07:45-15:30.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Accessible toilets on the concourse during staffing hours; key available from ticket office. Baby-changing facility on platform 3.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "NCP station car park with 171 spaces, open 24 hours daily; a separate premier car park is also listed.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Interchange between Greater Anglia and London Overground. Coffee kiosk, Wi-Fi, ATM and staffed assistance are available.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/chn",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Cheshunt Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:34.406Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6137852389",
+      "canonicalName": "Brimsdown",
+      "name": "Brimsdown",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.6555713,
+        "lon": -0.0307915
+      },
+      "identifiers": {
+        "crs": "BMD",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6137852389"
+      },
+      "fields": {
+        "manager": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "West Anglia Main Line",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 8,
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Typical weekday daytime departures; peak, evening and disruption patterns vary."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London Liverpool Street or Stratford",
+              "tph": 4,
+              "direct": true
+            },
+            {
+              "destination": "Hertford East or Bishop's Stortford",
+              "tph": 4,
+              "direct": true
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination groupings are mutually described service groups; exact terminal varies where stated."
+        },
+        "servicePattern": {
+          "value": "Typical weekday daytime pattern is approximately 4 tph southbound and 4 tph northbound; individual destinations vary by train.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Typically 8 weekday daytime departures per hour in total.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "London Liverpool Street, Stratford, Tottenham Hale, Cheshunt, Broxbourne, Hertford East and Bishop's Stortford",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal direct destinations; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct access to London Liverpool Street, Stratford, Tottenham Hale, Cheshunt, Broxbourne, Hertford East and Bishop's Stortford, with onward interchange at principal London and corridor stations.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Greater Anglia train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Onward interchange locations are not represented as direct destinations."
+        },
+        "cycleParking": {
+          "value": "Cycle storage is available; the operator page should be used for the current space count and configuration.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free access to each platform via the road and level crossing, approximately 30 m between platforms; category B1.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office Monday-Friday 06:15-12:55 and Saturday 07:15-14:00; closed Sunday; ticket machine, Oyster and smartcard facilities.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Seating available; no waiting room.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "No toilets.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "No station parking spaces.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Part-time staffed; CCTV and Wi-Fi available; no refreshments.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bmd",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Brimsdown Train Station Information",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:35.905Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/7147509522",
+      "canonicalName": "Southbury",
+      "name": "Southbury",
+      "mode": "London Overground",
+      "coordinates": {
+        "lat": 51.6480314,
+        "lon": -0.0526302
+      },
+      "identifiers": {
+        "crs": "SBU",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/7147509522"
+      },
+      "fields": {
+        "manager": {
+          "value": "London Overground",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/southbury/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Southbury Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "London Overground",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/southbury/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Southbury Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Weaver line (Southbury Loop)",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 4,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Typical weekday daytime departures; peak, evening and disruption patterns vary."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London Liverpool Street",
+              "tph": 2,
+              "direct": true
+            },
+            {
+              "destination": "Cheshunt",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination groupings are mutually described service groups; exact terminal varies where stated."
+        },
+        "servicePattern": {
+          "value": "Typically 2 tph to London Liverpool Street and 2 tph to Cheshunt.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Typically 4 weekday daytime departures per hour in total.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Cheshunt, Theobalds Grove, Turkey Street, Edmonton Green, Seven Sisters, Hackney Downs and London Liverpool Street",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal direct destinations; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct access to Cheshunt, Theobalds Grove, Turkey Street, Edmonton Green, Seven Sisters, Hackney Downs and London Liverpool Street, with onward interchange at principal London and corridor stations.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/modes/london-overground/london-overground-timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "London Overground timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Onward interchange locations are not represented as direct destinations."
+        },
+        "cycleParking": {
+          "value": "Bicycle storage is available; the official page does not state a space count.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/southbury/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Southbury Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "No step-free access to platforms (category C); no lifts.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/southbury/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Southbury Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office Monday-Friday 06:30-10:00; ticket machines available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/southbury/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Southbury Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting area and seating available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/southbury/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Southbury Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "No station toilets are listed by TfL/National Rail.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/southbury/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Southbury Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "No station parking spaces.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/southbury/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Southbury Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Managed by London Overground; CCTV, Wi-Fi and refreshments are available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/southbury/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Southbury Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:36.406Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6291571386",
+      "canonicalName": "Gordon Hill",
+      "name": "Gordon Hill",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.6629506,
+        "lon": -0.0942203
+      },
+      "identifiers": {
+        "crs": "GDH",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6291571386"
+      },
+      "fields": {
+        "manager": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/gordon-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/gordon-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Hertford Loop Line",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 6,
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Typical weekday daytime departures; peak, evening and disruption patterns vary."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Moorgate",
+              "tph": 4,
+              "direct": true
+            },
+            {
+              "destination": "Hertford North or Stevenage",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination groupings are mutually described service groups; exact terminal varies where stated."
+        },
+        "servicePattern": {
+          "value": "Typically 4 tph southbound towards Moorgate; around 2 tph continue north towards Hertford North/Stevenage, while additional services terminate/start at Gordon Hill.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Typically 6 weekday daytime departures per hour in total.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Moorgate, Old Street, Finsbury Park, Alexandra Palace, Enfield Chase, Hertford North and Stevenage on through services",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal direct destinations; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct access to Moorgate, Old Street, Finsbury Park, Alexandra Palace, Enfield Chase, Hertford North and Stevenage on through services, with onward interchange at principal London and corridor stations.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Onward interchange locations are not represented as direct destinations."
+        },
+        "cycleParking": {
+          "value": "Bicycle storage is available; current space count should be checked on the Great Northern station page.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/gordon-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "No step-free access to platforms (category C); no lifts.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/gordon-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office Monday-Friday 06:35-13:00 and Saturday 07:45-14:10; closed Sunday; ticket machines available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/gordon-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting area and seating available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/gordon-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "No station toilets are identified on the current National Rail station page.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/gordon-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "65 parking spaces; no accessible parking spaces.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/gordon-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Managed and served by Great Northern; CCTV and refreshments available; public Wi-Fi unavailable.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/gordon-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Gordon Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:36.905Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6291571385",
+      "canonicalName": "Crews Hill",
+      "name": "Crews Hill",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.6847476,
+        "lon": -0.1072562
+      },
+      "identifiers": {
+        "crs": "CWH",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6291571385"
+      },
+      "fields": {
+        "manager": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/crews-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/crews-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Hertford Loop Line",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 4,
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Typical weekday daytime departures; peak, evening and disruption patterns vary."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Moorgate",
+              "tph": 2,
+              "direct": true
+            },
+            {
+              "destination": "Hertford North or Stevenage",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Destination groupings are mutually described service groups; exact terminal varies where stated."
+        },
+        "servicePattern": {
+          "value": "Typically 2 tph towards Moorgate and 2 tph towards Hertford North/Stevenage.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Typically 4 weekday daytime departures per hour in total.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Moorgate, Old Street, Finsbury Park, Alexandra Palace, Enfield Chase, Gordon Hill, Hertford North and Stevenage",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Principal direct destinations; individual stopping patterns vary."
+        },
+        "journeyOpportunities": {
+          "value": "Provides direct access to Moorgate, Old Street, Finsbury Park, Alexandra Palace, Enfield Chase, Gordon Hill, Hertford North and Stevenage, with onward interchange at principal London and corridor stations.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/service-updates/timetables",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Great Northern train timetables",
+          "sourceType": "official operator timetable",
+          "timetablePeriod": "Current timetable at 16 July 2026",
+          "notes": "Onward interchange locations are not represented as direct destinations."
+        },
+        "cycleParking": {
+          "value": "Bicycle parking available; not covered by CCTV. The official page does not state a space count.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/crews-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "No step-free access to platforms (category C); no lifts.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/crews-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "No ticket office; ticket machines available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/crews-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting area and seating available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/crews-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "No station toilets are identified on the current National Rail station page.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/crews-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "15 parking spaces including 1 accessible space.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/crews-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Unstaffed station managed and served by Great Northern; CCTV available; no public Wi-Fi or refreshments.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/crews-hill/",
+          "retrievalDate": "2026-07-16",
+          "sourceTitle": "Crews Hill Station",
+          "sourceType": "official station information",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-16T13:16:37.406Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/8399259717",
+      "canonicalName": "Luton",
+      "name": "Luton",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.8825271,
+        "lon": -0.4140848
+      },
+      "identifiers": {
+        "crs": "LUT",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/8399259717"
+      },
+      "fields": {
+        "manager": {
+          "value": "Thameslink",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "National Rail identifies Thameslink as station manager."
+        },
+        "operators": {
+          "value": "Thameslink; East Midlands Railway",
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Thameslink timetables; EMR Intercity and Connect Timetable 01",
+          "sourceType": "official_operator_timetable",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Both operators provide scheduled passenger services calling at Luton."
+        },
+        "lines": {
+          "value": "Midland Main Line; Thameslink route",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Station | National Rail; EMR Timetable 01",
+          "sourceType": "official_station_page_and_timetable",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Route naming describes the infrastructure corridor and the principal branded cross-London service."
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Thameslink standard timetables; EMR Timetable 01",
+          "sourceType": "official_operator_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Typical weekday daytime combined departures in both directions: approximately 6 tph southbound and 6 tph northbound. This counts actual departures, not overlapping destination entries; individual hours can vary."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London St Pancras International",
+              "tph": 6,
+              "serviceType": "direct",
+              "notes": "Typical weekday daytime southbound opportunity, comprising Thameslink and EMR services; some Thameslink trains continue through central London."
+            },
+            {
+              "destination": "Bedford",
+              "tph": 4,
+              "serviceType": "direct",
+              "notes": "Typical Thameslink weekday daytime northbound frequency; selected EMR services may also provide additional Bedford calls in some periods."
+            },
+            {
+              "destination": "Corby",
+              "tph": 2,
+              "serviceType": "direct",
+              "notes": "Typical EMR Connect weekday daytime service via Bedford, Wellingborough and Kettering."
+            },
+            {
+              "destination": "London Bridge",
+              "tph": 2,
+              "serviceType": "direct",
+              "notes": "Typical through-Thameslink opportunity; do not add to total departures because these are the same southbound trains counted for central London."
+            },
+            {
+              "destination": "Gatwick Airport",
+              "tph": 2,
+              "serviceType": "direct",
+              "notes": "Typical through-Thameslink opportunity; frequency can vary by exact hour and engineering plan."
+            },
+            {
+              "destination": "Brighton",
+              "tph": 2,
+              "serviceType": "direct",
+              "notes": "Typical through-Thameslink opportunity on the Bedford–Brighton service group."
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Thameslink standard timetables; EMR Timetable 01",
+          "sourceType": "official_operator_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Destination frequencies overlap and must not be summed to derive total station departures."
+        },
+        "servicePattern": {
+          "value": "Typical weekday daytime service comprises frequent Thameslink trains north towards Bedford and south through London, including direct trains via St Pancras International and the Thameslink core to destinations such as London Bridge, Gatwick Airport and Brighton, together with East Midlands Railway services between London St Pancras International and Corby and selected longer-distance calls. The combined pattern is approximately 12 departures per hour across both directions, although exact calls vary by hour.",
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Thameslink standard timetables; EMR Timetable 01",
+          "sourceType": "official_operator_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Typical weekday pattern, not a guarantee for a particular travel date."
+        },
+        "frequency": {
+          "value": "Approximately 12 trains per hour in total during the typical weekday daytime period (about 6 tph in each direction), with a lower and more variable frequency overnight, early morning, late evening and at weekends.",
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Thameslink standard timetables; EMR Timetable 01",
+          "sourceType": "official_operator_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Use frequencyTotal for the numeric combined weekday daytime value."
+        },
+        "destinations": {
+          "value": "Principal direct destinations include Bedford, Flitwick, Harpenden, St Albans City, London St Pancras International, Farringdon, City Thameslink, London Blackfriars, London Bridge, Gatwick Airport and Brighton on Thameslink services, and Bedford, Wellingborough, Kettering, Corby and London St Pancras International on East Midlands Railway services. Selected longer-distance EMR calls vary by train.",
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Thameslink standard timetables; EMR Timetable 01",
+          "sourceType": "official_operator_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "List focuses on principal journey opportunities and is not every calling point of every train."
+        },
+        "journeyOpportunities": {
+          "value": "Luton provides high-frequency local, regional and inter-urban rail opportunities. Direct Thameslink services connect the station with Bedford, central London, south London, Gatwick Airport and the Brighton corridor, while East Midlands Railway provides faster links to London St Pancras and direct northbound access towards Wellingborough, Kettering and Corby. Interchange at London St Pancras/Farringdon and Bedford broadens access to national rail, Underground, Elizabeth line and other onward networks.",
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Thameslink standard timetables; EMR Timetable 01",
+          "sourceType": "official_operator_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Interchange opportunities are explicitly distinguished from direct services."
+        },
+        "cycleParking": {
+          "value": "Bicycle storage is available; bicycle hire is also shown as available. The current National Rail summary does not state the number or type of cycle spaces.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Capacity and detailed storage type not confirmed on the accessible station summary."
+        },
+        "stepFree": {
+          "value": "Step-free category B3. Step-free access is available by lift to platform 5 only; other platforms require steps. This means step-free access is only available for some services/directions. Passenger Assistance meeting point is by the ticket office.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "National Rail's detailed station data states lift access to platform 5 only."
+        },
+        "ticketing": {
+          "value": "Ticket office and ticket machines are available. Ticket office hours: Monday–Friday 05:45–21:45; Saturday 05:45–22:00; Sunday 06:45–21:45. Collection of pre-purchased tickets is supported through station ticketing facilities.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting areas and seating areas are available. Customer information screens, staff information and announcements are available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Toilets, accessible toilets and baby-changing facilities are available. National Rail also displays a Changing Places heading, but the detailed backend record states that a Changing Places toilet is not available; this output therefore does not claim that facility.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "A discrepancy exists between National Rail summary iconography and detailed data regarding Changing Places; accessible toilets are confirmed."
+        },
+        "carParking": {
+          "value": "Station Road Car Park provides 753 spaces, including 5 accessible spaces. Blue Badge arrangements and ANPR controls apply in accordance with on-site signage.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Luton is a staffed Thameslink-managed station on the Midland Main Line, served by Thameslink and East Midlands Railway. It is not the airport rail station; passengers for London Luton Airport normally use Luton Airport Parkway and transfer to the Luton DART.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-17T14:47:24.663Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6750291608",
+      "canonicalName": "Luton Airport Parkway",
+      "name": "Luton Airport Parkway",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.872845,
+        "lon": -0.3961244
+      },
+      "identifiers": {
+        "crs": "LTN",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6750291608"
+      },
+      "fields": {
+        "manager": {
+          "value": "Thameslink",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton-airport-parkway/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Airport Parkway Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Thameslink; East Midlands Railway",
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Thameslink timetables; EMR Intercity and Connect Timetable 01",
+          "sourceType": "official_operator_timetable",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Midland Main Line; Thameslink route; interchange with Luton DART",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton-airport-parkway/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=; https://lutonrising.org.uk/our-developments/luton-dart/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Airport Parkway | National Rail; EMR Timetable 01; Luton DART | Luton Rising",
+          "sourceType": "official_sources",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Thameslink standard timetables; EMR Timetable 01",
+          "sourceType": "official_operator_timetables",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Typical weekday daytime combined departures in both directions: approximately 6 tph southbound and 6 tph northbound. Individual hours vary."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London St Pancras International",
+              "tph": 6,
+              "serviceType": "direct",
+              "notes": "Typical weekday daytime southbound opportunity on Thameslink and EMR."
+            },
+            {
+              "destination": "Bedford",
+              "tph": 4,
+              "serviceType": "direct",
+              "notes": "Typical Thameslink weekday daytime northbound frequency."
+            },
+            {
+              "destination": "Corby",
+              "tph": 2,
+              "serviceType": "direct",
+              "notes": "Typical EMR Connect weekday daytime service."
+            },
+            {
+              "destination": "London Luton Airport terminal",
+              "tph": 15,
+              "serviceType": "direct_interchange",
+              "notes": "DART peak frequency from the adjoining DART Parkway station; this is a separate light-rail departure and is not included in the National Rail frequencyTotal."
+            },
+            {
+              "destination": "Gatwick Airport",
+              "tph": 2,
+              "serviceType": "direct",
+              "notes": "Typical through-Thameslink opportunity; overlaps with southbound London services."
+            },
+            {
+              "destination": "Brighton",
+              "tph": 2,
+              "serviceType": "direct",
+              "notes": "Typical through-Thameslink opportunity; overlaps with southbound London services."
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=; https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Thameslink and EMR timetables; Luton DART FAQs",
+          "sourceType": "official_operator_sources",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": "Destination entries overlap. DART is shown separately and excluded from National Rail departure total."
+        },
+        "servicePattern": {
+          "value": "Typical weekday daytime service comprises frequent Thameslink trains towards Bedford and through central London to south-London, Gatwick and Brighton corridor destinations, plus East Midlands Railway services between London St Pancras International and Corby. The adjacent Luton DART provides a separate high-frequency, four-minute transfer to the airport terminal.",
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=; https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Official operator timetables and Luton DART FAQs",
+          "sourceType": "official_operator_sources",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 12 National Rail departures per hour in total during the typical weekday daytime period (about 6 tph in each direction), plus separate Luton DART shuttles up to every 4 minutes at peak times.",
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=; https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Official operator timetables and Luton DART FAQs",
+          "sourceType": "official_operator_sources",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Principal direct National Rail destinations include Bedford, Luton, Harpenden, St Albans City, London St Pancras International, Farringdon, City Thameslink, London Blackfriars, London Bridge, Gatwick Airport and Brighton, together with Wellingborough, Kettering and Corby on East Midlands Railway services. The adjoining Luton DART provides a direct connection to London Luton Airport terminal.",
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=; https://lutonrising.org.uk/our-developments/luton-dart/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Official operator timetables and Luton DART | Luton Rising",
+          "sourceType": "official_operator_sources",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "Luton Airport Parkway provides frequent direct rail links to central London, Bedfordshire, Northamptonshire, Gatwick Airport and the Brighton corridor. It is the principal rail interchange for London Luton Airport, with the adjacent DART providing a direct four-minute transfer to the terminal. Interchange in central London provides onward access to Underground, Elizabeth line, national rail and international services.",
+          "status": "verified",
+          "source": "https://www.thameslinkrailway.com/service-updates/timetables/; https://www.eastmidlandsrailway.co.uk/media/5762/download?inline=; https://lutonrising.org.uk/our-developments/luton-dart/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Official operator timetables and Luton DART | Luton Rising",
+          "sourceType": "official_operator_sources",
+          "timetablePeriod": "17 May to 12 December 2026",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "Bicycle storage and bicycle hire are shown as available on the current National Rail station page. The accessible summary does not state capacity or storage type.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton-airport-parkway/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Airport Parkway Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "National Rail's backend data has previously shown a conflicting cycle-storage flag; the current public station page expressly lists bicycle storage."
+        },
+        "stepFree": {
+          "value": "Step-free category A, with step-free access to all National Rail platforms. Lifts are available. Staff help is available Monday–Sunday, and the Passenger Assistance meeting point is by/in the ticket office.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton-airport-parkway/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Airport Parkway Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office and ticket machines are available. Ticket office hours: Monday–Friday 06:00–00:30; Saturday 06:30–00:00; Sunday 07:30–00:00. Integrated rail tickets to or from 'Luton Airport' can include the DART connection.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton-airport-parkway/; https://www.lutondart.com/tickets-fares/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Airport Parkway | National Rail; Luton DART tickets and fares",
+          "sourceType": "official_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting areas and seating areas are available. Customer information screens, staff information, help points and announcements are available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton-airport-parkway/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Airport Parkway Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Toilets, an accessible toilet and baby-changing facilities are available. National Rail's detailed data identifies a unisex accessible toilet at the south entrance/platform level, accessed with a RADAR key. The current station summary displays a Changing Places heading, but detailed data has stated that Changing Places is not available; this output does not claim it.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton-airport-parkway/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Airport Parkway Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Accessible toilets confirmed; Changing Places discrepancy retained transparently."
+        },
+        "carParking": {
+          "value": "Station Car Park provides 824 spaces, including 12 accessible spaces. Blue Badge and ANPR arrangements apply in accordance with on-site signage.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton-airport-parkway/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Airport Parkway Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Luton Airport Parkway is the mainline rail interchange for London Luton Airport. The DART is accessed from the adjoining station complex, including via the signed route from Platform 1; when the National Rail station is closed, DART access is available via Kimpton Road.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/luton-airport-parkway/; https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "National Rail station page; Luton DART FAQs",
+          "sourceType": "official_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-17T14:47:25.164Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/8109900738",
+      "canonicalName": "Luton DART Parkway",
+      "name": "Luton DART Parkway",
+      "mode": "Tram/light rail",
+      "coordinates": {
+        "lat": 51.8726445,
+        "lon": -0.3951825
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/8109900738"
+      },
+      "fields": {
+        "manager": {
+          "value": "Luton Rising (trading name of London Luton Airport Ltd)",
+          "status": "verified",
+          "source": "https://lutonrising.org.uk/our-developments/luton-dart/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART | Luton Rising",
+          "sourceType": "official_owner_page",
+          "timetablePeriod": "",
+          "notes": "Luton Rising owns and runs the DART asset; operational delivery involves specialist contractors."
+        },
+        "operators": {
+          "value": "Luton DART, operated for Luton Rising with Doppelmayr Cable Car as system operator",
+          "status": "verified",
+          "source": "https://www.luton.gov.uk/news/2024/luton-dart-carries-27m-passengers-its-first-year",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART carries 2.7m passengers in its first year | Luton Borough Council",
+          "sourceType": "official_local_authority_release",
+          "timetablePeriod": "",
+          "notes": "Official council material states the system was constructed and operated for Luton Rising by Doppelmayr Cable Car and the construction joint venture."
+        },
+        "lines": {
+          "value": "Luton DART (Direct Air-Rail Transit), a cable-hauled automated fast passenger transit system between DART Parkway and the airport Central Terminal",
+          "status": "verified",
+          "source": "https://lutonrising.org.uk/our-developments/luton-dart/; https://www.luton.gov.uk/news/2024/luton-dart-carries-27m-passengers-its-first-year",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART | Luton Rising; Luton Borough Council anniversary release",
+          "sourceType": "official_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 15,
+          "status": "verified",
+          "source": "https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART FAQs",
+          "sourceType": "official_operator_page",
+          "timetablePeriod": "",
+          "notes": "Peak one-direction departure frequency based on every 4 minutes. Off-peak is about 8.6 tph at every 7 minutes; night service is 4–6 tph. Because the station is a two-station terminus, all departures are to the airport terminal."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London Luton Airport Central Terminal",
+              "tph": 15,
+              "serviceType": "direct",
+              "notes": "Peak service up to every 4 minutes; daytime off-peak generally every 7 minutes and night service 4–6 times per hour."
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART FAQs",
+          "sourceType": "official_operator_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "servicePattern": {
+          "value": "A direct, non-stop automated shuttle between DART Parkway and London Luton Airport Central Terminal. The DART normally runs 24 hours a day, seven days a week, with peak shuttles every 4 minutes, daytime off-peak shuttles every 7 minutes and a night service of 4–6 shuttles per hour. The journey takes approximately 4 minutes. The official FAQ notes no service on 25 and 26 December.",
+          "status": "verified",
+          "source": "https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART FAQs",
+          "sourceType": "official_operator_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Up to 15 departures per hour at peak times (every 4 minutes); approximately 8–9 departures per hour during daytime off-peak (every 7 minutes); 4–6 departures per hour overnight.",
+          "status": "verified",
+          "source": "https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART FAQs",
+          "sourceType": "official_operator_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "London Luton Airport Central Terminal only. National Rail services are reached by walking through the connected Luton Airport Parkway station complex; those onward rail destinations are interchange opportunities, not direct DART destinations.",
+          "status": "verified",
+          "source": "https://lutonrising.org.uk/our-developments/luton-dart/; https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART | Luton Rising; Luton DART FAQs",
+          "sourceType": "official_operator_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "The station provides a high-frequency, direct four-minute link to London Luton Airport terminal and an integrated interchange with National Rail at Luton Airport Parkway. Through rail tickets issued to or from 'Luton Airport' can include the DART transfer, supporting onward direct rail travel to central London, Bedford and other destinations served from the mainline station.",
+          "status": "verified",
+          "source": "https://www.lutondart.com/tickets-fares/; https://lutonrising.org.uk/our-developments/luton-dart/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART tickets and fares; Luton DART | Luton Rising",
+          "sourceType": "official_operator_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "Not confirmed",
+          "status": "needs_review",
+          "source": "https://www.lutondart.com/timetable/in-station/; https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART in-station information; Luton DART FAQs",
+          "sourceType": "official_operator_pages",
+          "timetablePeriod": "",
+          "notes": "The official DART station-information and FAQ pages checked do not confirm dedicated cycle parking for the DART station. Cycle facilities listed for the adjacent National Rail station should not be automatically attributed to this separate record."
+        },
+        "stepFree": {
+          "value": "Full step-free access is provided throughout the DART stations, with lifts, ramps, tactile paving and level/accessible boarding arrangements. Staff are available at both stations 24/7 to assist passengers.",
+          "status": "verified",
+          "source": "https://www.lutondart.com/timetable/in-station/; https://www.lutondart.com/help/faqs/; https://www.lutondart.com/timetable/onboard/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART station information, FAQs and onboard accessibility",
+          "sourceType": "official_operator_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "DART-only digital tickets can be bought online and scanned at the DART barriers. Contactless payment and ticket machines are available at the stations. Integrated National Rail tickets to or from 'Luton Airport' include the DART transfer; Oyster is not accepted. Concession schemes are available for qualifying users.",
+          "status": "verified",
+          "source": "https://www.lutondart.com/tickets-fares/; https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART tickets and fares; Luton DART FAQs",
+          "sourceType": "official_operator_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Seating is provided in station waiting areas and on platforms, including priority seating. Live rail and flight information screens, audio announcements, help points and 24/7 staff assistance are available. A coffee shop is located upstairs at DART Parkway.",
+          "status": "verified",
+          "source": "https://www.lutondart.com/timetable/in-station/; https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART station information; Luton DART FAQs",
+          "sourceType": "official_operator_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Accessible toilets are located on the ground floor of Luton DART Parkway Station.",
+          "status": "verified",
+          "source": "https://www.lutondart.com/timetable/in-station/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton Airport Parkway Station | What to Expect In-Station",
+          "sourceType": "official_operator_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "No dedicated DART-station parking capacity is confirmed. Pick-up can use the adjoining station car park subject to charges, while free drop-off is available at the Kimpton Road entrance. The adjacent National Rail station car park should be recorded under Luton Airport Parkway rather than duplicated as DART-owned parking.",
+          "status": "needs_review",
+          "source": "https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART FAQs",
+          "sourceType": "official_operator_page",
+          "timetablePeriod": "",
+          "notes": "Parking arrangements are shared/adjacent rather than clearly identified as a separate DART car park."
+        },
+        "notes": {
+          "value": "Luton DART Parkway is the lower terminus of the two-station DART system and is physically connected to Luton Airport Parkway National Rail station. It should remain a separate light-rail/automated-transit record to avoid duplicating National Rail facilities or counting DART departures within the mainline train frequency.",
+          "status": "verified",
+          "source": "https://lutonrising.org.uk/our-developments/luton-dart/; https://www.lutondart.com/help/faqs/",
+          "retrievalDate": "2026-07-17",
+          "sourceTitle": "Luton DART | Luton Rising; Luton DART FAQs",
+          "sourceType": "official_operator_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-17T14:47:24.916Z",
+      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
       "previousRevision": null
     }
   ]

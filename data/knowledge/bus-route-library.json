@@ -2,7 +2,7 @@
   "schema": "tpt.bus-route-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.3.0-20260717",
-  "updatedAt": "2026-07-17T14:35:04.382Z",
+  "updatedAt": "2026-07-17T14:44:23.516Z",
   "records": [
     {
       "routeNumber": "69",
@@ -503,49 +503,6 @@
         "updatedAt": "2026-07-16T14:12:15.139Z",
         "editorName": "Joe Freeman"
       }
-    },
-    {
-      "routeNumber": "ZIP",
-      "operator": "Dews Coaches (Ron W. Dew & Son Ltd)",
-      "routeOrigin": "Ely Market Street",
-      "routeDestination": "Ely Market Street",
-      "principalLocationsServed": [
-        "Ely",
-        "Little Thetford",
-        "Stretham",
-        "Wilburton",
-        "Haddenham",
-        "Witcham",
-        "Witcham Toll",
-        "Wentworth",
-        "Lancaster Way Business Park"
-      ],
-      "sources": [
-        {
-          "title": "Ely Zipper 1 local bus service timetable",
-          "url": "https://dews-coaches.com/local-bus-service.php",
-          "publisher": "Dews Coaches",
-          "retrievalDate": "2026-07-17"
-        },
-        {
-          "title": "ZIP Market Street - Market Street timetable",
-          "url": "https://bustimes.org/services/zip-ely-zipper-market-street-market-street",
-          "publisher": "Bus Times / Bus Open Data Service",
-          "retrievalDate": "2026-07-17"
-        },
-        {
-          "title": "Ely Zipper 1 registration PF0000224/1",
-          "url": "https://bustimes.org/registrations/PF0000224/1",
-          "publisher": "Traffic Commissioners local bus service registration data",
-          "retrievalDate": "2026-07-17"
-        }
-      ],
-      "retrievalDate": "2026-07-17",
-      "verificationStatus": "verified",
-      "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-17T14:35:04.382Z",
-      "originatingModuleBuild": "BUS-PROD-150-20260717",
-      "previousRevision": null
     }
   ]
 }

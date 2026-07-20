@@ -2,7 +2,7 @@
   "schema": "tpt.bus-route-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.3.0-20260717",
-  "updatedAt": "2026-07-20T08:27:14.736Z",
+  "updatedAt": "2026-07-20T08:27:21.903Z",
   "records": [
     {
       "routeNumber": "69",
@@ -81,36 +81,6 @@
         {
           "title": "473 bus route",
           "url": "https://tfl.gov.uk/bus/route/473/",
-          "publisher": "Transport for London",
-          "retrievalDate": "2026-07-16"
-        }
-      ],
-      "retrievalDate": "2026-07-16",
-      "verificationStatus": "verified",
-      "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-17T14:35:04.382Z",
-      "originatingModuleBuild": "BUS-PROD-150-20260717",
-      "previousRevision": {
-        "updatedAt": "2026-07-16T14:12:15.139Z",
-        "editorName": "Joe Freeman"
-      }
-    },
-    {
-      "routeNumber": "678",
-      "operator": "Transport for London (London Buses service; contracted operating company not stated on the cited passenger route page)",
-      "routeOrigin": "Beckton Bus Station",
-      "routeDestination": "Stratford Bus Station",
-      "principalLocationsServed": [
-        "Beckton",
-        "Prince Regent",
-        "Plaistow",
-        "Forest Gate",
-        "Stratford"
-      ],
-      "sources": [
-        {
-          "title": "678 bus route",
-          "url": "https://tfl.gov.uk/bus/route/678/",
           "publisher": "Transport for London",
           "retrievalDate": "2026-07-16"
         }

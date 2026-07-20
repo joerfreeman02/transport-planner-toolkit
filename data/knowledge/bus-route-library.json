@@ -2,7 +2,7 @@
   "schema": "tpt.bus-route-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.3.0-20260717",
-  "updatedAt": "2026-07-17T14:44:23.516Z",
+  "updatedAt": "2026-07-20T08:27:08.177Z",
   "records": [
     {
       "routeNumber": "69",
@@ -20,37 +20,6 @@
         {
           "title": "69 bus route",
           "url": "https://tfl.gov.uk/bus/route/69/",
-          "publisher": "Transport for London",
-          "retrievalDate": "2026-07-16"
-        }
-      ],
-      "retrievalDate": "2026-07-16",
-      "verificationStatus": "verified",
-      "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-17T14:35:04.382Z",
-      "originatingModuleBuild": "BUS-PROD-150-20260717",
-      "previousRevision": {
-        "updatedAt": "2026-07-16T14:12:15.139Z",
-        "editorName": "Joe Freeman"
-      }
-    },
-    {
-      "routeNumber": "241",
-      "operator": "Transport for London (London Buses service; contracted operating company not stated on the cited passenger route page)",
-      "routeOrigin": "Here East",
-      "routeDestination": "Royal Crest Avenue, Silvertown",
-      "principalLocationsServed": [
-        "Here East",
-        "Stratford",
-        "Forest Gate",
-        "Plaistow",
-        "Custom House",
-        "Royal Wharf"
-      ],
-      "sources": [
-        {
-          "title": "241 bus route",
-          "url": "https://tfl.gov.uk/bus/route/241/",
           "publisher": "Transport for London",
           "retrievalDate": "2026-07-16"
         }

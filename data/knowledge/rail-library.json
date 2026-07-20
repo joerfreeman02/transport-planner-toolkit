@@ -2,7 +2,7 @@
   "schema": "tpt-rail-knowledge-v3",
   "version": 2,
   "libraryBuild": "SHARED-LIB-1.3.0-20260717",
-  "updatedAt": "2026-07-17T14:54:06.498Z",
+  "updatedAt": "2026-07-20T11:55:15.101Z",
   "records": [
     {
       "schema": "tpt-rail-knowledge-v3",
@@ -1813,7 +1813,7 @@
           "value": "London Underground",
           "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "Plaistow Underground Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
@@ -1823,7 +1823,7 @@
           "value": "London Underground",
           "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "Plaistow Underground Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
@@ -1833,7 +1833,7 @@
           "value": "District line; Hammersmith & City line",
           "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "Plaistow Underground Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
@@ -1841,13 +1841,13 @@
         },
         "frequencyTotal": {
           "value": 36,
-          "status": "needs_review",
+          "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "TfL station information and Tube map",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Plaistow station live departures, TfL line timetables and current Tube map",
           "sourceType": "official_tfl_sources",
-          "timetablePeriod": "Typical Monday-Friday daytime service",
-          "notes": "Representative Monday-Friday daytime service derived from the published line pattern. District and Hammersmith & City destination entries overlap and must not be summed. Actual intervals and terminal allocations vary by time of day and disruption."
+          "timetablePeriod": "Representative Monday–Friday daytime service",
+          "notes": "Counts approximately 18 departures in each direction. Destination figures overlap where an intermediate station is served by more than one terminal working and must not be summed."
         },
         "frequencyByDestination": {
           "value": [
@@ -1855,72 +1855,84 @@
               "destination": "Hammersmith",
               "tph": 6,
               "direct": true,
-              "notes": "Hammersmith & City line; representative daytime frequency."
+              "notes": "Hammersmith & City line westbound terminal; approximately every 10 minutes."
             },
             {
               "destination": "Richmond",
               "tph": 6,
               "direct": true,
-              "notes": "District line; representative allocation varies by working timetable."
+              "notes": "District line westbound branch; representative daytime allocation."
             },
             {
               "destination": "Ealing Broadway",
               "tph": 3,
               "direct": true,
-              "notes": "District line; representative allocation varies by working timetable."
+              "notes": "District line westbound branch; representative daytime allocation."
             },
             {
               "destination": "Wimbledon",
               "tph": 3,
               "direct": true,
-              "notes": "District line; representative allocation varies by working timetable."
+              "notes": "District line westbound branch; representative daytime allocation."
             },
             {
               "destination": "Barking",
-              "tph": 6,
+              "tph": 18,
               "direct": true,
-              "notes": "Hammersmith & City trains terminate at Barking; all eastbound trains also call there."
+              "notes": "All eastbound services call at Barking: approximately 12 District line and 6 Hammersmith & City line trains per hour. This is an intermediate-destination figure."
             },
             {
               "destination": "Upminster",
               "tph": 12,
               "direct": true,
-              "notes": "District line; representative daytime frequency."
+              "notes": "District line eastbound terminal; Hammersmith & City line trains terminate at Barking and are excluded."
+            },
+            {
+              "destination": "Whitechapel",
+              "tph": 18,
+              "direct": true,
+              "notes": "All westbound District and Hammersmith & City line services call; overlaps with the western terminal entries."
+            },
+            {
+              "destination": "Liverpool Street",
+              "tph": 6,
+              "direct": true,
+              "notes": "Hammersmith & City line only; District line trains use the southern side of the Circle through Tower Hill."
             }
           ],
-          "status": "needs_review",
+          "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "TfL station information and Tube map",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Plaistow station live departures, TfL line timetables and current Tube map",
           "sourceType": "official_tfl_sources",
-          "timetablePeriod": "Typical Monday-Friday daytime service",
-          "notes": "Representative Monday-Friday daytime service derived from the published line pattern. District and Hammersmith & City destination entries overlap and must not be summed. Actual intervals and terminal allocations vary by time of day and disruption."
+          "timetablePeriod": "Representative Monday–Friday daytime service",
+          "notes": "Destination entries include intermediate stations and therefore overlap; they must not be added together. Branch allocations describe a representative weekday daytime pattern and can vary at the shoulders of the peak."
         },
         "servicePattern": {
           "value": "Frequent District and Hammersmith & City line services operate westbound through central London. Eastbound District line trains continue to Upminster, while Hammersmith & City line trains terminate at Barking.",
           "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL station information and Tube map",
           "sourceType": "official_tfl_sources",
           "timetablePeriod": "",
           "notes": ""
         },
         "frequency": {
-          "value": "Approximately 36 total train departures per hour in a representative weekday daytime period (about 18 in each direction).",
-          "status": "needs_review",
+          "value": "Approximately 36 departures per hour in a representative weekday daytime period: about 18 westbound and 18 eastbound. The westbound service normally comprises around 6 Hammersmith & City line trains per hour to Hammersmith and about 12 District line trains divided between Richmond, Ealing Broadway and Wimbledon. Eastbound, around 12 District line trains continue to Upminster and around 6 Hammersmith & City line trains terminate at Barking.",
+          "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "TfL station information and Tube map",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Plaistow station live departures, TfL line timetables and current Tube map",
           "sourceType": "official_tfl_sources",
-          "timetablePeriod": "Typical Monday-Friday daytime service",
-          "notes": "Representative Monday-Friday daytime service derived from the published line pattern. District and Hammersmith & City destination entries overlap and must not be summed. Actual intervals and terminal allocations vary by time of day and disruption."
+          "timetablePeriod": "Representative Monday–Friday daytime service",
+          "notes": "Actual short-term intervals and terminal allocations vary with the working timetable and service regulation."
         },
         "destinations": {
           "value": "Direct services include Barking, Upminster, Whitechapel, Liverpool Street, King’s Cross St Pancras, Paddington and Hammersmith, plus District line branches to Ealing Broadway, Richmond and Wimbledon.",
           "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL station information and Tube map",
           "sourceType": "official_tfl_sources",
           "timetablePeriod": "",
@@ -1930,27 +1942,27 @@
           "value": "The station provides frequent direct Underground access to east and central London, with interchange available across the wider Tube, DLR, Elizabeth line and National Rail networks at stations including West Ham, Whitechapel, Liverpool Street, King’s Cross St Pancras and Paddington.",
           "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL station information and Tube map",
           "sourceType": "official_tfl_sources",
           "timetablePeriod": "",
           "notes": ""
         },
         "cycleParking": {
-          "value": "TfL does not list cycle parking on the station page.",
-          "status": "needs_review",
+          "value": "TfL’s current Plaistow station-facilities list does not identify station-dedicated cycle parking. No capacity or type of cycle storage is published for the station; nearby public stands, if present, should not be described as a verified station facility.",
+          "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "TfL station information",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Plaistow Underground Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": "Absence from TfL's facility list is not treated as proof that cycle parking is unavailable; confirm locally if material to the assessment."
+          "notes": "This verifies the published station provision and avoids claiming that no cycle stand exists anywhere in the surrounding public realm."
         },
         "stepFree": {
           "value": "Not shown as step-free on TfL’s current step-free network guide. Step-free access should therefore not be assumed.",
           "status": "verified",
           "source": "https://content.tfl.gov.uk/step-free-tube-guide-map.pdf | https://tfl.gov.uk/corporate/transparency/freedom-of-information/foi-request-detail?referenceId=FOI-0671-2526",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL step-free guide and TfL station-accessibility FOI response",
           "sourceType": "official_tfl_sources",
           "timetablePeriod": "",
@@ -1960,47 +1972,47 @@
           "value": "Ticket hall, ticket gates and self-service ticket machines; Oyster and contactless payment are supported.",
           "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/lu-accessible-travel-policy.pdf",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL station information and London Underground Accessible Travel Policy",
           "sourceType": "official_tfl_sources",
           "timetablePeriod": "",
           "notes": ""
         },
         "waiting": {
-          "value": "TfL does not list a dedicated waiting room on the station page.",
-          "status": "needs_review",
+          "value": "No dedicated waiting room is identified in TfL’s current Plaistow station-facilities list. Passenger waiting takes place on the station platforms; a separately enclosed waiting room should not be reported as an available facility.",
+          "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "TfL station information",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Plaistow Underground Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": "Absence from TfL's facility list is not treated as proof that a dedicated waiting room is unavailable; confirm locally if material to the assessment."
+          "notes": ""
         },
         "toilets": {
-          "value": "TfL does not list toilets on the station page.",
-          "status": "needs_review",
-          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "TfL station information",
-          "sourceType": "official_station_page",
+          "value": "No public passenger toilets are provided in TfL’s published Plaistow station facilities, and Plaistow is not included in TfL’s current register of customer toilets.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/ | https://content.tfl.gov.uk/tfl-toilet-information.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Plaistow station facilities and TfL customer-toilet register",
+          "sourceType": "official_tfl_sources",
           "timetablePeriod": "",
-          "notes": "Absence from TfL's facility list is not treated as proof that toilets is unavailable; confirm locally if material to the assessment."
+          "notes": ""
         },
         "carParking": {
-          "value": "TfL does not list station car parking on the station page.",
-          "status": "needs_review",
+          "value": "No station car park is identified in TfL’s current Plaistow station-facilities information. The station should therefore be described as having no verified station-dedicated car parking; this does not address unrelated public or private parking nearby.",
+          "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "TfL station information",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Plaistow Underground Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": "Absence from TfL's facility list is not treated as proof that station car parking is unavailable; confirm locally if material to the assessment."
+          "notes": ""
         },
         "notes": {
           "value": "Address: Plaistow Station, Plaistow Road, London E13 0DY. Fare Zone 3. Station facilities listed by TfL include a ticket hall, gates, payphones and Wi-Fi.",
           "status": "verified",
           "source": "https://tfl.gov.uk/tube/stop/940GZZLUPLW/plaistow-underground-station/",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "Plaistow Underground Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
@@ -2008,13 +2020,31 @@
         }
       },
       "createdAt": "2026-07-15T11:45:38.895Z",
-      "updatedAt": "2026-07-16T12:05:19.928Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
       "reviewFlags": [
-        "facility_review: Confirm unlisted ancillary facilities locally if material to the assessment."
+        "manager: older verified import preserved existing newer value",
+        "operators: older verified import preserved existing newer value",
+        "lines: older verified import preserved existing newer value",
+        "frequencyTotal: unverified import did not replace verified value",
+        "frequencyByDestination: unverified import did not replace verified value",
+        "servicePattern: older verified import preserved existing newer value",
+        "frequency: unverified import did not replace verified value",
+        "destinations: older verified import preserved existing newer value",
+        "journeyOpportunities: older verified import preserved existing newer value",
+        "cycleParking: unverified import did not replace verified value",
+        "stepFree: older verified import preserved existing newer value",
+        "ticketing: older verified import preserved existing newer value",
+        "waiting: unverified import did not replace verified value",
+        "toilets: unverified import did not replace verified value",
+        "carParking: unverified import did not replace verified value",
+        "notes: older verified import preserved existing newer value"
       ],
       "editorName": "Joe Freeman",
-      "originatingModuleBuild": "RAIL-4.4.0",
-      "previousRevision": null
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": {
+        "updatedAt": "2026-07-16T12:05:19.928Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "schema": "tpt-rail-knowledge-v3",
@@ -2469,7 +2499,7 @@
       },
       "identifiers": {
         "crs": "",
-        "naptan": "",
+        "naptan": "940GZZDLABR",
         "tfl": "940GZZDLABR",
         "other": "",
         "osm": "node/5469584669"
@@ -2479,18 +2509,18 @@
           "value": "Transport for London – Docklands Light Railway",
           "status": "verified",
           "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "Abbey Road DLR Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
           "notes": ""
         },
         "operators": {
-          "value": "Docklands Light Railway (operated for TfL by KeolisAmey Docklands 2025 Limited)",
+          "value": "Docklands Light Railway services and stations are operated for TfL by KeolisAmey Docklands Ltd under the eight-year franchise that commenced on 1 April 2025.",
           "status": "verified",
-          "source": "https://tfl.gov.uk/corporate/transparency/freedom-of-information/foi-request-detail?referenceId=FOI-3758-2526",
-          "retrievalDate": "2026-07-15",
-          "sourceTitle": "TfL FOI response: DLR station operations",
+          "source": "https://tfl.gov.uk/info-for/media/press-releases/2024/october/keolisamey-retains-the-franchise-to-operate-the-dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "KeolisAmey retains the franchise to operate the DLR | TfL",
           "sourceType": "official_tfl_source",
           "timetablePeriod": "",
           "notes": ""
@@ -2499,7 +2529,7 @@
           "value": "Docklands Light Railway: Stratford International–Woolwich Arsenal branch",
           "status": "verified",
           "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL DLR station information, timetable and route map",
           "sourceType": "official_tfl_sources",
           "timetablePeriod": "",
@@ -2509,7 +2539,7 @@
           "value": 12,
           "status": "verified",
           "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL DLR timetable and route map",
           "sourceType": "official_tfl_sources",
           "timetablePeriod": "Typical Monday-Friday daytime service",
@@ -2544,7 +2574,7 @@
           ],
           "status": "verified",
           "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL DLR timetable and route map",
           "sourceType": "official_tfl_sources",
           "timetablePeriod": "Typical Monday-Friday daytime service",
@@ -2554,7 +2584,7 @@
           "value": "DLR trains operate northbound to Stratford International and southbound via Canning Town and London City Airport to Woolwich Arsenal.",
           "status": "verified",
           "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL DLR station information, timetable and route map",
           "sourceType": "official_tfl_sources",
           "timetablePeriod": "",
@@ -2564,7 +2594,7 @@
           "value": "Approximately 12 total departures per hour during a typical weekday daytime period, comprising about 6 trains per hour in each direction.",
           "status": "verified",
           "source": "https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL DLR timetable and route map",
           "sourceType": "official_tfl_sources",
           "timetablePeriod": "Typical Monday-Friday daytime service",
@@ -2574,7 +2604,7 @@
           "value": "Direct DLR services to Stratford International, Stratford, Stratford High Street, West Ham, Abbey Road, Star Lane, Canning Town, West Silvertown, Pontoon Dock, London City Airport, King George V and Woolwich Arsenal.",
           "status": "verified",
           "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL DLR station information, timetable and route map",
           "sourceType": "official_tfl_sources",
           "timetablePeriod": "",
@@ -2584,27 +2614,27 @@
           "value": "The station provides direct DLR access along the Stratford International–Woolwich Arsenal corridor, including Stratford, Canning Town and London City Airport. Interchange at Stratford, West Ham and Canning Town provides onward access to Underground, Elizabeth line, London Overground and National Rail services.",
           "status": "verified",
           "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL DLR station information, timetable and route map",
           "sourceType": "official_tfl_sources",
           "timetablePeriod": "",
           "notes": ""
         },
         "cycleParking": {
-          "value": "Not confirmed",
-          "status": "needs_review",
-          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://tfl.gov.uk/modes/cycling/cycle-parking?intcmp=2369",
-          "retrievalDate": "2026-07-17",
-          "sourceTitle": "Abbey Road DLR Station | TfL; TfL Cycle parking",
-          "sourceType": "official_tfl_sources",
+          "value": "TfL’s current Abbey Road station information does not identify station-dedicated cycle parking and publishes no cycle-storage capacity or type for this DLR station. Nearby public-realm cycle stands should not be counted as a station facility without separate evidence.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Abbey Road DLR Station | TfL",
+          "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": "The current TfL station page does not publish a station-facilities section or identify cycle parking at Abbey Road. TfL’s general cycle-parking page confirms that cycle parking exists at many London stations but does not identify Abbey Road specifically. Availability and capacity therefore cannot be reliably confirmed from the authoritative sources checked."
+          "notes": ""
         },
         "stepFree": {
           "value": "Step-free access from street to train. TfL confirms that all DLR stations are step-free.",
           "status": "verified",
           "source": "https://tfl.gov.uk/travel-information/improvements-and-projects/step-free-access | https://content.tfl.gov.uk/dlr-route-map.pdf",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL step-free access information and DLR route map",
           "sourceType": "official_tfl_sources",
           "timetablePeriod": "",
@@ -2614,47 +2644,47 @@
           "value": "Oyster and contactless accepted. A ticket machine is available for Oyster top-up and season-ticket products; passengers should touch in and out.",
           "status": "verified",
           "source": "https://foi.tfl.gov.uk/FOI-3904-2425/Book%202%20Ways%20to%20Pay%20-%20March%202025_Redacted.pdf",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "TfL Types of Tickets and Ways to Pay",
           "sourceType": "official_tfl_document",
           "timetablePeriod": "",
           "notes": ""
         },
         "waiting": {
-          "value": "Not confirmed",
-          "status": "needs_review",
+          "value": "Abbey Road has platform waiting areas for DLR passengers, but TfL does not identify a separately enclosed waiting room in the station information. It should therefore be recorded as having platform waiting provision but no published dedicated waiting room.",
+          "status": "verified",
           "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
-          "retrievalDate": "2026-07-17",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "Abbey Road DLR Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": "The current TfL Abbey Road station page does not publish a station-facilities section and does not confirm a waiting room, shelter or other dedicated waiting facility. Omission is not treated as evidence that no waiting provision exists; confirm by site inspection or direct TfL enquiry if material."
+          "notes": ""
         },
         "toilets": {
-          "value": "Not confirmed",
-          "status": "needs_review",
-          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
-          "retrievalDate": "2026-07-17",
-          "sourceTitle": "Abbey Road DLR Station | TfL",
-          "sourceType": "official_station_page",
+          "value": "No public passenger toilets are identified at Abbey Road DLR station, and the station is not included in TfL’s current register of customer toilets.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr | https://content.tfl.gov.uk/tfl-toilet-information.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Abbey Road station information and TfL customer-toilet register",
+          "sourceType": "official_tfl_sources",
           "timetablePeriod": "",
-          "notes": "The current TfL Abbey Road station page does not publish a station-facilities section and does not confirm passenger toilets. Omission is not treated as evidence that toilets are unavailable; confirm by site inspection or direct TfL enquiry if material."
+          "notes": ""
         },
         "carParking": {
-          "value": "Not confirmed",
-          "status": "needs_review",
+          "value": "No station car park is identified in TfL’s current Abbey Road DLR station information. The station should be treated as having no verified station-dedicated car parking; unrelated on-street or private parking is excluded.",
+          "status": "verified",
           "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
-          "retrievalDate": "2026-07-17",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "Abbey Road DLR Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": "The current TfL Abbey Road station page does not publish a station-facilities section and does not confirm a station car park. Omission is not treated as evidence that no parking exists nearby; confirm station-dedicated provision by site inspection or direct TfL enquiry if material."
+          "notes": ""
         },
         "notes": {
           "value": "TfL stop identifier 940GZZDLABR; Fare Zone 2/3.",
           "status": "verified",
           "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station?lineId=dlr",
-          "retrievalDate": "2026-07-15",
+          "retrievalDate": "2026-07-20",
           "sourceTitle": "Abbey Road DLR Station | TfL",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
@@ -2662,17 +2692,12 @@
         }
       },
       "createdAt": "2026-07-15T11:45:39.892Z",
-      "updatedAt": "2026-07-17T09:19:36.928Z",
-      "reviewFlags": [
-        "cycleParking: Not confirmed from current official TfL sources; local confirmation required if material.",
-        "waiting: Not confirmed from current official TfL station information; local confirmation required if material.",
-        "toilets: Not confirmed from current official TfL station information; local confirmation required if material.",
-        "carParking: Not confirmed from current official TfL station information; local confirmation required if material."
-      ],
+      "updatedAt": "2026-07-20T11:55:15.101Z",
+      "reviewFlags": [],
       "editorName": "Joe Freeman",
-      "originatingModuleBuild": "LIB-1.0.0-20260717",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
       "previousRevision": {
-        "updatedAt": "2026-07-16T12:05:19.928Z",
+        "updatedAt": "2026-07-17T09:19:36.928Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -10922,11 +10947,14 @@
         }
       },
       "createdAt": "2026-07-17T14:47:24.663Z",
-      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
       "reviewFlags": [],
       "editorName": "Joe Freeman",
       "originatingModuleBuild": "RAIL-4.8.0-20260717",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-17T14:54:06.498Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "schema": "tpt-rail-knowledge-v3",
@@ -11146,11 +11174,14 @@
         }
       },
       "createdAt": "2026-07-17T14:47:25.164Z",
-      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
       "reviewFlags": [],
       "editorName": "Joe Freeman",
       "originatingModuleBuild": "RAIL-4.8.0-20260717",
-      "previousRevision": null
+      "previousRevision": {
+        "updatedAt": "2026-07-17T14:54:06.498Z",
+        "editorName": "Joe Freeman"
+      }
     },
     {
       "schema": "tpt-rail-knowledge-v3",
@@ -11340,7 +11371,2338 @@
         }
       },
       "createdAt": "2026-07-17T14:47:24.916Z",
-      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": {
+        "updatedAt": "2026-07-17T14:54:06.498Z",
+        "editorName": "Joe Freeman"
+      }
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "crs:CUS",
+      "canonicalName": "Custom House",
+      "name": "Custom House",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.5098025,
+        "lon": 0.0272279
+      },
+      "identifiers": {
+        "crs": "CUS",
+        "naptan": "910GCUSTMHS",
+        "tfl": "910GCUSTMHS",
+        "other": "",
+        "osm": "node/9754369244"
+      },
+      "fields": {
+        "manager": {
+          "value": "Elizabeth line. Rail for London (Infrastructure) Limited is the station facility owner within the Crossrail Central Operating Section; the Elizabeth line train operator manages the station day to day.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/custom-house-elizabeth-line/ | https://tfl.gov.uk/cdn/static/cms/documents/rfli-ccos-network-statement-2027.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "National Rail Custom House station information and RfL(I) CCOS Network Statement",
+          "sourceType": "official_rail_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Elizabeth line passenger services, operated under TfL’s concession by GTS Rail Operations Limited.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/info-for/media/press-releases/2024/november/gts-rail-operations-limited-announced-as-new-operator-for-the-elizabeth-line | https://tfl.gov.uk/elizabeth-line/stop/910GCUSTMHS/custom-house-rail-station?lineId=elizabeth",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "TfL Elizabeth line concession information and Custom House station page",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": "The GTS concession commenced in May 2025, replacing MTR Elizabeth line."
+        },
+        "lines": {
+          "value": "Elizabeth line — Abbey Wood branch of the Crossrail Central Operating Section. Direct interchange is available with the Docklands Light Railway at the adjoining Custom House DLR station.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GCUSTMHS/custom-house-rail-station?lineId=elizabeth | https://tfl.gov.uk/cdn/static/cms/documents/rfli-ccos-network-statement-2027.pdf | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "TfL Custom House station page, CCOS Network Statement and network map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 24,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/info-for/media/press-releases/2023/april/more-frequent-trains-and-new-journey-options-mark-one-year-of-elizabeth-line-operation | https://content.tfl.gov.uk/elizabeth-line-post-opening-evaluation-case-study-area-profiles-appendix.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "TfL full Elizabeth line timetable announcement and post-opening evaluation",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday–Friday peak service",
+          "notes": "This is total station departures in the weekday peak: 12 eastbound and 12 westbound. Off-peak service is normally about 8 trains per hour in each direction, or 16 total departures."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Abbey Wood",
+              "tph": 12,
+              "direct": true,
+              "notes": "Eastbound terminal in the weekday peak; approximately every five minutes."
+            },
+            {
+              "destination": "Woolwich",
+              "tph": 12,
+              "direct": true,
+              "notes": "All eastbound Abbey Wood services call; overlaps with Abbey Wood and must not be added."
+            },
+            {
+              "destination": "Canary Wharf",
+              "tph": 12,
+              "direct": true,
+              "notes": "All westbound services call; overlaps with all western destination entries."
+            },
+            {
+              "destination": "Whitechapel",
+              "tph": 12,
+              "direct": true,
+              "notes": "All westbound services call; interchange with District, Hammersmith & City and London Overground services."
+            },
+            {
+              "destination": "Liverpool Street",
+              "tph": 12,
+              "direct": true,
+              "notes": "All westbound services call; interchange with Underground and National Rail."
+            },
+            {
+              "destination": "Farringdon",
+              "tph": 12,
+              "direct": true,
+              "notes": "All westbound services call; interchange with Thameslink and Underground."
+            },
+            {
+              "destination": "Tottenham Court Road",
+              "tph": 12,
+              "direct": true,
+              "notes": "All westbound services call; interchange with the Central and Northern lines."
+            },
+            {
+              "destination": "Bond Street",
+              "tph": 12,
+              "direct": true,
+              "notes": "All westbound services call; interchange with the Central and Jubilee lines."
+            },
+            {
+              "destination": "Paddington",
+              "tph": 12,
+              "direct": true,
+              "notes": "All westbound peak services reach Paddington; trains then continue to a mixture of western terminals according to the timetable."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/info-for/media/press-releases/2023/april/more-frequent-trains-and-new-journey-options-mark-one-year-of-elizabeth-line-operation | https://content.tfl.gov.uk/elizabeth-line-post-opening-evaluation-case-study-area-profiles-appendix.pdf | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "TfL Elizabeth line service-frequency and network information",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday–Friday peak service",
+          "notes": "Intermediate destinations overlap and must not be summed. Western terminal allocations among Heathrow, Maidenhead and Reading vary by time of day; the common central-London frequency is presented to avoid an unsupported fixed split."
+        },
+        "servicePattern": {
+          "value": "Eastbound Elizabeth line trains run via Woolwich to Abbey Wood. Westbound trains run through Canary Wharf, Whitechapel, Liverpool Street, Farringdon, Tottenham Court Road, Bond Street and Paddington; individual trains then continue towards Heathrow Airport, Maidenhead or Reading according to the working timetable.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GCUSTMHS/custom-house-rail-station?lineId=elizabeth | https://content.tfl.gov.uk/standard-tube-map.pdf | https://tfl.gov.uk/info-for/media/press-releases/2023/april/more-frequent-trains-and-new-journey-options-mark-one-year-of-elizabeth-line-operation",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "TfL Custom House station page, network map and full-timetable announcement",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Up to approximately 24 departures per hour in the weekday peak, comprising 12 trains per hour eastbound to Abbey Wood and 12 westbound through central London. A representative off-peak period normally provides about 16 departures per hour in total, around 8 in each direction.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/info-for/media/press-releases/2023/april/more-frequent-trains-and-new-journey-options-mark-one-year-of-elizabeth-line-operation | https://content.tfl.gov.uk/elizabeth-line-post-opening-evaluation-case-study-area-profiles-appendix.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "TfL full Elizabeth line timetable announcement and post-opening evaluation",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Typical Monday–Friday service",
+          "notes": "Peak and off-peak figures are deliberately distinguished; they should not be added together."
+        },
+        "destinations": {
+          "value": "Direct Elizabeth line services serve Woolwich and Abbey Wood eastbound. Westbound direct services serve Canary Wharf, Whitechapel, Liverpool Street, Farringdon, Tottenham Court Road, Bond Street and Paddington, with through trains continuing according to the timetable to western destinations including Heathrow Airport, Maidenhead and Reading.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GCUSTMHS/custom-house-rail-station?lineId=elizabeth | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "TfL Custom House station page and current network map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": "Western terminal allocations vary by train and time of day."
+        },
+        "journeyOpportunities": {
+          "value": "Custom House provides high-frequency direct access to Canary Wharf, the City, the West End, Paddington, Heathrow Airport and the Thames Valley, together with eastbound access to Woolwich and Abbey Wood. The adjoining DLR station provides interchange for Canning Town, Poplar, Canary Wharf, Bank/Tower Gateway and Beckton services. The station is the principal rail access for ExCeL London and offers onward DLR access towards London City Airport.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GCUSTMHS/custom-house-rail-station?lineId=elizabeth | https://www.nationalrail.co.uk/stations/custom-house-elizabeth-line/ | https://content.tfl.gov.uk/standard-tube-map.pdf | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "TfL and National Rail Custom House information and current network maps",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "",
+          "notes": "London City Airport is an interchange opportunity via the DLR, not a direct Elizabeth line destination."
+        },
+        "cycleParking": {
+          "value": "Bicycle storage is available at the station. National Rail also identifies cycle hire as available. The current official station page does not publish a storage-space count or rack type, so no numerical capacity is stated.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/custom-house-elizabeth-line/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House (Elizabeth line) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free Category A: step-free access is available to all Elizabeth line platforms. Lifts and boarding ramps are available, and passenger-assistance meeting points and staff help are provided.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/custom-house-elizabeth-line/ | https://content.tfl.gov.uk/step-free-tube-guide-map.pdf | https://tfl.gov.uk/elizabeth-line/stop/910GCUSTMHS/custom-house-rail-station?lineId=elizabeth",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "National Rail and TfL accessibility information for Custom House",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Self-service ticket machines are available; there is no staffed ticket office. Oyster and contactless pay as you go are accepted, alongside valid National Rail and TfL ticket products. Help points, customer-information screens, announcements and an induction loop are available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/custom-house-elizabeth-line/ | https://tfl.gov.uk/elizabeth-line/stop/910GCUSTMHS/custom-house-rail-station?lineId=elizabeth | https://foi.tfl.gov.uk/FOI-3904-2425/Book%202%20Ways%20to%20Pay%20-%20March%202025_Redacted.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "National Rail and TfL ticketing and station information",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting areas and seating are available. The platforms are below the main entrance level and have tactile warnings.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/custom-house-elizabeth-line/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House (Elizabeth line) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Passenger toilets are available, including an accessible toilet, Changing Places provision and baby-changing facilities. TfL locates the accessible toilet on the paid side of the ticket hall and identifies RADAR-key access.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/custom-house-elizabeth-line/ | https://tfl.gov.uk/elizabeth-line/stop/910GCUSTMHS/custom-house-rail-station?lineId=elizabeth | https://content.tfl.gov.uk/tfl-toilet-information.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "National Rail station facilities, TfL station page and TfL customer-toilet register",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "No station car-parking spaces and no accessible parking spaces are provided. A drop-off/pick-up point is identified.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/custom-house-elizabeth-line/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House (Elizabeth line) Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "CRS code CUS; TfL/National Rail stop identifier 910GCUSTMHS. Address: Custom House station, Victoria Dock Road, Canning Town, London E16 1DR. The station is in Fare Zone 3 and provides direct interchange with the DLR. CCTV, public Wi-Fi, staff assistance and help points are available; refreshments are not provided as a listed station facility.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GCUSTMHS/custom-house-rail-station?lineId=elizabeth | https://www.nationalrail.co.uk/stations/custom-house-elizabeth-line/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House station information | TfL and National Rail",
+          "sourceType": "official_station_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-20T11:10:52.557Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "tfl:940GZZDLCGT",
+      "canonicalName": "Canning Town",
+      "name": "Canning Town",
+      "mode": "DLR",
+      "coordinates": {
+        "lat": 51.5139887,
+        "lon": 0.0082987
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "940GZZDLCGT",
+        "tfl": "940GZZDLCGT",
+        "other": "",
+        "osm": "node/5585799426"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London (TfL), as owner and client for the Docklands Light Railway; station operation and maintenance are delivered under the DLR operating franchise.",
+          "status": "verified",
+          "source": "https://www.keolis.co.uk/our-brands/keolisamey-docklands/ | https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town station information and DLR operating-franchise information",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "KeolisAmey Docklands 2025 Limited operates and maintains Docklands Light Railway services for TfL under the eight-year contract running to 2033.",
+          "status": "verified",
+          "source": "https://www.keolis.co.uk/our-brands/keolisamey-docklands/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "KeolisAmey Docklands | Keolis UK",
+          "sourceType": "official_operator_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Docklands Light Railway (DLR).",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town DLR station page and current DLR route map",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 36,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLCGT/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "The 36 tph total counts each train departure once. It does not add intermediate destinations or count the Jubilee line."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Woolwich Arsenal",
+              "tph": 12,
+              "direct": true,
+              "notes": "Approximately six trains per hour originate on the Stratford International service group and six on the central-London service group; all continue east from Canning Town via West Silvertown and London City Airport. Displayed from platforms 1 and 3."
+            },
+            {
+              "destination": "Stratford International",
+              "tph": 6,
+              "direct": true,
+              "notes": "Northbound via West Ham, Abbey Road and Stratford."
+            },
+            {
+              "destination": "Beckton",
+              "tph": 6,
+              "direct": true,
+              "notes": "Eastbound via Royal Victoria, Custom House and Prince Regent."
+            },
+            {
+              "destination": "Tower Gateway",
+              "tph": 6,
+              "direct": true,
+              "notes": "Westbound via Poplar, Limehouse and Shadwell."
+            },
+            {
+              "destination": "Bank",
+              "tph": 6,
+              "direct": true,
+              "notes": "Westbound via Poplar, Limehouse and Shadwell."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLCGT/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "Terminal entries are mutually exclusive unless their notes explicitly identify an overlapping intermediate destination. Short-term intervals can vary with service regulation."
+        },
+        "servicePattern": {
+          "value": "Four DLR platforms serve three overlapping service groups: Stratford International–Woolwich Arsenal, central London–Woolwich Arsenal, and central London–Beckton. Woolwich trains reach Canning Town from two western/northern service groups and share the route east through West Silvertown; central-London trains divide between Bank and Tower Gateway.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLCGT/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 36 DLR departures per hour: about 12 westbound to Bank/Tower Gateway, 12 eastbound to Woolwich Arsenal, 6 eastbound to Beckton and 6 northbound to Stratford International. This is an average interval of roughly 2–3 minutes across all DLR platforms, although each individual terminal flow is generally every 10 minutes.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLCGT/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town live departures and DLR timetable",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "The 36 tph total counts each train departure once. It does not add intermediate destinations or count the Jubilee line."
+        },
+        "destinations": {
+          "value": "Direct DLR terminal destinations are Bank, Tower Gateway, Beckton, Woolwich Arsenal and Stratford International. Direct intermediate stops include Poplar, Limehouse, Shadwell, Royal Victoria, Custom House, London City Airport, West Ham and Stratford.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLCGT/Arrivals | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town live departures and current DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "Major interchange with the Jubilee line and Canning Town bus station. Direct DLR access is available to the City, Canary Wharf/Poplar, the Royal Docks, ExCeL London, London City Airport, Woolwich, Stratford and Stratford International. The Jubilee line adds direct access to Stratford, Canary Wharf, London Bridge, Waterloo, Westminster, the West End and north-west London.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town station information and current TfL network maps",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "TfL's current Canning Town station information does not identify station-dedicated cycle parking or publish a cycle-storage capacity. Nearby public-realm stands must not be counted as a verified station facility.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free access is available from street to train. TfL states that every DLR station is step-free; lifts or ramps provide access where platforms are elevated or below street level. Temporary lift faults can still affect a particular journey.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf | https://content.tfl.gov.uk/step-free-tube-guide-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town accessibility information and current TfL step-free/DLR maps",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Self-service ticket machines and Oyster/contactless validators are provided for DLR travel. Oyster pay as you go, contactless payment, Travelcards and other valid TfL tickets are accepted. DLR stations do not normally have a conventional staffed National Rail ticket office; passenger assistance is available through help points and roving staff.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr | https://foi.tfl.gov.uk/FOI-3904-2425/Book%202%20Ways%20to%20Pay%20-%20March%202025_Redacted.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town station information and TfL Ways to Pay guide",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Passenger waiting is provided on the DLR platforms, with seating and weather protection appropriate to the station structure. TfL does not list a separately enclosed waiting room at Canning Town.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "The DLR station facilities do not list passenger toilets within the DLR station. An accessible toilet is available in the adjoining Canning Town bus station, open daily; TfL records no baby-changing facility there.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr | https://content.tfl.gov.uk/tfl-toilet-information.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town station information and TfL customer-toilet register",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "TfL does not list a station car park at Canning Town. This means there is no verified station-dedicated car-parking provision; unrelated public, venue or private parking nearby is excluded.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "TfL stop 940GZZDLCGT; Fare Zones 2/3. The interchange has lifts, escalators, gates, ticket halls, Wi-Fi, payphones and cash machines. DLR and Jubilee line services share the wider Canning Town interchange but the frequency figure in this record is DLR only.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCGT/canning-town-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Canning Town station information and DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-20T11:10:52.060Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "tfl:940GZZDLCUS",
+      "canonicalName": "Custom House",
+      "name": "Custom House",
+      "mode": "DLR",
+      "coordinates": {
+        "lat": 51.5096341,
+        "lon": 0.0259614
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "940GZZDLCUS",
+        "tfl": "940GZZDLCUS",
+        "other": "",
+        "osm": "node/6143889603"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London (TfL), as owner and client for the Docklands Light Railway; station operation and maintenance are delivered under the DLR operating franchise.",
+          "status": "verified",
+          "source": "https://www.keolis.co.uk/our-brands/keolisamey-docklands/ | https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House station information and DLR operating-franchise information",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "KeolisAmey Docklands 2025 Limited operates and maintains Docklands Light Railway services for TfL under the eight-year contract running to 2033.",
+          "status": "verified",
+          "source": "https://www.keolis.co.uk/our-brands/keolisamey-docklands/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "KeolisAmey Docklands | Keolis UK",
+          "sourceType": "official_operator_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Docklands Light Railway (DLR).",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House DLR station page and current DLR route map",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLCUS/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Beckton",
+              "tph": 6,
+              "direct": true,
+              "notes": "Eastbound, approximately every 10 minutes."
+            },
+            {
+              "destination": "Tower Gateway",
+              "tph": 6,
+              "direct": true,
+              "notes": "Westbound via Canning Town, Poplar, Limehouse and Shadwell, approximately every 10 minutes."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLCUS/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "Terminal entries are mutually exclusive unless their notes explicitly identify an overlapping intermediate destination. Short-term intervals can vary with service regulation."
+        },
+        "servicePattern": {
+          "value": "Beckton-branch DLR service operating between Tower Gateway and Beckton. All trains call at Royal Victoria westbound and Prince Regent eastbound.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLCUS/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 12 DLR departures per hour: 6 eastbound to Beckton and 6 westbound to Tower Gateway, giving a broadly 10-minute service in each direction.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLCUS/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House live departures and DLR timetable",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Direct westbound DLR services serve Canning Town, Poplar, Limehouse, Shadwell and Tower Gateway. Direct eastbound services serve Prince Regent, Royal Albert, Beckton Park, Cyprus, Gallions Reach and Beckton.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLCUS/Arrivals | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House live departures and current DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "Direct interchange with the Elizabeth line at Custom House. The DLR serves ExCeL London and provides direct access to Canning Town, Poplar, Limehouse, Tower Gateway and Beckton; Elizabeth line interchange adds Woolwich, Abbey Wood, Canary Wharf, central London, Paddington and selected Heathrow services.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House station information and current TfL network maps",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": "Elizabeth line destinations are interchange opportunities and are not included in the DLR frequency total."
+        },
+        "cycleParking": {
+          "value": "TfL's current Custom House station information does not identify station-dedicated cycle parking or publish a cycle-storage capacity. Nearby public-realm stands must not be counted as a verified station facility.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free access is available from street to train. TfL states that every DLR station is step-free; lifts or ramps provide access where platforms are elevated or below street level. Temporary lift faults can still affect a particular journey.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf | https://content.tfl.gov.uk/step-free-tube-guide-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House accessibility information and current TfL step-free/DLR maps",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Self-service ticket machines and Oyster/contactless validators are provided for DLR travel. Oyster pay as you go, contactless payment, Travelcards and other valid TfL tickets are accepted. DLR stations do not normally have a conventional staffed National Rail ticket office; passenger assistance is available through help points and roving staff.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr | https://foi.tfl.gov.uk/FOI-3904-2425/Book%202%20Ways%20to%20Pay%20-%20March%202025_Redacted.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House station information and TfL Ways to Pay guide",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Passenger waiting is provided on the DLR platforms, with seating and weather protection appropriate to the station structure. TfL does not list a separately enclosed waiting room at Custom House.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "No toilet is listed as a DLR-station facility. Within the adjoining Elizabeth line station, an accessible toilet is on the paid side of the ticket hall, uses RADAR-key access and has baby-changing provision; access conditions depend on the interchange route and station opening.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr | https://content.tfl.gov.uk/tfl-toilet-information.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House station information and TfL customer-toilet register",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "TfL does not list a station car park at Custom House. This means there is no verified station-dedicated car-parking provision; unrelated public, venue or private parking nearby is excluded.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "TfL stop 940GZZDLCUS; Fare Zone 3. The station serves ExCeL London and is directly linked with Custom House Elizabeth line station. Frequency in this record is DLR only.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLCUS/custom-house-for-excel-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Custom House station information and DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-20T11:10:53.060Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "crs:FOG",
+      "canonicalName": "Forest Gate",
+      "name": "Forest Gate",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.549251,
+        "lon": 0.0232808
+      },
+      "identifiers": {
+        "crs": "FOG",
+        "naptan": "910GFRSTGT",
+        "tfl": "910GFRSTGT",
+        "other": "",
+        "osm": "node/6593924753"
+      },
+      "fields": {
+        "manager": {
+          "value": "Elizabeth line. The station is managed day to day as part of the TfL Elizabeth line concession.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/forest-gate/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Elizabeth line passenger services, operated for TfL by GTS Rail Operations Limited. GTS Rail began operating the concession on 25 May 2025.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/corporate/publications-and-reports/elizabeth-line-performance | https://tfl.gov.uk/elizabeth-line/stop/910GFRSTGT/forest-gate-rail-station?lineId=elizabeth",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Elizabeth line performance and Forest Gate station information",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Elizabeth line — Shenfield branch.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GFRSTGT/forest-gate-rail-station?lineId=elizabeth | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate station page and current TfL network map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 16,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GFRSTGT/forest-gate-rail-station?lineId=elizabeth | https://www.nationalrail.co.uk/stations/forest-gate/ | https://api.tfl.gov.uk/StopPoint/910GFRSTGT/Arrivals | https://tfl.gov.uk/corporate/publications-and-reports/crossrail-central-operating-section",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate live departures and Elizabeth line timetable",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "Eight departures per hour in each direction in the representative daytime window. Peak and late-evening terminal patterns vary."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Shenfield",
+              "tph": 8,
+              "direct": true,
+              "notes": "Eastbound in the representative daytime period, broadly every 7–8 minutes."
+            },
+            {
+              "destination": "Paddington",
+              "tph": 6,
+              "direct": true,
+              "notes": "Westbound terminating trains in the representative daytime period."
+            },
+            {
+              "destination": "Heathrow Terminal 5",
+              "tph": 2,
+              "direct": true,
+              "notes": "Westbound through trains in the representative daytime period, approximately every 30 minutes."
+            },
+            {
+              "destination": "Stratford",
+              "tph": 8,
+              "direct": true,
+              "notes": "All westbound trains call; this overlaps with Paddington and Heathrow terminal entries."
+            },
+            {
+              "destination": "Liverpool Street",
+              "tph": 8,
+              "direct": true,
+              "notes": "All westbound trains call; this is an overlapping intermediate-destination frequency."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GFRSTGT/forest-gate-rail-station?lineId=elizabeth | https://www.nationalrail.co.uk/stations/forest-gate/ | https://api.tfl.gov.uk/StopPoint/910GFRSTGT/Arrivals | https://tfl.gov.uk/corporate/publications-and-reports/crossrail-central-operating-section",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate live departures and Elizabeth line timetable",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "Intermediate-destination entries overlap with terminal entries and must not be summed."
+        },
+        "servicePattern": {
+          "value": "Eastbound trains run via Ilford, Romford and Gidea Park to Shenfield. Westbound trains run via Stratford, Whitechapel, Liverpool Street, Farringdon, Tottenham Court Road and Bond Street to Paddington; a representative two trains per hour continue through to Heathrow Terminal 5.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GFRSTGT/forest-gate-rail-station?lineId=elizabeth | https://www.nationalrail.co.uk/stations/forest-gate/ | https://api.tfl.gov.uk/StopPoint/910GFRSTGT/Arrivals | https://tfl.gov.uk/corporate/publications-and-reports/crossrail-central-operating-section",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate live departures and Elizabeth line timetable",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "In some peak periods, eastern short workings may terminate at Gidea Park; western allocations also change at service shoulders."
+        },
+        "frequency": {
+          "value": "Approximately 16 departures per hour in a representative weekday daytime period: 8 eastbound and 8 westbound. This equates to an average 7–8 minute interval in each direction; the western split observed was approximately 6 tph to Paddington and 2 tph to Heathrow Terminal 5.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GFRSTGT/forest-gate-rail-station?lineId=elizabeth | https://www.nationalrail.co.uk/stations/forest-gate/ | https://api.tfl.gov.uk/StopPoint/910GFRSTGT/Arrivals | https://tfl.gov.uk/corporate/publications-and-reports/crossrail-central-operating-section",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate live departures and Elizabeth line timetable",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Direct eastbound services reach Ilford, Seven Kings, Goodmayes, Chadwell Heath, Romford, Gidea Park, Harold Wood, Brentwood and Shenfield. Direct westbound services reach Stratford, Whitechapel, Liverpool Street, Farringdon, Tottenham Court Road, Bond Street and Paddington, with selected trains continuing to Heathrow Airport.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GFRSTGT/forest-gate-rail-station?lineId=elizabeth | https://content.tfl.gov.uk/standard-tube-map.pdf | https://tfl.gov.uk/corporate/publications-and-reports/crossrail-central-operating-section",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate station page, network map and Elizabeth line timetable",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "High-frequency direct access is available to Stratford, Whitechapel, Liverpool Street, Farringdon, the West End, Paddington, Heathrow Airport, Ilford, Romford and Shenfield. Stratford provides interchange with the Central and Jubilee lines, DLR, London Overground and National Rail. Wanstead Park Suffragette line station is a separate nearby street interchange.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GFRSTGT/forest-gate-rail-station?lineId=elizabeth | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate station page and current TfL network map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": "Wanstead Park is not an in-station interchange and requires a street walk."
+        },
+        "cycleParking": {
+          "value": "Cycle storage is available on platform 2 using stands. It is sheltered but not covered by station CCTV; National Rail does not publish a space count. Brompton cycle hire is available on Hampton Road, approximately two minutes’ walk from the station.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/forest-gate/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free Category A: step-free access is available to all platforms using lifts. Boarding ramps, passenger-assistance meeting points, help points and staff assistance are available. The outer Elizabeth line stations are step-free from street to platform; a boarding ramp may be required for the train.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/forest-gate/ | https://content.tfl.gov.uk/step-free-tube-guide-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate National Rail accessibility information and TfL step-free guide",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office: Monday–Friday 06:10–19:40, Saturday 06:40–18:40, Sunday 08:10–15:40. Ticket machines are available, including collection of pre-booked tickets. Oyster and contactless are accepted. A low-level counter, induction loops, help points and staff assistance from first to last train are provided.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/forest-gate/ | https://tfl.gov.uk/elizabeth-line/stop/910GFRSTGT/forest-gate-rail-station?lineId=elizabeth",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate ticketing information | National Rail and TfL",
+          "sourceType": "official_station_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting areas and seating are available. Customer-information screens, visual and audible announcements, help points and an induction loop are provided; tactile warnings are installed on both platforms.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/forest-gate/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Standard and accessible toilets are available; no Changing Places toilet or baby-changing facility is listed. TfL locates the accessible toilet on the unpaid side of the ticket hall and identifies RADAR-key access.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/forest-gate/ | https://tfl.gov.uk/elizabeth-line/stop/910GFRSTGT/forest-gate-rail-station?lineId=elizabeth | https://content.tfl.gov.uk/tfl-toilet-information.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate station facilities and TfL customer-toilet register",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "No station car-parking spaces and no accessible parking spaces are provided. National Rail identifies a drop-off/pick-up point.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/forest-gate/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "CRS FOG; TfL/National Rail stop 910GFRSTGT; Fare Zone 3. Address: Woodgrange Road, Forest Gate, Greater London E7 0NF. The station is staffed from first to last train and has CCTV, refreshments, information screens and announcements; public Wi-Fi is not listed.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/forest-gate/ | https://tfl.gov.uk/elizabeth-line/stop/910GFRSTGT/forest-gate-rail-station?lineId=elizabeth",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Forest Gate station information | National Rail and TfL",
+          "sourceType": "official_station_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-20T11:10:53.559Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "crs:MYL",
+      "canonicalName": "Maryland",
+      "name": "Maryland",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.5460532,
+        "lon": 0.0059223
+      },
+      "identifiers": {
+        "crs": "MYL",
+        "naptan": "910GMRYLAND",
+        "tfl": "910GMRYLAND",
+        "other": "",
+        "osm": "node/6503115198"
+      },
+      "fields": {
+        "manager": {
+          "value": "Elizabeth line. The station is managed day to day as part of the TfL Elizabeth line concession.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/maryland/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "Elizabeth line passenger services, operated for TfL by GTS Rail Operations Limited. GTS Rail began operating the concession on 25 May 2025.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/corporate/publications-and-reports/elizabeth-line-performance | https://tfl.gov.uk/elizabeth-line/stop/910GMRYLAND/maryland-rail-station?lineId=elizabeth",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Elizabeth line performance and Maryland station information",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Elizabeth line — Shenfield branch.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GMRYLAND/maryland-rail-station?lineId=elizabeth | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland station page and current TfL network map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 16,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GMRYLAND/maryland-rail-station?lineId=elizabeth | https://www.nationalrail.co.uk/stations/maryland/ | https://api.tfl.gov.uk/StopPoint/910GMRYLAND/Arrivals | https://tfl.gov.uk/corporate/publications-and-reports/crossrail-central-operating-section",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland live departures and Elizabeth line timetable",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "Eight departures per hour in each direction in the representative daytime window. Peak and late-evening terminal patterns vary."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Shenfield",
+              "tph": 8,
+              "direct": true,
+              "notes": "Eastbound in the representative daytime period, broadly every 7–8 minutes."
+            },
+            {
+              "destination": "Paddington",
+              "tph": 6,
+              "direct": true,
+              "notes": "Westbound terminating trains in the representative daytime period."
+            },
+            {
+              "destination": "Heathrow Terminal 5",
+              "tph": 2,
+              "direct": true,
+              "notes": "Westbound through trains in the representative daytime period, approximately every 30 minutes."
+            },
+            {
+              "destination": "Stratford",
+              "tph": 8,
+              "direct": true,
+              "notes": "All westbound trains call; this overlaps with Paddington and Heathrow terminal entries."
+            },
+            {
+              "destination": "Liverpool Street",
+              "tph": 8,
+              "direct": true,
+              "notes": "All westbound trains call; this is an overlapping intermediate-destination frequency."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GMRYLAND/maryland-rail-station?lineId=elizabeth | https://www.nationalrail.co.uk/stations/maryland/ | https://api.tfl.gov.uk/StopPoint/910GMRYLAND/Arrivals | https://tfl.gov.uk/corporate/publications-and-reports/crossrail-central-operating-section",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland live departures and Elizabeth line timetable",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "Intermediate-destination entries overlap with terminal entries and must not be summed."
+        },
+        "servicePattern": {
+          "value": "Eastbound trains run via Ilford, Romford and Gidea Park to Shenfield. Westbound trains run via Stratford, Whitechapel, Liverpool Street, Farringdon, Tottenham Court Road and Bond Street to Paddington; a representative two trains per hour continue through to Heathrow Terminal 5.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GMRYLAND/maryland-rail-station?lineId=elizabeth | https://www.nationalrail.co.uk/stations/maryland/ | https://api.tfl.gov.uk/StopPoint/910GMRYLAND/Arrivals | https://tfl.gov.uk/corporate/publications-and-reports/crossrail-central-operating-section",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland live departures and Elizabeth line timetable",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "In some peak periods, eastern short workings may terminate at Gidea Park; western allocations also change at service shoulders."
+        },
+        "frequency": {
+          "value": "Approximately 16 departures per hour in a representative weekday daytime period: 8 eastbound and 8 westbound. This equates to an average 7–8 minute interval in each direction; the western split observed was approximately 6 tph to Paddington and 2 tph to Heathrow Terminal 5.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GMRYLAND/maryland-rail-station?lineId=elizabeth | https://www.nationalrail.co.uk/stations/maryland/ | https://api.tfl.gov.uk/StopPoint/910GMRYLAND/Arrivals | https://tfl.gov.uk/corporate/publications-and-reports/crossrail-central-operating-section",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland live departures and Elizabeth line timetable",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Direct eastbound services reach Ilford, Seven Kings, Goodmayes, Chadwell Heath, Romford, Gidea Park, Harold Wood, Brentwood and Shenfield. Direct westbound services reach Stratford, Whitechapel, Liverpool Street, Farringdon, Tottenham Court Road, Bond Street and Paddington, with selected trains continuing to Heathrow Airport.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GMRYLAND/maryland-rail-station?lineId=elizabeth | https://content.tfl.gov.uk/standard-tube-map.pdf | https://tfl.gov.uk/corporate/publications-and-reports/crossrail-central-operating-section",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland station page, network map and Elizabeth line timetable",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "High-frequency direct access is available to Stratford, Whitechapel, Liverpool Street, Farringdon, the West End, Paddington, Heathrow Airport, Ilford, Romford and Shenfield. Stratford, one stop west, provides extensive interchange with Underground, DLR, London Overground and National Rail services.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/elizabeth-line/stop/910GMRYLAND/maryland-rail-station?lineId=elizabeth | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland station page and current TfL network map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": "Interchange opportunities at Stratford require leaving the Maryland train and are not additional direct services from Maryland."
+        },
+        "cycleParking": {
+          "value": "Cycle storage is available next to the station entrance. National Rail does not publish a space count or storage type and records the storage as unsheltered and without CCTV. Brompton cycle hire is available next to the entrance.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/maryland/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free Category A: step-free access is available to all platforms using lifts. Boarding ramps, passenger-assistance meeting points, help points and staff assistance are available. The outer Elizabeth line stations are step-free from street to platform; a boarding ramp may be required for the train.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/maryland/ | https://content.tfl.gov.uk/step-free-tube-guide-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland National Rail accessibility information and TfL step-free guide",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Ticket office: Monday–Friday 06:10–13:15 and Saturday 06:40–13:45; closed Sunday. Ticket machines and pre-booked ticket collection are available. Oyster and contactless are accepted. Help points, induction loops, staff assistance from first to last train and passenger-information systems are provided.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/maryland/ | https://tfl.gov.uk/elizabeth-line/stop/910GMRYLAND/maryland-rail-station?lineId=elizabeth",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland ticketing information | National Rail and TfL",
+          "sourceType": "official_station_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting areas and seating are available. Customer-information screens, visual and audible announcements, help points and an induction loop are provided; tactile warnings are installed on both platforms.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/maryland/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Standard and accessible toilets are available; no Changing Places toilet or baby-changing facility is listed. TfL locates the accessible toilet on the paid side of the ticket hall and identifies RADAR-key access.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/maryland/ | https://tfl.gov.uk/elizabeth-line/stop/910GMRYLAND/maryland-rail-station?lineId=elizabeth | https://content.tfl.gov.uk/tfl-toilet-information.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland station facilities and TfL customer-toilet register",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "No station car-parking spaces and no accessible parking spaces are provided. National Rail identifies a drop-off/pick-up point.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/maryland/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "CRS MYL; TfL/National Rail stop 910GMRYLAND; Fare Zone 3. Address: Leytonstone Road, Maryland Point, Greater London E15 1SA. CCTV, Wi-Fi, refreshments, help points, screens and announcements are available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/maryland/ | https://tfl.gov.uk/elizabeth-line/stop/910GMRYLAND/maryland-rail-station?lineId=elizabeth",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Maryland station information | National Rail and TfL",
+          "sourceType": "official_station_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-20T11:10:54.561Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "tfl:940GZZLUEHM",
+      "canonicalName": "East Ham",
+      "name": "East Ham",
+      "mode": "London Underground",
+      "coordinates": {
+        "lat": 51.5394005,
+        "lon": 0.0526042
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "940GZZLUEHM",
+        "tfl": "940GZZLUEHM",
+        "other": "",
+        "osm": "node/6402129352"
+      },
+      "fields": {
+        "manager": {
+          "value": "London Underground Limited, part of Transport for London.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "London Underground Limited operates District line and Hammersmith & City line passenger services.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham station page and current Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "District line and Hammersmith & City line.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham station page and current Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 36,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city | https://api.tfl.gov.uk/StopPoint/940GZZLUEHM/Arrivals | https://tfl.gov.uk/tube/timetable/district/ | https://tfl.gov.uk/tube/timetable/hammersmith-city/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham live departures and TfL line timetables",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "Representative combined service of approximately 18 tph in each direction. The working timetable and short workings vary by period."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Upminster",
+              "tph": 12,
+              "direct": true,
+              "notes": "District line eastbound."
+            },
+            {
+              "destination": "Barking",
+              "tph": 6,
+              "direct": true,
+              "notes": "Hammersmith & City line eastbound terminal in the representative pattern; all Upminster District trains also call there, so Barking has an overlapping through frequency of approximately 18 tph."
+            },
+            {
+              "destination": "Ealing Broadway",
+              "tph": 3,
+              "direct": true,
+              "notes": "District line westbound branch; representative allocation varies by period."
+            },
+            {
+              "destination": "Richmond",
+              "tph": 6,
+              "direct": true,
+              "notes": "District line westbound branch."
+            },
+            {
+              "destination": "Wimbledon",
+              "tph": 3,
+              "direct": true,
+              "notes": "District line westbound branch; representative allocation varies by period."
+            },
+            {
+              "destination": "Hammersmith (Hammersmith & City)",
+              "tph": 6,
+              "direct": true,
+              "notes": "Hammersmith & City line westbound terminal."
+            },
+            {
+              "destination": "Whitechapel",
+              "tph": 18,
+              "direct": true,
+              "notes": "All westbound District and Hammersmith & City trains call; overlaps all western terminal entries."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city | https://api.tfl.gov.uk/StopPoint/940GZZLUEHM/Arrivals | https://tfl.gov.uk/tube/timetable/district/ | https://tfl.gov.uk/tube/timetable/hammersmith-city/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham live departures and TfL line timetables",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "Intermediate stops overlap terminal entries and must not be summed. Branch allocations are representative rather than a guarantee for every operating hour."
+        },
+        "servicePattern": {
+          "value": "District line trains run east to Upminster or Barking and west through Whitechapel and central London to Ealing Broadway, Richmond or Wimbledon. Hammersmith & City line trains operate between Barking and Hammersmith via Whitechapel, Liverpool Street, King’s Cross St Pancras and Paddington.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city | https://api.tfl.gov.uk/StopPoint/940GZZLUEHM/Arrivals | https://tfl.gov.uk/tube/timetable/district/ | https://tfl.gov.uk/tube/timetable/hammersmith-city/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham station page, live departures and TfL line timetables",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 36 combined departures per hour in a representative weekday daytime period—about 18 eastbound and 18 westbound, or an average train every 3–4 minutes on each platform when both lines are combined. Each individual branch has a lower frequency, typically around 3, 6 or 12 tph.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city | https://api.tfl.gov.uk/StopPoint/940GZZLUEHM/Arrivals | https://tfl.gov.uk/tube/timetable/district/ | https://tfl.gov.uk/tube/timetable/hammersmith-city/ | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham live departures and TfL line timetables",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Eastbound direct destinations include Barking and all District line stations to Upminster. Westbound, both lines serve Upton Park, Plaistow, West Ham, Bromley-by-Bow, Bow Road, Mile End, Stepney Green, Whitechapel and Aldgate East. District trains then continue around the south side of the Circle towards Westminster and western branches; Hammersmith & City trains serve Liverpool Street, King’s Cross St Pancras, Baker Street, Paddington and Hammersmith.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham station page and current Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "Direct links are available to Barking, Upminster, Whitechapel, the City, Westminster, Victoria, the West End approaches and west London. Key interchanges include West Ham (Jubilee, DLR, c2c), Mile End (Central), Whitechapel (Elizabeth line and Windrush line), Liverpool Street (Hammersmith & City line services), King’s Cross St Pancras and Paddington.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham station page and current Tube map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "TfL’s East Ham station-facilities list does not identify station-dedicated cycle parking and publishes no verified capacity or storage type. Public highway stands or borough cycle facilities nearby should be described separately, not as station provision.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free access is available from street to platform. Boarding ramps are listed at the station to bridge the remaining platform-to-train step and gap; this is not advertised as level street-to-train boarding. Staff assistance can be requested.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city | https://content.tfl.gov.uk/step-free-tube-guide-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham accessibility information and TfL step-free guide",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "A staffed ticket hall, ticket gates and self-service machines support Oyster, contactless, Travelcards and valid TfL tickets. Wi-Fi and payphones are listed; boarding-ramp assistance is available from station staff.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city | https://foi.tfl.gov.uk/FOI-3904-2425/Book%202%20Ways%20to%20Pay%20-%20March%202025_Redacted.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham station information and TfL Ways to Pay guide",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Passenger waiting takes place on the platforms. TfL does not list a dedicated enclosed waiting room at East Ham; the facilities list includes ticket halls, gates, Wi-Fi, payphones and boarding ramps.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "TfL lists passenger toilets at East Ham Underground station. The published station page does not specify separate accessible-toilet, baby-changing or opening-hour details, so those additional features are not claimed.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "TfL does not list a station car park at East Ham. The nearby Newham Council Madge Gill Way car park is a separate public facility and must not be represented as station-owned parking.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "TfL stop 940GZZLUEHM; boundary of Fare Zones 3 and 4. Address: High Street North, London E6 2JA. Facilities listed by TfL include toilets, boarding ramps, gates, Wi-Fi, payphones and ticket halls.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/tube/stop/940GZZLUEHM/east-ham-underground-station?lineId=district%2Chammersmith-city",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "East Ham Underground Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-20T11:10:55.307Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "tfl:940GZZDLRVC",
+      "canonicalName": "Royal Victoria",
+      "name": "Royal Victoria",
+      "mode": "DLR",
+      "coordinates": {
+        "lat": 51.5091168,
+        "lon": 0.0175913
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "940GZZDLRVC",
+        "tfl": "940GZZDLRVC",
+        "other": "",
+        "osm": "node/6143889602"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London (TfL), as owner and client for the Docklands Light Railway; station operation and maintenance are delivered under the DLR operating franchise.",
+          "status": "verified",
+          "source": "https://www.keolis.co.uk/our-brands/keolisamey-docklands/ | https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria station information and DLR operating-franchise information",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "KeolisAmey Docklands 2025 Limited operates and maintains Docklands Light Railway services for TfL under the eight-year contract running to 2033.",
+          "status": "verified",
+          "source": "https://www.keolis.co.uk/our-brands/keolisamey-docklands/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "KeolisAmey Docklands | Keolis UK",
+          "sourceType": "official_operator_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Docklands Light Railway (DLR).",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria DLR station page and current DLR route map",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLRVC/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Beckton",
+              "tph": 6,
+              "direct": true,
+              "notes": "Eastbound, approximately every 10 minutes."
+            },
+            {
+              "destination": "Tower Gateway",
+              "tph": 6,
+              "direct": true,
+              "notes": "Westbound via Canning Town, Poplar, Limehouse and Shadwell, approximately every 10 minutes."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLRVC/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "Terminal entries are mutually exclusive unless their notes explicitly identify an overlapping intermediate destination. Short-term intervals can vary with service regulation."
+        },
+        "servicePattern": {
+          "value": "Beckton-branch DLR service operating between Tower Gateway and Beckton.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLRVC/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 12 departures per hour: 6 eastbound to Beckton and 6 westbound to Tower Gateway, broadly every 10 minutes in each direction.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLRVC/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria live departures and DLR timetable",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Direct westbound services serve Canning Town, Poplar, Limehouse, Shadwell and Tower Gateway. Direct eastbound services serve Custom House, Prince Regent, Royal Albert, Beckton Park, Cyprus, Gallions Reach and Beckton.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLRVC/Arrivals | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria live departures and current DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "Primary rail access for the western Royal Docks. Direct DLR access is available to Canning Town, Poplar, Limehouse, Tower Gateway, ExCeL via Custom House/Prince Regent and Beckton. The nearby Royal Docks London Cable Car terminal provides a separate cross-Thames connection to Greenwich Peninsula and North Greenwich.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria station information and current TfL network maps",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": "The cable car is a nearby interchange and not part of the DLR frequency."
+        },
+        "cycleParking": {
+          "value": "TfL's current Royal Victoria station information does not identify station-dedicated cycle parking or publish a cycle-storage capacity. Nearby public-realm stands must not be counted as a verified station facility.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free access is available from street to train. TfL states that every DLR station is step-free; lifts or ramps provide access where platforms are elevated or below street level. Temporary lift faults can still affect a particular journey.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf | https://content.tfl.gov.uk/step-free-tube-guide-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria accessibility information and current TfL step-free/DLR maps",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Self-service ticket machines and Oyster/contactless validators are provided for DLR travel. Oyster pay as you go, contactless payment, Travelcards and other valid TfL tickets are accepted. DLR stations do not normally have a conventional staffed National Rail ticket office; passenger assistance is available through help points and roving staff.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr | https://foi.tfl.gov.uk/FOI-3904-2425/Book%202%20Ways%20to%20Pay%20-%20March%202025_Redacted.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria station information and TfL Ways to Pay guide",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Passenger waiting is provided on the DLR platforms, with seating and weather protection appropriate to the station structure. TfL does not list a separately enclosed waiting room at Royal Victoria.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "TfL does not list public passenger toilets at Royal Victoria DLR station, and the station is not included in TfL’s current customer-toilet register.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr | https://content.tfl.gov.uk/tfl-toilet-information.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria station information and TfL customer-toilet register",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "TfL does not list a station car park at Royal Victoria. This means there is no verified station-dedicated car-parking provision; unrelated public, venue or private parking nearby is excluded.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "TfL stop 940GZZDLRVC; Fare Zone 3. The station is the nearest DLR stop to the Royal Docks London Cable Car terminal and City Hall.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLRVC/royal-victoria-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Victoria station information and DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-20T11:10:57.308Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "tfl:940GZZDLPRE",
+      "canonicalName": "Prince Regent",
+      "name": "Prince Regent",
+      "mode": "DLR",
+      "coordinates": {
+        "lat": 51.5094778,
+        "lon": 0.0331521
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "940GZZDLPRE",
+        "tfl": "940GZZDLPRE",
+        "other": "",
+        "osm": "node/6143889604"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London (TfL), as owner and client for the Docklands Light Railway; station operation and maintenance are delivered under the DLR operating franchise.",
+          "status": "verified",
+          "source": "https://www.keolis.co.uk/our-brands/keolisamey-docklands/ | https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent station information and DLR operating-franchise information",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "KeolisAmey Docklands 2025 Limited operates and maintains Docklands Light Railway services for TfL under the eight-year contract running to 2033.",
+          "status": "verified",
+          "source": "https://www.keolis.co.uk/our-brands/keolisamey-docklands/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "KeolisAmey Docklands | Keolis UK",
+          "sourceType": "official_operator_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Docklands Light Railway (DLR).",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent DLR station page and current DLR route map",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLPRE/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Beckton",
+              "tph": 6,
+              "direct": true,
+              "notes": "Eastbound, approximately every 10 minutes."
+            },
+            {
+              "destination": "Tower Gateway",
+              "tph": 6,
+              "direct": true,
+              "notes": "Westbound via Custom House, Canning Town, Poplar, Limehouse and Shadwell, approximately every 10 minutes."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLPRE/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "Terminal entries are mutually exclusive unless their notes explicitly identify an overlapping intermediate destination. Short-term intervals can vary with service regulation."
+        },
+        "servicePattern": {
+          "value": "Beckton-branch DLR service operating between Tower Gateway and Beckton.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLPRE/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 12 departures per hour: 6 eastbound to Beckton and 6 westbound to Tower Gateway, broadly every 10 minutes in each direction.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLPRE/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent live departures and DLR timetable",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Direct westbound services serve Custom House, Royal Victoria, Canning Town, Poplar, Limehouse, Shadwell and Tower Gateway. Direct eastbound services serve Royal Albert, Beckton Park, Cyprus, Gallions Reach and Beckton.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLPRE/Arrivals | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent live departures and current DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "Direct DLR access to the eastern entrance of ExCeL London, Custom House for Elizabeth line interchange, Canning Town for the Jubilee line and buses, Poplar, Limehouse, Tower Gateway and Beckton.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent station information and current TfL network maps",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": "Elizabeth and Jubilee line destinations require interchange and are excluded from DLR frequency."
+        },
+        "cycleParking": {
+          "value": "TfL's current Prince Regent station information does not identify station-dedicated cycle parking or publish a cycle-storage capacity. Nearby public-realm stands must not be counted as a verified station facility.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free access is available from street to train. TfL states that every DLR station is step-free; lifts or ramps provide access where platforms are elevated or below street level. Temporary lift faults can still affect a particular journey.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf | https://content.tfl.gov.uk/step-free-tube-guide-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent accessibility information and current TfL step-free/DLR maps",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Self-service ticket machines and Oyster/contactless validators are provided for DLR travel. Oyster pay as you go, contactless payment, Travelcards and other valid TfL tickets are accepted. DLR stations do not normally have a conventional staffed National Rail ticket office; passenger assistance is available through help points and roving staff.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr | https://foi.tfl.gov.uk/FOI-3904-2425/Book%202%20Ways%20to%20Pay%20-%20March%202025_Redacted.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent station information and TfL Ways to Pay guide",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Passenger waiting is provided on the DLR platforms, with seating and weather protection appropriate to the station structure. TfL does not list a separately enclosed waiting room at Prince Regent.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "TfL does not list public passenger toilets at Prince Regent DLR station, and the station is not included in TfL’s current customer-toilet register.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr | https://content.tfl.gov.uk/tfl-toilet-information.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent station information and TfL customer-toilet register",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "TfL does not list a station car park at Prince Regent. This means there is no verified station-dedicated car-parking provision; unrelated public, venue or private parking nearby is excluded.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "TfL stop 940GZZDLPRE; Fare Zone 3. The station serves the eastern end of ExCeL London.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLPRE/prince-regent-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Prince Regent station information and DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-20T11:10:59.310Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "tfl:940GZZDLSTD",
+      "canonicalName": "Stratford",
+      "name": "Stratford",
+      "mode": "DLR",
+      "coordinates": {
+        "lat": 51.541289,
+        "lon": -0.0035472
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "940GZZDLSTD",
+        "tfl": "940GZZDLSTD",
+        "other": "",
+        "osm": "node/5257403774"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London (TfL), as owner and client for the Docklands Light Railway; station operation and maintenance are delivered under the DLR operating franchise.",
+          "status": "verified",
+          "source": "https://www.keolis.co.uk/our-brands/keolisamey-docklands/ | https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford station information and DLR operating-franchise information",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "KeolisAmey Docklands 2025 Limited operates and maintains Docklands Light Railway services for TfL under the eight-year contract running to 2033.",
+          "status": "verified",
+          "source": "https://www.keolis.co.uk/our-brands/keolisamey-docklands/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "KeolisAmey Docklands | Keolis UK",
+          "sourceType": "official_operator_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "Docklands Light Railway (DLR).",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford DLR station page and current DLR route map",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 22,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLSTD/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "The Canary Wharf service is approximately every 6 minutes; the two through terminal flows are approximately every 10 minutes each."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Canary Wharf",
+              "tph": 10,
+              "direct": true,
+              "notes": "Departures from the terminating DLR platforms 4a/4b, broadly every 6 minutes."
+            },
+            {
+              "destination": "Stratford International",
+              "tph": 6,
+              "direct": true,
+              "notes": "Through DLR service from platforms 16/17, approximately every 10 minutes."
+            },
+            {
+              "destination": "Woolwich Arsenal",
+              "tph": 6,
+              "direct": true,
+              "notes": "Through DLR service via Stratford High Street, West Ham, Canning Town and London City Airport, approximately every 10 minutes."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLSTD/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "Terminal entries are mutually exclusive unless their notes explicitly identify an overlapping intermediate destination. Short-term intervals can vary with service regulation."
+        },
+        "servicePattern": {
+          "value": "Two DLR service groups use Stratford: a frequent terminating service to Canary Wharf via Bow Church and Poplar, and a through Stratford International–Woolwich Arsenal service using platforms 16/17.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLSTD/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford live departures, DLR timetable and route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 22 DLR departures per hour: about 10 to Canary Wharf, 6 to Stratford International and 6 to Woolwich Arsenal. The total counts DLR only and excludes Central, Jubilee, Elizabeth line, London Overground and National Rail departures.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLSTD/Arrivals | https://tfl.gov.uk/dlr/timetable/dlr/ | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford live departures and DLR timetable",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "The Canary Wharf service is approximately every 6 minutes; the two through terminal flows are approximately every 10 minutes each."
+        },
+        "destinations": {
+          "value": "Direct DLR destinations include Canary Wharf, Stratford International and Woolwich Arsenal. Intermediate direct stops include Bow Church, Devons Road, Poplar, Stratford High Street, Abbey Road, West Ham, Canning Town, West Silvertown, London City Airport and King George V.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr | https://api.tfl.gov.uk/StopPoint/940GZZDLSTD/Arrivals | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford live departures and current DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "One of London’s major multimodal interchanges: connections are available with the Central and Jubilee lines, Elizabeth line, London Overground Mildmay and Windrush lines, Greater Anglia and c2c National Rail services, coaches and extensive local buses. DLR direct journeys link Canary Wharf, the Royal Docks, London City Airport, Woolwich and Stratford International.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford station information and current TfL network maps",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "cycleParking": {
+          "value": "TfL's current Stratford station information does not identify station-dedicated cycle parking or publish a cycle-storage capacity. Nearby public-realm stands must not be counted as a verified station facility.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free access is available from street to train. TfL states that every DLR station is step-free; lifts or ramps provide access where platforms are elevated or below street level. Temporary lift faults can still affect a particular journey.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf | https://content.tfl.gov.uk/step-free-tube-guide-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford accessibility information and current TfL step-free/DLR maps",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "Self-service ticket machines and Oyster/contactless validators are provided for DLR travel. Oyster pay as you go, contactless payment, Travelcards and other valid TfL tickets are accepted. DLR stations do not normally have a conventional staffed National Rail ticket office; passenger assistance is available through help points and roving staff.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr | https://foi.tfl.gov.uk/FOI-3904-2425/Book%202%20Ways%20to%20Pay%20-%20March%202025_Redacted.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford station information and TfL Ways to Pay guide",
+          "sourceType": "official_transport_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Passenger waiting is provided on the DLR platforms, with seating and weather protection appropriate to the station structure. TfL does not list a separately enclosed waiting room at Stratford.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "Public toilets are provided within the Stratford interchange. TfL records female and male toilets on the paid side of the southern ticket hall, an accessible RADAR-key toilet adjacent to DLR platform 16, and another accessible facility on the paid side of the southern ticket hall available with staff assistance.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr | https://content.tfl.gov.uk/tfl-toilet-information.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford station information and TfL customer-toilet register",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "TfL does not list a station car park at Stratford. This means there is no verified station-dedicated car-parking provision; unrelated public, venue or private parking nearby is excluded.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford DLR Station | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "TfL DLR stop 940GZZDLSTD; Fare Zones 2/3. Facilities within the wider interchange include gates, boarding ramps, lifts, escalators, Wi-Fi, payphones, cash machines and toilets. This record reports DLR services only.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLSTD/stratford-dlr-station?lineId=dlr | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Stratford station information and DLR route map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-20T11:11:01.308Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "tfl:940GZZALRDK",
+      "canonicalName": "Royal Docks",
+      "name": "Royal Docks",
+      "mode": "London Cable Car",
+      "coordinates": {
+        "lat": 51.5076862,
+        "lon": 0.0179617
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "940GZZALRDK",
+        "tfl": "940GZZALRDK",
+        "other": "",
+        "osm": "way/170081288"
+      },
+      "fields": {
+        "manager": {
+          "value": "Transport for London manages the London Cable Car and Royal Docks terminal.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car | https://tfl.gov.uk/modes/london-cable-car/opening-hours-frequency",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks terminal and London Cable Car opening information | TfL",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "FirstGroup operates the London Cable Car for TfL. Its contract commenced on 28 June 2024 for an initial five-year term, with an option for a further three years.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/info-for/media/press-releases/2024/july/a-summer-at-the-circus-is-underway-at-the-ifs-cloud-cable-car",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "A summer at the circus is underway at the IFS Cloud Cable Car | TfL",
+          "sourceType": "official_tfl_source",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "London Cable Car between Royal Docks and Greenwich Peninsula.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car | https://tfl.gov.uk/modes/london-cable-car/opening-hours-frequency",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks terminal and London Cable Car opening information | TfL",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 12,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car | https://tfl.gov.uk/modes/london-cable-car/opening-hours-frequency",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks London Cable Car timetable and opening hours | TfL",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Published all-day timetable pattern, checked 20 July 2026",
+          "notes": "The numeric field records TfL’s five-minute public timetable slots (12 per hour) so it remains within the rail-toolkit schema. Operationally, TfL states that continuously circulating cabins arrive about every 30 seconds; that physical cabin rate must not be interpreted as 12 cabins per hour."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Greenwich Peninsula",
+              "tph": 12,
+              "direct": true,
+              "notes": "Only public-service destination from Royal Docks; published timetable entries every five minutes."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car | https://tfl.gov.uk/modes/london-cable-car/opening-hours-frequency",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks London Cable Car timetable and opening hours | TfL",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Published all-day timetable pattern, checked 20 July 2026",
+          "notes": ""
+        },
+        "servicePattern": {
+          "value": "Two-terminal cross-Thames cable-car service between Royal Docks and Greenwich Peninsula. Published opening hours are Monday–Thursday 08:00–21:00, Friday 09:00–22:00, Saturday 09:00–23:00, and Sunday/bank holidays 09:00–21:00.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car | https://tfl.gov.uk/modes/london-cable-car/opening-hours-frequency",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks London Cable Car timetable and opening hours | TfL",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Cabins circulate continuously and TfL states that cars normally arrive every 30 seconds, each carrying up to 10 people. The terminal timetable also displays five-minute public departure slots; the numeric frequencyTotal field records those 12 timetable slots per hour because the supplied rail schema permits no value above 100. Passenger waiting and boarding can be affected by queues, weather and operational restrictions.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car | https://tfl.gov.uk/modes/london-cable-car/opening-hours-frequency",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks London Cable Car timetable and opening hours | TfL",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "Published all-day timetable pattern, checked 20 July 2026",
+          "notes": "This field gives the operational cabin interval explicitly so the 12-slot schema value is not mistaken for physical cabin frequency."
+        },
+        "destinations": {
+          "value": "Direct service only to Greenwich Peninsula terminal, beside The O2 and within walking distance of North Greenwich Underground and bus station.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks terminal page and current TfL network map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "The cable car provides a direct cross-Thames link to Greenwich Peninsula for The O2, North Greenwich bus station and Jubilee line services. At Royal Docks, Royal Victoria DLR station is the nearest rail interchange for Canning Town, Poplar, Tower Gateway, Custom House and Beckton.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car | https://content.tfl.gov.uk/standard-tube-map.pdf | https://content.tfl.gov.uk/dlr-route-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks terminal and current TfL network maps",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": "North Greenwich and Royal Victoria require short street walks; they are not within the cable-car gateline."
+        },
+        "cycleParking": {
+          "value": "TfL’s Royal Docks terminal facilities do not list dedicated cycle parking. Ordinary bicycles are accepted on the London Cable Car at all times and travel free before 10:30 on weekdays excluding bank holidays; e-bikes, e-scooters and e-unicycles are prohibited. Surrounding public stands should not be treated as a terminal facility.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car | https://tfl.gov.uk/modes/london-cable-car/opening-hours-frequency",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks terminal and London Cable Car bicycle information | TfL",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "The terminal is wheelchair accessible and has lifts from the ticket hall/gateline level to boarding. TfL lists lifts, gates and a ticket hall at Royal Docks.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks London Cable Car terminal | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "A staffed ticket hall and gates are provided. Dedicated cable-car tickets can be purchased; Oyster pay as you go and contactless payment are accepted. Cable-car fares are separate from normal Tube/DLR fare-zone charging and are not included in daily capping in the same way as ordinary TfL rail journeys.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car | https://tfl.gov.uk/fares/find-fares/ifs-cloud-cable-car-fares",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks terminal and London Cable Car fares | TfL",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Passenger waiting takes place in the terminal ticket hall and managed queue/boarding areas. TfL does not list a separate enclosed waiting room; lifts connect the terminal levels.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks London Cable Car terminal | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "TfL does not list public toilets among the Royal Docks terminal facilities. No accessible toilet or baby-changing facility is therefore claimed as terminal provision.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks London Cable Car terminal | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "TfL does not list a terminal car park at Royal Docks. Nearby venue, hotel, public or private parking is separate and is not station-dedicated provision.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks London Cable Car terminal | TfL",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "Corrected classification: the supplied OSM way 170081288 is Royal Docks London Cable Car terminal, not a National Rail station. TfL stop 940GZZALRDK; address 27 Western Gateway, London E16 1FA. The supplied coordinates, OSM identifier and walking/cycling route calculations have been preserved.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/cable-car/stop/940GZZALRDK/royal-docks?lineId=london-cable-car | https://www.openstreetmap.org/way/170081288",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Royal Docks terminal | TfL and supplied OSM feature",
+          "sourceType": "official_tfl_source_plus_identifier_check",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-20T11:11:05.309Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
+      "reviewFlags": [
+        "corrected_mode_from_national_rail_to_london_cable_car"
+      ],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "crs:WNP",
+      "canonicalName": "Wanstead Park",
+      "name": "Wanstead Park",
+      "mode": "London Overground",
+      "coordinates": {
+        "lat": 51.5517605,
+        "lon": 0.0260733
+      },
+      "identifiers": {
+        "crs": "WNP",
+        "naptan": "910GWNSTDPK",
+        "tfl": "910GWNSTDPK",
+        "other": "",
+        "osm": "node/1742840596"
+      },
+      "fields": {
+        "manager": {
+          "value": "London Overground. The station is managed within TfL’s London Overground concession.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/wanstead-park/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "operators": {
+          "value": "London Overground services are operated for TfL by First Rail London Limited, which took over the concession on 3 May 2026.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/info-for/media/press-releases/2025/december/first-rail-london-limited-named-as-tfl-s-preferred-operator-for-london-overground | https://tfl.gov.uk/overground/stop/910GWNSTDPK/wanstead-park-rail-station?lineId=suffragette",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "First Rail London operator announcement and Wanstead Park station page",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "lines": {
+          "value": "London Overground Suffragette line (Gospel Oak–Barking Riverside).",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GWNSTDPK/wanstead-park-rail-station?lineId=suffragette | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park station page and current TfL network map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequencyTotal": {
+          "value": 8,
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GWNSTDPK/wanstead-park-rail-station?lineId=suffragette | https://www.nationalrail.co.uk/stations/wanstead-park/ | https://api.tfl.gov.uk/StopPoint/910GWNSTDPK/Arrivals",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park live departures and station information",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": "Four departures per hour in each direction in the representative daytime window."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Gospel Oak",
+              "tph": 4,
+              "direct": true,
+              "notes": "Westbound, broadly every 15 minutes."
+            },
+            {
+              "destination": "Barking Riverside",
+              "tph": 4,
+              "direct": true,
+              "notes": "Eastbound via Woodgrange Park and Barking, broadly every 15 minutes."
+            }
+          ],
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GWNSTDPK/wanstead-park-rail-station?lineId=suffragette | https://www.nationalrail.co.uk/stations/wanstead-park/ | https://api.tfl.gov.uk/StopPoint/910GWNSTDPK/Arrivals",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park live departures and station information",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "servicePattern": {
+          "value": "All-stations Suffragette line service between Gospel Oak and Barking Riverside. Westbound trains serve Leytonstone High Road, Walthamstow Queen’s Road, Blackhorse Road, South Tottenham, Harringay Green Lanes, Crouch Hill and Upper Holloway; eastbound trains serve Woodgrange Park, Barking and Barking Riverside.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GWNSTDPK/wanstead-park-rail-station?lineId=suffragette | https://www.nationalrail.co.uk/stations/wanstead-park/ | https://api.tfl.gov.uk/StopPoint/910GWNSTDPK/Arrivals",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park live departures and TfL route information",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "frequency": {
+          "value": "Approximately 8 departures per hour in total: 4 westbound to Gospel Oak and 4 eastbound to Barking Riverside, normally every 15 minutes in each direction.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GWNSTDPK/wanstead-park-rail-station?lineId=suffragette | https://www.nationalrail.co.uk/stations/wanstead-park/ | https://api.tfl.gov.uk/StopPoint/910GWNSTDPK/Arrivals",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park live departures and TfL route information",
+          "sourceType": "official_transport_sources",
+          "timetablePeriod": "Representative Monday-Friday daytime service observed 20 July 2026",
+          "notes": ""
+        },
+        "destinations": {
+          "value": "Direct western destinations include Leytonstone High Road, Walthamstow Queen’s Road, Blackhorse Road, South Tottenham, Harringay Green Lanes, Crouch Hill, Upper Holloway and Gospel Oak. Direct eastern destinations are Woodgrange Park, Barking and Barking Riverside.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GWNSTDPK/wanstead-park-rail-station?lineId=suffragette | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park station page and current TfL network map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "journeyOpportunities": {
+          "value": "The Suffragette line provides orbital links to the Victoria line at Blackhorse Road, the Weaver line at Walthamstow Queen’s Road/Walthamstow Central via street interchange, the Mildmay line at Gospel Oak, and District, Hammersmith & City, c2c and local bus services at Barking. Forest Gate Elizabeth line station is a nearby but separate street interchange.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/overground/stop/910GWNSTDPK/wanstead-park-rail-station?lineId=suffragette | https://content.tfl.gov.uk/standard-tube-map.pdf",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park station page and current TfL network map",
+          "sourceType": "official_tfl_sources",
+          "timetablePeriod": "",
+          "notes": "Forest Gate is not an in-station interchange and requires a street walk."
+        },
+        "cycleParking": {
+          "value": "Twelve cycle-storage spaces are provided in stands at the station entrance opposite the staff information point. The storage is sheltered and covered by CCTV.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/wanstead-park/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "stepFree": {
+          "value": "Step-free Category C: there is no step-free access to either platform and no lifts are provided. The platforms are above entrance level and are reached by stairs.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/wanstead-park/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "ticketing": {
+          "value": "There is no ticket office. A self-service ticket machine is available and can collect pre-booked tickets; Oyster pay as you go is accepted and Oyster top-up is available at the machine. The controls are suitable for wheelchair users, although the platforms themselves are not step-free.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/wanstead-park/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "waiting": {
+          "value": "Sheltered waiting areas and seating are available, but there is no enclosed waiting room. Customer-information screens, announcements, CCTV and an induction loop are provided; the station does not offer public Wi-Fi or refreshments.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/wanstead-park/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "toilets": {
+          "value": "No passenger toilets, accessible toilets, Changing Places toilet or baby-changing facility are provided.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/wanstead-park/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "carParking": {
+          "value": "No station car-parking spaces and no accessible parking spaces are provided. National Rail does not identify a formal station drop-off/pick-up facility, although its accessibility data describes space for one vehicle at a time on the station side of the road.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/wanstead-park/",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": ""
+        },
+        "notes": {
+          "value": "CRS WNP; TfL/National Rail stop 910GWNSTDPK; Fare Zone 3. The station is unstaffed in the conventional ticket-office sense, although London Overground customer-service staff coverage is described from start to end of service. Platforms are elevated and have tactile warnings.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/wanstead-park/ | https://tfl.gov.uk/overground/stop/910GWNSTDPK/wanstead-park-rail-station?lineId=suffragette",
+          "retrievalDate": "2026-07-20",
+          "sourceTitle": "Wanstead Park station information | National Rail and TfL",
+          "sourceType": "official_station_pages",
+          "timetablePeriod": "",
+          "notes": ""
+        }
+      },
+      "createdAt": "2026-07-20T11:11:07.311Z",
+      "updatedAt": "2026-07-20T11:55:15.101Z",
       "reviewFlags": [],
       "editorName": "Joe Freeman",
       "originatingModuleBuild": "RAIL-4.8.0-20260717",

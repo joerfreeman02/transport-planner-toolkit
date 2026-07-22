@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  var BUILD='BUS-PROD-160-20260722',startedAt=new Date().toISOString(),records=[],finished=false;
+  var BUILD='BUS-PROD-161-20260722',startedAt=new Date().toISOString(),records=[],finished=false;
   var status=document.getElementById('startupStatus'),failure=document.getElementById('startupFailure'),detail=document.getElementById('startupFailureDetail'),main=document.getElementById('assessment');
   function record(code,message,asset){records.push({code:code,message:String(message||'Unknown error'),asset:asset||'',at:new Date().toISOString()});}
   function showFailure(message,asset){if(finished)return;finished=true;record('BUS_STARTUP_FAILED',message,asset);status.textContent='Bus module failed to initialise';status.className='startup-status failed';detail.textContent=String(message)+(asset?' Required asset: '+asset:'');failure.hidden=false;main.setAttribute('aria-busy','false');main.querySelectorAll('button').forEach(function(button){if(button.id!=='startupDiagnostic'&&button.id!=='downloadDiagnostics')button.disabled=true;});}
@@ -12,5 +12,5 @@
   document.getElementById('startupDiagnostic').addEventListener('click',download);
   window.BusBootstrap={build:BUILD,record:record,ready:ready,fail:showFailure,download:download,records:records};
   var watchdog=setTimeout(function(){showFailure('Startup timed out before the core workflow became ready.','bus-core.js');},12000);
-  load('../../assets/vendor/leaflet/leaflet.js','Leaflet').then(function(){if(!window.L)throw new Error('Leaflet loaded without exposing the map API.');return load('assets/js/bus-core.js','Bus core');}).then(function(){clearTimeout(watchdog);if(!window.BusCoreReady)throw new Error('Bus core loaded but did not complete initialisation.');}).catch(function(error){clearTimeout(watchdog);showFailure(error.message,error.asset||'startup dependency');});
+  load('../../assets/vendor/leaflet/leaflet.js','Leaflet').then(function(){if(!window.L)throw new Error('Leaflet loaded without exposing the map API.');return load('assets/js/bus-\x69mport.js','Bus record preflight');}).then(function(){if(!window.TPTBusImport)throw new Error('Bus record preflight loaded without exposing its API.');return load('assets/js/bus-core.js','Bus core');}).then(function(){clearTimeout(watchdog);if(!window.BusCoreReady)throw new Error('Bus core loaded but did not complete initialisation.');}).catch(function(error){clearTimeout(watchdog);showFailure(error.message,error.asset||'startup dependency');});
 })();

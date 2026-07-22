@@ -34,3 +34,8 @@ The Dashboard now opens a minimum safe Library Manager for the three shared tran
 # Toolkit 2.5.0 — Research quality and validation
 
 Railway and Bus research exports now carry one shared self-contained authoritative-source standard. Completed imports reject instructional placeholders, quarantine fully audited unresolved findings for review, accept sourced factual negatives, and block incomplete or ambiguous proposals from Shared Library publication.
+# Toolkit 2.5.1 — Emergency corrective release
+
+Builds: `TPT-EMERGENCY-251-20260722`, `RAIL-4.9.1-20260722`, `BUS-PROD-161-20260722`, `LIB-1.1.1-20260722`, `SHARED-LIB-1.4.1-20260722`, `RESEARCH-QUALITY-1.0.1-20260722`.
+
+Rail discovery, selected-record publication, Bus partial imports, explicit shared Stop–Route relationships, publication feedback and Library Manager record readability have been corrected without changing the existing assessment schemas or the three accepted shared master datasets.

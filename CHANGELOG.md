@@ -83,3 +83,8 @@
 - Added one shared mode-specific research standard for Railway, Bus Assessment and Library Manager exports.
 - Added field-level placeholder, evidence, exhaustive-unresolved and route-identity validation with quality classifications and publication blockers.
 - Preserved legacy record loading and all shared master contents while preventing unsuitable new verified proposals.
+# 2.5.1 — Emergency corrective release — 2026-07-22
+
+- Excluded bus-only OSM stations from Railway discovery and limited Rail publication to selected saved proposals.
+- Added partial Bus research import with local recovery snapshots, review/quarantine reporting, composite route identity and a shared Stop–Route master.
+- Added persistent unpublished-state and publication-result panels, normalized verification statuses, and structured Library Manager editors.

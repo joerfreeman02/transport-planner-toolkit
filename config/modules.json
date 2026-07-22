@@ -1,7 +1,7 @@
 {
   "toolkit": {
-    "version": "2.5.0",
-    "build": "TPT-RESEARCH-250-20260722",
+    "version": "2.5.1",
+    "build": "TPT-EMERGENCY-251-20260722",
     "releaseDate": "2026-07-22",
     "status": "sprint-4-production"
   },
@@ -25,30 +25,30 @@
       "path": "modules/stats19/index.html"
     },
     "railway": {
-      "version": "4.9.0",
-      "build": "RAIL-4.9.0-20260722",
+      "version": "4.9.1",
+      "build": "RAIL-4.9.1-20260722",
       "status": "stable-frozen-functionality-word-export",
       "path": "modules/railway/index.html"
     },
     "bus": {
-      "version": "1.6.0",
-      "build": "BUS-PROD-160-20260722",
+      "version": "1.6.1",
+      "build": "BUS-PROD-161-20260722",
       "schemaVersion": "1.0.0",
       "status": "stable-frozen-production-baseline",
       "path": "modules/bus/index.html"
     },
     "libraryManager": {
-      "version": "1.1.0",
-      "build": "LIB-1.1.0-20260722",
+      "version": "1.1.1",
+      "build": "LIB-1.1.1-20260722",
       "status": "stable-minimum-library-maintenance",
       "path": "modules/library-manager/index.html"
     }
   },
   "sharedLibrary": {
-    "version": "1.4.0",
-    "build": "SHARED-LIB-1.4.0-20260722",
+    "version": "1.4.1",
+    "build": "SHARED-LIB-1.4.1-20260722",
     "status": "production-interim-no-backend"
   },
-  "researchQuality": {"version":"1.0.0","build":"RESEARCH-QUALITY-1.0.0-20260722"},
+  "researchQuality": {"version":"1.0.1","build":"RESEARCH-QUALITY-1.0.1-20260722"},
   "sharedTheme": {"version":"1.0.0","build":"TPT-THEME-1.0.0-20260716"}
 }

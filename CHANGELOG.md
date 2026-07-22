@@ -96,3 +96,7 @@
 - Excluded bus-only OSM stations from Railway discovery and limited Rail publication to selected saved proposals.
 - Added partial Bus research import with local recovery snapshots, review/quarantine reporting, composite route identity and a shared Stop–Route master.
 - Added persistent unpublished-state and publication-result panels, normalized verification statuses, and structured Library Manager editors.
+# Toolkit 2.6.1 corrective workflow completion — 2026-07-22
+
+- Added guided single-action Rail and Bus research steps, strict Rail total/directional TPH completeness, partial Rail batch acceptance, exact Bus batch matching, smaller Bus service batches, and persistent exclusion of incomplete service records.
+- Added explicit legacy Bus import, Library Manager incompleteness banners, and A–W behavioural coverage without changing shared masters, Accessibility or STATS19.

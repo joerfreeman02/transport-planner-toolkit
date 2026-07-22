@@ -6,12 +6,13 @@
   <meta name="theme-color" content="#173f5f">
   <title>Railway Assessment — Transport Planner Toolkit</title>
   <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css?build=RAIL-4.6.0-20260716">
-  <link rel="stylesheet" href="assets/css/railway.css?build=RAIL-4.10.0-20260722">
+  <link rel="stylesheet" href="assets/css/railway.css?build=RAIL-4.10.1-20260722">
   <link rel="stylesheet" href="assets/css/rail-4.2.css?build=RAIL-4.6.0-20260716">
   <link rel="stylesheet" href="../../assets/css/tpt-theme.css?build=TPT-THEME-1.0.0-20260716">
+  <link rel="stylesheet" href="../../assets/css/research-workflow.css?build=RESEARCH-WORKFLOW-101-20260722">
 </head>
 <body>
-<header class="app-header"><div><a class="home" href="../../">← Toolkit home</a><p class="eyebrow">Transport Planner Toolkit</p><h1>Railway Assessment</h1><p class="subtitle">Map, service, evidence and Word export · <strong id="buildLabel">RAIL-4.10.0-20260722</strong></p></div><button id="diagBtn" class="button ghost">Diagnostics</button></header>
+<header class="app-header"><div><a class="home" href="../../">← Toolkit home</a><p class="eyebrow">Transport Planner Toolkit</p><h1>Railway Assessment</h1><p class="subtitle">Map, service, evidence and Word export · <strong id="buildLabel">RAIL-4.10.1-20260722</strong></p></div><button id="diagBtn" class="button ghost">Diagnostics</button></header>
 <nav class="tabs" aria-label="Railway module sections">
   <button class="tab active" data-tab="assessment" aria-selected="true">Assessment</button>
   <button class="tab" data-tab="sources" aria-selected="false">Sources</button>
@@ -29,15 +30,15 @@
   <section class="panel"><div class="heading"><div><h2>Sources register</h2><p class="note">One consolidated register for the evidence used in this assessment.</p></div></div><div id="sourcesEmpty" class="empty-state">Run an assessment or import researched records to populate sources.</div><div class="table-scroll"><table id="sourcesTable" hidden><thead><tr><th>Station</th><th>Information</th><th>Source</th><th>Retrieved</th><th>Status</th></tr></thead><tbody id="sourcesBody"></tbody></table></div></section>
 </div>
 <div class="tab-page" data-page="research" hidden>
-  <section class="panel"><h2>Safe Railway research plan</h2><p>Safe research batch sizes are enforced for accuracy and reliability. They are Toolkit operational limits, not guaranteed ChatGPT account limits. Upload one batch at a time to a fresh ChatGPT conversation.</p><div id="railBatchPlan" class="rail-publish-preview" aria-live="polite"></div><div class="actions"><button id="redownloadResearch" class="button secondary" disabled>Re-download current batch</button><button id="downloadCorrection" class="button secondary" disabled>Download targeted correction request</button></div><div id="railImportProgress" class="message" role="status" aria-live="polite">No research file selected.</div><div id="railResearchErrors" class="rail-publish-preview" aria-live="assertive" hidden></div></section>
+  <section class="panel"><h2>Complete station service research</h2><p>Follow the highlighted next action. The Toolkit keeps each passing station and asks only for corrections still needed.</p><div id="railBatchPlan" class="rail-publish-preview" aria-live="polite"></div><div class="guided-primary"><button id="railPrimaryAction" class="button" disabled>Select stations in the assessment</button></div><details class="research-advanced"><summary>Advanced and repeat actions</summary><div class="actions"><button id="redownloadResearch" class="button secondary" disabled>Download the current request again</button><button id="downloadCorrection" class="button secondary" disabled>Download correction request</button></div></details><div id="railImportProgress" class="message" role="status" aria-live="polite">Waiting for station selection.</div><div id="railResearchErrors" class="rail-publish-preview" aria-live="assertive" hidden></div></section>
   <section class="panel"><h2>Assisted station research</h2><p>Download the request and attach it to a new ChatGPT conversation. No additional prompt is required: the document tells ChatGPT to research every station and return the completed file for import here.</p><div class="actions"><button id="exportResearch" class="button">Download research request for ChatGPT</button><label class="button secondary file-button">Import completed research<input id="importResearch" type="file" accept=".json,application/json" hidden></label><button id="publishShared" class="button secondary">Publish selected saved proposals</button><button id="refreshShared" class="button secondary">Refresh Shared Rail Library</button></div><p class="note">Select individual eligible local proposals. Blocked and unrelated records remain safely local.</p><div id="railProposalList" class="rail-proposal-list" aria-live="polite"></div><div id="railPublishPreview" class="rail-publish-preview" hidden></div><div id="railPublishResult" class="rail-publish-result" hidden></div><p id="sharedPublishMessage" class="message" role="status">Checking the Toolkit shared-library connection…</p></section>
   <section class="panel"><h2>Rail Knowledge Library</h2><p id="knowledgeStatus" class="note"></p><div id="sharedRailStatus" class="library-status-grid" aria-live="polite"></div><p class="note">Verified newer evidence is protected when older or unverified records are merged. Local Railway records remain in this browser after publication.</p><div class="actions"><button id="exportKnowledge" class="button secondary">Export library</button><label class="button secondary file-button">Import / merge library<input id="importKnowledge" type="file" accept=".json,application/json" hidden></label><button id="backupKnowledge" class="button secondary">Download backup</button><button id="clearKnowledge" class="button danger">Clear library</button></div></section>
 </div>
 <dialog id="diag"><div class="dialog-head"><h2>Diagnostics</h2><button id="closeDiag">×</button></div><pre id="diagOut"></pre></dialog>
 </main>
 <script src="assets/vendor/leaflet/leaflet.js?build=RAIL-4.6.0-20260716&amp;runtime=1.9.4-full"></script>
-<script src="../../assets/js/research-quality.js?build=RESEARCH-QUALITY-110-20260722"></script>
-<script src="../../assets/js/research-workflow.js?build=RESEARCH-WORKFLOW-100-20260722"></script>
+<script src="../../assets/js/research-quality.js?build=RESEARCH-QUALITY-111-20260722"></script>
+<script src="../../assets/js/research-workflow.js?build=RESEARCH-WORKFLOW-101-20260722"></script>
 <script src="../../assets/js/shared-library.js?build=SHARED-LIB-1.5.0-20260722&amp;asset=10"></script>
-<script type="module" src="assets/js/railway.js?build=RAIL-4.10.0-20260722"></script>
+<script type="module" src="assets/js/railway.js?build=RAIL-4.10.1-20260722"></script>
 </body></html>

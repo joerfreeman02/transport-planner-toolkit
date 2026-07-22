@@ -1,3 +1,9 @@
+# Toolkit 2.6.1 corrective production release
+
+Builds: `TPT-2.6.1-20260722`, `DASH-1.4.0-20260722`, `RAIL-4.10.1-20260722`, `BUS-PROD-171-20260722`, `LIB-1.2.1-20260722`, `SHARED-LIB-1.5.0-20260722`, `RESEARCH-QUALITY-1.1.1-20260722`, `RESEARCH-WORKFLOW-1.0.1-20260722`.
+
+This corrective pass makes Rail TPH completeness mandatory, preserves passing Rail records during partial imports, separates Bus discovery from completed service data, validates exact staged-batch identity, and presents one guided next action. Shared Knowledge Library data files are unchanged.
+
 # Toolkit 2.6.0 production release
 
 Builds: `TPT-2.6.0-20260722`, `DASH-1.4.0-20260722`, `RAIL-4.10.0-20260722`, `BUS-PROD-170-20260722`, `LIB-1.2.0-20260722`, `SHARED-LIB-1.5.0-20260722`, `RESEARCH-QUALITY-1.1.0-20260722`.

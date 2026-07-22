@@ -1,0 +1,5 @@
+.guided-research{display:grid;gap:.65rem;margin:1rem 0;padding:0;list-style:none}
+.guided-research li{border-left:4px solid #aab6bf;background:#f5f7f8;padding:.7rem .85rem}
+.guided-research li.complete{border-color:#218739}.guided-research li.next{border-color:#e2a400;background:#fff8df}.guided-research li.correction{border-color:#b72b36;background:#fff0f1}
+.guided-research .state{display:block;font-weight:800;letter-spacing:.02em}.guided-primary{margin:.75rem 0}.guided-primary button{font-size:1.05rem;font-weight:800;padding:.8rem 1.2rem}
+.research-advanced{margin-top:.75rem}.research-advanced summary{cursor:pointer;font-weight:700}.research-pending{border-left:4px solid #e2a400;padding:.75rem;background:#fff8df;margin-top:1rem}

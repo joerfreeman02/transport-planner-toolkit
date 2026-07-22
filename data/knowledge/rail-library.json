@@ -1,8 +1,8 @@
 {
   "schema": "tpt-rail-knowledge-v3",
   "version": 2,
-  "libraryBuild": "SHARED-LIB-1.3.0-20260717",
-  "updatedAt": "2026-07-20T11:55:15.101Z",
+  "libraryBuild": "SHARED-LIB-1.4.1-20260722",
+  "updatedAt": "2026-07-22T12:52:21.038Z",
   "records": [
     {
       "schema": "tpt-rail-knowledge-v3",
@@ -635,42 +635,46 @@
         "manager": {
           "value": "Greater Anglia",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Ware (Herts) Train Station Information",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Ware (Herts) Station",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "",
+          "publisher": "National Rail"
         },
         "operators": {
           "value": "Greater Anglia",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Ware (Herts) Train Station Information",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Ware (Herts) Station",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": "Current station operator and passenger train operator for the regular services described."
+          "notes": "Current station operator and passenger train operator for the regular services described.",
+          "publisher": "National Rail"
         },
         "lines": {
           "value": "Hertford East line (West Anglia route)",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/timetables",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Greater Anglia current timetables",
-          "sourceType": "official_timetable",
-          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
-          "notes": "Route description checked against the applicable official timetable tables."
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Route description checked against the applicable official timetable tables.",
+          "publisher": "Greater Anglia"
         },
         "frequencyTotal": {
           "value": 4,
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/timetables",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Greater Anglia current timetables",
-          "sourceType": "official_timetable",
-          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
-          "notes": "Typical weekday daytime actual departures in both directions combined; overlapping destination descriptions are not double-counted."
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Typical weekday daytime actual departures in both directions combined; overlapping destination descriptions are not double-counted.",
+          "publisher": "Greater Anglia"
         },
         "frequencyByDestination": {
           "value": [
@@ -688,131 +692,143 @@
             }
           ],
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/timetables",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Greater Anglia current timetables",
-          "sourceType": "official_timetable",
-          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
-          "notes": "Direct-service TPH. A service appearing against an intermediate and final destination represents one departure and must not be added twice."
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Direct-service TPH. A service appearing against an intermediate and final destination represents one departure and must not be added twice.",
+          "publisher": "Greater Anglia"
         },
         "servicePattern": {
           "value": "Typical Monday-Friday daytime: 2 tph direct to London Liverpool Street and 2 tph direct to Hertford East (4 departures per hour in total). Peak, evening and weekend patterns vary.",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/timetables",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Greater Anglia current timetables",
-          "sourceType": "official_timetable",
-          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
-          "notes": ""
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "",
+          "publisher": "Greater Anglia"
         },
         "frequency": {
           "value": "4 tph total (typical Monday-Friday daytime, both directions combined)",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/timetables",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Greater Anglia current timetables",
-          "sourceType": "official_timetable",
-          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
-          "notes": "Actual station departures, not a sum of overlapping destination opportunities."
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Actual station departures, not a sum of overlapping destination opportunities.",
+          "publisher": "Greater Anglia"
         },
         "destinations": {
           "value": "Direct typical daytime services to London Liverpool Street southbound and Hertford East northbound, serving intermediate Hertford East line stations shown in the current timetable.",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/timetables",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Greater Anglia current timetables",
-          "sourceType": "official_timetable",
-          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
-          "notes": ""
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "",
+          "publisher": "Greater Anglia"
         },
         "journeyOpportunities": {
           "value": "Direct London Liverpool Street and Hertford East services. Interchange opportunities include Tottenham Hale for the London Underground Victoria line and Broxbourne for Cambridge/Bishop’s Stortford corridor services; these are not counted as direct destination TPH.",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/timetables",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Greater Anglia current timetables",
-          "sourceType": "official_timetable",
-          "timetablePeriod": "Greater Anglia timetable valid from 17 May 2026",
-          "notes": "Direct services are explicitly distinguished from interchange opportunities."
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Direct services are explicitly distinguished from interchange opportunities.",
+          "publisher": "Greater Anglia"
         },
         "cycleParking": {
           "value": "30 cycle spaces; racks; not sheltered; cycle-storage CCTV available.",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Ware (Herts) Train Station Information",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Ware (Herts) Station",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "",
+          "publisher": "National Rail"
         },
         "stepFree": {
           "value": "Step-free access to the single platform. ORR category A.",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Ware (Herts) Train Station Information",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Ware (Herts) Station",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "",
+          "publisher": "National Rail"
         },
         "ticketing": {
           "value": "Ticket office: Monday-Friday 06:15-19:45; Saturday 07:15-19:45; Sunday 09:15-16:30. Ticket machine and pre-purchase collection available. Oyster and smartcard facilities are listed by the operator.",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Ware (Herts) Train Station Information",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Ware (Herts) Station",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "",
+          "publisher": "National Rail"
         },
         "waiting": {
           "value": "Heated waiting room on platform 1 with accessible seating: Monday-Saturday 06:00-19:30; Sunday 09:00-16:30. Coffee shop/vending facilities are listed.",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Ware (Herts) Train Station Information",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Ware (Herts) Station",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "",
+          "publisher": "National Rail"
         },
         "toilets": {
           "value": "No toilets; no National Key toilets.",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Ware (Herts) Train Station Information",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Ware (Herts) Station",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "",
+          "publisher": "National Rail"
         },
         "carParking": {
           "value": "Station Car Park operated by National Car Parks Ltd: 94 spaces; open 24 hours Monday-Sunday. A separately listed premium-bay area is also shown on the official page.",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Ware (Herts) Train Station Information",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Ware (Herts) Station",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "",
+          "publisher": "National Rail"
         },
         "notes": {
           "value": "Single-platform station. Coffee shop and vending facilities are listed on the current official station page.",
           "status": "verified",
-          "source": "https://www.greateranglia.co.uk/travel-information/station-information/war",
-          "retrievalDate": "2026-07-16",
-          "sourceTitle": "Ware (Herts) Train Station Information",
+          "source": "https://www.nationalrail.co.uk/stations/ware-herts/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Ware (Herts) Station",
           "sourceType": "official_station_page",
           "timetablePeriod": "",
-          "notes": ""
+          "notes": "",
+          "publisher": "National Rail"
         }
       },
       "createdAt": "2026-07-16T13:31:43.243Z",
-      "updatedAt": "2026-07-17T14:54:06.498Z",
+      "updatedAt": "2026-07-22T12:52:21.038Z",
       "reviewFlags": [],
-      "editorName": "Joe Freeman",
-      "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "editorName": "Test",
+      "originatingModuleBuild": "RAIL-4.9.1-20260722",
       "previousRevision": {
-        "updatedAt": "2026-07-16T13:37:04.549Z",
+        "updatedAt": "2026-07-17T14:54:06.498Z",
         "editorName": "Joe Freeman"
       }
     },
@@ -13706,6 +13722,648 @@
       "reviewFlags": [],
       "editorName": "Joe Freeman",
       "originatingModuleBuild": "RAIL-4.8.0-20260717",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6137915985",
+      "canonicalName": "Hertford East",
+      "name": "Hertford East",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.7993962,
+        "lon": -0.0717505
+      },
+      "identifiers": {
+        "crs": "HFE",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6137915985"
+      },
+      "fields": {
+        "manager": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-east/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford East Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "operators": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-east/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford East Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "lines": {
+          "value": "Hertford East line (West Anglia route)",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "The direct official timetable PDF is route-specific and identifies the Hertford East–Broxbourne–London Liverpool Street corridor.",
+          "publisher": "Greater Anglia"
+        },
+        "frequencyTotal": {
+          "value": 2,
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Typical Monday-Friday daytime departures from Hertford East, derived from the direct official route timetable. Arrivals are not counted as departures.",
+          "publisher": "Greater Anglia"
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "London Liverpool Street",
+              "direction": "southbound",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Direct-service TPH derived from the route-specific official timetable. Overlapping destination descriptions are not double-counted.",
+          "publisher": "Greater Anglia"
+        },
+        "servicePattern": {
+          "value": "Typical Monday-Friday daytime: 2 tph direct to London Liverpool Street. Some peak, evening and weekend services vary, including occasional Stratford workings.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Typical weekday daytime pattern derived from the direct official timetable; peak, evening and weekend patterns may vary.",
+          "publisher": "Greater Anglia"
+        },
+        "frequency": {
+          "value": "2 tph total (typical Monday-Friday daytime departures)",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Actual station departures derived from the direct official timetable, not a sum of overlapping journey opportunities.",
+          "publisher": "Greater Anglia"
+        },
+        "destinations": {
+          "value": "Direct typical daytime services to London Liverpool Street, serving intermediate Hertford East line stations including Ware, St Margarets, Rye House, Broxbourne and stations through the Lea Valley.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Direct destinations and intermediate route stations are taken from the route-specific official timetable.",
+          "publisher": "Greater Anglia"
+        },
+        "journeyOpportunities": {
+          "value": "Direct services towards London Liverpool Street. Interchange opportunities include Broxbourne for Cambridge, Bishop’s Stortford and Stansted Airport corridor services, and Tottenham Hale for the London Underground Victoria line.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42376/download?inline=",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Train Timetable 11: Hertford East and Broxbourne to London Liverpool Street",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Direct services are distinguished from interchange opportunities; interchange destinations are not counted as direct TPH.",
+          "publisher": "Greater Anglia"
+        },
+        "cycleParking": {
+          "value": "30 cycle spaces; stands and racks on the station concourse; not sheltered; CCTV coverage listed.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-east/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford East Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "stepFree": {
+          "value": "Step-free access to all platforms; ORR category A. Assistance meeting point at the ticket office.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-east/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford East Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "ticketing": {
+          "value": "Ticket office: Monday-Friday 07:15-18:00; Saturday 07:40-14:30; Sunday closed. Ticket machine, pre-purchase collection, Oyster top-up and smartcard facilities are available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-east/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford East Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "waiting": {
+          "value": "No enclosed waiting room; seated area available. Coffee shop and vending machine are listed.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-east/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford East Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "toilets": {
+          "value": "No standard public toilets are listed. A National Key accessible toilet is listed as available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-east/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford East Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "The operator page separately states 'Toilets: No' and 'National Key toilets available: Yes'; this wording preserves both entries.",
+          "publisher": "National Rail"
+        },
+        "carParking": {
+          "value": "Station Car Park operated by National Car Parks Ltd: 15 spaces; open 24 hours Monday-Sunday.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-east/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford East Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "notes": {
+          "value": "Part-time staffed terminus with two platforms, CCTV, Wi-Fi, departure screens, taxi provision and PlusBus availability.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-east/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford East Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        }
+      },
+      "createdAt": "2026-07-22T12:42:31.217Z",
+      "updatedAt": "2026-07-22T12:52:21.038Z",
+      "reviewFlags": [],
+      "editorName": "Test",
+      "originatingModuleBuild": "RAIL-4.9.1-20260722",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6291571393",
+      "canonicalName": "Hertford North",
+      "name": "Hertford North",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.7986797,
+        "lon": -0.0922384
+      },
+      "identifiers": {
+        "crs": "HFN",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6291571393"
+      },
+      "fields": {
+        "manager": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-north/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "operators": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-north/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "lines": {
+          "value": "Hertford Loop Line; Great Northern Northern City route",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/hertford-north-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "",
+          "publisher": "Great Northern"
+        },
+        "frequencyTotal": {
+          "value": 4,
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/hertford-north-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "Typical weekday daytime actual departures in both directions combined.",
+          "publisher": "Great Northern"
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Moorgate",
+              "direction": "southbound",
+              "tph": 2,
+              "direct": true
+            },
+            {
+              "destination": "Stevenage",
+              "direction": "northbound",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/hertford-north-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "",
+          "publisher": "Great Northern"
+        },
+        "servicePattern": {
+          "value": "Typical Monday-Friday daytime: 2 tph direct to Moorgate and 2 tph direct to Stevenage (4 departures per hour in total). Late-evening and weekend London terminals may vary.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/hertford-north-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "",
+          "publisher": "Great Northern"
+        },
+        "frequency": {
+          "value": "4 tph total (typical Monday-Friday daytime, both directions combined)",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/hertford-north-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "",
+          "publisher": "Great Northern"
+        },
+        "destinations": {
+          "value": "Direct typical daytime services southbound to Moorgate and northbound to Stevenage, serving intermediate stations on the Hertford Loop.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/hertford-north-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "",
+          "publisher": "Great Northern"
+        },
+        "journeyOpportunities": {
+          "value": "Direct London Moorgate and Stevenage services. Interchange is available at Finsbury Park for London Underground and wider National Rail services, and at Stevenage for East Coast Main Line services towards Cambridge, Peterborough and the north.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/hertford-north-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "Interchange opportunities are not counted as direct destination TPH.",
+          "publisher": "Great Northern"
+        },
+        "cycleParking": {
+          "value": "76 cycle spaces; stands; sheltered; located by the station entrance.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-north/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "stepFree": {
+          "value": "ORR category B3: step-free access to the booking office and platforms 2 and 3; steps to platform 1, which is used by some London trains. Lift serves platforms 2 and 3.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-north/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "ticketing": {
+          "value": "Ticket office: Monday-Friday 06:40-19:00; Saturday 07:45-14:10; Sunday closed. Ticket machines, pre-purchase collection, smartcard and contactless facilities are available; Oyster top-up is available at the machine.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-north/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "waiting": {
+          "value": "Sheltered waiting is available, with waiting rooms on platform 1 and on platforms 2/3. Refreshment and shop facilities are listed.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-north/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "toilets": {
+          "value": "Male and female toilets are available on platforms 2/3; an accessible toilet is listed.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-north/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "carParking": {
+          "value": "Station Car Park: 122 spaces; controlled by automatic number plate recognition. Free parking arrangements apply for Blue Badge holders subject to registration and display requirements.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-north/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "notes": {
+          "value": "Full-time staffed station with CCTV, customer information screens, announcements, refreshments, a shop and taxi provision.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/hertford-north/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Hertford North Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        }
+      },
+      "createdAt": "2026-07-22T12:42:31.718Z",
+      "updatedAt": "2026-07-22T12:52:21.038Z",
+      "reviewFlags": [],
+      "editorName": "Test",
+      "originatingModuleBuild": "RAIL-4.9.1-20260722",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/6291570883",
+      "canonicalName": "Bayford",
+      "name": "Bayford",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 51.7579011,
+        "lon": -0.0957274
+      },
+      "identifiers": {
+        "crs": "BAY",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/6291570883"
+      },
+      "fields": {
+        "manager": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/bayford/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "operators": {
+          "value": "Great Northern",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/bayford/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "lines": {
+          "value": "Hertford Loop Line; Great Northern Northern City route",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/bayford-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "",
+          "publisher": "Great Northern"
+        },
+        "frequencyTotal": {
+          "value": 4,
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/bayford-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "Typical weekday daytime departures in both directions combined.",
+          "publisher": "Great Northern"
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Moorgate",
+              "direction": "southbound",
+              "tph": 2,
+              "direct": true
+            },
+            {
+              "destination": "Stevenage",
+              "direction": "northbound",
+              "tph": 2,
+              "direct": true
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/bayford-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "",
+          "publisher": "Great Northern"
+        },
+        "servicePattern": {
+          "value": "Typical Monday-Friday daytime: 2 tph direct to Moorgate and 2 tph direct to Stevenage (4 departures per hour in total). Late-evening and weekend London terminals may vary.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/bayford-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "",
+          "publisher": "Great Northern"
+        },
+        "frequency": {
+          "value": "4 tph total (typical Monday-Friday daytime, both directions combined)",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/bayford-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "",
+          "publisher": "Great Northern"
+        },
+        "destinations": {
+          "value": "Direct typical daytime services southbound to Moorgate and northbound to Stevenage, serving intermediate stations on the Hertford Loop.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/bayford-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "",
+          "publisher": "Great Northern"
+        },
+        "journeyOpportunities": {
+          "value": "Direct London Moorgate and Stevenage services. Interchange is available at Finsbury Park for London Underground and wider National Rail services, and at Stevenage for East Coast Main Line services.",
+          "status": "verified",
+          "source": "https://www.greatnorthernrail.com/journey/bayford-to-moorgate",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford to Moorgate",
+          "sourceType": "official_station_to_destination_service_page",
+          "timetablePeriod": "Current weekday service information retrieved 22 July 2026",
+          "notes": "Interchange opportunities are not counted as direct destination TPH.",
+          "publisher": "Great Northern"
+        },
+        "cycleParking": {
+          "value": "10 cycle spaces; stands/rack in the car park; not sheltered; CCTV coverage listed.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/bayford/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Cross-checked against National Rail and other operator-published station data.",
+          "publisher": "National Rail"
+        },
+        "stepFree": {
+          "value": "ORR category B3: step-free access to platform 1 (towards London) via a ramp from the car park; steps to platform 2 (towards Hertford North/Stevenage).",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/bayford/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "ticketing": {
+          "value": "No ticket office. Ticket machine and pre-purchase collection are available; smartcard validation is available.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/bayford/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "waiting": {
+          "value": "Sheltered waiting and seating are available, but no enclosed waiting room or refreshment facilities are listed.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/bayford/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "toilets": {
+          "value": "No toilets, accessible toilets, baby-changing or Changing Places facilities are listed.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/bayford/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "carParking": {
+          "value": "Station car park: 50 spaces; open 24 hours Monday-Sunday.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/bayford/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        },
+        "notes": {
+          "value": "Unstaffed station with CCTV and customer information screens. Passenger assistance is provided via help points and the onboard team.",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/bayford/",
+          "retrievalDate": "2026-07-22",
+          "sourceTitle": "Bayford Station",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "National Rail"
+        }
+      },
+      "createdAt": "2026-07-22T12:42:32.719Z",
+      "updatedAt": "2026-07-22T12:52:21.038Z",
+      "reviewFlags": [],
+      "editorName": "Test",
+      "originatingModuleBuild": "RAIL-4.9.1-20260722",
       "previousRevision": null
     }
   ]

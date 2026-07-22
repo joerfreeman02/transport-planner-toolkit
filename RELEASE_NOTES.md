@@ -31,3 +31,6 @@ Known limitations:
 # Toolkit 2.4.0 — Library Manager
 
 The Dashboard now opens a minimum safe Library Manager for the three shared transport libraries. Shared records remain readable without a token; maintenance stays local until reviewed and published using the existing Toolkit GitHub connection. Bus Stop records link directly to unambiguous composite Bus Route records. Research requests are mode-specific and generic “check website/timetable” responses are blocked from verified imports.
+# Toolkit 2.5.0 — Research quality and validation
+
+Railway and Bus research exports now carry one shared self-contained authoritative-source standard. Completed imports reject instructional placeholders, quarantine fully audited unresolved findings for review, accept sourced factual negatives, and block incomplete or ambiguous proposals from Shared Library publication.

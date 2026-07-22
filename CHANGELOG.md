@@ -78,3 +78,8 @@
 - Added the Dashboard Library Manager for read-only shared Rail, Bus Stop and Bus Route browsing, complete record inspection, search/filter, CSV/JSON export, local edit/clear/import review, controlled publishing and single-record deletion.
 - Added exact-stop route navigation with composite Bus route identity and ambiguity protection for duplicate route numbers.
 - Strengthened Railway and Bus research instructions and rejected generic placeholder research during completed Rail import and Library Manager review.
+# 2.5.0 — 2026-07-22
+
+- Added one shared mode-specific research standard for Railway, Bus Assessment and Library Manager exports.
+- Added field-level placeholder, evidence, exhaustive-unresolved and route-identity validation with quality classifications and publication blockers.
+- Preserved legacy record loading and all shared master contents while preventing unsuitable new verified proposals.

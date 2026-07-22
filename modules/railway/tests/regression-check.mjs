@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {REQUEST_SCHEMA,COMPLETED_SCHEMA,FIELD_KEYS,buildResearchRequest,makeRecord,validateCompleted,mergeRecord,matchRecord,completedRecord,deduplicateDiscoveredStations} from '../assets/js/rail-knowledge.js';
+import {REQUEST_SCHEMA,COMPLETED_SCHEMA,FIELD_KEYS,buildResearchRequest,makeRecord,validateCompleted,validateRequestedRecords,mergeRecord,matchRecord,completedRecord,deduplicateDiscoveredStations} from '../assets/js/rail-knowledge.js';
 const here=path.dirname(fileURLToPath(import.meta.url)),root=path.resolve(here,'..');
 const read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const request=JSON.parse(read('tests/fixtures/sample-research-request.json'));
@@ -16,7 +16,9 @@ for(const k of ['frequencyTotal','frequencyByDestination','servicePattern','jour
 test('completed sample validates',()=>assert.equal(validateCompleted(completed),true));
 test('nested existingRecord completed layout validates and normalises',()=>{const base=structuredClone(completed.records[0]);base.identifiers={crs:'',naptan:'',tfl:'',other:'',osm:''};const nested={stationName:base.canonicalName,canonicalName:base.canonicalName,mode:base.mode,coordinates:base.coordinates,osm:{identifier:'node/123'},identifiers:{crs:'ABC',naptan:'9100ABC',tfl:'',other:'verified-id',osm:''},existingRecord:base};const envelope={schema:COMPLETED_SCHEMA,version:2,records:[nested]};assert.equal(validateCompleted(envelope),true);const n=completedRecord(nested);assert.ok(n.fields.manager);assert.equal(n.identifiers.crs,'ABC');assert.equal(n.identifiers.naptan,'9100ABC');assert.equal(n.identifiers.other,'verified-id');assert.equal(n.identifiers.osm,'node/123')});
 test('invalid schema is rejected',()=>assert.throws(()=>validateCompleted({...completed,schema:'bad'})));
+test('unrequested station research is rejected',()=>{const selected=[{name:'Example Central',mode:'National Rail',crs:'EXC',osmId:'node/1001'}];assert.equal(validateRequestedRecords({...completed,records:[completed.records[0]]},selected),true);assert.throws(()=>validateRequestedRecords({...completed,records:[completed.records[1]]},selected),/not selected/)});
 test('verified field requires source/date',()=>{const x=structuredClone(completed);x.records[0].fields.manager.source='';assert.throws(()=>validateCompleted(x))});
+test('new quality profile requires source title and publisher',()=>{const x=structuredClone(completed);x.researchQualityProfile=globalThis.TPTResearchQuality.build;assert.throws(()=>validateCompleted(x),/source title|source publisher/)});
 test('older verified data does not overwrite newer verified data',()=>{const a=makeRecord({name:'A',mode:'National Rail',crs:'AAA'}),b=makeRecord({name:'A',mode:'National Rail',crs:'AAA'});a.fields.manager={value:'New',status:'verified',source:'s',retrievalDate:'2026-07-14'};b.fields.manager={value:'Old',status:'verified',source:'s',retrievalDate:'2025-01-01'};assert.equal(mergeRecord(a,b).fields.manager.value,'New')});
 test('reliable identifier matching has priority',()=>{const a=makeRecord({name:'Different',mode:'National Rail',crs:'ABC'});assert.equal(matchRecord({[a.key]:a},{name:'Other',mode:'National Rail',crs:'ABC',lat:0,lon:0}),a)});
 test('duplicate mapped features collapse to one station',()=>{const stations=[{name:'Example Station',mode:'National Rail',lat:51.5,lon:-.12,osmId:'node/1',crs:'EXM',straight:100,tags:{name:'Example Station'}},{name:'Example railway station',mode:'National Rail',lat:51.5004,lon:-.1204,osmId:'way/2',crs:'EXM',straight:105,tags:{name:'Example railway station',railway:'station'}}];const result=deduplicateDiscoveredStations(stations);assert.equal(result.length,1);assert.equal(result[0].crs,'EXM')});
@@ -30,5 +32,5 @@ test('sources and research workflows are separated from assessment',()=>{const h
 test('station save provides an accessible visible confirmation',()=>{const h=read('index.html'),j=read('assets/js/railway.js');assert.match(j,/Saved to the local Rail overlay/);assert.match(j,/station-save-status/);assert.match(h,/aria-live="polite"/)});
 test('Word-ready export controls and shared formatter remain present',()=>{const h=read('index.html'),j=read('assets/js/railway.js');assert.match(h,/id="downloadWordBtn"/);assert.match(h,/Copy Word tables/);assert.match(j,/railwayWordTables/);assert.match(j,/word-export\.js/)});
 test('final Sprint 3 Railway export fields are present',()=>{const h=read('index.html'),j=read('assets/js/railway.js');assert.ok(h.includes('Download directional TPH'));['Step-free access','Service pattern:','Journey opportunities:','railwayTphTables'].forEach(x=>assert.ok(j.includes(x)))});
-test('build label is visible',()=>assert.ok(read('index.html').includes('RAIL-4.8.0-20260717')));
+test('build label is visible',()=>assert.ok(read('index.html').includes('RAIL-4.9.0-20260722')));
 let passed=0;for(const [name,fn] of tests){try{await fn();console.log(`PASS ${name}`);passed++}catch(e){console.error(`FAIL ${name}: ${e.message}`);process.exitCode=1}}console.log(`\n${passed}/${tests.length} tests passed`);

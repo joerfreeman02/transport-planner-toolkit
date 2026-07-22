@@ -1,0 +1,21 @@
+{
+  "schema": "tpt-rail-research-completed-v2",
+  "version": 2,
+  "records": [
+    {
+      "canonicalName": "Abbey Road",
+      "name": "Abbey Road",
+      "mode": "DLR",
+      "coordinates": { "lat": 51.5325414, "lon": 0.0036092 },
+      "identifiers": { "crs": "", "naptan": "940GZZDLABR", "tfl": "940GZZDLABR", "other": "", "osm": "node/5469584669" },
+      "fields": {
+        "cycleParking": {
+          "value": "See the TfL website for cycle parking information.",
+          "status": "verified",
+          "source": "https://tfl.gov.uk/dlr/stop/940GZZDLABR/abbey-road-dlr-station",
+          "retrievalDate": "2026-07-22"
+        }
+      }
+    }
+  ]
+}

@@ -1,4 +1,10 @@
-# Toolkit 2.1.0 production release
+# Toolkit 2.6.0 production release
+
+Builds: `TPT-2.6.0-20260722`, `DASH-1.4.0-20260722`, `RAIL-4.10.0-20260722`, `BUS-PROD-170-20260722`, `LIB-1.2.0-20260722`, `SHARED-LIB-1.5.0-20260722`, `RESEARCH-QUALITY-1.1.0-20260722`.
+
+This release completes safe, resumable, mode-specific Rail and Bus research workflows. It adds field-level Railway correction requests, staged Bus discovery/service batches, explicit incomplete-data handling, assessment-specific status, persistent review decisions and confirmed-only publication cleanup. Accessibility, STATS19, accepted mapping/routing, exports and shared-master content remain unchanged.
+
+## Previous release: Toolkit 2.1.0
 
 > Toolkit 2.3.0 is a deployed review build introducing EAS corporate browser theming, coordinate-only Google Maps verification and Copy coordinates controls. It remains unmerged pending workstation acceptance.
 

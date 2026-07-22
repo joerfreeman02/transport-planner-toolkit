@@ -1,5 +1,11 @@
 # Changelog
 
+## RAIL-4.10.0-20260722
+
+- Enforced five-station safe research batches with persistent batch progress.
+- Added grouped field-evidence errors and one targeted correction request for all blockers in a batch.
+- Kept selected-record publication and exact post-publication verification intact.
+
 ## RAIL-4.5.0-20260716
 
 - Added in-module shared publication, refresh and status reporting.

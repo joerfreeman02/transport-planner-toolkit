@@ -1,5 +1,13 @@
 # Changelog
 
+## Toolkit 2.6.0 research workflow assurance — 2026-07-22
+
+- Enforced deterministic Railway batches of no more than five stations with persistent progress and targeted correction requests.
+- Replaced oversized Bus research with staged stop-discovery and route/service batches capped at one stop pair or two standalone stops, four composite routes and eight relationships.
+- Aligned Rail, Bus and Library Manager prompts with field-level direct-evidence validation; corrected missing/no-service semantics.
+- Added assessment-scoped status, persisted review choices, exact publication receipts and confirmed-only proposal cleanup.
+- Replaced Dashboard bulk Rail publication with navigation to Railway publication review. Shared masters were not changed.
+
 ## Toolkit 2.3.0 corporate-theme review — 2026-07-16
 
 - Standardised Dashboard, Accessibility, Railway and Bus on the EAS orange, grey and white export colourway.

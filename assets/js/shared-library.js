@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  var BUILD='SHARED-LIB-1.4.1-20260722',REPO='joerfreeman02/transport-planner-toolkit',API='https://api.github.com/repos/'+REPO+'/contents/',PAGES='https://joerfreeman02.github.io/transport-planner-toolkit/',TOKEN_KEY='tpt.github.token.v1',EDITOR_KEY='tpt.github.editor.v1',STATUS_KEY='tpt.github.status.v1',CACHE_PREFIX='tpt.shared.master.v1.';
+  var BUILD='SHARED-LIB-1.5.0-20260722',REPO='joerfreeman02/transport-planner-toolkit',API='https://api.github.com/repos/'+REPO+'/contents/',PAGES='https://joerfreeman02.github.io/transport-planner-toolkit/',TOKEN_KEY='tpt.github.token.v1',EDITOR_KEY='tpt.github.editor.v1',STATUS_KEY='tpt.github.status.v1',CACHE_PREFIX='tpt.shared.master.v1.';
   var PATHS={rail:'data/knowledge/rail-library.json',busStops:'data/knowledge/bus-stop-library.json',busRoutes:'data/knowledge/bus-route-library.json',busStopRoutes:'data/knowledge/bus-stop-route-library.json'},ALLOWLIST=new Set(Object.values(PATHS)),memory={token:'',editor:'',user:'',lastRefresh:'',masters:null};
   function store(){return localStorage.getItem(TOKEN_KEY)?localStorage:sessionStorage;}
   function readSecret(){return memory.token||sessionStorage.getItem(TOKEN_KEY)||localStorage.getItem(TOKEN_KEY)||'';}

@@ -1,5 +1,11 @@
 # Bus Assessment changelog
 
+## BUS-1.7.0 — 22 July 2026
+
+- Added staged stop-discovery and route/service research with deterministic safe limits.
+- Restricted requests to assessment-relevant records and displayed request size.
+- Corrected blank/no-service semantics, persisted inclusion state and added exact confirmed publication receipts.
+
 ## BUS-1.2.0 — 16 July 2026
 
 - Added address, coordinate, empty-map click and draggable-marker site confirmation.

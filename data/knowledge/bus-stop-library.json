@@ -1,15 +1,15 @@
 {
   "schema": "tpt.bus-stop-library",
   "version": "1.0.0",
-  "libraryBuild": "SHARED-LIB-1.3.0-20260717",
-  "updatedAt": "2026-07-17T14:44:03.052Z",
+  "libraryBuild": "SHARED-LIB-1.5.0-20260722",
+  "updatedAt": "2026-07-22T17:21:22.398Z",
   "records": [
     {
       "naptanCode": "490011045S",
       "fallbackIdentity": "",
       "stopName": "Balaam Street",
-      "locality": "",
-      "direction": "Stop S",
+      "locality": "Plaistow",
+      "direction": "Stop S – towards Newham General Hospital",
       "pairedStopGroup": "S",
       "coordinates": {
         "latitude": 51.5296166,
@@ -24,25 +24,39 @@
           "title": "Balaam Street bus stop",
           "url": "https://tfl.gov.uk/bus/stop/490011045S/balaam-street",
           "publisher": "Transport for London",
-          "retrievalDate": "2026-07-16"
+          "retrievalDate": "2026-07-22"
         }
       ],
-      "retrievalDate": "2026-07-16",
+      "retrievalDate": "2026-07-22",
       "verificationStatus": "verified",
-      "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-17T14:35:01.626Z",
-      "originatingModuleBuild": "BUS-PROD-150-20260717",
+      "editorName": "Joe Freeman Home",
+      "updatedAt": "2026-07-22T17:21:22.398Z",
+      "originatingModuleBuild": "BUS-PROD-171-20260722",
       "previousRevision": {
-        "updatedAt": "2026-07-16T14:12:12.622Z",
+        "updatedAt": "2026-07-17T14:35:01.626Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "walking": {
+        "distance": 57.5,
+        "duration": 45.8,
+        "status": "routed",
+        "source": "OSRM foot"
+      },
+      "cycling": {
+        "distance": 80.4,
+        "duration": 57.5,
+        "status": "routed",
+        "source": "OSRM bike"
+      },
+      "source": "NaPTAN identity via mapped stop data",
+      "existingSavedRecord": null
     },
     {
       "naptanCode": "490011045N",
       "fallbackIdentity": "",
       "stopName": "Balaam Street",
-      "locality": "",
-      "direction": "Stop T",
+      "locality": "Plaistow",
+      "direction": "Stop T – towards Forest Gate or Stratford",
       "pairedStopGroup": "T",
       "coordinates": {
         "latitude": 51.5296486,
@@ -60,18 +74,32 @@
           "title": "Balaam Street bus stop",
           "url": "https://tfl.gov.uk/bus/stop/490011045N/balaam-street",
           "publisher": "Transport for London",
-          "retrievalDate": "2026-07-16"
+          "retrievalDate": "2026-07-22"
         }
       ],
-      "retrievalDate": "2026-07-16",
+      "retrievalDate": "2026-07-22",
       "verificationStatus": "verified",
-      "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-17T14:35:01.626Z",
-      "originatingModuleBuild": "BUS-PROD-150-20260717",
+      "editorName": "Joe Freeman Home",
+      "updatedAt": "2026-07-22T17:21:22.398Z",
+      "originatingModuleBuild": "BUS-PROD-171-20260722",
       "previousRevision": {
-        "updatedAt": "2026-07-16T14:12:12.622Z",
+        "updatedAt": "2026-07-17T14:35:01.626Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "walking": {
+        "distance": 38.7,
+        "duration": 30.9,
+        "status": "routed",
+        "source": "OSRM foot"
+      },
+      "cycling": {
+        "distance": 38.7,
+        "duration": 23.3,
+        "status": "routed",
+        "source": "OSRM bike"
+      },
+      "source": "NaPTAN identity via mapped stop data",
+      "existingSavedRecord": null
     },
     {
       "naptanCode": "490011042S",

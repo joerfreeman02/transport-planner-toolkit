@@ -1,7 +1,393 @@
 {
   "schema": "tpt.bus-stop-route-library",
   "version": "1.0.0",
-  "libraryBuild": "SHARED-LIB-1.4.1-20260722",
-  "updatedAt": "2026-07-22T00:00:00.000Z",
-  "records": []
+  "libraryBuild": "SHARED-LIB-1.5.0-20260722",
+  "updatedAt": "2026-07-22T17:21:22.314Z",
+  "records": [
+    {
+      "naptanCode": "490011045N",
+      "fallbackIdentity": "",
+      "routeNumber": "241",
+      "compositeRouteKey": "241|east london bus coach company ltd|here east|royal crest avenue|east london here east and stratford via plaistow and custom house to silvertown and royal wharf",
+      "operator": "East London Bus & Coach Company Ltd",
+      "routeOrigin": "Here East",
+      "routeDestination": "Royal Crest Avenue",
+      "geographicContext": "East London: Here East and Stratford via Plaistow and Custom House to Silvertown and Royal Wharf",
+      "directionFromStop": "Northbound / north-westbound",
+      "stopSpecificDestination": "Hackney Wick, Here East",
+      "mondayFridayOperatingPeriod": "Daily service from early morning until shortly after midnight",
+      "saturdayOperatingPeriod": "Daily service from early morning until shortly after midnight",
+      "sundayOperatingPeriod": "Sunday service from early morning until shortly after midnight",
+      "typicalWeekdayBusesPerHour": "5–7",
+      "saturdayBusesPerHour": "5–7",
+      "sundayBusesPerHour": "4–6",
+      "serviceQualifications": {
+        "peak": "Service frequency varies by time of day.",
+        "evening": "Operates throughout the evening.",
+        "night": "Final journeys operate around midnight; no separate night-route designation.",
+        "schoolDay": "",
+        "seasonal": "",
+        "irregularOrLimited": "Some journeys may terminate at Stratford."
+      },
+      "servicePattern": "Frequent daily service, generally around every 8–12 minutes during the daytime",
+      "journeyOpportunities": "Direct access to Plaistow Station, Stratford, Stratford City and Here East, with interchange at Stratford for Underground, Elizabeth line, DLR, National Rail and London Overground services.",
+      "transportStatementParagraph": "Balaam Street stop T is served by route 241 towards Hackney Wick, Here East. Frequent daily service, generally around every 8–12 minutes during the daytime. The service provides direct access to Plaistow Station, Stratford, Stratford City and Here East, with interchange at Stratford for Underground, Elizabeth line, DLR, National Rail and London Overground services.",
+      "sources": [
+        {
+          "title": "241 bus timetable",
+          "url": "https://tfl.gov.uk/bus/timetable/241/",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Balaam Street bus stop – route 241",
+          "url": "https://tfl.gov.uk/bus/stop/490011045N/balaam-street?lineId=241",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Who runs your bus",
+          "url": "https://tfl.gov.uk/modes/buses/who-runs-your-bus?intcmp=44680",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        }
+      ],
+      "retrievalDate": "2026-07-22",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman Home",
+      "updatedAt": "2026-07-22T17:21:22.314Z",
+      "originatingModuleBuild": "BUS-PROD-171-20260722",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490011045N",
+      "fallbackIdentity": "",
+      "routeNumber": "262",
+      "compositeRouteKey": "262|east london bus coach company ltd|stratford bus station|gallions reach shopping park|east london stratford and plaistow via newham university hospital and beckton to gallions reach",
+      "operator": "East London Bus & Coach Company Ltd",
+      "routeOrigin": "Stratford Bus Station",
+      "routeDestination": "Gallions Reach Shopping Park",
+      "geographicContext": "East London: Stratford and Plaistow via Newham University Hospital and Beckton to Gallions Reach",
+      "directionFromStop": "Northbound / westbound",
+      "stopSpecificDestination": "Stratford Bus Station",
+      "mondayFridayOperatingPeriod": "Daily service from early morning until shortly after midnight",
+      "saturdayOperatingPeriod": "Daily service from early morning until shortly after midnight",
+      "sundayOperatingPeriod": "Sunday service from early morning until shortly after midnight",
+      "typicalWeekdayBusesPerHour": "4–6",
+      "saturdayBusesPerHour": "4–6",
+      "sundayBusesPerHour": "3–4",
+      "serviceQualifications": {
+        "peak": "Service frequency varies by time of day.",
+        "evening": "Operates throughout the evening.",
+        "night": "Final journeys operate shortly after midnight; no separate night-route designation.",
+        "schoolDay": "",
+        "seasonal": "",
+        "irregularOrLimited": ""
+      },
+      "servicePattern": "Frequent daily service, generally around every 10–15 minutes during the daytime",
+      "journeyOpportunities": "Direct access to Plaistow Station, Stratford Broadway and Stratford Bus Station, with interchange for Underground, Elizabeth line, DLR, National Rail and London Overground services.",
+      "transportStatementParagraph": "Balaam Street stop T is served by route 262 towards Stratford Bus Station. Frequent daily service, generally around every 10–15 minutes during the daytime. The service provides direct access to Plaistow Station, Stratford Broadway and Stratford Bus Station, with interchange for Underground, Elizabeth line, DLR, National Rail and London Overground services.",
+      "sources": [
+        {
+          "title": "262 bus timetable",
+          "url": "https://tfl.gov.uk/bus/timetable/262/",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Balaam Street bus stop – route 262",
+          "url": "https://tfl.gov.uk/bus/stop/490011045N/balaam-street?lineId=262",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Who runs your bus",
+          "url": "https://tfl.gov.uk/modes/buses/who-runs-your-bus?intcmp=44680",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        }
+      ],
+      "retrievalDate": "2026-07-22",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman Home",
+      "updatedAt": "2026-07-22T17:21:22.314Z",
+      "originatingModuleBuild": "BUS-PROD-171-20260722",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490011045N",
+      "fallbackIdentity": "",
+      "routeNumber": "325",
+      "compositeRouteKey": "325|blue triangle buses ltd|east beckton sainsbury s|prince regent bus station|east london east beckton and east ham via upton park and plaistow to custom house and prince regent",
+      "operator": "Blue Triangle Buses Ltd",
+      "routeOrigin": "East Beckton / Sainsbury's",
+      "routeDestination": "Prince Regent Bus Station",
+      "geographicContext": "East London: East Beckton and East Ham via Upton Park and Plaistow to Custom House and Prince Regent",
+      "directionFromStop": "Northbound / eastbound",
+      "stopSpecificDestination": "East Beckton, Sainsbury's",
+      "mondayFridayOperatingPeriod": "Daily service from early morning until around midnight",
+      "saturdayOperatingPeriod": "Daily service from early morning until around midnight",
+      "sundayOperatingPeriod": "Sunday service from early morning until around midnight",
+      "typicalWeekdayBusesPerHour": "3–5",
+      "saturdayBusesPerHour": "3–5",
+      "sundayBusesPerHour": "2–4",
+      "serviceQualifications": {
+        "peak": "Service frequency varies by time of day.",
+        "evening": "Operates throughout the evening.",
+        "night": "No separate night service.",
+        "schoolDay": "",
+        "seasonal": "",
+        "irregularOrLimited": ""
+      },
+      "servicePattern": "Regular daily service, generally around every 12–20 minutes during the daytime",
+      "journeyOpportunities": "Direct access to Upton Park, Green Street, East Ham Station, Newham Town Hall and East Beckton.",
+      "transportStatementParagraph": "Balaam Street stop T is served by route 325 towards East Beckton, Sainsbury's. Regular daily service, generally around every 12–20 minutes during the daytime. The service provides direct access to Upton Park, Green Street, East Ham Station, Newham Town Hall and East Beckton.",
+      "sources": [
+        {
+          "title": "325 bus timetable",
+          "url": "https://tfl.gov.uk/bus/timetable/325/",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Balaam Street bus stop – route 325",
+          "url": "https://tfl.gov.uk/bus/stop/490011045N/balaam-street?lineId=325",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Who runs your bus",
+          "url": "https://tfl.gov.uk/modes/buses/who-runs-your-bus?intcmp=44680",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        }
+      ],
+      "retrievalDate": "2026-07-22",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman Home",
+      "updatedAt": "2026-07-22T17:21:22.314Z",
+      "originatingModuleBuild": "BUS-PROD-171-20260722",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490011045N",
+      "fallbackIdentity": "",
+      "routeNumber": "473",
+      "compositeRouteKey": "473|east london bus coach company ltd|north woolwich ferry|stratford bus station|east london north woolwich and london city airport via newham university hospital and plaistow to stratford",
+      "operator": "East London Bus & Coach Company Ltd",
+      "routeOrigin": "North Woolwich Ferry",
+      "routeDestination": "Stratford Bus Station",
+      "geographicContext": "East London: North Woolwich and London City Airport via Newham University Hospital and Plaistow to Stratford",
+      "directionFromStop": "Northbound / westbound",
+      "stopSpecificDestination": "Stratford Bus Station",
+      "mondayFridayOperatingPeriod": "Daily service from early morning until shortly after midnight",
+      "saturdayOperatingPeriod": "Daily service from early morning until shortly after midnight",
+      "sundayOperatingPeriod": "Sunday service from early morning until shortly after midnight",
+      "typicalWeekdayBusesPerHour": "5–6",
+      "saturdayBusesPerHour": "5–6",
+      "sundayBusesPerHour": "3–5",
+      "serviceQualifications": {
+        "peak": "Service frequency varies by time of day.",
+        "evening": "Operates throughout the evening.",
+        "night": "Final journeys operate shortly after midnight; no separate night-route designation.",
+        "schoolDay": "",
+        "seasonal": "",
+        "irregularOrLimited": ""
+      },
+      "servicePattern": "Frequent daily service, generally around every 10–12 minutes during the daytime",
+      "journeyOpportunities": "Direct access to Plaistow Station, Stratford Broadway and Stratford Bus Station, with interchange for Underground, Elizabeth line, DLR, National Rail and London Overground services.",
+      "transportStatementParagraph": "Balaam Street stop T is served by route 473 towards Stratford Bus Station. Frequent daily service, generally around every 10–12 minutes during the daytime. The service provides direct access to Plaistow Station, Stratford Broadway and Stratford Bus Station, with interchange for Underground, Elizabeth line, DLR, National Rail and London Overground services.",
+      "sources": [
+        {
+          "title": "473 bus timetable",
+          "url": "https://tfl.gov.uk/bus/timetable/473/",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Balaam Street bus stop – route 473 toward Stratford",
+          "url": "https://tfl.gov.uk/bus/stop/490011045N/balaam-street?lineId=473",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Who runs your bus",
+          "url": "https://tfl.gov.uk/modes/buses/who-runs-your-bus?intcmp=44680",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        }
+      ],
+      "retrievalDate": "2026-07-22",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman Home",
+      "updatedAt": "2026-07-22T17:21:22.314Z",
+      "originatingModuleBuild": "BUS-PROD-171-20260722",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490011045N",
+      "fallbackIdentity": "",
+      "routeNumber": "678",
+      "compositeRouteKey": "678|east london bus coach company ltd|st george s road|beckton bus station|east london school day service between forest gate upton park plaistow custom house prince regent cyprus and beckton",
+      "operator": "East London Bus & Coach Company Ltd",
+      "routeOrigin": "St George's Road",
+      "routeDestination": "Beckton Bus Station",
+      "geographicContext": "East London school-day service between Forest Gate/Upton Park, Plaistow, Custom House, Prince Regent, Cyprus and Beckton",
+      "directionFromStop": "Northbound / north-eastbound",
+      "stopSpecificDestination": "St George's Road",
+      "mondayFridayOperatingPeriod": "Limited Monday-to-Friday school-day service only",
+      "saturdayOperatingPeriod": "No Saturday service",
+      "sundayOperatingPeriod": "No Sunday service",
+      "typicalWeekdayBusesPerHour": "Limited scheduled school-day journeys only",
+      "saturdayBusesPerHour": "No service",
+      "sundayBusesPerHour": "No service",
+      "serviceQualifications": {
+        "peak": "",
+        "evening": "",
+        "night": "",
+        "schoolDay": "Operates on Monday-to-Friday schooldays only.",
+        "seasonal": "",
+        "irregularOrLimited": "Limited school-day journeys; not a regular all-day service."
+      },
+      "servicePattern": "Limited school-day service only; not a regular all-day route",
+      "journeyOpportunities": "Limited school-day access toward Upton Park and St George's Road.",
+      "transportStatementParagraph": "Balaam Street stop T is served by route 678 towards St George's Road. Limited school-day service only; not a regular all-day route. The service provides limited school-day access toward Upton Park and St George's Road.",
+      "sources": [
+        {
+          "title": "678 bus timetable",
+          "url": "https://tfl.gov.uk/bus/timetable/678/",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Balaam Street bus stop – route 678",
+          "url": "https://tfl.gov.uk/bus/stop/490011045N/balaam-street?lineId=678",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Who runs your bus",
+          "url": "https://tfl.gov.uk/modes/buses/who-runs-your-bus?intcmp=44680",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        }
+      ],
+      "retrievalDate": "2026-07-22",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman Home",
+      "updatedAt": "2026-07-22T17:21:22.314Z",
+      "originatingModuleBuild": "BUS-PROD-171-20260722",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490011045S",
+      "fallbackIdentity": "",
+      "routeNumber": "262",
+      "compositeRouteKey": "262|east london bus coach company ltd|stratford bus station|gallions reach shopping park|east london stratford plaistow newham university hospital beckton gallions reach",
+      "operator": "East London Bus & Coach Company Ltd",
+      "routeOrigin": "Stratford Bus Station",
+      "routeDestination": "Gallions Reach Shopping Park",
+      "geographicContext": "East London: Stratford–Plaistow–Newham University Hospital–Beckton–Gallions Reach",
+      "directionFromStop": "Southbound / eastbound",
+      "stopSpecificDestination": "Gallions Reach Shopping Park",
+      "mondayFridayOperatingPeriod": "05:16–00:57 from Balaam Street towards Gallions Reach Shopping Park",
+      "saturdayOperatingPeriod": "05:15–00:57 from Balaam Street towards Gallions Reach Shopping Park",
+      "sundayOperatingPeriod": "06:06–00:57 from Balaam Street towards Gallions Reach Shopping Park",
+      "typicalWeekdayBusesPerHour": "4–6",
+      "saturdayBusesPerHour": "4–6",
+      "sundayBusesPerHour": "3–4",
+      "serviceQualifications": {
+        "peak": "Service frequency varies by time of day.",
+        "evening": "Operates throughout the evening.",
+        "night": "Final journeys operate shortly after midnight; no separate night-route designation.",
+        "schoolDay": "",
+        "seasonal": "",
+        "irregularOrLimited": ""
+      },
+      "servicePattern": "Frequent daily service, generally every 10–15 minutes during the daytime",
+      "journeyOpportunities": "Direct services to Newham University Hospital, Beckton Bus Station, Gallions Reach Station and Gallions Reach Shopping Park, with DLR interchange at Beckton and Gallions Reach.",
+      "transportStatementParagraph": "Balaam Street stop S is served by route 262 towards Gallions Reach Shopping Park. Frequent daily service, generally every 10–15 minutes during the daytime. The service provides direct services to Newham University Hospital, Beckton Bus Station, Gallions Reach Station and Gallions Reach Shopping Park, with DLR interchange at Beckton and Gallions Reach.",
+      "sources": [
+        {
+          "title": "262 bus timetable",
+          "url": "https://tfl.gov.uk/bus/timetable/262/",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Balaam Street bus stop – route 262",
+          "url": "https://tfl.gov.uk/bus/stop/490011045S/balaam-street?lineId=262",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Who runs your bus",
+          "url": "https://tfl.gov.uk/modes/buses/who-runs-your-bus?intcmp=44680",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        }
+      ],
+      "retrievalDate": "2026-07-22",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman Home",
+      "updatedAt": "2026-07-22T17:21:22.314Z",
+      "originatingModuleBuild": "BUS-PROD-171-20260722",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "490011045S",
+      "fallbackIdentity": "",
+      "routeNumber": "473",
+      "compositeRouteKey": "473|east london bus coach company ltd|stratford bus station|north woolwich ferry|east london stratford plaistow newham university hospital prince regent london city airport north woolwich",
+      "operator": "East London Bus & Coach Company Ltd",
+      "routeOrigin": "Stratford Bus Station",
+      "routeDestination": "North Woolwich Ferry",
+      "geographicContext": "East London: Stratford–Plaistow–Newham University Hospital–Prince Regent–London City Airport–North Woolwich",
+      "directionFromStop": "Southbound / south-eastbound",
+      "stopSpecificDestination": "North Woolwich Ferry",
+      "mondayFridayOperatingPeriod": "Daily service from early morning until shortly after midnight",
+      "saturdayOperatingPeriod": "Daily service from early morning until shortly after midnight",
+      "sundayOperatingPeriod": "Sunday service from early morning until shortly after midnight",
+      "typicalWeekdayBusesPerHour": "4–6",
+      "saturdayBusesPerHour": "4–6",
+      "sundayBusesPerHour": "3–5",
+      "serviceQualifications": {
+        "peak": "Service frequency varies by time of day.",
+        "evening": "Operates throughout the evening.",
+        "night": "Final journeys operate shortly after midnight; no separate night-route designation.",
+        "schoolDay": "",
+        "seasonal": "",
+        "irregularOrLimited": ""
+      },
+      "servicePattern": "Frequent daily service, generally every 10–14 minutes during the daytime",
+      "journeyOpportunities": "Direct services to Newham University Hospital, Prince Regent, London City Airport and North Woolwich Ferry, with DLR interchange at Prince Regent and London City Airport.",
+      "transportStatementParagraph": "Balaam Street stop S is served by route 473 towards North Woolwich Ferry. Frequent daily service, generally every 10–14 minutes during the daytime. The service provides direct services to Newham University Hospital, Prince Regent, London City Airport and North Woolwich Ferry, with DLR interchange at Prince Regent and London City Airport.",
+      "sources": [
+        {
+          "title": "473 bus timetable",
+          "url": "https://tfl.gov.uk/bus/timetable/473/",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Balaam Street bus stop – route 473 toward North Woolwich",
+          "url": "https://tfl.gov.uk/bus/stop/490011045S/balaam-street?lineId=473",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Who runs your bus",
+          "url": "https://tfl.gov.uk/modes/buses/who-runs-your-bus?intcmp=44680",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
+        }
+      ],
+      "retrievalDate": "2026-07-22",
+      "verificationStatus": "verified",
+      "editorName": "Joe Freeman Home",
+      "updatedAt": "2026-07-22T17:21:22.314Z",
+      "originatingModuleBuild": "BUS-PROD-171-20260722",
+      "previousRevision": null
+    }
+  ]
 }

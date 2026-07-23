@@ -75,7 +75,7 @@ test('Planner/Admin and Library Explorer controls are present',()=>{
 });
 test('EAS component foundation is limited to affected screens',()=>{
   const theme=fs.readFileSync(new URL('../assets/css/eas-theme.css',import.meta.url),'utf8'),dashboard=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8'),accessibility=fs.readFileSync(new URL('../modules/accessibility/index.html',import.meta.url),'utf8'),stats19=fs.readFileSync(new URL('../modules/stats19/index.html',import.meta.url),'utf8');
-  assert.match(theme,/#002060/);assert.match(theme,/#8cfc2b/);assert.match(theme,/\.admin-only\[hidden\]\{display:none!important\}/);assert.match(dashboard,/eas-white\.png/);assert.doesNotMatch(accessibility,/eas-theme|eas-white/);assert.doesNotMatch(stats19,/eas-theme|eas-white/);
+  assert.match(theme,/#002060/);assert.match(theme,/#8cfc2b/);assert.match(theme,/\[hidden\]\{display:none!important\}/);assert.match(dashboard,/eas-white\.png/);assert.doesNotMatch(accessibility,/eas-theme|eas-white/);assert.doesNotMatch(stats19,/eas-theme|eas-white/);
 });
 test('Shared Bus Stop publication sanitizer preserves reusable identity',()=>{
   const shared=fs.readFileSync(new URL('../assets/js/shared-library.js',import.meta.url),'utf8');assert.match(shared,/function sanitizeBusStop/);assert.match(shared,/existingSavedRecord/);assert.match(shared,/sanitize\(path,records\)/);

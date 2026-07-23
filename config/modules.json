@@ -1,14 +1,14 @@
 {
   "toolkit": {
-    "version": "2.7.0",
-    "build": "TPT-2.7.0-20260723",
+    "version": "2.7.1",
+    "build": "TPT-2.7.1-20260723",
     "releaseDate": "2026-07-23",
     "status": "site-research-production"
   },
   "modules": {
     "dashboard": {
-      "version": "1.5.0",
-      "build": "DASH-1.5.0-20260723",
+      "version": "1.5.1",
+      "build": "DASH-1.5.1-20260723",
       "status": "planner-mode-production",
       "path": "index.html"
     },
@@ -25,14 +25,14 @@
       "path": "modules/stats19/index.html"
     },
     "railway": {
-      "version": "4.11.0",
-      "build": "RAIL-4.11.0-20260723",
+      "version": "4.11.1",
+      "build": "RAIL-4.11.1-20260723",
       "status": "site-research-compatible",
       "path": "modules/railway/index.html"
     },
     "bus": {
-      "version": "1.8.0",
-      "build": "BUS-PROD-180-20260723",
+      "version": "1.8.1",
+      "build": "BUS-PROD-181-20260723",
       "schemaVersion": "1.0.0",
       "status": "canonical-route-site-research",
       "path": "modules/bus/index.html"
@@ -44,8 +44,8 @@
       "path": "modules/library-manager/index.html"
     },
     "siteResearch": {
-      "version": "1.0.0",
-      "build": "SITE-RESEARCH-1.0.0-20260723",
+      "version": "1.0.1",
+      "build": "SITE-RESEARCH-1.0.1-20260723",
       "status": "production",
       "path": "modules/site-research/index.html"
     }
@@ -56,6 +56,6 @@
     "status": "canonical-route-sanitized"
   },
   "researchQuality": {"version":"1.2.0","build":"RESEARCH-QUALITY-1.2.0-20260723"},
-  "researchWorkflow": {"version":"1.1.0","build":"RESEARCH-WORKFLOW-1.1.0-20260723"},
+  "researchWorkflow": {"version":"1.1.1","build":"RESEARCH-WORKFLOW-1.1.1-20260723"},
   "sharedTheme": {"version":"1.1.0","build":"TPT-THEME-1.1.0-20260723"}
 }

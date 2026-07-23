@@ -1,5 +1,11 @@
 # Changelog
 
+## Toolkit 2.7.1 Site Research stabilisation — 2026-07-23
+
+- Fixed real Bus stop-pair persistence and added one-pack compound stop, Route and relationship research with strict partial-import validation.
+- Restored visible Combined, Railway-only and Bus-only guidance; added optional Admin ten-station Railway enrichment.
+- Replaced Site Research output placeholders with compact real Rail, Bus Stop, Bus Route and Relationship templates.
+
 ## Toolkit 2.7.0 compact Site Research — 2026-07-23
 
 - Added shared-first combined Site Research packs with adaptive Rail and Bus batching, partial import and visible reuse counts.

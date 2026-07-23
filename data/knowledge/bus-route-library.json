@@ -1,8 +1,8 @@
 {
   "schema": "tpt.bus-route-library",
   "version": "1.0.0",
-  "libraryBuild": "SHARED-LIB-1.5.0-20260722",
-  "updatedAt": "2026-07-22T17:21:22.388Z",
+  "libraryBuild": "SHARED-LIB-1.6.0-20260723",
+  "updatedAt": "2026-07-23T09:00:00.000Z",
   "records": [
     {
       "routeNumber": "69",
@@ -32,7 +32,18 @@
       "previousRevision": {
         "updatedAt": "2026-07-16T14:12:15.139Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "transportAuthority": "transport-for-london",
+      "canonicalRouteKey": "route:transport-for-london:69:canning town bus station~walthamstow bus station:",
+      "legacyRouteKeys": [
+        "69|transport for london london buses service contracted operating company not stated on the cited passenger route page|canning town bus station|walthamstow bus station|"
+      ],
+      "previousRevisions": [
+        {
+          "updatedAt": "2026-07-16T14:12:15.139Z",
+          "editorName": "Joe Freeman"
+        }
+      ]
     },
     {
       "routeNumber": "33",
@@ -64,7 +75,18 @@
       "previousRevision": {
         "updatedAt": "2026-07-16T14:12:15.139Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "transportAuthority": "hertfordshire-intalink",
+      "canonicalRouteKey": "route:hertfordshire-intalink:33:bishop s stortford~hoddesdon:",
+      "legacyRouteKeys": [
+        "33|central connect|hoddesdon|bishop s stortford|"
+      ],
+      "previousRevisions": [
+        {
+          "updatedAt": "2026-07-16T14:12:15.139Z",
+          "editorName": "Joe Freeman"
+        }
+      ]
     },
     {
       "routeNumber": "310",
@@ -98,7 +120,18 @@
       "previousRevision": {
         "updatedAt": "2026-07-16T14:12:15.139Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "transportAuthority": "hertfordshire-intalink",
+      "canonicalRouteKey": "route:hertfordshire-intalink:310:hertford~waltham cross:",
+      "legacyRouteKeys": [
+        "310|arriva kent thameside ltd|hertford|waltham cross|"
+      ],
+      "previousRevisions": [
+        {
+          "updatedAt": "2026-07-16T14:12:15.139Z",
+          "editorName": "Joe Freeman"
+        }
+      ]
     },
     {
       "routeNumber": "25/25B",
@@ -132,7 +165,18 @@
       "previousRevision": {
         "updatedAt": "2026-07-16T14:12:15.139Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "transportAuthority": "hertfordshire-intalink",
+      "canonicalRouteKey": "route:hertfordshire-intalink:25 25b:cheshunt brookfield centre or broxbourne~harlow town centre:",
+      "legacyRouteKeys": [
+        "25 25b|central connect|harlow town centre|cheshunt brookfield centre or broxbourne|"
+      ],
+      "previousRevisions": [
+        {
+          "updatedAt": "2026-07-16T14:12:15.139Z",
+          "editorName": "Joe Freeman"
+        }
+      ]
     },
     {
       "routeNumber": "35/35B/35C",
@@ -166,7 +210,18 @@
       "previousRevision": {
         "updatedAt": "2026-07-16T14:12:15.139Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "transportAuthority": "hertfordshire-intalink",
+      "canonicalRouteKey": "route:hertfordshire-intalink:35 35b 35c:bishop s stortford~hertford:",
+      "legacyRouteKeys": [
+        "35 35b 35c|central connect|hertford|bishop s stortford|"
+      ],
+      "previousRevisions": [
+        {
+          "updatedAt": "2026-07-16T14:12:15.139Z",
+          "editorName": "Joe Freeman"
+        }
+      ]
     },
     {
       "routeNumber": "217",
@@ -197,7 +252,18 @@
       "previousRevision": {
         "updatedAt": "2026-07-16T14:12:15.139Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "transportAuthority": "transport-for-london",
+      "canonicalRouteKey": "route:transport-for-london:217:turnpike lane bus station~waltham cross bus station:",
+      "legacyRouteKeys": [
+        "217|arriva london north|waltham cross bus station|turnpike lane bus station|"
+      ],
+      "previousRevisions": [
+        {
+          "updatedAt": "2026-07-16T14:12:15.139Z",
+          "editorName": "Joe Freeman"
+        }
+      ]
     },
     {
       "routeNumber": "279",
@@ -229,7 +295,18 @@
       "previousRevision": {
         "updatedAt": "2026-07-16T14:12:15.139Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "transportAuthority": "transport-for-london",
+      "canonicalRouteKey": "route:transport-for-london:279:manor house station~waltham cross bus station:",
+      "legacyRouteKeys": [
+        "279|arriva london north|waltham cross bus station|manor house station|"
+      ],
+      "previousRevisions": [
+        {
+          "updatedAt": "2026-07-16T14:12:15.139Z",
+          "editorName": "Joe Freeman"
+        }
+      ]
     },
     {
       "routeNumber": "317",
@@ -259,7 +336,18 @@
       "previousRevision": {
         "updatedAt": "2026-07-16T14:12:15.139Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "transportAuthority": "transport-for-london",
+      "canonicalRouteKey": "route:transport-for-london:317:enfield little park gardens~waltham cross bus station:",
+      "legacyRouteKeys": [
+        "317|metroline travel|waltham cross bus station|enfield little park gardens|"
+      ],
+      "previousRevisions": [
+        {
+          "updatedAt": "2026-07-16T14:12:15.139Z",
+          "editorName": "Joe Freeman"
+        }
+      ]
     },
     {
       "routeNumber": "327",
@@ -287,7 +375,18 @@
       "previousRevision": {
         "updatedAt": "2026-07-16T14:12:15.139Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "transportAuthority": "transport-for-london",
+      "canonicalRouteKey": "route:transport-for-london:327:elsinge estate~waltham cross bus station:",
+      "legacyRouteKeys": [
+        "327|metroline travel|waltham cross bus station|elsinge estate|"
+      ],
+      "previousRevisions": [
+        {
+          "updatedAt": "2026-07-16T14:12:15.139Z",
+          "editorName": "Joe Freeman"
+        }
+      ]
     },
     {
       "routeNumber": "491",
@@ -318,7 +417,18 @@
       "previousRevision": {
         "updatedAt": "2026-07-16T14:12:15.139Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "transportAuthority": "transport-for-london",
+      "canonicalRouteKey": "route:transport-for-london:491:north middlesex hospital~waltham cross bus station:",
+      "legacyRouteKeys": [
+        "491|metroline travel|waltham cross bus station|north middlesex hospital|"
+      ],
+      "previousRevisions": [
+        {
+          "updatedAt": "2026-07-16T14:12:15.139Z",
+          "editorName": "Joe Freeman"
+        }
+      ]
     },
     {
       "routeNumber": "N279",
@@ -350,7 +460,18 @@
       "previousRevision": {
         "updatedAt": "2026-07-16T14:12:15.139Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "transportAuthority": "transport-for-london",
+      "canonicalRouteKey": "route:transport-for-london:n279:trafalgar square~waltham cross bus station:",
+      "legacyRouteKeys": [
+        "n279|arriva london north|waltham cross bus station|trafalgar square|"
+      ],
+      "previousRevisions": [
+        {
+          "updatedAt": "2026-07-16T14:12:15.139Z",
+          "editorName": "Joe Freeman"
+        }
+      ]
     },
     {
       "routeNumber": "241",
@@ -404,7 +525,13 @@
       "editorName": "Joe Freeman Home",
       "updatedAt": "2026-07-22T17:21:22.388Z",
       "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
+      "previousRevision": null,
+      "transportAuthority": "transport-for-london",
+      "canonicalRouteKey": "route:transport-for-london:241:here east~royal crest avenue:",
+      "legacyRouteKeys": [
+        "241|east london bus coach company ltd|here east|royal crest avenue|east london here east and stratford via plaistow and custom house to silvertown and royal wharf"
+      ],
+      "previousRevisions": []
     },
     {
       "routeNumber": "262",
@@ -449,6 +576,12 @@
           "url": "https://tfl.gov.uk/modes/buses/who-runs-your-bus?intcmp=44680",
           "publisher": "Transport for London",
           "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Balaam Street bus stop – route 262",
+          "url": "https://tfl.gov.uk/bus/stop/490011045S/balaam-street?lineId=262",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
         }
       ],
       "retrievalDate": "2026-07-22",
@@ -456,7 +589,80 @@
       "editorName": "Joe Freeman Home",
       "updatedAt": "2026-07-22T17:21:22.388Z",
       "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
+      "previousRevision": null,
+      "transportAuthority": "transport-for-london",
+      "canonicalRouteKey": "route:transport-for-london:262:gallions reach shopping park~stratford bus station:",
+      "legacyRouteKeys": [
+        "262|east london bus coach company ltd|stratford bus station|gallions reach shopping park|east london stratford and plaistow via newham university hospital and beckton to gallions reach",
+        "262|east london bus coach company ltd|stratford bus station|gallions reach shopping park|east london stratford plaistow newham university hospital beckton gallions reach"
+      ],
+      "previousRevisions": [
+        {
+          "routeNumber": "262",
+          "operator": "East London Bus & Coach Company Ltd",
+          "routeOrigin": "Stratford Bus Station",
+          "routeDestination": "Gallions Reach Shopping Park",
+          "geographicContext": "East London: Stratford–Plaistow–Newham University Hospital–Beckton–Gallions Reach",
+          "principalLocationsServed": [
+            "Stratford Bus Station",
+            "Stratford Broadway",
+            "Plaistow Station",
+            "Balaam Street",
+            "Newham University Hospital",
+            "Beckton Bus Station",
+            "Gallions Reach Station",
+            "Gallions Reach Shopping Park"
+          ],
+          "mondayFridayOperatingPeriod": "05:16–00:57 from Balaam Street towards Gallions Reach Shopping Park",
+          "saturdayOperatingPeriod": "05:15–00:57 from Balaam Street towards Gallions Reach Shopping Park",
+          "sundayOperatingPeriod": "06:06–00:57 from Balaam Street towards Gallions Reach Shopping Park",
+          "servicePattern": "Frequent daily service, generally every 10–15 minutes during the daytime",
+          "serviceQualifications": {
+            "evening": "Operates throughout the evening.",
+            "night": "Final journeys operate shortly after midnight; no separate night-route designation.",
+            "schoolDay": "",
+            "irregularOrLimited": ""
+          },
+          "sources": [
+            {
+              "title": "262 bus timetable",
+              "url": "https://tfl.gov.uk/bus/timetable/262/",
+              "publisher": "Transport for London",
+              "retrievalDate": "2026-07-22"
+            },
+            {
+              "title": "Balaam Street bus stop – route 262",
+              "url": "https://tfl.gov.uk/bus/stop/490011045S/balaam-street?lineId=262",
+              "publisher": "Transport for London",
+              "retrievalDate": "2026-07-22"
+            },
+            {
+              "title": "Who runs your bus",
+              "url": "https://tfl.gov.uk/modes/buses/who-runs-your-bus?intcmp=44680",
+              "publisher": "Transport for London",
+              "retrievalDate": "2026-07-22"
+            }
+          ],
+          "retrievalDate": "2026-07-22",
+          "verificationStatus": "verified",
+          "editorName": "Joe Freeman Home",
+          "updatedAt": "2026-07-22T17:21:22.388Z",
+          "originatingModuleBuild": "BUS-PROD-171-20260722",
+          "previousRevision": null
+        }
+      ],
+      "migrationHistory": [
+        {
+          "at": "2026-07-23T09:00:00.000Z",
+          "build": "SHARED-LIB-1.6.0-20260723",
+          "action": "canonical-route-merge",
+          "canonicalRouteKey": "route:transport-for-london:262:gallions reach shopping park~stratford bus station:",
+          "mergedLegacyKeys": [
+            "262|east london bus coach company ltd|stratford bus station|gallions reach shopping park|east london stratford plaistow newham university hospital beckton gallions reach"
+          ],
+          "reason": "Same route number, regional authority and normalized terminal pair; geographic-context wording did not represent a distinct route."
+        }
+      ]
     },
     {
       "routeNumber": "325",
@@ -509,7 +715,13 @@
       "editorName": "Joe Freeman Home",
       "updatedAt": "2026-07-22T17:21:22.388Z",
       "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
+      "previousRevision": null,
+      "transportAuthority": "transport-for-london",
+      "canonicalRouteKey": "route:transport-for-london:325:east beckton sainsbury s~prince regent bus station:",
+      "legacyRouteKeys": [
+        "325|blue triangle buses ltd|east beckton sainsbury s|prince regent bus station|east london east beckton and east ham via upton park and plaistow to custom house and prince regent"
+      ],
+      "previousRevisions": []
     },
     {
       "routeNumber": "473",
@@ -554,6 +766,12 @@
           "url": "https://tfl.gov.uk/modes/buses/who-runs-your-bus?intcmp=44680",
           "publisher": "Transport for London",
           "retrievalDate": "2026-07-22"
+        },
+        {
+          "title": "Balaam Street bus stop – route 473 toward North Woolwich",
+          "url": "https://tfl.gov.uk/bus/stop/490011045S/balaam-street?lineId=473",
+          "publisher": "Transport for London",
+          "retrievalDate": "2026-07-22"
         }
       ],
       "retrievalDate": "2026-07-22",
@@ -561,7 +779,80 @@
       "editorName": "Joe Freeman Home",
       "updatedAt": "2026-07-22T17:21:22.388Z",
       "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
+      "previousRevision": null,
+      "transportAuthority": "transport-for-london",
+      "canonicalRouteKey": "route:transport-for-london:473:north woolwich ferry~stratford bus station:",
+      "legacyRouteKeys": [
+        "473|east london bus coach company ltd|north woolwich ferry|stratford bus station|east london north woolwich and london city airport via newham university hospital and plaistow to stratford",
+        "473|east london bus coach company ltd|stratford bus station|north woolwich ferry|east london stratford plaistow newham university hospital prince regent london city airport north woolwich"
+      ],
+      "previousRevisions": [
+        {
+          "routeNumber": "473",
+          "operator": "East London Bus & Coach Company Ltd",
+          "routeOrigin": "Stratford Bus Station",
+          "routeDestination": "North Woolwich Ferry",
+          "geographicContext": "East London: Stratford–Plaistow–Newham University Hospital–Prince Regent–London City Airport–North Woolwich",
+          "principalLocationsServed": [
+            "Stratford Bus Station",
+            "Stratford Broadway",
+            "Plaistow Station",
+            "Balaam Street",
+            "Newham University Hospital",
+            "Prince Regent",
+            "London City Airport",
+            "North Woolwich Ferry"
+          ],
+          "mondayFridayOperatingPeriod": "Daily service from early morning until shortly after midnight",
+          "saturdayOperatingPeriod": "Daily service from early morning until shortly after midnight",
+          "sundayOperatingPeriod": "Sunday service from early morning until shortly after midnight",
+          "servicePattern": "Frequent daily service, generally every 10–14 minutes during the daytime",
+          "serviceQualifications": {
+            "evening": "Operates throughout the evening.",
+            "night": "Final journeys operate shortly after midnight; no separate night-route designation.",
+            "schoolDay": "",
+            "irregularOrLimited": ""
+          },
+          "sources": [
+            {
+              "title": "473 bus timetable",
+              "url": "https://tfl.gov.uk/bus/timetable/473/",
+              "publisher": "Transport for London",
+              "retrievalDate": "2026-07-22"
+            },
+            {
+              "title": "Balaam Street bus stop – route 473 toward North Woolwich",
+              "url": "https://tfl.gov.uk/bus/stop/490011045S/balaam-street?lineId=473",
+              "publisher": "Transport for London",
+              "retrievalDate": "2026-07-22"
+            },
+            {
+              "title": "Who runs your bus",
+              "url": "https://tfl.gov.uk/modes/buses/who-runs-your-bus?intcmp=44680",
+              "publisher": "Transport for London",
+              "retrievalDate": "2026-07-22"
+            }
+          ],
+          "retrievalDate": "2026-07-22",
+          "verificationStatus": "verified",
+          "editorName": "Joe Freeman Home",
+          "updatedAt": "2026-07-22T17:21:22.388Z",
+          "originatingModuleBuild": "BUS-PROD-171-20260722",
+          "previousRevision": null
+        }
+      ],
+      "migrationHistory": [
+        {
+          "at": "2026-07-23T09:00:00.000Z",
+          "build": "SHARED-LIB-1.6.0-20260723",
+          "action": "canonical-route-merge",
+          "canonicalRouteKey": "route:transport-for-london:473:north woolwich ferry~stratford bus station:",
+          "mergedLegacyKeys": [
+            "473|east london bus coach company ltd|stratford bus station|north woolwich ferry|east london stratford plaistow newham university hospital prince regent london city airport north woolwich"
+          ],
+          "reason": "Same route number, regional authority and normalized terminal pair; geographic-context wording did not represent a distinct route."
+        }
+      ]
     },
     {
       "routeNumber": "678",
@@ -614,113 +905,13 @@
       "editorName": "Joe Freeman Home",
       "updatedAt": "2026-07-22T17:21:22.388Z",
       "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
-    },
-    {
-      "routeNumber": "262",
-      "operator": "East London Bus & Coach Company Ltd",
-      "routeOrigin": "Stratford Bus Station",
-      "routeDestination": "Gallions Reach Shopping Park",
-      "geographicContext": "East London: Stratford–Plaistow–Newham University Hospital–Beckton–Gallions Reach",
-      "principalLocationsServed": [
-        "Stratford Bus Station",
-        "Stratford Broadway",
-        "Plaistow Station",
-        "Balaam Street",
-        "Newham University Hospital",
-        "Beckton Bus Station",
-        "Gallions Reach Station",
-        "Gallions Reach Shopping Park"
+      "previousRevision": null,
+      "transportAuthority": "transport-for-london",
+      "canonicalRouteKey": "route:transport-for-london:678:beckton bus station~st george s road:",
+      "legacyRouteKeys": [
+        "678|east london bus coach company ltd|st george s road|beckton bus station|east london school day service between forest gate upton park plaistow custom house prince regent cyprus and beckton"
       ],
-      "mondayFridayOperatingPeriod": "05:16–00:57 from Balaam Street towards Gallions Reach Shopping Park",
-      "saturdayOperatingPeriod": "05:15–00:57 from Balaam Street towards Gallions Reach Shopping Park",
-      "sundayOperatingPeriod": "06:06–00:57 from Balaam Street towards Gallions Reach Shopping Park",
-      "servicePattern": "Frequent daily service, generally every 10–15 minutes during the daytime",
-      "serviceQualifications": {
-        "evening": "Operates throughout the evening.",
-        "night": "Final journeys operate shortly after midnight; no separate night-route designation.",
-        "schoolDay": "",
-        "irregularOrLimited": ""
-      },
-      "sources": [
-        {
-          "title": "262 bus timetable",
-          "url": "https://tfl.gov.uk/bus/timetable/262/",
-          "publisher": "Transport for London",
-          "retrievalDate": "2026-07-22"
-        },
-        {
-          "title": "Balaam Street bus stop – route 262",
-          "url": "https://tfl.gov.uk/bus/stop/490011045S/balaam-street?lineId=262",
-          "publisher": "Transport for London",
-          "retrievalDate": "2026-07-22"
-        },
-        {
-          "title": "Who runs your bus",
-          "url": "https://tfl.gov.uk/modes/buses/who-runs-your-bus?intcmp=44680",
-          "publisher": "Transport for London",
-          "retrievalDate": "2026-07-22"
-        }
-      ],
-      "retrievalDate": "2026-07-22",
-      "verificationStatus": "verified",
-      "editorName": "Joe Freeman Home",
-      "updatedAt": "2026-07-22T17:21:22.388Z",
-      "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
-    },
-    {
-      "routeNumber": "473",
-      "operator": "East London Bus & Coach Company Ltd",
-      "routeOrigin": "Stratford Bus Station",
-      "routeDestination": "North Woolwich Ferry",
-      "geographicContext": "East London: Stratford–Plaistow–Newham University Hospital–Prince Regent–London City Airport–North Woolwich",
-      "principalLocationsServed": [
-        "Stratford Bus Station",
-        "Stratford Broadway",
-        "Plaistow Station",
-        "Balaam Street",
-        "Newham University Hospital",
-        "Prince Regent",
-        "London City Airport",
-        "North Woolwich Ferry"
-      ],
-      "mondayFridayOperatingPeriod": "Daily service from early morning until shortly after midnight",
-      "saturdayOperatingPeriod": "Daily service from early morning until shortly after midnight",
-      "sundayOperatingPeriod": "Sunday service from early morning until shortly after midnight",
-      "servicePattern": "Frequent daily service, generally every 10–14 minutes during the daytime",
-      "serviceQualifications": {
-        "evening": "Operates throughout the evening.",
-        "night": "Final journeys operate shortly after midnight; no separate night-route designation.",
-        "schoolDay": "",
-        "irregularOrLimited": ""
-      },
-      "sources": [
-        {
-          "title": "473 bus timetable",
-          "url": "https://tfl.gov.uk/bus/timetable/473/",
-          "publisher": "Transport for London",
-          "retrievalDate": "2026-07-22"
-        },
-        {
-          "title": "Balaam Street bus stop – route 473 toward North Woolwich",
-          "url": "https://tfl.gov.uk/bus/stop/490011045S/balaam-street?lineId=473",
-          "publisher": "Transport for London",
-          "retrievalDate": "2026-07-22"
-        },
-        {
-          "title": "Who runs your bus",
-          "url": "https://tfl.gov.uk/modes/buses/who-runs-your-bus?intcmp=44680",
-          "publisher": "Transport for London",
-          "retrievalDate": "2026-07-22"
-        }
-      ],
-      "retrievalDate": "2026-07-22",
-      "verificationStatus": "verified",
-      "editorName": "Joe Freeman Home",
-      "updatedAt": "2026-07-22T17:21:22.388Z",
-      "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
+      "previousRevisions": []
     }
   ]
 }

@@ -1,0 +1,154 @@
+{
+  "schema": "tpt.bus-route-canonical-migration-report",
+  "version": 1,
+  "generatedAt": "2026-07-23T09:00:00.000Z",
+  "build": "SHARED-LIB-1.6.0-20260723",
+  "before": {
+    "routes": 18,
+    "stops": 38,
+    "relationships": 7
+  },
+  "after": {
+    "routes": 16,
+    "stops": 38,
+    "relationships": 7
+  },
+  "canonicalRule": [
+    "transport authority or defensible regional identifier",
+    "route number",
+    "normalized unordered terminal pair",
+    "explicit branch or variant"
+  ],
+  "mergedCandidates": [
+    {
+      "routeNumber": "262",
+      "canonicalRouteKey": "route:transport-for-london:262:gallions reach shopping park~stratford bus station:",
+      "canonicalRecord": "262|east london bus coach company ltd|stratford bus station|gallions reach shopping park|east london stratford and plaistow via newham university hospital and beckton to gallions reach",
+      "mergedLegacyKeys": [
+        "262|east london bus coach company ltd|stratford bus station|gallions reach shopping park|east london stratford plaistow newham university hospital beckton gallions reach"
+      ],
+      "preservedFields": [
+        "canonicalRouteKey",
+        "editorName",
+        "geographicContext",
+        "legacyRouteKeys",
+        "migrationHistory",
+        "mondayFridayOperatingPeriod",
+        "operator",
+        "originatingModuleBuild",
+        "previousRevision",
+        "previousRevisions",
+        "principalLocationsServed",
+        "retrievalDate",
+        "routeDestination",
+        "routeNumber",
+        "routeOrigin",
+        "saturdayOperatingPeriod",
+        "servicePattern",
+        "serviceQualifications",
+        "sources",
+        "sundayOperatingPeriod",
+        "transportAuthority",
+        "updatedAt",
+        "verificationStatus"
+      ],
+      "conflicts": []
+    },
+    {
+      "routeNumber": "473",
+      "canonicalRouteKey": "route:transport-for-london:473:north woolwich ferry~stratford bus station:",
+      "canonicalRecord": "473|east london bus coach company ltd|north woolwich ferry|stratford bus station|east london north woolwich and london city airport via newham university hospital and plaistow to stratford",
+      "mergedLegacyKeys": [
+        "473|east london bus coach company ltd|stratford bus station|north woolwich ferry|east london stratford plaistow newham university hospital prince regent london city airport north woolwich"
+      ],
+      "preservedFields": [
+        "canonicalRouteKey",
+        "editorName",
+        "geographicContext",
+        "legacyRouteKeys",
+        "migrationHistory",
+        "mondayFridayOperatingPeriod",
+        "operator",
+        "originatingModuleBuild",
+        "previousRevision",
+        "previousRevisions",
+        "principalLocationsServed",
+        "retrievalDate",
+        "routeDestination",
+        "routeNumber",
+        "routeOrigin",
+        "saturdayOperatingPeriod",
+        "servicePattern",
+        "serviceQualifications",
+        "sources",
+        "sundayOperatingPeriod",
+        "transportAuthority",
+        "updatedAt",
+        "verificationStatus"
+      ],
+      "conflicts": []
+    }
+  ],
+  "deliberatelyNotMerged": [],
+  "relationshipReferencesUpdated": 7,
+  "busStopSanitation": {
+    "recordsChanged": 2,
+    "fieldsRemoved": 6,
+    "records": [
+      {
+        "stopIdentity": "490011045S",
+        "stopName": "Balaam Street",
+        "removedFields": [
+          "cycling",
+          "existingSavedRecord",
+          "walking"
+        ],
+        "preservedFields": [
+          "coordinates",
+          "direction",
+          "editorName",
+          "fallbackIdentity",
+          "locality",
+          "naptanCode",
+          "originatingModuleBuild",
+          "pairedStopGroup",
+          "previousRevision",
+          "retrievalDate",
+          "routesServed",
+          "source",
+          "sources",
+          "stopName",
+          "updatedAt",
+          "verificationStatus"
+        ]
+      },
+      {
+        "stopIdentity": "490011045N",
+        "stopName": "Balaam Street",
+        "removedFields": [
+          "cycling",
+          "existingSavedRecord",
+          "walking"
+        ],
+        "preservedFields": [
+          "coordinates",
+          "direction",
+          "editorName",
+          "fallbackIdentity",
+          "locality",
+          "naptanCode",
+          "originatingModuleBuild",
+          "pairedStopGroup",
+          "previousRevision",
+          "retrievalDate",
+          "routesServed",
+          "source",
+          "sources",
+          "stopName",
+          "updatedAt",
+          "verificationStatus"
+        ]
+      }
+    ]
+  }
+}

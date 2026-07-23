@@ -1,15 +1,15 @@
 {
   "toolkit": {
-    "version": "2.6.1",
-    "build": "TPT-2.6.1-20260722",
-    "releaseDate": "2026-07-22",
-    "status": "sprint-4-production"
+    "version": "2.7.0",
+    "build": "TPT-2.7.0-20260723",
+    "releaseDate": "2026-07-23",
+    "status": "site-research-production"
   },
   "modules": {
     "dashboard": {
-      "version": "1.4.0",
-      "build": "DASH-1.4.0-20260722",
-      "status": "stable-frozen-identity",
+      "version": "1.5.0",
+      "build": "DASH-1.5.0-20260723",
+      "status": "planner-mode-production",
       "path": "index.html"
     },
     "accessibility": {
@@ -25,31 +25,37 @@
       "path": "modules/stats19/index.html"
     },
     "railway": {
-      "version": "4.10.1",
-      "build": "RAIL-4.10.1-20260722",
-      "status": "stable-frozen-functionality-word-export",
+      "version": "4.11.0",
+      "build": "RAIL-4.11.0-20260723",
+      "status": "site-research-compatible",
       "path": "modules/railway/index.html"
     },
     "bus": {
-      "version": "1.7.1",
-      "build": "BUS-PROD-171-20260722",
+      "version": "1.8.0",
+      "build": "BUS-PROD-180-20260723",
       "schemaVersion": "1.0.0",
-      "status": "stable-frozen-production-baseline",
+      "status": "canonical-route-site-research",
       "path": "modules/bus/index.html"
     },
     "libraryManager": {
-      "version": "1.2.1",
-      "build": "LIB-1.2.1-20260722",
-      "status": "stable-minimum-library-maintenance",
+      "version": "1.3.0",
+      "build": "LIB-1.3.0-20260723",
+      "status": "admin-maintenance-and-read-only-explorer",
       "path": "modules/library-manager/index.html"
+    },
+    "siteResearch": {
+      "version": "1.0.0",
+      "build": "SITE-RESEARCH-1.0.0-20260723",
+      "status": "production",
+      "path": "modules/site-research/index.html"
     }
   },
   "sharedLibrary": {
-    "version": "1.5.0",
-    "build": "SHARED-LIB-1.5.0-20260722",
-    "status": "production-interim-no-backend"
+    "version": "1.6.0",
+    "build": "SHARED-LIB-1.6.0-20260723",
+    "status": "canonical-route-sanitized"
   },
-  "researchQuality": {"version":"1.1.1","build":"RESEARCH-QUALITY-1.1.1-20260722"},
-  "researchWorkflow": {"version":"1.0.1","build":"RESEARCH-WORKFLOW-1.0.1-20260722"},
-  "sharedTheme": {"version":"1.0.0","build":"TPT-THEME-1.0.0-20260716"}
+  "researchQuality": {"version":"1.2.0","build":"RESEARCH-QUALITY-1.2.0-20260723"},
+  "researchWorkflow": {"version":"1.1.0","build":"RESEARCH-WORKFLOW-1.1.0-20260723"},
+  "sharedTheme": {"version":"1.1.0","build":"TPT-THEME-1.1.0-20260723"}
 }

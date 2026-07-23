@@ -1,3 +1,9 @@
+# Toolkit 2.7.0 compact Site Research production release
+
+Builds: `TPT-2.7.0-20260723`, `DASH-1.5.0-20260723`, `RAIL-4.11.0-20260723`, `BUS-PROD-180-20260723`, `LIB-1.3.0-20260723`, `SITE-RESEARCH-1.0.0-20260723`, `SHARED-LIB-1.6.0-20260723`, `RESEARCH-QUALITY-1.2.0-20260723`, `RESEARCH-WORKFLOW-1.1.0-20260723`.
+
+Site Research now reuses complete shared knowledge before creating the fewest safe Rail/Bus research uploads. Bus Route identity no longer depends on operator wording or route number alone. Planner Mode is the default, Admin Tools are persisted, and Library Explorer provides read-only shared-library access. Accessibility and STATS19 are unchanged.
+
 # Toolkit 2.6.1 corrective production release
 
 Builds: `TPT-2.6.1-20260722`, `DASH-1.4.0-20260722`, `RAIL-4.10.1-20260722`, `BUS-PROD-171-20260722`, `LIB-1.2.1-20260722`, `SHARED-LIB-1.5.0-20260722`, `RESEARCH-QUALITY-1.1.1-20260722`, `RESEARCH-WORKFLOW-1.0.1-20260722`.

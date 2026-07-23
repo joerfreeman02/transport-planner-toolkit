@@ -3,20 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#164e4b">
-  <title>Transport Planner Toolkit — TPT 2.6.1</title>
+  <meta name="theme-color" content="#002060">
+  <title>Transport Planner Toolkit — TPT 2.7.0</title>
   <link rel="stylesheet" href="assets/css/shell.css?build=TPT-SHARED-220-20260716">
-  <link rel="stylesheet" href="assets/css/tpt-theme.css?build=TPT-THEME-1.0.0-20260716">
+  <link rel="stylesheet" href="assets/css/eas-theme.css?build=TPT-THEME-1.1.0-20260723">
 </head>
 <body>
   <header class="hero">
     <div class="hero-inner">
       <div>
+        <img class="eas-logo" src="assets/images/eas-white.png" alt="EAS Transport Planning">
         <p class="eyebrow">Professional transport planning workflow</p>
         <h1>Transport Planner Toolkit</h1>
         <p class="tagline">A growing suite of traceable, report-focused tools designed to remove repetitive work while preserving professional review and engineering judgement.</p>
       </div>
-      <span class="build">TPT 2.6.1 · TPT-2.6.1-20260722 · Dashboard DASH-1.4.0</span>
+      <span class="build">TPT 2.7.0 · TPT-2.7.0-20260723 · Dashboard DASH-1.5.0</span>
     </div>
   </header>
   <main>
@@ -28,9 +29,11 @@
         <div style="display:flex;gap:8px"><button id="saveProject" class="primary">Save</button><button id="clearProject" class="secondary">Clear</button></div>
       </div>
       <div id="projectStatus" class="project-status"></div>
+      <label class="check-label"><input id="showAdminTools" type="checkbox"> Show Admin Tools</label>
+      <p class="project-status">Admin Tools is a saved display preference, not an access-control system. Shared writes still require an authorised token.</p>
     </section>
 
-    <section class="project-card" id="sharedLibrarySettings">
+    <section class="project-card admin-only" id="sharedLibrarySettings">
       <div class="section-title"><div><h2>Shared Company Knowledge Library</h2><p>Everyone can read the deployed company masters. Authorised editors can publish reviewed local proposals using a fine-grained GitHub token.</p></div><span id="sharedConnectionBadge" class="status existing">Read only</span></div>
       <p><strong>Treat the access token like a password.</strong> It is stored only in this browser when requested, cleared from the field after connection, and never included in diagnostics or exports.</p>
       <div class="project-grid">
@@ -44,6 +47,12 @@
 
     <h2 class="modules-title">Modules</h2>
     <section class="modules">
+      <article class="module">
+        <div class="module-top"><span class="icon">SITE</span><span class="status stable">Guided workflow</span></div>
+        <h3>Site Research</h3>
+        <p>Checks selected Rail and Bus locations against company knowledge, then creates the fewest compact ChatGPT research packs required.</p>
+        <div class="module-actions"><a class="button primary" href="modules/site-research/">Open guided Site Research</a></div>
+      </article>
       <article class="module">
         <div class="module-top"><span class="icon">🚶</span><span class="status stable">Ready to use</span></div>
         <h3>Accessibility Assessment</h3>
@@ -72,6 +81,12 @@
         <div class="module-actions"><a class="button primary" href="modules/bus/">Open module</a></div>
       </article>
       <article class="module">
+        <div class="module-top"><span class="icon">LIB</span><span class="status stable">Read only</span></div>
+        <h3>Library Explorer</h3>
+        <p>Search stations, Bus stops, Bus Routes and stop-specific services to see reusable evidence, sources and review dates.</p>
+        <div class="module-actions"><a class="button primary" href="modules/library-manager/?mode=explorer">Explore company information</a></div>
+      </article>
+      <article class="module admin-only">
         <div class="module-top"><span class="icon">LIB</span><span class="status stable">Ready to use</span></div>
         <h3>Library Manager</h3>
         <p>Browse, search, repair, research, export and safely maintain the shared Rail, Bus Stop and Bus Route libraries.</p>
@@ -80,8 +95,9 @@
     </section>
   </main>
   <footer>Transport Planner Toolkit · Commercial-grade internal platform · Data remains in the browser unless a module explicitly uses an external mapping, geocoding or routing service.</footer>
-  <script src="assets/js/research-quality.js?build=RESEARCH-QUALITY-110-20260722"></script>
-  <script src="assets/js/shared-library.js?build=SHARED-LIB-150-20260722&amp;asset=10"></script>
-  <script src="assets/js/shell.js?build=TPT-SHARED-220-20260716"></script>
+  <script src="assets/js/research-quality.js?build=RESEARCH-QUALITY-120-20260723"></script>
+  <script src="assets/js/research-workflow.js?build=RESEARCH-WORKFLOW-110-20260723"></script>
+  <script src="assets/js/shared-library.js?build=SHARED-LIB-160-20260723"></script>
+  <script src="assets/js/shell.js?build=DASH-1.5.0-20260723"></script>
 </body>
 </html>

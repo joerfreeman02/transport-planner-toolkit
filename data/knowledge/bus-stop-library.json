@@ -1,8 +1,8 @@
 {
   "schema": "tpt.bus-stop-library",
   "version": "1.0.0",
-  "libraryBuild": "SHARED-LIB-1.5.0-20260722",
-  "updatedAt": "2026-07-22T17:21:22.398Z",
+  "libraryBuild": "SHARED-LIB-1.6.0-20260723",
+  "updatedAt": "2026-07-23T09:00:00.000Z",
   "records": [
     {
       "naptanCode": "490011045S",
@@ -36,20 +36,7 @@
         "updatedAt": "2026-07-17T14:35:01.626Z",
         "editorName": "Joe Freeman"
       },
-      "walking": {
-        "distance": 57.5,
-        "duration": 45.8,
-        "status": "routed",
-        "source": "OSRM foot"
-      },
-      "cycling": {
-        "distance": 80.4,
-        "duration": 57.5,
-        "status": "routed",
-        "source": "OSRM bike"
-      },
-      "source": "NaPTAN identity via mapped stop data",
-      "existingSavedRecord": null
+      "source": "NaPTAN identity via mapped stop data"
     },
     {
       "naptanCode": "490011045N",
@@ -86,20 +73,7 @@
         "updatedAt": "2026-07-17T14:35:01.626Z",
         "editorName": "Joe Freeman"
       },
-      "walking": {
-        "distance": 38.7,
-        "duration": 30.9,
-        "status": "routed",
-        "source": "OSRM foot"
-      },
-      "cycling": {
-        "distance": 38.7,
-        "duration": 23.3,
-        "status": "routed",
-        "source": "OSRM bike"
-      },
-      "source": "NaPTAN identity via mapped stop data",
-      "existingSavedRecord": null
+      "source": "NaPTAN identity via mapped stop data"
     },
     {
       "naptanCode": "490011042S",

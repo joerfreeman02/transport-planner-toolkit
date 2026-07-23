@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Site Research — Transport Planner Toolkit</title>
+  <link rel="stylesheet" href="../../assets/css/eas-theme.css?build=TPT-THEME-1.1.0-20260723">
+  <link rel="stylesheet" href="../../assets/css/research-workflow.css?build=RESEARCH-WORKFLOW-110-20260723">
+  <link rel="stylesheet" href="site-research.css?build=SITE-RESEARCH-1.0.0-20260723">
+</head>
+<body>
+  <header class="hero"><div class="hero-inner"><div><img class="eas-logo" src="../../assets/images/eas-white.png" alt="EAS Transport Planning"><a class="home" href="../../">← Toolkit home</a><p class="eyebrow">Transport Planner Toolkit</p><h1>Site Research</h1><p class="tagline">Reuse company knowledge first, then research only genuinely missing site information.</p></div><span class="build">SITE-RESEARCH-1.0.0</span></div></header>
+  <main>
+    <section class="panel">
+      <h2>Guided site workflow</h2>
+      <ol id="guidedSteps" class="guided-research" aria-live="polite"></ol>
+      <div class="guided-primary">
+        <button id="primaryAction" class="primary" disabled>Loading company information…</button>
+        <label id="importLabel" class="button-like primary" hidden>Import completed Site Research<input id="importResearch" type="file" accept=".json,application/json" hidden></label>
+      </div>
+      <p id="status" class="status-message" role="status">Loading all Shared Library masters without a token…</p>
+    </section>
+    <section class="panel">
+      <h2>Selected site and transport locations</h2>
+      <p id="siteSummary">No saved site selection found.</p>
+      <div class="selection-links"><a class="button secondary" href="../railway/">Select Railway stations</a><a class="button secondary" href="../bus/">Select Bus stops</a><button id="refreshPlan" class="secondary">Recheck company information</button></div>
+      <div id="selectionSummary" class="summary-grid"></div>
+    </section>
+    <section class="panel">
+      <h2>Research requirement</h2>
+      <div id="uploadSummary" class="upload-summary">Calculating the smallest safe research pack…</div>
+      <div id="reuseSummary"></div>
+      <details class="research-advanced"><summary>Advanced details</summary><div id="advanced"></div></details>
+    </section>
+    <section id="importResult" class="panel" hidden></section>
+  </main>
+  <script src="../../assets/js/research-quality.js?build=RESEARCH-QUALITY-120-20260723"></script>
+  <script src="../../assets/js/research-workflow.js?build=RESEARCH-WORKFLOW-110-20260723"></script>
+  <script src="../../assets/js/shared-library.js?build=SHARED-LIB-160-20260723"></script>
+  <script src="site-research.js?build=SITE-RESEARCH-1.0.0-20260723"></script>
+</body>
+</html>

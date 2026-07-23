@@ -1,5 +1,12 @@
 # Changelog
 
+## Toolkit 2.7.0 compact Site Research — 2026-07-23
+
+- Added shared-first combined Site Research packs with adaptive Rail and Bus batching, partial import and visible reuse counts.
+- Canonicalised Bus Route identity by authority, route, terminal pair and variant; merged duplicate 262/473 records and migrated stop relationships without losing source history.
+- Added persisted Planner/Admin modes and a read-only Library Explorer; retained Library Manager maintenance controls in Admin Tools.
+- Sanitised project-only access fields from Shared Bus Stop publication and introduced limited EAS blue/lime presentation tokens.
+
 ## Toolkit 2.6.0 research workflow assurance — 2026-07-22
 
 - Enforced deterministic Railway batches of no more than five stations with persistent progress and targeted correction requests.

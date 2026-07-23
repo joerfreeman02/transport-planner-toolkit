@@ -1,14 +1,14 @@
 {
   "schema": "tpt.bus-stop-route-library",
   "version": "1.0.0",
-  "libraryBuild": "SHARED-LIB-1.5.0-20260722",
-  "updatedAt": "2026-07-22T17:21:22.314Z",
+  "libraryBuild": "SHARED-LIB-1.6.0-20260723",
+  "updatedAt": "2026-07-23T09:00:00.000Z",
   "records": [
     {
       "naptanCode": "490011045N",
       "fallbackIdentity": "",
       "routeNumber": "241",
-      "compositeRouteKey": "241|east london bus coach company ltd|here east|royal crest avenue|east london here east and stratford via plaistow and custom house to silvertown and royal wharf",
+      "compositeRouteKey": "route:transport-for-london:241:here east~royal crest avenue:",
       "operator": "East London Bus & Coach Company Ltd",
       "routeOrigin": "Here East",
       "routeDestination": "Royal Crest Avenue",
@@ -57,13 +57,15 @@
       "editorName": "Joe Freeman Home",
       "updatedAt": "2026-07-22T17:21:22.314Z",
       "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
+      "previousRevision": null,
+      "legacyRouteKey": "241|east london bus coach company ltd|here east|royal crest avenue|east london here east and stratford via plaistow and custom house to silvertown and royal wharf",
+      "canonicalRouteKey": "route:transport-for-london:241:here east~royal crest avenue:"
     },
     {
       "naptanCode": "490011045N",
       "fallbackIdentity": "",
       "routeNumber": "262",
-      "compositeRouteKey": "262|east london bus coach company ltd|stratford bus station|gallions reach shopping park|east london stratford and plaistow via newham university hospital and beckton to gallions reach",
+      "compositeRouteKey": "route:transport-for-london:262:gallions reach shopping park~stratford bus station:",
       "operator": "East London Bus & Coach Company Ltd",
       "routeOrigin": "Stratford Bus Station",
       "routeDestination": "Gallions Reach Shopping Park",
@@ -112,13 +114,15 @@
       "editorName": "Joe Freeman Home",
       "updatedAt": "2026-07-22T17:21:22.314Z",
       "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
+      "previousRevision": null,
+      "legacyRouteKey": "262|east london bus coach company ltd|stratford bus station|gallions reach shopping park|east london stratford and plaistow via newham university hospital and beckton to gallions reach",
+      "canonicalRouteKey": "route:transport-for-london:262:gallions reach shopping park~stratford bus station:"
     },
     {
       "naptanCode": "490011045N",
       "fallbackIdentity": "",
       "routeNumber": "325",
-      "compositeRouteKey": "325|blue triangle buses ltd|east beckton sainsbury s|prince regent bus station|east london east beckton and east ham via upton park and plaistow to custom house and prince regent",
+      "compositeRouteKey": "route:transport-for-london:325:east beckton sainsbury s~prince regent bus station:",
       "operator": "Blue Triangle Buses Ltd",
       "routeOrigin": "East Beckton / Sainsbury's",
       "routeDestination": "Prince Regent Bus Station",
@@ -167,13 +171,15 @@
       "editorName": "Joe Freeman Home",
       "updatedAt": "2026-07-22T17:21:22.314Z",
       "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
+      "previousRevision": null,
+      "legacyRouteKey": "325|blue triangle buses ltd|east beckton sainsbury s|prince regent bus station|east london east beckton and east ham via upton park and plaistow to custom house and prince regent",
+      "canonicalRouteKey": "route:transport-for-london:325:east beckton sainsbury s~prince regent bus station:"
     },
     {
       "naptanCode": "490011045N",
       "fallbackIdentity": "",
       "routeNumber": "473",
-      "compositeRouteKey": "473|east london bus coach company ltd|north woolwich ferry|stratford bus station|east london north woolwich and london city airport via newham university hospital and plaistow to stratford",
+      "compositeRouteKey": "route:transport-for-london:473:north woolwich ferry~stratford bus station:",
       "operator": "East London Bus & Coach Company Ltd",
       "routeOrigin": "North Woolwich Ferry",
       "routeDestination": "Stratford Bus Station",
@@ -222,13 +228,15 @@
       "editorName": "Joe Freeman Home",
       "updatedAt": "2026-07-22T17:21:22.314Z",
       "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
+      "previousRevision": null,
+      "legacyRouteKey": "473|east london bus coach company ltd|north woolwich ferry|stratford bus station|east london north woolwich and london city airport via newham university hospital and plaistow to stratford",
+      "canonicalRouteKey": "route:transport-for-london:473:north woolwich ferry~stratford bus station:"
     },
     {
       "naptanCode": "490011045N",
       "fallbackIdentity": "",
       "routeNumber": "678",
-      "compositeRouteKey": "678|east london bus coach company ltd|st george s road|beckton bus station|east london school day service between forest gate upton park plaistow custom house prince regent cyprus and beckton",
+      "compositeRouteKey": "route:transport-for-london:678:beckton bus station~st george s road:",
       "operator": "East London Bus & Coach Company Ltd",
       "routeOrigin": "St George's Road",
       "routeDestination": "Beckton Bus Station",
@@ -277,13 +285,15 @@
       "editorName": "Joe Freeman Home",
       "updatedAt": "2026-07-22T17:21:22.314Z",
       "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
+      "previousRevision": null,
+      "legacyRouteKey": "678|east london bus coach company ltd|st george s road|beckton bus station|east london school day service between forest gate upton park plaistow custom house prince regent cyprus and beckton",
+      "canonicalRouteKey": "route:transport-for-london:678:beckton bus station~st george s road:"
     },
     {
       "naptanCode": "490011045S",
       "fallbackIdentity": "",
       "routeNumber": "262",
-      "compositeRouteKey": "262|east london bus coach company ltd|stratford bus station|gallions reach shopping park|east london stratford plaistow newham university hospital beckton gallions reach",
+      "compositeRouteKey": "route:transport-for-london:262:gallions reach shopping park~stratford bus station:",
       "operator": "East London Bus & Coach Company Ltd",
       "routeOrigin": "Stratford Bus Station",
       "routeDestination": "Gallions Reach Shopping Park",
@@ -332,13 +342,15 @@
       "editorName": "Joe Freeman Home",
       "updatedAt": "2026-07-22T17:21:22.314Z",
       "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
+      "previousRevision": null,
+      "legacyRouteKey": "262|east london bus coach company ltd|stratford bus station|gallions reach shopping park|east london stratford plaistow newham university hospital beckton gallions reach",
+      "canonicalRouteKey": "route:transport-for-london:262:gallions reach shopping park~stratford bus station:"
     },
     {
       "naptanCode": "490011045S",
       "fallbackIdentity": "",
       "routeNumber": "473",
-      "compositeRouteKey": "473|east london bus coach company ltd|stratford bus station|north woolwich ferry|east london stratford plaistow newham university hospital prince regent london city airport north woolwich",
+      "compositeRouteKey": "route:transport-for-london:473:north woolwich ferry~stratford bus station:",
       "operator": "East London Bus & Coach Company Ltd",
       "routeOrigin": "Stratford Bus Station",
       "routeDestination": "North Woolwich Ferry",
@@ -387,7 +399,9 @@
       "editorName": "Joe Freeman Home",
       "updatedAt": "2026-07-22T17:21:22.314Z",
       "originatingModuleBuild": "BUS-PROD-171-20260722",
-      "previousRevision": null
+      "previousRevision": null,
+      "legacyRouteKey": "473|east london bus coach company ltd|stratford bus station|north woolwich ferry|east london stratford plaistow newham university hospital prince regent london city airport north woolwich",
+      "canonicalRouteKey": "route:transport-for-london:473:north woolwich ferry~stratford bus station:"
     }
   ]
 }

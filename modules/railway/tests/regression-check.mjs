@@ -32,5 +32,5 @@ test('sources and research workflows are separated from assessment',()=>{const h
 test('station save provides an accessible visible confirmation',()=>{const h=read('index.html'),j=read('assets/js/railway.js');assert.match(j,/Saved to the local Rail overlay/);assert.match(j,/station-save-status/);assert.match(h,/aria-live="polite"/)});
 test('Word-ready export controls and shared formatter remain present',()=>{const h=read('index.html'),j=read('assets/js/railway.js');assert.match(h,/id="downloadWordBtn"/);assert.match(h,/Copy Word tables/);assert.match(j,/railwayWordTables/);assert.match(j,/word-export\.js/)});
 test('final Sprint 3 Railway export fields are present',()=>{const h=read('index.html'),j=read('assets/js/railway.js');assert.ok(h.includes('Download directional TPH'));['Step-free access','Service pattern:','Journey opportunities:','railwayTphTables'].forEach(x=>assert.ok(j.includes(x)))});
-test('build label is visible',()=>assert.ok(read('index.html').includes('RAIL-4.10.1-20260722')));
+test('build label is visible',()=>assert.ok(read('index.html').includes('RAIL-4.11.0-20260723')));
 let passed=0;for(const [name,fn] of tests){try{await fn();console.log(`PASS ${name}`);passed++}catch(e){console.error(`FAIL ${name}: ${e.message}`);process.exitCode=1}}console.log(`\n${passed}/${tests.length} tests passed`);

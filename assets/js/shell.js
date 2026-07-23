@@ -9,6 +9,14 @@ function save(){
 function clearProject(){localStorage.removeItem(KEY);$('projectName').value='';$('siteAddress').value='';$('projectStatus').textContent='Project details cleared.';}
 const p=load();$('projectName').value=p.name||'';$('siteAddress').value=p.siteAddress||'';
 $('saveProject').onclick=save;$('clearProject').onclick=clearProject;
+const ADMIN_KEY='tpt.show-admin-tools.v1',adminToggle=$('showAdminTools');
+function renderAdminTools(){
+  const enabled=localStorage.getItem(ADMIN_KEY)==='true';
+  adminToggle.checked=enabled;
+  document.querySelectorAll('.admin-only').forEach(element=>element.hidden=!enabled);
+}
+adminToggle.onchange=()=>{localStorage.setItem(ADMIN_KEY,String(adminToggle.checked));renderAdminTools();};
+renderAdminTools();
 
 const sharedStatus=$('sharedStatus'),sharedBadge=$('sharedConnectionBadge'),sharedEditor=$('sharedEditor'),sharedToken=$('sharedToken'),publishRail=$('publishRail');
 function renderSharedConnection(message){

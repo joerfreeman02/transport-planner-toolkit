@@ -40,13 +40,13 @@ for (const marker of ['Collision Record Cards', 'fileinput']) {
   if (!ok) failures++;
 }
 const bus = fs.readFileSync(path.join(root, 'modules/bus/index.html'), 'utf8');
-for (const marker of ['Bus Assessment', 'Find nearby stops', 'Search radius', 'Walking', 'Cycling', 'BUS-1.8.1', 'Bus Route and Service Review']) {
+for (const marker of ['Bus Assessment', 'Find nearby stops', 'Search radius', 'Walking', 'Cycling', 'BUS-1.8.2', 'Bus Route and Service Review']) {
   const ok = bus.includes(marker);
   console.log(`${ok ? 'PASS' : 'FAIL'} Bus marker: ${marker}`);
   if (!ok) failures++;
 }
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'config/modules.json'), 'utf8'));
-for (const [label,actual,expected] of [['Dashboard',manifest.modules.dashboard.version,'1.5.1'],['Accessibility',manifest.modules.accessibility.version,'1.5.0'],['Railway',manifest.modules.railway.version,'4.11.1'],['Bus',manifest.modules.bus.version,'1.8.1'],['Library Manager',manifest.modules.libraryManager.version,'1.3.0'],['STATS19',manifest.modules.stats19.version,'1.0.0']]) {
+for (const [label,actual,expected] of [['Dashboard',manifest.modules.dashboard.version,'1.5.1'],['Accessibility',manifest.modules.accessibility.version,'1.5.0'],['Railway',manifest.modules.railway.version,'4.11.1'],['Bus',manifest.modules.bus.version,'1.8.2'],['Library Manager',manifest.modules.libraryManager.version,'1.3.0'],['STATS19',manifest.modules.stats19.version,'1.0.0']]) {
   const ok = actual === expected;
   console.log(`${ok ? 'PASS' : 'FAIL'} frozen identity: ${label} ${actual}`);
   if (!ok) failures++;

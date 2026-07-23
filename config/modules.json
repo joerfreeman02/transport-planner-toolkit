@@ -31,10 +31,10 @@
       "path": "modules/railway/index.html"
     },
     "bus": {
-      "version": "1.8.1",
-      "build": "BUS-PROD-181-20260723",
+      "version": "1.8.2",
+      "build": "BUS-EMERGENCY-182-20260723",
       "schemaVersion": "1.0.0",
-      "status": "canonical-route-site-research",
+      "status": "emergency-exact-identity-site-research",
       "path": "modules/bus/index.html"
     },
     "libraryManager": {

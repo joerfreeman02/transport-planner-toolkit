@@ -2,7 +2,7 @@
   "schema": "tpt.bus-route-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.6.0-20260723",
-  "updatedAt": "2026-07-23T09:00:00.000Z",
+  "updatedAt": "2026-07-24T08:44:30.701Z",
   "records": [
     {
       "routeNumber": "69",
@@ -912,6 +912,255 @@
         "678|east london bus coach company ltd|st george s road|beckton bus station|east london school day service between forest gate upton park plaistow custom house prince regent cyprus and beckton"
       ],
       "previousRevisions": []
+    },
+    {
+      "routeNumber": "25",
+      "operator": "Central Connect",
+      "routeOrigin": "Harlow Town Centre",
+      "routeDestination": "Cheshunt, Brookfield Centre",
+      "principalLocationsServed": [
+        "Stanstead Abbotts",
+        "St Margarets",
+        "Rye Park",
+        "Hoddesdon",
+        "Broxbourne",
+        "Wormley",
+        "Cheshunt"
+      ],
+      "sources": [
+        {
+          "title": "Service 25 and 25B timetable",
+          "url": "https://www.intalink.org.uk/services/bf591133-6663-4684-a249-994fc6a78df9",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-24"
+        }
+      ],
+      "retrievalDate": "2026-07-24",
+      "verificationStatus": "verified",
+      "geographicContext": "Service corridor between Harlow Town Centre and Cheshunt, Brookfield Centre via Stanstead Abbotts, St Margarets, Rye Park, Hoddesdon, Broxbourne, Wormley, Cheshunt.",
+      "mondayFridayOperatingPeriod": "approximately 06:15-20:25 / approximately 06:05-20:15",
+      "saturdayOperatingPeriod": "approximately 07:15-19:25 / approximately 07:05-19:15",
+      "sundayOperatingPeriod": "No service",
+      "servicePattern": "Generally hourly towards Hoddesdon, Broxbourne, Wormley and Cheshunt, with some journeys terminating short. / Generally hourly towards Harlow via Roydon Road, with some timetable variation at peaks and in the evening.",
+      "serviceQualifications": {
+        "peak": "Some peak and evening journeys operate as route 25B and terminate at Hoddesdon or Broxbourne rather than continuing to Brookfield Centre.",
+        "evening": "Service reduces during the evening.",
+        "night": "No overnight service."
+      },
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-24T08:44:30.701Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "25B",
+      "operator": "Central Connect",
+      "routeOrigin": "Harlow Town Centre",
+      "routeDestination": "Hoddesdon / Broxbourne",
+      "principalLocationsServed": [
+        "Stanstead Abbotts",
+        "St Margarets",
+        "Rye Park",
+        "Hoddesdon",
+        "Broxbourne"
+      ],
+      "sources": [
+        {
+          "title": "Service 25 and 25B timetable",
+          "url": "https://www.intalink.org.uk/services/bf591133-6663-4684-a249-994fc6a78df9",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-24"
+        }
+      ],
+      "retrievalDate": "2026-07-24",
+      "verificationStatus": "verified",
+      "geographicContext": "Service corridor between Harlow Town Centre and Hoddesdon / Broxbourne via Stanstead Abbotts, St Margarets, Rye Park, Hoddesdon, Broxbourne.",
+      "mondayFridayOperatingPeriod": "Selected peak/evening journeys only",
+      "saturdayOperatingPeriod": "Selected journeys only",
+      "sundayOperatingPeriod": "No service",
+      "servicePattern": "Limited short-working journeys supplement route 25 and terminate at Hoddesdon or Broxbourne.",
+      "serviceQualifications": {
+        "peak": "Some peak and evening journeys operate as route 25B and terminate at Hoddesdon or Broxbourne rather than continuing to Brookfield Centre.",
+        "evening": "Service reduces during the evening.",
+        "night": "No overnight service."
+      },
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-24T08:44:30.701Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "33",
+      "operator": "Central Connect",
+      "routeOrigin": "Hoddesdon",
+      "routeDestination": "Bishop's Stortford",
+      "principalLocationsServed": [
+        "Stanstead Abbotts",
+        "Gilston",
+        "High Wych",
+        "Sawbridgeworth",
+        "Bishop's Stortford"
+      ],
+      "sources": [
+        {
+          "title": "Service 33 timetable",
+          "url": "https://www.intalink.org.uk/services/ba2a262b-66ba-46bd-ae26-5567b05a6802",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-24"
+        },
+        {
+          "title": "Brand new Bishop's Stortford–Hoddesdon service",
+          "url": "https://www.intalink.org.uk/brand-new-bishops-stortford-hoddesdon-service",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-24"
+        }
+      ],
+      "retrievalDate": "2026-07-24",
+      "verificationStatus": "verified",
+      "geographicContext": "Service corridor between Hoddesdon and Bishop's Stortford via Stanstead Abbotts, Gilston, High Wych, Sawbridgeworth, Bishop's Stortford.",
+      "mondayFridayOperatingPeriod": "Two morning and two afternoon journeys",
+      "saturdayOperatingPeriod": "No service",
+      "sundayOperatingPeriod": "No service",
+      "servicePattern": "Four weekday journeys in each direction, arranged as two morning and two afternoon trips.",
+      "serviceQualifications": {
+        "peak": "Two morning and two afternoon journeys operate in each direction.",
+        "evening": "No evening service.",
+        "night": "No overnight service."
+      },
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-24T08:44:30.701Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "35",
+      "operator": "Central Connect",
+      "routeOrigin": "Hertford",
+      "routeDestination": "Bishop's Stortford",
+      "principalLocationsServed": [
+        "Ware",
+        "St Margarets",
+        "Stanstead Abbotts",
+        "Hunsdon",
+        "Widford",
+        "Much Hadham",
+        "Little Hadham",
+        "Bishop's Park",
+        "Bishop's Stortford"
+      ],
+      "sources": [
+        {
+          "title": "Service 35, 35B and 35C timetable",
+          "url": "https://www.intalink.org.uk/services/a462c109-1f5c-413a-bfee-dc61d8ad0819",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-24"
+        },
+        {
+          "title": "Current service disruptions",
+          "url": "https://www.intalink.org.uk/service-updates",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-24"
+        }
+      ],
+      "retrievalDate": "2026-07-24",
+      "verificationStatus": "verified",
+      "geographicContext": "Service corridor between Hertford and Bishop's Stortford via Ware, St Margarets, Stanstead Abbotts, Hunsdon, Widford, Much Hadham, Little Hadham, Bishop's Park, Bishop's Stortford.",
+      "mondayFridayOperatingPeriod": "approximately 07:00-20:05 / approximately 06:20-20:40",
+      "saturdayOperatingPeriod": "approximately 08:00-19:05 / approximately 08:15-19:05",
+      "sundayOperatingPeriod": "No service",
+      "servicePattern": "Generally hourly on weekdays and approximately two-hourly on Saturdays towards St Margarets, Ware and Hertford. / Generally hourly on weekdays and approximately two-hourly on Saturdays towards Hunsdon, Much Hadham and Bishop's Stortford.",
+      "serviceQualifications": {
+        "peak": "Additional journeys and minor interval variations occur at peak times.",
+        "evening": "A limited evening service operates.",
+        "night": "No overnight service.",
+        "seasonal": "At retrieval on 24 July 2026, an open-ended Medcalf Hill road closure meant service 35 was not serving stops between Stanstead Abbotts Roydon Road and Cradle End; Abbotts Rise remained the stated alternative stop."
+      },
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-24T08:44:30.701Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "35C",
+      "operator": "Central Connect",
+      "routeOrigin": "Hertford",
+      "routeDestination": "Bishop's Stortford, Parsonage Estate",
+      "principalLocationsServed": [
+        "Ware",
+        "St Margarets",
+        "Stanstead Abbotts",
+        "Hunsdon",
+        "Widford",
+        "Much Hadham",
+        "Little Hadham",
+        "Bishop's Park",
+        "Bishop's Stortford",
+        "Parsonage Estate"
+      ],
+      "sources": [
+        {
+          "title": "Service 35, 35B and 35C timetable",
+          "url": "https://www.intalink.org.uk/services/a462c109-1f5c-413a-bfee-dc61d8ad0819",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-24"
+        }
+      ],
+      "retrievalDate": "2026-07-24",
+      "verificationStatus": "verified",
+      "geographicContext": "Service corridor between Hertford and Bishop's Stortford, Parsonage Estate via Ware, St Margarets, Stanstead Abbotts, Hunsdon, Widford, Much Hadham, Little Hadham, Bishop's Park, Bishop's Stortford, Parsonage Estate.",
+      "mondayFridayOperatingPeriod": "Selected school-day / evening journeys",
+      "saturdayOperatingPeriod": "No regular Saturday service",
+      "sundayOperatingPeriod": "No service",
+      "servicePattern": "Selected route 35 variations, primarily associated with school-day or extended workings. / Selected route 35 variations extend beyond Bishop's Stortford town centre to the Parsonage Estate.",
+      "serviceQualifications": {
+        "evening": "Some evening journeys extend to Parsonage Estate.",
+        "night": "No overnight service.",
+        "schoolDay": "Route 35C denotes school-day and/or extended Parsonage Estate variations; it is not an all-day hourly service."
+      },
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-24T08:44:30.701Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "35B",
+      "operator": "Central Connect",
+      "routeOrigin": "Hertford",
+      "routeDestination": "Stanstead Abbotts",
+      "principalLocationsServed": [
+        "Ware",
+        "St Margarets",
+        "Stanstead Abbotts"
+      ],
+      "sources": [
+        {
+          "title": "Service 35, 35B and 35C timetable",
+          "url": "https://www.intalink.org.uk/services/a462c109-1f5c-413a-bfee-dc61d8ad0819",
+          "publisher": "Intalink / Hertfordshire County Council",
+          "retrievalDate": "2026-07-24"
+        }
+      ],
+      "retrievalDate": "2026-07-24",
+      "verificationStatus": "verified",
+      "geographicContext": "Service corridor between Hertford and Stanstead Abbotts via Ware, St Margarets, Stanstead Abbotts.",
+      "mondayFridayOperatingPeriod": "Selected early-morning / evening short workings",
+      "saturdayOperatingPeriod": "Selected short workings only",
+      "sundayOperatingPeriod": "No service",
+      "servicePattern": "Limited short workings from Hertford terminate in Stanstead Abbotts rather than continuing towards Bishop's Stortford.",
+      "serviceQualifications": {
+        "evening": "Limited short-working journeys between Hertford and Stanstead Abbotts.",
+        "night": "No overnight service."
+      },
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-24T08:44:30.701Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
     }
   ]
 }

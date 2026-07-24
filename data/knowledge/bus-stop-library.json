@@ -2,7 +2,7 @@
   "schema": "tpt.bus-stop-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.6.0-20260723",
-  "updatedAt": "2026-07-23T09:00:00.000Z",
+  "updatedAt": "2026-07-24T08:44:30.585Z",
   "records": [
     {
       "naptanCode": "490011045S",
@@ -689,27 +689,37 @@
         "longitude": 0.0074363
       },
       "routesServed": [
-        "25/25B",
+        "25",
+        "25B",
         "33",
-        "35/35B/35C"
+        "35",
+        "35C"
       ],
       "sources": [
         {
-          "title": "Abbotts Court (W-bound)",
+          "title": "Intalink stop record 210021309340",
           "url": "https://www.intalink.org.uk/stops/210021309340",
           "publisher": "Intalink / Hertfordshire County Council",
-          "retrievalDate": "2026-07-16"
+          "retrievalDate": "2026-07-24"
+        },
+        {
+          "title": "NaPTAN stop data",
+          "url": "https://beta-naptan.dft.gov.uk/",
+          "publisher": "Department for Transport",
+          "retrievalDate": "2026-07-24"
         }
       ],
-      "retrievalDate": "2026-07-16",
+      "retrievalDate": "2026-07-24",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-17T14:35:01.626Z",
-      "originatingModuleBuild": "BUS-PROD-150-20260717",
+      "updatedAt": "2026-07-24T08:44:30.585Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "previousRevision": {
-        "updatedAt": "2026-07-16T14:12:12.622Z",
+        "updatedAt": "2026-07-17T14:35:01.626Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "indicator": "W-bound",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724"
     },
     {
       "naptanCode": "210021303480",
@@ -723,27 +733,37 @@
         "longitude": 0.0070198
       },
       "routesServed": [
-        "25/25B",
+        "25",
         "33",
-        "35/35B/35C"
+        "35",
+        "35B",
+        "35C"
       ],
       "sources": [
         {
-          "title": "Abbotts Court (E-bound)",
+          "title": "Intalink stop record 210021303480",
           "url": "https://www.intalink.org.uk/stops/210021303480",
           "publisher": "Intalink / Hertfordshire County Council",
-          "retrievalDate": "2026-07-16"
+          "retrievalDate": "2026-07-24"
+        },
+        {
+          "title": "NaPTAN stop data",
+          "url": "https://beta-naptan.dft.gov.uk/",
+          "publisher": "Department for Transport",
+          "retrievalDate": "2026-07-24"
         }
       ],
-      "retrievalDate": "2026-07-16",
+      "retrievalDate": "2026-07-24",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-17T14:35:01.626Z",
-      "originatingModuleBuild": "BUS-PROD-150-20260717",
+      "updatedAt": "2026-07-24T08:44:30.585Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "previousRevision": {
-        "updatedAt": "2026-07-16T14:12:12.622Z",
+        "updatedAt": "2026-07-17T14:35:01.626Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "indicator": "E-bound",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724"
     },
     {
       "naptanCode": "210021303500",
@@ -757,27 +777,37 @@
         "longitude": 0.0113048
       },
       "routesServed": [
-        "25/25B",
+        "25",
         "33",
-        "35/35B/35C"
+        "35",
+        "35B",
+        "35C"
       ],
       "sources": [
         {
-          "title": "Abbotts Rise (adj)",
+          "title": "Intalink stop record 210021303500",
           "url": "https://www.intalink.org.uk/stops/210021303500",
           "publisher": "Intalink / Hertfordshire County Council",
-          "retrievalDate": "2026-07-16"
+          "retrievalDate": "2026-07-24"
+        },
+        {
+          "title": "NaPTAN stop data",
+          "url": "https://beta-naptan.dft.gov.uk/",
+          "publisher": "Department for Transport",
+          "retrievalDate": "2026-07-24"
         }
       ],
-      "retrievalDate": "2026-07-16",
+      "retrievalDate": "2026-07-24",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-17T14:35:01.626Z",
-      "originatingModuleBuild": "BUS-PROD-150-20260717",
+      "updatedAt": "2026-07-24T08:44:30.585Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "previousRevision": {
-        "updatedAt": "2026-07-16T14:12:12.622Z",
+        "updatedAt": "2026-07-17T14:35:01.626Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "indicator": "adj",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724"
     },
     {
       "naptanCode": "210021309320",
@@ -791,27 +821,37 @@
         "longitude": 0.0112847
       },
       "routesServed": [
-        "25/25B",
+        "25",
+        "25B",
         "33",
-        "35/35B/35C"
+        "35",
+        "35C"
       ],
       "sources": [
         {
-          "title": "Abbotts Rise (opp)",
+          "title": "Intalink stop record 210021309320",
           "url": "https://www.intalink.org.uk/stops/210021309320",
           "publisher": "Intalink / Hertfordshire County Council",
-          "retrievalDate": "2026-07-16"
+          "retrievalDate": "2026-07-24"
+        },
+        {
+          "title": "NaPTAN stop data",
+          "url": "https://beta-naptan.dft.gov.uk/",
+          "publisher": "Department for Transport",
+          "retrievalDate": "2026-07-24"
         }
       ],
-      "retrievalDate": "2026-07-16",
+      "retrievalDate": "2026-07-24",
       "verificationStatus": "verified",
       "editorName": "Joe Freeman",
-      "updatedAt": "2026-07-17T14:35:01.626Z",
-      "originatingModuleBuild": "BUS-PROD-150-20260717",
+      "updatedAt": "2026-07-24T08:44:30.585Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "previousRevision": {
-        "updatedAt": "2026-07-16T14:12:12.622Z",
+        "updatedAt": "2026-07-17T14:35:01.626Z",
         "editorName": "Joe Freeman"
-      }
+      },
+      "indicator": "opp",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724"
     },
     {
       "naptanCode": "210021309360",

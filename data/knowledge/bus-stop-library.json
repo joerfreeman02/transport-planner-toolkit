@@ -2,7 +2,7 @@
   "schema": "tpt.bus-stop-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.6.0-20260723",
-  "updatedAt": "2026-07-24T08:44:30.585Z",
+  "updatedAt": "2026-07-24T15:09:21.754Z",
   "records": [
     {
       "naptanCode": "490011045S",
@@ -1309,6 +1309,92 @@
       "editorName": "Joe Freeman",
       "updatedAt": "2026-07-17T14:35:01.626Z",
       "originatingModuleBuild": "BUS-PROD-150-20260717",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "1500240100Y2",
+      "fallbackIdentity": "",
+      "stopName": "Broad Green",
+      "locality": "Steeple Bumpstead",
+      "direction": "Opp",
+      "pairedStopGroup": "broad green",
+      "coordinates": {
+        "latitude": 52.048522,
+        "longitude": 0.4652316
+      },
+      "routesServed": [
+        "DaRT 3"
+      ],
+      "sources": [
+        {
+          "title": "Broad Green (Opp) — stop record 1500240100Y2",
+          "url": "https://bustimes.org/stops/1500240100Y2",
+          "publisher": "Bus Times, using NaPTAN stop data",
+          "retrievalDate": "2026-07-24"
+        },
+        {
+          "title": "NaPTAN stop data",
+          "url": "https://beta-naptan.dft.gov.uk/",
+          "publisher": "Department for Transport",
+          "retrievalDate": "2026-07-24"
+        },
+        {
+          "title": "DaRT 3 – North East Braintree",
+          "url": "https://www.travelessex.co.uk/dart-landing/dart-3",
+          "publisher": "TravelEssex / Essex County Council",
+          "retrievalDate": "2026-07-24"
+        }
+      ],
+      "retrievalDate": "2026-07-24",
+      "verificationStatus": "verified",
+      "indicator": "Opp",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-24T15:09:21.754Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "150024010002",
+      "fallbackIdentity": "",
+      "stopName": "Broad Green",
+      "locality": "Steeple Bumpstead",
+      "direction": "Adj",
+      "pairedStopGroup": "broad green",
+      "coordinates": {
+        "latitude": 52.0484678,
+        "longitude": 0.4652432
+      },
+      "routesServed": [
+        "DaRT 3"
+      ],
+      "sources": [
+        {
+          "title": "Broad Green (Adj) — stop record 150024010002",
+          "url": "https://bustimes.org/stops/150024010002",
+          "publisher": "Bus Times, using NaPTAN stop data",
+          "retrievalDate": "2026-07-24"
+        },
+        {
+          "title": "NaPTAN stop data",
+          "url": "https://beta-naptan.dft.gov.uk/",
+          "publisher": "Department for Transport",
+          "retrievalDate": "2026-07-24"
+        },
+        {
+          "title": "DaRT 3 – North East Braintree",
+          "url": "https://www.travelessex.co.uk/dart-landing/dart-3",
+          "publisher": "TravelEssex / Essex County Council",
+          "retrievalDate": "2026-07-24"
+        }
+      ],
+      "retrievalDate": "2026-07-24",
+      "verificationStatus": "verified",
+      "indicator": "Adj",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-24T15:09:21.754Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "previousRevision": null
     }
   ]

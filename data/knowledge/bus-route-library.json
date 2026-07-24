@@ -2,7 +2,7 @@
   "schema": "tpt.bus-route-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.6.0-20260723",
-  "updatedAt": "2026-07-24T08:44:30.701Z",
+  "updatedAt": "2026-07-24T15:09:21.355Z",
   "records": [
     {
       "routeNumber": "69",
@@ -1159,6 +1159,63 @@
       "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "editorName": "Joe Freeman",
       "updatedAt": "2026-07-24T08:44:30.701Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "routeNumber": "DaRT 3",
+      "operator": "Central Connect",
+      "routeOrigin": "North East Braintree demand-responsive operating area",
+      "routeDestination": "North East Braintree demand-responsive operating area",
+      "principalLocationsServed": [
+        "Steeple Bumpstead",
+        "Great Yeldham",
+        "Ridgewell",
+        "Stambourne",
+        "Toppesfield",
+        "Halstead",
+        "Sudbury",
+        "Earls Colne",
+        "Colne Engaine",
+        "Pebmarsh",
+        "Belchamp St Paul"
+      ],
+      "sources": [
+        {
+          "title": "DaRT 3 – North East Braintree",
+          "url": "https://www.travelessex.co.uk/dart-landing/dart-3",
+          "publisher": "TravelEssex / Essex County Council",
+          "retrievalDate": "2026-07-24"
+        },
+        {
+          "title": "Broad Green (Opp) — stop record 1500240100Y2",
+          "url": "https://bustimes.org/stops/1500240100Y2",
+          "publisher": "Bus Times, using NaPTAN stop data",
+          "retrievalDate": "2026-07-24"
+        },
+        {
+          "title": "Broad Green (Adj) — stop record 150024010002",
+          "url": "https://bustimes.org/stops/150024010002",
+          "publisher": "Bus Times, using NaPTAN stop data",
+          "retrievalDate": "2026-07-24"
+        }
+      ],
+      "retrievalDate": "2026-07-24",
+      "verificationStatus": "verified",
+      "geographicContext": "Service corridor between North East Braintree demand-responsive operating area and North East Braintree demand-responsive operating area via Steeple Bumpstead, Great Yeldham, Ridgewell, Stambourne, Toppesfield, Halstead, Sudbury, Earls Colne, Colne Engaine, Pebmarsh, Belchamp St Paul.",
+      "mondayFridayOperatingPeriod": "06:00-20:00, advance booking required",
+      "saturdayOperatingPeriod": "06:00-20:00, advance booking required",
+      "sundayOperatingPeriod": "No service",
+      "servicePattern": "Flexible demand-responsive transport rather than a conventional fixed-route service. Passengers book an available journey between eligible locations within the DaRT 3 North East Braintree operating area.",
+      "serviceQualifications": {
+        "peak": "No fixed peak timetable. Journey times are agreed through the booking process and remain subject to vehicle availability.",
+        "evening": "The service operates until 20:00 Monday to Saturday, subject to an accepted advance booking.",
+        "night": "No service after 20:00.",
+        "seasonal": "No service on Sundays or bank holidays. Bookings must normally be made by 18:00 on the preceding operating day; Monday journeys must be booked by 18:00 on Saturday."
+      },
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-24T15:09:21.355Z",
       "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "previousRevision": null
     }

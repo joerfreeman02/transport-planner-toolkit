@@ -2,7 +2,7 @@
   "schema": "tpt.bus-stop-route-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.6.0-20260723",
-  "updatedAt": "2026-07-24T15:09:21.371Z",
+  "updatedAt": "2026-07-29T14:09:41.232Z",
   "records": [
     {
       "naptanCode": "490011045N",
@@ -1440,6 +1440,1562 @@
       "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "editorName": "Joe Freeman",
       "updatedAt": "2026-07-24T15:09:21.371Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001234",
+      "routeNumber": "102",
+      "directionFromStop": "westbound / northbound",
+      "stopSpecificDestination": "High Wycombe",
+      "mondayFridayOperatingPeriod": "Approximately 02:45-23:50 from High Wycombe, with services operating into the early hours in the reverse direction.",
+      "saturdayOperatingPeriod": "Broadly similar all-day and late-evening service.",
+      "sundayOperatingPeriod": "Regular Sunday service operates.",
+      "typicalWeekdayBusesPerHour": "approximately 2",
+      "saturdayBusesPerHour": "approximately 2",
+      "sundayBusesPerHour": "approximately 2",
+      "serviceQualifications": {
+        "peak": "Minor peak-time interval variations occur.",
+        "evening": "Late-evening services operate.",
+        "night": "Selected very early-morning and late-night journeys operate.",
+        "schoolDay": "No school-day-only restriction.",
+        "seasonal": "No seasonal variation identified."
+      },
+      "servicePattern": "Up to every 30 minutes daily.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Gerrards Cross, Denham, Uxbridge.",
+      "transportStatementParagraph": "Cricket Ground is served by route 102, operated by Carousel Buses, with services westbound / northbound towards High Wycombe. Up to every 30 minutes daily. The route provides direct journey opportunities to Beaconsfield, Gerrards Cross, Denham, Uxbridge.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, opposite Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001234",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Flightline 102 - High Wycombe to Uxbridge & Heathrow Airport",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/102",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town stops and services",
+          "url": "https://bustimes.org/localities/beaconsfield-old-town",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, adjacent Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001233",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield, opposite Ronald Road",
+          "url": "https://bustimes.org/stops/040000001231",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield, adjacent Ronald Road",
+          "url": "https://bustimes.org/stops/040000001232",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Heathrow Airport",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Heathrow Airport via High Wycombe, Beaconsfield, Gerrards Cross, Denham, Uxbridge, Heathrow Airport.",
+      "canonicalRouteKey": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "compositeRouteKey": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "routeIdentifier": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001233",
+      "routeNumber": "102",
+      "directionFromStop": "eastbound / southbound",
+      "stopSpecificDestination": "Uxbridge and Heathrow Airport",
+      "mondayFridayOperatingPeriod": "Approximately 02:45-23:50 from High Wycombe, with services operating into the early hours in the reverse direction.",
+      "saturdayOperatingPeriod": "Broadly similar all-day and late-evening service.",
+      "sundayOperatingPeriod": "Regular Sunday service operates.",
+      "typicalWeekdayBusesPerHour": "approximately 2",
+      "saturdayBusesPerHour": "approximately 2",
+      "sundayBusesPerHour": "approximately 2",
+      "serviceQualifications": {
+        "peak": "Minor peak-time interval variations occur.",
+        "evening": "Late-evening services operate.",
+        "night": "Selected very early-morning and late-night journeys operate.",
+        "schoolDay": "No school-day-only restriction.",
+        "seasonal": "No seasonal variation identified."
+      },
+      "servicePattern": "Up to every 30 minutes daily.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Gerrards Cross, Denham, Uxbridge.",
+      "transportStatementParagraph": "Cricket Ground is served by route 102, operated by Carousel Buses, with services eastbound / southbound towards Uxbridge and Heathrow Airport. Up to every 30 minutes daily. The route provides direct journey opportunities to Beaconsfield, Gerrards Cross, Denham, Uxbridge.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, adjacent Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001233",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Flightline 102 - High Wycombe to Uxbridge & Heathrow Airport",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/102",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town stops and services",
+          "url": "https://bustimes.org/localities/beaconsfield-old-town",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, opposite Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001234",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield, opposite Ronald Road",
+          "url": "https://bustimes.org/stops/040000001231",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield, adjacent Ronald Road",
+          "url": "https://bustimes.org/stops/040000001232",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Heathrow Airport",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Heathrow Airport via High Wycombe, Beaconsfield, Gerrards Cross, Denham, Uxbridge, Heathrow Airport.",
+      "canonicalRouteKey": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "compositeRouteKey": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "routeIdentifier": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001231",
+      "routeNumber": "102",
+      "directionFromStop": "westbound / northbound",
+      "stopSpecificDestination": "High Wycombe",
+      "mondayFridayOperatingPeriod": "Approximately 02:45-23:50 from High Wycombe, with services operating into the early hours in the reverse direction.",
+      "saturdayOperatingPeriod": "Broadly similar all-day and late-evening service.",
+      "sundayOperatingPeriod": "Regular Sunday service operates.",
+      "typicalWeekdayBusesPerHour": "approximately 2",
+      "saturdayBusesPerHour": "approximately 2",
+      "sundayBusesPerHour": "approximately 2",
+      "serviceQualifications": {
+        "peak": "Minor peak-time interval variations occur.",
+        "evening": "Late-evening services operate.",
+        "night": "Selected very early-morning and late-night journeys operate.",
+        "schoolDay": "No school-day-only restriction.",
+        "seasonal": "No seasonal variation identified."
+      },
+      "servicePattern": "Up to every 30 minutes daily.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Gerrards Cross, Denham, Uxbridge.",
+      "transportStatementParagraph": "Ronald Road is served by route 102, operated by Carousel Buses, with services westbound / northbound towards High Wycombe. Up to every 30 minutes daily. The route provides direct journey opportunities to Beaconsfield, Gerrards Cross, Denham, Uxbridge.",
+      "sources": [
+        {
+          "title": "Beaconsfield, opposite Ronald Road",
+          "url": "https://bustimes.org/stops/040000001231",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Flightline 102 - High Wycombe to Uxbridge & Heathrow Airport",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/102",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town stops and services",
+          "url": "https://bustimes.org/localities/beaconsfield-old-town",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, opposite Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001234",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, adjacent Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001233",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield, adjacent Ronald Road",
+          "url": "https://bustimes.org/stops/040000001232",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Heathrow Airport",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Heathrow Airport via High Wycombe, Beaconsfield, Gerrards Cross, Denham, Uxbridge, Heathrow Airport.",
+      "canonicalRouteKey": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "compositeRouteKey": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "routeIdentifier": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001232",
+      "routeNumber": "102",
+      "directionFromStop": "eastbound / southbound",
+      "stopSpecificDestination": "Uxbridge and Heathrow Airport",
+      "mondayFridayOperatingPeriod": "Approximately 02:45-23:50 from High Wycombe, with services operating into the early hours in the reverse direction.",
+      "saturdayOperatingPeriod": "Broadly similar all-day and late-evening service.",
+      "sundayOperatingPeriod": "Regular Sunday service operates.",
+      "typicalWeekdayBusesPerHour": "approximately 2",
+      "saturdayBusesPerHour": "approximately 2",
+      "sundayBusesPerHour": "approximately 2",
+      "serviceQualifications": {
+        "peak": "Minor peak-time interval variations occur.",
+        "evening": "Late-evening services operate.",
+        "night": "Selected very early-morning and late-night journeys operate.",
+        "schoolDay": "No school-day-only restriction.",
+        "seasonal": "No seasonal variation identified."
+      },
+      "servicePattern": "Up to every 30 minutes daily.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Gerrards Cross, Denham, Uxbridge.",
+      "transportStatementParagraph": "Ronald Road is served by route 102, operated by Carousel Buses, with services eastbound / southbound towards Uxbridge and Heathrow Airport. Up to every 30 minutes daily. The route provides direct journey opportunities to Beaconsfield, Gerrards Cross, Denham, Uxbridge.",
+      "sources": [
+        {
+          "title": "Beaconsfield, adjacent Ronald Road",
+          "url": "https://bustimes.org/stops/040000001232",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Flightline 102 - High Wycombe to Uxbridge & Heathrow Airport",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/102",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town stops and services",
+          "url": "https://bustimes.org/localities/beaconsfield-old-town",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, opposite Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001234",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, adjacent Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001233",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield, opposite Ronald Road",
+          "url": "https://bustimes.org/stops/040000001231",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Heathrow Airport",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Heathrow Airport via High Wycombe, Beaconsfield, Gerrards Cross, Denham, Uxbridge, Heathrow Airport.",
+      "canonicalRouteKey": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "compositeRouteKey": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "routeIdentifier": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001215",
+      "routeNumber": "31",
+      "directionFromStop": "eastbound",
+      "stopSpecificDestination": "Beaconsfield town centre / terminal stops",
+      "mondayFridayOperatingPeriod": "Approximately 06:30-20:45 across the route.",
+      "saturdayOperatingPeriod": "Approximately 07:30-20:45 across the route.",
+      "sundayOperatingPeriod": "No regular Sunday service identified.",
+      "typicalWeekdayBusesPerHour": "approximately 2",
+      "saturdayBusesPerHour": "approximately 2",
+      "sundayBusesPerHour": "0",
+      "serviceQualifications": {
+        "peak": "Some school-time journeys serve Beaconsfield High School.",
+        "evening": "Service reduces during the evening.",
+        "night": "No overnight service.",
+        "schoolDay": "Selected journeys vary at school times.",
+        "seasonal": "No seasonal variation identified."
+      },
+      "servicePattern": "Up to every 30 minutes on Mondays to Saturdays.",
+      "journeyOpportunities": "Direct or through journeys to Hazlemere, Tylers Green, Penn, Knotty Green.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 31, operated by Carousel Buses, with services eastbound towards Beaconsfield town centre / terminal stops. Up to every 30 minutes on Mondays to Saturdays. The route provides direct journey opportunities to Hazlemere, Tylers Green, Penn, Knotty Green.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "31 - High Wycombe to Beaconsfield",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/31",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town stops and services",
+          "url": "https://bustimes.org/localities/beaconsfield-old-town",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Beaconsfield",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Beaconsfield via High Wycombe, Hazlemere, Tylers Green, Penn, Knotty Green, Beaconsfield.",
+      "canonicalRouteKey": "31|carousel buses|high wycombe bus station|beaconsfield|service corridor between high wycombe bus station and beaconsfield via high wycombe hazlemere tylers green penn knotty green beaconsfield",
+      "compositeRouteKey": "31|carousel buses|high wycombe bus station|beaconsfield|service corridor between high wycombe bus station and beaconsfield via high wycombe hazlemere tylers green penn knotty green beaconsfield",
+      "routeIdentifier": "31|carousel buses|high wycombe bus station|beaconsfield|service corridor between high wycombe bus station and beaconsfield via high wycombe hazlemere tylers green penn knotty green beaconsfield",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001215",
+      "routeNumber": "102",
+      "directionFromStop": "eastbound / southbound",
+      "stopSpecificDestination": "Uxbridge and Heathrow Airport",
+      "mondayFridayOperatingPeriod": "Approximately 02:45-23:50 from High Wycombe, with services operating into the early hours in the reverse direction.",
+      "saturdayOperatingPeriod": "Broadly similar all-day and late-evening service.",
+      "sundayOperatingPeriod": "Regular Sunday service operates.",
+      "typicalWeekdayBusesPerHour": "approximately 2",
+      "saturdayBusesPerHour": "approximately 2",
+      "sundayBusesPerHour": "approximately 2",
+      "serviceQualifications": {
+        "peak": "Minor peak-time interval variations occur.",
+        "evening": "Late-evening services operate.",
+        "night": "Selected very early-morning and late-night journeys operate.",
+        "schoolDay": "No school-day-only restriction.",
+        "seasonal": "No seasonal variation identified."
+      },
+      "servicePattern": "Up to every 30 minutes daily.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Gerrards Cross, Denham, Uxbridge.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 102, operated by Carousel Buses, with services eastbound / southbound towards Uxbridge and Heathrow Airport. Up to every 30 minutes daily. The route provides direct journey opportunities to Beaconsfield, Gerrards Cross, Denham, Uxbridge.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Flightline 102 - High Wycombe to Uxbridge & Heathrow Airport",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/102",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town stops and services",
+          "url": "https://bustimes.org/localities/beaconsfield-old-town",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, opposite Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001234",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, adjacent Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001233",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield, opposite Ronald Road",
+          "url": "https://bustimes.org/stops/040000001231",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield, adjacent Ronald Road",
+          "url": "https://bustimes.org/stops/040000001232",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Heathrow Airport",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Heathrow Airport via High Wycombe, Beaconsfield, Gerrards Cross, Denham, Uxbridge, Heathrow Airport.",
+      "canonicalRouteKey": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "compositeRouteKey": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "routeIdentifier": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001215",
+      "routeNumber": "103",
+      "directionFromStop": "southbound / eastbound",
+      "stopSpecificDestination": "Slough, Langley or Windsor",
+      "mondayFridayOperatingPeriod": "Approximately 04:40-23:00 from High Wycombe.",
+      "saturdayOperatingPeriod": "Regular daytime and evening service.",
+      "sundayOperatingPeriod": "Regular Sunday service.",
+      "typicalWeekdayBusesPerHour": "approximately 2",
+      "saturdayBusesPerHour": "approximately 2",
+      "sundayBusesPerHour": "approximately 2",
+      "serviceQualifications": {
+        "peak": "Minor peak-time interval variations occur.",
+        "evening": "Hourly or reduced frequency during later evening periods.",
+        "night": "No overnight service.",
+        "schoolDay": "No school-day-only restriction.",
+        "seasonal": "Windsor journeys can be diverted during Changing of the Guard road closures."
+      },
+      "servicePattern": "Up to every 30 minutes daily between High Wycombe and Slough; Monday-Saturday daytime journeys alternate onward to Windsor or Langley.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Farnham Common, Slough, Langley.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 103, operated by Carousel Buses, with services southbound / eastbound towards Slough, Langley or Windsor. Up to every 30 minutes daily between High Wycombe and Slough; Monday-Saturday daytime journeys alternate onward to Windsor or Langley. The route provides direct journey opportunities to Beaconsfield, Farnham Common, Slough, Langley.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "103 - High Wycombe to Slough, Langley or Windsor",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/103",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Wilton Park stop record",
+          "url": "https://bustimes.org/stops/040000000331",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Wilton Park northbound stop",
+          "url": "https://bustimes.org/stops/040000000347",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Service changes in Slough and Windsor from 4 January 2026",
+          "url": "https://www.carouselbuses.co.uk/service-changes-slough-windsor-4th-january-2026",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Slough, Langley or Windsor",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Slough, Langley or Windsor via High Wycombe, Beaconsfield, Farnham Common, Slough, Langley, Windsor.",
+      "canonicalRouteKey": "103|carousel buses|high wycombe bus station|slough langley or windsor|service corridor between high wycombe bus station and slough langley or windsor via high wycombe beaconsfield farnham common slough langley windsor",
+      "compositeRouteKey": "103|carousel buses|high wycombe bus station|slough langley or windsor|service corridor between high wycombe bus station and slough langley or windsor via high wycombe beaconsfield farnham common slough langley windsor",
+      "routeIdentifier": "103|carousel buses|high wycombe bus station|slough langley or windsor|service corridor between high wycombe bus station and slough langley or windsor via high wycombe beaconsfield farnham common slough langley windsor",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001215",
+      "routeNumber": "104",
+      "directionFromStop": "eastbound / south-eastbound",
+      "stopSpecificDestination": "Uxbridge",
+      "mondayFridayOperatingPeriod": "Approximately 06:00-20:30 across the route.",
+      "saturdayOperatingPeriod": "Daytime and early-evening service.",
+      "sundayOperatingPeriod": "Hourly Sunday service.",
+      "typicalWeekdayBusesPerHour": "approximately 1",
+      "saturdayBusesPerHour": "approximately 1",
+      "sundayBusesPerHour": "approximately 1",
+      "serviceQualifications": {
+        "peak": "Minor timetable variations occur.",
+        "evening": "Limited evening service.",
+        "night": "No overnight service.",
+        "schoolDay": "No school-day-only restriction.",
+        "seasonal": "Temporary diversions may apply during local road closures."
+      },
+      "servicePattern": "Generally hourly daily.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Seer Green, Chalfont St Giles, Gerrards Cross, Denham.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 104, operated by Carousel Buses, with services eastbound / south-eastbound towards Uxbridge. Generally hourly daily. The route provides direct journey opportunities to Beaconsfield, Seer Green, Chalfont St Giles, Gerrards Cross, Denham.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "104 - High Wycombe to Uxbridge",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/104",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Service changes from 31 August 2025",
+          "url": "https://www.carouselbuses.co.uk/service-changes-31st-august-2025",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Uxbridge, York Road",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Uxbridge, York Road via High Wycombe, Beaconsfield, Seer Green, Chalfont St Giles, Gerrards Cross, Denham, Uxbridge.",
+      "canonicalRouteKey": "104|carousel buses|high wycombe bus station|uxbridge york road|service corridor between high wycombe bus station and uxbridge york road via high wycombe beaconsfield seer green chalfont st giles gerrards cross denham uxbridge",
+      "compositeRouteKey": "104|carousel buses|high wycombe bus station|uxbridge york road|service corridor between high wycombe bus station and uxbridge york road via high wycombe beaconsfield seer green chalfont st giles gerrards cross denham uxbridge",
+      "routeIdentifier": "104|carousel buses|high wycombe bus station|uxbridge york road|service corridor between high wycombe bus station and uxbridge york road via high wycombe beaconsfield seer green chalfont st giles gerrards cross denham uxbridge",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001215",
+      "routeNumber": "105",
+      "directionFromStop": "north-eastbound",
+      "stopSpecificDestination": "Amersham, Chesham and Chartridge",
+      "mondayFridayOperatingPeriod": "Approximately 06:25-18:10 from High Wycombe, with return journeys extending into the early evening.",
+      "saturdayOperatingPeriod": "Hourly daytime service.",
+      "sundayOperatingPeriod": "No regular Sunday service identified.",
+      "typicalWeekdayBusesPerHour": "approximately 1",
+      "saturdayBusesPerHour": "approximately 1",
+      "sundayBusesPerHour": "0",
+      "serviceQualifications": {
+        "peak": "Selected journeys serve school timing points.",
+        "evening": "Limited early-evening service.",
+        "night": "No overnight service.",
+        "schoolDay": "Some journeys vary at school times.",
+        "seasonal": "No seasonal variation identified."
+      },
+      "servicePattern": "Generally hourly on Mondays to Saturdays.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Coleshill, Amersham, Chesham Bois, Chesham.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 105, operated by Carousel Buses, with services north-eastbound towards Amersham, Chesham and Chartridge. Generally hourly on Mondays to Saturdays. The route provides direct journey opportunities to Beaconsfield, Coleshill, Amersham, Chesham Bois, Chesham.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "105 - High Wycombe to Chesham and Chartridge",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/105",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Service changes from 31 August 2025",
+          "url": "https://www.carouselbuses.co.uk/service-changes-31st-august-2025",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Chartridge, Village Hall",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Chartridge, Village Hall via High Wycombe, Beaconsfield, Coleshill, Amersham, Chesham Bois, Chesham, Chartridge.",
+      "canonicalRouteKey": "105|carousel buses|high wycombe bus station|chartridge village hall|service corridor between high wycombe bus station and chartridge village hall via high wycombe beaconsfield coleshill amersham chesham bois chesham chartridge",
+      "compositeRouteKey": "105|carousel buses|high wycombe bus station|chartridge village hall|service corridor between high wycombe bus station and chartridge village hall via high wycombe beaconsfield coleshill amersham chesham bois chesham chartridge",
+      "routeIdentifier": "105|carousel buses|high wycombe bus station|chartridge village hall|service corridor between high wycombe bus station and chartridge village hall via high wycombe beaconsfield coleshill amersham chesham bois chesham chartridge",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001215",
+      "routeNumber": "380",
+      "directionFromStop": "eastbound",
+      "stopSpecificDestination": "Loudwater",
+      "mondayFridayOperatingPeriod": "One return journey on Tuesdays and Fridays, approximately 10:05-12:17.",
+      "saturdayOperatingPeriod": "No service.",
+      "sundayOperatingPeriod": "No service.",
+      "typicalWeekdayBusesPerHour": "less than 1; Tuesdays and Fridays only",
+      "saturdayBusesPerHour": "0",
+      "sundayBusesPerHour": "0",
+      "serviceQualifications": {
+        "peak": "No peak service.",
+        "evening": "No evening service.",
+        "night": "No overnight service.",
+        "schoolDay": "Not a school service.",
+        "seasonal": "No seasonal variation identified."
+      },
+      "servicePattern": "One return journey on Tuesdays and Fridays only.",
+      "journeyOpportunities": "Direct or through journeys to Seer Green, Beaconsfield, Forty Green, Holtspur.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 380, operated by Red Eagle, with services eastbound towards Loudwater. One return journey on Tuesdays and Fridays only. The route provides direct journey opportunities to Seer Green, Beaconsfield, Forty Green, Holtspur.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "380 - Jordans, Beaconsfield, Forty Green and Loudwater",
+          "url": "https://bustimes.org/services/380-jordans-beaconsfield-holtspur-loudwater",
+          "publisher": "Bus Times using Traveline National Dataset",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town stops and services",
+          "url": "https://bustimes.org/localities/beaconsfield-old-town",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Red Eagle",
+      "routeOrigin": "Jordans",
+      "routeDestination": "Loudwater, Tesco Store",
+      "geographicContext": "Service corridor between Jordans and Loudwater, Tesco Store via Jordans, Seer Green, Beaconsfield, Forty Green, Holtspur, Loudwater.",
+      "canonicalRouteKey": "380|red eagle|jordans|loudwater tesco store|service corridor between jordans and loudwater tesco store via jordans seer green beaconsfield forty green holtspur loudwater",
+      "compositeRouteKey": "380|red eagle|jordans|loudwater tesco store|service corridor between jordans and loudwater tesco store via jordans seer green beaconsfield forty green holtspur loudwater",
+      "routeIdentifier": "380|red eagle|jordans|loudwater tesco store|service corridor between jordans and loudwater tesco store via jordans seer green beaconsfield forty green holtspur loudwater",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001215",
+      "routeNumber": "604",
+      "directionFromStop": "westbound",
+      "stopSpecificDestination": "Marlow Hill Schools",
+      "mondayFridayOperatingPeriod": "One morning journey towards Marlow Hill Schools and one afternoon return journey on school days.",
+      "saturdayOperatingPeriod": "No service.",
+      "sundayOperatingPeriod": "No service.",
+      "typicalWeekdayBusesPerHour": "school-day journeys only",
+      "saturdayBusesPerHour": "0",
+      "sundayBusesPerHour": "0",
+      "serviceQualifications": {
+        "peak": "Operates at school travel times.",
+        "evening": "No evening service.",
+        "night": "No overnight service.",
+        "schoolDay": "School days only.",
+        "seasonal": "Does not operate during school holidays."
+      },
+      "servicePattern": "Dedicated school service operating once in each direction on school days.",
+      "journeyOpportunities": "Direct or through journeys to The Chalfonts, Seer Green, Beaconsfield, Holtspur, Loudwater, Flackwell Heath.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 604, operated by Carousel Buses, with services westbound towards Marlow Hill Schools. Dedicated school service operating once in each direction on school days. The route provides direct journey opportunities to The Chalfonts, Seer Green, Beaconsfield, Holtspur, Loudwater, Flackwell Heath.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "604 - Gerrards Cross to Marlow Hill Schools",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/604",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Buses to Marlow Hill Schools",
+          "url": "https://www.carouselbuses.co.uk/schools/marlow-hill",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "Gerrards Cross, Fulmer Drive",
+      "routeDestination": "High Wycombe, Marlow Hill Schools",
+      "geographicContext": "Service corridor between Gerrards Cross, Fulmer Drive and High Wycombe, Marlow Hill Schools via Gerrards Cross, The Chalfonts, Seer Green, Beaconsfield, Holtspur, Loudwater, Flackwell Heath, Marlow Hill Schools.",
+      "canonicalRouteKey": "604|carousel buses|gerrards cross fulmer drive|high wycombe marlow hill schools|service corridor between gerrards cross fulmer drive and high wycombe marlow hill schools via gerrards cross the chalfonts seer green beaconsfield holtspur loudwater flackwell heath marlow hill schools",
+      "compositeRouteKey": "604|carousel buses|gerrards cross fulmer drive|high wycombe marlow hill schools|service corridor between gerrards cross fulmer drive and high wycombe marlow hill schools via gerrards cross the chalfonts seer green beaconsfield holtspur loudwater flackwell heath marlow hill schools",
+      "routeIdentifier": "604|carousel buses|gerrards cross fulmer drive|high wycombe marlow hill schools|service corridor between gerrards cross fulmer drive and high wycombe marlow hill schools via gerrards cross the chalfonts seer green beaconsfield holtspur loudwater flackwell heath marlow hill schools",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001215",
+      "routeNumber": "624",
+      "directionFromStop": "westbound / south-westbound",
+      "stopSpecificDestination": "Henley College",
+      "mondayFridayOperatingPeriod": "One morning journey towards Henley College and one afternoon return journey on college days.",
+      "saturdayOperatingPeriod": "No service.",
+      "sundayOperatingPeriod": "No service.",
+      "typicalWeekdayBusesPerHour": "college-day journeys only",
+      "saturdayBusesPerHour": "0",
+      "sundayBusesPerHour": "0",
+      "serviceQualifications": {
+        "peak": "Operates at college travel times.",
+        "evening": "No evening service.",
+        "night": "No overnight service.",
+        "schoolDay": "College days only.",
+        "seasonal": "Does not operate during college holidays."
+      },
+      "servicePattern": "Dedicated college service operating once in each direction on college days.",
+      "journeyOpportunities": "Direct or through journeys to Gerrards Cross, The Chalfonts, Seer Green, Beaconsfield, Wooburn Green, Bourne End.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 624, operated by Carousel Buses, with services westbound / south-westbound towards Henley College. Dedicated college service operating once in each direction on college days. The route provides direct journey opportunities to Gerrards Cross, The Chalfonts, Seer Green, Beaconsfield, Wooburn Green, Bourne End.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "624 - Denham to Henley College",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/624",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town stops and services",
+          "url": "https://bustimes.org/localities/beaconsfield-old-town",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "Denham, Springbridge Nurseries",
+      "routeDestination": "Henley-on-Thames, Deanfield Avenue / Henley College",
+      "geographicContext": "Service corridor between Denham, Springbridge Nurseries and Henley-on-Thames, Deanfield Avenue / Henley College via Denham, Gerrards Cross, The Chalfonts, Seer Green, Beaconsfield, Wooburn Green, Bourne End, Henley-on-Thames.",
+      "canonicalRouteKey": "624|carousel buses|denham springbridge nurseries|henley on thames deanfield avenue henley college|service corridor between denham springbridge nurseries and henley on thames deanfield avenue henley college via denham gerrards cross the chalfonts seer green beaconsfield wooburn green bourne end henley on thames",
+      "compositeRouteKey": "624|carousel buses|denham springbridge nurseries|henley on thames deanfield avenue henley college|service corridor between denham springbridge nurseries and henley on thames deanfield avenue henley college via denham gerrards cross the chalfonts seer green beaconsfield wooburn green bourne end henley on thames",
+      "routeIdentifier": "624|carousel buses|denham springbridge nurseries|henley on thames deanfield avenue henley college|service corridor between denham springbridge nurseries and henley on thames deanfield avenue henley college via denham gerrards cross the chalfonts seer green beaconsfield wooburn green bourne end henley on thames",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001216",
+      "routeNumber": "31",
+      "directionFromStop": "westbound / north-westbound",
+      "stopSpecificDestination": "High Wycombe",
+      "mondayFridayOperatingPeriod": "Approximately 06:30-20:45 across the route.",
+      "saturdayOperatingPeriod": "Approximately 07:30-20:45 across the route.",
+      "sundayOperatingPeriod": "No regular Sunday service identified.",
+      "typicalWeekdayBusesPerHour": "approximately 2",
+      "saturdayBusesPerHour": "approximately 2",
+      "sundayBusesPerHour": "0",
+      "serviceQualifications": {
+        "peak": "Some school-time journeys serve Beaconsfield High School.",
+        "evening": "Service reduces during the evening.",
+        "night": "No overnight service.",
+        "schoolDay": "Selected journeys vary at school times.",
+        "seasonal": "No seasonal variation identified."
+      },
+      "servicePattern": "Up to every 30 minutes on Mondays to Saturdays.",
+      "journeyOpportunities": "Direct or through journeys to Hazlemere, Tylers Green, Penn, Knotty Green.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 31, operated by Carousel Buses, with services westbound / north-westbound towards High Wycombe. Up to every 30 minutes on Mondays to Saturdays. The route provides direct journey opportunities to Hazlemere, Tylers Green, Penn, Knotty Green.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "31 - High Wycombe to Beaconsfield",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/31",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town stops and services",
+          "url": "https://bustimes.org/localities/beaconsfield-old-town",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Beaconsfield",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Beaconsfield via High Wycombe, Hazlemere, Tylers Green, Penn, Knotty Green, Beaconsfield.",
+      "canonicalRouteKey": "31|carousel buses|high wycombe bus station|beaconsfield|service corridor between high wycombe bus station and beaconsfield via high wycombe hazlemere tylers green penn knotty green beaconsfield",
+      "compositeRouteKey": "31|carousel buses|high wycombe bus station|beaconsfield|service corridor between high wycombe bus station and beaconsfield via high wycombe hazlemere tylers green penn knotty green beaconsfield",
+      "routeIdentifier": "31|carousel buses|high wycombe bus station|beaconsfield|service corridor between high wycombe bus station and beaconsfield via high wycombe hazlemere tylers green penn knotty green beaconsfield",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001216",
+      "routeNumber": "102",
+      "directionFromStop": "westbound / northbound",
+      "stopSpecificDestination": "High Wycombe",
+      "mondayFridayOperatingPeriod": "Approximately 02:45-23:50 from High Wycombe, with services operating into the early hours in the reverse direction.",
+      "saturdayOperatingPeriod": "Broadly similar all-day and late-evening service.",
+      "sundayOperatingPeriod": "Regular Sunday service operates.",
+      "typicalWeekdayBusesPerHour": "approximately 2",
+      "saturdayBusesPerHour": "approximately 2",
+      "sundayBusesPerHour": "approximately 2",
+      "serviceQualifications": {
+        "peak": "Minor peak-time interval variations occur.",
+        "evening": "Late-evening services operate.",
+        "night": "Selected very early-morning and late-night journeys operate.",
+        "schoolDay": "No school-day-only restriction.",
+        "seasonal": "No seasonal variation identified."
+      },
+      "servicePattern": "Up to every 30 minutes daily.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Gerrards Cross, Denham, Uxbridge.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 102, operated by Carousel Buses, with services westbound / northbound towards High Wycombe. Up to every 30 minutes daily. The route provides direct journey opportunities to Beaconsfield, Gerrards Cross, Denham, Uxbridge.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Flightline 102 - High Wycombe to Uxbridge & Heathrow Airport",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/102",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town stops and services",
+          "url": "https://bustimes.org/localities/beaconsfield-old-town",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, opposite Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001234",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, adjacent Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001233",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield, opposite Ronald Road",
+          "url": "https://bustimes.org/stops/040000001231",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield, adjacent Ronald Road",
+          "url": "https://bustimes.org/stops/040000001232",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Heathrow Airport",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Heathrow Airport via High Wycombe, Beaconsfield, Gerrards Cross, Denham, Uxbridge, Heathrow Airport.",
+      "canonicalRouteKey": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "compositeRouteKey": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "routeIdentifier": "102|carousel buses|high wycombe bus station|heathrow airport|service corridor between high wycombe bus station and heathrow airport via high wycombe beaconsfield gerrards cross denham uxbridge heathrow airport",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001216",
+      "routeNumber": "103",
+      "directionFromStop": "northbound / westbound",
+      "stopSpecificDestination": "High Wycombe",
+      "mondayFridayOperatingPeriod": "Approximately 04:40-23:00 from High Wycombe.",
+      "saturdayOperatingPeriod": "Regular daytime and evening service.",
+      "sundayOperatingPeriod": "Regular Sunday service.",
+      "typicalWeekdayBusesPerHour": "approximately 2",
+      "saturdayBusesPerHour": "approximately 2",
+      "sundayBusesPerHour": "approximately 2",
+      "serviceQualifications": {
+        "peak": "Minor peak-time interval variations occur.",
+        "evening": "Hourly or reduced frequency during later evening periods.",
+        "night": "No overnight service.",
+        "schoolDay": "No school-day-only restriction.",
+        "seasonal": "Windsor journeys can be diverted during Changing of the Guard road closures."
+      },
+      "servicePattern": "Up to every 30 minutes daily between High Wycombe and Slough; Monday-Saturday daytime journeys alternate onward to Windsor or Langley.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Farnham Common, Slough, Langley.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 103, operated by Carousel Buses, with services northbound / westbound towards High Wycombe. Up to every 30 minutes daily between High Wycombe and Slough; Monday-Saturday daytime journeys alternate onward to Windsor or Langley. The route provides direct journey opportunities to Beaconsfield, Farnham Common, Slough, Langley.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "103 - High Wycombe to Slough, Langley or Windsor",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/103",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Wilton Park stop record",
+          "url": "https://bustimes.org/stops/040000000331",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Wilton Park northbound stop",
+          "url": "https://bustimes.org/stops/040000000347",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Service changes in Slough and Windsor from 4 January 2026",
+          "url": "https://www.carouselbuses.co.uk/service-changes-slough-windsor-4th-january-2026",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Slough, Langley or Windsor",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Slough, Langley or Windsor via High Wycombe, Beaconsfield, Farnham Common, Slough, Langley, Windsor.",
+      "canonicalRouteKey": "103|carousel buses|high wycombe bus station|slough langley or windsor|service corridor between high wycombe bus station and slough langley or windsor via high wycombe beaconsfield farnham common slough langley windsor",
+      "compositeRouteKey": "103|carousel buses|high wycombe bus station|slough langley or windsor|service corridor between high wycombe bus station and slough langley or windsor via high wycombe beaconsfield farnham common slough langley windsor",
+      "routeIdentifier": "103|carousel buses|high wycombe bus station|slough langley or windsor|service corridor between high wycombe bus station and slough langley or windsor via high wycombe beaconsfield farnham common slough langley windsor",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001216",
+      "routeNumber": "104",
+      "directionFromStop": "westbound / north-westbound",
+      "stopSpecificDestination": "High Wycombe",
+      "mondayFridayOperatingPeriod": "Approximately 06:00-20:30 across the route.",
+      "saturdayOperatingPeriod": "Daytime and early-evening service.",
+      "sundayOperatingPeriod": "Hourly Sunday service.",
+      "typicalWeekdayBusesPerHour": "approximately 1",
+      "saturdayBusesPerHour": "approximately 1",
+      "sundayBusesPerHour": "approximately 1",
+      "serviceQualifications": {
+        "peak": "Minor timetable variations occur.",
+        "evening": "Limited evening service.",
+        "night": "No overnight service.",
+        "schoolDay": "No school-day-only restriction.",
+        "seasonal": "Temporary diversions may apply during local road closures."
+      },
+      "servicePattern": "Generally hourly daily.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Seer Green, Chalfont St Giles, Gerrards Cross, Denham.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 104, operated by Carousel Buses, with services westbound / north-westbound towards High Wycombe. Generally hourly daily. The route provides direct journey opportunities to Beaconsfield, Seer Green, Chalfont St Giles, Gerrards Cross, Denham.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "104 - High Wycombe to Uxbridge",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/104",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Service changes from 31 August 2025",
+          "url": "https://www.carouselbuses.co.uk/service-changes-31st-august-2025",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Uxbridge, York Road",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Uxbridge, York Road via High Wycombe, Beaconsfield, Seer Green, Chalfont St Giles, Gerrards Cross, Denham, Uxbridge.",
+      "canonicalRouteKey": "104|carousel buses|high wycombe bus station|uxbridge york road|service corridor between high wycombe bus station and uxbridge york road via high wycombe beaconsfield seer green chalfont st giles gerrards cross denham uxbridge",
+      "compositeRouteKey": "104|carousel buses|high wycombe bus station|uxbridge york road|service corridor between high wycombe bus station and uxbridge york road via high wycombe beaconsfield seer green chalfont st giles gerrards cross denham uxbridge",
+      "routeIdentifier": "104|carousel buses|high wycombe bus station|uxbridge york road|service corridor between high wycombe bus station and uxbridge york road via high wycombe beaconsfield seer green chalfont st giles gerrards cross denham uxbridge",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001216",
+      "routeNumber": "105",
+      "directionFromStop": "westbound",
+      "stopSpecificDestination": "High Wycombe",
+      "mondayFridayOperatingPeriod": "Approximately 06:25-18:10 from High Wycombe, with return journeys extending into the early evening.",
+      "saturdayOperatingPeriod": "Hourly daytime service.",
+      "sundayOperatingPeriod": "No regular Sunday service identified.",
+      "typicalWeekdayBusesPerHour": "approximately 1",
+      "saturdayBusesPerHour": "approximately 1",
+      "sundayBusesPerHour": "0",
+      "serviceQualifications": {
+        "peak": "Selected journeys serve school timing points.",
+        "evening": "Limited early-evening service.",
+        "night": "No overnight service.",
+        "schoolDay": "Some journeys vary at school times.",
+        "seasonal": "No seasonal variation identified."
+      },
+      "servicePattern": "Generally hourly on Mondays to Saturdays.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Coleshill, Amersham, Chesham Bois, Chesham.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 105, operated by Carousel Buses, with services westbound towards High Wycombe. Generally hourly on Mondays to Saturdays. The route provides direct journey opportunities to Beaconsfield, Coleshill, Amersham, Chesham Bois, Chesham.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "105 - High Wycombe to Chesham and Chartridge",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/105",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Service changes from 31 August 2025",
+          "url": "https://www.carouselbuses.co.uk/service-changes-31st-august-2025",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Chartridge, Village Hall",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Chartridge, Village Hall via High Wycombe, Beaconsfield, Coleshill, Amersham, Chesham Bois, Chesham, Chartridge.",
+      "canonicalRouteKey": "105|carousel buses|high wycombe bus station|chartridge village hall|service corridor between high wycombe bus station and chartridge village hall via high wycombe beaconsfield coleshill amersham chesham bois chesham chartridge",
+      "compositeRouteKey": "105|carousel buses|high wycombe bus station|chartridge village hall|service corridor between high wycombe bus station and chartridge village hall via high wycombe beaconsfield coleshill amersham chesham bois chesham chartridge",
+      "routeIdentifier": "105|carousel buses|high wycombe bus station|chartridge village hall|service corridor between high wycombe bus station and chartridge village hall via high wycombe beaconsfield coleshill amersham chesham bois chesham chartridge",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001216",
+      "routeNumber": "380",
+      "directionFromStop": "westbound",
+      "stopSpecificDestination": "Jordans",
+      "mondayFridayOperatingPeriod": "One return journey on Tuesdays and Fridays, approximately 10:05-12:17.",
+      "saturdayOperatingPeriod": "No service.",
+      "sundayOperatingPeriod": "No service.",
+      "typicalWeekdayBusesPerHour": "less than 1; Tuesdays and Fridays only",
+      "saturdayBusesPerHour": "0",
+      "sundayBusesPerHour": "0",
+      "serviceQualifications": {
+        "peak": "No peak service.",
+        "evening": "No evening service.",
+        "night": "No overnight service.",
+        "schoolDay": "Not a school service.",
+        "seasonal": "No seasonal variation identified."
+      },
+      "servicePattern": "One return journey on Tuesdays and Fridays only.",
+      "journeyOpportunities": "Direct or through journeys to Seer Green, Beaconsfield, Forty Green, Holtspur.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 380, operated by Red Eagle, with services westbound towards Jordans. One return journey on Tuesdays and Fridays only. The route provides direct journey opportunities to Seer Green, Beaconsfield, Forty Green, Holtspur.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "380 - Jordans, Beaconsfield, Forty Green and Loudwater",
+          "url": "https://bustimes.org/services/380-jordans-beaconsfield-holtspur-loudwater",
+          "publisher": "Bus Times using Traveline National Dataset",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town stops and services",
+          "url": "https://bustimes.org/localities/beaconsfield-old-town",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Red Eagle",
+      "routeOrigin": "Jordans",
+      "routeDestination": "Loudwater, Tesco Store",
+      "geographicContext": "Service corridor between Jordans and Loudwater, Tesco Store via Jordans, Seer Green, Beaconsfield, Forty Green, Holtspur, Loudwater.",
+      "canonicalRouteKey": "380|red eagle|jordans|loudwater tesco store|service corridor between jordans and loudwater tesco store via jordans seer green beaconsfield forty green holtspur loudwater",
+      "compositeRouteKey": "380|red eagle|jordans|loudwater tesco store|service corridor between jordans and loudwater tesco store via jordans seer green beaconsfield forty green holtspur loudwater",
+      "routeIdentifier": "380|red eagle|jordans|loudwater tesco store|service corridor between jordans and loudwater tesco store via jordans seer green beaconsfield forty green holtspur loudwater",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001216",
+      "routeNumber": "604",
+      "directionFromStop": "eastbound",
+      "stopSpecificDestination": "Gerrards Cross",
+      "mondayFridayOperatingPeriod": "One morning journey towards Marlow Hill Schools and one afternoon return journey on school days.",
+      "saturdayOperatingPeriod": "No service.",
+      "sundayOperatingPeriod": "No service.",
+      "typicalWeekdayBusesPerHour": "school-day journeys only",
+      "saturdayBusesPerHour": "0",
+      "sundayBusesPerHour": "0",
+      "serviceQualifications": {
+        "peak": "Operates at school travel times.",
+        "evening": "No evening service.",
+        "night": "No overnight service.",
+        "schoolDay": "School days only.",
+        "seasonal": "Does not operate during school holidays."
+      },
+      "servicePattern": "Dedicated school service operating once in each direction on school days.",
+      "journeyOpportunities": "Direct or through journeys to The Chalfonts, Seer Green, Beaconsfield, Holtspur, Loudwater, Flackwell Heath.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 604, operated by Carousel Buses, with services eastbound towards Gerrards Cross. Dedicated school service operating once in each direction on school days. The route provides direct journey opportunities to The Chalfonts, Seer Green, Beaconsfield, Holtspur, Loudwater, Flackwell Heath.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "604 - Gerrards Cross to Marlow Hill Schools",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/604",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Buses to Marlow Hill Schools",
+          "url": "https://www.carouselbuses.co.uk/schools/marlow-hill",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "Gerrards Cross, Fulmer Drive",
+      "routeDestination": "High Wycombe, Marlow Hill Schools",
+      "geographicContext": "Service corridor between Gerrards Cross, Fulmer Drive and High Wycombe, Marlow Hill Schools via Gerrards Cross, The Chalfonts, Seer Green, Beaconsfield, Holtspur, Loudwater, Flackwell Heath, Marlow Hill Schools.",
+      "canonicalRouteKey": "604|carousel buses|gerrards cross fulmer drive|high wycombe marlow hill schools|service corridor between gerrards cross fulmer drive and high wycombe marlow hill schools via gerrards cross the chalfonts seer green beaconsfield holtspur loudwater flackwell heath marlow hill schools",
+      "compositeRouteKey": "604|carousel buses|gerrards cross fulmer drive|high wycombe marlow hill schools|service corridor between gerrards cross fulmer drive and high wycombe marlow hill schools via gerrards cross the chalfonts seer green beaconsfield holtspur loudwater flackwell heath marlow hill schools",
+      "routeIdentifier": "604|carousel buses|gerrards cross fulmer drive|high wycombe marlow hill schools|service corridor between gerrards cross fulmer drive and high wycombe marlow hill schools via gerrards cross the chalfonts seer green beaconsfield holtspur loudwater flackwell heath marlow hill schools",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001216",
+      "routeNumber": "624",
+      "directionFromStop": "eastbound / north-eastbound",
+      "stopSpecificDestination": "Denham",
+      "mondayFridayOperatingPeriod": "One morning journey towards Henley College and one afternoon return journey on college days.",
+      "saturdayOperatingPeriod": "No service.",
+      "sundayOperatingPeriod": "No service.",
+      "typicalWeekdayBusesPerHour": "college-day journeys only",
+      "saturdayBusesPerHour": "0",
+      "sundayBusesPerHour": "0",
+      "serviceQualifications": {
+        "peak": "Operates at college travel times.",
+        "evening": "No evening service.",
+        "night": "No overnight service.",
+        "schoolDay": "College days only.",
+        "seasonal": "Does not operate during college holidays."
+      },
+      "servicePattern": "Dedicated college service operating once in each direction on college days.",
+      "journeyOpportunities": "Direct or through journeys to Gerrards Cross, The Chalfonts, Seer Green, Beaconsfield, Wooburn Green, Bourne End.",
+      "transportStatementParagraph": "The Saracen's Head is served by route 624, operated by Carousel Buses, with services eastbound / north-eastbound towards Denham. Dedicated college service operating once in each direction on college days. The route provides direct journey opportunities to Gerrards Cross, The Chalfonts, Seer Green, Beaconsfield, Wooburn Green, Bourne End.",
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "624 - Denham to Henley College",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/624",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town stops and services",
+          "url": "https://bustimes.org/localities/beaconsfield-old-town",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "Denham, Springbridge Nurseries",
+      "routeDestination": "Henley-on-Thames, Deanfield Avenue / Henley College",
+      "geographicContext": "Service corridor between Denham, Springbridge Nurseries and Henley-on-Thames, Deanfield Avenue / Henley College via Denham, Gerrards Cross, The Chalfonts, Seer Green, Beaconsfield, Wooburn Green, Bourne End, Henley-on-Thames.",
+      "canonicalRouteKey": "624|carousel buses|denham springbridge nurseries|henley on thames deanfield avenue henley college|service corridor between denham springbridge nurseries and henley on thames deanfield avenue henley college via denham gerrards cross the chalfonts seer green beaconsfield wooburn green bourne end henley on thames",
+      "compositeRouteKey": "624|carousel buses|denham springbridge nurseries|henley on thames deanfield avenue henley college|service corridor between denham springbridge nurseries and henley on thames deanfield avenue henley college via denham gerrards cross the chalfonts seer green beaconsfield wooburn green bourne end henley on thames",
+      "routeIdentifier": "624|carousel buses|denham springbridge nurseries|henley on thames deanfield avenue henley college|service corridor between denham springbridge nurseries and henley on thames deanfield avenue henley college via denham gerrards cross the chalfonts seer green beaconsfield wooburn green bourne end henley on thames",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000000347",
+      "routeNumber": "103",
+      "directionFromStop": "northbound / westbound",
+      "stopSpecificDestination": "High Wycombe",
+      "mondayFridayOperatingPeriod": "Approximately 04:40-23:00 from High Wycombe.",
+      "saturdayOperatingPeriod": "Regular daytime and evening service.",
+      "sundayOperatingPeriod": "Regular Sunday service.",
+      "typicalWeekdayBusesPerHour": "approximately 2",
+      "saturdayBusesPerHour": "approximately 2",
+      "sundayBusesPerHour": "approximately 2",
+      "serviceQualifications": {
+        "peak": "Minor peak-time interval variations occur.",
+        "evening": "Hourly or reduced frequency during later evening periods.",
+        "night": "No overnight service.",
+        "schoolDay": "No school-day-only restriction.",
+        "seasonal": "Windsor journeys can be diverted during Changing of the Guard road closures."
+      },
+      "servicePattern": "Up to every 30 minutes daily between High Wycombe and Slough; Monday-Saturday daytime journeys alternate onward to Windsor or Langley.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Farnham Common, Slough, Langley.",
+      "transportStatementParagraph": "Wilton Park is served by route 103, operated by Carousel Buses, with services northbound / westbound towards High Wycombe. Up to every 30 minutes daily between High Wycombe and Slough; Monday-Saturday daytime journeys alternate onward to Windsor or Langley. The route provides direct journey opportunities to Beaconsfield, Farnham Common, Slough, Langley.",
+      "sources": [
+        {
+          "title": "Beaconsfield Wilton Park northbound stop",
+          "url": "https://bustimes.org/stops/040000000347",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "103 - High Wycombe to Slough, Langley or Windsor",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/103",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Wilton Park stop record",
+          "url": "https://bustimes.org/stops/040000000331",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Service changes in Slough and Windsor from 4 January 2026",
+          "url": "https://www.carouselbuses.co.uk/service-changes-slough-windsor-4th-january-2026",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Slough, Langley or Windsor",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Slough, Langley or Windsor via High Wycombe, Beaconsfield, Farnham Common, Slough, Langley, Windsor.",
+      "canonicalRouteKey": "103|carousel buses|high wycombe bus station|slough langley or windsor|service corridor between high wycombe bus station and slough langley or windsor via high wycombe beaconsfield farnham common slough langley windsor",
+      "compositeRouteKey": "103|carousel buses|high wycombe bus station|slough langley or windsor|service corridor between high wycombe bus station and slough langley or windsor via high wycombe beaconsfield farnham common slough langley windsor",
+      "routeIdentifier": "103|carousel buses|high wycombe bus station|slough langley or windsor|service corridor between high wycombe bus station and slough langley or windsor via high wycombe beaconsfield farnham common slough langley windsor",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000000331",
+      "routeNumber": "103",
+      "directionFromStop": "southbound / eastbound",
+      "stopSpecificDestination": "Slough, Langley or Windsor",
+      "mondayFridayOperatingPeriod": "Approximately 04:40-23:00 from High Wycombe.",
+      "saturdayOperatingPeriod": "Regular daytime and evening service.",
+      "sundayOperatingPeriod": "Regular Sunday service.",
+      "typicalWeekdayBusesPerHour": "approximately 2",
+      "saturdayBusesPerHour": "approximately 2",
+      "sundayBusesPerHour": "approximately 2",
+      "serviceQualifications": {
+        "peak": "Minor peak-time interval variations occur.",
+        "evening": "Hourly or reduced frequency during later evening periods.",
+        "night": "No overnight service.",
+        "schoolDay": "No school-day-only restriction.",
+        "seasonal": "Windsor journeys can be diverted during Changing of the Guard road closures."
+      },
+      "servicePattern": "Up to every 30 minutes daily between High Wycombe and Slough; Monday-Saturday daytime journeys alternate onward to Windsor or Langley.",
+      "journeyOpportunities": "Direct or through journeys to Beaconsfield, Farnham Common, Slough, Langley.",
+      "transportStatementParagraph": "Wilton Park is served by route 103, operated by Carousel Buses, with services southbound / eastbound towards Slough, Langley or Windsor. Up to every 30 minutes daily between High Wycombe and Slough; Monday-Saturday daytime journeys alternate onward to Windsor or Langley. The route provides direct journey opportunities to Beaconsfield, Farnham Common, Slough, Langley.",
+      "sources": [
+        {
+          "title": "Beaconsfield Wilton Park southbound stop",
+          "url": "https://bustimes.org/stops/040000000331",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "103 - High Wycombe to Slough, Langley or Windsor",
+          "url": "https://www.carouselbuses.co.uk/services/CSLB/103",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Beaconsfield Wilton Park northbound stop",
+          "url": "https://bustimes.org/stops/040000000347",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        },
+        {
+          "title": "Service changes in Slough and Windsor from 4 January 2026",
+          "url": "https://www.carouselbuses.co.uk/service-changes-slough-windsor-4th-january-2026",
+          "publisher": "Carousel Buses",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "retrievalDate": "2026-07-29",
+      "verificationStatus": "verified",
+      "operator": "Carousel Buses",
+      "routeOrigin": "High Wycombe, Bus Station",
+      "routeDestination": "Slough, Langley or Windsor",
+      "geographicContext": "Service corridor between High Wycombe, Bus Station and Slough, Langley or Windsor via High Wycombe, Beaconsfield, Farnham Common, Slough, Langley, Windsor.",
+      "canonicalRouteKey": "103|carousel buses|high wycombe bus station|slough langley or windsor|service corridor between high wycombe bus station and slough langley or windsor via high wycombe beaconsfield farnham common slough langley windsor",
+      "compositeRouteKey": "103|carousel buses|high wycombe bus station|slough langley or windsor|service corridor between high wycombe bus station and slough langley or windsor via high wycombe beaconsfield farnham common slough langley windsor",
+      "routeIdentifier": "103|carousel buses|high wycombe bus station|slough langley or windsor|service corridor between high wycombe bus station and slough langley or windsor via high wycombe beaconsfield farnham common slough langley windsor",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.232Z",
       "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "previousRevision": null
     }

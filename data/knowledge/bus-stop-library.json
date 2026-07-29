@@ -2,7 +2,7 @@
   "schema": "tpt.bus-stop-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.6.0-20260723",
-  "updatedAt": "2026-07-24T15:09:21.754Z",
+  "updatedAt": "2026-07-29T14:09:41.105Z",
   "records": [
     {
       "naptanCode": "490011045S",
@@ -1394,6 +1394,276 @@
       "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "editorName": "Joe Freeman",
       "updatedAt": "2026-07-24T15:09:21.754Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001234",
+      "fallbackIdentity": "",
+      "stopName": "Cricket Ground",
+      "locality": "Beaconsfield",
+      "direction": "Opp",
+      "pairedStopGroup": "cricket ground",
+      "coordinates": {
+        "latitude": 51.6020084,
+        "longitude": -0.630827
+      },
+      "source": "NaPTAN identity via mapped stop data",
+      "retrievalDate": "2026-07-29",
+      "routesServed": [
+        "102"
+      ],
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, opposite Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001234",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "verificationStatus": "verified",
+      "indicator": "Opp",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.105Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001233",
+      "fallbackIdentity": "",
+      "stopName": "Cricket Ground",
+      "locality": "Beaconsfield",
+      "direction": "adj",
+      "pairedStopGroup": "cricket ground",
+      "coordinates": {
+        "latitude": 51.6019818,
+        "longitude": -0.6300392
+      },
+      "source": "NaPTAN identity via mapped stop data",
+      "retrievalDate": "2026-07-29",
+      "routesServed": [
+        "102"
+      ],
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, adjacent Cricket Ground",
+          "url": "https://bustimes.org/stops/040000001233",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "verificationStatus": "verified",
+      "indicator": "adj",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.105Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001231",
+      "fallbackIdentity": "",
+      "stopName": "Ronald Road",
+      "locality": "Beaconsfield",
+      "direction": "Opp",
+      "pairedStopGroup": "ronald road",
+      "coordinates": {
+        "latitude": 51.6062467,
+        "longitude": -0.6330317
+      },
+      "source": "NaPTAN identity via mapped stop data",
+      "retrievalDate": "2026-07-29",
+      "routesServed": [
+        "102"
+      ],
+      "sources": [
+        {
+          "title": "Beaconsfield, opposite Ronald Road",
+          "url": "https://bustimes.org/stops/040000001231",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "verificationStatus": "verified",
+      "indicator": "Opp",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.105Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001215",
+      "fallbackIdentity": "",
+      "stopName": "The Saracen's Head",
+      "locality": "Beaconsfield",
+      "direction": "Stop J",
+      "pairedStopGroup": "J",
+      "coordinates": {
+        "latitude": 51.6020288,
+        "longitude": -0.6356133
+      },
+      "source": "NaPTAN identity via mapped stop data",
+      "retrievalDate": "2026-07-29",
+      "routesServed": [
+        "31",
+        "102",
+        "103",
+        "104",
+        "105",
+        "380",
+        "604",
+        "624"
+      ],
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop J",
+          "url": "https://bustimes.org/stops/040000001215",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "verificationStatus": "verified",
+      "indicator": "Stop J",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.105Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001232",
+      "fallbackIdentity": "",
+      "stopName": "Ronald Road",
+      "locality": "Beaconsfield",
+      "direction": "adj",
+      "pairedStopGroup": "ronald road",
+      "coordinates": {
+        "latitude": 51.6067492,
+        "longitude": -0.6331602
+      },
+      "source": "NaPTAN identity via mapped stop data",
+      "retrievalDate": "2026-07-29",
+      "routesServed": [
+        "102"
+      ],
+      "sources": [
+        {
+          "title": "Beaconsfield, adjacent Ronald Road",
+          "url": "https://bustimes.org/stops/040000001232",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "verificationStatus": "verified",
+      "indicator": "adj",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.105Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000001216",
+      "fallbackIdentity": "",
+      "stopName": "The Saracen's Head",
+      "locality": "Beaconsfield",
+      "direction": "Stop K",
+      "pairedStopGroup": "K",
+      "coordinates": {
+        "latitude": 51.6016175,
+        "longitude": -0.637681
+      },
+      "source": "NaPTAN identity via mapped stop data",
+      "retrievalDate": "2026-07-29",
+      "routesServed": [
+        "31",
+        "102",
+        "103",
+        "104",
+        "105",
+        "380",
+        "604",
+        "624"
+      ],
+      "sources": [
+        {
+          "title": "Beaconsfield Old Town, The Saracen's Head PH Stop K",
+          "url": "https://bustimes.org/stops/040000001216",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "verificationStatus": "verified",
+      "indicator": "Stop K",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.105Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000000347",
+      "fallbackIdentity": "",
+      "stopName": "Wilton Park",
+      "locality": "Beaconsfield",
+      "direction": "Direction not stated",
+      "pairedStopGroup": "wilton park",
+      "coordinates": {
+        "latitude": 51.6036535,
+        "longitude": -0.624057
+      },
+      "source": "NaPTAN identity via mapped stop data",
+      "retrievalDate": "2026-07-29",
+      "routesServed": [
+        "103"
+      ],
+      "sources": [
+        {
+          "title": "Beaconsfield Wilton Park northbound stop",
+          "url": "https://bustimes.org/stops/040000000347",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "verificationStatus": "verified",
+      "indicator": "Direction not stated",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.105Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "040000000331",
+      "fallbackIdentity": "",
+      "stopName": "Wilton Park",
+      "locality": "Beaconsfield",
+      "direction": "Direction not stated",
+      "pairedStopGroup": "wilton park",
+      "coordinates": {
+        "latitude": 51.6039076,
+        "longitude": -0.6237399
+      },
+      "source": "NaPTAN identity via mapped stop data",
+      "retrievalDate": "2026-07-29",
+      "routesServed": [
+        "103"
+      ],
+      "sources": [
+        {
+          "title": "Beaconsfield Wilton Park southbound stop",
+          "url": "https://bustimes.org/stops/040000000331",
+          "publisher": "Bus Times using NaPTAN/TNDS",
+          "retrievalDate": "2026-07-29"
+        }
+      ],
+      "verificationStatus": "verified",
+      "indicator": "Direction not stated",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-07-29T14:09:41.105Z",
       "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "previousRevision": null
     }

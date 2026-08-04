@@ -2,7 +2,7 @@
   "schema": "tpt-rail-knowledge-v3",
   "version": 2,
   "libraryBuild": "SHARED-LIB-1.6.0-20260723",
-  "updatedAt": "2026-07-23T10:10:35.167Z",
+  "updatedAt": "2026-08-04T11:14:46.760Z",
   "records": [
     {
       "schema": "tpt-rail-knowledge-v3",
@@ -14688,6 +14688,248 @@
       "reviewFlags": [],
       "editorName": "Test",
       "originatingModuleBuild": "RAIL-4.9.1-20260722",
+      "previousRevision": null
+    },
+    {
+      "schema": "tpt-rail-knowledge-v3",
+      "version": 2,
+      "key": "osm:node/3788778657",
+      "canonicalName": "Bury St Edmunds",
+      "name": "Bury St Edmunds",
+      "mode": "National Rail",
+      "coordinates": {
+        "lat": 52.2536353,
+        "lon": 0.7125888
+      },
+      "identifiers": {
+        "crs": "",
+        "naptan": "",
+        "tfl": "",
+        "other": "",
+        "osm": "node/3788778657"
+      },
+      "fields": {
+        "manager": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.nationalrail.co.uk/stations/bury-st-edmunds/",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Bury St Edmunds Station | National Rail",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "National Rail identifies Greater Anglia as the station manager.",
+          "publisher": "National Rail"
+        },
+        "operators": {
+          "value": "Greater Anglia",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bse",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Bury St Edmunds Train Station Information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "Greater Anglia manages the station and operates the scheduled passenger services described in the current timetable.",
+          "publisher": "Greater Anglia"
+        },
+        "lines": {
+          "value": "Ipswich–Cambridge route (promoted as the St Edmund’s Line) and the Ipswich–Peterborough regional route",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42368/download?inline= | https://www.greateranglia.co.uk/about-us/news-desk/news-articles/ipswich-cambridge-rail-route-be-promoted-st-edmunds-line",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Train Timetable 7: Ipswich to Cambridge and Peterborough; Ipswich to Cambridge rail route to be promoted as St. Edmund’s Line",
+          "sourceType": "official_timetable_and_operator_news",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "The timetable provides the operational route description; Greater Anglia separately identifies the Ipswich–Cambridge route as the St Edmund’s Line.",
+          "publisher": "Greater Anglia"
+        },
+        "frequencyTotal": {
+          "value": "4 tph total (typical Monday–Friday daytime, both directions combined)",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42368/download?inline=",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Train Timetable 7: Ipswich to Cambridge and Peterborough",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Actual scheduled departures from Bury St Edmunds in both directions combined; overlapping intermediate and terminal destination descriptions are not double-counted.",
+          "publisher": "Greater Anglia",
+          "numericTph": 4,
+          "methodology": "Counted actual departures in a representative typical Monday–Friday daytime hour from the current Greater Anglia timetable: two eastbound departures to Ipswich and two westbound departures, normally one to Cambridge and one to Peterborough.",
+          "evidenceNote": "Checked against the current official Greater Anglia timetable valid 17 May to 12 December 2026."
+        },
+        "frequencyByDestination": {
+          "value": [
+            {
+              "destination": "Ipswich",
+              "terminalDestination": "Ipswich",
+              "direction": "eastbound",
+              "tph": 2,
+              "numericTph": 2,
+              "line": "St Edmund’s Line / Ipswich–Cambridge and Peterborough route",
+              "direct": true,
+              "qualification": "Typical Monday–Friday daytime; service intervals vary at peak, early-morning and late-evening times."
+            },
+            {
+              "destination": "Cambridge",
+              "terminalDestination": "Cambridge",
+              "direction": "westbound",
+              "tph": 1,
+              "numericTph": 1,
+              "line": "St Edmund’s Line",
+              "direct": true,
+              "qualification": "Typical Monday–Friday daytime."
+            },
+            {
+              "destination": "Peterborough",
+              "terminalDestination": "Peterborough",
+              "direction": "westbound",
+              "tph": 1,
+              "numericTph": 1,
+              "line": "Ipswich–Peterborough regional route",
+              "direct": true,
+              "qualification": "Typical Monday–Friday daytime, generally via Ely, Manea, March and Whittlesea."
+            }
+          ],
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42368/download?inline=",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Train Timetable 7: Ipswich to Cambridge and Peterborough",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Direct-service TPH only. Intermediate calling points and terminal destinations belonging to the same train are not counted as separate departures.",
+          "publisher": "Greater Anglia",
+          "evidenceNote": "Checked against the current official Greater Anglia timetable valid 17 May to 12 December 2026."
+        },
+        "servicePattern": {
+          "value": "Typical Monday–Friday daytime service comprises 2 tph eastbound to Ipswich and 2 tph westbound, normally split between 1 tph to Cambridge and 1 tph to Peterborough. Early-morning, peak, evening and weekend patterns vary.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42368/download?inline=",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Train Timetable 7: Ipswich to Cambridge and Peterborough",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "",
+          "publisher": "Greater Anglia",
+          "evidenceNote": "Checked against the current official Greater Anglia timetable valid 17 May to 12 December 2026."
+        },
+        "frequency": {
+          "value": "Typically 2 tph in each direction (4 tph total), with westbound services normally divided between Cambridge and Peterborough",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42368/download?inline=",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Train Timetable 7: Ipswich to Cambridge and Peterborough",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Actual station departures rather than a sum of overlapping destination opportunities.",
+          "publisher": "Greater Anglia",
+          "evidenceNote": "Checked against the current official Greater Anglia timetable valid 17 May to 12 December 2026."
+        },
+        "destinations": {
+          "value": "Direct eastbound services serve Thurston, Elmswell, Stowmarket and Needham Market before Ipswich. Direct westbound services operate towards Cambridge via Kennett and Newmarket, and towards Peterborough via Ely, Manea, March and Whittlesea; individual stopping patterns vary.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42368/download?inline=",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Train Timetable 7: Ipswich to Cambridge and Peterborough",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Only direct scheduled destinations and principal intermediate calling points are described.",
+          "publisher": "Greater Anglia",
+          "evidenceNote": "Checked against the current official Greater Anglia timetable valid 17 May to 12 December 2026."
+        },
+        "journeyOpportunities": {
+          "value": "Direct services provide access to Ipswich, Stowmarket, Newmarket, Cambridge, Ely, March and Peterborough. Interchange at Ipswich provides onward opportunities towards Norwich, London Liverpool Street, the East Suffolk Line and Felixstowe; interchange at Cambridge, Ely and Peterborough provides wider regional and national connections. Interchange opportunities are not counted as direct destination TPH.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/media/42368/download?inline=",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Train Timetable 7: Ipswich to Cambridge and Peterborough",
+          "sourceType": "official_timetable_pdf",
+          "timetablePeriod": "Valid from 17 May 2026 to 12 December 2026",
+          "notes": "Direct services are explicitly distinguished from onward interchange opportunities.",
+          "publisher": "Greater Anglia",
+          "evidenceNote": "Checked against the current official Greater Anglia timetable valid 17 May to 12 December 2026."
+        },
+        "cycleParking": {
+          "value": "Cycle storage comprises 24 stands at the station entrance and on both platforms, plus a 52-space enclosed Cycle Hub on the north side of the station; 16 spaces within the hub are access-controlled using a registered Greater Anglia Smartcard. Storage is sheltered and covered by CCTV, with compounds, lockers and stands available.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bse",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Bury St Edmunds Train Station Information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "The operator station record provides the location, capacity, access and security details.",
+          "publisher": "Greater Anglia"
+        },
+        "stepFree": {
+          "value": "Step-free category A. Both platforms have step-free access via lifts. Ramps for train access are available, with staff or conductor assistance provided when booked or requested.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bse",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Bury St Edmunds Train Station Information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "The operator classifies the station as step-free category A.",
+          "publisher": "Greater Anglia"
+        },
+        "ticketing": {
+          "value": "There is no ticket office. Ticket machines and collection of pre-purchased tickets are available. Greater Anglia Smartcards can be issued, topped up and validated at the station.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bse",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Bury St Edmunds Train Station Information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "Greater Anglia"
+        },
+        "waiting": {
+          "value": "A waiting room is available in the station building and from the Platform 2 canopy, with seating and sheltered waiting areas. Published opening times are Monday–Saturday 05:45–20:30 and Sunday 08:15–19:45.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bse",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Bury St Edmunds Train Station Information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "Greater Anglia"
+        },
+        "toilets": {
+          "value": "Male, female and accessible toilets are located on Platform 2. The accessible toilet is operated by RADAR key. Published opening times are Monday–Friday 05:45–20:30, Saturday 06:50–20:30 and Sunday 08:15–19:45.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bse",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Bury St Edmunds Train Station Information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "Greater Anglia"
+        },
+        "carParking": {
+          "value": "The station car park is operated by National Car Parks and provides 98 spaces, including 2 accessible spaces. It is open 24 hours a day, seven days a week.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bse",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Bury St Edmunds Train Station Information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "",
+          "publisher": "Greater Anglia"
+        },
+        "notes": {
+          "value": "The station is staffed part-time and provides customer-information screens, announcements, help points, CCTV, Wi-Fi and refreshments. Rail-replacement and local onward-transport information is provided through the operator station record.",
+          "status": "verified",
+          "source": "https://www.greateranglia.co.uk/travel-information/station-information/bse",
+          "retrievalDate": "2026-08-04",
+          "sourceTitle": "Bury St Edmunds Train Station Information",
+          "sourceType": "official_station_page",
+          "timetablePeriod": "",
+          "notes": "General station summary based on the current operator station-information record.",
+          "publisher": "Greater Anglia"
+        }
+      },
+      "createdAt": "2026-08-04T11:05:27.596Z",
+      "updatedAt": "2026-08-04T11:14:46.760Z",
+      "reviewFlags": [],
+      "editorName": "Joe Freeman",
+      "originatingModuleBuild": "RAIL-4.11.1-20260723",
       "previousRevision": null
     }
   ]

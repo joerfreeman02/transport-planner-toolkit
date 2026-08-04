@@ -2,7 +2,7 @@
   "schema": "tpt.bus-stop-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.6.0-20260723",
-  "updatedAt": "2026-07-29T14:09:41.105Z",
+  "updatedAt": "2026-08-04T10:52:56.894Z",
   "records": [
     {
       "naptanCode": "490011045S",
@@ -1664,6 +1664,83 @@
       "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "editorName": "Joe Freeman",
       "updatedAt": "2026-07-29T14:09:41.105Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "390010530",
+      "fallbackIdentity": "",
+      "stopName": "Church Corner",
+      "locality": "Thorpe Morieux",
+      "direction": "E-bound",
+      "pairedStopGroup": "church corner",
+      "coordinates": {
+        "latitude": 52.1451043,
+        "longitude": 0.8367228
+      },
+      "source": "NaPTAN identity via mapped stop data",
+      "retrievalDate": "2026-08-04",
+      "routesServed": [
+        "53",
+        "Connecting Communities Babergh - Lavenham Area"
+      ],
+      "sources": [
+        {
+          "title": "Thorpe Morieux Church Corner (E-bound) stop record",
+          "url": "https://bustimes.org/stops/390010530",
+          "publisher": "Bus Times using NaPTAN and timetable data",
+          "retrievalDate": "2026-08-04"
+        },
+        {
+          "title": "NaPTAN and NPTG",
+          "url": "https://beta-naptan.dft.gov.uk/",
+          "publisher": "Department for Transport",
+          "retrievalDate": "2026-08-04"
+        }
+      ],
+      "verificationStatus": "verified",
+      "indicator": "E-bound",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-08-04T10:52:56.894Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "390010531",
+      "fallbackIdentity": "",
+      "stopName": "Church Corner",
+      "locality": "Thorpe Morieux",
+      "direction": "W-bound",
+      "pairedStopGroup": "church corner",
+      "coordinates": {
+        "latitude": 52.1449682,
+        "longitude": 0.8367726
+      },
+      "source": "NaPTAN identity via mapped stop data",
+      "retrievalDate": "2026-08-04",
+      "routesServed": [
+        "53"
+      ],
+      "sources": [
+        {
+          "title": "Thorpe Morieux Church Corner (W-bound) stop record",
+          "url": "https://bustimes.org/stops/390010531",
+          "publisher": "Bus Times using NaPTAN and timetable data",
+          "retrievalDate": "2026-08-04"
+        },
+        {
+          "title": "NaPTAN and NPTG",
+          "url": "https://beta-naptan.dft.gov.uk/",
+          "publisher": "Department for Transport",
+          "retrievalDate": "2026-08-04"
+        }
+      ],
+      "verificationStatus": "verified",
+      "indicator": "W-bound",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-08-04T10:52:56.894Z",
       "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "previousRevision": null
     }

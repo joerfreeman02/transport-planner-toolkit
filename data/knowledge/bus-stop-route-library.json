@@ -2,7 +2,7 @@
   "schema": "tpt.bus-stop-route-library",
   "version": "1.0.0",
   "libraryBuild": "SHARED-LIB-1.6.0-20260723",
-  "updatedAt": "2026-07-29T14:09:41.232Z",
+  "updatedAt": "2026-08-04T10:52:56.841Z",
   "records": [
     {
       "naptanCode": "490011045N",
@@ -2996,6 +2996,204 @@
       "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "editorName": "Joe Freeman",
       "updatedAt": "2026-07-29T14:09:41.232Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "390010531",
+      "routeNumber": "53",
+      "directionFromStop": "westbound, continuing north towards Bury St Edmunds",
+      "stopSpecificDestination": "Bury St Edmunds Bus Station",
+      "mondayFridayOperatingPeriod": "Wednesdays only: one departure at approximately 10:25.",
+      "saturdayOperatingPeriod": "No service.",
+      "sundayOperatingPeriod": "No service.",
+      "typicalWeekdayBusesPerHour": "Less than 1; one journey on Wednesdays only.",
+      "saturdayBusesPerHour": "0",
+      "sundayBusesPerHour": "0",
+      "serviceQualifications": {
+        "peak": "Not applicable; route 53 operates as one return journey on Wednesdays rather than as a peak-frequency service.",
+        "evening": "No evening service.",
+        "night": "No overnight service.",
+        "schoolDay": "The published journey is not identified as school-day-only.",
+        "seasonal": "A temporary Bildeston High Street diversion is published for 13 July to 3 November 2026; Church Corner remains listed in the current timetable."
+      },
+      "servicePattern": "One Wednesday journey from Hadleigh to Bury St Edmunds, with a corresponding return journey later in the day.",
+      "journeyOpportunities": "Direct Wednesday travel to Greatfields, Great Green, Felsham, Bradfield St George, Sicklesmere and Bury St Edmunds.",
+      "transportStatementParagraph": "Church Corner (westbound) is served by route 53, operated by KonectBuses. One journey operates on Wednesdays at approximately 10:25 towards Bury St Edmunds, providing direct access to Felsham, Bradfield St George, Sicklesmere and Bury St Edmunds.",
+      "sources": [
+        {
+          "title": "Thorpe Morieux Church Corner (W-bound) stop record",
+          "url": "https://bustimes.org/stops/390010531",
+          "publisher": "Bus Times using NaPTAN and timetable data",
+          "retrievalDate": "2026-08-04"
+        },
+        {
+          "title": "53 - Whatfield to Bury St Edmunds",
+          "url": "https://www.konectbuses.co.uk/services/HEDO/53",
+          "publisher": "KonectBuses",
+          "retrievalDate": "2026-08-04"
+        },
+        {
+          "title": "Hadleigh area timetable changes",
+          "url": "https://www.konectbuses.co.uk/network-changes/3733493b-bea2-4280-8497-e7ef1572f002",
+          "publisher": "KonectBuses",
+          "retrievalDate": "2026-08-04"
+        },
+        {
+          "title": "53 - Hadleigh to Bury St Edmunds current timetable",
+          "url": "https://bustimes.org/services/53-bury-st-edmunds-bildeston-hadleigh",
+          "publisher": "Bus Times using Bus Open Data Service",
+          "retrievalDate": "2026-08-04"
+        },
+        {
+          "title": "Thorpe Morieux Church Corner (E-bound) stop record",
+          "url": "https://bustimes.org/stops/390010530",
+          "publisher": "Bus Times using NaPTAN and timetable data",
+          "retrievalDate": "2026-08-04"
+        }
+      ],
+      "retrievalDate": "2026-08-04",
+      "verificationStatus": "verified",
+      "operator": "KonectBuses",
+      "routeOrigin": "Hadleigh Bus Station",
+      "routeDestination": "Bury St Edmunds Bus Station",
+      "geographicContext": "Service corridor between Hadleigh Bus Station and Bury St Edmunds Bus Station via Hadleigh, Semer, Bildeston, Hitcham, Brettenham, Thorpe Morieux, Felsham, Bradfield St George, Sicklesmere, Bury St Edmunds.",
+      "canonicalRouteKey": "53|konectbuses|hadleigh bus station|bury st edmunds bus station|service corridor between hadleigh bus station and bury st edmunds bus station via hadleigh semer bildeston hitcham brettenham thorpe morieux felsham bradfield st george sicklesmere bury st edmunds",
+      "compositeRouteKey": "53|konectbuses|hadleigh bus station|bury st edmunds bus station|service corridor between hadleigh bus station and bury st edmunds bus station via hadleigh semer bildeston hitcham brettenham thorpe morieux felsham bradfield st george sicklesmere bury st edmunds",
+      "routeIdentifier": "53|konectbuses|hadleigh bus station|bury st edmunds bus station|service corridor between hadleigh bus station and bury st edmunds bus station via hadleigh semer bildeston hitcham brettenham thorpe morieux felsham bradfield st george sicklesmere bury st edmunds",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-08-04T10:52:56.841Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "390010530",
+      "routeNumber": "53",
+      "directionFromStop": "eastbound, continuing south towards Hadleigh",
+      "stopSpecificDestination": "Hadleigh Bus Station",
+      "mondayFridayOperatingPeriod": "Wednesdays only: one departure at approximately 13:35.",
+      "saturdayOperatingPeriod": "No service.",
+      "sundayOperatingPeriod": "No service.",
+      "typicalWeekdayBusesPerHour": "Less than 1; one journey on Wednesdays only.",
+      "saturdayBusesPerHour": "0",
+      "sundayBusesPerHour": "0",
+      "serviceQualifications": {
+        "peak": "Not applicable; route 53 operates as one return journey on Wednesdays rather than as a peak-frequency service.",
+        "evening": "No evening service.",
+        "night": "No overnight service.",
+        "schoolDay": "The published journey is not identified as school-day-only.",
+        "seasonal": "A temporary Bildeston High Street diversion is published for 13 July to 3 November 2026; Church Corner remains listed in the current timetable."
+      },
+      "servicePattern": "One Wednesday return journey from Bury St Edmunds to Hadleigh, following the morning journey in the opposite direction.",
+      "journeyOpportunities": "Direct Wednesday travel to Brettenham, Hitcham, Bildeston, Semer and Hadleigh.",
+      "transportStatementParagraph": "Church Corner (eastbound) is served by route 53, operated by KonectBuses. One journey operates on Wednesdays at approximately 13:35 towards Hadleigh, providing direct access to Brettenham, Hitcham, Bildeston, Semer and Hadleigh.",
+      "sources": [
+        {
+          "title": "Thorpe Morieux Church Corner (E-bound) stop record",
+          "url": "https://bustimes.org/stops/390010530",
+          "publisher": "Bus Times using NaPTAN and timetable data",
+          "retrievalDate": "2026-08-04"
+        },
+        {
+          "title": "53 - Whatfield to Bury St Edmunds",
+          "url": "https://www.konectbuses.co.uk/services/HEDO/53",
+          "publisher": "KonectBuses",
+          "retrievalDate": "2026-08-04"
+        },
+        {
+          "title": "Hadleigh area timetable changes",
+          "url": "https://www.konectbuses.co.uk/network-changes/3733493b-bea2-4280-8497-e7ef1572f002",
+          "publisher": "KonectBuses",
+          "retrievalDate": "2026-08-04"
+        },
+        {
+          "title": "53 - Hadleigh to Bury St Edmunds current timetable",
+          "url": "https://bustimes.org/services/53-bury-st-edmunds-bildeston-hadleigh",
+          "publisher": "Bus Times using Bus Open Data Service",
+          "retrievalDate": "2026-08-04"
+        },
+        {
+          "title": "Thorpe Morieux Church Corner (W-bound) stop record",
+          "url": "https://bustimes.org/stops/390010531",
+          "publisher": "Bus Times using NaPTAN and timetable data",
+          "retrievalDate": "2026-08-04"
+        }
+      ],
+      "retrievalDate": "2026-08-04",
+      "verificationStatus": "verified",
+      "operator": "KonectBuses",
+      "routeOrigin": "Hadleigh Bus Station",
+      "routeDestination": "Bury St Edmunds Bus Station",
+      "geographicContext": "Service corridor between Hadleigh Bus Station and Bury St Edmunds Bus Station via Hadleigh, Semer, Bildeston, Hitcham, Brettenham, Thorpe Morieux, Felsham, Bradfield St George, Sicklesmere, Bury St Edmunds.",
+      "canonicalRouteKey": "53|konectbuses|hadleigh bus station|bury st edmunds bus station|service corridor between hadleigh bus station and bury st edmunds bus station via hadleigh semer bildeston hitcham brettenham thorpe morieux felsham bradfield st george sicklesmere bury st edmunds",
+      "compositeRouteKey": "53|konectbuses|hadleigh bus station|bury st edmunds bus station|service corridor between hadleigh bus station and bury st edmunds bus station via hadleigh semer bildeston hitcham brettenham thorpe morieux felsham bradfield st george sicklesmere bury st edmunds",
+      "routeIdentifier": "53|konectbuses|hadleigh bus station|bury st edmunds bus station|service corridor between hadleigh bus station and bury st edmunds bus station via hadleigh semer bildeston hitcham brettenham thorpe morieux felsham bradfield st george sicklesmere bury st edmunds",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-08-04T10:52:56.841Z",
+      "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "previousRevision": null
+    },
+    {
+      "naptanCode": "390010530",
+      "routeNumber": "Connecting Communities Babergh - Lavenham Area",
+      "directionFromStop": "eastbound",
+      "stopSpecificDestination": "Kettlebaston, Village Sign",
+      "mondayFridayOperatingPeriod": "Monday-Friday, excluding bank holidays: published hourly pickup slots from approximately 07:12 to 18:12; advance booking required.",
+      "saturdayOperatingPeriod": "Service available between 07:00 and 19:00 by pre-booked demand-responsive arrangement; no fixed stop-specific timetable.",
+      "sundayOperatingPeriod": "No service.",
+      "typicalWeekdayBusesPerHour": "Approximately 1 published booking slot per hour, subject to demand and advance reservation.",
+      "saturdayBusesPerHour": "Demand-responsive; no fixed frequency.",
+      "sundayBusesPerHour": "0",
+      "serviceQualifications": {
+        "peak": "Demand-responsive service with no separate peak-only pattern.",
+        "evening": "The Babergh service is available until 19:00 on Mondays to Saturdays, subject to advance booking.",
+        "night": "No service after 19:00.",
+        "schoolDay": "Not restricted to school or college days.",
+        "seasonal": "The published Monday-Friday timetable excludes bank holidays; all journeys must be booked in advance."
+      },
+      "servicePattern": "Pre-booked demand-responsive service. At Church Corner, published weekday journeys towards Kettlebaston are pickup-only; return journeys use the same stop for set-down only.",
+      "journeyOpportunities": "Pre-booked travel towards Brent Eleigh, Monks Eleigh, Chelsworth, Bildeston, Hitcham, Preston St Mary and Kettlebaston, with wider Babergh connections available through the demand-responsive service.",
+      "transportStatementParagraph": "Church Corner (eastbound) is also served by the pre-booked Connecting Communities Babergh – Lavenham Area service. Published weekday pickup slots operate hourly between approximately 07:12 and 18:12 towards Kettlebaston, while the wider Babergh demand-responsive service is available from 07:00 to 19:00 on Mondays to Saturdays.",
+      "sources": [
+        {
+          "title": "Thorpe Morieux Church Corner (E-bound) stop record",
+          "url": "https://bustimes.org/stops/390010530",
+          "publisher": "Bus Times using NaPTAN and timetable data",
+          "retrievalDate": "2026-08-04"
+        },
+        {
+          "title": "Connecting Communities - Babergh",
+          "url": "https://communities.suffolkonboard.com/book-a-journey/babergh/",
+          "publisher": "Suffolk County Council",
+          "retrievalDate": "2026-08-04"
+        },
+        {
+          "title": "Hadleigh Community Transport",
+          "url": "https://infolink.suffolk.gov.uk/kb5/suffolk/infolink/service.page?id=syo0VBJ3514",
+          "publisher": "Suffolk County Council",
+          "retrievalDate": "2026-08-04"
+        },
+        {
+          "title": "Connecting Communities Babergh - Lavenham Area timetable",
+          "url": "https://bustimes.org/services/connecting-communities-babergh-lavenham-area",
+          "publisher": "Bus Times using the Traveline National Dataset",
+          "retrievalDate": "2026-08-04"
+        }
+      ],
+      "retrievalDate": "2026-08-04",
+      "verificationStatus": "verified",
+      "operator": "Hadleigh Community Transport",
+      "routeOrigin": "Newton Green, Rectory Road",
+      "routeDestination": "Kettlebaston, Village Sign",
+      "geographicContext": "Service corridor between Newton Green, Rectory Road and Kettlebaston, Village Sign via Newton Green, Gedding, Felsham, Cockfield, Hadleigh, Wattisham, Milden, Lindsey, Semer, Lavenham, Nedging Tye, Brettenham, Thorpe Morieux, Brent Eleigh, Monks Eleigh, Chelsworth, Bildeston, Hitcham, Preston St Mary, Kettlebaston.",
+      "canonicalRouteKey": "connecting communities babergh lavenham area|hadleigh community transport|newton green rectory road|kettlebaston village sign|service corridor between newton green rectory road and kettlebaston village sign via newton green gedding felsham cockfield hadleigh wattisham milden lindsey semer lavenham nedging tye brettenham thorpe morieux brent eleigh monks eleigh chelsworth bildeston hitcham preston st mary kettlebaston",
+      "compositeRouteKey": "connecting communities babergh lavenham area|hadleigh community transport|newton green rectory road|kettlebaston village sign|service corridor between newton green rectory road and kettlebaston village sign via newton green gedding felsham cockfield hadleigh wattisham milden lindsey semer lavenham nedging tye brettenham thorpe morieux brent eleigh monks eleigh chelsworth bildeston hitcham preston st mary kettlebaston",
+      "routeIdentifier": "connecting communities babergh lavenham area|hadleigh community transport|newton green rectory road|kettlebaston village sign|service corridor between newton green rectory road and kettlebaston village sign via newton green gedding felsham cockfield hadleigh wattisham milden lindsey semer lavenham nedging tye brettenham thorpe morieux brent eleigh monks eleigh chelsworth bildeston hitcham preston st mary kettlebaston",
+      "publicationCompatibilityBuild": "BUS-PUBLISH-COMPAT-1.0.0-20260724",
+      "editorName": "Joe Freeman",
+      "updatedAt": "2026-08-04T10:52:56.841Z",
       "originatingModuleBuild": "BUS-PROD-150-20260717+BUS-PUBLISH-COMPAT-1.0.0-20260724",
       "previousRevision": null
     }

@@ -1,0 +1,14 @@
+{
+  "version": 0.6,
+  "elements": [
+    { "type": "way", "id": 101, "tags": { "highway": "primary", "ref": "A100", "name": "Regional Road" }, "geometry": [{"lat":51.490,"lon":-0.120},{"lat":51.500,"lon":-0.100},{"lat":51.510,"lon":-0.080}] },
+    { "type": "way", "id": 102, "tags": { "highway": "motorway", "ref": "M10" }, "geometry": [{"lat":51.515,"lon":-0.120},{"lat":51.515,"lon":-0.080}] },
+    { "type": "way", "id": 103, "tags": { "railway": "rail", "name": "Test railway" }, "geometry": [{"lat":51.485,"lon":-0.105},{"lat":51.520,"lon":-0.095}] },
+    { "type": "node", "id": 104, "lat": 51.505, "lon": -0.098, "tags": { "railway": "station", "network": "National Rail", "name": "Test Central" } },
+    { "type": "node", "id": 105, "lat": 51.497, "lon": -0.102, "tags": { "railway": "station", "station": "subway", "network": "London Underground", "name": "Test Underground" } },
+    { "type": "way", "id": 106, "tags": { "waterway": "canal", "name": "Test Navigation" }, "geometry": [{"lat":51.485,"lon":-0.115},{"lat":51.520,"lon":-0.110}] },
+    { "type": "relation", "id": 107, "tags": { "route": "bicycle", "network": "ncn", "ref": "NCN 1" }, "members": [{ "type":"way", "ref":201, "geometry":[{"lat":51.492,"lon":-0.118},{"lat":51.506,"lon":-0.085}] }] },
+    { "type": "relation", "id": 108, "tags": { "route": "bus", "ref": "99", "name": "Route 99" }, "members": [{ "type":"way", "ref":202, "geometry":[{"lat":51.493,"lon":-0.112},{"lat":51.501,"lon":-0.100},{"lat":51.509,"lon":-0.088}] }] },
+    { "type": "node", "id": 109, "lat": 51.5015, "lon": -0.104, "tags": { "amenity": "school", "name": "Test School" } }
+  ]
+}

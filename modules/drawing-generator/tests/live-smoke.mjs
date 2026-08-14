@@ -6,7 +6,7 @@ const { chromium } = require('playwright');
 const root = process.env.TPT_REVIEW_ROOT;
 assert.ok(root, 'TPT_REVIEW_ROOT must identify the deployed toolkit root.');
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const page = await context.newPage();
 const failures = [];

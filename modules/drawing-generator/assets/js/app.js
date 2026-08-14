@@ -199,7 +199,10 @@ function renderSourceStatus() {
   const source = currentSource();
   byId('downloadSnapshot').disabled = !source.snapshot;
   byId('sourceDiagnostics').textContent = source.snapshot ? JSON.stringify(source.snapshot, null, 2) : 'Not loaded.';
-  if (source.status === 'success') setMessage('sourceStatus', `${source.features.length} classified vector features loaded from ${source.snapshot.provider}. The in-memory snapshot will be reused for print.`, 'success');
+  if (source.status === 'success') {
+    const warnings = source.snapshot.warnings || [];
+    setMessage('sourceStatus', `${source.features.length} classified vector features loaded from ${source.snapshot.provider}. The in-memory snapshot will be reused for print.${warnings.length ? ` ${warnings.join(' ')}` : ''}`, warnings.length ? 'warning' : 'success');
+  }
   else if (source.status === 'zero') setMessage('sourceStatus', 'The provider request succeeded and returned a genuine zero-feature result for this extent.', 'warning');
   else if (source.status === 'failed') setMessage('sourceStatus', source.error, 'error');
   else setMessage('sourceStatus', 'No vector snapshot loaded. Required layers may be added through reviewed overlays.', 'warning');

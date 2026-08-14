@@ -5,7 +5,8 @@
 - HGV route-to/from selection is never automatic; draw/import and professionally approve it.
 - Nationwide bus-route completeness is not guaranteed; import/draw reviewed route groups.
 - Community considerations are candidates only until a professional explicitly includes them.
-- Strategic-cycle hierarchy and navigable-waterway status depend on available tags; review or overlay missing evidence.
+- Strategic-cycle hierarchy requires explicit OSM `ncn`/`rcn` network and route-reference evidence; other bicycle relations remain review-only until a planner adds an approved overlay.
+- Navigable-waterway status requires explicit OSM `boat=yes` or `motorboat=yes`; canal/river type alone is review-only and must not be used as a navigability claim.
 - Route labels, group names and controlled colours require user review.
 
 ## Technical limitations
@@ -25,7 +26,7 @@
 - Relation geometries may be discontinuous MultiLineStrings. No cartographic conflation is performed.
 - Station modes follow current Railway tag semantics, but ambiguous/poorly tagged stations may need reviewed overlays.
 - Automatic bus retrieval is limited to OSM bus-route relations and may omit services or contain stale geometry.
-- Waterway navigability is conservative: unproven rivers remain review-only.
+- Waterway navigability is conservative: all unproven rivers and canals remain review-only.
 - No authoritative traffic-order, restriction, bridge-height/weight or swept-path evidence is used. The tool cannot determine HGV suitability.
 
 ## Cosmetic refinements

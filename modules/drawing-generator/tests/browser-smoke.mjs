@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const root = process.env.TPT_REVIEW_ROOT || 'http://127.0.0.1:8768/';
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
 const context = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
 const page = await context.newPage();
 const errors = [];
@@ -70,10 +70,12 @@ try {
   await page.locator('#overlayFile').setInputFiles(fileURLToPath(new URL('./fixtures/synthetic-overlays.geojson', import.meta.url)));
   await page.waitForFunction(() => document.querySelectorAll('#overlayRows tr[data-overlay-id]').length === 2);
   const expected = {
-    'regional-plan': '50000', 'regional-routing': '50000',
-    'local-context': '2500', 'local-routing': '2500'
+    'regional-plan': { denominator: '50000', title: 'REGIONAL PLAN', number: 'EAS-SK-H-101', scale: '1:50,000' },
+    'regional-routing': { denominator: '50000', title: 'REGIONAL ROUTING PLAN', number: 'EAS-SK-H-102', scale: '1:50,000' },
+    'local-context': { denominator: '2500', title: 'LOCAL CONTEXT PLAN', number: 'EAS-SK-H-105', scale: '1:2,500' },
+    'local-routing': { denominator: '2500', title: 'LOCAL ROUTING PLAN', number: 'EAS-SK-H-103', scale: '1:2,500' }
   };
-  for (const [mode, denominator] of Object.entries(expected)) {
+  for (const [mode, details] of Object.entries(expected)) {
     await page.locator('#modeSelect').selectOption(mode);
     if (mode !== 'regional-plan') {
       await page.locator('#loadSources').click();
@@ -81,11 +83,17 @@ try {
     }
     const svg = page.locator('#drawingSvg');
     assert.equal(await svg.getAttribute('data-mode'), mode);
-    assert.equal(await svg.getAttribute('data-scale'), denominator);
+    assert.equal(await svg.getAttribute('data-scale'), details.denominator);
     assert.equal(await svg.locator('.scale-bar').getAttribute('data-paper-mm'), '20');
     assert.equal(await svg.locator('.north-arrow').count(), 1);
     assert.equal(await page.locator('#drawingSheet .title-block').count(), 1);
     assert.match(await page.locator('#sheetAttribution').innerText(), /OpenStreetMap/);
+    assert.equal(await page.locator('[data-sheet-meta="drawingTitle"]').first().innerText(), details.title);
+    assert.equal(await page.locator('[data-sheet-meta="drawingNumber"]').first().innerText(), details.number);
+    assert.equal(await page.locator('[data-sheet-meta="scale"]').first().innerText(), details.scale);
+    const currentDate = await page.locator('[data-meta="date"]').inputValue();
+    assert.match(currentDate, /^\d{2}\/\d{2}\/\d{4}$/);
+    assert.equal(await page.locator('[data-sheet-meta="date"]').first().innerText(), currentDate);
   }
   assert.equal(await page.getByRole('button', { name: 'Print / Save PDF' }).count(), 1);
   assert.deepEqual(badLocalResponses, []);

@@ -1,0 +1,54 @@
+name: Drawing Generator CI
+
+on:
+  pull_request:
+    paths:
+      - "modules/drawing-generator/**"
+      - "docs/drawing-generator/**"
+      - "docs/adr/**"
+      - ".github/workflows/drawing-generator-ci.yml"
+      - ".github/dependabot.yml"
+  push:
+    branches: [main]
+    paths:
+      - "modules/drawing-generator/**"
+      - "docs/drawing-generator/**"
+      - "docs/adr/**"
+      - ".github/workflows/drawing-generator-ci.yml"
+      - ".github/dependabot.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Drawing Generator deterministic tests
+        run: node modules/drawing-generator/tests/drawing-generator.test.mjs
+      - name: Critical existing deterministic regressions
+        run: |
+          node tests/run-tests.mjs
+          node tests/regression-check.mjs
+          node tests/bus-foundation.test.mjs
+          node modules/railway/tests/regression-check.mjs
+          node modules/accessibility/tests/classification-regression.mjs
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Browser and PDF acceptance
+        run: |
+          python3 -m http.server 8768 > /tmp/tpt-http.log 2>&1 &
+          for attempt in {1..20}; do curl -fsS http://127.0.0.1:8768/ > /dev/null && break; sleep 0.25; done
+          TPT_REVIEW_ROOT=http://127.0.0.1:8768/ node modules/drawing-generator/tests/browser-smoke.mjs
+          TPT_REVIEW_ROOT=http://127.0.0.1:8768/ DG0_PDF_OUTPUT="$RUNNER_TEMP/dg0-pdf" node modules/drawing-generator/tests/pdf-qa.mjs
+          test "$(find "$RUNNER_TEMP/dg0-pdf" -maxdepth 1 -name '*.pdf' | wc -l)" -eq 4

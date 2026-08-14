@@ -1,0 +1,14 @@
+{
+  "type": "Feature",
+  "properties": { "fixture": "synthetic-review-only" },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [[
+      [-0.10110, 51.49970],
+      [-0.09985, 51.49970],
+      [-0.09985, 51.50045],
+      [-0.10110, 51.50045],
+      [-0.10110, 51.49970]
+    ]]
+  }
+}

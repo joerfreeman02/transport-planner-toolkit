@@ -13,3 +13,4 @@ Required fields: status, date, owner, context, options, decision and consequence
 | ADR-005 | Shared mapping adoption strategy | Accepted for Sprint 4 implementation |
 | ADR-006 | Shared export adoption strategy | Accepted for Sprint 4 implementation |
 | ADR-007 | Project Data Model boundary | Accepted for Sprint 4 implementation |
+| ADR-008 | Drawing Generator projected SVG and physical scale engine | Proposed |

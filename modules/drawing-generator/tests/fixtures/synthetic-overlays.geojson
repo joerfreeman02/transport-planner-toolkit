@@ -1,0 +1,15 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "class": "route-to-site", "label": "REVIEWED ROUTE TO SITE", "layerName": "Approved routing fixture", "colour": "#ed1c24" },
+      "geometry": { "type": "LineString", "coordinates": [[-0.108, 51.503], [-0.104, 51.5015], [-0.1005, 51.5001]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "class": "community", "label": "COMMUNITY FACILITY", "layerName": "Selected considerations", "colour": "#666666" },
+      "geometry": { "type": "Point", "coordinates": [-0.1025, 51.501] }
+    }
+  ]
+}

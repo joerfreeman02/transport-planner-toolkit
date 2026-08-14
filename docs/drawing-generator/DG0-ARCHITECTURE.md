@@ -1,7 +1,7 @@
 # DG-0 architecture
 
 Status: **Proposed live-review candidate; not an accepted baseline.**
-Version/build: `DRAW-0.1.0` / `DRAW-0.1.0-DG0-20260814`.
+Version/build: `DRAW-0.1.0` / `DRAW-0.1.0-DG0C1-20260814`.
 
 ## Scope and boundaries
 

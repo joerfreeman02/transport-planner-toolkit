@@ -1,4 +1,4 @@
-# DG-0 file-by-file diff audit
+# DG-0 / DG-0C1 file-by-file diff audit
 
 Allowlist result before deployment: **PASS**. All candidate implementation changes are additive except the ADR register row. Generated QA PDFs and confidential local visual references are untracked and excluded from commit.
 
@@ -64,3 +64,19 @@ Allowlist result before deployment: **PASS**. All candidate implementation chang
 | `modules/drawing-generator/tests/fixtures/synthetic-site.geojson` | Sanitized boundary fixture. |
 | `modules/drawing-generator/tests/fixtures/synthetic-overlays.geojson` | Sanitized reviewed-overlay fixture. |
 | `modules/drawing-generator/tests/fixtures/synthetic-overpass.json` | Sanitized vector-source fixture. |
+
+## DG-0C1 corrective delta
+
+The corrective change is contained within the existing, isolated Drawing Generator and its documentation/tests. No protected module, Dashboard, shared-library data, production identity or recovery branch is altered. Generated C1 PDFs/renders and the authorised local source comparison are untracked and excluded from the commit.
+
+| File | Corrective purpose |
+|---|---|
+| `modules/drawing-generator/index.html` | Displays the C1 build stamp. |
+| `modules/drawing-generator/assets/js/config.js` | Sets `DRAW-0.1.0-DG0C1-20260814`; status remains an unaccepted live-review candidate. |
+| `modules/drawing-generator/assets/js/source-adapter.js` | Conservative bicycle, waterway, road and motorway evidence classification plus visible source warnings. |
+| `modules/drawing-generator/assets/js/svg-renderer.js` | Neutral `MAIN ROAD` legend and exclusion of review-only cycle evidence. |
+| `modules/drawing-generator/assets/js/app.js` | Makes review-only source warnings visible in the source status. |
+| `modules/drawing-generator/tests/drawing-generator.test.mjs` | Adds source-safety and road-label regression evidence. |
+| `modules/drawing-generator/tests/browser-smoke.mjs` | Verifies all four title-block defaults/current date and supports a supplied local Chromium path for reproducible QA. |
+| `modules/drawing-generator/tests/live-smoke.mjs`, `pdf-qa.mjs` | Support a supplied local Chromium path for reproducible QA. |
+| `docs/drawing-generator/{DATA-SOURCE-REGISTER,GOLDEN-DRAWING-COMPARISON,KNOWN-LIMITATIONS,TEST-EVIDENCE}.md` | Documents conservative rules, the sanitised comparison, limitations and C1 evidence. |

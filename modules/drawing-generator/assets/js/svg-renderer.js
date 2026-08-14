@@ -3,7 +3,7 @@ import { extentForDrawing, scaleBarForMode } from './scale-engine.js';
 import { modeConfig } from './drawing-modes.js';
 
 const STYLE = Object.freeze({
-  'main-road': { stroke: '#ed1c24', width: 1.35, label: 'MAIN ROAD / A ROAD' },
+  'main-road': { stroke: '#ed1c24', width: 1.35, label: 'MAIN ROAD' },
   motorway: { stroke: '#ec1ce8', width: 2.2, label: 'MOTORWAY' },
   'strategic-cycle': { stroke: '#f0a500', width: 1.2, label: 'STRATEGIC CYCLE ROUTE' },
   'cycle-route': { stroke: '#0057e7', width: 1.1, label: 'CYCLE ROUTE' },
@@ -54,7 +54,7 @@ function geometryPoint(geometry, project) {
 }
 
 function sourceVisible(modeId, className) {
-  if (className === 'community-candidate' || className === 'waterway-review') return false;
+  if (className === 'community-candidate' || className === 'waterway-review' || className === 'cycle-review') return false;
   return modeConfig(modeId).visibleClasses.includes(className);
 }
 

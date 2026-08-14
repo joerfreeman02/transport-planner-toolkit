@@ -7,7 +7,7 @@ const { chromium } = require('playwright');
 const root = process.env.TPT_REVIEW_ROOT || 'http://127.0.0.1:8768/';
 const output = path.resolve(process.env.DG0_PDF_OUTPUT || 'output/pdf');
 fs.mkdirSync(output, { recursive: true });
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
 
 const site = { type: 'Polygon', coordinates: [[[-.1011, 51.4997], [-.09985, 51.4997], [-.09985, 51.50045], [-.1011, 51.50045], [-.1011, 51.4997]]] };
 const lines = {

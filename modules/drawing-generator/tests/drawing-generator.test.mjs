@@ -127,6 +127,24 @@ await test('ambiguous waterway evidence is retained as review-only', () => {
   const result = source.classifyOverpassElement({ type: 'way', id: 1, tags: { waterway: 'river', name: 'Test River' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] });
   assert.equal(result[0].properties.class, 'waterway-review');
 });
+await test('a canal requires explicit boat evidence before it is styled as navigable', () => {
+  const unconfirmed = source.classifyOverpassElement({ type: 'way', id: 2, tags: { waterway: 'canal' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] });
+  const confirmed = source.classifyOverpassElement({ type: 'way', id: 3, tags: { waterway: 'canal', boat: 'yes' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] });
+  assert.equal(unconfirmed[0].properties.class, 'waterway-review'); assert.equal(confirmed[0].properties.class, 'waterway');
+});
+await test('only explicitly evidenced national or regional bicycle relations are strategic', () => {
+  const generic = source.classifyOverpassElement({ type: 'relation', id: 4, tags: { route: 'bicycle', network: 'lcn' }, members: [{ geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] }] });
+  const evidenced = source.classifyOverpassElement({ type: 'relation', id: 5, tags: { route: 'bicycle', network: 'ncn', ref: '1' }, members: [{ geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] }] });
+  assert.equal(generic[0].properties.class, 'cycle-review'); assert.equal(evidenced[0].properties.class, 'strategic-cycle');
+});
+await test('main-road labels preserve only an evidenced A-road reference and motorway labels preserve motorway evidence', () => {
+  const aRoad = source.classifyOverpassElement({ type: 'way', id: 6, tags: { highway: 'primary', ref: 'A406', name: 'North Circular Road' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
+  const nonA = source.classifyOverpassElement({ type: 'way', id: 7, tags: { highway: 'primary', ref: 'B123', name: 'Example Road' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
+  const motorway = source.classifyOverpassElement({ type: 'way', id: 8, tags: { highway: 'motorway', ref: 'M25', name: 'London Orbital Motorway' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
+  assert.deepEqual([aRoad.properties.class, aRoad.properties.officialARef, aRoad.properties.label], ['main-road', 'A406', 'A406 – North Circular Road']);
+  assert.deepEqual([nonA.properties.class, nonA.properties.officialARef, nonA.properties.label], ['main-road', '', 'B123 – Example Road']);
+  assert.deepEqual([motorway.properties.class, motorway.properties.label], ['motorway', 'M25 – London Orbital Motorway']);
+});
 await test('structured source query includes required transport evidence', () => {
   const query = source.buildOverpassQuery('local-context', extent);
   for (const marker of ['highway', 'railway', 'waterway', 'route"="bicycle', 'route"="bus', 'amenity']) assert.match(query, new RegExp(marker));

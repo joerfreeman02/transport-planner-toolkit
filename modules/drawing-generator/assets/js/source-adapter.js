@@ -60,16 +60,41 @@ function feature(element, className, geometry, extra = {}) {
   };
 }
 
+function labelFromReferenceAndName(tags, fallback) {
+  const ref = String(tags.ref || '').trim();
+  const name = String(tags.name || '').trim();
+  return ref && name ? `${ref} – ${name}` : ref || name || fallback;
+}
+
+function isExplicitAReference(ref) {
+  return /(^|[;\s])A\d{1,4}[A-Z]?(?=$|[;\s])/i.test(String(ref || '').trim());
+}
+
+function hasStrategicCycleEvidence(tags) {
+  const networks = String(tags.network || '').toLowerCase().split(/[;,\s]+/);
+  return networks.some(network => network === 'ncn' || network === 'rcn') && Boolean(String(tags.ref || '').trim());
+}
+
+function hasNavigableWaterwayEvidence(tags) {
+  return tags.boat === 'yes' || tags.motorboat === 'yes';
+}
+
 export function classifyOverpassElement(element) {
   const tags = element?.tags || {};
   const geometry = lineGeometry(element);
   if (!geometry) return [];
   if (tags.highway) {
-    if (/^motorway/.test(tags.highway)) return [feature(element, 'motorway', geometry)];
-    if (/^(trunk|primary)/.test(tags.highway)) return [feature(element, 'main-road', geometry)];
+    if (/^motorway/.test(tags.highway)) return [feature(element, 'motorway', geometry, { motorwayLabel: labelFromReferenceAndName(tags, 'Motorway'), label: labelFromReferenceAndName(tags, 'Motorway') })];
+    if (/^(trunk|primary)/.test(tags.highway)) {
+      const roadLabel = labelFromReferenceAndName(tags, 'OSM main road');
+      return [feature(element, 'main-road', geometry, { roadFunction: tags.highway, officialARef: isExplicitAReference(tags.ref) ? String(tags.ref).trim() : '', roadLabel, label: roadLabel })];
+    }
     if (tags.highway === 'cycleway') return [feature(element, 'cycle-route', geometry, { network: 'local' })];
   }
-  if (tags.route === 'bicycle') return [feature(element, 'strategic-cycle', geometry, { network: tags.network || 'unclassified' })];
+  if (tags.route === 'bicycle') {
+    if (hasStrategicCycleEvidence(tags)) return [feature(element, 'strategic-cycle', geometry, { network: tags.network, strategicEvidence: 'explicit-network-and-ref' })];
+    return [feature(element, 'cycle-review', geometry, { network: tags.network || 'unclassified', reviewRequired: true })];
+  }
   if (tags.route === 'bus') return [feature(element, 'bus-route', geometry, { routeLabel: tags.ref || tags.name || 'Bus route' })];
   if (tags.railway && /^(rail|subway|light_rail|tram)$/.test(tags.railway)) return [feature(element, 'railway', geometry, { railType: tags.railway })];
   if (hasRailEvidence(tags) && (tags.railway === 'station' || tags.railway === 'halt' || tags.railway === 'tram_stop' || tags.public_transport === 'station')) {
@@ -77,8 +102,8 @@ export function classifyOverpassElement(element) {
     return [feature(element, RAIL_MODE_CLASS[mode] || 'station-national-rail', pointGeometry(element) || geometry, { mode })];
   }
   if (tags.waterway && (/^(river|canal)$/.test(tags.waterway))) {
-    const navigable = tags.waterway === 'canal' || tags.boat === 'yes' || tags.motorboat === 'yes';
-    return [feature(element, navigable ? 'waterway' : 'waterway-review', geometry, { navigable })];
+    const navigable = hasNavigableWaterwayEvidence(tags);
+    return [feature(element, navigable ? 'waterway' : 'waterway-review', geometry, { navigable, navigabilityEvidence: navigable ? (tags.boat === 'yes' ? 'boat=yes' : 'motorboat=yes') : 'none' })];
   }
   if (tags.amenity || tags.shop) return [feature(element, 'community-candidate', pointGeometry(element) || geometry, { category: tags.amenity || tags.shop })];
   return [];
@@ -122,7 +147,10 @@ export class OverpassTransportAdapter {
           returnedSourceIdentifiers: payload.elements.map(element => `${element.type}/${element.id}`),
           rawFeatureCount: payload.elements.length, normalisedFeatureCount: features.length,
           classificationCounts: countByClass(features), priorFailures: failures,
-          warnings: features.some(item => item.properties.class === 'waterway-review') ? ['Some waterways are not evidenced as navigable and remain review-only.'] : [],
+          warnings: [
+            ...(features.some(item => item.properties.class === 'waterway-review') ? ['Some waterways are not evidenced as navigable and remain review-only.'] : []),
+            ...(features.some(item => item.properties.class === 'cycle-review') ? ['Some bicycle-route relations are not evidenced as strategic and remain review-only.'] : [])
+          ],
           attribution: OSM_ATTRIBUTION
         };
         const snapshot = { ...snapshotCore, checksum: await checksum(JSON.stringify(snapshotCore)) };

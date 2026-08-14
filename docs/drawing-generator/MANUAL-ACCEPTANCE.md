@@ -3,7 +3,7 @@
 Drawing Generator is a live-review candidate and must not be accepted merely because these steps complete.
 
 1. Open the deployed direct Drawing Generator URL in Chrome or Edge.
-2. Confirm the banner says `LIVE REVIEW CANDIDATE - NOT ACCEPTED BASELINE` and the build says `DRAW-0.1.0-DG0-20260814`.
+2. Confirm the banner says `LIVE REVIEW CANDIDATE - NOT ACCEPTED BASELINE` and the build says `DRAW-0.1.0-DG0C1-20260814`.
 3. Enter the live project address and search, or enter confirmed coordinates. Confirm this centres the map but does **not** create a site polygon.
 4. Draw the approved site boundary with the polygon tool, or import a Product Owner-prepared GeoJSON Polygon/MultiPolygon. Edit it and confirm any holes. Do not treat the architect PDF as georeferenced geometry.
 5. Enter client, architect, project, drawing/project numbers, designer, date, revision/status and description.

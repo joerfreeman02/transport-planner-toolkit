@@ -14,7 +14,7 @@ The exact 16-script deterministic/regression set completed **11 passed / 5 faile
 
 The exact six-script existing browser set completed **4 passed / 2 failed**. Existing failures were `core-polish-browser.mjs` (Ready tags expected 4, actual 5) and `shared-library-browser.mjs` (hidden editor field `locator.fill` timeout when run against the active dashboard). These failures were recorded before DG-0 and no test was weakened.
 
-## Candidate results
+## DG-0 candidate results
 
 | Gate/command | Result |
 |---|---|
@@ -35,3 +35,17 @@ The 16 deterministic scripts were: `tests/run-tests.mjs`, `tests/regression-chec
 The six browser scripts were: `tests/accessibility-google-browser.mjs`, `tests/bus-browser-smoke.mjs`, `tests/core-polish-browser.mjs`, `tests/shared-cache-browser.mjs`, `tests/shared-consumption-browser.mjs`, and `tests/shared-library-browser.mjs`.
 
 After merge, the same deterministic comparison and deployed `live-smoke.mjs` must be rerun and appended to the release handover; a merge alone is not a live pass.
+
+## DG-0C1 corrective results
+
+Corrective starting commit: `2a3ffafb40e02ca0307e9726f14c668b2ea053ed` (`origin/main` after DG-0 merge). Corrective build: `DRAW-0.1.0-DG0C1-20260814`.
+
+| Gate/command | Result |
+|---|---|
+| `node modules/drawing-generator/tests/drawing-generator.test.mjs` | **36/36 passed**. New evidence proves: generic bicycle relations remain review-only unless an explicit `ncn`/`rcn` network and route reference are present; canal status alone is insufficient; road/motorway labels retain only returned evidence. |
+| Local `browser-smoke.mjs` | Pass: all four title/number/scale defaults, current editable date, site/import/source/overlay flow, fixed-scale print safeguard, no page errors. |
+| Local `live-smoke.mjs` | Pass: Drawing Generator/four modes plus Dashboard, Accessibility, Railway, Bus, STATS19, Library Manager and Site Research; no page errors. |
+| Sanitised `pdf-qa.mjs` + Poppler inspection | Four PDFs created; each is one-page A3 landscape (1191.12 × 841.92 pt). Rendered visual review confirmed title block, C1 stamp, attribution, neutral `MAIN ROAD` key and no clipping. |
+| Authorised current-source comparison | Local-only public-Overpass retrieval for the approved historic review extents completed. Regional evidence included road, motorway, rail/station, cycle and confirmed/review-only waterway classes; local evidence included road, rail and community-candidate classes. No boundary, raw query, response or PDF was persisted. |
+
+The same 16 deterministic scripts completed **11 passed / 5 failed**, with exactly the documented pre-existing failures. The same six browser scripts completed **4 passed / 2 failed**, with exactly the documented `core-polish-browser.mjs` and `shared-library-browser.mjs` controls. No test was weakened.

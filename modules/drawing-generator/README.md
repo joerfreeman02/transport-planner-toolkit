@@ -2,7 +2,7 @@
 
 Isolated live-review candidate for four EAS A3 planning drawings. Open `modules/drawing-generator/` through a web server; ES modules do not support reliable `file://` execution.
 
-Version `DRAW-0.1.0`; build `DRAW-0.1.0-DG0-20260814`; status **LIVE REVIEW CANDIDATE - NOT ACCEPTED BASELINE**.
+Version `DRAW-0.1.0`; build `DRAW-0.1.0-DG0C1-20260814`; status **LIVE REVIEW CANDIDATE - NOT ACCEPTED BASELINE**.
 
 ## Supported drawings
 

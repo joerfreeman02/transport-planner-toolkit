@@ -71,7 +71,10 @@ function availableClasses() {
   state.overlayStore.list().filter(item => item.properties.visible !== false && classVisibleForDrawing(state.modeId, item.properties.class)).forEach(item => classes.add(item.properties.class));
   if ([...classes].some(className => className?.startsWith('station-'))) classes.add('rail-station');
   if (state.site) classes.add('site');
-  if (classes.has('strategic-cycle')) classes.add('cycle-route');
+  if (classes.has('strategic-cycle') || classes.has('cycle-network-primary') || classes.has('cycle-network-local')) {
+    classes.add('cycle-route');
+    classes.add('cycle-network');
+  }
   return classes;
 }
 
@@ -143,7 +146,12 @@ const mapUi = createMapController({
   onSiteDeleted: () => clearSite(),
   onOverlayCreated: (feature, meta) => { const record = state.overlayStore.add(feature, meta); persist(); queueMicrotask(renderOverlayRows); return record; },
   onOverlayChanged: (id, geometry) => { state.overlayStore.update(id, { geometry }); persist(); queueMicrotask(renderOverlayRows); },
-  onOverlayDeleted: id => { state.overlayStore.remove(id); persist(); queueMicrotask(renderOverlayRows); }
+  onOverlayDeleted: id => { state.overlayStore.remove(id); persist(); queueMicrotask(renderOverlayRows); },
+  onDrawingStateChanged: active => {
+    byId('drawSite').disabled = active;
+    byId('cancelDrawing').hidden = !active;
+    if (active) setMessage('siteStatus', 'Site drawing active. Complete the polygon or choose Cancel drawing to return to map navigation.', 'warning');
+  }
 });
 
 function acceptSite(input, origin = 'Boundary') {
@@ -210,21 +218,31 @@ function renderSourceStatus() {
 }
 
 async function retrieveSources() {
-  if (!state.location && !state.site) return setMessage('sourceStatus', 'Locate the map or import the site before retrieving data.', 'error');
-  setMessage('sourceStatus', 'Retrieving structured vector transport features...'); byId('loadSources').disabled = true;
+  if (!state.location && !state.site) {
+    setMessage('sourceStatus', 'Locate the map or import the site before retrieving data.', 'error');
+    byId('workflowStatus').textContent = 'Locate the site before generating the drawing.';
+    return false;
+  }
+  setMessage('sourceStatus', 'Retrieving structured contextual map and transport features...');
+  byId('workflowStatus').textContent = 'Generating the contextual map and controlled EAS overlays...';
+  byId('loadSources').disabled = true; byId('generateDrawing').disabled = true;
   const adapter = new OverpassTransportAdapter();
   try {
     const source = await adapter.retrieve(state.modeId, extentForDrawing(drawingCentre(), state.modeId), BUILD);
     state.sourcesByMode[state.modeId] = source; mapUi.setSource(source.features); renderSourceStatus(); renderPreview();
+    byId('workflowStatus').textContent = 'Drawing refreshed. Review the sheet below before printing.';
+    return true;
   } catch (error) {
     state.sourcesByMode[state.modeId] = { status: 'failed', features: [], snapshot: null, error: `${error.message}${error.details?.failures ? ` ${error.details.failures.map(item => `${item.endpoint}: ${item.kind}`).join('; ')}` : ''}` };
     mapUi.setSource([]); renderSourceStatus(); renderPreview();
-  } finally { byId('loadSources').disabled = false; }
+    byId('workflowStatus').textContent = 'The external source could not be loaded. The sheet remains available for reviewed manual evidence.';
+    return false;
+  } finally { byId('loadSources').disabled = false; byId('generateDrawing').disabled = false; }
 }
 
 function renderCommunityCandidates() {
   const candidates = currentSource().features.filter(item => item.properties?.class === 'community-candidate');
-  byId('communityPanel').hidden = !candidates.length;
+  byId('communityPanel').hidden = state.modeId !== 'local-context' || !candidates.length;
   byId('communityCandidates').innerHTML = candidates.map((item, index) => `<div class="candidate-card" data-index="${index}"><strong>${escapeHtml(item.properties.name || 'Unnamed mapped feature')}</strong><span>${escapeHtml(item.properties.category || 'Unclassified')}</span><button>Add as reviewed consideration</button></div>`).join('');
   byId('communityCandidates').querySelectorAll('.candidate-card').forEach(card => card.querySelector('button').addEventListener('click', () => {
     const item = candidates[Number(card.dataset.index)];
@@ -233,19 +251,27 @@ function renderCommunityCandidates() {
   }));
 }
 
+function populateOverlayClassOptions() {
+  const options = Object.entries(OVERLAY_CLASSES).filter(([id]) => classVisibleForDrawing(state.modeId, id));
+  byId('overlayClass').innerHTML = options.map(([id, value]) => `<option value="${id}">${value.label}</option>`).join('');
+  const selected = OVERLAY_CLASSES[byId('overlayClass').value];
+  if (selected) byId('overlayColour').value = selected.colour;
+}
+
 function initialiseControls() {
   byId('modeSelect').value = state.modeId;
-  byId('overlayClass').innerHTML = Object.entries(OVERLAY_CLASSES).map(([id, value]) => `<option value="${id}">${value.label}</option>`).join('');
   byId('overlayColour').innerHTML = CONTROLLED_COLOURS.map(colour => `<option value="${colour}">${colour}</option>`).join('');
+  populateOverlayClassOptions();
   byId('overlayClass').addEventListener('change', () => { byId('overlayColour').value = OVERLAY_CLASSES[byId('overlayClass').value].colour; });
   byId('modeSelect').addEventListener('change', event => {
     captureMetadata(); state.modeId = event.target.value; state.metadataByMode[state.modeId] ||= defaultMetadata(state.modeId);
-    populateMetadata(); mapUi.setSource(currentSource().features); renderSourceStatus(); persist(); renderPreview();
+    populateMetadata(); populateOverlayClassOptions(); mapUi.setSource(currentSource().features); renderSourceStatus(); persist(); renderPreview();
   });
   metaInputs.forEach(input => input.addEventListener('input', captureMetadata));
   byId('searchAddress').addEventListener('click', searchAddress);
   byId('useCoordinates').addEventListener('click', () => setLocation(Number(byId('latitudeInput').value), Number(byId('longitudeInput').value)));
   byId('drawSite').addEventListener('click', () => mapUi.startSiteDrawing());
+  byId('cancelDrawing').addEventListener('click', () => { mapUi.cancelDrawing(); setMessage('siteStatus', 'Drawing cancelled. Map navigation restored.', 'success'); });
   byId('clearSite').addEventListener('click', clearSite);
   byId('siteFile').addEventListener('change', async event => { const file = event.target.files[0]; if (file) { try { acceptSite(await readJson(file), 'Imported boundary'); } catch (error) { setMessage('siteStatus', error.message, 'error'); } } event.target.value = ''; });
   document.querySelectorAll('[data-draw-overlay]').forEach(button => button.addEventListener('click', () => { try { mapUi.startOverlayDrawing(button.dataset.drawOverlay, overlayMetadata()); } catch (error) { setMessage('overlayStatus', error.message, 'error'); } }));
@@ -256,6 +282,7 @@ function initialiseControls() {
   });
   byId('downloadOverlays').addEventListener('click', () => downloadJson(`drawing-overlays-${BUILD}.geojson`, state.overlayStore.exportGeoJson()));
   byId('loadSources').addEventListener('click', retrieveSources);
+  byId('generateDrawing').addEventListener('click', retrieveSources);
   byId('downloadSnapshot').addEventListener('click', () => { if (currentSource().snapshot) downloadJson(`drawing-source-${state.modeId}-${BUILD}.json`, { ...currentSource().snapshot, features: currentSource().features }); });
   byId('refreshPreview').addEventListener('click', renderPreview);
   byId('printDrawing').addEventListener('click', () => { renderPreview(); requestAnimationFrame(() => window.print()); });
@@ -277,7 +304,7 @@ if (['localhost', '127.0.0.1'].includes(location.hostname)) {
       addOverlay(feature, metadata) { const record = state.overlayStore.add(feature, metadata); renderOverlayRows(); return record; },
       clearOverlays() { state.overlayStore.clear(); renderOverlayRows(); },
       render: renderPreview,
-      snapshot: () => ({ modeId: state.modeId, site: state.site, location: state.location, overlays: state.overlayStore.list(), source: currentSource(), metadata: structuredClone(metadata()), status: STATUS })
+      snapshot: () => ({ modeId: state.modeId, site: state.site, location: state.location, overlays: state.overlayStore.list(), source: currentSource(), metadata: structuredClone(metadata()), status: STATUS, drawingActive: mapUi.isDrawingActive(), navigationEnabled: mapUi.navigationEnabled(), advancedOpen: byId('advancedTools').open })
     }), configurable: false, enumerable: false, writable: false
   });
 }

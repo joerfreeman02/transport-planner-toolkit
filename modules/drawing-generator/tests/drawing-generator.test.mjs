@@ -15,6 +15,7 @@ const railway = await import('../assets/js/railway-adapter.js');
 const acceptedRailway = await import('../../railway/assets/js/rail-knowledge.js');
 const { createOverlayStore, normaliseOverlay } = await import('../assets/js/overlay-store.js');
 const source = await import('../assets/js/source-adapter.js');
+const cartography = await import('../assets/js/cartography.js');
 const { renderDrawingSvg } = await import('../assets/js/svg-renderer.js');
 
 let passed = 0;
@@ -132,22 +133,63 @@ await test('a canal requires explicit boat evidence before it is styled as navig
   const confirmed = source.classifyOverpassElement({ type: 'way', id: 3, tags: { waterway: 'canal', boat: 'yes' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] });
   assert.equal(unconfirmed[0].properties.class, 'waterway-review'); assert.equal(confirmed[0].properties.class, 'waterway');
 });
-await test('only explicitly evidenced national or regional bicycle relations are strategic', () => {
-  const generic = source.classifyOverpassElement({ type: 'relation', id: 4, tags: { route: 'bicycle', network: 'lcn' }, members: [{ geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] }] });
-  const evidenced = source.classifyOverpassElement({ type: 'relation', id: 5, tags: { route: 'bicycle', network: 'ncn', ref: '1' }, members: [{ geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] }] });
-  assert.equal(generic[0].properties.class, 'cycle-review'); assert.equal(evidenced[0].properties.class, 'strategic-cycle');
+await test('current OSM cycle hierarchy is retained without requiring a route reference', () => {
+  for (const network of ['icn', 'ncn', 'rcn', 'lcn']) {
+    const result = source.classifyOverpassElement({ type: 'relation', id: network, tags: { route: 'bicycle', network, name: `${network.toUpperCase()} route`, operator: 'Test operator', cycle_network: 'GB:test' }, members: [{ geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] }] })[0];
+    assert.equal(result.properties.class, network === 'lcn' ? 'cycle-network-local' : 'cycle-network-primary');
+    assert.equal(result.properties.ref, '');
+    assert.deepEqual([result.properties.network, result.properties.name, result.properties.operator, result.properties.cycleNetwork], [network, `${network.toUpperCase()} route`, 'Test operator', 'GB:test']);
+  }
+});
+await test('proposed and construction cycle relations remain review-only', () => {
+  const proposed = source.classifyOverpassElement({ type: 'relation', id: 4, tags: { route: 'bicycle', network: 'ncn', status: 'proposed' }, members: [{ geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] }] })[0];
+  const construction = source.classifyOverpassElement({ type: 'relation', id: 5, tags: { route: 'bicycle', network: 'lcn', construction: 'cycleway' }, members: [{ geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] }] })[0];
+  assert.equal(proposed.properties.class, 'cycle-review');
+  assert.equal(construction.properties.class, 'cycle-review');
 });
 await test('main-road labels preserve only an evidenced A-road reference and motorway labels preserve motorway evidence', () => {
   const aRoad = source.classifyOverpassElement({ type: 'way', id: 6, tags: { highway: 'primary', ref: 'A406', name: 'North Circular Road' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
   const nonA = source.classifyOverpassElement({ type: 'way', id: 7, tags: { highway: 'primary', ref: 'B123', name: 'Example Road' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
   const motorway = source.classifyOverpassElement({ type: 'way', id: 8, tags: { highway: 'motorway', ref: 'M25', name: 'London Orbital Motorway' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
-  assert.deepEqual([aRoad.properties.class, aRoad.properties.officialARef, aRoad.properties.label], ['main-road', 'A406', 'A406 – North Circular Road']);
-  assert.deepEqual([nonA.properties.class, nonA.properties.officialARef, nonA.properties.label], ['main-road', '', 'B123 – Example Road']);
-  assert.deepEqual([motorway.properties.class, motorway.properties.label], ['motorway', 'M25 – London Orbital Motorway']);
+  assert.deepEqual([aRoad.properties.class, aRoad.properties.officialARef, aRoad.properties.label], ['main-road', 'A406', 'A406 - North Circular Road']);
+  assert.deepEqual([nonA.properties.class, nonA.properties.officialARef, nonA.properties.label], ['main-road', '', 'B123 - Example Road']);
+  assert.deepEqual([motorway.properties.class, motorway.properties.label], ['motorway', 'M25 - London Orbital Motorway']);
 });
 await test('structured source query includes required transport evidence', () => {
   const query = source.buildOverpassQuery('local-context', extent);
-  for (const marker of ['highway', 'railway', 'waterway', 'route"="bicycle', 'route"="bus', 'amenity']) assert.match(query, new RegExp(marker));
+  for (const marker of ['highway', 'railway', 'waterway', 'route"="bicycle', 'route"="bus', 'amenity', 'landuse', 'natural', 'place']) assert.match(query, new RegExp(marker));
+});
+await test('context features classify as structured vector basemap evidence', () => {
+  const road = source.classifyOverpassElement({ type: 'way', id: 9, tags: { highway: 'secondary', name: 'Context Road' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
+  const area = source.classifyOverpassElement({ type: 'way', id: 10, tags: { landuse: 'residential' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.5 }, { lon: -.09, lat: 51.51 }, { lon: -.1, lat: 51.5 }] })[0];
+  const place = source.classifyOverpassElement({ type: 'node', id: 11, lat: 51.5, lon: -.1, tags: { place: 'town', name: 'Example Town' } })[0];
+  assert.deepEqual([road.properties.class, area.properties.class, place.properties.class], ['context-road-major', 'context-area', 'context-place']);
+});
+
+await test('presentation generalisation merges only connected like-for-like linework', () => {
+  const features = [
+    { type: 'Feature', id: 'way/1', properties: { class: 'main-road', ref: 'A1', sourceId: 'way/1' }, geometry: { type: 'LineString', coordinates: [[0, 0], [1, 0]] } },
+    { type: 'Feature', id: 'way/2', properties: { class: 'main-road', ref: 'A1', sourceId: 'way/2' }, geometry: { type: 'LineString', coordinates: [[1, 0], [2, 0]] } },
+    { type: 'Feature', id: 'way/3', properties: { class: 'main-road', ref: 'A1', sourceId: 'way/3' }, geometry: { type: 'LineString', coordinates: [[4, 0], [5, 0]] } }
+  ];
+  const result = cartography.generalisePresentationFeatures(features);
+  assert.equal(result.length, 2);
+  assert.deepEqual(result.map(item => item.properties.presentationSegmentCount).sort(), [1, 2]);
+  assert.equal(result.find(item => item.properties.presentationSegmentCount === 2).geometry.type, 'MultiLineString');
+});
+await test('presentation generalisation de-duplicates coincident station labels', () => {
+  const result = cartography.generalisePresentationFeatures([
+    { type: 'Feature', id: 'node/1', properties: { class: 'station-national-rail', name: 'Central' }, geometry: { type: 'Point', coordinates: [-.1, 51.5] } },
+    { type: 'Feature', id: 'node/2', properties: { class: 'station-underground', name: 'Central' }, geometry: { type: 'Point', coordinates: [-.10001, 51.50001] } }
+  ]);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].properties.class, 'station-underground');
+});
+await test('managed labels are bounded, collision-controlled and repeat-limited', () => {
+  const features = [0, 1, 2].map(index => ({ type: 'Feature', id: `road/${index}`, properties: { class: 'main-road', ref: 'A1' }, geometry: { type: 'LineString', coordinates: [[10 + index * 100, 30], [80 + index * 100, 30]] } }));
+  const placements = cartography.createLabelPlacements(features, point => point, 'regional-plan', 400, 200);
+  assert.equal(placements.length, 2);
+  assert.ok(placements.every(item => item.box.x1 >= 7 && item.box.x2 <= 393 && item.box.y1 >= 7 && item.box.y2 <= 193));
 });
 
 const sourceFeatures = [
@@ -159,6 +201,7 @@ for (const modeId of Object.keys(DRAWING_MODES)) await test(`${modeId} renders o
   assert.match(result.markup, /<svg[^>]+data-scale=/);
   assert.match(result.markup, /class="scale-bar" data-paper-mm="20"/);
   assert.match(result.markup, /north-arrow/);
+  assert.match(result.markup, /data-contextual-basemap="structured-osm-vector"/);
   assert.equal((result.markup.match(/<svg/g) || []).length, 1);
 });
 

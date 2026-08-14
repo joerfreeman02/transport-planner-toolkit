@@ -80,3 +80,26 @@ The corrective change is contained within the existing, isolated Drawing Generat
 | `modules/drawing-generator/tests/browser-smoke.mjs` | Verifies all four title-block defaults/current date and supports a supplied local Chromium path for reproducible QA. |
 | `modules/drawing-generator/tests/live-smoke.mjs`, `pdf-qa.mjs` | Support a supplied local Chromium path for reproducible QA. |
 | `docs/drawing-generator/{DATA-SOURCE-REGISTER,GOLDEN-DRAWING-COMPARISON,KNOWN-LIMITATIONS,TEST-EVIDENCE}.md` | Documents conservative rules, the sanitised comparison, limitations and C1 evidence. |
+
+## DG-0C2 corrective delta
+
+C2 starts exactly at `f3ed7417dc1876ae5ac5b3bc7959b120081077c3`. The protected-surface answers above remain NO. C2 does not alter `.github`, dependency files, Dashboard, Accessibility, Railway, Bus, STATS19, Library Manager, Site Research, Shared Knowledge Library data or any existing production identity. The generated PDF and rendered PNG are QA artifacts and are not committed.
+
+| File | C2 purpose |
+|---|---|
+| `modules/drawing-generator/index.html` | Planner-first setup/generate/review flow; advanced editing/source diagnostics collapsed by default; C2 identity. |
+| `modules/drawing-generator/assets/css/drawing-generator.css` | Unobscured editor, advanced-panel styling, compact legend/sidebar/title handling, managed labels and corrected print isolation. |
+| `modules/drawing-generator/assets/js/app.js` | Primary Generate flow, visible workflow status, cancelable drawing state, mode-relevant advanced overlay choices and acceptance telemetry. |
+| `modules/drawing-generator/assets/js/config.js` | C2 build identity; candidate status unchanged. |
+| `modules/drawing-generator/assets/js/drawing-modes.js` | Structured context and explicit primary/local cycle-network visibility per mode. |
+| `modules/drawing-generator/assets/js/map-controller.js` | Full-opacity OSM editing map, default navigation, explicit active-draw cancellation/restoration and generalized source display. |
+| `modules/drawing-generator/assets/js/overlay-store.js` | Adds controlled manual primary/local cycle-network classes while retaining existing compatibility classes. |
+| `modules/drawing-generator/assets/js/source-adapter.js` | Exact-extent structured context query/classification; current `icn`/`ncn`/`rcn`/`lcn` cycle hierarchy without ref requirement; lifecycle review-only safety; retained metadata. |
+| `modules/drawing-generator/assets/js/cartography.js` | New pure connected-way presentation grouping, coincident station de-duplication and deterministic collision/repetition label management. |
+| `modules/drawing-generator/assets/js/svg-renderer.js` | Draws structured context beneath controlled overlays in the exact BNG SVG; controlled labels and compact legend hierarchy. |
+| `modules/drawing-generator/tests/{drawing-generator.test.mjs,browser-smoke.mjs,pdf-qa.mjs}` | Adds C2 source/cartography/UX/context/PDF acceptance and a single-mode PDF output option. |
+| `modules/drawing-generator/tests/fixtures/synthetic-overpass.json` | Sanitized context, current ref-less cycle and proposed-cycle evidence. |
+| `modules/drawing-generator/README.md` | C2 identity and planner/context workflow. |
+| `docs/adr/ADR-008-drawing-generator-spatial-rendering.md` | Records the structured-context and managed-label refinement without changing Proposed status. |
+| `docs/drawing-generator/{DG0-ARCHITECTURE,DATA-SOURCE-REGISTER,GOLDEN-DRAWING-COMPARISON,KNOWN-LIMITATIONS,MANUAL-ACCEPTANCE,TEST-EVIDENCE,DIFF-AUDIT}.md` | C2 architecture, evidence, precedent comparison, constraints, acceptance and audit. |
+| `docs/drawing-generator/TFL-CYCLE-EVIDENCE.md` | Official TfL evidence hierarchy, safe future-adapter rule and documented reason no fragile runtime dependency was added. |

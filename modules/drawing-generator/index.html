@@ -12,92 +12,100 @@
 <body>
   <header class="app-header">
     <img src="assets/images/eas-primary.png" alt="EAS Consulting Engineers">
-    <div><a href="../../">Transport Planner Toolkit</a><h1>Drawing Generator</h1><p>Four-plan professional-assist drawing engine</p></div>
-    <div class="build"><strong>DRAW-0.1.0</strong><span>DRAW-0.1.0-DG0C1-20260814</span></div>
+    <div><a href="../../">Transport Planner Toolkit</a><h1>Drawing Generator</h1><p>Planner-first professional drawing workflow</p></div>
+    <div class="build"><strong>DRAW-0.1.0</strong><span>DRAW-0.1.0-DG0C2-20260814</span></div>
   </header>
   <div class="candidate-banner" role="status">LIVE REVIEW CANDIDATE - NOT ACCEPTED BASELINE</div>
 
   <main class="application">
-    <section class="panel" aria-labelledby="project-heading">
-      <div class="panel-heading"><span>01</span><div><h2 id="project-heading">Project, drawing and site</h2><p>Address search centres the map only. A point is never treated as a site boundary.</p></div></div>
-      <div class="form-grid compact">
+    <section class="panel planner-primary" aria-labelledby="project-heading">
+      <div class="panel-heading"><span>01</span><div><h2 id="project-heading">Set up the drawing</h2><p>Choose the drawing, identify the project, then locate and confirm the site.</p></div></div>
+      <div class="form-grid setup-grid">
         <label>Drawing type<select id="modeSelect">
           <option value="regional-plan">Regional Plan - A3 @ 1:50,000</option>
           <option value="regional-routing">Regional Routing Plan - A3 @ 1:50,000</option>
           <option value="local-context">Local Context Plan - A3 @ 1:2,500</option>
           <option value="local-routing">Local Routing Plan - A3 @ 1:2,500</option>
         </select></label>
+        <label>Project<input data-meta="project" placeholder="Project or site name"></label>
+        <label>Client<input data-meta="client" placeholder="Client name"></label>
+      </div>
+      <h3>Locate the site</h3>
+      <div class="locate-grid">
         <label>Project/site address<input id="addressInput" autocomplete="street-address" placeholder="Search centre only"></label>
         <div class="field-action"><button id="searchAddress">Find address</button></div>
-        <label>Latitude<input id="latitudeInput" type="number" step="0.000001" placeholder="51.500000"></label>
-        <label>Longitude<input id="longitudeInput" type="number" step="0.000001" placeholder="-0.100000"></label>
-        <div class="field-action"><button id="useCoordinates">Use coordinates</button></div>
       </div>
+      <details class="coordinate-entry"><summary>Use known coordinates</summary><div class="form-grid coordinate-grid"><label>Latitude<input id="latitudeInput" type="number" step="0.000001" placeholder="51.500000"></label><label>Longitude<input id="longitudeInput" type="number" step="0.000001" placeholder="-0.100000"></label><div class="field-action"><button id="useCoordinates">Use coordinates</button></div></div></details>
       <div id="searchResults" class="search-results" aria-live="polite"></div>
       <p id="siteStatus" class="status-message">Locate the map, then draw or import the confirmed site boundary.</p>
       <div class="toolbar">
         <button id="drawSite" class="primary">Draw site boundary</button>
+        <button id="cancelDrawing" class="secondary" hidden>Cancel drawing</button>
         <label class="button-like">Import site GeoJSON<input id="siteFile" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden></label>
         <button id="clearSite" class="secondary">Delete/reset boundary</button>
       </div>
       <div id="editingMap" class="editing-map" aria-label="Interactive Drawing Generator editing map"></div>
-      <p class="hint">Use the map edit toolbar to edit or delete site and overlay geometry. Polygon, MultiPolygon and interior rings are preserved on import.</p>
+      <p class="hint">The map normally pans and zooms. Drawing starts only after you choose Draw site boundary; use Cancel drawing at any time.</p>
+      <div class="generation-actions"><button id="generateDrawing" class="primary action-large">Generate / refresh drawing</button><p id="workflowStatus">The generated sheet appears below for professional review.</p></div>
     </section>
 
-    <section class="panel" aria-labelledby="metadata-heading">
-      <div class="panel-heading"><span>02</span><div><h2 id="metadata-heading">Drawing metadata</h2><p>All title-block values remain editable. Printing is blocked if scale text conflicts with the fixed drawing mode.</p></div></div>
-      <div class="form-grid metadata-grid">
-        <label>Client<input data-meta="client"></label>
-        <label>Architect<input data-meta="architect"></label>
-        <label>Project<input data-meta="project"></label>
-        <label>Project number<input data-meta="projectNumber"></label>
-        <label>Drawing title<input data-meta="drawingTitle"></label>
-        <label>Drawing number<input data-meta="drawingNumber"></label>
-        <label>Scale<input data-meta="scale" inputmode="numeric"></label>
-        <label>Designed by<input data-meta="designedBy"></label>
-        <label>Drawn by<input data-meta="drawnBy"></label>
-        <label>Date<input data-meta="date"></label>
-        <label>Revision<input data-meta="revision"></label>
-        <label>Drawing status<input data-meta="drawingStatus"></label>
-        <label class="wide">Revision description<input data-meta="revisionDescription"></label>
-      </div>
-    </section>
+    <details id="advancedTools" class="advanced-tools">
+      <summary>Advanced editing / source diagnostics</summary>
+      <div class="advanced-stack">
+        <section class="panel embedded-panel" aria-labelledby="metadata-heading">
+          <div class="panel-heading"><span>A1</span><div><h2 id="metadata-heading">Title-block details</h2><p>Optional professional metadata and fixed-scale validation.</p></div></div>
+          <div class="form-grid metadata-grid">
+            <label>Architect<input data-meta="architect"></label>
+            <label>Project number<input data-meta="projectNumber"></label>
+            <label>Drawing title<input data-meta="drawingTitle"></label>
+            <label>Drawing number<input data-meta="drawingNumber"></label>
+            <label>Scale<input data-meta="scale" inputmode="numeric"></label>
+            <label>Designed by<input data-meta="designedBy"></label>
+            <label>Drawn by<input data-meta="drawnBy"></label>
+            <label>Date<input data-meta="date"></label>
+            <label>Revision<input data-meta="revision"></label>
+            <label>Drawing status<input data-meta="drawingStatus"></label>
+            <label class="wide">Revision description<input data-meta="revisionDescription"></label>
+          </div>
+        </section>
 
-    <section class="panel" aria-labelledby="source-heading">
-      <div class="panel-heading"><span>03</span><div><h2 id="source-heading">Auditable vector sources</h2><p>Structured OpenStreetMap transport features are retrieved for the calculated drawing extent; pixels never determine geometry or classification.</p></div></div>
-      <div class="toolbar"><button id="loadSources" class="primary">Retrieve vector layers</button><button id="downloadSnapshot" disabled>Download source snapshot</button></div>
-      <p id="sourceStatus" class="status-message warning">No vector snapshot loaded. Required layers may be added through reviewed overlays.</p>
-      <details><summary>Source diagnostics</summary><pre id="sourceDiagnostics">Not loaded.</pre></details>
-      <div id="communityPanel" hidden><h3>Community candidates - professional selection required</h3><p>Mapped candidates are not added automatically.</p><div id="communityCandidates" class="candidate-list"></div></div>
-    </section>
+        <section class="panel embedded-panel" aria-labelledby="source-heading">
+          <div class="panel-heading"><span>A2</span><div><h2 id="source-heading">Source diagnostics</h2><p>Structured OpenStreetMap context and transport evidence for the exact drawing extent.</p></div></div>
+          <div class="toolbar"><button id="loadSources">Refresh vector source</button><button id="downloadSnapshot" disabled>Download source snapshot</button></div>
+          <p id="sourceStatus" class="status-message warning">No vector snapshot loaded. Required layers may be added through reviewed overlays.</p>
+          <details><summary>Source record</summary><pre id="sourceDiagnostics">Not loaded.</pre></details>
+          <div id="communityPanel" hidden><h3>Community candidates - professional selection required</h3><p>Mapped candidates are not added automatically.</p><div id="communityCandidates" class="candidate-list"></div></div>
+        </section>
 
-    <section class="panel" aria-labelledby="overlay-heading">
-      <div class="panel-heading"><span>04</span><div><h2 id="overlay-heading">Reviewed manual overlays</h2><p>Draw or import professional/user-approved geometry. Unsupported geometry and styles are rejected visibly.</p></div></div>
-      <div class="form-grid overlay-form">
-        <label>Layer class<select id="overlayClass"></select></label>
-        <label>Layer/group name<input id="overlayLayerName" value="Reviewed overlay"></label>
-        <label>Label<input id="overlayLabel" placeholder="Optional printed label"></label>
-        <label>Controlled colour<select id="overlayColour"></select></label>
+        <section class="panel embedded-panel" aria-labelledby="overlay-heading">
+          <div class="panel-heading"><span>A3</span><div><h2 id="overlay-heading">Reviewed professional overlays</h2><p>Add only planner-approved geometry relevant to the selected drawing mode.</p></div></div>
+          <div class="form-grid overlay-form">
+            <label>Layer class<select id="overlayClass"></select></label>
+            <label>Layer/group name<input id="overlayLayerName" value="Reviewed overlay"></label>
+            <label>Label<input id="overlayLabel" placeholder="Optional printed label"></label>
+            <label>Controlled colour<select id="overlayColour"></select></label>
+          </div>
+          <div class="toolbar">
+            <button data-draw-overlay="Point">Draw point</button>
+            <button data-draw-overlay="LineString">Draw line</button>
+            <button data-draw-overlay="Polygon">Draw area</button>
+            <label class="button-like">Import overlay GeoJSON<input id="overlayFile" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden></label>
+            <button id="downloadOverlays">Download overlays</button>
+          </div>
+          <p id="overlayStatus" class="status-message">No reviewed overlays.</p>
+          <div class="table-wrap"><table><thead><tr><th>Show</th><th>Layer</th><th>Class</th><th>Label</th><th>Colour</th><th>Action</th></tr></thead><tbody id="overlayRows"><tr><td colspan="6">No reviewed overlays.</td></tr></tbody></table></div>
+        </section>
       </div>
-      <div class="toolbar">
-        <button data-draw-overlay="Point">Draw point</button>
-        <button data-draw-overlay="LineString">Draw line</button>
-        <button data-draw-overlay="Polygon">Draw area</button>
-        <label class="button-like">Import overlay GeoJSON<input id="overlayFile" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden></label>
-        <button id="downloadOverlays">Download overlays</button>
-      </div>
-      <p id="overlayStatus" class="status-message">No reviewed overlays.</p>
-      <div class="table-wrap"><table><thead><tr><th>Show</th><th>Layer</th><th>Class</th><th>Label</th><th>Colour</th><th>Action</th></tr></thead><tbody id="overlayRows"><tr><td colspan="6">No reviewed overlays.</td></tr></tbody></table></div>
-    </section>
+    </details>
 
     <section class="panel preview-panel" aria-labelledby="preview-heading">
-      <div class="panel-heading"><span>05</span><div><h2 id="preview-heading">A3 drawing sheet</h2><p>The projected SVG extent is calculated from the physical map-frame dimensions and declared scale.</p></div></div>
-      <div class="toolbar"><button id="refreshPreview">Refresh preview</button><button id="printDrawing" class="primary">Print / Save PDF</button></div>
+      <div class="panel-heading"><span>02</span><div><h2 id="preview-heading">Review and issue</h2><p>Check the contextual map, transport hierarchy, labels and title block before printing.</p></div></div>
+      <div class="toolbar"><button id="refreshPreview">Refresh sheet only</button><button id="printDrawing" class="primary">Print / Save PDF</button></div>
       <p id="drawingStatus" class="status-message warning">A confirmed site boundary is required before professional issue.</p>
       <div class="sheet-stage">
         <article id="drawingSheet" class="drawing-sheet layout-regional" aria-label="A3 landscape EAS drawing sheet">
           <div class="sheet-grid">
-            <section id="sheetMap" class="sheet-map" aria-label="Scale-driven vector map frame"></section>
+            <section id="sheetMap" class="sheet-map" aria-label="Scale-driven contextual vector map frame"></section>
             <aside class="sheet-sidebar">
               <div class="candidate-stamp">LIVE REVIEW CANDIDATE<br>NOT ACCEPTED BASELINE</div>
               <h2>KEY</h2>
@@ -114,7 +122,7 @@
               <div class="title-cell project"><small>PROJECT</small><strong data-sheet-meta="project">-</strong><small>PROJECT No.</small><span data-sheet-meta="projectNumber">-</span></div>
               <div class="title-cell drawing"><small>TITLE</small><strong data-sheet-meta="drawingTitle">REGIONAL PLAN</strong><small>DRAWING No.</small><span data-sheet-meta="drawingNumber">EAS-SK-H-101</span></div>
               <div class="title-cell issue"><small>DRAWING STATUS</small><strong data-sheet-meta="drawingStatus">LIVE REVIEW</strong><div class="mini-grid"><span><small>SCALE @ A3</small><b data-sheet-meta="scale">1:50,000</b></span><span><small>DESIGNED</small><b data-sheet-meta="designedBy">-</b></span><span><small>DRAWN</small><b data-sheet-meta="drawnBy">-</b></span><span><small>DATE</small><b data-sheet-meta="date">-</b></span></div></div>
-              <div class="title-cell revision"><div class="revision-head"><small>REV</small><small>DATE</small><small>BY</small><small>DESCRIPTION</small></div><div class="revision-row"><b data-sheet-meta="revision">P01</b><span data-sheet-meta="date">-</span><span data-sheet-meta="drawnBy">-</span><span data-sheet-meta="revisionDescription">Live review candidate</span></div><small class="build-id">DRAW-0.1.0-DG0C1-20260814</small></div>
+              <div class="title-cell revision"><div class="revision-head"><small>REV</small><small>DATE</small><small>BY</small><small>DESCRIPTION</small></div><div class="revision-row"><b data-sheet-meta="revision">P01</b><span data-sheet-meta="date">-</span><span data-sheet-meta="drawnBy">-</span><span data-sheet-meta="revisionDescription">Live review candidate</span></div><small class="build-id">DRAW-0.1.0-DG0C2-20260814</small></div>
             </section>
           </div>
           <div class="sheet-attribution"><span id="sheetAttribution">No external source loaded.</span><span id="sheetExtent">Scale-driven projected extent.</span></div>
@@ -122,7 +130,7 @@
       </div>
     </section>
   </main>
-  <footer>Transport Planner Toolkit - Drawing Generator DG-0 - professional review required</footer>
+  <footer>Transport Planner Toolkit - Drawing Generator DG-0C2 - professional review required</footer>
   <script src="assets/vendor/proj4.js"></script>
   <script src="../../assets/vendor/leaflet/leaflet.js"></script>
   <script src="assets/vendor/leaflet.draw.js"></script>

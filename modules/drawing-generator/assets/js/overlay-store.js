@@ -4,6 +4,8 @@ import { validateGeometry } from './geometry.js';
 export const OVERLAY_CLASSES = Object.freeze({
   'main-road': { label: 'Main road / A road', geometry: ['LineString', 'MultiLineString'], colour: '#ed1c24' },
   motorway: { label: 'Motorway', geometry: ['LineString', 'MultiLineString'], colour: '#ec1ce8' },
+  'cycle-network-primary': { label: 'National / regional cycle network', geometry: ['LineString', 'MultiLineString'], colour: '#f0a500' },
+  'cycle-network-local': { label: 'Local cycle network', geometry: ['LineString', 'MultiLineString'], colour: '#f0a500' },
   'strategic-cycle': { label: 'Strategic cycle route', geometry: ['LineString', 'MultiLineString'], colour: '#f0a500' },
   waterway: { label: 'Navigable waterway', geometry: ['LineString', 'MultiLineString'], colour: '#0057e7' },
   railway: { label: 'Railway', geometry: ['LineString', 'MultiLineString'], colour: '#666666' },

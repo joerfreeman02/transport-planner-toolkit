@@ -6,9 +6,15 @@
     { "type": "way", "id": 103, "tags": { "railway": "rail", "name": "Test railway" }, "geometry": [{"lat":51.485,"lon":-0.105},{"lat":51.520,"lon":-0.095}] },
     { "type": "node", "id": 104, "lat": 51.505, "lon": -0.098, "tags": { "railway": "station", "network": "National Rail", "name": "Test Central" } },
     { "type": "node", "id": 105, "lat": 51.497, "lon": -0.102, "tags": { "railway": "station", "station": "subway", "network": "London Underground", "name": "Test Underground" } },
-    { "type": "way", "id": 106, "tags": { "waterway": "canal", "name": "Test Navigation" }, "geometry": [{"lat":51.485,"lon":-0.115},{"lat":51.520,"lon":-0.110}] },
-    { "type": "relation", "id": 107, "tags": { "route": "bicycle", "network": "ncn", "ref": "NCN 1" }, "members": [{ "type":"way", "ref":201, "geometry":[{"lat":51.492,"lon":-0.118},{"lat":51.506,"lon":-0.085}] }] },
+    { "type": "way", "id": 106, "tags": { "waterway": "canal", "name": "Test Navigation", "boat": "yes" }, "geometry": [{"lat":51.485,"lon":-0.115},{"lat":51.520,"lon":-0.110}] },
+    { "type": "relation", "id": 107, "tags": { "route": "bicycle", "network": "ncn", "name": "National Cycle Route" }, "members": [{ "type":"way", "ref":201, "geometry":[{"lat":51.492,"lon":-0.118},{"lat":51.506,"lon":-0.085}] }] },
     { "type": "relation", "id": 108, "tags": { "route": "bus", "ref": "99", "name": "Route 99" }, "members": [{ "type":"way", "ref":202, "geometry":[{"lat":51.493,"lon":-0.112},{"lat":51.501,"lon":-0.100},{"lat":51.509,"lon":-0.088}] }] },
-    { "type": "node", "id": 109, "lat": 51.5015, "lon": -0.104, "tags": { "amenity": "school", "name": "Test School" } }
+    { "type": "node", "id": 109, "lat": 51.5015, "lon": -0.104, "tags": { "amenity": "school", "name": "Test School" } },
+    { "type": "way", "id": 110, "tags": { "highway": "secondary", "ref": "B100", "name": "Context Road" }, "geometry": [{"lat":51.488,"lon":-0.120},{"lat":51.502,"lon":-0.100},{"lat":51.514,"lon":-0.082}] },
+    { "type": "way", "id": 111, "tags": { "highway": "residential", "name": "Local Street" }, "geometry": [{"lat":51.498,"lon":-0.106},{"lat":51.501,"lon":-0.099}] },
+    { "type": "way", "id": 112, "tags": { "landuse": "residential" }, "geometry": [{"lat":51.493,"lon":-0.112},{"lat":51.493,"lon":-0.104},{"lat":51.498,"lon":-0.104},{"lat":51.493,"lon":-0.112}] },
+    { "type": "node", "id": 113, "lat": 51.508, "lon": -0.105, "tags": { "place": "town", "name": "Example Town" } },
+    { "type": "relation", "id": 114, "tags": { "route": "bicycle", "network": "lcn", "name": "Local Cycle Network" }, "members": [{ "type":"way", "ref":203, "geometry":[{"lat":51.497,"lon":-0.111},{"lat":51.504,"lon":-0.089}] }] },
+    { "type": "relation", "id": 115, "tags": { "route": "bicycle", "network": "rcn", "status": "proposed", "name": "Future route" }, "members": [{ "type":"way", "ref":204, "geometry":[{"lat":51.496,"lon":-0.116},{"lat":51.507,"lon":-0.087}] }] }
   ]
 }

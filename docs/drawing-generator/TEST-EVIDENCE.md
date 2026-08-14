@@ -49,3 +49,19 @@ Corrective starting commit: `2a3ffafb40e02ca0307e9726f14c668b2ea053ed` (`origin/
 | Authorised current-source comparison | Local-only public-Overpass retrieval for the approved historic review extents completed. Regional evidence included road, motorway, rail/station, cycle and confirmed/review-only waterway classes; local evidence included road, rail and community-candidate classes. No boundary, raw query, response or PDF was persisted. |
 
 The same 16 deterministic scripts completed **11 passed / 5 failed**, with exactly the documented pre-existing failures. The same six browser scripts completed **4 passed / 2 failed**, with exactly the documented `core-polish-browser.mjs` and `shared-library-browser.mjs` controls. No test was weakened.
+
+## DG-0C2 professional cartography and UX recovery
+
+Corrective starting commit: `f3ed7417dc1876ae5ac5b3bc7959b120081077c3` (`origin/main`). Corrective build: `DRAW-0.1.0-DG0C2-20260814`. Status remains **LIVE REVIEW CANDIDATE - NOT ACCEPTED BASELINE**.
+
+| Gate/command | Result |
+|---|---|
+| `node modules/drawing-generator/tests/drawing-generator.test.mjs` | **41/41 passed**. Covers geometry, CRS, exact fixed scale, Railway equivalence, overlay safety, source failure states, structured context classification, current/ref-less `icn`/`ncn`/`rcn`/`lcn` hierarchy, proposed/construction review-only status, connected-only way grouping, station de-duplication, bounded/repeat-limited label placement, four SVG modes and A3 sheet identity. |
+| Local `browser-smoke.mjs` | Pass across all four modes: advanced controls collapsed by default; navigation on by default; drawing starts explicitly; Cancel and site import restore navigation; primary Generate flow; exact contextual SVG marker/count; snapshot/overlays; mode-relevant advanced choices; no local HTTP/page errors. |
+| Local `live-smoke.mjs` | Pass: Drawing Generator/four modes plus Dashboard, Accessibility, Railway, Bus, STATS19, Library Manager and Site Research; no page errors. |
+| Critical existing CI deterministic scripts | Pass: `run-tests`, `regression-check`, `bus-foundation`, Railway regression and Accessibility classification regression. |
+| Same 16-script deterministic baseline set | **11 passed / 5 failed**, exactly matching C1. Known failures remain `emergency-sprint1a`, `library-manager`, `research-quality`, `research-workflow-completion` and `sprint1c`. |
+| Same six-script browser baseline set | **4 passed / 2 failed**, exactly matching C1. Known failures remain `core-polish-browser` (expected 4 Ready tags, actual 5) and `shared-library-browser` (hidden editor field fill timeout). |
+| Regional `pdf-qa.mjs` + Poppler/pypdf/rendered visual inspection | One sanitized C2 Regional Plan PDF. One page, A3 landscape, 1191.12 x 841.92 pt; required build/status/scale/OSM/cycle text present; full-extent contextual hierarchy, legend, border and title strip visually inspected with no clipping. SHA-256 `8C98605B9075BC194BB1920BCDA3BF18324BAC59D0F62BD2EE6C9E87D0714928`. |
+
+The C2 branch changes only the Drawing Generator implementation/tests and its documentation/ADR. No protected functional module, Dashboard code, Shared Knowledge Library data, production identity, dependency workflow or security workflow is changed. Deployed live smoke remains a post-merge gate; local smoke is not represented as deployment evidence.

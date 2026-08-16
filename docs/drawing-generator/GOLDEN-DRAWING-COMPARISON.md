@@ -20,3 +20,7 @@ The comparison confirms that the four-sheet structure and returned-class hierarc
 ## Comparison conclusion
 
 The sheet geometry, contextual hierarchy, scale hierarchy, title/legend placement, major line hierarchy, station distinction, site emphasis and routing colours are materially aligned with the precedent. C2 materially improves orientation and declutters source labels while keeping the source auditable. Remaining differences are live-source coverage, manual professional classification and advanced curved/leader-line typography. The actual site boundary and approved route geometry still require Product Owner input and must not be encoded as a public fixture.
+
+## DG-0C3.1 routing comparison
+
+The routing sheets now follow the precedent hierarchy more closely: rendered OSM context, site, route-to and route-from are primary; automatic main-road, motorway, cycle, water, rail and station thematic overlays are suppressed in Regional Routing. Local Routing additionally permits only explicitly selected community/manual overlays. Direction arrows are spaced by route distance on the final geometry rather than emitted at every source vertex. The right-side duplicate corporate block is removed, leaving one current EAS logo in the title block for every mode. Road following is a geometry-assistance enhancement, but planner waypoint choice and explicit approval remain the professional control.

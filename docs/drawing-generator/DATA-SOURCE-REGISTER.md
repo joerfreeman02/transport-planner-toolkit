@@ -15,7 +15,8 @@ The issued sheet combines rendered OSM Standard cartography with separately cont
 | Main roads / motorways | OSM highway ways | `highway=trunk/primary` becomes functional `main-road`; `highway=motorway*` becomes `motorway`. An A-road statement is made only where an explicit `A...` ref is returned. | Same | Labels preserve returned ref/name (`A406 - North Circular Road`, for example); otherwise the legend says only `MAIN ROAD`. |
 | Bus routes | OSM bus-route relations, requested only in local modes | `bus-route`, label from ref/name | Same | Imported/drawn route group is the deadline-safe primary fallback; completeness is not claimed. |
 | Community candidates | OSM selected amenity/shop tags, requested only in local modes | `community-candidate`; user must select before inclusion | Same | User draws/imports/adds a reviewed consideration. Automatic professional relevance is not claimed. |
-| Site/routes/manual layers | User-supplied GeoJSON or Leaflet.draw | Validated controlled class/style | User evidence; no OSM attribution unless derived from OSM | User edits, hides or deletes. Route selection is always professional/user-controlled. |
+| Road-following geometry | Provider-neutral route adapter; current default is OSRM car geometry at `https://routing.openstreetmap.de/routed-car/route/v1/driving`, called only after the planner completes ordered waypoint guidance | Geometry assistance through every waypoint in order; no HGV safety, suitability, optimality or recommendation claim | OpenStreetMap contributors; routed by OSRM; provider and metrics retained per route | Rough geometry remains intact on failure. Retry/add guidance/redraw or explicitly accept manual geometry. Print blocks until direction and planner approval are confirmed. |
+| Site/routes/manual layers | User-supplied GeoJSON or Leaflet.draw | Validated controlled class/style. Route selection remains planner-controlled even when the final line follows mapped roads. | User evidence; OSM/OSRM attribution is retained where road geometry is derived | User edits, hides or deletes. Site is never inferred from an address point. |
 
 ## Query and snapshot
 
@@ -28,3 +29,5 @@ Provider order is `overpass-api.de`, `overpass.kumi.systems`, then `overpass.pri
 ## Licensing
 
 OSM-derived data must retain `Map data (c) OpenStreetMap contributors, ODbL 1.0` on the drawing. OSMF tile-policy controls applied in C3 are: exact official URL, visible attribution, native browser referer/user agent and caching, no prefetch/offline archive/bulk scan, a replaceable provider, fixed zooms and an 80-tile viewport cap. Automated tests intercept every tile. Nominatim, public Overpass and public OSM tiles have no availability SLA; production-scale use requires an approved provider or self-hosted service.
+
+The public OSRM default is also replaceable, user-triggered and non-bulk. The guarded real-world routing QA makes two sequential requests; ordinary automated tests use a mocked provider and issue no public routing calls. Production traffic beyond occasional deliberate planner actions requires an approved commercial or self-hosted routing service.

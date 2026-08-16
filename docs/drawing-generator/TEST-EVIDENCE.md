@@ -83,3 +83,22 @@ C3 started exactly at `090a2f1ecfb299ed7119a0199c50ae11e916ef29` on `corrective/
 | Local `live-smoke.mjs` with map tiles intercepted | Pass: Drawing Generator/four modes, Dashboard, Accessibility, Railway, Bus, STATS19, Library Manager and Site Research; no page errors. |
 
 Automated C3 tests never harvest public tiles. The one live artifact is real-world evidence, not a synthetic fixture. Generated PDFs/renders remain untracked and are not part of the commit. Remote PR CI and deployment smoke remain separate gates; no merge is authorised by this evidence.
+# DG-0C3.1 final Monday readiness evidence
+
+Build/status: `DRAW-0.1.0-DG0C3.1-20260816`; **WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE**. The corrective work continued from commit `2c069c7b1581dcbaa92b009b74abd4c87b092ba8` on the existing branch and PR; it did not merge or start a new sprint.
+
+## Deterministic and browser gates
+
+- `node modules/drawing-generator/tests/drawing-generator.test.mjs`: **49 passed**. New coverage includes mocked waypoint-order road snapping, non-destructive failure, deterministic route-to/route-from reversal, direction review without a site, distance-based arrow cadence, routing thematic suppression, render non-mutation and one issued logo.
+- `node modules/drawing-generator/tests/browser-smoke.mjs`: **passed** with no page errors/bad local responses. It covers all four modes, two mocked road requests, explicit approval, direction normalization, regional→local→regional geometry persistence, site-change reapproval, exact failure warning, manual fallback, tile failure safety and route/source/tile mocks.
+- Critical protected regressions: root deterministic **13 passed**; foundation regression **passed**; Bus **10 passed**; Railway **29/29 passed**; Accessibility classification **6 passed**.
+
+## PDF and real-world evidence
+
+- Four deterministic QA PDFs were generated with mocked tiles/routes. Each is exactly one A3 landscape page.
+- A Milton Keynes Regional Plan used a small synthetic non-client site, 4,089 current classified Overpass features and 35 live z13 OSM tiles.
+- A Milton Keynes Regional Routing Plan used the same synthetic site, exactly two sequential live road-geometry requests and 35 live z13 OSM tiles. Both routes reached `approved`; Route From Site was deterministically reversed so its start is nearest the site.
+- All six PDFs were rendered to PNG and visually inspected. Map/title frames fit, title content is not clipped, one title-block EAS logo appears, Regional Routing contains only site/routes over the real OSM basemap, Local Routing retains only the explicitly selected community item in addition to site/routes, and arrows are readable and correctly directed.
+- `pdfinfo` reported `Pages: 1` and A3 page size `1191.12 x 841.92 pts` for every artifact.
+
+The live scripts are guarded and excluded from CI. Automated browser/PDF tests intercept public tile and routing traffic. No client address, boundary, route or historic-project payload is stored in the repository or QA artifacts.

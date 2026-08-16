@@ -3,6 +3,7 @@ import { extentForDrawing, scaleBarForMode } from './scale-engine.js';
 import { modeConfig } from './drawing-modes.js';
 import { createLabelPlacements, generalisePresentationFeatures } from './cartography.js';
 import { basemapProvider as defaultBasemapProvider, basemapTileMarkup, tileManifestForDrawing } from './basemap-compositor.js';
+import { routeArrowPlacements } from './route-geometry.js';
 
 const STYLE = Object.freeze({
   'context-area': { stroke: '#d7d9d5', fill: '#eceee9', width: .35, label: '' },
@@ -80,7 +81,16 @@ function sourceVisible(modeId, className) {
 
 export const classVisibleForDrawing = sourceVisible;
 
-function featureMarkup(item, project, index) {
+function routeArrowMarkup(item, project, family, marker, colour) {
+  if (item.geometry?.type !== 'LineString') return '';
+  return routeArrowPlacements(item.geometry, family).map(placement => {
+    const [x1, y1] = project(placement.start);
+    const [x2, y2] = project(placement.end);
+    return `<line class="route-direction-arrow" data-distance-m="${placement.distanceMetres.toFixed(1)}" x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${escapeXml(colour)}" stroke-width="1.1" marker-end="${marker}" vector-effect="non-scaling-stroke"/>`;
+  }).join('');
+}
+
+function featureMarkup(item, project, index, family) {
   const className = item.properties?.class;
   const style = styleForFeature(item);
   if (!style) return '';
@@ -98,9 +108,11 @@ function featureMarkup(item, project, index) {
   const path = pathForGeometry(item.geometry, project);
   if (!path) return '';
   const isArea = item.geometry.type.includes('Polygon');
-  const arrow = className === 'route-to-site' ? 'url(#arrow-to)' : className === 'route-from-site' ? 'url(#arrow-from)' : '';
-  const markup = `<path d="${path}" fill="${isArea ? escapeXml(item.properties?.colour || style.fill || 'none') : 'none'}" fill-opacity="${isArea ? '.34' : '0'}" fill-rule="evenodd" stroke="${escapeXml(colour)}" stroke-width="${style.width}"${style.dash ? ` stroke-dasharray="${style.dash}"` : ''}${arrow ? ` marker-mid="${arrow}" marker-end="${arrow}"` : ''} stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-  return `<g class="layer-${escapeXml(className)}" data-feature-index="${index}">${markup}</g>`;
+  const marker = className === 'route-to-site' ? 'url(#arrow-to)' : className === 'route-from-site' ? 'url(#arrow-from)' : '';
+  const routeStatus = item.properties?.route?.status || '';
+  const reviewDash = marker && ['rough', 'snapping', 'snap-failed', 'snap-review-required', 'direction-review'].includes(routeStatus) ? '6 3' : style.dash;
+  const markup = `<path d="${path}" fill="${isArea ? escapeXml(item.properties?.colour || style.fill || 'none') : 'none'}" fill-opacity="${isArea ? '.34' : '0'}" fill-rule="evenodd" stroke="${escapeXml(colour)}" stroke-width="${style.width}"${reviewDash ? ` stroke-dasharray="${reviewDash}"` : ''} stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${marker ? routeArrowMarkup(item, project, family, marker, colour) : ''}`;
+  return `<g class="layer-${escapeXml(className)}" data-feature-index="${index}"${routeStatus ? ` data-route-status="${escapeXml(routeStatus)}"` : ''}>${markup}</g>`;
 }
 
 function labelMarkup(placements) {
@@ -149,6 +161,8 @@ export function renderDrawingSvg({ modeId, centerBng, site = null, sourceFeature
   const barWidth = scaleBar.paperMm / mode.mapFrameMm.width * viewWidth;
   const barX = 18, barY = viewHeight - 24;
   const warning = sourceStatus === 'success' || sourceStatus === 'zero' ? '' : 'VECTOR SOURCE NOT LOADED - REVIEW REQUIRED';
+  const routeFailure = visibleOverlays.some(item => item.properties?.route?.status === 'snap-failed');
+  const routeDirectionReview = visibleOverlays.some(item => item.properties?.route?.directionStatus === 'review-required');
   const markup = `<svg xmlns="http://www.w3.org/2000/svg" id="drawingSvg" role="img" aria-label="${escapeXml(mode.title)} scale drawing" viewBox="0 0 ${viewWidth} ${viewHeight.toFixed(3)}" preserveAspectRatio="none" data-mode="${modeId}" data-scale="${mode.scale}" data-paper-width-mm="${mode.mapFrameMm.width}" data-paper-height-mm="${mode.mapFrameMm.height}" data-ground-width-m="${extent.groundWidth}" data-ground-height-m="${extent.groundHeight}" data-contextual-basemap="rendered-osm-raster-tiles" data-basemap-provider="${escapeXml(basemapProvider.id)}" data-basemap-status="${escapeXml(basemapStatus)}" data-basemap-zoom="${basemap?.zoom || ''}" data-basemap-tile-count="${basemap?.tileCount || 0}" data-basemap-alignment-error-px="${(basemap?.maximumAlignmentErrorPx || 0).toFixed(6)}">
     <defs>
       <clipPath id="map-clip"><rect x="0" y="0" width="${viewWidth}" height="${viewHeight.toFixed(3)}"/></clipPath>
@@ -156,10 +170,12 @@ export function renderDrawingSvg({ modeId, centerBng, site = null, sourceFeature
       <marker id="arrow-from" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,4 L0,8" fill="none" stroke="#0057e7" stroke-width="1.3"/></marker>
     </defs>
     <rect width="${viewWidth}" height="${viewHeight.toFixed(3)}" fill="#f7f7f3"/>
-    <g clip-path="url(#map-clip)" aria-label="Rendered OpenStreetMap basemap and controlled EAS overlays"><g class="rendered-osm-basemap" aria-label="OpenStreetMap Standard rendered tile context">${basemap ? basemapTileMarkup(basemap) : ''}</g>${gridMarkup(extent, viewWidth, viewHeight, mode)}<g class="controlled-eas-overlays">${controlledFeatures.map((item, index) => featureMarkup(item, project, index)).join('')}</g><g class="controlled-labels">${labelMarkup(labels)}</g></g>
+    <g clip-path="url(#map-clip)" aria-label="Rendered OpenStreetMap basemap and controlled EAS overlays"><g class="rendered-osm-basemap" aria-label="OpenStreetMap Standard rendered tile context">${basemap ? basemapTileMarkup(basemap) : ''}</g>${gridMarkup(extent, viewWidth, viewHeight, mode)}<g class="controlled-eas-overlays">${controlledFeatures.map((item, index) => featureMarkup(item, project, index, mode.family)).join('')}</g><g class="controlled-labels">${labelMarkup(labels)}</g></g>
     <g class="north-arrow" aria-label="North arrow" transform="translate(38 34)"><path d="M0,-23 L-13,7 L0,1 L13,7 Z" fill="#8d8d8d" stroke="#333" stroke-width="1"/><text x="0" y="31" text-anchor="middle">N</text></g>
     <g class="scale-bar" data-paper-mm="${scaleBar.paperMm}" data-ground-metres="${scaleBar.groundMetres}"><line x1="${barX}" y1="${barY}" x2="${(barX + barWidth).toFixed(3)}" y2="${barY}" stroke="#111" stroke-width="2" vector-effect="non-scaling-stroke"/><line x1="${barX}" y1="${barY - 5}" x2="${barX}" y2="${barY + 5}" stroke="#111" stroke-width="1"/><line x1="${(barX + barWidth).toFixed(3)}" y1="${barY - 5}" x2="${(barX + barWidth).toFixed(3)}" y2="${barY + 5}" stroke="#111" stroke-width="1"/><text x="${barX}" y="${barY - 9}" class="scale-label">${scaleBar.label}</text></g>
     ${warning ? `<text x="${viewWidth - 15}" y="20" text-anchor="end" class="source-warning">${warning}</text>` : ''}
+    ${routeFailure ? `<text x="${viewWidth - 15}" y="38" text-anchor="end" class="source-warning route-review-warning">ROAD SNAP FAILED - ROUTE REQUIRES MANUAL REVIEW</text>` : ''}
+    ${routeDirectionReview ? `<text x="${viewWidth - 15}" y="56" text-anchor="end" class="source-warning route-review-warning">ROUTE DIRECTION REQUIRES REVIEW</text>` : ''}
     <g id="basemapFailureWarning" class="basemap-failure-warning" visibility="${basemapStatus === 'failed' ? 'visible' : 'hidden'}"><rect x="180" y="${(viewHeight / 2 - 24).toFixed(2)}" width="640" height="48" rx="4"/><text x="500" y="${(viewHeight / 2 + 4).toFixed(2)}" text-anchor="middle">BASEMAP FAILED TO LOAD - REVIEW REQUIRED</text></g>
     <rect x=".5" y=".5" width="${viewWidth - 1}" height="${(viewHeight - 1).toFixed(3)}" fill="none" stroke="#222" stroke-width="1" vector-effect="non-scaling-stroke"/>
   </svg>`;
@@ -167,11 +183,11 @@ export function renderDrawingSvg({ modeId, centerBng, site = null, sourceFeature
 }
 
 // Bind separately so the map callback receives the current projector and index.
-function featureMarkupBound(item, index, project) { return featureMarkup(item, project, index); }
+function featureMarkupBound(item, index, project, family) { return featureMarkup(item, project, index, family); }
 
 // Correct the generated feature callback without exposing renderer internals.
 export function renderFeatureSetForTest(features, extent, modeId) {
   const mode = modeConfig(modeId), viewWidth = 1000, viewHeight = viewWidth * mode.mapFrameMm.height / mode.mapFrameMm.width;
   const project = projector(extent, viewWidth, viewHeight);
-  return generalisePresentationFeatures(features).map((item, index) => featureMarkupBound(item, index, project)).join('');
+  return generalisePresentationFeatures(features).map((item, index) => featureMarkupBound(item, index, project, mode.family)).join('');
 }

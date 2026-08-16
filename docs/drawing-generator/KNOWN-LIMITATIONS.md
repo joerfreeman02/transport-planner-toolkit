@@ -42,3 +42,10 @@
 
 - Approved hosted raster/vector provider, a status-safe TfL Cycle Routes/CID adapter, authoritative bus sources, waterway reconciliation, OSTN15 support, topology-aware cartographic generalisation, curved/leader-line labels, direct PDF generation, project storage/versioning and a formally extracted shared spatial package.
 - Codecov and OpenSSF Scorecard adoption remain governance decisions; Sentry/telemetry require a separate privacy decision.
+# DG-0C3.1 routing limitations
+
+- Road snapping follows planner-supplied waypoints using the selected provider's car-road graph. It does not assess height, width, weight, loading, turning, access, time, traffic, temporary restrictions, permits or HGV suitability.
+- Public routing and map services have no SLA. Failure is deliberately non-destructive and requires retry, more guidance, redraw or explicit manual fallback.
+- Waypoint proximity/order checks detect material divergence but do not prove that the chosen road is legally or operationally suitable.
+- Site endpoint direction uses geometric proximity to the confirmed polygon; equal/ambiguous endpoint proximity is blocked for review.
+- Local Routing may show a community/manual overlay only after explicit planner selection; relevance remains a professional judgement.

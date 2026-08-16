@@ -15,6 +15,7 @@ const interceptedSourceRequests = [];
 const interceptedSourceBodies = [];
 const observedSourceRequests = [];
 const interceptedTileRequests = [];
+const interceptedRouteRequests = [];
 let expectedTileFailure = false;
 page.on('pageerror', error => errors.push(error.message));
 page.on('console', message => { if (message.type() === 'error' && !/tile|ERR_ABORTED/i.test(message.text()) && !(expectedTileFailure && /status of 503/i.test(message.text()))) errors.push(message.text()); });
@@ -35,6 +36,14 @@ await page.route(/https:\/\/(?:tile\.openstreetmap\.org|tiles\.test)\/\d+\/\d+\/
   return route.fulfill({ status: 200, contentType: 'image/png', body: transparentPng });
 });
 await page.route(/https:\/\/tiles-fail\.test\/\d+\/\d+\/\d+\.png/, route => route.fulfill({ status: 503, contentType: 'text/plain', body: 'mock tile failure' }));
+await page.route(/https:\/\/routing\.test\/route\/v1\/driving\/.+/, route => {
+  interceptedRouteRequests.push(route.request().url());
+  const coordinatePart = new URL(route.request().url()).pathname.split('/driving/')[1];
+  const guidance = coordinatePart.split(';').map(value => value.split(',').map(Number));
+  const coordinates = guidance.flatMap((coordinate, index) => index === guidance.length - 1 ? [coordinate] : [coordinate, [(coordinate[0] + guidance[index + 1][0]) / 2, (coordinate[1] + guidance[index + 1][1]) / 2]]);
+  return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'Ok', routes: [{ distance: 900, duration: 120, geometry: { type: 'LineString', coordinates } }] }) });
+});
+await page.route(/https:\/\/routing-fail\.test\/route\/v1\/driving\/.+/, route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'NoRoute', message: 'mock route failure' }) }));
 await page.addInitScript(() => localStorage.clear());
 
 try {
@@ -147,6 +156,47 @@ try {
       assert.deepEqual(await page.evaluate(() => { const snapshot = window.__DG0_ACCEPTANCE__.snapshot(); return [snapshot.drawingActive, snapshot.navigationEnabled]; }), [false, true]);
     }
   }
+  await page.evaluate(async () => {
+    const api = window.__DG0_ACCEPTANCE__;
+    api.setMode('regional-routing');
+    api.clearOverlays();
+    api.setRoadRoutingProvider({ id: 'mock-road-routing', name: 'Mock road geometry', endpoint: 'https://routing.test/route/v1/driving', attribution: 'Mock road geometry', reportIssueUrl: 'https://example.test/fix', maximumGuidanceDeviationMetres: 150 });
+    await api.addRoughRoute({ type: 'LineString', coordinates: [[-.112, 51.504], [-.106, 51.502], [-.1005, 51.5001]] }, 'route-to-site');
+    await api.addRoughRoute({ type: 'LineString', coordinates: [[-.112, 51.496], [-.106, 51.498], [-.1005, 51.5001]] }, 'route-from-site');
+  });
+  let routeSnapshot = await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().overlays.filter(item => item.properties.class.startsWith('route-')));
+  assert.equal(routeSnapshot.length, 2);
+  assert.ok(routeSnapshot.every(item => item.properties.route.status === 'snapped-review' && item.properties.route.directionStatus === 'confirmed'));
+  assert.deepEqual(routeSnapshot.find(item => item.properties.class === 'route-to-site').geometry.coordinates.at(-1), [-.1005, 51.5001]);
+  assert.deepEqual(routeSnapshot.find(item => item.properties.class === 'route-from-site').geometry.coordinates[0], [-.1005, 51.5001]);
+  assert.equal(routeSnapshot.find(item => item.properties.class === 'route-from-site').properties.route.reversedByNormalization, true);
+  assert.equal(interceptedRouteRequests.length, 2);
+  assert.equal(await page.locator('#drawingSvg .route-direction-arrow').count() > 0, true);
+  assert.equal(await page.locator('#drawingSvg [class*="layer-main-road"], #drawingSvg [class*="layer-railway"], #drawingSvg [class*="layer-station-"]').count(), 0);
+  await page.locator('#approveSnappedRoutes').click();
+  routeSnapshot = await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().overlays.filter(item => item.properties.class.startsWith('route-')));
+  assert.ok(routeSnapshot.every(item => item.properties.route.status === 'approved'));
+  const retainedGeometry = JSON.stringify(routeSnapshot.map(item => item.geometry));
+  await page.locator('#modeSelect').selectOption('local-routing');
+  assert.equal(JSON.stringify(await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().overlays.filter(item => item.properties.class.startsWith('route-')).map(item => item.geometry))), retainedGeometry);
+  await page.locator('#modeSelect').selectOption('regional-routing');
+  assert.equal(JSON.stringify(await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().overlays.filter(item => item.properties.class.startsWith('route-')).map(item => item.geometry))), retainedGeometry);
+  await page.evaluate(() => { const api = window.__DG0_ACCEPTANCE__; api.setSite(api.snapshot().site); });
+  const revalidatedRoutes = await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().overlays.filter(item => item.properties.class.startsWith('route-')).map(item => item.properties.route));
+  assert.ok(revalidatedRoutes.every(route => route.status === 'snapped-review' && route.directionStatus === 'confirmed'), JSON.stringify(revalidatedRoutes, null, 2));
+  await page.locator('#approveSnappedRoutes').click();
+
+  await page.evaluate(async () => {
+    const api = window.__DG0_ACCEPTANCE__;
+    api.clearOverlays();
+    api.setRoadRoutingProvider({ id: 'mock-road-routing-failure', name: 'Mock failed road geometry', endpoint: 'https://routing-fail.test/route/v1/driving' });
+    await api.addRoughRoute({ type: 'LineString', coordinates: [[-.112, 51.504], [-.106, 51.502], [-.1005, 51.5001]] }, 'route-to-site');
+  });
+  assert.match(await page.locator('#routeStatus').innerText(), /ROAD SNAP FAILED — ROUTE REQUIRES MANUAL REVIEW/);
+  const failedRoute = await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().overlays[0]);
+  assert.deepEqual(failedRoute.geometry, failedRoute.properties.route.roughGeometry);
+  await page.locator('#acceptManualFallback').click();
+  assert.equal((await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().overlays[0].properties.route.status)), 'manual-approved');
   const overlayCountBeforeFailure = (await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot())).overlays.length;
   expectedTileFailure = true;
   await page.evaluate(() => {
@@ -162,7 +212,7 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Print / Save PDF' }).count(), 1);
   assert.deepEqual(badLocalResponses, []);
   assert.equal(errors.length, 0, errors.join('\n'));
-  console.log(JSON.stringify({ modes: Object.keys(expected), defaultNavigation: true, drawingCancellation: true, routeCancellation: true, importRestoresNavigation: true, advancedDefaultCollapsed: true, siteImport: true, renderedBasemap: true, mockedTiles: interceptedTileRequests.length, basemapFailureSafe: true, sourceSnapshot: true, overlayImport: 2, badLocalResponses, pageErrors: errors }, null, 2));
+  console.log(JSON.stringify({ modes: Object.keys(expected), defaultNavigation: true, drawingCancellation: true, routeCancellation: true, roadSnapMocked: interceptedRouteRequests.length, routeDirectionNormalised: true, routeModePersistence: true, manualFallback: true, importRestoresNavigation: true, advancedDefaultCollapsed: true, siteImport: true, renderedBasemap: true, mockedTiles: interceptedTileRequests.length, basemapFailureSafe: true, sourceSnapshot: true, overlayImport: 2, badLocalResponses, pageErrors: errors }, null, 2));
 } finally {
   await browser.close();
 }

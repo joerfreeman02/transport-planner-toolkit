@@ -19,7 +19,7 @@ export const DRAWING_MODES = Object.freeze({
     scale: 50000,
     mapFrameMm: Object.freeze({ width: 336, height: 245 }),
     requiredClasses: Object.freeze(['site', 'route-to-site', 'route-from-site']),
-    visibleClasses: Object.freeze(['context-area', 'context-road-major', 'context-place', 'site', 'main-road', 'motorway', 'cycle-network-primary', 'cycle-network-local', 'strategic-cycle', 'waterway', 'railway', 'station-national-rail', 'station-overground', 'station-underground', 'station-dlr', 'station-tram', 'route-to-site', 'route-from-site', 'custom-line', 'custom-point', 'custom-area'])
+    visibleClasses: Object.freeze(['site', 'route-to-site', 'route-from-site', 'custom-line', 'custom-point', 'custom-area'])
   }),
   'local-context': Object.freeze({
     id: 'local-context',
@@ -40,8 +40,8 @@ export const DRAWING_MODES = Object.freeze({
     defaultDrawingNumber: 'EAS-SK-H-103',
     scale: 2500,
     mapFrameMm: Object.freeze({ width: 318, height: 285 }),
-    requiredClasses: Object.freeze(['site', 'community', 'route-to-site', 'route-from-site']),
-    visibleClasses: Object.freeze(['context-area', 'context-road-major', 'context-road-minor', 'context-place', 'site', 'railway', 'station-national-rail', 'station-overground', 'station-underground', 'station-dlr', 'station-tram', 'cycle-network-primary', 'cycle-network-local', 'cycle-route', 'community', 'route-to-site', 'route-from-site', 'custom-line', 'custom-point', 'custom-area'])
+    requiredClasses: Object.freeze(['site', 'route-to-site', 'route-from-site']),
+    visibleClasses: Object.freeze(['site', 'community', 'route-to-site', 'route-from-site', 'custom-line', 'custom-point', 'custom-area'])
   })
 });
 

@@ -59,6 +59,9 @@ details { margin-top:.7rem; }
 .routing-tools>p { margin:.35rem 0; }
 .routing-tools .route-to { background:#b5121b; border-color:#b5121b; }
 .routing-tools .route-from { background:#0057a8; border-color:#0057a8; }
+.route-safety-note { padding:.65rem .75rem; border-left:4px solid #ed1c24; background:#fff; color:#263540; }
+.route-review-actions { margin-top:.65rem; padding-top:.65rem; border-top:1px solid #c7d5df; }
+.route-state { display:block; max-width:240px; margin-top:.25rem; color:#4e5e6b; font-size:.65rem; line-height:1.25; }
 pre { max-height:260px; overflow:auto; padding:.8rem; background:#101820; color:#dbe7ed; font-size:.72rem; white-space:pre-wrap; }
 .candidate-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:.5rem; }
 .candidate-card { border:1px solid #ccd5dc; padding:.65rem; display:grid; gap:.35rem; }
@@ -91,20 +94,17 @@ td input,td select { min-height:2rem; padding:.3rem; }
 .legend-symbol.dashed::after { border-top-style:dashed; }
 .legend-symbol.area { height:7mm; border:.4mm solid var(--legend-colour); background:color-mix(in srgb,var(--legend-colour) 30%,white); }
 .legend-symbol.point::after { content:""; position:absolute; left:7mm; top:0; width:3mm; height:3mm; border:.25mm solid #444; background:var(--legend-colour); }
-.company-block { margin-top:auto; padding-top:2.2mm; border-top:.25mm solid #666; text-align:center; font-size:4.7pt; line-height:1.22; }
-.company-block img { width:43mm; max-height:16mm; object-fit:contain; }
-.company-block p { margin:1mm 0; }
-.layout-local .company-block { display:none; }
 .title-block { display:grid; border-top:.25mm solid #222; border-right:0; border-bottom:0; background:white; }
 .layout-regional .title-block { grid-column:1 / span 2; grid-row:2; grid-template-columns:37mm 79mm 75mm 73mm 62mm 82mm; }
-.layout-local .title-block { grid-column:2; grid-row:2; grid-template-columns:1fr; grid-template-rows:24mm 20mm 24mm 23mm 34mm; }
+.layout-local .title-block { grid-column:2; grid-row:2; grid-template-columns:1fr; grid-template-rows:18mm 18mm 18mm 20mm 27mm 24mm; }
 .title-cell { min-width:0; padding:1.4mm 2mm; border-right:.25mm solid #333; display:grid; align-content:start; gap:1mm; font-size:6pt; overflow:hidden; overflow-wrap:anywhere; }
 .title-cell small { font-size:4.2pt; }
 .title-cell strong { font-size:7.6pt; font-weight:600; }
 .title-cell span { font-size:6.4pt; }
 .identity { place-items:center; align-content:center; }
 .identity img { width:31mm; max-height:16mm; object-fit:contain; }
-.layout-local .identity { display:none; }
+.layout-local .identity { display:grid; padding:1mm; }
+.layout-local .identity img { width:30mm; max-height:15mm; }
 .mini-grid { display:grid; grid-template-columns:repeat(2,1fr); margin-top:1mm; border-top:.2mm solid #555; }
 .mini-grid span { display:grid; padding:1mm; border-right:.2mm solid #777; }
 .mini-grid b { font-size:6.3pt; }

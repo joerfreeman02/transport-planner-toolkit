@@ -18,6 +18,8 @@ const source = await import('../assets/js/source-adapter.js');
 const cartography = await import('../assets/js/cartography.js');
 const basemap = await import('../assets/js/basemap-compositor.js');
 const { renderDrawingSvg } = await import('../assets/js/svg-renderer.js');
+const routeGeometry = await import('../assets/js/route-geometry.js');
+const routeSnap = await import('../assets/js/route-snap-adapter.js');
 
 let passed = 0;
 async function test(name, fn) {
@@ -247,12 +249,70 @@ await test('retained overlays are isolated to appropriate drawing modes', () => 
   assert.match(localRouting, /layer-route-to-site/); assert.match(localRouting, /layer-community/); assert.doesNotMatch(localRouting, /layer-bus-route/);
 });
 
+await test('road-snap adapter follows planner waypoints in order through a provider-neutral mocked boundary', async () => {
+  const rough = { type: 'LineString', coordinates: [[-0.11, 51.5], [-0.105, 51.502], [-0.1, 51.501]] };
+  let requestedUrl = '';
+  const fetchImpl = async url => {
+    requestedUrl = url;
+    return { ok: true, json: async () => ({ code: 'Ok', routes: [{ distance: 1400, duration: 180, geometry: { type: 'LineString', coordinates: [[-0.11, 51.5], [-0.108, 51.501], [-0.105, 51.502], [-0.102, 51.5015], [-0.1, 51.501]] } }] }) };
+  };
+  const result = await routeSnap.snapRouteThroughGuidance(rough, { fetchImpl, provider: { ...routeSnap.DEFAULT_ROAD_ROUTING_PROVIDER, endpoint: 'https://routing.test/route/v1/driving' } });
+  assert.equal(result.status, 'snapped-review');
+  assert.equal(result.provenance.providerPurpose, 'geometry-assistance-only');
+  assert.equal(result.provenance.waypointOrderPreserved, true);
+  assert.match(requestedUrl, /-0\.1100000,51\.5000000;-0\.1050000,51\.5020000;-0\.1000000,51\.5010000/);
+  assert.equal(result.geometry.coordinates.length, 5);
+});
+
+await test('road-snap failure preserves the planner rough geometry for manual review', async () => {
+  const rough = { type: 'LineString', coordinates: [[-0.11, 51.5], [-0.1, 51.501]] };
+  const result = await routeSnap.snapRouteThroughGuidance(rough, { fetchImpl: async () => { throw new Error('mock unavailable'); } });
+  assert.equal(result.status, 'snap-failed');
+  assert.deepEqual(result.geometry, rough);
+  assert.match(result.error, /mock unavailable/);
+});
+
+await test('route direction normalization deterministically reverses both route directions when needed', () => {
+  const sitePolygon = { type: 'Polygon', coordinates: [[[-0.1002, 51.4998], [-0.0998, 51.4998], [-0.0998, 51.5002], [-0.1002, 51.5002], [-0.1002, 51.4998]]] };
+  const siteFirst = { type: 'LineString', coordinates: [[-0.1, 51.5], [-0.105, 51.5], [-0.11, 51.5]] };
+  const siteLast = { type: 'LineString', coordinates: [[-0.11, 51.5], [-0.105, 51.5], [-0.1, 51.5]] };
+  const toSite = routeGeometry.normaliseRouteDirection(siteFirst, 'route-to-site', sitePolygon);
+  const fromSite = routeGeometry.normaliseRouteDirection(siteLast, 'route-from-site', sitePolygon);
+  assert.equal(toSite.status, 'confirmed'); assert.equal(toSite.reversed, true); assert.deepEqual(toSite.geometry.coordinates.at(-1), [-0.1, 51.5]);
+  assert.equal(fromSite.status, 'confirmed'); assert.equal(fromSite.reversed, true); assert.deepEqual(fromSite.geometry.coordinates[0], [-0.1, 51.5]);
+  assert.equal(routeGeometry.normaliseRouteDirection(siteLast, 'route-to-site', null).reason, 'ROUTE DIRECTION REQUIRES REVIEW');
+});
+
+await test('route arrows use distance cadence on final geometry and follow coordinate direction', () => {
+  const sparse = { type: 'LineString', coordinates: [[-0.11, 51.5], [-0.1, 51.5]] };
+  const dense = { type: 'LineString', coordinates: Array.from({ length: 101 }, (_, index) => [-0.11 + (index / 10000), 51.5]) };
+  const sparseArrows = routeGeometry.routeArrowPlacements(sparse, 'local');
+  const denseArrows = routeGeometry.routeArrowPlacements(dense, 'local');
+  assert.equal(sparseArrows.length, denseArrows.length);
+  assert.ok(sparseArrows.length >= 3 && sparseArrows.length <= 10);
+  assert.ok(sparseArrows.every(item => item.end[0] > item.start[0]));
+});
+
+await test('routing drawings suppress automatic thematic overlays and rendering never mutates retained route geometry', () => {
+  const centerBng = crs.wgs84ToBng([-.1, 51.5]);
+  const route = normaliseOverlay({ type: 'LineString', coordinates: [[-.11, 51.5], [-.1, 51.5]] }, { className: 'route-to-site', route: { status: 'approved', directionStatus: 'confirmed' } });
+  const original = structuredClone(route.geometry);
+  const result = renderDrawingSvg({ modeId: 'regional-routing', centerBng, site, sourceFeatures, overlays: [route], sourceStatus: 'success' });
+  assert.match(result.markup, /layer-route-to-site/);
+  assert.doesNotMatch(result.markup, /layer-(main-road|station-underground)/);
+  assert.doesNotMatch(result.markup, /marker-mid=/);
+  assert.match(result.markup, /class="route-direction-arrow"/);
+  assert.deepEqual(route.geometry, original);
+});
+
 await test('A3 sheet contains title block, map frame, current logo, legend, attribution and build', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const css = fs.readFileSync(new URL('../assets/css/drawing-generator.css', import.meta.url), 'utf8');
   for (const marker of ['id="drawingSheet"', 'id="sheetMap"', 'id="sheetLegend"', 'assets/images/eas-primary.png', 'sheetAttribution', BUILD]) assert.match(html, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(css, /@page\s*\{\s*size:A3 landscape;\s*margin:0;/);
   assert.match(css, /width:420mm;\s*height:297mm/);
+  const sheet = html.slice(html.indexOf('id="drawingSheet"'), html.indexOf('</article>', html.indexOf('id="drawingSheet"')));
+  assert.equal((sheet.match(/assets\/images\/eas-primary\.png/g) || []).length, 1);
 });
 
 await test('dashboard registers exactly one WIP drawing card while preserving established cards', () => {

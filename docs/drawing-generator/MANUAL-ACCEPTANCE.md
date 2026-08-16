@@ -3,7 +3,21 @@
 Drawing Generator is a live-review candidate and must not be accepted merely because these steps complete.
 
 1. Open the deployed direct Drawing Generator URL in Chrome or Edge.
-2. Confirm the banner says `WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE` and the build says `DRAW-0.1.0-DG0C3-20260816`.
+2. Confirm the banner says `WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE` and the build says `DRAW-0.1.0-DG0C3.1-20260816`.
+3. In each drawing mode confirm the issued sheet contains exactly one EAS logo, in the title block.
+
+## Routing workflow
+
+1. Confirm a real site polygon, then choose Regional Routing or Local Routing.
+2. Draw Route To Site as ordered rough waypoints through the planner-selected roads. Repeat for Route From Site.
+3. Confirm the application replaces each rough guide with clean road-following geometry and reports planner approval is required.
+4. Confirm Route To ends nearest the site and Route From starts nearest the site. If a line was reversed, confirm its overlay record displays that normalization.
+5. Confirm arrows follow route direction and use a clean distance cadence rather than every geometry vertex.
+6. Confirm Regional Routing contains no automatic road/motorway/cycle/water/rail/station thematic overlays. In Local Routing, retain a community/manual overlay only where explicitly selected and relevant.
+7. Approve the snapped routes. Confirm print becomes available only when both route directions, basemap, scale and site are ready.
+8. Edit a route to add guidance and confirm it is re-snapped and approval is cleared. Change Regional Routing to Local Routing and back; confirm the retained geometry is unchanged.
+9. Simulate provider failure. Confirm the rough geometry remains visible, the exact UI warning is `ROAD SNAP FAILED — ROUTE REQUIRES MANUAL REVIEW`, and print remains blocked. Retry, redraw, or explicitly choose Use Manual Geometry. Manual acceptance must still pass the site-direction check.
+10. Clear the site and confirm the exact warning `ROUTE DIRECTION REQUIRES REVIEW` blocks readiness.
 3. Confirm **Advanced editing / source diagnostics** starts closed, the map can pan immediately, and **Draw site boundary** begins an explicit drawing state. Choose **Cancel drawing** and confirm normal map navigation returns.
 4. Enter the live project address and search, or enter confirmed coordinates. Confirm this centres the map but does **not** create a site polygon.
 5. Draw the approved site boundary with the polygon tool, or import a Product Owner-prepared GeoJSON Polygon/MultiPolygon. Edit it and confirm any holes. Do not treat the architect PDF as georeferenced geometry.

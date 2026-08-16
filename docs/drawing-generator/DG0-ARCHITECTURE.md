@@ -1,7 +1,11 @@
 # DG-0 architecture
 
 Status: **Proposed live-review candidate; not an accepted baseline.**
-Version/build: `DRAW-0.1.0` / `DRAW-0.1.0-DG0C3-20260816`.
+Version/build: `DRAW-0.1.0` / `DRAW-0.1.0-DG0C3.1-20260816`.
+
+## Road-geometry assistance boundary
+
+`route-snap-adapter.js` owns the replaceable external provider boundary, request construction, bounded failure handling and provenance. `route-geometry.js` is network-free and owns route length, waypoint-order/deviation checks, site-direction normalization and distance-based arrow placement. `app.js` owns user intent and state transitions (`rough` → `snapping` → `snapped-review` → `approved`, with explicit failure/review/manual branches). `svg-renderer.js` consumes final retained geometry without mutating it. Provider output can never self-approve or change the planner's ordered waypoint choice.
 
 ## Scope and boundaries
 

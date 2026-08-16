@@ -43,7 +43,8 @@ export function normaliseOverlay(feature, metadata = {}) {
       class: className, label: String(metadata.label ?? feature?.properties?.label ?? feature?.properties?.name ?? '').trim(),
       layerName: String(metadata.layerName ?? feature?.properties?.layerName ?? definition.label).trim() || definition.label,
       colour, visible: metadata.visible ?? feature?.properties?.visible ?? true,
-      source: metadata.source || feature?.properties?.source || 'manual/reviewed user input'
+      source: metadata.source || feature?.properties?.source || 'manual/reviewed user input',
+      route: structuredClone(metadata.route ?? feature?.properties?.route ?? null)
     },
     geometry
   };
@@ -64,7 +65,7 @@ export function createOverlayStore(initial = []) {
     update(overlayId, patch = {}) {
       const current = records.get(overlayId); if (!current) throw new Error('Overlay not found.');
       const feature = { ...current, properties: { ...current.properties, ...(patch.properties || patch) }, geometry: patch.geometry || current.geometry };
-      const next = normaliseOverlay(feature, { id: overlayId, className: feature.properties.class, label: feature.properties.label, layerName: feature.properties.layerName, colour: feature.properties.colour, visible: feature.properties.visible, source: feature.properties.source });
+      const next = normaliseOverlay(feature, { id: overlayId, className: feature.properties.class, label: feature.properties.label, layerName: feature.properties.layerName, colour: feature.properties.colour, visible: feature.properties.visible, source: feature.properties.source, route: feature.properties.route });
       records.set(overlayId, next); return structuredClone(next);
     },
     remove(overlayId) { return records.delete(overlayId); },

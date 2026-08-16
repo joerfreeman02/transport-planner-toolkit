@@ -50,8 +50,8 @@ const sourceFeatures = [
   ['bus-route', { type: 'LineString', coordinates: [[-.112, 51.493], [-.1, 51.501], [-.088, 51.509]] }, { routeLabel: '99' }]
 ].map(([className, geometry, properties]) => ({ type: 'Feature', properties: { class: className, ...properties }, geometry }));
 const overlays = [
-  [{ type: 'Feature', properties: {}, geometry: lines.route }, { className: 'route-to-site', label: 'ROUTE TO SITE', layerName: 'Reviewed routes', colour: '#ed1c24' }],
-  [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [...lines.route.coordinates].reverse() } }, { className: 'route-from-site', label: 'ROUTE FROM SITE', layerName: 'Reviewed routes', colour: '#0057e7' }],
+  [{ type: 'Feature', properties: {}, geometry: lines.route }, { className: 'route-to-site', label: 'ROUTE TO SITE', layerName: 'Planner-guided road routing', colour: '#ed1c24', source: 'Mock road geometry; automated QA only', route: { status: 'approved', directionStatus: 'confirmed', selectionAuthority: 'planner', providerPurpose: 'geometry-assistance-only', provenance: { providerName: 'Mock road geometry', providerId: 'qa-mock', providerPurpose: 'geometry-assistance-only', waypointOrderPreserved: true, maxGuidanceDeviationMetres: 0 } } }],
+  [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [...lines.route.coordinates].reverse() } }, { className: 'route-from-site', label: 'ROUTE FROM SITE', layerName: 'Planner-guided road routing', colour: '#0057e7', source: 'Mock road geometry; automated QA only', route: { status: 'approved', directionStatus: 'confirmed', selectionAuthority: 'planner', providerPurpose: 'geometry-assistance-only', provenance: { providerName: 'Mock road geometry', providerId: 'qa-mock', providerPurpose: 'geometry-assistance-only', waypointOrderPreserved: true, maxGuidanceDeviationMetres: 0 } } }],
   [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [-.1025, 51.501] } }, { className: 'community', label: 'COMMUNITY FACILITY', layerName: 'Selected considerations', colour: '#666666' }]
 ];
 
@@ -77,7 +77,13 @@ try {
     await page.evaluate(() => window.__DG0_ACCEPTANCE__.requestBasemap());
     await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'success');
     await page.emulateMedia({ media: 'print' });
-    await page.pdf({ path: path.join(output, `drawing-generator-${mode}-DG0C3-live-review.pdf`), format: 'A3', landscape: true, printBackground: true, preferCSSPageSize: true, margin: { top: '0', right: '0', bottom: '0', left: '0' } });
+    if (mode.endsWith('-routing')) {
+      const classes = await page.locator('#drawingSvg .controlled-eas-overlays > g').evaluateAll(groups => groups.map(group => group.getAttribute('class')));
+      if (classes.some(value => /main-road|motorway|cycle|waterway|railway|station/.test(value || ''))) throw new Error(`${mode} retained a suppressed thematic overlay.`);
+      if (!await page.locator('#drawingSvg .route-direction-arrow').count()) throw new Error(`${mode} did not render distance-based route arrows.`);
+    }
+    if (await page.locator('#drawingSheet .identity img').count() !== 1) throw new Error(`${mode} did not contain exactly one issued title-block logo.`);
+    await page.pdf({ path: path.join(output, `drawing-generator-${mode}-DG0C3.1-live-review.pdf`), format: 'A3', landscape: true, printBackground: true, preferCSSPageSize: true, margin: { top: '0', right: '0', bottom: '0', left: '0' } });
     await page.close();
   }
   console.log(`Created ${modes.length} A3 live-review QA PDF${modes.length === 1 ? '' : 's'} in ${output}`);

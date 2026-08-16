@@ -120,3 +120,13 @@ C3 starts exactly at `090a2f1ecfb299ed7119a0199c50ae11e916ef29` and preserves th
 | `modules/drawing-generator/README.md` | C3 operation, tile boundary and guarded live-QA instructions. |
 | `docs/adr/ADR-008-drawing-generator-spatial-rendering.md` | Records the hybrid rendered-OSM/controlled-vector decision while retaining Proposed status. |
 | `docs/drawing-generator/{DG0-ARCHITECTURE,DATA-SOURCE-REGISTER,KNOWN-LIMITATIONS,MANUAL-ACCEPTANCE,TEST-EVIDENCE,DIFF-AUDIT}.md` | C3 architecture, policy/source separation, limitations, acceptance and evidence. |
+# DG-0C3.1 corrective delta
+
+- Added provider-neutral, user-triggered road-geometry assistance through ordered planner waypoints, with bounded failure, retained rough geometry and per-route provenance.
+- Added deterministic site direction normalization and recorded reversals; ambiguous/no-site routes block readiness.
+- Added explicit snapped approval, retry/redraw/add-guidance path and manual fallback acceptance; site changes clear prior approval.
+- Replaced per-vertex SVG markers with ground-distance arrow cadence on final retained geometry.
+- Reduced Regional Routing to basemap/site/routes/manual reviewed items and Local Routing to basemap/site/routes plus explicitly selected community/manual items; unchanged Regional Plan and Local Context hierarchies remain intact.
+- Removed the right-sidebar duplicate company/logo block and retained one current EAS title-block logo in all four layouts.
+- Added unit/browser/live QA, one-page A3 artifacts, source/provider documentation and an ADR. Generated artifacts remain untracked.
+- No protected module identity, historic client data, main-branch merge or new sprint was introduced.

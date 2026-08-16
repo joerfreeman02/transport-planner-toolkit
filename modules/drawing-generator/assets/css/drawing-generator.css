@@ -54,6 +54,11 @@ details { margin-top:.7rem; }
 .generation-actions { display:flex; align-items:center; gap:1rem; margin-top:1rem; padding:1rem; border:1px solid #c7d5df; background:#f4f8fb; }
 .generation-actions p { margin:0; color:#4e5e6b; }
 .action-large { min-width:240px; padding:.85rem 1.2rem; font-size:1rem; }
+.routing-tools { margin-top:1rem; padding:1rem; border:2px solid #8ba0b1; border-radius:6px; background:#f6f9fb; }
+.routing-tools h3 { margin:0 0 .35rem; }
+.routing-tools>p { margin:.35rem 0; }
+.routing-tools .route-to { background:#b5121b; border-color:#b5121b; }
+.routing-tools .route-from { background:#0057a8; border-color:#0057a8; }
 pre { max-height:260px; overflow:auto; padding:.8rem; background:#101820; color:#dbe7ed; font-size:.72rem; white-space:pre-wrap; }
 .candidate-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:.5rem; }
 .candidate-card { border:1px solid #ccd5dc; padding:.65rem; display:grid; gap:.35rem; }
@@ -118,9 +123,12 @@ td input,td select { min-height:2rem; padding:.3rem; }
 .label-motorway { fill:#a20d9f; }
 .label-cycle-network-primary,.label-cycle-network-local { fill:#9a6500; font-size:7px; }
 .label-railway { fill:#52575a; font-size:7px; }
-.bng-grid { opacity:.28; }
+.rendered-osm-basemap { opacity:.9; }
+.rendered-osm-basemap image { image-rendering:auto; }
+.bng-grid { opacity:.2; }
 .bng-grid line { stroke:#bfc5c7; stroke-width:.3; vector-effect:non-scaling-stroke; }
-.contextual-osm-basemap { opacity:.94; }
+.basemap-failure-warning rect { fill:#fff4f4; stroke:#b0000a; stroke-width:2px; }
+.basemap-failure-warning text { fill:#b0000a; font:800 13px Arial,sans-serif; letter-spacing:.03em; }
 .north-arrow text { font-size:22px; font-family:Arial,sans-serif; fill:#333; }
 .scale-label { font-size:8px; font-family:Arial,sans-serif; fill:#111; }
 .source-warning { fill:#b0000a; font-size:7px; font-weight:800; }
@@ -134,6 +142,7 @@ footer { padding:1.2rem; color:#dbe5ed; background:#172633; text-align:center; }
 @page { size:A3 landscape; margin:0; }
 @media print {
   html,body { width:420mm; height:297mm; margin:0!important; padding:0!important; background:white!important; }
+  *,*::before,*::after { -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; }
   body>*:not(main), main.application>*:not(.preview-panel), .preview-panel>.panel-heading, .preview-panel>.toolbar, .preview-panel>#drawingStatus { display:none!important; }
   main.application,.preview-panel,.sheet-stage { display:block!important; width:420mm!important; height:297mm!important; max-width:none!important; margin:0!important; padding:0!important; border:0!important; box-shadow:none!important; background:white!important; overflow:hidden!important; }
   .drawing-sheet { width:420mm!important; height:297mm!important; margin:0!important; box-shadow:none!important; break-inside:avoid; page-break-inside:avoid; }

@@ -16,6 +16,7 @@ const acceptedRailway = await import('../../railway/assets/js/rail-knowledge.js'
 const { createOverlayStore, normaliseOverlay } = await import('../assets/js/overlay-store.js');
 const source = await import('../assets/js/source-adapter.js');
 const cartography = await import('../assets/js/cartography.js');
+const basemap = await import('../assets/js/basemap-compositor.js');
 const { renderDrawingSvg } = await import('../assets/js/svg-renderer.js');
 
 let passed = 0;
@@ -141,6 +142,24 @@ await test('current OSM cycle hierarchy is retained without requiring a route re
     assert.deepEqual([result.properties.network, result.properties.name, result.properties.operator, result.properties.cycleNetwork], [network, `${network.toUpperCase()} route`, 'Test operator', 'GB:test']);
   }
 });
+await test('official OSM provider is exact, attributed, bounded and replaceable', () => {
+  const provider = basemap.basemapProvider();
+  assert.equal(provider.urlTemplate, 'https://tile.openstreetmap.org/{z}/{x}/{y}.png');
+  assert.match(provider.attribution, /OpenStreetMap contributors/);
+  assert.equal(provider.maxTilesPerView, 80);
+  assert.equal(basemap.validateBasemapProvider({ ...provider, id: 'test', urlTemplate: 'https://tiles.test/{z}/{x}/{y}.png' }).id, 'test');
+});
+await test('projection-aware tile manifests cover the exact BNG frames without stretch', () => {
+  for (const [modeId, expectedZoom, expectedTiles, maximumError] of [['regional-plan', 13, 30, .03], ['local-context', 17, 25, .003]]) {
+    const regional = modeId.startsWith('regional-');
+    const drawingExtent = scale.extentForDrawing({ easting: 530000, northing: 180000 }, modeId);
+    const manifest = basemap.tileManifestForDrawing({ extent: drawingExtent, modeId, viewWidth: 1000, viewHeight: regional ? 1000 * 245 / 336 : 1000 * 285 / 318 });
+    assert.deepEqual([manifest.zoom, manifest.tileCount], [expectedZoom, expectedTiles]);
+    assert.ok(manifest.maximumAlignmentErrorPx < maximumError, `${modeId}: ${manifest.maximumAlignmentErrorPx}`);
+    assert.ok(manifest.tiles.every(tile => Number.isFinite(tile.matrix.a) && Number.isFinite(tile.matrix.b) && Number.isFinite(tile.matrix.c) && Number.isFinite(tile.matrix.d)));
+    assert.equal(new Set(manifest.tiles.map(tile => tile.url)).size, expectedTiles);
+  }
+});
 await test('proposed and construction cycle relations remain review-only', () => {
   const proposed = source.classifyOverpassElement({ type: 'relation', id: 4, tags: { route: 'bicycle', network: 'ncn', status: 'proposed' }, members: [{ geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] }] })[0];
   const construction = source.classifyOverpassElement({ type: 'relation', id: 5, tags: { route: 'bicycle', network: 'lcn', construction: 'cycleway' }, members: [{ geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] }] })[0];
@@ -155,9 +174,11 @@ await test('main-road labels preserve only an evidenced A-road reference and mot
   assert.deepEqual([nonA.properties.class, nonA.properties.officialARef, nonA.properties.label], ['main-road', '', 'B123 - Example Road']);
   assert.deepEqual([motorway.properties.class, motorway.properties.label], ['motorway', 'M25 - London Orbital Motorway']);
 });
-await test('structured source query includes required transport evidence', () => {
+await test('structured source query includes professional transport evidence but no pseudo-basemap harvest', () => {
   const query = source.buildOverpassQuery('local-context', extent);
-  for (const marker of ['highway', 'railway', 'waterway', 'route"="bicycle', 'route"="bus', 'amenity', 'landuse', 'natural', 'place']) assert.match(query, new RegExp(marker));
+  for (const marker of ['highway', 'railway', 'waterway', 'route"="bicycle', 'route"="bus', 'amenity']) assert.match(query, new RegExp(marker));
+  for (const excluded of ['landuse', 'natural']) assert.doesNotMatch(query, new RegExp(excluded));
+  assert.doesNotMatch(query, /\["place"/);
 });
 await test('context features classify as structured vector basemap evidence', () => {
   const road = source.classifyOverpassElement({ type: 'way', id: 9, tags: { highway: 'secondary', name: 'Context Road' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
@@ -201,7 +222,10 @@ for (const modeId of Object.keys(DRAWING_MODES)) await test(`${modeId} renders o
   assert.match(result.markup, /<svg[^>]+data-scale=/);
   assert.match(result.markup, /class="scale-bar" data-paper-mm="20"/);
   assert.match(result.markup, /north-arrow/);
-  assert.match(result.markup, /data-contextual-basemap="structured-osm-vector"/);
+  assert.match(result.markup, /data-contextual-basemap="rendered-osm-raster-tiles"/);
+  assert.match(result.markup, /data-basemap-provider="osm-standard"/);
+  assert.match(result.markup, /class="osm-rendered-tile"/);
+  assert.ok(result.basemap.tileCount > 0 && result.basemap.tileCount <= 80);
   assert.equal((result.markup.match(/<svg/g) || []).length, 1);
 });
 
@@ -229,6 +253,15 @@ await test('A3 sheet contains title block, map frame, current logo, legend, attr
   for (const marker of ['id="drawingSheet"', 'id="sheetMap"', 'id="sheetLegend"', 'assets/images/eas-primary.png', 'sheetAttribution', BUILD]) assert.match(html, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(css, /@page\s*\{\s*size:A3 landscape;\s*margin:0;/);
   assert.match(css, /width:420mm;\s*height:297mm/);
+});
+
+await test('dashboard registers exactly one WIP drawing card while preserving established cards', () => {
+  const dashboard = fs.readFileSync(new URL('../../../index.html', import.meta.url), 'utf8');
+  const modules = JSON.parse(fs.readFileSync(new URL('../../../config/modules.json', import.meta.url), 'utf8'));
+  assert.equal((dashboard.match(/data-module="drawing-generator"/g) || []).length, 1);
+  assert.match(dashboard, /data-module="drawing-generator"[\s\S]*WORK IN PROGRESS[\s\S]*Drawing Generator/);
+  for (const title of ['Combined Site Research', 'Accessibility Assessment', 'STATS19 Collision Record Cards', 'Railway Assessment', 'Bus Assessment', 'Library Explorer', 'Library Manager']) assert.match(dashboard, new RegExp(title));
+  assert.deepEqual(modules.modules.drawingGenerator, { version: '0.1.0', build: BUILD, status: 'work-in-progress-live-review', path: 'modules/drawing-generator/index.html' });
 });
 
 console.log(`\n${passed} Drawing Generator tests passed.`);

@@ -14,8 +14,10 @@ const badLocalResponses = [];
 const interceptedSourceRequests = [];
 const interceptedSourceBodies = [];
 const observedSourceRequests = [];
+const interceptedTileRequests = [];
+let expectedTileFailure = false;
 page.on('pageerror', error => errors.push(error.message));
-page.on('console', message => { if (message.type() === 'error' && !/tile|ERR_ABORTED/i.test(message.text())) errors.push(message.text()); });
+page.on('console', message => { if (message.type() === 'error' && !/tile|ERR_ABORTED/i.test(message.text()) && !(expectedTileFailure && /status of 503/i.test(message.text()))) errors.push(message.text()); });
 page.on('request', request => { if (/api\/interpreter/.test(request.url())) observedSourceRequests.push(request.url()); });
 page.on('response', response => {
   if (response.url().startsWith(root) && response.status() >= 400) badLocalResponses.push(`${response.status()} ${response.url()}`);
@@ -27,12 +29,19 @@ await page.route(/https:\/\/[^/]*overpass[^/]*\/api\/interpreter/, route => {
   interceptedSourceBodies.push(route.request().postData() || '');
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) });
 });
+const transparentPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+await page.route(/https:\/\/(?:tile\.openstreetmap\.org|tiles\.test)\/\d+\/\d+\/\d+\.png/, route => {
+  interceptedTileRequests.push(route.request().url());
+  return route.fulfill({ status: 200, contentType: 'image/png', body: transparentPng });
+});
+await page.route(/https:\/\/tiles-fail\.test\/\d+\/\d+\/\d+\.png/, route => route.fulfill({ status: 503, contentType: 'text/plain', body: 'mock tile failure' }));
 await page.addInitScript(() => localStorage.clear());
 
 try {
   await page.goto(new URL('modules/drawing-generator/', root).href, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => Boolean(window.__DG0_ACCEPTANCE__));
-  assert.match(await page.locator('.candidate-banner').innerText(), /LIVE REVIEW CANDIDATE - NOT ACCEPTED BASELINE/);
+  await page.evaluate(() => window.__DG0_ACCEPTANCE__.setBasemapProvider({ id: 'test-tiles', name: 'Mock OSM tiles', urlTemplate: 'https://tiles.test/{z}/{x}/{y}.png', attribution: 'Map data (c) OpenStreetMap contributors', tileSize: 256, minZoom: 0, maxZoom: 19, maxTilesPerView: 80 }));
+  assert.match(await page.locator('.candidate-banner').innerText(), /WORK IN PROGRESS \/ LIVE REVIEW - NOT ACCEPTED BASELINE/);
   assert.equal(await page.locator('#editingMap.leaflet-container').count(), 1);
   assert.equal(await page.locator('#advancedTools').evaluate(element => element.open), false);
   assert.deepEqual(await page.evaluate(() => { const snapshot = window.__DG0_ACCEPTANCE__.snapshot(); return [snapshot.drawingActive, snapshot.navigationEnabled, snapshot.advancedOpen]; }), [false, true, false]);
@@ -50,7 +59,8 @@ try {
   assert.equal(await page.locator('#printDrawing').isDisabled(), true);
   assert.match(await page.locator('#drawingStatus').innerText(), /Print blocked/);
   await page.locator('[data-meta="scale"]').fill('1:50,000');
-  assert.equal(await page.locator('#printDrawing').isEnabled(), true);
+  assert.equal(await page.locator('#printDrawing').isDisabled(), true);
+  assert.match(await page.locator('#drawingStatus').innerText(), /Generate the drawing/);
   await page.locator('.coordinate-entry > summary').click();
   await page.locator('#latitudeInput').fill('51.500000');
   await page.locator('#longitudeInput').fill('-0.100000');
@@ -79,12 +89,17 @@ try {
     }, null, 2));
     throw error;
   }
+  await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'success', null, { timeout: 45000 });
   assert.ok(interceptedSourceRequests.length >= 1, 'Expected the Overpass request to use the intercepted fixture');
-  assert.match(decodeURIComponent(interceptedSourceBodies[0]), /landuse/);
+  assert.doesNotMatch(decodeURIComponent(interceptedSourceBodies[0]), /landuse|natural|\["place"/);
+  assert.ok(interceptedTileRequests.some(url => url.startsWith('https://tiles.test/')), 'Expected composed drawing tiles to use the mock provider');
   assert.equal(await page.locator('#downloadSnapshot').isEnabled(), true);
   assert.ok((await page.locator('#sheetLegend .legend-row').count()) >= 7);
-  assert.equal(await page.locator('#drawingSvg').getAttribute('data-contextual-basemap'), 'structured-osm-vector');
-  assert.ok(Number(await page.locator('#drawingSvg').getAttribute('data-contextual-feature-count')) >= 3);
+  assert.equal(await page.locator('#drawingSvg').getAttribute('data-contextual-basemap'), 'rendered-osm-raster-tiles');
+  assert.equal(await page.locator('#drawingSvg').getAttribute('data-basemap-provider'), 'test-tiles');
+  assert.equal(await page.locator('#drawingSvg').getAttribute('data-basemap-status'), 'success');
+  assert.ok(Number(await page.locator('#drawingSvg').getAttribute('data-basemap-tile-count')) > 0);
+  assert.equal(await page.locator('#printDrawing').isEnabled(), true);
 
   await page.locator('#overlayFile').setInputFiles(fileURLToPath(new URL('./fixtures/synthetic-overlays.geojson', import.meta.url)));
   await page.waitForFunction(() => document.querySelectorAll('#overlayRows tr[data-overlay-id]').length === 2);
@@ -96,6 +111,7 @@ try {
   };
   for (const [mode, details] of Object.entries(expected)) {
     await page.locator('#modeSelect').selectOption(mode);
+    assert.equal(await page.locator('#routingTools').isVisible(), mode.endsWith('-routing'));
     const overlayClasses = await page.locator('#overlayClass option').evaluateAll(options => options.map(option => option.value));
     if (mode === 'regional-plan') assert.ok(!overlayClasses.includes('route-to-site') && !overlayClasses.includes('community'));
     if (mode === 'regional-routing') assert.ok(overlayClasses.includes('route-to-site') && !overlayClasses.includes('community'));
@@ -104,14 +120,17 @@ try {
     if (mode !== 'regional-plan') {
       await page.locator('#loadSources').click();
       await page.waitForFunction(() => /classified vector features loaded/i.test(document.querySelector('#sourceStatus')?.textContent || ''));
+      await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'success');
     }
     const svg = page.locator('#drawingSvg');
     assert.equal(await svg.getAttribute('data-mode'), mode);
     assert.equal(await svg.getAttribute('data-scale'), details.denominator);
     assert.equal(await svg.locator('.scale-bar').getAttribute('data-paper-mm'), '20');
     assert.equal(await svg.locator('.north-arrow').count(), 1);
-    assert.equal(await svg.getAttribute('data-contextual-basemap'), 'structured-osm-vector');
-    assert.ok(Number(await svg.getAttribute('data-contextual-feature-count')) >= (mode.startsWith('regional-') ? 3 : 4));
+    assert.equal(await svg.getAttribute('data-contextual-basemap'), 'rendered-osm-raster-tiles');
+    assert.equal(await svg.getAttribute('data-basemap-status'), 'success');
+    assert.equal(await svg.getAttribute('data-basemap-zoom'), mode.startsWith('regional-') ? '13' : '17');
+    assert.ok(Number(await svg.getAttribute('data-basemap-tile-count')) <= 80);
     assert.equal(await page.locator('#drawingSheet .title-block').count(), 1);
     assert.match(await page.locator('#sheetAttribution').innerText(), /OpenStreetMap/);
     assert.equal(await page.locator('[data-sheet-meta="drawingTitle"]').first().innerText(), details.title);
@@ -120,11 +139,30 @@ try {
     const currentDate = await page.locator('[data-meta="date"]').inputValue();
     assert.match(currentDate, /^\d{2}\/\d{2}\/\d{4}$/);
     assert.equal(await page.locator('[data-sheet-meta="date"]').first().innerText(), currentDate);
+    if (mode.endsWith('-routing')) {
+      await page.locator('#drawRouteTo').click();
+      assert.deepEqual(await page.evaluate(() => { const snapshot = window.__DG0_ACCEPTANCE__.snapshot(); return [snapshot.drawingActive, snapshot.navigationEnabled]; }), [true, false]);
+      assert.equal(await page.locator('#cancelRouteDrawing').isVisible(), true);
+      await page.locator('#cancelRouteDrawing').click();
+      assert.deepEqual(await page.evaluate(() => { const snapshot = window.__DG0_ACCEPTANCE__.snapshot(); return [snapshot.drawingActive, snapshot.navigationEnabled]; }), [false, true]);
+    }
   }
+  const overlayCountBeforeFailure = (await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot())).overlays.length;
+  expectedTileFailure = true;
+  await page.evaluate(() => {
+    const api = window.__DG0_ACCEPTANCE__;
+    api.setBasemapProvider({ id: 'failed-test-tiles', name: 'Failed test tiles', urlTemplate: 'https://tiles-fail.test/{z}/{x}/{y}.png', attribution: 'Map data (c) OpenStreetMap contributors', tileSize: 256, minZoom: 0, maxZoom: 19, maxTilesPerView: 80 });
+    api.requestBasemap();
+  });
+  await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'failed');
+  assert.match(await page.locator('#basemapFailureWarning').textContent(), /BASEMAP FAILED TO LOAD - REVIEW REQUIRED/);
+  assert.equal(await page.locator('#basemapFailureWarning').getAttribute('visibility'), 'visible');
+  assert.equal(await page.locator('#printDrawing').isDisabled(), true);
+  assert.equal((await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot())).overlays.length, overlayCountBeforeFailure);
   assert.equal(await page.getByRole('button', { name: 'Print / Save PDF' }).count(), 1);
   assert.deepEqual(badLocalResponses, []);
   assert.equal(errors.length, 0, errors.join('\n'));
-  console.log(JSON.stringify({ modes: Object.keys(expected), defaultNavigation: true, drawingCancellation: true, importRestoresNavigation: true, advancedDefaultCollapsed: true, siteImport: true, contextualBasemap: true, sourceSnapshot: true, overlayImport: 2, badLocalResponses, pageErrors: errors }, null, 2));
+  console.log(JSON.stringify({ modes: Object.keys(expected), defaultNavigation: true, drawingCancellation: true, routeCancellation: true, importRestoresNavigation: true, advancedDefaultCollapsed: true, siteImport: true, renderedBasemap: true, mockedTiles: interceptedTileRequests.length, basemapFailureSafe: true, sourceSnapshot: true, overlayImport: 2, badLocalResponses, pageErrors: errors }, null, 2));
 } finally {
   await browser.close();
 }

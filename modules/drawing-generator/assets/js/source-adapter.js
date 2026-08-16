@@ -20,13 +20,7 @@ function bboxWgs84(extent) {
 export function buildOverpassQuery(modeId, extent) {
   const bbox = bboxWgs84(extent);
   const bounds = `${bbox.south.toFixed(7)},${bbox.west.toFixed(7)},${bbox.north.toFixed(7)},${bbox.east.toFixed(7)}`;
-  const context = `
-    way["highway"~"^(secondary|secondary_link|tertiary|tertiary_link)$"](${bounds});
-    way["landuse"~"^(residential|commercial|retail|industrial|forest|grass|recreation_ground)$"](${bounds});
-    way["natural"~"^(water|wood)$"](${bounds});
-    nwr["place"~"^(city|town|village|suburb|neighbourhood)$"](${bounds});`;
   const local = modeId.startsWith('local-') ? `
-    way["highway"~"^(unclassified|residential|living_street)$"](${bounds});
     relation["route"="bus"](${bounds});
     nwr["amenity"~"^(school|college|university|hospital|clinic|library|community_centre|place_of_worship|police)$"](${bounds});
     nwr["shop"~"^(supermarket|convenience)$"](${bounds});` : '';
@@ -37,7 +31,7 @@ export function buildOverpassQuery(modeId, extent) {
     nwr["public_transport"="station"](${bounds});
     way["waterway"~"^(river|canal)$"](${bounds});
     way["highway"="cycleway"](${bounds});
-    relation["route"="bicycle"](${bounds});${context}${local}
+    relation["route"="bicycle"](${bounds});${local}
   );out tags center geom;`;
 }
 

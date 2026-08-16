@@ -12,7 +12,7 @@ Allowlist result before deployment: **PASS**. All candidate implementation chang
 | STATS19 | NO |
 | Library Manager | NO |
 | Site Research | NO |
-| Dashboard | NO |
+| Dashboard | C3 WIP registration only; no established card or behaviour altered |
 | Shared Knowledge Library data | NO |
 | Existing production version identities | NO |
 
@@ -103,3 +103,20 @@ C2 starts exactly at `f3ed7417dc1876ae5ac5b3bc7959b120081077c3`. The protected-s
 | `docs/adr/ADR-008-drawing-generator-spatial-rendering.md` | Records the structured-context and managed-label refinement without changing Proposed status. |
 | `docs/drawing-generator/{DG0-ARCHITECTURE,DATA-SOURCE-REGISTER,GOLDEN-DRAWING-COMPARISON,KNOWN-LIMITATIONS,MANUAL-ACCEPTANCE,TEST-EVIDENCE,DIFF-AUDIT}.md` | C2 architecture, evidence, precedent comparison, constraints, acceptance and audit. |
 | `docs/drawing-generator/TFL-CYCLE-EVIDENCE.md` | Official TfL evidence hierarchy, safe future-adapter rule and documented reason no fragile runtime dependency was added. |
+
+## DG-0C3 corrective delta
+
+C3 starts exactly at `090a2f1ecfb299ed7119a0199c50ae11e916ef29` and preserves the C2 branch/history. The only protected-surface exception is the explicitly authorised, additive static Dashboard registration: one WIP card in `index.html` and one module entry in `config/modules.json`. Existing cards, Ready labels, Dashboard JavaScript/CSS, production identities and all functional modules remain unchanged. Generated C3 PDFs/renders are untracked and excluded from commit.
+
+| File | C3 purpose |
+|---|---|
+| `index.html` | Adds one static Drawing Generator card labelled `WORK IN PROGRESS`; established cards are untouched. |
+| `config/modules.json` | Registers Drawing Generator `0.1.0` / C3 build / WIP path without changing toolkit identity. |
+| `modules/drawing-generator/assets/js/basemap-compositor.js` | New provider abstraction, fixed zooms, exact intersecting-tile manifest, per-tile BNG affine placement and 80-tile cap. |
+| `modules/drawing-generator/assets/js/{app,map-controller,source-adapter,svg-renderer,config}.js` | C3 workflow/status, exact official tile URL, basemap lifecycle/failure safety, professional-only Overpass query, hybrid composition and acceptance telemetry. |
+| `modules/drawing-generator/index.html`, `assets/css/drawing-generator.css` | C3 WIP identity, primary routing controls, rendered-basemap language, failure/print styling and exact print colours. |
+| `modules/drawing-generator/tests/{drawing-generator.test.mjs,browser-smoke.mjs,pdf-qa.mjs,live-smoke.mjs}` | Projection/source/dashboard unit gates; completely intercepted automated tile acceptance/PDFs; protected local smoke. |
+| `modules/drawing-generator/tests/real-world-regional-pdf-qa.mjs` | Explicitly guarded one-viewport live Milton Keynes proof driver; non-issued editing zooms are mocked. |
+| `modules/drawing-generator/README.md` | C3 operation, tile boundary and guarded live-QA instructions. |
+| `docs/adr/ADR-008-drawing-generator-spatial-rendering.md` | Records the hybrid rendered-OSM/controlled-vector decision while retaining Proposed status. |
+| `docs/drawing-generator/{DG0-ARCHITECTURE,DATA-SOURCE-REGISTER,KNOWN-LIMITATIONS,MANUAL-ACCEPTANCE,TEST-EVIDENCE,DIFF-AUDIT}.md` | C3 architecture, policy/source separation, limitations, acceptance and evidence. |

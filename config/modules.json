@@ -48,6 +48,12 @@
       "build": "SITE-RESEARCH-1.0.1-20260723",
       "status": "production",
       "path": "modules/site-research/index.html"
+    },
+    "drawingGenerator": {
+      "version": "0.1.0",
+      "build": "DRAW-0.1.0-DG0C3-20260816",
+      "status": "work-in-progress-live-review",
+      "path": "modules/drawing-generator/index.html"
     }
   },
   "sharedLibrary": {

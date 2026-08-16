@@ -1,12 +1,11 @@
 # DG-0 data-source register
 
-All automatic drawing content is structured vector evidence. The Leaflet editing basemap is excluded from print; issued context is a restrained subset of the checksummed OSM vector snapshot projected into the exact drawing extent.
+The issued sheet combines rendered OSM Standard cartography with separately controlled vector evidence. Raster context is visual orientation only; professional claims remain traceable vectors or reviewed user overlays.
 
 | Layer | Provider/retrieval | Classification | Attribution | Failure/manual fallback |
 |---|---|---|---|---|
 | Address centre | OpenStreetMap Nominatim JSON search, deliberate user action | Selected result supplies WGS84 centre only | OpenStreetMap contributors | Enter coordinates manually. Never creates a boundary. |
-| Issued contextual areas/places | OSM through Overpass; selected `landuse`, `natural` and `place` tags | Pale `context-area` polygons and collision-managed `context-place` labels beneath controlled overlays; excluded from legend | OpenStreetMap contributors, ODbL 1.0 | The sheet remains usable with reviewed overlays and a visible source warning; no raster screenshot fallback. |
-| Issued contextual roads | OSM through Overpass; secondary/tertiary ways for all modes, plus residential/unclassified/living-street ways for local modes | `context-road-major` / `context-road-minor`; pale, unlabelled and excluded from legend | Same | Same; local street density is deliberately not requested for regional output. |
+| Issued rendered basemap | OSM Standard XYZ, exact `https://tile.openstreetmap.org/{z}/{x}/{y}.png`; fixed z13 regional / z17 local; only intersecting tiles | Projection-aware per-tile affine placement beneath vectors; visual context only | OpenStreetMap contributors, ODbL 1.0 | All controlled vectors remain intact. Print is blocked and exact visible warning says `BASEMAP FAILED TO LOAD - REVIEW REQUIRED`. Provider is replaceable. |
 | Main/A roads | OSM through Overpass POST; `highway=trunk/primary` and links | `main-road` | OpenStreetMap contributors, ODbL 1.0 | Provider state shown; reviewed LineString/MultiLineString overlay. |
 | Motorways | OSM through Overpass; `highway=motorway` and links | `motorway` | Same | Reviewed line overlay. |
 | Railway | OSM through Overpass; `railway=rail/subway/light_rail/tram` | `railway`, preserving rail type | Same | Reviewed line overlay. |
@@ -20,7 +19,7 @@ All automatic drawing content is structured vector evidence. The Leaflet editing
 
 ## Query and snapshot
 
-The generated Overpass query and exact BNG-derived WGS84 bounding box are recorded with provider endpoint, UTC retrieval time, drawing build/type, source identifiers, raw/normalised counts, classification counts, warnings, attribution, prior provider failures and SHA-256 checksum. The downloadable JSON snapshot includes the classified feature geometries so a review state can be preserved locally. Live project snapshots must not be committed.
+The generated Overpass query requests professional transport/candidate evidence only; landuse, natural, place and minor/residential pseudo-basemap harvesting is excluded. The exact BNG-derived WGS84 bounding box is recorded with provider endpoint, UTC retrieval time, drawing build/type, source identifiers, raw/normalised counts, classification counts, warnings, attribution, prior provider failures and SHA-256 checksum. The downloadable JSON snapshot includes classified feature geometries so a review state can be preserved locally. Live project snapshots must not be committed.
 
 Presentation grouping does not alter the source snapshot. The renderer records all contributing source identifiers on each generalised presentation feature and groups only connected features with the same class and returned identity. Disconnected same-name ways remain separate.
 
@@ -28,4 +27,4 @@ Provider order is `overpass-api.de`, `overpass.kumi.systems`, then `overpass.pri
 
 ## Licensing
 
-OSM-derived data must retain `Map data (c) OpenStreetMap contributors, ODbL 1.0` on the drawing. Nominatim and public Overpass services are used without an availability SLA; production-scale/bulk use would require an approved hosted provider or self-hosted service and an explicit usage-policy review.
+OSM-derived data must retain `Map data (c) OpenStreetMap contributors, ODbL 1.0` on the drawing. OSMF tile-policy controls applied in C3 are: exact official URL, visible attribution, native browser referer/user agent and caching, no prefetch/offline archive/bulk scan, a replaceable provider, fixed zooms and an 80-tile viewport cap. Automated tests intercept every tile. Nominatim, public Overpass and public OSM tiles have no availability SLA; production-scale use requires an approved provider or self-hosted service.

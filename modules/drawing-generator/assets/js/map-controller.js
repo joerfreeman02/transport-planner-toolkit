@@ -1,4 +1,5 @@
 import { generalisePresentationFeatures } from './cartography.js';
+import { basemapProvider } from './basemap-compositor.js';
 
 const SOURCE_STYLES = Object.freeze({
   'context-area': { color: '#b6b6a9', weight: .7, opacity: .55, fillColor: '#e8e8df', fillOpacity: .32 },
@@ -27,7 +28,8 @@ function pointIcon(className = 'source') {
 
 export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCreated, onOverlayChanged, onOverlayDeleted, onDrawingStateChanged = () => {} }) {
   const map = L.map('editingMap', { zoomControl: true }).setView([52.2, -1.4], 6);
-  const base = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true, opacity: 1, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+  const provider = basemapProvider();
+  const base = L.tileLayer(provider.urlTemplate, { minZoom: provider.minZoom, maxZoom: provider.maxZoom, crossOrigin: true, opacity: 1, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
   const editable = L.featureGroup().addTo(map);
   const source = L.geoJSON(null, {
     style: feature => SOURCE_STYLES[feature.properties?.class] || { color: '#777', weight: 1.5 },
@@ -42,18 +44,21 @@ export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCre
   let activeHandler = null;
 
   function finishDrawingState() {
+    const completed = pending;
     pending = null;
     activeHandler = null;
     if (map.dragging) map.dragging.enable();
-    onDrawingStateChanged(false);
+    onDrawingStateChanged(false, completed);
   }
 
   function cancelDrawing() {
     const handler = activeHandler;
+    const cancelled = pending;
     activeHandler = null;
     pending = null;
     if (handler?.enabled()) handler.disable();
-    finishDrawingState();
+    if (map.dragging) map.dragging.enable();
+    onDrawingStateChanged(false, cancelled);
   }
 
   function startDrawing(handler, nextPending) {
@@ -62,7 +67,7 @@ export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCre
     activeHandler = handler;
     if (map.dragging) map.dragging.disable();
     handler.enable();
-    onDrawingStateChanged(true);
+    onDrawingStateChanged(true, pending);
   }
 
   map.on(L.Draw.Event.CREATED, event => {

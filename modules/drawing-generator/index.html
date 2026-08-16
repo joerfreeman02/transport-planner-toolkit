@@ -13,9 +13,9 @@
   <header class="app-header">
     <img src="assets/images/eas-primary.png" alt="EAS Consulting Engineers">
     <div><a href="../../">Transport Planner Toolkit</a><h1>Drawing Generator</h1><p>Planner-first professional drawing workflow</p></div>
-    <div class="build"><strong>DRAW-0.1.0</strong><span>DRAW-0.1.0-DG0C2-20260814</span></div>
+    <div class="build"><strong>DRAW-0.1.0</strong><span>DRAW-0.1.0-DG0C3-20260816</span></div>
   </header>
-  <div class="candidate-banner" role="status">LIVE REVIEW CANDIDATE - NOT ACCEPTED BASELINE</div>
+  <div class="candidate-banner" role="status">WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE</div>
 
   <main class="application">
     <section class="panel planner-primary" aria-labelledby="project-heading">
@@ -46,6 +46,17 @@
       </div>
       <div id="editingMap" class="editing-map" aria-label="Interactive Drawing Generator editing map"></div>
       <p class="hint">The map normally pans and zooms. Drawing starts only after you choose Draw site boundary; use Cancel drawing at any time.</p>
+      <section id="routingTools" class="routing-tools" aria-labelledby="routing-heading" hidden>
+        <h3 id="routing-heading">Planner-approved routing</h3>
+        <p>Routing lines are controlled professional overlays. Review direction and geometry before issue.</p>
+        <div class="toolbar">
+          <button id="drawRouteTo" class="primary route-to">Draw Route To Site</button>
+          <button id="drawRouteFrom" class="primary route-from">Draw Route From Site</button>
+          <button id="cancelRouteDrawing" class="secondary" hidden>Cancel Route Drawing</button>
+          <button id="deleteRoutes" class="secondary">Delete/Redraw Route</button>
+        </div>
+        <p id="routeStatus" class="status-message warning">No planner-approved routing lines added.</p>
+      </section>
       <div class="generation-actions"><button id="generateDrawing" class="primary action-large">Generate / refresh drawing</button><p id="workflowStatus">The generated sheet appears below for professional review.</p></div>
     </section>
 
@@ -70,7 +81,7 @@
         </section>
 
         <section class="panel embedded-panel" aria-labelledby="source-heading">
-          <div class="panel-heading"><span>A2</span><div><h2 id="source-heading">Source diagnostics</h2><p>Structured OpenStreetMap context and transport evidence for the exact drawing extent.</p></div></div>
+          <div class="panel-heading"><span>A2</span><div><h2 id="source-heading">Source diagnostics</h2><p>Structured professional transport evidence for the exact drawing extent, separate from the rendered basemap.</p></div></div>
           <div class="toolbar"><button id="loadSources">Refresh vector source</button><button id="downloadSnapshot" disabled>Download source snapshot</button></div>
           <p id="sourceStatus" class="status-message warning">No vector snapshot loaded. Required layers may be added through reviewed overlays.</p>
           <details><summary>Source record</summary><pre id="sourceDiagnostics">Not loaded.</pre></details>
@@ -99,15 +110,15 @@
     </details>
 
     <section class="panel preview-panel" aria-labelledby="preview-heading">
-      <div class="panel-heading"><span>02</span><div><h2 id="preview-heading">Review and issue</h2><p>Check the contextual map, transport hierarchy, labels and title block before printing.</p></div></div>
+      <div class="panel-heading"><span>02</span><div><h2 id="preview-heading">Review and issue</h2><p>Check the rendered OpenStreetMap basemap, controlled transport hierarchy, labels and title block before printing.</p></div></div>
       <div class="toolbar"><button id="refreshPreview">Refresh sheet only</button><button id="printDrawing" class="primary">Print / Save PDF</button></div>
       <p id="drawingStatus" class="status-message warning">A confirmed site boundary is required before professional issue.</p>
       <div class="sheet-stage">
         <article id="drawingSheet" class="drawing-sheet layout-regional" aria-label="A3 landscape EAS drawing sheet">
           <div class="sheet-grid">
-            <section id="sheetMap" class="sheet-map" aria-label="Scale-driven contextual vector map frame"></section>
+            <section id="sheetMap" class="sheet-map" aria-label="Scale-driven rendered OpenStreetMap and controlled vector map frame"></section>
             <aside class="sheet-sidebar">
-              <div class="candidate-stamp">LIVE REVIEW CANDIDATE<br>NOT ACCEPTED BASELINE</div>
+              <div class="candidate-stamp">WORK IN PROGRESS<br>LIVE REVIEW<br>NOT ACCEPTED BASELINE</div>
               <h2>KEY</h2>
               <div id="sheetLegend" class="sheet-legend"></div>
               <div class="company-block">
@@ -122,7 +133,7 @@
               <div class="title-cell project"><small>PROJECT</small><strong data-sheet-meta="project">-</strong><small>PROJECT No.</small><span data-sheet-meta="projectNumber">-</span></div>
               <div class="title-cell drawing"><small>TITLE</small><strong data-sheet-meta="drawingTitle">REGIONAL PLAN</strong><small>DRAWING No.</small><span data-sheet-meta="drawingNumber">EAS-SK-H-101</span></div>
               <div class="title-cell issue"><small>DRAWING STATUS</small><strong data-sheet-meta="drawingStatus">LIVE REVIEW</strong><div class="mini-grid"><span><small>SCALE @ A3</small><b data-sheet-meta="scale">1:50,000</b></span><span><small>DESIGNED</small><b data-sheet-meta="designedBy">-</b></span><span><small>DRAWN</small><b data-sheet-meta="drawnBy">-</b></span><span><small>DATE</small><b data-sheet-meta="date">-</b></span></div></div>
-              <div class="title-cell revision"><div class="revision-head"><small>REV</small><small>DATE</small><small>BY</small><small>DESCRIPTION</small></div><div class="revision-row"><b data-sheet-meta="revision">P01</b><span data-sheet-meta="date">-</span><span data-sheet-meta="drawnBy">-</span><span data-sheet-meta="revisionDescription">Live review candidate</span></div><small class="build-id">DRAW-0.1.0-DG0C2-20260814</small></div>
+              <div class="title-cell revision"><div class="revision-head"><small>REV</small><small>DATE</small><small>BY</small><small>DESCRIPTION</small></div><div class="revision-row"><b data-sheet-meta="revision">P01</b><span data-sheet-meta="date">-</span><span data-sheet-meta="drawnBy">-</span><span data-sheet-meta="revisionDescription">Live review candidate</span></div><small class="build-id">DRAW-0.1.0-DG0C3-20260816</small></div>
             </section>
           </div>
           <div class="sheet-attribution"><span id="sheetAttribution">No external source loaded.</span><span id="sheetExtent">Scale-driven projected extent.</span></div>
@@ -130,7 +141,7 @@
       </div>
     </section>
   </main>
-  <footer>Transport Planner Toolkit - Drawing Generator DG-0C2 - professional review required</footer>
+  <footer>Transport Planner Toolkit - Drawing Generator DG-0C3 - work in progress / professional review required</footer>
   <script src="assets/vendor/proj4.js"></script>
   <script src="../../assets/vendor/leaflet/leaflet.js"></script>
   <script src="assets/vendor/leaflet.draw.js"></script>

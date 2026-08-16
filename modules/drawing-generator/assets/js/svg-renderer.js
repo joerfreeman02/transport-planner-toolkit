@@ -2,6 +2,7 @@ import { wgs84ToBng } from './crs.js';
 import { extentForDrawing, scaleBarForMode } from './scale-engine.js';
 import { modeConfig } from './drawing-modes.js';
 import { createLabelPlacements, generalisePresentationFeatures } from './cartography.js';
+import { basemapProvider as defaultBasemapProvider, basemapTileMarkup, tileManifestForDrawing } from './basemap-compositor.js';
 
 const STYLE = Object.freeze({
   'context-area': { stroke: '#d7d9d5', fill: '#eceee9', width: .35, label: '' },
@@ -132,37 +133,37 @@ export function legendItemsForDrawing(modeId, sourceFeatures = [], overlays = []
   return priority.filter(className => present.has(className) && STYLE[className]).map(className => ({ className, ...STYLE[className] }));
 }
 
-export function renderDrawingSvg({ modeId, centerBng, site = null, sourceFeatures = [], overlays = [], sourceStatus = 'not-loaded' }) {
+export function renderDrawingSvg({ modeId, centerBng, site = null, sourceFeatures = [], overlays = [], sourceStatus = 'not-loaded', includeBasemap = true, basemapProvider = defaultBasemapProvider(), basemapStatus = includeBasemap ? 'loading' : 'not-requested' }) {
   const mode = modeConfig(modeId);
   const extent = extentForDrawing(centerBng, modeId);
   const viewWidth = 1000;
   const viewHeight = viewWidth * mode.mapFrameMm.height / mode.mapFrameMm.width;
   const project = projector(extent, viewWidth, viewHeight);
-  const visibleSource = sourceFeatures.filter(item => sourceVisible(modeId, item.properties?.class));
+  const visibleSource = sourceFeatures.filter(item => sourceVisible(modeId, item.properties?.class) && !item.properties?.class?.startsWith('context-'));
   const visibleOverlays = overlays.filter(item => item.properties?.visible !== false && sourceVisible(modeId, item.properties?.class));
   const features = generalisePresentationFeatures([...visibleSource, ...visibleOverlays, siteFeature(site)].filter(Boolean));
-  const contextFeatures = features.filter(item => item.properties?.class?.startsWith('context-'));
-  const controlledFeatures = features.filter(item => !item.properties?.class?.startsWith('context-'));
-  const contextCount = contextFeatures.length;
+  const controlledFeatures = features;
+  const basemap = includeBasemap ? tileManifestForDrawing({ extent, modeId, viewWidth, viewHeight, provider: basemapProvider }) : null;
   const labels = createLabelPlacements(features, project, modeId, viewWidth, viewHeight);
   const scaleBar = scaleBarForMode(modeId);
   const barWidth = scaleBar.paperMm / mode.mapFrameMm.width * viewWidth;
   const barX = 18, barY = viewHeight - 24;
   const warning = sourceStatus === 'success' || sourceStatus === 'zero' ? '' : 'VECTOR SOURCE NOT LOADED - REVIEW REQUIRED';
-  const markup = `<svg xmlns="http://www.w3.org/2000/svg" id="drawingSvg" role="img" aria-label="${escapeXml(mode.title)} scale drawing" viewBox="0 0 ${viewWidth} ${viewHeight.toFixed(3)}" preserveAspectRatio="none" data-mode="${modeId}" data-scale="${mode.scale}" data-paper-width-mm="${mode.mapFrameMm.width}" data-paper-height-mm="${mode.mapFrameMm.height}" data-ground-width-m="${extent.groundWidth}" data-ground-height-m="${extent.groundHeight}" data-contextual-basemap="structured-osm-vector" data-contextual-feature-count="${contextCount}">
+  const markup = `<svg xmlns="http://www.w3.org/2000/svg" id="drawingSvg" role="img" aria-label="${escapeXml(mode.title)} scale drawing" viewBox="0 0 ${viewWidth} ${viewHeight.toFixed(3)}" preserveAspectRatio="none" data-mode="${modeId}" data-scale="${mode.scale}" data-paper-width-mm="${mode.mapFrameMm.width}" data-paper-height-mm="${mode.mapFrameMm.height}" data-ground-width-m="${extent.groundWidth}" data-ground-height-m="${extent.groundHeight}" data-contextual-basemap="rendered-osm-raster-tiles" data-basemap-provider="${escapeXml(basemapProvider.id)}" data-basemap-status="${escapeXml(basemapStatus)}" data-basemap-zoom="${basemap?.zoom || ''}" data-basemap-tile-count="${basemap?.tileCount || 0}" data-basemap-alignment-error-px="${(basemap?.maximumAlignmentErrorPx || 0).toFixed(6)}">
     <defs>
       <clipPath id="map-clip"><rect x="0" y="0" width="${viewWidth}" height="${viewHeight.toFixed(3)}"/></clipPath>
       <marker id="arrow-to" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,4 L0,8" fill="none" stroke="#ed1c24" stroke-width="1.3"/></marker>
       <marker id="arrow-from" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,4 L0,8" fill="none" stroke="#0057e7" stroke-width="1.3"/></marker>
     </defs>
     <rect width="${viewWidth}" height="${viewHeight.toFixed(3)}" fill="#f7f7f3"/>
-    <g clip-path="url(#map-clip)" aria-label="Structured OpenStreetMap contextual basemap and controlled EAS overlays"><g class="contextual-osm-basemap">${contextFeatures.map((item, index) => featureMarkup(item, project, index)).join('')}</g>${gridMarkup(extent, viewWidth, viewHeight, mode)}<g class="controlled-eas-overlays">${controlledFeatures.map((item, index) => featureMarkup(item, project, index)).join('')}</g><g class="controlled-labels">${labelMarkup(labels)}</g></g>
+    <g clip-path="url(#map-clip)" aria-label="Rendered OpenStreetMap basemap and controlled EAS overlays"><g class="rendered-osm-basemap" aria-label="OpenStreetMap Standard rendered tile context">${basemap ? basemapTileMarkup(basemap) : ''}</g>${gridMarkup(extent, viewWidth, viewHeight, mode)}<g class="controlled-eas-overlays">${controlledFeatures.map((item, index) => featureMarkup(item, project, index)).join('')}</g><g class="controlled-labels">${labelMarkup(labels)}</g></g>
     <g class="north-arrow" aria-label="North arrow" transform="translate(38 34)"><path d="M0,-23 L-13,7 L0,1 L13,7 Z" fill="#8d8d8d" stroke="#333" stroke-width="1"/><text x="0" y="31" text-anchor="middle">N</text></g>
     <g class="scale-bar" data-paper-mm="${scaleBar.paperMm}" data-ground-metres="${scaleBar.groundMetres}"><line x1="${barX}" y1="${barY}" x2="${(barX + barWidth).toFixed(3)}" y2="${barY}" stroke="#111" stroke-width="2" vector-effect="non-scaling-stroke"/><line x1="${barX}" y1="${barY - 5}" x2="${barX}" y2="${barY + 5}" stroke="#111" stroke-width="1"/><line x1="${(barX + barWidth).toFixed(3)}" y1="${barY - 5}" x2="${(barX + barWidth).toFixed(3)}" y2="${barY + 5}" stroke="#111" stroke-width="1"/><text x="${barX}" y="${barY - 9}" class="scale-label">${scaleBar.label}</text></g>
     ${warning ? `<text x="${viewWidth - 15}" y="20" text-anchor="end" class="source-warning">${warning}</text>` : ''}
+    <g id="basemapFailureWarning" class="basemap-failure-warning" visibility="${basemapStatus === 'failed' ? 'visible' : 'hidden'}"><rect x="180" y="${(viewHeight / 2 - 24).toFixed(2)}" width="640" height="48" rx="4"/><text x="500" y="${(viewHeight / 2 + 4).toFixed(2)}" text-anchor="middle">BASEMAP FAILED TO LOAD - REVIEW REQUIRED</text></g>
     <rect x=".5" y=".5" width="${viewWidth - 1}" height="${(viewHeight - 1).toFixed(3)}" fill="none" stroke="#222" stroke-width="1" vector-effect="non-scaling-stroke"/>
   </svg>`;
-  return { markup, extent, legend: legendItemsForDrawing(modeId, sourceFeatures, overlays, Boolean(site)), scaleBar, presentationFeatures: features, labels };
+  return { markup, extent, legend: legendItemsForDrawing(modeId, sourceFeatures, overlays, Boolean(site)), scaleBar, presentationFeatures: features, labels, basemap };
 }
 
 // Bind separately so the map callback receives the current projector and index.

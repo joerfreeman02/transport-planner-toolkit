@@ -65,3 +65,21 @@ Corrective starting commit: `f3ed7417dc1876ae5ac5b3bc7959b120081077c3` (`origin/
 | Regional `pdf-qa.mjs` + Poppler/pypdf/rendered visual inspection | One sanitized C2 Regional Plan PDF. One page, A3 landscape, 1191.12 x 841.92 pt; required build/status/scale/OSM/cycle text present; full-extent contextual hierarchy, legend, border and title strip visually inspected with no clipping. SHA-256 `8C98605B9075BC194BB1920BCDA3BF18324BAC59D0F62BD2EE6C9E87D0714928`. |
 
 The C2 branch changes only the Drawing Generator implementation/tests and its documentation/ADR. No protected functional module, Dashboard code, Shared Knowledge Library data, production identity, dependency workflow or security workflow is changed. Deployed live smoke remains a post-merge gate; local smoke is not represented as deployment evidence.
+
+## DG-0C3 real OSM basemap and four-drawing recovery
+
+C3 started exactly at `090a2f1ecfb299ed7119a0199c50ae11e916ef29` on `corrective/dg0c2-professional-cartography-ux`; `origin/main` was `f3ed7417dc1876ae5ac5b3bc7959b120081077c3`. Build: `DRAW-0.1.0-DG0C3-20260816`. Status: **WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE**.
+
+| Gate/command | Result |
+|---|---|
+| `node modules/drawing-generator/tests/drawing-generator.test.mjs` | **44/44 passed**. Adds exact official provider URL/attribution/cap, replaceable-provider validation, projection-aware tile manifests, fixed z13/z17, 30/25-tile reference manifests, below-0.03 px affine-centre error, exclusion of Overpass pseudo-basemap tags, four rendered-tile SVGs and isolated Dashboard WIP registration. |
+| Local `browser-smoke.mjs` with all tiles intercepted | Pass across all four modes. Proves mocked tile success, exact SVG provider/zoom/count/status telemetry, print block until complete, primary route controls/cancellation, default navigation, source/overlay preservation and exact failed-basemap warning with print disabled. No local HTTP/page errors. |
+| Four-mode `pdf-qa.mjs` with intercepted mocked tiles | Four one-page A3 landscape PDFs created. Each identifies the tile fixture as mocked/no-public-retrieval and retains C3 build/status, scale, attribution, title block and controlled overlays. |
+| Guarded `real-world-regional-pdf-qa.mjs` | One authorised public-tile viewport for Milton Keynes. **35 unique z13 OSM tiles**, 35 composed tiles and **4,086 live classified Overpass features**. Editing-map zooms were intercepted, so only the issued Regional viewport used the public tile service. |
+| Poppler `pdfinfo` and 120 dpi page renders | All five PDFs: exactly one page, A3 landscape, `1191.12 x 841.92 pt`; rendered visual inspection confirmed visible cartography, unclipped border/title/legend, current logo, scale bar and WIP stamp. |
+| pypdf text/hash inspection | All five contain C3 build, WIP status and tile attribution/fixture disclosure. Principal real-world PDF SHA-256: `77973816479BD3615A76BD6450661021084EF01CB37D2A9765D2BF9C118E4A16`. |
+| Same 16 deterministic baseline scripts | **11 passed / 5 failed**, exactly matching C2. Known failures: `emergency-sprint1a`, `library-manager`, `research-quality`, `research-workflow-completion`, `sprint1c`. |
+| Same six browser baseline scripts | **4 passed / 2 failed**, exactly matching C2. Known failures: `core-polish-browser` and `shared-library-browser`. |
+| Local `live-smoke.mjs` with map tiles intercepted | Pass: Drawing Generator/four modes, Dashboard, Accessibility, Railway, Bus, STATS19, Library Manager and Site Research; no page errors. |
+
+Automated C3 tests never harvest public tiles. The one live artifact is real-world evidence, not a synthetic fixture. Generated PDFs/renders remain untracked and are not part of the commit. Remote PR CI and deployment smoke remain separate gates; no merge is authorised by this evidence.

@@ -10,6 +10,13 @@ const modes = (process.env.DG0_PDF_MODES || 'regional-plan,regional-routing,loca
 fs.mkdirSync(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, ...(process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
 
+function mockedOsmTile(url) {
+  const match = url.match(/\/(\d+)\/(\d+)\/(\d+)\.png/);
+  const [, z = '0', x = '0', y = '0'] = match || [];
+  const offset = (Number(x) * 17 + Number(y) * 31) % 100;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><rect width="256" height="256" fill="#eef0e8"/><path d="M0 ${40 + offset} C80 ${10 + offset / 2} 160 ${160 - offset / 2} 256 ${110 + offset / 3}" fill="none" stroke="#fff" stroke-width="13"/><path d="M0 ${40 + offset} C80 ${10 + offset / 2} 160 ${160 - offset / 2} 256 ${110 + offset / 3}" fill="none" stroke="#e6b8a7" stroke-width="7"/><path d="M${20 + offset} 0 C${80 + offset / 2} 90 ${30 + offset / 3} 170 ${170 + offset / 2} 256" fill="none" stroke="#fff" stroke-width="8"/><path d="M${20 + offset} 0 C${80 + offset / 2} 90 ${30 + offset / 3} 170 ${170 + offset / 2} 256" fill="none" stroke="#d1d1cb" stroke-width="3"/><path d="M0 ${210 - offset / 2} Q110 ${120 + offset / 3} 256 ${180 - offset / 4}" fill="none" stroke="#b7d6ea" stroke-width="7"/><rect x="24" y="26" width="62" height="40" fill="#d9e8cf" stroke="#c5d7b8"/><text x="128" y="142" text-anchor="middle" font-family="Arial" font-size="11" fill="#59605b">QA MAP ${z}/${x}/${y}</text></svg>`;
+}
+
 const site = { type: 'Polygon', coordinates: [[[-.1011, 51.4997], [-.09985, 51.4997], [-.09985, 51.50045], [-.1011, 51.50045], [-.1011, 51.4997]]] };
 const lines = {
   road: { type: 'LineString', coordinates: [[-.215, 51.459], [-.155, 51.477], [-.1, 51.5], [-.045, 51.523], [.015, 51.541]] },
@@ -52,21 +59,25 @@ try {
   for (const mode of modes) {
     const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
     await page.addInitScript(() => localStorage.clear());
+    await page.route(/https:\/\/(?:tile\.openstreetmap\.org|tiles\.test)\/\d+\/\d+\/\d+\.png/, route => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: mockedOsmTile(route.request().url()) }));
     await page.goto(new URL('modules/drawing-generator/', root).href, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => Boolean(window.__DG0_ACCEPTANCE__));
     await page.locator('#advancedTools > summary').click();
     await page.evaluate(({ mode, site, sourceFeatures, overlays }) => {
       const api = window.__DG0_ACCEPTANCE__;
-      api.setMode(mode); api.setLocation(51.5, -.1); api.setSite(site); api.setSource(sourceFeatures, { retrievedAt: '2026-08-14T12:00:00Z' });
-      overlays.forEach(([feature, metadata]) => api.addOverlay(feature, metadata)); api.render();
+      api.setBasemapProvider({ id: 'qa-mocked-osm', name: 'Mocked OSM tile fixture', urlTemplate: 'https://tiles.test/{z}/{x}/{y}.png', attribution: 'Automated QA tile fixture - no public tile retrieval', tileSize: 256, minZoom: 0, maxZoom: 19, maxTilesPerView: 80 });
+      api.setMode(mode); api.setLocation(51.5, -.1); api.setSite(site); api.setSource(sourceFeatures, { retrievedAt: '2026-08-16T12:00:00Z' });
+      overlays.forEach(([feature, metadata]) => api.addOverlay(feature, metadata));
     }, { mode, site, sourceFeatures, overlays });
     await page.locator('[data-meta="client"]').fill('Synthetic QA Client');
     await page.locator('[data-meta="project"]').fill('Drawing Generator QA Site');
     await page.locator('[data-meta="projectNumber"]').fill('DG0-QA');
     await page.locator('[data-meta="designedBy"]').fill('QA');
     await page.locator('[data-meta="drawnBy"]').fill('QA');
+    await page.evaluate(() => window.__DG0_ACCEPTANCE__.requestBasemap());
+    await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'success');
     await page.emulateMedia({ media: 'print' });
-    await page.pdf({ path: path.join(output, `drawing-generator-${mode}-live-review.pdf`), format: 'A3', landscape: true, printBackground: true, preferCSSPageSize: true, margin: { top: '0', right: '0', bottom: '0', left: '0' } });
+    await page.pdf({ path: path.join(output, `drawing-generator-${mode}-DG0C3-live-review.pdf`), format: 'A3', landscape: true, printBackground: true, preferCSSPageSize: true, margin: { top: '0', right: '0', bottom: '0', left: '0' } });
     await page.close();
   }
   console.log(`Created ${modes.length} A3 live-review QA PDF${modes.length === 1 ? '' : 's'} in ${output}`);

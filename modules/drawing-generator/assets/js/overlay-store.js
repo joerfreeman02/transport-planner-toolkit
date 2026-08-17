@@ -18,7 +18,7 @@ export const OVERLAY_CLASSES = Object.freeze({
   'route-from-site': { label: 'Route from site', geometry: ['LineString', 'MultiLineString'], colour: '#0057e7' },
   'bus-route': { label: 'Bus route', geometry: ['LineString', 'MultiLineString'], colour: '#7f2a90' },
   'cycle-route': { label: 'Cycle route', geometry: ['LineString', 'MultiLineString'], colour: '#f58220' },
-  community: { label: 'Community consideration', geometry: ['Point', 'Polygon', 'MultiPolygon'], colour: '#666666' },
+  community: { label: 'Community consideration area', geometry: ['Polygon', 'MultiPolygon'], colour: '#666666' },
   'custom-line': { label: 'Reviewed line', geometry: ['LineString', 'MultiLineString'], colour: '#111111' },
   'custom-point': { label: 'Reviewed point', geometry: ['Point'], colour: '#666666' },
   'custom-area': { label: 'Reviewed area', geometry: ['Polygon', 'MultiPolygon'], colour: '#00a651' }
@@ -44,7 +44,8 @@ export function normaliseOverlay(feature, metadata = {}) {
       layerName: String(metadata.layerName ?? feature?.properties?.layerName ?? definition.label).trim() || definition.label,
       colour, visible: metadata.visible ?? feature?.properties?.visible ?? true,
       source: metadata.source || feature?.properties?.source || 'manual/reviewed user input',
-      route: structuredClone(metadata.route ?? feature?.properties?.route ?? null)
+      route: structuredClone(metadata.route ?? feature?.properties?.route ?? null),
+      community: structuredClone(metadata.community ?? feature?.properties?.community ?? null)
     },
     geometry
   };
@@ -65,7 +66,7 @@ export function createOverlayStore(initial = []) {
     update(overlayId, patch = {}) {
       const current = records.get(overlayId); if (!current) throw new Error('Overlay not found.');
       const feature = { ...current, properties: { ...current.properties, ...(patch.properties || patch) }, geometry: patch.geometry || current.geometry };
-      const next = normaliseOverlay(feature, { id: overlayId, className: feature.properties.class, label: feature.properties.label, layerName: feature.properties.layerName, colour: feature.properties.colour, visible: feature.properties.visible, source: feature.properties.source, route: feature.properties.route });
+      const next = normaliseOverlay(feature, { id: overlayId, className: feature.properties.class, label: feature.properties.label, layerName: feature.properties.layerName, colour: feature.properties.colour, visible: feature.properties.visible, source: feature.properties.source, route: feature.properties.route, community: feature.properties.community });
       records.set(overlayId, next); return structuredClone(next);
     },
     remove(overlayId) { return records.delete(overlayId); },

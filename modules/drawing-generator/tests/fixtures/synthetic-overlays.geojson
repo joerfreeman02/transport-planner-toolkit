@@ -9,7 +9,7 @@
     {
       "type": "Feature",
       "properties": { "class": "community", "label": "COMMUNITY FACILITY", "layerName": "Selected considerations", "colour": "#666666" },
-      "geometry": { "type": "Point", "coordinates": [-0.1025, 51.501] }
+      "geometry": { "type": "Polygon", "coordinates": [[[-0.1029,51.5007],[-0.1021,51.5007],[-0.1021,51.5013],[-0.1029,51.5013],[-0.1029,51.5007]]] }
     }
   ]
 }

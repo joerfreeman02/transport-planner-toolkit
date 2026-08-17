@@ -1,4 +1,5 @@
 import { modeConfig } from './drawing-modes.js';
+import { bngToWgs84 } from './crs.js';
 
 export function paperMmToGroundMetres(paperMm, scaleDenominator) {
   if (!(paperMm > 0) || !(scaleDenominator > 0)) throw new Error('Paper distance and scale denominator must be positive.');
@@ -31,5 +32,24 @@ export function extentForDrawing(center, modeId) {
     paperWidthMm: mode.mapFrameMm.width,
     paperHeightMm: mode.mapFrameMm.height,
     scale: mode.scale
+  });
+}
+
+export function issuedExtentGeoJson(center, modeId) {
+  const extent = extentForDrawing(center, modeId);
+  const ring = [
+    [extent.minE, extent.minN], [extent.minE, extent.maxN],
+    [extent.maxE, extent.maxN], [extent.maxE, extent.minN], [extent.minE, extent.minN]
+  ].map(bngToWgs84);
+  return Object.freeze({
+    type: 'Feature',
+    properties: Object.freeze({
+      class: 'issued-drawing-extent',
+      label: `ISSUED DRAWING AREA — 1:${extent.scale.toLocaleString('en-GB')}`,
+      scale: extent.scale,
+      groundWidth: extent.groundWidth,
+      groundHeight: extent.groundHeight
+    }),
+    geometry: Object.freeze({ type: 'Polygon', coordinates: Object.freeze([Object.freeze(ring)]) })
   });
 }

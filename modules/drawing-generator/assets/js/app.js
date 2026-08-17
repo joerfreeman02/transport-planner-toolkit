@@ -111,6 +111,7 @@ function scaleMetadataMatches(mode) {
 
 function renderPreview() {
   const mode = modeConfig(state.modeId);
+  mapUi.setIssuedDrawingExtent(drawingCentre(), state.modeId);
   const source = currentSource();
   const basemap = currentBasemap();
   const result = renderDrawingSvg({ modeId: state.modeId, centerBng: drawingCentre(), site: state.site, sourceFeatures: source.features, sourceReview: state.sourceReview, overlays: state.overlayStore.list(), sourceStatus: source.status, includeBasemap: basemap.requested, basemapProvider: state.basemapProvider, basemapStatus: basemap.status });
@@ -228,6 +229,13 @@ function overlayMetadata() {
 }
 
 const mapUi = createMapController({
+  onMapCenterChanged: center => {
+    if (state.site) return;
+    if (state.location && Math.abs(state.location.lat - center.lat) < 1e-9 && Math.abs(state.location.lon - center.lon) < 1e-9) return;
+    state.location = { ...center, label: 'Interactive map centre' };
+    invalidateBasemaps(); state.sourcesByMode[state.modeId] = undefined;
+    persist(); renderSourceStatus(); renderPreview();
+  },
   onSiteChanged: geometry => acceptSite(geometry, 'Edited boundary'),
   onSiteDeleted: () => clearSite(),
   onOverlayCreated: (feature, meta) => {
@@ -259,7 +267,7 @@ const mapUi = createMapController({
     byId('drawRouteTo').disabled = active;
     byId('drawRouteFrom').disabled = active;
     if (active && detail?.kind === 'site') setMessage('siteStatus', 'Site drawing active. Complete the polygon or choose Cancel drawing to return to map navigation.', 'warning');
-    if (routeDrawing) setMessage('routeStatus', `${detail.metadata.label} drawing active. Complete the line or choose Cancel route drawing.`, 'warning');
+    if (routeDrawing) setMessage('routeStatus', `${detail.metadata.label} drawing active. Click to add waypoints; drag to pan and use the mouse wheel to zoom. Navigation does not add route vertices.`, 'warning');
     if (!active) renderRoutingTools();
   }
 });
@@ -332,7 +340,7 @@ function setSourceReviewState(sourceId, reviewState) {
   if (!sourceId || !['included', 'excluded'].includes(reviewState)) return;
   state.sourceReview[sourceId] = reviewState;
   persist();
-  mapUi.setSource(reviewedSourceFeatures());
+  mapUi.setSource(reviewedSourceFeatures(), state.modeId);
   renderSourceStatus();
   renderPreview();
 }
@@ -376,12 +384,12 @@ async function retrieveSources() {
   const adapter = new OverpassTransportAdapter();
   try {
     const source = await adapter.retrieve(state.modeId, extentForDrawing(drawingCentre(), state.modeId), BUILD);
-    state.sourcesByMode[state.modeId] = { ...source, features: assessStationRailConsistency(source.features) }; mapUi.setSource(reviewedSourceFeatures()); renderSourceStatus(); renderPreview();
+    state.sourcesByMode[state.modeId] = { ...source, features: assessStationRailConsistency(source.features) }; mapUi.setSource(reviewedSourceFeatures(), state.modeId); renderSourceStatus(); renderPreview();
     if (currentBasemap().status !== 'failed') byId('workflowStatus').textContent = 'Professional source refreshed; waiting for the rendered basemap if still loading.';
     return true;
   } catch (error) {
     state.sourcesByMode[state.modeId] = { status: 'failed', features: [], snapshot: null, error: `${error.message}${error.details?.failures ? ` ${error.details.failures.map(item => `${item.endpoint}: ${item.kind}`).join('; ')}` : ''}` };
-    mapUi.setSource([]); renderSourceStatus(); renderPreview();
+    mapUi.setSource([], state.modeId); renderSourceStatus(); renderPreview();
     byId('workflowStatus').textContent = 'Professional vector evidence could not be loaded. The rendered basemap and reviewed manual overlays remain separate.';
     return false;
   } finally { byId('loadSources').disabled = false; byId('generateDrawing').disabled = false; }
@@ -390,11 +398,26 @@ async function retrieveSources() {
 function renderCommunityCandidates() {
   const candidates = currentSource().features.filter(item => item.properties?.class === 'community-candidate');
   byId('communityPanel').hidden = state.modeId !== 'local-context' || !candidates.length;
-  byId('communityCandidates').innerHTML = candidates.map((item, index) => `<div class="candidate-card" data-index="${index}"><strong>${escapeHtml(item.properties.name || 'Unnamed mapped feature')}</strong><span>${escapeHtml(item.properties.category || 'Unclassified')}</span><button>Add as reviewed consideration</button></div>`).join('');
+  const selected = new Set(state.overlayStore.list().map(item => item.properties.community?.candidateSourceId).filter(Boolean));
+  byId('communityCandidates').innerHTML = candidates.map((item, index) => {
+    const evidence = item.properties.communityEvidence || {};
+    const sourceId = item.properties.sourceId;
+    const added = selected.has(sourceId);
+    const disabled = evidence.reviewRequired;
+    const status = disabled ? evidence.reviewReason : `${evidence.associationMethod === 'source-area' ? 'Mapped source area' : 'Single containing building'} — ${evidence.buildingSourceId}`;
+    return `<div class="candidate-card${added ? ' is-selected' : ''}${disabled ? ' requires-review' : ''}" data-index="${index}"><strong>${escapeHtml(item.properties.name || 'Unnamed mapped feature')}</strong><span>${escapeHtml(item.properties.category || 'Unclassified')}</span><small>${escapeHtml(status)}</small><button ${disabled ? 'disabled' : ''}>${disabled ? 'Footprint requires review' : added ? 'Added — Remove' : 'Add as reviewed area'}</button></div>`;
+  }).join('');
   byId('communityCandidates').querySelectorAll('.candidate-card').forEach(card => card.querySelector('button').addEventListener('click', () => {
     const item = candidates[Number(card.dataset.index)];
-    state.overlayStore.add(item, { className: 'community', label: item.properties.name || item.properties.category, layerName: 'Community considerations', colour: '#666666', source: item.properties.sourceId });
-    persist(); renderOverlayRows();
+    const sourceId = item.properties.sourceId;
+    const overlayId = `community:${sourceId}`;
+    if (state.overlayStore.get(overlayId)) state.overlayStore.remove(overlayId);
+    else state.overlayStore.add(item, {
+      id: overlayId, className: 'community', label: item.properties.name || item.properties.category,
+      layerName: 'Community considerations', colour: '#666666', source: sourceId,
+      community: structuredClone(item.properties.communityEvidence)
+    });
+    persist(); renderOverlayRows(); renderCommunityCandidates();
   }));
 }
 
@@ -621,7 +644,7 @@ function initialiseControls() {
   byId('overlayClass').addEventListener('change', () => { byId('overlayColour').value = OVERLAY_CLASSES[byId('overlayClass').value].colour; });
   byId('modeSelect').addEventListener('change', event => {
     captureMetadata(); state.modeId = event.target.value; state.metadataByMode[state.modeId] ||= defaultMetadata(state.modeId);
-    populateMetadata(); populateOverlayClassOptions(); mapUi.setSource(reviewedSourceFeatures()); renderSourceStatus(); renderRoutingTools(); persist(); renderPreview();
+    populateMetadata(); populateOverlayClassOptions(); mapUi.setSource(reviewedSourceFeatures(), state.modeId); renderSourceStatus(); renderRoutingTools(); persist(); renderPreview();
   });
   metaInputs.forEach(input => input.addEventListener('input', captureMetadata));
   byId('searchAddress').addEventListener('click', searchAddress);
@@ -672,10 +695,10 @@ setTimeout(() => mapUi.invalidate(), 100);
 if (['localhost', '127.0.0.1'].includes(location.hostname)) {
   Object.defineProperty(window, '__DG0_ACCEPTANCE__', {
     value: Object.freeze({
-      setMode(id) { if (!DRAWING_MODES[id]) throw new Error('Invalid mode'); state.modeId = id; byId('modeSelect').value = id; populateMetadata(); populateOverlayClassOptions(); mapUi.setSource(reviewedSourceFeatures()); renderSourceStatus(); renderRoutingTools(); renderPreview(); },
+      setMode(id) { if (!DRAWING_MODES[id]) throw new Error('Invalid mode'); state.modeId = id; byId('modeSelect').value = id; populateMetadata(); populateOverlayClassOptions(); mapUi.setSource(reviewedSourceFeatures(), state.modeId); renderSourceStatus(); renderRoutingTools(); renderPreview(); },
       setLocation(lat, lon, label = 'Acceptance QA location') { setLocation(lat, lon, label); },
       setSite(geometry) { acceptSite(geometry, 'Synthetic acceptance fixture'); },
-      setSource(features, snapshot = {}) { state.sourcesByMode[state.modeId] = { status: 'success', features: assessStationRailConsistency(features), snapshot: { attribution: OSM_ATTRIBUTION, provider: 'Synthetic acceptance fixture', ...snapshot } }; mapUi.setSource(reviewedSourceFeatures()); renderSourceStatus(); renderPreview(); },
+      setSource(features, snapshot = {}) { state.sourcesByMode[state.modeId] = { status: 'success', features: assessStationRailConsistency(features), snapshot: { attribution: OSM_ATTRIBUTION, provider: 'Synthetic acceptance fixture', ...snapshot } }; mapUi.setSource(reviewedSourceFeatures(), state.modeId); renderSourceStatus(); renderPreview(); },
       setSourceReview(sourceId, reviewState) { setSourceReviewState(sourceId, reviewState); },
       addOverlay(feature, metadata) { const record = state.overlayStore.add(feature, metadata); renderOverlayRows(); return record; },
       async addRoughRoute(geometry, className) {
@@ -697,7 +720,7 @@ if (['localhost', '127.0.0.1'].includes(location.hostname)) {
       setRoadRoutingProvider(provider) { state.roadRoutingProvider = Object.freeze({ ...DEFAULT_ROAD_ROUTING_PROVIDER, ...provider }); },
       requestBasemap() { const basemap = currentBasemap(); basemap.requested = true; basemap.status = 'loading'; renderPreview(); },
       render: renderPreview,
-      snapshot: () => ({ modeId: state.modeId, site: state.site, location: state.location, overlays: state.overlayStore.list(), source: currentSource(), reviewedSourceFeatures: reviewedSourceFeatures(), sourceReview: structuredClone(state.sourceReview), basemap: { ...currentBasemap(), providerId: state.basemapProvider.id, zoom: state.lastRender?.result.basemap?.zoom || null, tileCount: state.lastRender?.result.basemap?.tileCount || 0, maxAlignmentError: state.lastRender?.result.basemap?.maxAlignmentError || null }, metadata: structuredClone(metadata()), status: STATUS, drawingActive: mapUi.isDrawingActive(), navigationEnabled: mapUi.navigationEnabled(), routingVisible: !byId('routingTools').hidden, advancedOpen: byId('advancedTools').open })
+      snapshot: () => ({ modeId: state.modeId, site: state.site, location: state.location, overlays: state.overlayStore.list(), source: currentSource(), reviewedSourceFeatures: reviewedSourceFeatures(), sourceReview: structuredClone(state.sourceReview), issuedExtent: mapUi.issuedExtent(), basemap: { ...currentBasemap(), providerId: state.basemapProvider.id, zoom: state.lastRender?.result.basemap?.zoom || null, tileCount: state.lastRender?.result.basemap?.tileCount || 0, maxAlignmentError: state.lastRender?.result.basemap?.maxAlignmentError || null }, metadata: structuredClone(metadata()), status: STATUS, drawingActive: mapUi.isDrawingActive(), navigationEnabled: mapUi.navigationEnabled(), activeRouteVertexCount: mapUi.activeVertexCount(), mapCenter: mapUi.mapCenter(), routingVisible: !byId('routingTools').hidden, advancedOpen: byId('advancedTools').open })
     }), configurable: false, enumerable: false, writable: false
   });
 }

@@ -21,6 +21,7 @@ const { renderDrawingSvg } = await import('../assets/js/svg-renderer.js');
 const routeGeometry = await import('../assets/js/route-geometry.js');
 const routeSnap = await import('../assets/js/route-snap-adapter.js');
 const sourceReview = await import('../assets/js/source-review.js');
+const community = await import('../assets/js/community-association.js');
 
 let passed = 0;
 async function test(name, fn) {
@@ -77,6 +78,19 @@ await test('map-frame ground extents derive from physical dimensions', () => {
   assert.deepEqual([regional.groundWidth, regional.groundHeight], [16800, 12250]);
   assert.deepEqual([local.groundWidth, local.groundHeight], [795, 712.5]);
 });
+await test('interactive issued-area footprint is derived from the exact PDF extent engine', () => {
+  const center = { easting: 530000, northing: 180000 };
+  for (const [modeId, expected] of [['regional-routing', [16800, 12250, 50000]], ['local-routing', [795, 712.5, 2500]]]) {
+    const extent = scale.extentForDrawing(center, modeId);
+    const feature = scale.issuedExtentGeoJson(center, modeId);
+    assert.deepEqual([feature.properties.groundWidth, feature.properties.groundHeight, feature.properties.scale], expected);
+    const projected = feature.geometry.coordinates[0].map(crs.wgs84ToBng);
+    assert.ok(Math.abs(Math.min(...projected.map(point => point.easting)) - extent.minE) < .03);
+    assert.ok(Math.abs(Math.max(...projected.map(point => point.easting)) - extent.maxE) < .03);
+    assert.ok(Math.abs(Math.min(...projected.map(point => point.northing)) - extent.minN) < .03);
+    assert.ok(Math.abs(Math.max(...projected.map(point => point.northing)) - extent.maxN) < .03);
+  }
+});
 
 await test('all four drawing modes are independently configured', () => assert.deepEqual(Object.keys(DRAWING_MODES), ['regional-plan', 'regional-routing', 'local-context', 'local-routing']));
 await test('regional and local mode scales remain fixed', () => {
@@ -107,7 +121,8 @@ await test('overlay import, edit, visibility and delete are deterministic', () =
   assert.equal(store.list().length, 0);
 });
 await test('unsupported overlay class/geometry combinations are rejected', () => assert.throws(() => normaliseOverlay({ type: 'Point', coordinates: [-.1, 51.5] }, { className: 'route-to-site', colour: '#ed1c24' }), /does not support/));
-await test('unsupported arbitrary colours are rejected', () => assert.throws(() => normaliseOverlay({ type: 'Point', coordinates: [-.1, 51.5] }, { className: 'community', colour: '#abcdef' }), /controlled drawing palette/));
+await test('unsupported arbitrary colours are rejected', () => assert.throws(() => normaliseOverlay({ type: 'Polygon', coordinates: [[[-.1, 51.5], [-.099, 51.5], [-.099, 51.501], [-.1, 51.5]]] }, { className: 'community', colour: '#abcdef' }), /controlled drawing palette/));
+await test('community facilities cannot be stored as generic points', () => assert.throws(() => normaliseOverlay({ type: 'Point', coordinates: [-.1, 51.5] }, { className: 'community' }), /does not support Point/));
 
 const response = (payload, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => payload });
 const extent = scale.extentForDrawing({ easting: 530000, northing: 180000 }, 'regional-plan');
@@ -144,6 +159,32 @@ await test('current OSM cycle hierarchy is retained without requiring a route re
     assert.equal(result.properties.ref, '');
     assert.deepEqual([result.properties.network, result.properties.name, result.properties.operator, result.properties.cycleNetwork], [network, `${network.toUpperCase()} route`, 'Test operator', 'GB:test']);
   }
+});
+await test('railway sidings and yard tracks remain support-only rather than issued line hierarchy', () => {
+  const main = source.classifyOverpassElement({ type: 'way', id: 31, tags: { railway: 'rail', usage: 'main' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
+  const siding = source.classifyOverpassElement({ type: 'way', id: 32, tags: { railway: 'rail', service: 'siding' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
+  assert.equal(main.properties.class, 'railway');
+  assert.equal(siding.properties.class, 'railway-support');
+  assert.equal(siding.properties.supportOnly, true);
+});
+await test('current bus relation geometry is retained, grouped and controlled-colour styled', () => {
+  const item = source.classifyOverpassElement({ type: 'relation', id: 18, tags: { route: 'bus', ref: '97', name: 'Route 97' }, members: [{ geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] }] })[0];
+  assert.deepEqual([item.properties.class, item.properties.routeGroup, item.properties.routeLabel], ['bus-route', '97', '97']);
+  assert.match(item.properties.geometryEvidence, /osm-clipped/);
+  assert.ok(['#ed1c24', '#7f2a90', '#00a651', '#00a9e0'].includes(item.properties.colour));
+});
+await test('bus relation without line geometry is explicitly review-only', () => {
+  const item = source.classifyOverpassElement({ type: 'relation', id: 19, center: { lon: -.1, lat: 51.5 }, tags: { route: 'bus', ref: '99' }, members: [] })[0];
+  assert.equal(item.properties.class, 'bus-route-review');
+  assert.equal(item.properties.reviewReason, 'BUS ROUTE GEOMETRY REQUIRES REVIEW');
+});
+await test('clipped relation null geometry placeholders are ignored safely', () => {
+  const item = source.classifyOverpassElement({
+    type: 'relation', id: 191, center: { lon: -.1, lat: 51.5 }, tags: { route: 'bus', ref: '212' },
+    members: [{ geometry: [null, { lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }, null] }, { geometry: [null, null] }, null]
+  })[0];
+  assert.equal(item.properties.class, 'bus-route');
+  assert.equal(item.geometry.coordinates.length, 1);
 });
 await test('official OSM provider is exact, attributed, bounded and replaceable', () => {
   const provider = basemap.basemapProvider();
@@ -203,8 +244,43 @@ await test('source review retains a compatible nearby station and explicit exclu
 await test('structured source query includes professional transport evidence but no pseudo-basemap harvest', () => {
   const query = source.buildOverpassQuery('local-context', extent);
   for (const marker of ['highway', 'railway', 'waterway', 'route"="bicycle', 'route"="bus', 'amenity']) assert.match(query, new RegExp(marker));
+  assert.match(query, /out body center geom\(/);
+  assert.match(query, /around\.communityAmenityNodes:100/);
+  assert.match(query, /\["building"\]/);
   for (const excluded of ['landuse', 'natural']) assert.doesNotMatch(query, new RegExp(excluded));
   assert.doesNotMatch(query, /\["place"/);
+});
+await test('community area geometry is preserved instead of replaced by its Overpass centre', () => {
+  const item = source.classifyOverpassElement({
+    type: 'way', id: 20, center: { lon: -.1, lat: 51.5 }, tags: { amenity: 'library', name: 'Mapped Library' },
+    geometry: [{ lon: -.101, lat: 51.499 }, { lon: -.099, lat: 51.499 }, { lon: -.099, lat: 51.501 }, { lon: -.101, lat: 51.499 }]
+  })[0];
+  assert.equal(item.geometry.type, 'Polygon');
+  assert.equal(item.properties.originalGeometryType, 'Polygon');
+});
+await test('community node associates only with exactly one containing source building', () => {
+  const candidate = { type: 'Feature', id: 'node/21', properties: { class: 'community-candidate', sourceId: 'node/21', name: 'Clinic' }, geometry: { type: 'Point', coordinates: [0, 0] } };
+  const building = { type: 'Feature', id: 'way/22', properties: { class: 'building-support', sourceId: 'way/22' }, geometry: { type: 'Polygon', coordinates: [[[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]] } };
+  const result = community.resolveCommunityCandidateGeometry([candidate, building])[0];
+  assert.equal(result.geometry.type, 'Polygon');
+  assert.deepEqual(result.properties.communityEvidence, { candidateSourceId: 'node/21', buildingSourceId: 'way/22', associationMethod: 'single-containing-building', reviewState: 'ready', reviewRequired: false, reviewReason: '' });
+});
+await test('ambiguous and missing community buildings never fabricate a footprint', () => {
+  const candidate = { type: 'Feature', id: 'node/23', properties: { class: 'community-candidate', sourceId: 'node/23' }, geometry: { type: 'Point', coordinates: [0, 0] } };
+  const polygon = { type: 'Polygon', coordinates: [[[-1, -1], [1, -1], [1, 1], [-1, 1], [-1, -1]]] };
+  const ambiguous = community.resolveCommunityCandidateGeometry([candidate, { type: 'Feature', properties: { class: 'building-support', sourceId: 'way/a' }, geometry: polygon }, { type: 'Feature', properties: { class: 'building-support', sourceId: 'way/b' }, geometry: polygon }])[0];
+  const missing = community.resolveCommunityCandidateGeometry([candidate])[0];
+  assert.equal(ambiguous.geometry.type, 'Point'); assert.equal(ambiguous.properties.communityEvidence.reviewState, 'review-required');
+  assert.equal(missing.geometry.type, 'Point'); assert.equal(missing.properties.communityEvidence.associationMethod, 'none');
+});
+await test('community provenance survives persistence and deterministic selection ids prevent duplicates', () => {
+  const store = createOverlayStore();
+  const metadata = { id: 'community:node/21', className: 'community', community: { candidateSourceId: 'node/21', buildingSourceId: 'way/22', associationMethod: 'single-containing-building', reviewState: 'ready' } };
+  const area = { type: 'Polygon', coordinates: [[[-.1, 51.5], [-.099, 51.5], [-.099, 51.501], [-.1, 51.5]]] };
+  store.add(area, metadata); store.add(area, metadata);
+  assert.equal(store.list().length, 1);
+  assert.equal(store.get('community:node/21').properties.community.buildingSourceId, 'way/22');
+  assert.equal(createOverlayStore(store.exportGeoJson().features).get('community:node/21').properties.community.associationMethod, 'single-containing-building');
 });
 await test('context features classify as structured vector basemap evidence', () => {
   const road = source.classifyOverpassElement({ type: 'way', id: 9, tags: { highway: 'secondary', name: 'Context Road' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
@@ -262,7 +338,7 @@ await test('retained overlays are isolated to appropriate drawing modes', () => 
   const all = [
     normaliseOverlay({ type: 'LineString', coordinates: [[-.101, 51.5], [-.099, 51.501]] }, { className: 'route-to-site' }),
     normaliseOverlay({ type: 'LineString', coordinates: [[-.101, 51.501], [-.099, 51.5]] }, { className: 'bus-route' }),
-    normaliseOverlay({ type: 'Point', coordinates: [-.1, 51.5] }, { className: 'community' })
+    normaliseOverlay({ type: 'Polygon', coordinates: [[[-.101, 51.499], [-.099, 51.499], [-.099, 51.501], [-.101, 51.499]]] }, { className: 'community' })
   ];
   const regionalPlan = renderDrawingSvg({ modeId: 'regional-plan', centerBng, overlays: all }).markup;
   const regionalRouting = renderDrawingSvg({ modeId: 'regional-routing', centerBng, overlays: all }).markup;
@@ -329,6 +405,41 @@ await test('routing drawings suppress automatic thematic overlays and rendering 
   assert.doesNotMatch(result.markup, /marker-mid=/);
   assert.match(result.markup, /class="route-direction-arrow"/);
   assert.deepEqual(route.geometry, original);
+});
+await test('Local Context suppresses generic main-road theming and applies the recovered cycle/rail hierarchy', () => {
+  const centerBng = crs.wgs84ToBng([-.1, 51.5]);
+  const features = [
+    { type: 'Feature', properties: { class: 'main-road', officialARef: 'A1' }, geometry: { type: 'LineString', coordinates: [[-.11, 51.49], [-.09, 51.51]] } },
+    { type: 'Feature', properties: { class: 'cycle-network-primary' }, geometry: { type: 'LineString', coordinates: [[-.11, 51.5], [-.09, 51.5]] } },
+    { type: 'Feature', properties: { class: 'cycle-network-local' }, geometry: { type: 'LineString', coordinates: [[-.1, 51.49], [-.1, 51.51]] } },
+    { type: 'Feature', properties: { class: 'railway' }, geometry: { type: 'LineString', coordinates: [[-.105, 51.49], [-.105, 51.51]] } }
+  ];
+  const markup = renderDrawingSvg({ modeId: 'local-context', centerBng, sourceFeatures: features }).markup;
+  assert.doesNotMatch(markup, /layer-main-road/);
+  assert.match(markup, /layer-cycle-network-primary[\s\S]*stroke="#ec1ce8"/);
+  assert.match(markup, /layer-cycle-network-local[\s\S]*stroke="#0057e7"/);
+  assert.match(markup, /layer-railway[\s\S]*stroke="#f58220"/);
+});
+await test('coincident TO and FROM arrows use opposing presentation-only offsets and white halos', () => {
+  const centerBng = crs.wgs84ToBng([-.1, 51.5]);
+  const geometry = { type: 'LineString', coordinates: [[-.12, 51.5], [-.08, 51.5]] };
+  const overlays = [
+    normaliseOverlay(geometry, { className: 'route-to-site', route: { status: 'approved', directionStatus: 'confirmed' } }),
+    normaliseOverlay(geometry, { className: 'route-from-site', route: { status: 'approved', directionStatus: 'confirmed' } })
+  ];
+  const before = structuredClone(overlays.map(item => item.geometry));
+  const markup = renderDrawingSvg({ modeId: 'regional-routing', centerBng, overlays }).markup;
+  assert.match(markup, /data-cartographic-offset="-3\.2"/);
+  assert.match(markup, /data-cartographic-offset="3\.2"/);
+  assert.match(markup, /route-direction-arrow-halo/);
+  assert.deepEqual(overlays.map(item => item.geometry), before);
+});
+await test('site uses an external leader callout and no generic polygon-centre SITE label', () => {
+  const centerBng = crs.wgs84ToBng([-.1, 51.5]);
+  const result = renderDrawingSvg({ modeId: 'local-context', centerBng, site }).markup;
+  assert.match(result, /class="site-callout"/);
+  assert.match(result, /class="site-callout-leader"/);
+  assert.doesNotMatch(result, /class="map-label label-site"/);
 });
 
 await test('A3 sheet contains title block, map frame, current logo, legend, attribution and build', () => {

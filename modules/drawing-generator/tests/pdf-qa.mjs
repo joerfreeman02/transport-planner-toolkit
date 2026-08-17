@@ -52,11 +52,17 @@ const sourceFeatures = [
 const overlays = [
   [{ type: 'Feature', properties: {}, geometry: lines.route }, { className: 'route-to-site', label: 'ROUTE TO SITE', layerName: 'Planner-guided road routing', colour: '#ed1c24', source: 'Mock road geometry; automated QA only', route: { status: 'approved', directionStatus: 'confirmed', selectionAuthority: 'planner', providerPurpose: 'geometry-assistance-only', provenance: { providerName: 'Mock road geometry', providerId: 'qa-mock', providerPurpose: 'geometry-assistance-only', waypointOrderPreserved: true, maxGuidanceDeviationMetres: 0 } } }],
   [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [...lines.route.coordinates].reverse() } }, { className: 'route-from-site', label: 'ROUTE FROM SITE', layerName: 'Planner-guided road routing', colour: '#0057e7', source: 'Mock road geometry; automated QA only', route: { status: 'approved', directionStatus: 'confirmed', selectionAuthority: 'planner', providerPurpose: 'geometry-assistance-only', provenance: { providerName: 'Mock road geometry', providerId: 'qa-mock', providerPurpose: 'geometry-assistance-only', waypointOrderPreserved: true, maxGuidanceDeviationMetres: 0 } } }],
-  [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [-.1025, 51.501] } }, { className: 'community', label: 'COMMUNITY FACILITY', layerName: 'Selected considerations', colour: '#666666' }]
+  [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[-.1029, 51.5007], [-.1021, 51.5007], [-.1021, 51.5013], [-.1029, 51.5013], [-.1029, 51.5007]]] } }, { className: 'community', label: 'COMMUNITY FACILITY', layerName: 'Selected considerations', colour: '#666666' }]
 ];
 
 try {
   for (const mode of modes) {
+    const modeOverlays = structuredClone(overlays);
+    if (mode === 'regional-routing') {
+      const regionalRoute = [[-.202, 51.463], [-.174, 51.479], [-.142, 51.489], [-.1005, 51.5001]];
+      modeOverlays[0][0].geometry.coordinates = regionalRoute;
+      modeOverlays[1][0].geometry.coordinates = [...regionalRoute].reverse();
+    }
     const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
     await page.addInitScript(() => localStorage.clear());
     await page.route(/https:\/\/(?:tile\.openstreetmap\.org|tiles\.test)\/\d+\/\d+\/\d+\.png/, route => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: mockedOsmTile(route.request().url()) }));
@@ -68,7 +74,7 @@ try {
       api.setBasemapProvider({ id: 'qa-mocked-osm', name: 'Mocked OSM tile fixture', urlTemplate: 'https://tiles.test/{z}/{x}/{y}.png', attribution: 'Automated QA tile fixture - no public tile retrieval', tileSize: 256, minZoom: 0, maxZoom: 19, maxTilesPerView: 80 });
       api.setMode(mode); api.setLocation(51.5, -.1); api.setSite(site); api.setSource(sourceFeatures, { retrievedAt: '2026-08-16T12:00:00Z' });
       overlays.forEach(([feature, metadata]) => api.addOverlay(feature, metadata));
-    }, { mode, site, sourceFeatures, overlays });
+    }, { mode, site, sourceFeatures, overlays: modeOverlays });
     await page.locator('[data-meta="client"]').fill('Synthetic QA Client');
     await page.locator('[data-meta="project"]').fill('Drawing Generator QA Site');
     await page.locator('[data-meta="projectNumber"]').fill('DG0-QA');
@@ -85,7 +91,7 @@ try {
     if (await page.locator('#drawingSheet .identity img').count() !== 1) throw new Error(`${mode} did not contain exactly one issued title-block logo.`);
     if (!await page.locator('#drawingSvg .osm-attribution').count()) throw new Error(`${mode} did not render the distinct OpenStreetMap attribution.`);
     if (!await page.locator('#drawingSvg .osm-attribution').textContent().then(text => /OpenStreetMap contributors/.test(text || ''))) throw new Error(`${mode} did not retain readable OpenStreetMap attribution text.`);
-    await page.pdf({ path: path.join(output, `drawing-generator-${mode}-DG0C3.2-live-review.pdf`), format: 'A3', landscape: true, printBackground: true, preferCSSPageSize: true, margin: { top: '0', right: '0', bottom: '0', left: '0' } });
+    await page.pdf({ path: path.join(output, `drawing-generator-${mode}-DG0C3.3-live-review.pdf`), format: 'A3', landscape: true, printBackground: true, preferCSSPageSize: true, margin: { top: '0', right: '0', bottom: '0', left: '0' } });
     await page.close();
   }
   console.log(`Created ${modes.length} A3 live-review QA PDF${modes.length === 1 ? '' : 's'} in ${output}`);

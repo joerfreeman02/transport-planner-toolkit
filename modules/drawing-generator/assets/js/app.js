@@ -186,12 +186,16 @@ function monitorBasemapTiles(result) {
     basemap.status = 'failed'; basemap.error = 'No tile images were composed.'; setBasemapDomStatus('failed'); updateDrawingReadiness(); return;
   }
   Promise.all(tiles.map(async (tile, index) => {
-    const response = await fetch(tile.url, { mode: 'cors', cache: 'no-store' });
-    if (!response.ok) throw new Error(`Tile ${index + 1} failed.`);
-    const blob = await response.blob();
-    const bitmap = await createImageBitmap(blob);
-    if (bitmap.width < 128 || bitmap.height < 128) { bitmap.close(); throw new Error(`Tile ${index + 1} is incomplete.`); }
-    return bitmap;
+    const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetch(tile.url, { mode: 'cors', cache: 'no-store', signal: controller.signal });
+      if (!response.ok) throw new Error(`Tile ${index + 1} failed.`);
+      const blob = await response.blob();
+      const bitmap = await createImageBitmap(blob);
+      if (bitmap.width < 128 || bitmap.height < 128) { bitmap.close(); throw new Error(`Tile ${index + 1} is incomplete.`); }
+      return bitmap;
+    } catch (error) { if (error.name === 'AbortError') throw new Error(`Tile ${index + 1} timed out.`); throw error; }
+    finally { clearTimeout(timeout); }
   })).then(bitmaps => {
     if (token !== state.basemapRenderToken) return;
     basemap.loaded = bitmaps.length;

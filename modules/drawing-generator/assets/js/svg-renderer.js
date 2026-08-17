@@ -112,6 +112,23 @@ function routeArrowMarkup(item, project, family, marker, colour) {
   }).join('');
 }
 
+function offsetLinePath(coordinates, project, offset) {
+  const points = coordinates.map(project);
+  if (!offset || points.length < 2) return linePath(coordinates, project);
+  const normals = points.map((point, index) => {
+    const previous = points[Math.max(0, index - 1)], next = points[Math.min(points.length - 1, index + 1)];
+    const dx = next[0] - previous[0], dy = next[1] - previous[1], length = Math.hypot(dx, dy) || 1;
+    return [-dy / length, dx / length];
+  });
+  return points.map((point, index) => `${index ? 'L' : 'M'}${(point[0] + normals[index][0] * offset).toFixed(2)},${(point[1] + normals[index][1] * offset).toFixed(2)}`).join(' ');
+}
+
+function busPathForGeometry(geometry, project, offset) {
+  if (geometry.type === 'LineString') return offsetLinePath(geometry.coordinates, project, offset);
+  if (geometry.type === 'MultiLineString') return geometry.coordinates.map(line => offsetLinePath(line, project, offset)).join(' ');
+  return pathForGeometry(geometry, project);
+}
+
 function featureMarkup(item, project, index, family, modeId = '') {
   const className = item.properties?.class;
   const style = styleForFeature(item, modeId);
@@ -127,15 +144,15 @@ function featureMarkup(item, project, index, family, modeId = '') {
       : `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="4.5" fill="${escapeXml(item.properties?.colour || style.fill)}" stroke="${escapeXml(style.stroke || '#555')}" stroke-width=".8" vector-effect="non-scaling-stroke"/>`;
     return `<g class="layer-${escapeXml(className)}" data-feature-index="${index}">${symbol}</g>`;
   }
-  const path = pathForGeometry(item.geometry, project);
+  const presentationOffset = className === 'bus-route' ? Number(item.properties?.presentationBusOffset || 0) : 0;
+  const path = className === 'bus-route' ? busPathForGeometry(item.geometry, project, presentationOffset) : pathForGeometry(item.geometry, project);
   if (!path) return '';
   const isArea = item.geometry.type.includes('Polygon');
   const marker = className === 'route-to-site' ? 'url(#arrow-to)' : className === 'route-from-site' ? 'url(#arrow-from)' : '';
   const routeStatus = item.properties?.route?.status || '';
   const reviewDash = marker && ['rough', 'snapping', 'snap-failed', 'snap-review-required', 'direction-review'].includes(routeStatus) ? '6 3' : style.dash;
   const markup = `<path d="${path}" fill="${isArea ? escapeXml(item.properties?.colour || style.fill || 'none') : 'none'}" fill-opacity="${isArea ? '.34' : '0'}" fill-rule="evenodd" stroke="${escapeXml(colour)}" stroke-width="${className === 'bus-route' ? 1.7 : style.width}"${reviewDash ? ` stroke-dasharray="${reviewDash}"` : ''} stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${marker ? routeArrowMarkup(item, project, family, marker, colour) : ''}`;
-  const offset = className === 'bus-route' ? Number(item.properties?.presentationBusOffset || 0) : 0;
-  return `<g class="layer-${escapeXml(className)}" data-feature-index="${index}"${routeStatus ? ` data-route-status="${escapeXml(routeStatus)}"` : ''}${offset ? ` transform="translate(0 ${offset.toFixed(2)})"` : ''}>${markup}</g>`;
+  return `<g class="layer-${escapeXml(className)}" data-feature-index="${index}"${routeStatus ? ` data-route-status="${escapeXml(routeStatus)}"` : ''}>${markup}</g>`;
 }
 
 function labelMarkup(placements) {

@@ -30,10 +30,10 @@ await page.route(/https:\/\/[^/]*overpass[^/]*\/api\/interpreter/, route => {
   interceptedSourceBodies.push(route.request().postData() || '');
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) });
 });
-const transparentPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+const tileSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#e7ece5"/><path d="M0 40L256 210" stroke="#b6c2ad" stroke-width="8"/></svg>';
 await page.route(/https:\/\/(?:tile\.openstreetmap\.org|tiles\.test)\/\d+\/\d+\/\d+\.png/, route => {
   interceptedTileRequests.push(route.request().url());
-  return route.fulfill({ status: 200, contentType: 'image/png', body: transparentPng });
+  return route.fulfill({ status: 200, contentType: 'image/svg+xml', body: tileSvg });
 });
 await page.route(/https:\/\/tiles-fail\.test\/\d+\/\d+\/\d+\.png/, route => route.fulfill({ status: 503, contentType: 'text/plain', body: 'mock tile failure' }));
 await page.route(/https:\/\/routing\.test\/route\/v1\/driving\/.+/, route => {
@@ -284,10 +284,14 @@ try {
     api.requestBasemap();
   });
   await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'failed');
-  assert.match(await page.locator('#basemapFailureWarning').textContent(), /BASEMAP FAILED TO LOAD - REVIEW REQUIRED/);
+  assert.match(await page.locator('#basemapFailureWarning').textContent(), /BASEMAP INCOMPLETE — PRINT BLOCKED/);
   assert.equal(await page.locator('#basemapFailureWarning').getAttribute('visibility'), 'visible');
   assert.equal(await page.locator('#printDrawing').isDisabled(), true);
-  assert.equal((await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot())).overlays.length, overlayCountBeforeFailure);
+  await page.evaluate(() => { const api = window.__DG0_ACCEPTANCE__; api.clearOverlays(); api.setBasemapProvider({ id: 'test-tiles', name: 'Mock OSM tiles', urlTemplate: 'https://tiles.test/{z}/{x}/{y}.png', attribution: 'Map data (c) OpenStreetMap contributors', tileSize: 256, minZoom: 0, maxZoom: 19, maxTilesPerView: 80 }); });
+  await page.locator('#retryBasemap').click();
+  await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'success');
+  assert.equal(await page.locator('#printDrawing').isEnabled(), true);
+  assert.equal((await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot())).overlays.length, 0);
   assert.equal(await page.getByRole('button', { name: 'Print / Save PDF' }).count(), 1);
   assert.deepEqual(badLocalResponses, []);
   assert.equal(errors.length, 0, errors.join('\n'));

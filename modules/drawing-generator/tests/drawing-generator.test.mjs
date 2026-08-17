@@ -202,6 +202,13 @@ await test('controlled bus presentation groups preserve source identity and prev
   assert.equal(grouped[0].properties.presentationBusLabel, 'ALL BUS ROUTES');
   assert.deepEqual(presentation.busRouteReferences(features), ['10', '20']);
 });
+await test('ungrouped bus services retain a single clean ALL BUS ROUTES presentation fallback', () => {
+  const features = ['97', '179'].map(ref => ({ type: 'Feature', properties: { class: 'bus-route', ref, sourceId: `relation/${ref}` }, geometry: { type: 'LineString', coordinates: [[-.1, 51.5], [-.09, 51.51]] } }));
+  const result = presentation.applyBusPresentationGroups(features);
+  assert.ok(result.every(item => item.properties.presentationBusLabel === 'ALL BUS ROUTES' && item.properties.colour === '#ed1c24'));
+  const legend = renderDrawingSvg({ modeId: 'local-context', centerBng: crs.wgs84ToBng([-.1, 51.5]), sourceFeatures: features }).legend.filter(item => item.className === 'bus-route');
+  assert.deepEqual(legend.map(item => item.label), ['ALL BUS ROUTES — 97, 179']);
+});
 await test('clipped relation null geometry placeholders are ignored safely', () => {
   const item = source.classifyOverpassElement({
     type: 'relation', id: 191, center: { lon: -.1, lat: 51.5 }, tags: { route: 'bus', ref: '212' },
@@ -448,6 +455,11 @@ await test('Local Context preserves hierarchy with green cycles and evidence-led
   const genericOnly = renderDrawingSvg({ modeId: 'local-context', centerBng, sourceFeatures: [features[3]] });
   assert.ok(genericOnly.legend.some(item => item.label === 'RAILWAY'));
   assert.ok(!genericOnly.legend.some(item => item.label === 'LONDON OVERGROUND'));
+});
+await test('Regional Plan suppresses duplicate rail-mode legend labels', () => {
+  const centerBng = crs.wgs84ToBng([-.1, 51.5]);
+  const rails = ['', 'National Rail', 'London Overground'].map((railMode, index) => ({ type: 'Feature', properties: { class: 'railway', railMode }, geometry: { type: 'LineString', coordinates: [[-.11 + index * .002, 51.49], [-.09 + index * .002, 51.51]] } }));
+  assert.deepEqual(renderDrawingSvg({ modeId: 'regional-plan', centerBng, sourceFeatures: rails }).legend.filter(item => item.className === 'railway').map(item => item.label), ['RAILWAY']);
 });
 await test('basemap appearance is optional, defaults to colour and leaves professional vector geometry unchanged', () => {
   const centerBng = crs.wgs84ToBng([-.1, 51.5]);

@@ -195,6 +195,7 @@ export function legendItemsForDrawing(modeId, sourceFeatures = [], overlays = []
   return priority.flatMap(className => {
     if (!present.has(className) || !STYLE[className]) return [];
     if (className === 'railway') {
+      if (modeId === 'regional-plan') return [{ className, ...styleForFeature({ properties: { class: 'railway' } }, modeId), label: 'RAILWAY' }];
       const modes = new Map();
       visibleSource.filter(item => item.properties?.class === 'railway').forEach(item => {
         const key = item.properties?.railMode || 'Railway';
@@ -206,7 +207,11 @@ export function legendItemsForDrawing(modeId, sourceFeatures = [], overlays = []
       const routes = new Map();
       busRoutes.forEach(item => {
         const key = item.properties.presentationBusGroup || item.properties.routeGroup || item.properties.ref || item.properties.routeLabel || 'BUS';
-        if (!routes.has(key)) routes.set(key, { className, ...STYLE[className], stroke: item.properties.colour || STYLE[className].stroke, label: item.properties.presentationBusLabel || `BUS ROUTE ${key}` });
+        if (!routes.has(key)) {
+          const references = item.properties.presentationBusRouteRefs || [];
+          const label = item.properties.presentationBusLabel || `BUS ROUTE ${key}`;
+          routes.set(key, { className, ...STYLE[className], stroke: item.properties.colour || STYLE[className].stroke, label: label === 'ALL BUS ROUTES' && references.length ? `ALL BUS ROUTES — ${references.join(', ')}` : label });
+        }
       });
       return [...routes.values()].sort((left, right) => left.label.localeCompare(right.label, 'en-GB', { numeric: true }));
     }
@@ -251,7 +256,7 @@ export function renderDrawingSvg({ modeId, centerBng, site = null, sourceFeature
     ${routeFailure ? `<text x="${viewWidth - 15}" y="38" text-anchor="end" class="source-warning route-review-warning">ROAD SNAP FAILED - ROUTE REQUIRES MANUAL REVIEW</text>` : ''}
     ${routeDirectionReview ? `<text x="${viewWidth - 15}" y="56" text-anchor="end" class="source-warning route-review-warning">ROUTE DIRECTION REQUIRES REVIEW</text>` : ''}
     ${busGeometryReview ? `<text x="${viewWidth - 15}" y="74" text-anchor="end" class="source-warning route-review-warning">BUS ROUTE GEOMETRY REQUIRES REVIEW</text>` : ''}
-    <g id="basemapFailureWarning" class="basemap-failure-warning" visibility="${basemapStatus === 'failed' ? 'visible' : 'hidden'}"><rect x="180" y="${(viewHeight / 2 - 24).toFixed(2)}" width="640" height="48" rx="4"/><text x="500" y="${(viewHeight / 2 + 4).toFixed(2)}" text-anchor="middle">BASEMAP FAILED TO LOAD - REVIEW REQUIRED</text></g>
+    <g id="basemapFailureWarning" class="basemap-failure-warning" visibility="${basemapStatus === 'failed' ? 'visible' : 'hidden'}"><rect x="180" y="${(viewHeight / 2 - 24).toFixed(2)}" width="640" height="48" rx="4"/><text x="500" y="${(viewHeight / 2 + 4).toFixed(2)}" text-anchor="middle">BASEMAP INCOMPLETE — PRINT BLOCKED</text></g>
     <rect x=".5" y=".5" width="${viewWidth - 1}" height="${(viewHeight - 1).toFixed(3)}" fill="none" stroke="#222" stroke-width="1" vector-effect="non-scaling-stroke"/>
   </svg>`;
   return { markup, extent, legend: legendItemsForDrawing(modeId, sourceFeatures, overlays, Boolean(site), sourceReview, busGroups), scaleBar, presentationFeatures: features, labels, basemap, basemapAppearance: appearance };

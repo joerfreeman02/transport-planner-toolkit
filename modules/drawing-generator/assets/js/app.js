@@ -154,7 +154,7 @@ function updateDrawingReadiness() {
   const blockPrint = !record.scaleMatches || basemap.status !== 'success' || Boolean(routeBlock);
   byId('printDrawing').disabled = blockPrint;
   if (!record.scaleMatches) setMessage('drawingStatus', `Print blocked: scale metadata must be 1:${mode.scale.toLocaleString('en-GB')} for ${mode.title}.`, 'error');
-  else if (basemap.status === 'failed') setMessage('drawingStatus', 'BASEMAP FAILED TO LOAD - REVIEW REQUIRED. Controlled overlays remain intact; retry Generate / refresh drawing.', 'error');
+  else if (basemap.status === 'failed') setMessage('drawingStatus', 'BASEMAP INCOMPLETE — PRINT BLOCKED. Controlled overlays remain intact; use Retry basemap.', 'error');
   else if (!basemap.requested) setMessage('drawingStatus', 'Generate the drawing to load the rendered OpenStreetMap basemap before printing.', 'warning');
   else if (basemap.status === 'loading') setMessage('drawingStatus', `Loading rendered OpenStreetMap basemap (${basemap.loaded}/${basemap.total || record.result.basemap?.tileCount || 0} tiles).`, 'warning');
   else if (!state.site) setMessage('drawingStatus', `Not issue-ready: no confirmed site boundary. Missing layer evidence: ${record.missing.join(', ') || 'none'}.`, 'warning');
@@ -169,6 +169,7 @@ function setBasemapDomStatus(status) {
   svg.dataset.basemapStatus = status;
   const warning = byId('basemapFailureWarning');
   if (warning) warning.setAttribute('visibility', status === 'failed' ? 'visible' : 'hidden');
+  byId('retryBasemap').hidden = status !== 'failed';
 }
 
 function monitorBasemapTiles(result) {
@@ -191,12 +192,23 @@ function monitorBasemapTiles(result) {
     if (settled < images.length) { updateDrawingReadiness(); return; }
     basemap.status = failed ? 'failed' : 'success';
     setBasemapDomStatus(basemap.status);
-    byId('workflowStatus').textContent = failed ? 'Basemap failed to load. Retry; professional overlays remain intact.' : `Drawing basemap ready from ${state.basemapProvider.name}. Review professional overlays before printing.`;
+    byId('workflowStatus').textContent = failed ? 'Basemap incomplete — print blocked. Retry basemap; professional overlays remain intact.' : `Drawing basemap ready from ${state.basemapProvider.name}. Review professional overlays before printing.`;
     updateDrawingReadiness();
   };
   images.forEach((image, index) => {
-    image.addEventListener('load', () => settle(''), { once: true });
-    image.addEventListener('error', () => settle(`Tile ${index + 1} failed.`), { once: true });
+    let completed = false;
+    let timeout;
+    const complete = error => { if (completed) return; completed = true; clearTimeout(timeout); settle(error); };
+    const validate = async () => {
+      try {
+        if (typeof image.decode === 'function') await image.decode();
+        complete(image.naturalWidth < 128 || image.naturalHeight < 128 ? `Tile ${index + 1} is incomplete or unusable.` : '');
+      } catch { complete(`Tile ${index + 1} could not be decoded.`); }
+    };
+    timeout = setTimeout(() => complete(`Tile ${index + 1} timed out or remained undecoded.`), 15000);
+    image.addEventListener('load', validate, { once: true });
+    image.addEventListener('error', () => complete(`Tile ${index + 1} failed.`), { once: true });
+    if (image.complete) validate();
   });
 }
 
@@ -785,6 +797,7 @@ function initialiseControls() {
   byId('groupSelectedBusRoutes').addEventListener('click', groupSelectedBusRoutes);
   byId('loadSources').addEventListener('click', retrieveSources);
   byId('generateDrawing').addEventListener('click', retrieveSources);
+  byId('retryBasemap').addEventListener('click', () => { const basemap = currentBasemap(); basemap.requested = true; basemap.status = 'loading'; basemap.loaded = 0; basemap.total = 0; basemap.error = ''; renderPreview(); });
   byId('downloadSnapshot').addEventListener('click', () => { if (currentSource().snapshot) downloadJson(`drawing-source-${state.modeId}-${BUILD}.json`, { ...currentSource().snapshot, features: currentSource().features }); });
   byId('refreshPreview').addEventListener('click', renderPreview);
   byId('printDrawing').addEventListener('click', () => {

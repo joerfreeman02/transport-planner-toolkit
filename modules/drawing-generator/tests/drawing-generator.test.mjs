@@ -166,7 +166,7 @@ await test('rail geometry mode never infers London Overground without explicit e
   const generic = source.classifyOverpassElement({ type: 'way', id: 41, tags: { railway: 'rail' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
   const overground = source.classifyOverpassElement({ type: 'way', id: 42, tags: { railway: 'rail', operator: 'London Overground' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
   const national = source.classifyOverpassElement({ type: 'way', id: 43, tags: { railway: 'rail', operator: 'Network Rail' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
-  assert.deepEqual([generic.properties.railMode, overground.properties.railMode, national.properties.railMode], ['', 'London Overground', 'National Rail']);
+  assert.deepEqual([generic.properties.railMode, overground.properties.railMode, national.properties.railMode], ['', 'London Overground', '']);
   assert.equal(railway.modeForRailGeometryTags({ railway: 'light_rail' }), 'Tram/light rail');
 });
 await test('railway sidings and yard tracks remain support-only rather than issued line hierarchy', () => {

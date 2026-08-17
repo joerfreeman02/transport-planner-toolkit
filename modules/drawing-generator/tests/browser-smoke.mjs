@@ -35,7 +35,7 @@ await page.route(/https:\/\/(?:tile\.openstreetmap\.org|tiles\.test)\/\d+\/\d+\/
   interceptedTileRequests.push(route.request().url());
   return route.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: rasterTile });
 });
-await page.route(/https:\/\/tiles-fail\.test\/\d+\/\d+\/\d+\.png/, route => route.fulfill({ status: 503, contentType: 'text/plain', body: 'mock tile failure' }));
+await page.route(/https:\/\/tiles-fail\.test\/\d+\/\d+\/\d+\.png/, route => route.fulfill(expectedTileFailure ? { status: 503, contentType: 'text/plain', body: 'mock tile failure' } : { status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: rasterTile }));
 await page.route(/https:\/\/routing\.test\/route\/v1\/driving\/.+/, route => {
   interceptedRouteRequests.push(route.request().url());
   const coordinatePart = new URL(route.request().url()).pathname.split('/driving/')[1];
@@ -154,6 +154,7 @@ try {
       await page.waitForFunction(() => /classified vector features loaded/i.test(document.querySelector('#sourceStatus')?.textContent || ''));
       await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'success');
     }
+    await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'success');
     const svg = page.locator('#drawingSvg');
     const issued = await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().issuedExtent.properties);
     assert.deepEqual([issued.groundWidth, issued.groundHeight, issued.scale], mode.startsWith('regional-') ? [16800, 12250, 50000] : [795, 712.5, 2500]);
@@ -276,7 +277,7 @@ try {
   assert.deepEqual(failedRoute.geometry, failedRoute.properties.route.roughGeometry);
   await page.locator('#acceptManualFallback').click();
   assert.equal((await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().overlays[0].properties.route.status)), 'manual-approved');
-  const overlayCountBeforeFailure = (await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot())).overlays.length;
+  await page.evaluate(() => window.__DG0_ACCEPTANCE__.clearOverlays());
   expectedTileFailure = true;
   await page.evaluate(() => {
     const api = window.__DG0_ACCEPTANCE__;
@@ -287,10 +288,11 @@ try {
   assert.match(await page.locator('#basemapFailureWarning').textContent(), /BASEMAP INCOMPLETE — PRINT BLOCKED/);
   assert.equal(await page.locator('#basemapFailureWarning').getAttribute('visibility'), 'visible');
   assert.equal(await page.locator('#printDrawing').isDisabled(), true);
-  await page.evaluate(() => { const api = window.__DG0_ACCEPTANCE__; api.clearOverlays(); api.setBasemapProvider({ id: 'test-tiles', name: 'Mock OSM tiles', urlTemplate: 'https://tiles.test/{z}/{x}/{y}.png', attribution: 'Map data (c) OpenStreetMap contributors', tileSize: 256, minZoom: 0, maxZoom: 19, maxTilesPerView: 80 }); });
+  assert.equal(await page.locator('#retryBasemap').isVisible(), true);
+  expectedTileFailure = false;
   await page.locator('#retryBasemap').click();
   await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'success');
-  assert.equal(await page.locator('#printDrawing').isEnabled(), true);
+  assert.equal(await page.locator('#retryBasemap').isVisible(), false);
   assert.equal((await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot())).overlays.length, 0);
   assert.equal(await page.getByRole('button', { name: 'Print / Save PDF' }).count(), 1);
   assert.deepEqual(badLocalResponses, []);

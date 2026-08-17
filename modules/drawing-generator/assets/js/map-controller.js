@@ -1,6 +1,14 @@
+import { generalisePresentationFeatures } from './cartography.js';
+import { basemapProvider } from './basemap-compositor.js';
+
 const SOURCE_STYLES = Object.freeze({
+  'context-area': { color: '#b6b6a9', weight: .7, opacity: .55, fillColor: '#e8e8df', fillOpacity: .32 },
+  'context-road-major': { color: '#a8a8a0', weight: 2, opacity: .75 },
+  'context-road-minor': { color: '#c9c9c2', weight: 1.2, opacity: .7 },
+  'context-place': { color: '#777', weight: 1, opacity: .6 },
   'main-road': { color: '#ed1c24', weight: 2, opacity: .8 }, motorway: { color: '#ec1ce8', weight: 3, opacity: .85 },
   railway: { color: '#777', weight: 2, dashArray: '5 3' }, waterway: { color: '#0047bb', weight: 2 },
+  'cycle-network-primary': { color: '#f0a500', weight: 2.5 }, 'cycle-network-local': { color: '#d98600', weight: 2, dashArray: '7 4' },
   'strategic-cycle': { color: '#f0a500', weight: 2 }, 'cycle-route': { color: '#0057e7', weight: 2 },
   'bus-route': { color: '#7f2a90', weight: 3 }
 });
@@ -18,20 +26,50 @@ function pointIcon(className = 'source') {
   return L.divIcon({ className: `dg-map-marker ${className}`, html: '<span></span>', iconSize: [14, 14], iconAnchor: [7, 7] });
 }
 
-export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCreated, onOverlayChanged, onOverlayDeleted }) {
+export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCreated, onOverlayChanged, onOverlayDeleted, onDrawingStateChanged = () => {} }) {
   const map = L.map('editingMap', { zoomControl: true }).setView([52.2, -1.4], 6);
-  const base = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, crossOrigin: true, opacity: .62, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+  const provider = basemapProvider();
+  const base = L.tileLayer(provider.urlTemplate, { minZoom: provider.minZoom, maxZoom: provider.maxZoom, crossOrigin: true, opacity: 1, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
   const editable = L.featureGroup().addTo(map);
   const source = L.geoJSON(null, {
     style: feature => SOURCE_STYLES[feature.properties?.class] || { color: '#777', weight: 1.5 },
     pointToLayer: (feature, latlng) => L.marker(latlng, { icon: pointIcon(feature.properties?.class || 'source') }),
     onEachFeature: (feature, layer) => { const label = feature.properties?.name || feature.properties?.routeLabel || feature.properties?.class; if (label) layer.bindTooltip(label); }
   }).addTo(map);
-  L.control.layers({ OpenStreetMap: base }, { 'Structured vector source': source, 'Editable geometry': editable }, { collapsed: false }).addTo(map);
+  L.control.layers({ OpenStreetMap: base }, { 'Structured vector source': source, 'Editable geometry': editable }, { collapsed: true }).addTo(map);
   map.addControl(new L.Control.Draw({ draw: false, edit: { featureGroup: editable, remove: true } }));
   L.control.scale({ imperial: false }).addTo(map);
 
   let pending = null;
+  let activeHandler = null;
+
+  function finishDrawingState() {
+    const completed = pending;
+    pending = null;
+    activeHandler = null;
+    if (map.dragging) map.dragging.enable();
+    onDrawingStateChanged(false, completed);
+  }
+
+  function cancelDrawing() {
+    const handler = activeHandler;
+    const cancelled = pending;
+    activeHandler = null;
+    pending = null;
+    if (handler?.enabled()) handler.disable();
+    if (map.dragging) map.dragging.enable();
+    onDrawingStateChanged(false, cancelled);
+  }
+
+  function startDrawing(handler, nextPending) {
+    cancelDrawing();
+    pending = nextPending;
+    activeHandler = handler;
+    if (map.dragging) map.dragging.disable();
+    handler.enable();
+    onDrawingStateChanged(true, pending);
+  }
+
   map.on(L.Draw.Event.CREATED, event => {
     if (!pending) return;
     if (pending.kind === 'site') {
@@ -46,8 +84,10 @@ export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCre
       if (event.layer.setStyle) event.layer.setStyle({ color: created.properties.colour, weight: 4, fillColor: created.properties.colour, fillOpacity: .25 });
       editable.addLayer(event.layer);
     }
-    pending = null;
+    finishDrawingState();
   });
+  map.on(L.Draw.Event.DRAWSTOP, () => finishDrawingState());
+  map.on('draw:canceled', () => finishDrawingState());
   map.on(L.Draw.Event.EDITED, event => {
     let siteTouched = false;
     event.layers.eachLayer(layer => {
@@ -80,6 +120,7 @@ export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCre
     setView(lat, lon, zoom = 16) { map.setView([lat, lon], zoom); },
     invalidate() { map.invalidateSize(); },
     setSite(geometry) {
+      cancelDrawing();
       [...editable.getLayers()].filter(layer => layer._dgKind === 'site').forEach(layer => editable.removeLayer(layer));
       if (geometry) addGeoJsonToEditable({ type: 'Feature', properties: {}, geometry }, 'site');
       const bounds = editable.getBounds(); if (geometry && bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 18 });
@@ -88,19 +129,22 @@ export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCre
       [...editable.getLayers()].filter(layer => layer._dgKind === 'overlay').forEach(layer => editable.removeLayer(layer));
       overlays.forEach(overlay => { if (overlay.properties.visible !== false) addGeoJsonToEditable(overlay, 'overlay', overlay.id); });
     },
-    setSource(features) { source.clearLayers(); source.addData({ type: 'FeatureCollection', features }); },
-    startSiteDrawing() { pending = { kind: 'site' }; new L.Draw.Polygon(map, { allowIntersection: false, shapeOptions: { color: '#ed1c24', weight: 4 } }).enable(); },
+    setSource(features) { source.clearLayers(); source.addData({ type: 'FeatureCollection', features: generalisePresentationFeatures(features) }); },
+    startSiteDrawing() { startDrawing(new L.Draw.Polygon(map, { allowIntersection: false, shapeOptions: { color: '#ed1c24', weight: 4 } }), { kind: 'site' }); },
     startOverlayDrawing(type, metadata) {
-      pending = { kind: 'overlay', metadata };
       const handlers = {
         Point: () => new L.Draw.Marker(map, { icon: pointIcon('overlay') }),
         LineString: () => new L.Draw.Polyline(map, { shapeOptions: { color: metadata.colour, weight: 4 } }),
         Polygon: () => new L.Draw.Polygon(map, { allowIntersection: false, shapeOptions: { color: metadata.colour, weight: 4 } })
       };
       if (!handlers[type]) throw new Error(`Unsupported drawing geometry: ${type}.`);
-      handlers[type]().enable();
+      startDrawing(handlers[type](), { kind: 'overlay', metadata });
     },
+    cancelDrawing,
+    isDrawingActive() { return Boolean(activeHandler); },
+    navigationEnabled() { return Boolean(map.dragging?.enabled()); },
     clearSite() {
+      cancelDrawing();
       [...editable.getLayers()].filter(layer => layer._dgKind === 'site').forEach(layer => editable.removeLayer(layer));
     }
   };

@@ -49,3 +49,68 @@ Corrective starting commit: `2a3ffafb40e02ca0307e9726f14c668b2ea053ed` (`origin/
 | Authorised current-source comparison | Local-only public-Overpass retrieval for the approved historic review extents completed. Regional evidence included road, motorway, rail/station, cycle and confirmed/review-only waterway classes; local evidence included road, rail and community-candidate classes. No boundary, raw query, response or PDF was persisted. |
 
 The same 16 deterministic scripts completed **11 passed / 5 failed**, with exactly the documented pre-existing failures. The same six browser scripts completed **4 passed / 2 failed**, with exactly the documented `core-polish-browser.mjs` and `shared-library-browser.mjs` controls. No test was weakened.
+
+## DG-0C2 professional cartography and UX recovery
+
+Corrective starting commit: `f3ed7417dc1876ae5ac5b3bc7959b120081077c3` (`origin/main`). Corrective build: `DRAW-0.1.0-DG0C2-20260814`. Status remains **LIVE REVIEW CANDIDATE - NOT ACCEPTED BASELINE**.
+
+| Gate/command | Result |
+|---|---|
+| `node modules/drawing-generator/tests/drawing-generator.test.mjs` | **41/41 passed**. Covers geometry, CRS, exact fixed scale, Railway equivalence, overlay safety, source failure states, structured context classification, current/ref-less `icn`/`ncn`/`rcn`/`lcn` hierarchy, proposed/construction review-only status, connected-only way grouping, station de-duplication, bounded/repeat-limited label placement, four SVG modes and A3 sheet identity. |
+| Local `browser-smoke.mjs` | Pass across all four modes: advanced controls collapsed by default; navigation on by default; drawing starts explicitly; Cancel and site import restore navigation; primary Generate flow; exact contextual SVG marker/count; snapshot/overlays; mode-relevant advanced choices; no local HTTP/page errors. |
+| Local `live-smoke.mjs` | Pass: Drawing Generator/four modes plus Dashboard, Accessibility, Railway, Bus, STATS19, Library Manager and Site Research; no page errors. |
+| Critical existing CI deterministic scripts | Pass: `run-tests`, `regression-check`, `bus-foundation`, Railway regression and Accessibility classification regression. |
+| Same 16-script deterministic baseline set | **11 passed / 5 failed**, exactly matching C1. Known failures remain `emergency-sprint1a`, `library-manager`, `research-quality`, `research-workflow-completion` and `sprint1c`. |
+| Same six-script browser baseline set | **4 passed / 2 failed**, exactly matching C1. Known failures remain `core-polish-browser` (expected 4 Ready tags, actual 5) and `shared-library-browser` (hidden editor field fill timeout). |
+| Regional `pdf-qa.mjs` + Poppler/pypdf/rendered visual inspection | One sanitized C2 Regional Plan PDF. One page, A3 landscape, 1191.12 x 841.92 pt; required build/status/scale/OSM/cycle text present; full-extent contextual hierarchy, legend, border and title strip visually inspected with no clipping. SHA-256 `8C98605B9075BC194BB1920BCDA3BF18324BAC59D0F62BD2EE6C9E87D0714928`. |
+
+The C2 branch changes only the Drawing Generator implementation/tests and its documentation/ADR. No protected functional module, Dashboard code, Shared Knowledge Library data, production identity, dependency workflow or security workflow is changed. Deployed live smoke remains a post-merge gate; local smoke is not represented as deployment evidence.
+
+## DG-0C3 real OSM basemap and four-drawing recovery
+
+C3 started exactly at `090a2f1ecfb299ed7119a0199c50ae11e916ef29` on `corrective/dg0c2-professional-cartography-ux`; `origin/main` was `f3ed7417dc1876ae5ac5b3bc7959b120081077c3`. Build: `DRAW-0.1.0-DG0C3-20260816`. Status: **WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE**.
+
+| Gate/command | Result |
+|---|---|
+| `node modules/drawing-generator/tests/drawing-generator.test.mjs` | **44/44 passed**. Adds exact official provider URL/attribution/cap, replaceable-provider validation, projection-aware tile manifests, fixed z13/z17, 30/25-tile reference manifests, below-0.03 px affine-centre error, exclusion of Overpass pseudo-basemap tags, four rendered-tile SVGs and isolated Dashboard WIP registration. |
+| Local `browser-smoke.mjs` with all tiles intercepted | Pass across all four modes. Proves mocked tile success, exact SVG provider/zoom/count/status telemetry, print block until complete, primary route controls/cancellation, default navigation, source/overlay preservation and exact failed-basemap warning with print disabled. No local HTTP/page errors. |
+| Four-mode `pdf-qa.mjs` with intercepted mocked tiles | Four one-page A3 landscape PDFs created. Each identifies the tile fixture as mocked/no-public-retrieval and retains C3 build/status, scale, attribution, title block and controlled overlays. |
+| Guarded `real-world-regional-pdf-qa.mjs` | One authorised public-tile viewport for Milton Keynes. **35 unique z13 OSM tiles**, 35 composed tiles and **4,086 live classified Overpass features**. Editing-map zooms were intercepted, so only the issued Regional viewport used the public tile service. |
+| Poppler `pdfinfo` and 120 dpi page renders | All five PDFs: exactly one page, A3 landscape, `1191.12 x 841.92 pt`; rendered visual inspection confirmed visible cartography, unclipped border/title/legend, current logo, scale bar and WIP stamp. |
+| pypdf text/hash inspection | All five contain C3 build, WIP status and tile attribution/fixture disclosure. Principal real-world PDF SHA-256: `77973816479BD3615A76BD6450661021084EF01CB37D2A9765D2BF9C118E4A16`. |
+| Same 16 deterministic baseline scripts | **11 passed / 5 failed**, exactly matching C2. Known failures: `emergency-sprint1a`, `library-manager`, `research-quality`, `research-workflow-completion`, `sprint1c`. |
+| Same six browser baseline scripts | **4 passed / 2 failed**, exactly matching C2. Known failures: `core-polish-browser` and `shared-library-browser`. |
+| Local `live-smoke.mjs` with map tiles intercepted | Pass: Drawing Generator/four modes, Dashboard, Accessibility, Railway, Bus, STATS19, Library Manager and Site Research; no page errors. |
+
+Automated C3 tests never harvest public tiles. The one live artifact is real-world evidence, not a synthetic fixture. Generated PDFs/renders remain untracked and are not part of the commit. Remote PR CI and deployment smoke remain separate gates; no merge is authorised by this evidence.
+# DG-0C3.1 final Monday readiness evidence
+
+Build/status: `DRAW-0.1.0-DG0C3.1-20260816`; **WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE**. The corrective work continued from commit `2c069c7b1581dcbaa92b009b74abd4c87b092ba8` on the existing branch and PR; it did not merge or start a new sprint.
+
+## Deterministic and browser gates
+
+- `node modules/drawing-generator/tests/drawing-generator.test.mjs`: **49 passed**. New coverage includes mocked waypoint-order road snapping, non-destructive failure, deterministic route-to/route-from reversal, direction review without a site, distance-based arrow cadence, routing thematic suppression, render non-mutation and one issued logo.
+- `node modules/drawing-generator/tests/browser-smoke.mjs`: **passed** with no page errors/bad local responses. It covers all four modes, two mocked road requests, explicit approval, direction normalization, regional→local→regional geometry persistence, site-change reapproval, exact failure warning, manual fallback, tile failure safety and route/source/tile mocks.
+- Critical protected regressions: root deterministic **13 passed**; foundation regression **passed**; Bus **10 passed**; Railway **29/29 passed**; Accessibility classification **6 passed**.
+
+## PDF and real-world evidence
+
+- Four deterministic QA PDFs were generated with mocked tiles/routes. Each is exactly one A3 landscape page.
+- A Milton Keynes Regional Plan used a small synthetic non-client site, 4,089 current classified Overpass features and 35 live z13 OSM tiles.
+- A Milton Keynes Regional Routing Plan used the same synthetic site, exactly two sequential live road-geometry requests and 35 live z13 OSM tiles. Both routes reached `approved`; Route From Site was deterministically reversed so its start is nearest the site.
+- All six PDFs were rendered to PNG and visually inspected. Map/title frames fit, title content is not clipped, one title-block EAS logo appears, Regional Routing contains only site/routes over the real OSM basemap, Local Routing retains only the explicitly selected community item in addition to site/routes, and arrows are readable and correctly directed.
+- `pdfinfo` reported `Pages: 1` and A3 page size `1191.12 x 841.92 pts` for every artifact.
+
+The live scripts are guarded and excluded from CI. Automated browser/PDF tests intercept public tile and routing traffic. No client address, boundary, route or historic-project payload is stored in the repository or QA artifacts.
+
+# DG-0C3.2 final pre-merge author-control evidence
+
+Build/status: `DRAW-0.1.0-DG0C3.2-20260817`; **WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE**. This narrow correction continues on the existing draft PR and does not merge, alter production identities or introduce a new sprint.
+
+## Evidence to record at the gate
+
+- `node modules/drawing-generator/tests/drawing-generator.test.mjs`: **51 passed**. Covers immutable station-to-returned-rail QA, the exact no-nearby-rail warning/default withholding, explicit include/exclude presentation filtering, A/M-reference-only labels, single-ref regional repeat cap and all-mode distinct OSM attribution.
+- `node modules/drawing-generator/tests/browser-smoke.mjs`: **passed** with no page errors or bad local responses. It proves the visible Advanced source-review control, source ID/state/warning presentation, map removal/restoration after explicit Include, local state persistence over mode changes, four-mode attribution, routing approval/direction and failed-tile safety with mocked sources/tiles/routes.
+- `pdf-qa.mjs` created four deterministic one-page A3 PDFs with mocked tiles/routes and asserted the separate readable OSM attribution in every mode. `pdfinfo`, `pypdf` text checks and 110 dpi rendered-page inspection confirmed all six C3.2 PDFs are one-page A3 landscape (`1191.12 x 841.92 pt`), contain the C3.2 build and contain `OpenStreetMap contributors`.
+- The guarded Milton Keynes Regional Plan retrieved 4,089 classified features, composed 35 live z13 tiles and exposed **one** visible source-review flag. The guarded Regional Routing Plan made exactly **two** sequential public route requests, used 35 live z13 tiles and ended both routes `approved`, with Route From Site normalised/reversed.
+- C3.2 retains GitHub tooling policy: no workflow/dependency tooling change; Dependabot remains, Codecov/OpenSSF/Sentry are deferred and Renovate is not installed.

@@ -4,6 +4,8 @@ import { validateGeometry } from './geometry.js';
 export const OVERLAY_CLASSES = Object.freeze({
   'main-road': { label: 'Main road / A road', geometry: ['LineString', 'MultiLineString'], colour: '#ed1c24' },
   motorway: { label: 'Motorway', geometry: ['LineString', 'MultiLineString'], colour: '#ec1ce8' },
+  'cycle-network-primary': { label: 'National / regional cycle network', geometry: ['LineString', 'MultiLineString'], colour: '#f0a500' },
+  'cycle-network-local': { label: 'Local cycle network', geometry: ['LineString', 'MultiLineString'], colour: '#f0a500' },
   'strategic-cycle': { label: 'Strategic cycle route', geometry: ['LineString', 'MultiLineString'], colour: '#f0a500' },
   waterway: { label: 'Navigable waterway', geometry: ['LineString', 'MultiLineString'], colour: '#0057e7' },
   railway: { label: 'Railway', geometry: ['LineString', 'MultiLineString'], colour: '#666666' },
@@ -41,7 +43,8 @@ export function normaliseOverlay(feature, metadata = {}) {
       class: className, label: String(metadata.label ?? feature?.properties?.label ?? feature?.properties?.name ?? '').trim(),
       layerName: String(metadata.layerName ?? feature?.properties?.layerName ?? definition.label).trim() || definition.label,
       colour, visible: metadata.visible ?? feature?.properties?.visible ?? true,
-      source: metadata.source || feature?.properties?.source || 'manual/reviewed user input'
+      source: metadata.source || feature?.properties?.source || 'manual/reviewed user input',
+      route: structuredClone(metadata.route ?? feature?.properties?.route ?? null)
     },
     geometry
   };
@@ -62,7 +65,7 @@ export function createOverlayStore(initial = []) {
     update(overlayId, patch = {}) {
       const current = records.get(overlayId); if (!current) throw new Error('Overlay not found.');
       const feature = { ...current, properties: { ...current.properties, ...(patch.properties || patch) }, geometry: patch.geometry || current.geometry };
-      const next = normaliseOverlay(feature, { id: overlayId, className: feature.properties.class, label: feature.properties.label, layerName: feature.properties.layerName, colour: feature.properties.colour, visible: feature.properties.visible, source: feature.properties.source });
+      const next = normaliseOverlay(feature, { id: overlayId, className: feature.properties.class, label: feature.properties.label, layerName: feature.properties.layerName, colour: feature.properties.colour, visible: feature.properties.visible, source: feature.properties.source, route: feature.properties.route });
       records.set(overlayId, next); return structuredClone(next);
     },
     remove(overlayId) { return records.delete(overlayId); },

@@ -12,7 +12,7 @@ Allowlist result before deployment: **PASS**. All candidate implementation chang
 | STATS19 | NO |
 | Library Manager | NO |
 | Site Research | NO |
-| Dashboard | NO |
+| Dashboard | C3 WIP registration only; no established card or behaviour altered |
 | Shared Knowledge Library data | NO |
 | Existing production version identities | NO |
 
@@ -80,3 +80,62 @@ The corrective change is contained within the existing, isolated Drawing Generat
 | `modules/drawing-generator/tests/browser-smoke.mjs` | Verifies all four title-block defaults/current date and supports a supplied local Chromium path for reproducible QA. |
 | `modules/drawing-generator/tests/live-smoke.mjs`, `pdf-qa.mjs` | Support a supplied local Chromium path for reproducible QA. |
 | `docs/drawing-generator/{DATA-SOURCE-REGISTER,GOLDEN-DRAWING-COMPARISON,KNOWN-LIMITATIONS,TEST-EVIDENCE}.md` | Documents conservative rules, the sanitised comparison, limitations and C1 evidence. |
+
+## DG-0C2 corrective delta
+
+C2 starts exactly at `f3ed7417dc1876ae5ac5b3bc7959b120081077c3`. The protected-surface answers above remain NO. C2 does not alter `.github`, dependency files, Dashboard, Accessibility, Railway, Bus, STATS19, Library Manager, Site Research, Shared Knowledge Library data or any existing production identity. The generated PDF and rendered PNG are QA artifacts and are not committed.
+
+| File | C2 purpose |
+|---|---|
+| `modules/drawing-generator/index.html` | Planner-first setup/generate/review flow; advanced editing/source diagnostics collapsed by default; C2 identity. |
+| `modules/drawing-generator/assets/css/drawing-generator.css` | Unobscured editor, advanced-panel styling, compact legend/sidebar/title handling, managed labels and corrected print isolation. |
+| `modules/drawing-generator/assets/js/app.js` | Primary Generate flow, visible workflow status, cancelable drawing state, mode-relevant advanced overlay choices and acceptance telemetry. |
+| `modules/drawing-generator/assets/js/config.js` | C2 build identity; candidate status unchanged. |
+| `modules/drawing-generator/assets/js/drawing-modes.js` | Structured context and explicit primary/local cycle-network visibility per mode. |
+| `modules/drawing-generator/assets/js/map-controller.js` | Full-opacity OSM editing map, default navigation, explicit active-draw cancellation/restoration and generalized source display. |
+| `modules/drawing-generator/assets/js/overlay-store.js` | Adds controlled manual primary/local cycle-network classes while retaining existing compatibility classes. |
+| `modules/drawing-generator/assets/js/source-adapter.js` | Exact-extent structured context query/classification; current `icn`/`ncn`/`rcn`/`lcn` cycle hierarchy without ref requirement; lifecycle review-only safety; retained metadata. |
+| `modules/drawing-generator/assets/js/cartography.js` | New pure connected-way presentation grouping, coincident station de-duplication and deterministic collision/repetition label management. |
+| `modules/drawing-generator/assets/js/svg-renderer.js` | Draws structured context beneath controlled overlays in the exact BNG SVG; controlled labels and compact legend hierarchy. |
+| `modules/drawing-generator/tests/{drawing-generator.test.mjs,browser-smoke.mjs,pdf-qa.mjs}` | Adds C2 source/cartography/UX/context/PDF acceptance and a single-mode PDF output option. |
+| `modules/drawing-generator/tests/fixtures/synthetic-overpass.json` | Sanitized context, current ref-less cycle and proposed-cycle evidence. |
+| `modules/drawing-generator/README.md` | C2 identity and planner/context workflow. |
+| `docs/adr/ADR-008-drawing-generator-spatial-rendering.md` | Records the structured-context and managed-label refinement without changing Proposed status. |
+| `docs/drawing-generator/{DG0-ARCHITECTURE,DATA-SOURCE-REGISTER,GOLDEN-DRAWING-COMPARISON,KNOWN-LIMITATIONS,MANUAL-ACCEPTANCE,TEST-EVIDENCE,DIFF-AUDIT}.md` | C2 architecture, evidence, precedent comparison, constraints, acceptance and audit. |
+| `docs/drawing-generator/TFL-CYCLE-EVIDENCE.md` | Official TfL evidence hierarchy, safe future-adapter rule and documented reason no fragile runtime dependency was added. |
+
+## DG-0C3 corrective delta
+
+C3 starts exactly at `090a2f1ecfb299ed7119a0199c50ae11e916ef29` and preserves the C2 branch/history. The only protected-surface exception is the explicitly authorised, additive static Dashboard registration: one WIP card in `index.html` and one module entry in `config/modules.json`. Existing cards, Ready labels, Dashboard JavaScript/CSS, production identities and all functional modules remain unchanged. Generated C3 PDFs/renders are untracked and excluded from commit.
+
+| File | C3 purpose |
+|---|---|
+| `index.html` | Adds one static Drawing Generator card labelled `WORK IN PROGRESS`; established cards are untouched. |
+| `config/modules.json` | Registers Drawing Generator `0.1.0` / C3 build / WIP path without changing toolkit identity. |
+| `modules/drawing-generator/assets/js/basemap-compositor.js` | New provider abstraction, fixed zooms, exact intersecting-tile manifest, per-tile BNG affine placement and 80-tile cap. |
+| `modules/drawing-generator/assets/js/{app,map-controller,source-adapter,svg-renderer,config}.js` | C3 workflow/status, exact official tile URL, basemap lifecycle/failure safety, professional-only Overpass query, hybrid composition and acceptance telemetry. |
+| `modules/drawing-generator/index.html`, `assets/css/drawing-generator.css` | C3 WIP identity, primary routing controls, rendered-basemap language, failure/print styling and exact print colours. |
+| `modules/drawing-generator/tests/{drawing-generator.test.mjs,browser-smoke.mjs,pdf-qa.mjs,live-smoke.mjs}` | Projection/source/dashboard unit gates; completely intercepted automated tile acceptance/PDFs; protected local smoke. |
+| `modules/drawing-generator/tests/real-world-regional-pdf-qa.mjs` | Explicitly guarded one-viewport live Milton Keynes proof driver; non-issued editing zooms are mocked. |
+| `modules/drawing-generator/README.md` | C3 operation, tile boundary and guarded live-QA instructions. |
+| `docs/adr/ADR-008-drawing-generator-spatial-rendering.md` | Records the hybrid rendered-OSM/controlled-vector decision while retaining Proposed status. |
+| `docs/drawing-generator/{DG0-ARCHITECTURE,DATA-SOURCE-REGISTER,KNOWN-LIMITATIONS,MANUAL-ACCEPTANCE,TEST-EVIDENCE,DIFF-AUDIT}.md` | C3 architecture, policy/source separation, limitations, acceptance and evidence. |
+# DG-0C3.1 corrective delta
+
+- Added provider-neutral, user-triggered road-geometry assistance through ordered planner waypoints, with bounded failure, retained rough geometry and per-route provenance.
+- Added deterministic site direction normalization and recorded reversals; ambiguous/no-site routes block readiness.
+- Added explicit snapped approval, retry/redraw/add-guidance path and manual fallback acceptance; site changes clear prior approval.
+- Replaced per-vertex SVG markers with ground-distance arrow cadence on final retained geometry.
+- Reduced Regional Routing to basemap/site/routes/manual reviewed items and Local Routing to basemap/site/routes plus explicitly selected community/manual items; unchanged Regional Plan and Local Context hierarchies remain intact.
+- Removed the right-sidebar duplicate company/logo block and retained one current EAS title-block logo in all four layouts.
+- Added unit/browser/live QA, one-page A3 artifacts, source/provider documentation and an ADR. Generated artifacts remain untracked.
+- No protected module identity, historic client data, main-branch merge or new sprint was introduced.
+
+# DG-0C3.2 pre-merge author-control delta
+
+- Added `source-review.js` and an Advanced diagnostics source-review panel. It reports stable source ID, station name/mode, include/exclude state and returned-rail QA, defaults only no-nearby-rail stations to withheld, and persists explicit planner decisions in local storage.
+- Preserved source geometry and snapshot provenance: station QA is an immutable-input presentation assessment; excluded source records are removed consistently from editor map, issued SVG and legend without altering provider evidence.
+- Added a dedicated, readable `© OpenStreetMap contributors` SVG map-corner attribution in all modes. The sheet footer now holds engineering/provider provenance only.
+- Reduced controlled road labelling: Regional/Local context road names are suppressed; Regional primary/motorway labels use returned A/M refs only with a one-reference normal cap and reduced label budget.
+- Updated all four deterministic and two Milton Keynes live QA PDF drivers to the C3.2 build; the live regional proof reports visible flagged source-review candidates.
+- No GitHub workflow/tooling files changed: Dependabot was retained; Codecov, OpenSSF Scorecard, Sentry and Renovate remain deferred/not installed under the existing governance boundary. Generated PDFs/renders remain untracked.

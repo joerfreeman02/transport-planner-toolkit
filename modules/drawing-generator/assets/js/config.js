@@ -1,6 +1,6 @@
 export const VERSION = 'DRAW-0.1.0';
-export const BUILD = 'DRAW-0.1.0-DG0C1-20260814';
-export const STATUS = 'LIVE REVIEW CANDIDATE - NOT ACCEPTED BASELINE';
+export const BUILD = 'DRAW-0.1.0-DG0C3.2-20260817';
+export const STATUS = 'WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE';
 
 export const OVERPASS_ENDPOINTS = Object.freeze([
   'https://overpass-api.de/api/interpreter',

@@ -10,10 +10,12 @@ const browser = await chromium.launch({ headless: true, ...(process.env.TPT_PLAY
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 const page = await context.newPage();
 const failures = [];
+const transparentPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 page.on('pageerror', error => failures.push(error.message));
 page.on('console', message => {
   if (message.type() === 'error' && !/tile|ERR_ABORTED|favicon/i.test(message.text())) failures.push(message.text());
 });
+await page.route(/https:\/\/[^/]*openstreetmap\.org\/.*\.png/, route => route.fulfill({ status: 200, contentType: 'image/png', body: transparentPng }));
 
 const surfaces = [
   ['Dashboard', ''],
@@ -29,7 +31,7 @@ try {
   const generatorUrl = new URL('modules/drawing-generator/', root).href;
   const response = await page.goto(generatorUrl, { waitUntil: 'domcontentloaded' });
   assert.ok(response?.ok(), `Drawing Generator returned ${response?.status()}.`);
-  assert.match(await page.locator('.candidate-banner').innerText(), /LIVE REVIEW CANDIDATE - NOT ACCEPTED BASELINE/);
+  assert.match(await page.locator('.candidate-banner').innerText(), /WORK IN PROGRESS \/ LIVE REVIEW - NOT ACCEPTED BASELINE/);
   assert.equal(await page.locator('#modeSelect option').count(), 4);
   assert.equal(await page.locator('#editingMap.leaflet-container').count(), 1);
   for (const mode of ['regional-plan', 'regional-routing', 'local-context', 'local-routing']) {

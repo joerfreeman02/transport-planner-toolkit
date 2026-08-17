@@ -152,3 +152,7 @@ C3 starts exactly at `090a2f1ecfb299ed7119a0199c50ae11e916ef29` and preserves th
 - `CURRENT-SOURCE-MAPPING.md`, architecture, README, manual acceptance and test evidence document current-source colour/status mapping, the TfL credential decision, route navigation, exact issued extent, confidentiality and results.
 - No Accessibility, Railway, Bus, STATS19, Library Manager, Shared Library, Site Research, Dashboard implementation, production identity, `.github` workflow or dependency-tooling file is modified. Dependabot is retained; Codecov/OpenSSF/Sentry remain deferred and Renovate remains uninstalled.
 - Historic reference PDFs, client-specific content, live source payloads, temporary QA scripts, six generated PDFs and rendered PNGs are untracked and excluded from the commit.
+
+# DG-0C3.3A release-candidate allowlist
+
+The C3.3A candidate changes only Drawing Generator implementation, its sanitised fixtures/tests and Drawing Generator documentation. It adds `presentation-controls.js` for renderer-only bus/basemap presentation state. No protected module, production identity, Dashboard implementation, shared data, workflow, dependency or generated client artifact is changed. Temporary/PDF outputs remain untracked.

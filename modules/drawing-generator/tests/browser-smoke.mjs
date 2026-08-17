@@ -59,6 +59,18 @@ try {
   assert.equal(await page.locator('#editingMap path.issued-drawing-extent').count(), 1);
   assert.equal(await page.locator('#advancedTools').evaluate(element => element.open), false);
   assert.deepEqual(await page.evaluate(() => { const snapshot = window.__DG0_ACCEPTANCE__.snapshot(); return [snapshot.drawingActive, snapshot.navigationEnabled, snapshot.advancedOpen]; }), [false, true, false]);
+  assert.deepEqual(await page.locator('[data-workflow-step]').evaluateAll(items => items.map(item => item.dataset.workflowStep)), ['1', '2', '3', '4', '5']);
+  assert.equal(await page.locator('#sourcesAudit').isVisible(), true);
+  assert.equal(await page.locator('#basemapColour').inputValue(), 'colour');
+  assert.equal(await page.locator('#basemapEmphasis').inputValue(), 'faded');
+  for (const mode of ['regional-plan', 'regional-routing', 'local-context', 'local-routing']) {
+    await page.locator('#modeSelect').selectOption(mode);
+    assert.equal(await page.locator('#modeSelect').inputValue(), mode);
+    assert.equal(await page.locator('#advancedTools').evaluate(element => element.open), false);
+    assert.match(await page.locator('#project-heading').innerText(), /Choose the drawing/);
+  }
+  await page.locator('#modeSelect').selectOption('regional-plan');
+  assert.match(await page.locator('#sourcesAuditRows').innerText(), /OpenStreetMap.*TfL Cycle.*TPT Railway/s);
   await page.locator('#drawSite').click();
   assert.deepEqual(await page.evaluate(() => { const snapshot = window.__DG0_ACCEPTANCE__.snapshot(); return [snapshot.drawingActive, snapshot.navigationEnabled]; }), [true, false]);
   assert.equal(await page.locator('#cancelDrawing').isVisible(), true);
@@ -116,6 +128,8 @@ try {
   assert.equal(await page.locator('#drawingSvg').getAttribute('data-contextual-basemap'), 'rendered-osm-raster-tiles');
   assert.equal(await page.locator('#drawingSvg').getAttribute('data-basemap-provider'), 'test-tiles');
   assert.equal(await page.locator('#drawingSvg').getAttribute('data-basemap-status'), 'success');
+  assert.equal(await page.locator('#drawingSvg').getAttribute('data-basemap-colour'), 'colour');
+  assert.equal(await page.locator('#drawingSvg').getAttribute('data-basemap-emphasis'), 'faded');
   assert.ok(Number(await page.locator('#drawingSvg').getAttribute('data-basemap-tile-count')) > 0);
   assert.equal(await page.locator('#printDrawing').isEnabled(), true);
 
@@ -185,6 +199,9 @@ try {
       assert.deepEqual(await page.evaluate(() => { const snapshot = window.__DG0_ACCEPTANCE__.snapshot(); return [snapshot.drawingActive, snapshot.navigationEnabled]; }), [false, true]);
     }
     if (mode === 'local-context') {
+      assert.equal(await page.locator('#busPresentationPanel').isVisible(), true);
+      assert.equal(await page.locator('#drawingSvg .north-arrow-panel').count(), 1);
+      assert.equal(await page.locator('#drawingSvg .scale-bar-panel').count(), 1);
       assert.ok(await page.locator('#communityPanel').isVisible());
       const candidate = page.locator('#communityCandidates .candidate-card').filter({ hasText: 'Test School' });
       assert.equal(await candidate.count(), 1);
@@ -274,7 +291,7 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Print / Save PDF' }).count(), 1);
   assert.deepEqual(badLocalResponses, []);
   assert.equal(errors.length, 0, errors.join('\n'));
-  console.log(JSON.stringify({ modes: Object.keys(expected), defaultNavigation: true, drawingCancellation: true, routeCancellation: true, routePanWithoutVertex: true, issuedExtentParity: true, communityAreaAddRemove: true, editorLayerControls: true, roadSnapMocked: interceptedRouteRequests.length, routeDirectionNormalised: true, coincidentArrowPresentation: true, routeModePersistence: true, manualFallback: true, importRestoresNavigation: true, advancedDefaultCollapsed: true, siteImport: true, renderedBasemap: true, mockedTiles: interceptedTileRequests.length, basemapFailureSafe: true, sourceSnapshot: true, sourceReviewPersistence: true, overlayImport: 2, badLocalResponses, pageErrors: errors }, null, 2));
+  console.log(JSON.stringify({ modes: Object.keys(expected), firstTimePlannerWorkflow: true, defaultNavigation: true, drawingCancellation: true, routeCancellation: true, routePanWithoutVertex: true, issuedExtentParity: true, communityAreaAddRemove: true, editorLayerControls: true, roadSnapMocked: interceptedRouteRequests.length, routeDirectionNormalised: true, coincidentArrowPresentation: true, routeModePersistence: true, manualFallback: true, importRestoresNavigation: true, advancedDefaultCollapsed: true, siteImport: true, renderedBasemap: true, optionalBasemapAppearance: true, mockedTiles: interceptedTileRequests.length, basemapFailureSafe: true, sourceSnapshot: true, sourceReviewPersistence: true, overlayImport: 2, badLocalResponses, pageErrors: errors }, null, 2));
 } finally {
   await browser.close();
 }

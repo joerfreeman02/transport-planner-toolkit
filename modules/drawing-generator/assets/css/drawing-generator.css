@@ -50,6 +50,15 @@ details { margin-top:.7rem; }
 .advanced-tools>summary { padding:1rem 1.2rem; color:var(--navy); background:white; border-radius:7px; font-size:1rem; font-weight:800; cursor:pointer; }
 .advanced-tools[open]>summary { border-bottom:1px solid #c9d2d9; border-radius:7px 7px 0 0; }
 .advanced-stack { display:grid; gap:1rem; padding:1rem; }
+.sources-audit { margin-top:1.2rem; padding:1rem; border:1px solid #aebbc5; border-radius:6px; background:#f7fafc; }
+.sources-audit .panel-heading { margin-bottom:.7rem; }
+.appearance-controls { max-width:900px; }
+.sources-audit-rows { display:grid; gap:.35rem; margin:.7rem 0; }
+.sources-audit-row { display:grid; grid-template-columns:170px minmax(190px,1fr) minmax(130px,.7fr) auto; gap:.65rem; align-items:center; padding:.5rem .65rem; border:1px solid #d2dbe1; background:#fff; font-size:.8rem; }
+.sources-audit-row strong { color:var(--navy); }.sources-audit-row span { color:#4f5d68; }.sources-audit-row b { font-size:.72rem; color:#176b35; }.sources-audit-row a,.candidate-audit-actions a { color:#0057a8; font-weight:700; }
+.planner-selection-panel { margin-top:.8rem; padding:.8rem; border:1px solid #c4d0d8; background:#fff; }.planner-selection-panel h3 { margin:0; }.planner-selection-panel>p { margin:.35rem 0 .65rem; color:#4e5e6b; font-size:.82rem; }
+.bus-route-selection { display:flex; flex-wrap:wrap; gap:.4rem; margin:.5rem 0; }.bus-route-choice { display:flex; align-items:center; gap:.35rem; padding:.4rem .55rem; border:1px solid #cbd5dc; background:#f8fafb; font-size:.78rem; }.bus-route-choice input { width:auto; min-height:auto; }
+.bus-group-rows { display:grid; gap:.35rem; margin-top:.55rem; }.bus-group-row { display:grid; grid-template-columns:10px minmax(170px,1fr) minmax(120px,1fr) auto; gap:.55rem; align-items:center; padding:.45rem .55rem; border:1px solid #d1dae0; font-size:.8rem; }.bus-group-row i { display:block; height:18px; background:var(--group-colour); }.bus-group-row span { color:#56636e; }
 .embedded-panel { box-shadow:none; }
 .generation-actions { display:flex; align-items:center; gap:1rem; margin-top:1rem; padding:1rem; border:1px solid #c7d5df; background:#f4f8fb; }
 .generation-actions p { margin:0; color:#4e5e6b; }
@@ -67,6 +76,7 @@ pre { max-height:260px; overflow:auto; padding:.8rem; background:#101820; color:
 .candidate-card { border:1px solid #ccd5dc; padding:.65rem; display:grid; gap:.35rem; }
 .candidate-card strong { color:var(--navy); }
 .candidate-card small { color:#53616d; line-height:1.3; }
+.candidate-audit-actions { display:flex; flex-wrap:wrap; gap:.6rem; font-size:.78rem; }
 .candidate-card.is-selected { border-color:#238636; background:#eef9f0; box-shadow:inset 4px 0 #238636; }
 .candidate-card.requires-review { border-color:#d19000; background:#fff9e6; }
 .source-review-panel { margin-top:1rem; padding:.85rem; border:1px solid #9aabb8; background:#f8fbfd; }
@@ -139,20 +149,21 @@ td input,td select { min-height:2rem; padding:.3rem; }
 .label-context-place { fill:#5a6164; font-size:9px; font-weight:600; }
 .label-main-road { fill:#b20d16; }
 .label-motorway { fill:#a20d9f; }
-.label-cycle-network-primary,.label-cycle-network-local { fill:#9a6500; font-size:7px; }
+.label-cycle-network-primary,.label-cycle-network-local { fill:#08703d; font-size:7px; }
 .label-railway { fill:#52575a; font-size:7px; }
-.rendered-osm-basemap { opacity:.9; }
 .rendered-osm-basemap image { image-rendering:auto; }
 .bng-grid { opacity:.2; }
 .bng-grid line { stroke:#bfc5c7; stroke-width:.3; vector-effect:non-scaling-stroke; }
 .basemap-failure-warning rect { fill:#fff4f4; stroke:#b0000a; stroke-width:2px; }
 .basemap-failure-warning text { fill:#b0000a; font:800 13px Arial,sans-serif; letter-spacing:.03em; }
+.north-arrow-panel,.scale-bar-panel { fill:rgba(255,255,255,.9); stroke:#8d989f; stroke-width:.55; vector-effect:non-scaling-stroke; }
 .north-arrow text { font-size:22px; font-family:Arial,sans-serif; fill:#333; }
 .scale-label { font-size:8px; font-family:Arial,sans-serif; fill:#111; }
 .osm-attribution rect { fill:rgba(255,255,255,.88); stroke:#454545; stroke-width:.6; vector-effect:non-scaling-stroke; }
 .osm-attribution text { fill:#151515; font:700 9px Arial,sans-serif; letter-spacing:.01em; }
 .source-warning { fill:#b0000a; font-size:7px; font-weight:800; }
 .site-callout text { fill:#b20d16; font:800 10px Arial,sans-serif; letter-spacing:.08em; }
+.community-annotation path { fill:none; stroke:#666; stroke-width:1; vector-effect:non-scaling-stroke; }.community-annotation rect { fill:rgba(255,255,255,.93); stroke:#737373; stroke-width:.8; vector-effect:non-scaling-stroke; }.community-annotation text { fill:#303438; font:800 8px Arial,sans-serif; letter-spacing:.015em; }
 .dg-map-marker span { display:block; width:12px; height:12px; border:2px solid #fff; border-radius:50%; background:#555; box-shadow:0 0 0 1px #333; }
 .dg-map-marker.station-national-rail span { background:#888; }
 .dg-map-marker.station-overground span { background:#ef6c24; }
@@ -174,6 +185,7 @@ footer { padding:1.2rem; color:#dbe5ed; background:#172633; text-align:center; }
   .app-header img { width:110px; }
   .build { grid-column:1 / span 2; text-align:left; }
   .form-grid,.form-grid.compact,.setup-grid,.metadata-grid,.overlay-form,.coordinate-grid { grid-template-columns:1fr 1fr; }
+  .sources-audit-row { grid-template-columns:1fr 1fr; }
   .locate-grid { grid-template-columns:1fr; }
   .generation-actions { align-items:stretch; flex-direction:column; }
   .editing-map { min-height:420px; }

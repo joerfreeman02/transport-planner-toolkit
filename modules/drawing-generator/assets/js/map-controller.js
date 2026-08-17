@@ -9,8 +9,8 @@ const SOURCE_STYLES = Object.freeze({
   'context-place': { color: '#777', weight: 1, opacity: .6 },
   'main-road': { color: '#ed1c24', weight: 2, opacity: .8 }, motorway: { color: '#ec1ce8', weight: 3, opacity: .85 },
   railway: { color: '#666', weight: 2.4, dashArray: '7 3' }, waterway: { color: '#00a9e0', weight: 2.6 }, 'waterway-review': { color: '#00a9e0', weight: 1.8, dashArray: '3 4' },
-  'cycle-network-primary': { color: '#ec1ce8', weight: 3 }, 'cycle-network-local': { color: '#0057e7', weight: 2.5 },
-  'strategic-cycle': { color: '#ec1ce8', weight: 2.8 }, 'cycle-route': { color: '#0057e7', weight: 2.5 }, 'cycle-review': { color: '#7f2a90', weight: 1.8, dashArray: '3 4' },
+  'cycle-network-primary': { color: '#00a651', weight: 3 }, 'cycle-network-local': { color: '#00a651', weight: 2.5, dashArray: '7 4' },
+  'strategic-cycle': { color: '#00a651', weight: 2.8 }, 'cycle-route': { color: '#00a651', weight: 2.5, dashArray: '7 4' }, 'cycle-review': { color: '#7f2a90', weight: 1.8, dashArray: '3 4' },
   'bus-route': { color: '#7f2a90', weight: 3.4 }, 'bus-route-review': { color: '#ed1c24', weight: 2, dashArray: '3 4' },
   'community-candidate': { color: '#666', weight: 1.5, fillColor: '#999', fillOpacity: .12 }
 });
@@ -27,6 +27,16 @@ const SOURCE_GROUPS = Object.freeze({
 function groupForFeature(feature) {
   const className = feature.properties?.class;
   return Object.keys(SOURCE_GROUPS).find(name => SOURCE_GROUPS[name].has(className)) || '';
+}
+
+function sourceStyle(feature) {
+  const className = feature.properties?.class;
+  if (className === 'railway') {
+    const railMode = feature.properties?.railMode || '';
+    const colour = { 'London Overground': '#f58220', 'London Underground': '#0057e7', DLR: '#00a4a7', 'Tram/light rail': '#5a8f29', 'National Rail': '#666' }[railMode] || '#666';
+    return { ...(SOURCE_STYLES.railway || {}), color: colour, ...(railMode ? { dashArray: '' } : {}) };
+  }
+  return { ...(SOURCE_STYLES[className] || { color: '#777', weight: 1.5 }), ...(feature.properties?.colour ? { color: feature.properties.colour } : {}) };
 }
 
 function defaultGroups(modeId) {
@@ -54,7 +64,7 @@ export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCre
   const base = L.tileLayer(provider.urlTemplate, { minZoom: provider.minZoom, maxZoom: provider.maxZoom, crossOrigin: true, opacity: 1, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
   const editable = L.featureGroup().addTo(map);
   const sourceGroups = Object.fromEntries(Object.keys(SOURCE_GROUPS).map(name => [name, L.geoJSON(null, {
-    style: feature => ({ ...(SOURCE_STYLES[feature.properties?.class] || { color: '#777', weight: 1.5 }), ...(feature.properties?.colour ? { color: feature.properties.colour } : {}) }),
+    style: sourceStyle,
     pointToLayer: (feature, latlng) => L.marker(latlng, { icon: pointIcon(feature.properties?.class || 'source') }),
     onEachFeature: (feature, layer) => { const label = feature.properties?.name || feature.properties?.routeLabel || feature.properties?.class; if (label) layer.bindTooltip(label); }
   })]));

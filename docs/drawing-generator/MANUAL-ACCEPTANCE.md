@@ -3,8 +3,12 @@
 Drawing Generator is a live-review candidate and must not be accepted merely because these steps complete.
 
 1. Open the deployed direct Drawing Generator URL in Chrome or Edge.
-2. Confirm the banner says `WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE` and the build says `DRAW-0.1.0-DG0C3.3-20260817`.
-3. In each drawing mode confirm the issued sheet contains exactly one EAS logo, in the title block.
+2. Confirm the banner says `WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE` and the build says `DRAW-0.1.0-DG0C3.3A-20260817`.
+3. Without opening **Advanced controls and diagnostics**, switch through Regional Plan, Regional Routing, Local Context and Local Routing. Confirm the normal five steps are visible: choose drawing, locate site, confirm site/routes, set appearance/check sources, then generate/review/issue.
+4. Confirm Colour and Faded are the initial basemap choices. Switch to Greyscale only when desired and confirm Colour remains selectable; the site, routes and controlled coloured overlays must not change.
+5. In Local Context, optionally make a bus presentation group. Confirm a route cannot be added to two groups, ungrouped routes remain shown and the group does not change route source identity or geometry.
+6. Confirm generic rail geometry is labelled `RAILWAY`, not London Overground, unless explicit source evidence supports a named mode. Confirm community candidates offer stable OpenStreetMap and Google Maps links and that selected annotations use a leader and backed label.
+7. In each drawing mode confirm the issued sheet contains exactly one EAS logo, in the title block.
 
 ## Routing workflow
 
@@ -25,7 +29,7 @@ Drawing Generator is a live-review candidate and must not be accepted merely bec
 4. Enter the live project address and search, or enter confirmed coordinates. Confirm this centres the map but does **not** create a site polygon.
 5. Draw the approved site boundary with the polygon tool, or import a Product Owner-prepared GeoJSON Polygon/MultiPolygon. Edit it and confirm any holes. Do not treat the architect PDF as georeferenced geometry.
 6. Enter project/client in the primary setup. Open Advanced only for architect, drawing/project numbers, designer, date, revision/status, diagnostics and reviewed overlays.
-7. Select **Regional Plan**, choose **Generate / refresh drawing**, review every missing-layer warning, and add reviewed overlays where needed. Confirm recognizable OSM Standard roads, settlements, land and water appear as the rendered basemap beneath the red/magenta/orange/blue/grey controlled hierarchy. Confirm a separate readable `© OpenStreetMap contributors` marker at the map edge, z13 and a bounded tile count are recorded on the sheet/SVG.
+7. Select **Regional Plan**, choose **Generate / refresh drawing**, review every missing-layer warning, and add reviewed overlays where needed. Confirm recognizable OSM Standard roads, settlements, land and water appear as the rendered basemap beneath the red/green/blue/grey controlled hierarchy. Confirm a separate readable `© OpenStreetMap contributors` marker at the map edge, z13 and a bounded tile count are recorded on the sheet/SVG.
 8. In **Advanced editing / source diagnostics**, inspect each station row: confirm its stable source ID, name/mode, current Include/Exclude state and returned-rail QA. Confirm a `REVIEW REQUIRED - NO NEARBY RETURNED RAIL GEOMETRY` station is excluded from map, drawing and legend until **Include** is explicitly selected; confirm the decision persists through a mode change/retrieval without relocating the source geometry.
 9. Select **Regional Routing**. Confirm the primary buttons **Draw Route To Site**, **Draw Route From Site**, **Cancel Route Drawing** and **Delete/Redraw Route** are visible/usable. Draw professionally approved directions and review arrows/legend.
 10. Select **Local Context**, retrieve local candidates and use the separate Cycle, Rail, Bus, Water and Community controls. Include only relevant community considerations with an evidenced source area or single containing building. Confirm Add changes immediately to Added/Remove, updates map and preview, persists without duplicates, and that ambiguous/no-building nodes remain review-only. Confirm generic red main-road thematic clutter is absent.

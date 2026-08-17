@@ -21,6 +21,18 @@ export function modeForTags(tags = {}) {
   return 'National Rail';
 }
 
+// Rail line styling must only use explicit way/relation evidence. Unlike stations,
+// a bare railway=rail way does not establish a passenger-service mode.
+export function modeForRailGeometryTags(tags = {}) {
+  const summary = normal([tags.network, tags.operator, tags.line, tags.route, tags.name, tags.description].filter(Boolean).join(' '));
+  if (tags.railway === 'tram' || tags.railway === 'light_rail' || summary.includes('tramlink') || /\btram\b/.test(summary)) return 'Tram/light rail';
+  if (summary.includes('docklands light railway') || /\bdlr\b/.test(summary)) return 'DLR';
+  if (summary.includes('london overground') || /\boverground\b/.test(summary)) return 'London Overground';
+  if (tags.railway === 'subway' || summary.includes('london underground') || /\bunderground\b/.test(summary)) return 'London Underground';
+  if (/\b(national rail|network rail|great western|northern|southern|thameslink|southeastern|greater anglia|avanti|chiltern)\b/.test(summary)) return 'National Rail';
+  return '';
+}
+
 export const RAIL_MODE_CLASS = Object.freeze({
   'National Rail': 'station-national-rail',
   'London Overground': 'station-overground',

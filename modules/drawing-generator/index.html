@@ -13,13 +13,13 @@
   <header class="app-header">
     <img src="assets/images/eas-primary.png" alt="EAS Consulting Engineers">
     <div><a href="../../">Transport Planner Toolkit</a><h1>Drawing Generator</h1><p>Planner-first professional drawing workflow</p></div>
-    <div class="build"><strong>DRAW-0.1.0</strong><span>DRAW-0.1.0-DG0C3.3-20260817</span></div>
+    <div class="build"><strong>DRAW-0.1.0</strong><span>DRAW-0.1.0-DG0C3.3A-20260817</span></div>
   </header>
   <div class="candidate-banner" role="status">WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE</div>
 
   <main class="application">
     <section class="panel planner-primary" aria-labelledby="project-heading">
-      <div class="panel-heading"><span>01</span><div><h2 id="project-heading">Set up the drawing</h2><p>Choose the drawing, identify the project, then locate and confirm the site.</p></div></div>
+      <div class="panel-heading" data-workflow-step="1"><span>01</span><div><h2 id="project-heading">Choose the drawing</h2><p>Start with the drawing type and basic project identification.</p></div></div>
       <div class="form-grid setup-grid">
         <label>Drawing type<select id="modeSelect">
           <option value="regional-plan">Regional Plan - A3 @ 1:50,000</option>
@@ -30,13 +30,14 @@
         <label>Project<input data-meta="project" placeholder="Project or site name"></label>
         <label>Client<input data-meta="client" placeholder="Client name"></label>
       </div>
-      <h3>Locate the site</h3>
+      <h3 data-workflow-step="2">Locate the site</h3>
       <div class="locate-grid">
         <label>Project/site address<input id="addressInput" autocomplete="street-address" placeholder="Search centre only"></label>
         <div class="field-action"><button id="searchAddress">Find address</button></div>
       </div>
       <details class="coordinate-entry"><summary>Use known coordinates</summary><div class="form-grid coordinate-grid"><label>Latitude<input id="latitudeInput" type="number" step="0.000001" placeholder="51.500000"></label><label>Longitude<input id="longitudeInput" type="number" step="0.000001" placeholder="-0.100000"></label><div class="field-action"><button id="useCoordinates">Use coordinates</button></div></div></details>
       <div id="searchResults" class="search-results" aria-live="polite"></div>
+      <h3 data-workflow-step="3">Confirm the site and plan routes</h3>
       <p id="siteStatus" class="status-message">Locate the map, then draw or import the confirmed site boundary.</p>
       <div class="toolbar">
         <button id="drawSite" class="primary">Draw site boundary</button>
@@ -64,11 +65,27 @@
         <p class="hint">To add guidance, edit or redraw the route with another waypoint, then retry. Waypoint order is preserved.</p>
         <p id="routeStatus" class="status-message warning">No planner-approved routing lines added.</p>
       </section>
-      <div class="generation-actions"><button id="generateDrawing" class="primary action-large">Generate / refresh drawing</button><p id="workflowStatus">The generated sheet appears below for professional review.</p></div>
+      <section id="sourcesAudit" class="sources-audit" data-workflow-step="4" aria-labelledby="sources-audit-heading">
+        <div class="panel-heading"><span>04</span><div><h2 id="sources-audit-heading">Set appearance and check sources</h2><p>Choose the issued-map treatment, refresh current evidence, then make any required local selections.</p></div></div>
+        <div class="form-grid compact appearance-controls">
+          <label>Basemap colour<select id="basemapColour"><option value="colour">Colour</option><option value="greyscale">Greyscale</option></select></label>
+          <label>Map emphasis<select id="basemapEmphasis"><option value="faded">Faded - recommended</option><option value="normal">Normal</option></select></label>
+          <div class="field-action"><button id="loadSources" type="button">Refresh drawing evidence</button></div>
+        </div>
+        <p id="sourceStatus" class="status-message warning">Refresh drawing evidence after locating the site.</p>
+        <div id="sourcesAuditRows" class="sources-audit-rows" aria-label="Sources and audit summary"></div>
+        <section id="busPresentationPanel" class="planner-selection-panel" hidden aria-labelledby="bus-presentation-heading">
+          <h3 id="bus-presentation-heading">Bus presentation groups</h3><p>Optional presentation-only grouping. Source route numbers and geometry remain unchanged.</p>
+          <div id="busRouteSelection" class="bus-route-selection"></div>
+          <div class="form-grid compact"><label>Group label<input id="busGroupLabel" placeholder="BUS ROUTES 313, 379 &amp; 385"></label><label>Controlled colour<select id="busGroupColour"></select></label><div class="field-action"><button id="groupSelectedBusRoutes" type="button">Group selected routes</button></div></div>
+          <div id="busGroupRows" class="bus-group-rows"></div>
+        </section>
+        <section id="communityPanel" class="planner-selection-panel" hidden aria-labelledby="community-heading"><h3 id="community-heading">Community considerations</h3><p>Select only evidence-backed areas to include in the drawing.</p><div id="communityCandidates" class="candidate-list"></div></section>
+      </section>
     </section>
 
     <details id="advancedTools" class="advanced-tools">
-      <summary>Advanced editing / source diagnostics</summary>
+      <summary>Advanced controls and diagnostics</summary>
       <div class="advanced-stack">
         <section class="panel embedded-panel" aria-labelledby="metadata-heading">
           <div class="panel-heading"><span>A1</span><div><h2 id="metadata-heading">Title-block details</h2><p>Optional professional metadata and fixed-scale validation.</p></div></div>
@@ -88,16 +105,14 @@
         </section>
 
         <section class="panel embedded-panel" aria-labelledby="source-heading">
-          <div class="panel-heading"><span>A2</span><div><h2 id="source-heading">Source diagnostics</h2><p>Structured professional transport evidence for the exact drawing extent, separate from the rendered basemap.</p></div></div>
-          <div class="toolbar"><button id="loadSources">Refresh vector source</button><button id="downloadSnapshot" disabled>Download source snapshot</button></div>
-          <p id="sourceStatus" class="status-message warning">No vector snapshot loaded. Required layers may be added through reviewed overlays.</p>
+          <div class="panel-heading"><span>A2</span><div><h2 id="source-heading">Engineering source diagnostics</h2><p>Raw snapshot and station consistency controls for technical review only.</p></div></div>
+          <div class="toolbar"><button id="downloadSnapshot" disabled>Download source snapshot</button></div>
           <details><summary>Source record</summary><pre id="sourceDiagnostics">Not loaded.</pre></details>
           <section id="sourceReviewPanel" class="source-review-panel" hidden aria-labelledby="source-review-heading">
             <h3 id="source-review-heading">Professional source review</h3>
             <p>Station inclusion is controlled against returned railway geometry. Source records remain immutable; choices persist locally by source ID.</p>
             <div id="sourceReviewRows" class="source-review-list"></div>
           </section>
-          <div id="communityPanel" hidden><h3>Community candidates - professional selection required</h3><p>Mapped candidates are not added automatically.</p><div id="communityCandidates" class="candidate-list"></div></div>
         </section>
 
         <section class="panel embedded-panel" aria-labelledby="overlay-heading">
@@ -121,9 +136,10 @@
       </div>
     </details>
 
-    <section class="panel preview-panel" aria-labelledby="preview-heading">
-      <div class="panel-heading"><span>02</span><div><h2 id="preview-heading">Review and issue</h2><p>Check the rendered OpenStreetMap basemap, controlled transport hierarchy, labels and title block before printing.</p></div></div>
-      <div class="toolbar"><button id="refreshPreview">Refresh sheet only</button><button id="printDrawing" class="primary">Print / Save PDF</button></div>
+    <section class="panel preview-panel" data-workflow-step="5" aria-labelledby="preview-heading">
+      <div class="panel-heading"><span>05</span><div><h2 id="preview-heading">Generate, review and issue</h2><p>Review the selected basemap treatment, transport hierarchy, labels and title block before printing.</p></div></div>
+      <div class="toolbar"><button id="generateDrawing" class="primary action-large">Generate / refresh drawing</button><button id="refreshPreview">Refresh sheet only</button><button id="printDrawing" class="primary">Print / Save PDF</button></div>
+      <p id="workflowStatus" class="status-message">Ready to generate a planner-reviewed drawing.</p>
       <p id="drawingStatus" class="status-message warning">A confirmed site boundary is required before professional issue.</p>
       <div class="sheet-stage">
         <article id="drawingSheet" class="drawing-sheet layout-regional" aria-label="A3 landscape EAS drawing sheet">
@@ -140,7 +156,7 @@
               <div class="title-cell project"><small>PROJECT</small><strong data-sheet-meta="project">-</strong><small>PROJECT No.</small><span data-sheet-meta="projectNumber">-</span></div>
               <div class="title-cell drawing"><small>TITLE</small><strong data-sheet-meta="drawingTitle">REGIONAL PLAN</strong><small>DRAWING No.</small><span data-sheet-meta="drawingNumber">EAS-SK-H-101</span></div>
               <div class="title-cell issue"><small>DRAWING STATUS</small><strong data-sheet-meta="drawingStatus">LIVE REVIEW</strong><div class="mini-grid"><span><small>SCALE @ A3</small><b data-sheet-meta="scale">1:50,000</b></span><span><small>DESIGN / DRAWN</small><b><span data-sheet-meta="designedBy">-</span> / <span data-sheet-meta="drawnBy">-</span></b></span><span><small>DATE</small><b data-sheet-meta="date">-</b></span></div></div>
-              <div class="title-cell revision"><div class="revision-head"><small>REV</small><small>DATE</small><small>BY</small><small>DESCRIPTION</small></div><div class="revision-row"><b data-sheet-meta="revision">P01</b><span data-sheet-meta="date">-</span><span data-sheet-meta="drawnBy">-</span><span data-sheet-meta="revisionDescription">Live review candidate</span></div><small class="build-id">DRAW-0.1.0-DG0C3.3-20260817</small></div>
+              <div class="title-cell revision"><div class="revision-head"><small>REV</small><small>DATE</small><small>BY</small><small>DESCRIPTION</small></div><div class="revision-row"><b data-sheet-meta="revision">P01</b><span data-sheet-meta="date">-</span><span data-sheet-meta="drawnBy">-</span><span data-sheet-meta="revisionDescription">Live review candidate</span></div><small class="build-id">DRAW-0.1.0-DG0C3.3A-20260817</small></div>
             </section>
           </div>
           <div class="sheet-attribution"><span id="sheetAttribution">No external source loaded.</span><span id="sheetExtent">Scale-driven projected extent.</span></div>
@@ -148,7 +164,7 @@
       </div>
     </section>
   </main>
-  <footer>Transport Planner Toolkit - Drawing Generator DG-0C3.3 - work in progress / professional review required</footer>
+  <footer>Transport Planner Toolkit - Drawing Generator DG-0C3.3A - work in progress / professional review required</footer>
   <script src="assets/vendor/proj4.js"></script>
   <script src="../../assets/vendor/leaflet/leaflet.js"></script>
   <script src="assets/vendor/leaflet.draw.js"></script>

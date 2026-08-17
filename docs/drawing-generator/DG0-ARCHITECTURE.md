@@ -1,7 +1,7 @@
 # DG-0 architecture
 
 Status: **Proposed live-review candidate; not an accepted baseline.**
-Version/build: `DRAW-0.1.0` / `DRAW-0.1.0-DG0C3.3-20260817`.
+Version/build: `DRAW-0.1.0` / `DRAW-0.1.0-DG0C3.3A-20260817`.
 
 ## Road-geometry assistance boundary
 
@@ -25,6 +25,8 @@ The module does not select professional HGV routes, infer a site polygon from an
 8. A pure presentation stage filters source-review exclusions, groups only connected like-for-like linework, removes coincident duplicate station labels, caps repeated labels and withholds colliding/out-of-frame labels. Original feature/source identifiers remain in the source snapshot and presentation metadata. Regional road labelling is limited to returned A/M references, with no geographic road/junction/roundabout names and one repeated reference normally permitted.
 9. The renderer composes the raster tiles beneath BNG-projected, clipped controlled vectors in one SVG and records provider, zoom, tile count and maximum affine-centre error. It carries a separate map-corner OpenStreetMap attribution rather than mixing copyright text with engineering provenance. Tile failure preserves vector overlays, blocks print and displays `BASEMAP FAILED TO LOAD - REVIEW REQUIRED`.
 10. CSS composes one `420mm x 297mm` landscape sheet. Browser Print / Save PDF uses `@page { size: A3 landscape; margin: 0; }`.
+11. Basemap colour/emphasis is per-mode presentation state. The rendered OSM tile group alone may be faded or greyscale; controlled source and professional overlay geometry is unchanged.
+12. Optional bus presentation groups are applied as a rendering copy, so raw route identity, geometry and source provenance remain immutable. Rail geometry is mode-labelled only on explicit tags; generic track geometry remains neutral.
 
 ## Components
 

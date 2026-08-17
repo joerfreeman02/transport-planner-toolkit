@@ -22,6 +22,7 @@ const routeGeometry = await import('../assets/js/route-geometry.js');
 const routeSnap = await import('../assets/js/route-snap-adapter.js');
 const sourceReview = await import('../assets/js/source-review.js');
 const community = await import('../assets/js/community-association.js');
+const presentation = await import('../assets/js/presentation-controls.js');
 
 let passed = 0;
 async function test(name, fn) {
@@ -160,6 +161,14 @@ await test('current OSM cycle hierarchy is retained without requiring a route re
     assert.deepEqual([result.properties.network, result.properties.name, result.properties.operator, result.properties.cycleNetwork], [network, `${network.toUpperCase()} route`, 'Test operator', 'GB:test']);
   }
 });
+
+await test('rail geometry mode never infers London Overground without explicit evidence', () => {
+  const generic = source.classifyOverpassElement({ type: 'way', id: 41, tags: { railway: 'rail' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
+  const overground = source.classifyOverpassElement({ type: 'way', id: 42, tags: { railway: 'rail', operator: 'London Overground' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
+  const national = source.classifyOverpassElement({ type: 'way', id: 43, tags: { railway: 'rail', operator: 'Network Rail' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
+  assert.deepEqual([generic.properties.railMode, overground.properties.railMode, national.properties.railMode], ['', 'London Overground', 'National Rail']);
+  assert.equal(railway.modeForRailGeometryTags({ railway: 'light_rail' }), 'Tram/light rail');
+});
 await test('railway sidings and yard tracks remain support-only rather than issued line hierarchy', () => {
   const main = source.classifyOverpassElement({ type: 'way', id: 31, tags: { railway: 'rail', usage: 'main' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
   const siding = source.classifyOverpassElement({ type: 'way', id: 32, tags: { railway: 'rail', service: 'siding' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
@@ -177,6 +186,21 @@ await test('bus relation without line geometry is explicitly review-only', () =>
   const item = source.classifyOverpassElement({ type: 'relation', id: 19, center: { lon: -.1, lat: 51.5 }, tags: { route: 'bus', ref: '99' }, members: [] })[0];
   assert.equal(item.properties.class, 'bus-route-review');
   assert.equal(item.properties.reviewReason, 'BUS ROUTE GEOMETRY REQUIRES REVIEW');
+});
+await test('controlled bus presentation groups preserve source identity and prevent duplicate route membership', () => {
+  const features = [
+    { type: 'Feature', id: 'relation/1', properties: { class: 'bus-route', sourceId: 'relation/1', ref: '10', geometryEvidence: 'osm-clipped' }, geometry: { type: 'LineString', coordinates: [[-.1, 51.5], [-.09, 51.51]] } },
+    { type: 'Feature', id: 'relation/2', properties: { class: 'bus-route', sourceId: 'relation/2', ref: '20', geometryEvidence: 'osm-clipped' }, geometry: { type: 'LineString', coordinates: [[-.1, 51.51], [-.09, 51.52]] } }
+  ];
+  const grouped = presentation.applyBusPresentationGroups(features, [
+    { id: 'bus-group-1', label: 'ALL BUS ROUTES', routeRefs: ['10', '20'], colour: '#7f2a90' },
+    { id: 'bus-group-2', label: 'DUPLICATE', routeRefs: ['20'], colour: '#00a651' }
+  ]);
+  assert.deepEqual(presentation.normaliseBusGroups([{ routeRefs: ['10', '20'] }, { routeRefs: ['20'] }]).map(group => group.routeRefs), [['10', '20']]);
+  assert.deepEqual(features.map(feature => feature.properties.sourceId), grouped.map(feature => feature.properties.sourceId));
+  assert.deepEqual(features.map(feature => feature.geometry), grouped.map(feature => feature.geometry));
+  assert.equal(grouped[0].properties.presentationBusLabel, 'ALL BUS ROUTES');
+  assert.deepEqual(presentation.busRouteReferences(features), ['10', '20']);
 });
 await test('clipped relation null geometry placeholders are ignored safely', () => {
   const item = source.classifyOverpassElement({
@@ -406,19 +430,41 @@ await test('routing drawings suppress automatic thematic overlays and rendering 
   assert.match(result.markup, /class="route-direction-arrow"/);
   assert.deepEqual(route.geometry, original);
 });
-await test('Local Context suppresses generic main-road theming and applies the recovered cycle/rail hierarchy', () => {
+await test('Local Context preserves hierarchy with green cycles and evidence-led rail styling', () => {
   const centerBng = crs.wgs84ToBng([-.1, 51.5]);
   const features = [
     { type: 'Feature', properties: { class: 'main-road', officialARef: 'A1' }, geometry: { type: 'LineString', coordinates: [[-.11, 51.49], [-.09, 51.51]] } },
     { type: 'Feature', properties: { class: 'cycle-network-primary' }, geometry: { type: 'LineString', coordinates: [[-.11, 51.5], [-.09, 51.5]] } },
     { type: 'Feature', properties: { class: 'cycle-network-local' }, geometry: { type: 'LineString', coordinates: [[-.1, 51.49], [-.1, 51.51]] } },
-    { type: 'Feature', properties: { class: 'railway' }, geometry: { type: 'LineString', coordinates: [[-.105, 51.49], [-.105, 51.51]] } }
+    { type: 'Feature', properties: { class: 'railway' }, geometry: { type: 'LineString', coordinates: [[-.105, 51.49], [-.105, 51.51]] } },
+    { type: 'Feature', properties: { class: 'railway', railMode: 'London Overground' }, geometry: { type: 'LineString', coordinates: [[-.106, 51.49], [-.106, 51.51]] } }
   ];
   const markup = renderDrawingSvg({ modeId: 'local-context', centerBng, sourceFeatures: features }).markup;
   assert.doesNotMatch(markup, /layer-main-road/);
-  assert.match(markup, /layer-cycle-network-primary[\s\S]*stroke="#ec1ce8"/);
-  assert.match(markup, /layer-cycle-network-local[\s\S]*stroke="#0057e7"/);
+  assert.match(markup, /layer-cycle-network-primary[\s\S]*stroke="#00a651"/);
+  assert.match(markup, /layer-cycle-network-local[\s\S]*stroke="#00a651"[\s\S]*stroke-dasharray="4 2\.5"/);
+  assert.match(markup, /layer-railway[\s\S]*stroke="#666666"/);
   assert.match(markup, /layer-railway[\s\S]*stroke="#f58220"/);
+  const genericOnly = renderDrawingSvg({ modeId: 'local-context', centerBng, sourceFeatures: [features[3]] });
+  assert.ok(genericOnly.legend.some(item => item.label === 'RAILWAY'));
+  assert.ok(!genericOnly.legend.some(item => item.label === 'LONDON OVERGROUND'));
+});
+await test('basemap appearance is optional, defaults to colour and leaves professional vector geometry unchanged', () => {
+  const centerBng = crs.wgs84ToBng([-.1, 51.5]);
+  const sourceFeatures = [{ type: 'Feature', properties: { class: 'cycle-network-primary' }, geometry: { type: 'LineString', coordinates: [[-.11, 51.5], [-.09, 51.5]] } }];
+  const colour = renderDrawingSvg({ modeId: 'local-context', centerBng, sourceFeatures }).markup;
+  const greyscale = renderDrawingSvg({ modeId: 'local-context', centerBng, sourceFeatures, basemapAppearance: { colour: 'greyscale', emphasis: 'normal' } }).markup;
+  assert.deepEqual(presentation.normaliseBasemapAppearance(), { colour: 'colour', emphasis: 'faded' });
+  assert.match(colour, /data-basemap-colour="colour"[\s\S]*opacity:0\.8/);
+  assert.match(greyscale, /data-basemap-colour="greyscale"[\s\S]*style="opacity:1" filter="url\(#basemap-greyscale\)"/);
+  assert.match(greyscale, /layer-cycle-network-primary[\s\S]*stroke="#00a651"/);
+});
+await test('community annotations use a leader and a readable backed label', () => {
+  const centerBng = crs.wgs84ToBng([-.1, 51.5]);
+  const overlay = normaliseOverlay({ type: 'Polygon', coordinates: [[[-.102, 51.499], [-.1, 51.499], [-.1, 51.501], [-.102, 51.499]]] }, { className: 'community', label: 'Community facility' });
+  const markup = renderDrawingSvg({ modeId: 'local-context', centerBng, overlays: [overlay] }).markup;
+  assert.match(markup, /community-annotation-leader/);
+  assert.match(markup, /community-annotation-backing/);
 });
 await test('coincident TO and FROM arrows use opposing presentation-only offsets and white halos', () => {
   const centerBng = crs.wgs84ToBng([-.1, 51.5]);
@@ -445,7 +491,7 @@ await test('site uses an external leader callout and no generic polygon-centre S
 await test('A3 sheet contains title block, map frame, current logo, legend, attribution and build', () => {
   const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const css = fs.readFileSync(new URL('../assets/css/drawing-generator.css', import.meta.url), 'utf8');
-  for (const marker of ['id="drawingSheet"', 'id="sheetMap"', 'id="sheetLegend"', 'assets/images/eas-primary.png', 'sheetAttribution', BUILD]) assert.match(html, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  for (const marker of ['id="drawingSheet"', 'id="sheetMap"', 'id="sheetLegend"', 'assets/images/eas-primary.png', 'sheetAttribution', 'id="workflowStatus"', BUILD]) assert.match(html, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(css, /@page\s*\{\s*size:A3 landscape;\s*margin:0;/);
   assert.match(css, /width:420mm;\s*height:297mm/);
   const sheet = html.slice(html.indexOf('id="drawingSheet"'), html.indexOf('</article>', html.indexOf('id="drawingSheet"')));

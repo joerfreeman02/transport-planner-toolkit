@@ -134,3 +134,12 @@ Corrective starting commit: `6a3c55ecbcb1587f449c8d69121e85c98d0e76a3`. Build/st
 The source defect was not absent current data: the comparison area contains current bus and cycle evidence. The old query requested every intersecting relation in full and the normalizer then dereferenced null placeholders introduced by clipped relation output. C3.3 uses relation bodies with geometry clipped to the exact frame and filters null placeholders before normalization. TfL remains the preferred bus-route existence authority, but its official Unified API requires registered credentials; no key was available or embedded. OSM remains the current geometry backbone and missing bus line geometry is surfaced as `BUS ROUTE GEOMETRY REQUIRES REVIEW`.
 
 Generated comparison PDFs, page renders, current-source payloads and temporary QA drivers remain untracked. Draft PR `#14` was opened against `main`; GitHub `Drawing Generator CI / deterministic` passed on the functional candidate. The PR remains draft and no merge is authorised.
+
+# DG-0C3.3A release-candidate evidence
+
+Build/status: `DRAW-0.1.0-DG0C3.3A-20260817`; **WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE**.
+
+- `drawing-generator.test.mjs`: **68/68 passed**. Coverage includes generic/explicit rail-mode safety, neutral generic rail rendering, optional colour/greyscale basemap treatment, green cycle hierarchy, backed community labels, immutable controlled bus grouping, arrow readability and exact scale/extent parity.
+- `browser-smoke.mjs`: passed with no page errors/bad local responses. A first-time-user check switches through all four modes and confirms the five normal planner steps are available without opening Advanced controls. It also verifies default colour/faded basemap appearance, source-audit visibility, routing navigation and issued-extent parity.
+- TfL cycle/bus data remains reference-only because the official Unified API requires credentials; no uncredentialed proxy or synthetic TfL route geometry was added.
+- Generated PDFs/screenshots and any real-world source payload remain untracked and excluded from commit. Protected modules and production identity remain untouched.

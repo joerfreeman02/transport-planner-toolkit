@@ -1,6 +1,6 @@
 import { OVERPASS_ENDPOINTS, OSM_ATTRIBUTION } from './config.js';
 import { bngToWgs84 } from './crs.js';
-import { hasRailEvidence, modeForTags, RAIL_MODE_CLASS } from './railway-adapter.js';
+import { hasRailEvidence, modeForTags, modeForRailGeometryTags, RAIL_MODE_CLASS } from './railway-adapter.js';
 import { resolveCommunityCandidateGeometry } from './community-association.js';
 
 export class SourceError extends Error {
@@ -167,7 +167,8 @@ export function classifyOverpassElement(element) {
   }
   if (tags.railway && /^(rail|subway|light_rail|tram)$/.test(tags.railway)) {
     const serviceTrack = /^(siding|yard|spur|crossover)$/.test(tags.service || '');
-    return [feature(element, serviceTrack ? 'railway-support' : 'railway', geometry, { railType: tags.railway, usage: tags.usage || '', service: tags.service || '', supportOnly: serviceTrack })];
+    const railMode = modeForRailGeometryTags(tags);
+    return [feature(element, serviceTrack ? 'railway-support' : 'railway', geometry, { railType: tags.railway, railMode, usage: tags.usage || '', service: tags.service || '', supportOnly: serviceTrack })];
   }
   if (hasRailEvidence(tags) && (tags.railway === 'station' || tags.railway === 'halt' || tags.railway === 'tram_stop' || tags.public_transport === 'station')) {
     const mode = modeForTags(tags);

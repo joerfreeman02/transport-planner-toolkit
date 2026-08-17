@@ -205,7 +205,16 @@ function monitorBasemapTiles(result) {
     const validate = async () => {
       try {
         if (typeof image.decode === 'function') await image.decode();
-        complete(image.naturalWidth < 128 || image.naturalHeight < 128 ? `Tile ${index + 1} is incomplete or unusable.` : '');
+        if (image.naturalWidth < 128 || image.naturalHeight < 128) return complete(`Tile ${index + 1} is incomplete or unusable.`);
+        const response = await fetch(image.getAttribute('href'), { mode: 'cors', cache: 'no-store' });
+        if (!response.ok) return complete(`Tile ${index + 1} could not be embedded.`);
+        const blob = await response.blob();
+        if (blob.size < 256) return complete(`Tile ${index + 1} has unusable image content.`);
+        const dataUrl = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); });
+        image.setAttribute('href', dataUrl);
+        if (typeof image.decode === 'function') await image.decode();
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        complete('');
       } catch { complete(`Tile ${index + 1} could not be decoded.`); }
     };
     timeout = setTimeout(() => complete(`Tile ${index + 1} timed out or remained undecoded.`), 15000);

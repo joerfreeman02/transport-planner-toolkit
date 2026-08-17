@@ -11,7 +11,7 @@ import { basemapProvider, validateBasemapProvider } from './basemap-compositor.j
 import { normaliseRouteDirection } from './route-geometry.js';
 import { DEFAULT_ROAD_ROUTING_PROVIDER, snapRouteThroughGuidance } from './route-snap-adapter.js';
 import { assessStationRailConsistency, resolveSourcePresentation, stationReviewCandidates } from './source-review.js';
-import { BASEMAP_APPEARANCE_DEFAULT, busRouteReferences, nextBusGroupId, normaliseBasemapAppearance, normaliseBusGroups } from './presentation-controls.js';
+import { BASEMAP_APPEARANCE_DEFAULT, BUS_COLOUR_OPTIONS, busRouteReferences, nextBusGroupId, normaliseBasemapAppearance, normaliseBusGroups, suggestBusPresentationGroups } from './presentation-controls.js';
 
 configureProj4(globalThis.proj4);
 const byId = id => document.getElementById(id);
@@ -434,6 +434,23 @@ function renderSourcesAudit() {
   ].join('');
 }
 
+function renderBusColourPreview() {
+  const target = byId('busColourPreview');
+  if (!target) return;
+  const selected = BUS_COLOUR_OPTIONS.find(option => option.value === byId('busGroupColour').value) || BUS_COLOUR_OPTIONS[0];
+  target.innerHTML = `<i style="--group-colour:${escapeHtml(selected.value)}"></i><span>Selected group appearance: <strong>${escapeHtml(selected.label)}</strong></span>`;
+}
+
+function addBusPresentationGroup(routeRefs, label, colour) {
+  const groups = currentBusGroups();
+  const occupied = new Set(groups.flatMap(group => group.routeRefs));
+  const available = [...new Set(routeRefs)].filter(ref => !occupied.has(ref));
+  if (!available.length) return setMessage('sourceStatus', 'Those services are already grouped.', 'warning');
+  groups.push({ id: nextBusGroupId(groups), label: label || `BUS ROUTES ${available.join(', ')}`, routeRefs: available, colour });
+  state.busGroupsByMode[state.modeId] = normaliseBusGroups(groups);
+  persist(); renderBusPresentationGroups(); renderPreview();
+}
+
 function renderBusPresentationGroups() {
   const panel = byId('busPresentationPanel');
   const refs = state.modeId === 'local-context' ? busRouteReferences(currentSource().features) : [];
@@ -442,21 +459,29 @@ function renderBusPresentationGroups() {
   const groups = currentBusGroups();
   const occupied = new Set(groups.flatMap(group => group.routeRefs));
   byId('busRouteSelection').innerHTML = refs.map(ref => `<label class="bus-route-choice"><input type="checkbox" value="${escapeHtml(ref)}" ${occupied.has(ref) ? 'disabled' : ''}>${escapeHtml(ref)}${occupied.has(ref) ? ' - grouped' : ''}</label>`).join('');
+  const suggestions = suggestBusPresentationGroups(currentSource().features, groups);
+  byId('busSuggestions').innerHTML = suggestions.length
+    ? `<strong>Suggested presentation groups</strong>${suggestions.map((suggestion, index) => `<article class="bus-suggestion" data-suggestion-index="${index}"><b>${escapeHtml(suggestion.routeRefs.join(', '))}</b><span>${escapeHtml(suggestion.reason)} Planner confirmation required.</span><button type="button">Use suggestion</button></article>`).join('')}`
+    : '<p class="hint">No strong automatic grouping suggestion — review routes manually.</p>';
   byId('busGroupRows').innerHTML = groups.map(group => `<article class="bus-group-row" data-group-id="${escapeHtml(group.id)}"><i style="--group-colour:${escapeHtml(group.colour)}"></i><strong>${escapeHtml(group.label)}</strong><span>${escapeHtml(group.routeRefs.join(', '))}</span><button type="button">Remove group</button></article>`).join('') || '<p class="hint">Ungrouped services remain visible individually.</p>';
   byId('busGroupRows').querySelectorAll('button').forEach(button => button.addEventListener('click', event => {
     const id = event.currentTarget.closest('[data-group-id]').dataset.groupId;
-    state.busGroupsByMode[state.modeId] = groups.filter(group => group.id !== id); persist(); renderPreview();
+    state.busGroupsByMode[state.modeId] = groups.filter(group => group.id !== id); persist(); renderBusPresentationGroups(); renderPreview();
   }));
+  byId('busSuggestions').querySelectorAll('.bus-suggestion button').forEach(button => button.addEventListener('click', event => {
+    const suggestion = suggestions[Number(event.currentTarget.closest('[data-suggestion-index]').dataset.suggestionIndex)];
+    const colour = BUS_COLOUR_OPTIONS[groups.length % BUS_COLOUR_OPTIONS.length].value;
+    addBusPresentationGroup(suggestion.routeRefs, `BUS ROUTES ${suggestion.routeRefs.join(', ')}`, colour);
+  }));
+  renderBusColourPreview();
 }
 
 function groupSelectedBusRoutes() {
   const selected = [...byId('busRouteSelection').querySelectorAll('input:checked')].map(input => input.value);
   if (!selected.length) return setMessage('sourceStatus', 'Select one or more ungrouped bus routes first.', 'warning');
-  const groups = currentBusGroups();
   const label = byId('busGroupLabel').value.trim() || `BUS ROUTES ${selected.join(', ')}`;
-  groups.push({ id: nextBusGroupId(groups), label, routeRefs: selected, colour: byId('busGroupColour').value });
-  state.busGroupsByMode[state.modeId] = normaliseBusGroups(groups);
-  byId('busGroupLabel').value = ''; persist(); renderPreview();
+  addBusPresentationGroup(selected, label, byId('busGroupColour').value);
+  byId('busGroupLabel').value = '';
 }
 
 function setSourceReviewState(sourceId, reviewState) {
@@ -526,20 +551,55 @@ function renderCommunityCandidates() {
     const evidence = item.properties.communityEvidence || {};
     const sourceId = item.properties.sourceId;
     const added = selected.has(sourceId);
-    const disabled = evidence.reviewRequired;
-    const status = disabled ? 'Review required' : evidence.associationMethod === 'source-area' ? 'Source area' : 'Single containing building';
-    return `<div class="candidate-card${added ? ' is-selected' : ''}${disabled ? ' requires-review' : ''}" data-index="${index}"><strong>${escapeHtml(item.properties.name || 'Unnamed mapped feature')}</strong><span>${escapeHtml(item.properties.category || 'Unclassified')}</span><small>OSM source ID: ${escapeHtml(sourceId)}</small><small>Geometry: ${escapeHtml(status)}${disabled ? ` - ${escapeHtml(evidence.reviewReason || '')}` : ''}</small><div class="candidate-audit-actions"><a href="${escapeHtml(sourceLink(sourceId))}" target="_blank" rel="noopener">Open OSM</a><a href="${escapeHtml(googleMapsLink(item))}" target="_blank" rel="noopener">Open in Google Maps</a></div><button ${disabled ? 'disabled' : ''}>${disabled ? 'Footprint requires review' : added ? 'Added — Remove' : 'Add as reviewed area'}</button></div>`;
+    const reviewRequired = Boolean(evidence.reviewRequired);
+    const choices = Array.isArray(evidence.footprintChoices) ? evidence.footprintChoices : [];
+    const status = reviewRequired ? 'Review required' : evidence.associationMethod === 'source-area' ? 'Source area' : 'Single containing building';
+    const action = added
+      ? '<button type="button" data-community-action="remove">Added — Remove</button>'
+      : !reviewRequired
+        ? '<button type="button" data-community-action="add">Add as reviewed area</button>'
+        : choices.length
+          ? `<details class="footprint-review"><summary>Review footprint (${choices.length} exact OSM buildings)</summary>${choices.map((choice, choiceIndex) => `<div class="footprint-choice"><code>${escapeHtml(choice.sourceId)}</code><a href="${escapeHtml(sourceLink(choice.sourceId))}" target="_blank" rel="noopener">Open OSM</a><button type="button" data-community-action="use-footprint" data-choice-index="${choiceIndex}">Use this footprint</button></div>`).join('')}</details>`
+          : '<button type="button" class="community-manual-review" data-community-action="manual-review">Open manual footprint review</button>';
+    return `<div class="candidate-card${added ? ' is-selected' : ''}${reviewRequired ? ' requires-review' : ''}" data-index="${index}"><strong>${escapeHtml(item.properties.name || 'Unnamed mapped feature')}</strong><span>${escapeHtml(item.properties.category || 'Unclassified')}</span><small>OSM source ID: ${escapeHtml(sourceId)}</small><small>Geometry: ${escapeHtml(status)}${reviewRequired ? ` - ${escapeHtml(evidence.reviewReason || '')}` : ''}</small><div class="candidate-audit-actions"><a href="${escapeHtml(sourceLink(sourceId))}" target="_blank" rel="noopener">Open OSM</a><a href="${escapeHtml(googleMapsLink(item))}" target="_blank" rel="noopener">Open in Google Maps</a></div>${action}</div>`;
   }).join('');
-  byId('communityCandidates').querySelectorAll('.candidate-card').forEach(card => card.querySelector('button').addEventListener('click', () => {
+  byId('communityCandidates').querySelectorAll('[data-community-action]').forEach(button => button.addEventListener('click', () => {
+    const card = button.closest('.candidate-card');
     const item = candidates[Number(card.dataset.index)];
     const sourceId = item.properties.sourceId;
     const overlayId = `community:${sourceId}`;
-    if (state.overlayStore.get(overlayId)) state.overlayStore.remove(overlayId);
-    else state.overlayStore.add(item, {
-      id: overlayId, className: 'community', label: item.properties.name || item.properties.category,
-      layerName: 'Community considerations', colour: '#666666', source: sourceId,
-      community: structuredClone(item.properties.communityEvidence)
-    });
+    const action = button.dataset.communityAction;
+    if (action === 'remove') state.overlayStore.remove(overlayId);
+    else if (action === 'manual-review') {
+      byId('advancedTools').open = true;
+      byId('overlayClass').value = 'community';
+      byId('overlayClass').dispatchEvent(new Event('change'));
+      byId('overlayLayerName').value = 'Community considerations';
+      byId('overlayLabel').value = item.properties.name || item.properties.category || 'Community consideration';
+      byId('overlayColour').value = '#666666';
+      setMessage('overlayStatus', 'Draw the exact planner-reviewed community footprint. No automatic footprint has been inferred.', 'warning');
+      byId('overlayStatus').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    } else {
+      const evidence = structuredClone(item.properties.communityEvidence || {});
+      let geometry = item.geometry;
+      if (action === 'use-footprint') {
+        const choice = evidence.footprintChoices?.[Number(button.dataset.choiceIndex)];
+        if (!choice?.geometry) return setMessage('sourceStatus', 'The selected footprint is no longer available. Refresh current evidence.', 'error');
+        geometry = structuredClone(choice.geometry);
+        evidence.buildingSourceId = choice.sourceId;
+        evidence.associationMethod = 'planner-selected-containing-building';
+        evidence.reviewState = 'ready';
+        evidence.reviewRequired = false;
+        evidence.reviewReason = '';
+        delete evidence.footprintChoices;
+      }
+      state.overlayStore.add({ ...item, geometry }, {
+        id: overlayId, className: 'community', label: item.properties.name || item.properties.category,
+        layerName: 'Community considerations', colour: '#666666', source: sourceId,
+        community: evidence
+      });
+    }
     persist(); renderOverlayRows(); renderCommunityCandidates();
   }));
 }
@@ -770,7 +830,8 @@ function populateAppearanceControls() {
 function initialiseControls() {
   byId('modeSelect').value = state.modeId;
   byId('overlayColour').innerHTML = CONTROLLED_COLOURS.map(colour => `<option value="${colour}">${colour}</option>`).join('');
-  byId('busGroupColour').innerHTML = ['#ed1c24', '#0057e7', '#7f2a90', '#ec1ce8'].map(colour => `<option value="${colour}">${colour}</option>`).join('');
+  byId('busGroupColour').innerHTML = BUS_COLOUR_OPTIONS.map(option => `<option value="${option.value}">${option.label}</option>`).join('');
+  byId('busGroupColour').addEventListener('change', renderBusColourPreview);
   populateAppearanceControls();
   populateOverlayClassOptions();
   byId('overlayClass').addEventListener('change', () => { byId('overlayColour').value = OVERLAY_CLASSES[byId('overlayClass').value].colour; });
@@ -828,6 +889,8 @@ if (state.location) { byId('latitudeInput').value = state.location.lat; byId('lo
 if (state.site) { try { state.site = extractSiteGeometry(state.site); mapUi.setSite(state.site); } catch { state.site = null; } }
 migrateLegacyRoutesForReview();
 renderOverlayRows(); renderSourceStatus(); renderRoutingTools(); renderPreview();
+const legacyOverlayWarnings = state.overlayStore.migrationWarnings?.() || [];
+if (legacyOverlayWarnings.length) setMessage('siteStatus', `LEGACY DRAWING ITEM REQUIRES REVIEW — ${legacyOverlayWarnings.length} saved item${legacyOverlayWarnings.length === 1 ? ' was' : 's were'} incompatible with the current professional geometry rules and ${legacyOverlayWarnings.length === 1 ? 'has' : 'have'} been withheld. Refresh current evidence and reselect ${legacyOverlayWarnings.length === 1 ? 'it' : 'them'} if required.`, 'warning');
 setTimeout(() => mapUi.invalidate(), 100);
 
 if (['localhost', '127.0.0.1'].includes(location.hostname)) {

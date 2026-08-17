@@ -166,7 +166,7 @@ export function classifyOverpassElement(element) {
     if (tags.highway === 'cycleway') return [feature(element, isCurrentCycleRelation(tags) ? 'cycle-route' : 'cycle-review', geometry, { network: 'local', currentStatusEvidence: 'no-non-current-lifecycle-tags', ...(isCurrentCycleRelation(tags) ? {} : { reviewRequired: true, reviewReason: 'non-current-route' }) })];
   }
   if (tags.railway && /^(rail|subway|light_rail|tram)$/.test(tags.railway)) {
-    const serviceTrack = /^(siding|yard|spur|crossover)$/.test(tags.service || '');
+    const serviceTrack = /^(siding|yard|crossover)$/.test(tags.service || '');
     const railMode = modeForRailGeometryTags(tags);
     return [feature(element, serviceTrack ? 'railway-support' : 'railway', geometry, { railType: tags.railway, railMode, usage: tags.usage || '', service: tags.service || '', supportOnly: serviceTrack })];
   }

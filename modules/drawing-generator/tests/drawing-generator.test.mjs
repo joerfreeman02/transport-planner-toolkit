@@ -161,6 +161,14 @@ await test('current OSM cycle hierarchy is retained without requiring a route re
     assert.deepEqual([result.properties.network, result.properties.name, result.properties.operator, result.properties.cycleNetwork], [network, `${network.toUpperCase()} route`, 'Test operator', 'GB:test']);
   }
 });
+await test('legacy persisted overlays migrate individually', () => {
+  const valid = { properties: { id: 'valid-route', class: 'route-to-site', colour: '#ed1c24', label: 'Valid route' }, geometry: { type: 'LineString', coordinates: [[-.1, 51.5], [-.09, 51.51]] } };
+  const invalid = { id: 'legacy-community-point', properties: { class: 'community', colour: '#666666' }, geometry: { type: 'Point', coordinates: [-.1, 51.5] } };
+  const store = createOverlayStore([valid, invalid]);
+  assert.equal(store.list().some(item => item.id === 'valid-route'), true);
+  assert.equal(store.list().some(item => item.id === 'legacy-community-point'), false);
+  assert.equal(store.migrationWarnings().length, 1);
+});
 
 await test('rail geometry mode never infers London Overground without explicit evidence', () => {
   const generic = source.classifyOverpassElement({ type: 'way', id: 41, tags: { railway: 'rail' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
@@ -470,7 +478,7 @@ await test('basemap appearance is optional, defaults to colour and leaves profes
   const colour = renderDrawingSvg({ modeId: 'local-context', centerBng, sourceFeatures }).markup;
   const greyscale = renderDrawingSvg({ modeId: 'local-context', centerBng, sourceFeatures, basemapAppearance: { colour: 'greyscale', emphasis: 'normal' } }).markup;
   assert.deepEqual(presentation.normaliseBasemapAppearance(), { colour: 'colour', emphasis: 'faded' });
-  assert.match(colour, /data-basemap-colour="colour"[\s\S]*opacity:0\.8/);
+  assert.match(colour, /data-basemap-colour="colour"[\s\S]*opacity:0\.6/);
   assert.match(greyscale, /data-basemap-colour="greyscale"[\s\S]*style="opacity:1" filter="url\(#basemap-greyscale\)"/);
   assert.match(greyscale, /layer-cycle-network-primary[\s\S]*stroke="#00a651"/);
 });

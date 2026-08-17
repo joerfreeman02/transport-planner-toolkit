@@ -58,8 +58,23 @@ function defaultClass(type) {
 }
 
 export function createOverlayStore(initial = []) {
-  const records = new Map(initial.map(item => { const record = normaliseOverlay(item); return [record.id, record]; }));
+  const records = new Map();
+  const migrationWarnings = [];
+  (Array.isArray(initial) ? initial : []).forEach((item, index) => {
+    try {
+      const record = normaliseOverlay(item);
+      records.set(record.id, record);
+    } catch (error) {
+      migrationWarnings.push(Object.freeze({
+        index,
+        id: String(item?.id || item?.properties?.id || ''),
+        className: String(item?.properties?.class || item?.properties?.className || ''),
+        reason: String(error?.message || 'Saved item is incompatible with the current drawing rules.')
+      }));
+    }
+  });
   return {
+    migrationWarnings: () => migrationWarnings.map(item => ({ ...item })),
     list: () => [...records.values()].map(item => structuredClone(item)),
     get: overlayId => records.has(overlayId) ? structuredClone(records.get(overlayId)) : null,
     add(feature, metadata) { const record = normaliseOverlay(feature, metadata); records.set(record.id, record); return structuredClone(record); },

@@ -13,7 +13,7 @@
   <header class="app-header">
     <img src="assets/images/eas-primary.png" alt="EAS Consulting Engineers">
     <div><a href="../../">Transport Planner Toolkit</a><h1>Drawing Generator</h1><p>Planner-first professional drawing workflow</p></div>
-    <div class="build"><strong>DRAW-0.1.0</strong><span>DRAW-0.1.0-DG0C3.3B-20260817</span></div>
+    <div class="build"><strong>DRAW-0.1.0</strong><span>DRAW-0.1.0-DG0C3.3B-HF1-20260817</span></div>
   </header>
   <div class="candidate-banner" role="status">WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE</div>
 
@@ -80,6 +80,8 @@
           <h3 id="bus-presentation-heading">Bus presentation groups</h3><p>Optional presentation-only grouping. Source route numbers and geometry remain unchanged.</p>
           <div id="busRouteSelection" class="bus-route-selection"></div>
           <div class="form-grid compact"><label>Group label<input id="busGroupLabel" placeholder="BUS ROUTES 313, 379 &amp; 385"></label><label>Controlled colour<select id="busGroupColour"></select></label><div class="field-action"><button id="groupSelectedBusRoutes" type="button">Group selected routes</button></div></div>
+          <div id="busColourPreview" class="bus-colour-preview" aria-live="polite"></div>
+          <div id="busSuggestions" class="bus-suggestions" aria-label="Suggested presentation groups"></div>
           <div id="busGroupRows" class="bus-group-rows"></div>
         </section>
         <section id="communityPanel" class="planner-selection-panel" hidden aria-labelledby="community-heading"><h3 id="community-heading">Community considerations</h3><p>Select only evidence-backed areas to include in the drawing.</p><div id="communityCandidates" class="candidate-list"></div></section>

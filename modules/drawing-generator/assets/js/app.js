@@ -178,30 +178,35 @@ function setBasemapDomStatus(status) {
 function monitorBasemapTiles(result) {
   const basemap = currentBasemap();
   if (!basemap.requested || !result.basemap) return updateDrawingReadiness();
-  const images = [...byId('sheetMap').querySelectorAll('[data-basemap-tile]')];
+  const tiles = result.basemap.tiles || [];
   const token = ++state.basemapRenderToken;
-  basemap.status = 'loading'; basemap.loaded = 0; basemap.total = images.length; basemap.error = '';
+  basemap.status = 'loading'; basemap.loaded = 0; basemap.total = tiles.length; basemap.error = '';
   setBasemapDomStatus('loading'); updateDrawingReadiness();
-  if (!images.length) {
+  if (!tiles.length) {
     basemap.status = 'failed'; basemap.error = 'No tile images were composed.'; setBasemapDomStatus('failed'); updateDrawingReadiness(); return;
   }
-  let settled = 0, failed = false;
-  const settle = error => {
+  Promise.all(tiles.map(async (tile, index) => {
+    const response = await fetch(tile.url, { mode: 'cors', cache: 'no-store' });
+    if (!response.ok) throw new Error(`Tile ${index + 1} failed.`);
+    const blob = await response.blob();
+    const bitmap = await createImageBitmap(blob);
+    if (bitmap.width < 128 || bitmap.height < 128) { bitmap.close(); throw new Error(`Tile ${index + 1} is incomplete.`); }
+    return bitmap;
+  })).then(bitmaps => {
     if (token !== state.basemapRenderToken) return;
-    settled += 1; if (error) { failed = true; basemap.error ||= error; } else basemap.loaded += 1;
-    if (settled < images.length) return updateDrawingReadiness();
+    basemap.loaded = bitmaps.length;
     const paint = () => requestAnimationFrame(() => requestAnimationFrame(() => {
       if (token !== state.basemapRenderToken) return;
       const image = byId('sheetMap').querySelector('.issued-basemap-image');
-      basemap.status = failed || !image || !image.complete || image.naturalWidth < 1 || image.naturalHeight < 1 ? 'failed' : 'success';
+      basemap.status = !image || !image.complete || image.naturalWidth < 1 || image.naturalHeight < 1 ? 'failed' : 'success';
       if (basemap.status === 'failed') basemap.error ||= 'Issued basemap image is incomplete.';
       setBasemapDomStatus(basemap.status); updateDrawingReadiness();
     }));
-    if (!failed) {
+    {
       const canvas = document.createElement('canvas'); canvas.width = Math.ceil(result.viewWidth * 2); canvas.height = Math.ceil(result.viewHeight * 2);
       const context = canvas.getContext('2d');
       try {
-        images.forEach((image, index) => { const m = result.basemap.tiles[index].matrix; context.setTransform(m.a * 2, m.b * 2, m.c * 2, m.d * 2, m.e * 2, m.f * 2); context.drawImage(image, 0, 0, result.basemap.provider.tileSize, result.basemap.provider.tileSize); });
+        bitmaps.forEach((bitmap, index) => { const m = tiles[index].matrix; context.setTransform(m.a * 2, m.b * 2, m.c * 2, m.d * 2, m.e * 2, m.f * 2); context.drawImage(bitmap, 0, 0, result.basemap.provider.tileSize, result.basemap.provider.tileSize); bitmap.close(); });
         context.setTransform(1, 0, 0, 1, 0, 0);
         canvas.toBlob(blob => {
           if (token !== state.basemapRenderToken || !blob) return;
@@ -210,14 +215,9 @@ function monitorBasemapTiles(result) {
           image.onerror = () => { basemap.status = 'failed'; basemap.error = 'Issued basemap image failed to decode.'; setBasemapDomStatus('failed'); updateDrawingReadiness(); };
           image.src = url;
         }, 'image/png');
-      } catch (error) { failed = true; basemap.error = error.message; paint(); }
-    } else paint();
-  };
-  images.forEach((image, index) => {
-    image.addEventListener('load', () => settle(''), { once: true });
-    image.addEventListener('error', () => settle(`Tile ${index + 1} failed.`), { once: true });
-  });
-  if (images.every(image => image.complete)) images.forEach((image, index) => settle(image.naturalWidth > 0 ? '' : `Tile ${index + 1} failed.`));
+      } catch (error) { basemap.status = 'failed'; basemap.error = error.message; setBasemapDomStatus('failed'); updateDrawingReadiness(); }
+    }
+  }).catch(error => { if (token !== state.basemapRenderToken) return; basemap.status = 'failed'; basemap.error = error.message || 'Basemap tile decode failed.'; setBasemapDomStatus('failed'); updateDrawingReadiness(); });
   byId('workflowStatus').textContent = 'Loading complete issued OpenStreetMap tile coverage…';
   updateDrawingReadiness();
 }

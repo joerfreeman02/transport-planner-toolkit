@@ -30,10 +30,10 @@ await page.route(/https:\/\/[^/]*overpass[^/]*\/api\/interpreter/, route => {
   interceptedSourceBodies.push(route.request().postData() || '');
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) });
 });
-const tileSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#e7ece5"/><path d="M0 40L256 210" stroke="#b6c2ad" stroke-width="8"/></svg>';
+const rasterTile = fs.readFileSync(new URL('../assets/images/eas-primary.png', import.meta.url));
 await page.route(/https:\/\/(?:tile\.openstreetmap\.org|tiles\.test)\/\d+\/\d+\/\d+\.png/, route => {
   interceptedTileRequests.push(route.request().url());
-  return route.fulfill({ status: 200, contentType: 'image/svg+xml', headers: { 'access-control-allow-origin': '*' }, body: tileSvg });
+  return route.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: rasterTile });
 });
 await page.route(/https:\/\/tiles-fail\.test\/\d+\/\d+\/\d+\.png/, route => route.fulfill({ status: 503, contentType: 'text/plain', body: 'mock tile failure' }));
 await page.route(/https:\/\/routing\.test\/route\/v1\/driving\/.+/, route => {

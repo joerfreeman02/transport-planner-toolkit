@@ -178,28 +178,37 @@ function setBasemapDomStatus(status) {
 function monitorBasemapTiles(result) {
   const basemap = currentBasemap();
   if (!basemap.requested || !result.basemap) return updateDrawingReadiness();
-  const images = [...byId('sheetMap').querySelectorAll('[data-basemap-tile]')];
   const token = ++state.basemapRenderToken;
-  basemap.status = 'loading'; basemap.loaded = 0; basemap.total = images.length; basemap.error = '';
+  const tiles = result.basemap.tiles || [];
+  basemap.status = 'loading'; basemap.loaded = 0; basemap.total = tiles.length; basemap.error = '';
   setBasemapDomStatus('loading'); updateDrawingReadiness();
-  if (!images.length) {
+  if (!tiles.length) {
     basemap.status = 'failed'; basemap.error = 'No tile images were composed.'; setBasemapDomStatus('failed'); updateDrawingReadiness(); return;
   }
-  const prepare = async (image, index) => {
-    const response = await fetch(image.getAttribute('href'), { mode: 'cors', cache: 'no-store' });
+  const prepare = async (tile, index) => {
+    const response = await fetch(tile.url, { mode: 'cors', cache: 'no-store' });
     if (!response.ok) throw new Error(`Tile ${index + 1} failed.`);
     const blob = await response.blob();
     if (blob.size < 256) throw new Error(`Tile ${index + 1} has unusable image content.`);
     const dataUrl = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); });
     const probe = new Image(); probe.src = dataUrl; await probe.decode();
     if (probe.naturalWidth < 128 || probe.naturalHeight < 128) throw new Error(`Tile ${index + 1} is incomplete or unusable.`);
-    image.setAttribute('href', dataUrl);
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return { tile, image: probe };
   };
-  Promise.allSettled(images.map(prepare)).then(results => {
+  Promise.allSettled(tiles.map(prepare)).then(results => {
     if (token !== state.basemapRenderToken) return;
-    const failed = results.find(result => result.status === 'rejected');
+    let failed = results.find(result => result.status === 'rejected');
     basemap.loaded = results.filter(result => result.status === 'fulfilled').length;
+    if (!failed) {
+      try {
+        const scale = 2, canvas = document.createElement('canvas'); canvas.width = Math.ceil(result.viewWidth * scale); canvas.height = Math.ceil(result.viewHeight * scale);
+        const context = canvas.getContext('2d');
+        results.forEach(item => { const { tile, image } = item.value; const m = tile.matrix; context.setTransform(m.a * scale, m.b * scale, m.c * scale, m.d * scale, m.e * scale, m.f * scale); context.drawImage(image, 0, 0, result.basemap.provider.tileSize, result.basemap.provider.tileSize); });
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        const group = byId('sheetMap').querySelector('.rendered-osm-basemap'); if (!group) throw new Error('Basemap group is unavailable.');
+        group.innerHTML = `<image class="osm-composed-basemap" data-basemap-composite="true" href="${canvas.toDataURL('image/png')}" x="0" y="0" width="${result.viewWidth}" height="${result.viewHeight}" preserveAspectRatio="none"/>`;
+      } catch (error) { failed = { reason: error }; }
+    }
     basemap.status = failed ? 'failed' : 'success'; basemap.error = failed ? failed.reason?.message || 'Basemap embedding failed.' : '';
     setBasemapDomStatus(basemap.status);
     byId('workflowStatus').textContent = failed ? 'Basemap incomplete — print blocked. Retry basemap; professional overlays remain intact.' : `Drawing basemap ready from ${state.basemapProvider.name}. Review professional overlays before printing.`;

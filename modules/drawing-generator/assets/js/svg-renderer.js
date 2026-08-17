@@ -133,8 +133,7 @@ function featureMarkup(item, project, index, family, modeId = '') {
   const marker = className === 'route-to-site' ? 'url(#arrow-to)' : className === 'route-from-site' ? 'url(#arrow-from)' : '';
   const routeStatus = item.properties?.route?.status || '';
   const reviewDash = marker && ['rough', 'snapping', 'snap-failed', 'snap-review-required', 'direction-review'].includes(routeStatus) ? '6 3' : style.dash;
-  const busCorridor = className === 'bus-route' ? `<path class="bus-route-corridor" d="${path}" fill="none" stroke="#ed1c24" stroke-width="3.5" stroke-opacity=".58" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` : '';
-  const markup = `${busCorridor}<path d="${path}" fill="${isArea ? escapeXml(item.properties?.colour || style.fill || 'none') : 'none'}" fill-opacity="${isArea ? '.34' : '0'}" fill-rule="evenodd" stroke="${escapeXml(colour)}" stroke-width="${className === 'bus-route' ? 1.7 : style.width}"${reviewDash ? ` stroke-dasharray="${reviewDash}"` : ''} stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${marker ? routeArrowMarkup(item, project, family, marker, colour) : ''}`;
+  const markup = `<path d="${path}" fill="${isArea ? escapeXml(item.properties?.colour || style.fill || 'none') : 'none'}" fill-opacity="${isArea ? '.34' : '0'}" fill-rule="evenodd" stroke="${escapeXml(colour)}" stroke-width="${className === 'bus-route' ? 1.7 : style.width}"${reviewDash ? ` stroke-dasharray="${reviewDash}"` : ''} stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${marker ? routeArrowMarkup(item, project, family, marker, colour) : ''}`;
   return `<g class="layer-${escapeXml(className)}" data-feature-index="${index}"${routeStatus ? ` data-route-status="${escapeXml(routeStatus)}"` : ''}>${markup}</g>`;
 }
 
@@ -259,7 +258,7 @@ export function renderDrawingSvg({ modeId, centerBng, site = null, sourceFeature
     <g id="basemapFailureWarning" class="basemap-failure-warning" visibility="${basemapStatus === 'failed' ? 'visible' : 'hidden'}"><rect x="180" y="${(viewHeight / 2 - 24).toFixed(2)}" width="640" height="48" rx="4"/><text x="500" y="${(viewHeight / 2 + 4).toFixed(2)}" text-anchor="middle">BASEMAP INCOMPLETE — PRINT BLOCKED</text></g>
     <rect x=".5" y=".5" width="${viewWidth - 1}" height="${(viewHeight - 1).toFixed(3)}" fill="none" stroke="#222" stroke-width="1" vector-effect="non-scaling-stroke"/>
   </svg>`;
-  return { markup, extent, legend: legendItemsForDrawing(modeId, sourceFeatures, overlays, Boolean(site), sourceReview, busGroups), scaleBar, presentationFeatures: features, labels, basemap, basemapAppearance: appearance };
+  return { markup, extent, viewWidth, viewHeight, legend: legendItemsForDrawing(modeId, sourceFeatures, overlays, Boolean(site), sourceReview, busGroups), scaleBar, presentationFeatures: features, labels, basemap, basemapAppearance: appearance };
 }
 
 // Bind separately so the map callback receives the current projector and index.

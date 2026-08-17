@@ -31,12 +31,11 @@ export function normaliseBusGroups(groups = []) {
 export function applyBusPresentationGroups(features = [], groups = []) {
   const normalised = normaliseBusGroups(groups);
   const byReference = new Map(normalised.flatMap(group => group.routeRefs.map(ref => [ref, group])));
-  const fallbackRefs = busRouteReferences(features).filter(ref => !byReference.has(ref));
   return features.map(feature => {
     if (feature.properties?.class !== 'bus-route') return feature;
     const reference = routeReference(feature);
     const group = byReference.get(reference);
-    if (!group) return { ...feature, properties: { ...feature.properties, presentationBusGroup: 'all-ungrouped-bus-routes', presentationBusLabel: 'ALL BUS ROUTES', presentationBusRouteRefs: fallbackRefs, colour: '#ed1c24' } };
+    if (!group) { const identity = reference || 'UNREFERENCED'; return { ...feature, properties: { ...feature.properties, presentationBusGroup: `ungrouped-${identity}`, presentationBusLabel: `BUS ROUTE ${identity}`, presentationBusRouteRefs: reference ? [reference] : [], colour: '#ed1c24' } }; }
     return { ...feature, properties: { ...feature.properties, presentationBusGroup: group.id, presentationBusLabel: group.label, presentationBusRouteRefs: [...group.routeRefs], colour: group.colour } };
   });
 }

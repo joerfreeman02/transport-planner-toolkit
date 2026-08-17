@@ -83,7 +83,9 @@ try {
       if (!await page.locator('#drawingSvg .route-direction-arrow').count()) throw new Error(`${mode} did not render distance-based route arrows.`);
     }
     if (await page.locator('#drawingSheet .identity img').count() !== 1) throw new Error(`${mode} did not contain exactly one issued title-block logo.`);
-    await page.pdf({ path: path.join(output, `drawing-generator-${mode}-DG0C3.1-live-review.pdf`), format: 'A3', landscape: true, printBackground: true, preferCSSPageSize: true, margin: { top: '0', right: '0', bottom: '0', left: '0' } });
+    if (!await page.locator('#drawingSvg .osm-attribution').count()) throw new Error(`${mode} did not render the distinct OpenStreetMap attribution.`);
+    if (!await page.locator('#drawingSvg .osm-attribution').textContent().then(text => /OpenStreetMap contributors/.test(text || ''))) throw new Error(`${mode} did not retain readable OpenStreetMap attribution text.`);
+    await page.pdf({ path: path.join(output, `drawing-generator-${mode}-DG0C3.2-live-review.pdf`), format: 'A3', landscape: true, printBackground: true, preferCSSPageSize: true, margin: { top: '0', right: '0', bottom: '0', left: '0' } });
     await page.close();
   }
   console.log(`Created ${modes.length} A3 live-review QA PDF${modes.length === 1 ? '' : 's'} in ${output}`);

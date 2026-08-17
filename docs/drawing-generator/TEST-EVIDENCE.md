@@ -102,3 +102,15 @@ Build/status: `DRAW-0.1.0-DG0C3.1-20260816`; **WORK IN PROGRESS / LIVE REVIEW - 
 - `pdfinfo` reported `Pages: 1` and A3 page size `1191.12 x 841.92 pts` for every artifact.
 
 The live scripts are guarded and excluded from CI. Automated browser/PDF tests intercept public tile and routing traffic. No client address, boundary, route or historic-project payload is stored in the repository or QA artifacts.
+
+# DG-0C3.2 final pre-merge author-control evidence
+
+Build/status: `DRAW-0.1.0-DG0C3.2-20260817`; **WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE**. This narrow correction continues on the existing draft PR and does not merge, alter production identities or introduce a new sprint.
+
+## Evidence to record at the gate
+
+- `node modules/drawing-generator/tests/drawing-generator.test.mjs`: **51 passed**. Covers immutable station-to-returned-rail QA, the exact no-nearby-rail warning/default withholding, explicit include/exclude presentation filtering, A/M-reference-only labels, single-ref regional repeat cap and all-mode distinct OSM attribution.
+- `node modules/drawing-generator/tests/browser-smoke.mjs`: **passed** with no page errors or bad local responses. It proves the visible Advanced source-review control, source ID/state/warning presentation, map removal/restoration after explicit Include, local state persistence over mode changes, four-mode attribution, routing approval/direction and failed-tile safety with mocked sources/tiles/routes.
+- `pdf-qa.mjs` created four deterministic one-page A3 PDFs with mocked tiles/routes and asserted the separate readable OSM attribution in every mode. `pdfinfo`, `pypdf` text checks and 110 dpi rendered-page inspection confirmed all six C3.2 PDFs are one-page A3 landscape (`1191.12 x 841.92 pt`), contain the C3.2 build and contain `OpenStreetMap contributors`.
+- The guarded Milton Keynes Regional Plan retrieved 4,089 classified features, composed 35 live z13 tiles and exposed **one** visible source-review flag. The guarded Regional Routing Plan made exactly **two** sequential public route requests, used 35 live z13 tiles and ended both routes `approved`, with Route From Site normalised/reversed.
+- C3.2 retains GitHub tooling policy: no workflow/dependency tooling change; Dependabot remains, Codecov/OpenSSF/Sentry are deferred and Renovate is not installed.

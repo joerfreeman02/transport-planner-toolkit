@@ -10,6 +10,7 @@ import { createMapController } from './map-controller.js';
 import { basemapProvider, validateBasemapProvider } from './basemap-compositor.js';
 import { normaliseRouteDirection } from './route-geometry.js';
 import { DEFAULT_ROAD_ROUTING_PROVIDER, snapRouteThroughGuidance } from './route-snap-adapter.js';
+import { assessStationRailConsistency, resolveSourcePresentation, stationReviewCandidates } from './source-review.js';
 
 configureProj4(globalThis.proj4);
 const byId = id => document.getElementById(id);
@@ -25,6 +26,7 @@ const state = {
   location: persisted.location && Number.isFinite(persisted.location.lat) && Number.isFinite(persisted.location.lon) ? persisted.location : null,
   site: persisted.site || null,
   metadataByMode: persisted.metadataByMode || {},
+  sourceReview: persisted.sourceReview || {},
   sourcesByMode: {},
   overlayStore: createOverlayStore(persisted.overlays || []),
   basemapByMode: {},
@@ -38,7 +40,7 @@ Object.keys(DRAWING_MODES).forEach(id => { state.metadataByMode[id] = { ...defau
 
 function persist() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ modeId: state.modeId, location: state.location, site: state.site, metadataByMode: state.metadataByMode, overlays: state.overlayStore.list() }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ modeId: state.modeId, location: state.location, site: state.site, metadataByMode: state.metadataByMode, sourceReview: state.sourceReview, overlays: state.overlayStore.list() }));
   } catch { setMessage('overlayStatus', 'The browser could not persist the current editable geometry. Download the overlay file before closing.', 'warning'); }
 }
 
@@ -67,6 +69,10 @@ function drawingCentre() {
 
 function currentSource() { return state.sourcesByMode[state.modeId] || { status: 'not-loaded', features: [], snapshot: null }; }
 
+function reviewedSourceFeatures() {
+  return resolveSourcePresentation(currentSource().features, state.sourceReview);
+}
+
 function currentBasemap() {
   state.basemapByMode[state.modeId] ||= { requested: false, status: 'not-requested', loaded: 0, total: 0, error: '' };
   return state.basemapByMode[state.modeId];
@@ -86,7 +92,7 @@ function legendMarkup(items) {
 }
 
 function availableClasses() {
-  const classes = new Set(currentSource().features.map(item => item.properties?.class));
+  const classes = new Set(reviewedSourceFeatures().map(item => item.properties?.class));
   state.overlayStore.list().filter(item => item.properties.visible !== false && classVisibleForDrawing(state.modeId, item.properties.class)).forEach(item => classes.add(item.properties.class));
   if ([...classes].some(className => className?.startsWith('station-'))) classes.add('rail-station');
   if (state.site) classes.add('site');
@@ -107,14 +113,14 @@ function renderPreview() {
   const mode = modeConfig(state.modeId);
   const source = currentSource();
   const basemap = currentBasemap();
-  const result = renderDrawingSvg({ modeId: state.modeId, centerBng: drawingCentre(), site: state.site, sourceFeatures: source.features, overlays: state.overlayStore.list(), sourceStatus: source.status, includeBasemap: basemap.requested, basemapProvider: state.basemapProvider, basemapStatus: basemap.status });
+  const result = renderDrawingSvg({ modeId: state.modeId, centerBng: drawingCentre(), site: state.site, sourceFeatures: source.features, sourceReview: state.sourceReview, overlays: state.overlayStore.list(), sourceStatus: source.status, includeBasemap: basemap.requested, basemapProvider: state.basemapProvider, basemapStatus: basemap.status });
   byId('sheetMap').innerHTML = result.markup;
   byId('sheetLegend').innerHTML = legendMarkup(result.legend);
   byId('drawingSheet').className = `drawing-sheet layout-${mode.family}`;
   document.querySelectorAll('[data-sheet-meta]').forEach(element => { const value = metadata()[element.dataset.sheetMeta]; element.textContent = value || '-'; });
   const routeProviders = isRoutingMode() ? [...new Set(routeOverlays().map(item => item.properties.route?.provenance?.providerName).filter(Boolean))] : [];
   const routeAttribution = routeProviders.length ? `; road geometry: ${routeProviders.join(', ')} (geometry assistance only - planner selected/approved)` : '';
-  byId('sheetAttribution').textContent = `${state.basemapProvider.attribution} | Basemap: ${state.basemapProvider.name}; professional overlays: ${source.snapshot?.provider || 'reviewed/manual evidence'}${routeAttribution}.`;
+  byId('sheetAttribution').textContent = `Professional source: ${source.snapshot?.provider || 'reviewed/manual evidence'}${routeAttribution}. Engineering extent shown at right.`;
   byId('sheetExtent').textContent = `BNG extent ${result.extent.groundWidth.toFixed(0)} m x ${result.extent.groundHeight.toFixed(0)} m - A3 @ 1:${mode.scale.toLocaleString('en-GB')}`;
   const missing = mode.requiredClasses.filter(className => !availableClasses().has(className));
   const scaleMatches = scaleMetadataMatches(mode);
@@ -318,7 +324,41 @@ function renderSourceStatus() {
   else if (source.status === 'zero') setMessage('sourceStatus', 'The provider request succeeded and returned a genuine zero-feature result for this extent.', 'warning');
   else if (source.status === 'failed') setMessage('sourceStatus', source.error, 'error');
   else setMessage('sourceStatus', 'No vector snapshot loaded. Required layers may be added through reviewed overlays.', 'warning');
+  renderProfessionalSourceReview();
   renderCommunityCandidates();
+}
+
+function setSourceReviewState(sourceId, reviewState) {
+  if (!sourceId || !['included', 'excluded'].includes(reviewState)) return;
+  state.sourceReview[sourceId] = reviewState;
+  persist();
+  mapUi.setSource(reviewedSourceFeatures());
+  renderSourceStatus();
+  renderPreview();
+}
+
+function renderProfessionalSourceReview() {
+  const candidates = stationReviewCandidates(currentSource().features, state.sourceReview);
+  const panel = byId('sourceReviewPanel');
+  panel.hidden = !candidates.length;
+  if (!candidates.length) return;
+  byId('sourceReviewRows').innerHTML = candidates.map(candidate => {
+    const qa = candidate.qa;
+    const proximity = qa.reviewRequired
+      ? `${escapeHtml(qa.warning)}${qa.nearestRailDistanceMetres === null ? '' : ` (${qa.nearestRailDistanceMetres} m from returned railway; threshold ${qa.thresholdMetres} m)`}`
+      : `Nearest returned railway: ${qa.nearestRailDistanceMetres ?? 'not assessed'} m (threshold ${qa.thresholdMetres} m)`;
+    const action = candidate.state === 'included' ? 'Exclude' : 'Include';
+    const nextState = candidate.state === 'included' ? 'excluded' : 'included';
+    return `<article class="source-review-card" data-source-id="${escapeHtml(candidate.sourceId)}">
+      <div><strong>${escapeHtml(candidate.name)}</strong><span>${escapeHtml(candidate.mode)}</span></div>
+      <code>${escapeHtml(candidate.sourceId)}</code>
+      <p class="${qa.reviewRequired ? 'review-warning' : 'review-ok'}">${proximity}</p>
+      <div class="source-review-action"><b>${candidate.state.toUpperCase()}</b><button type="button" data-next-state="${nextState}">${action}</button></div>
+    </article>`;
+  }).join('');
+  byId('sourceReviewRows').querySelectorAll('.source-review-card').forEach(card => {
+    card.querySelector('button').addEventListener('click', () => setSourceReviewState(card.dataset.sourceId, card.querySelector('button').dataset.nextState));
+  });
 }
 
 async function retrieveSources() {
@@ -336,7 +376,7 @@ async function retrieveSources() {
   const adapter = new OverpassTransportAdapter();
   try {
     const source = await adapter.retrieve(state.modeId, extentForDrawing(drawingCentre(), state.modeId), BUILD);
-    state.sourcesByMode[state.modeId] = source; mapUi.setSource(source.features); renderSourceStatus(); renderPreview();
+    state.sourcesByMode[state.modeId] = { ...source, features: assessStationRailConsistency(source.features) }; mapUi.setSource(reviewedSourceFeatures()); renderSourceStatus(); renderPreview();
     if (currentBasemap().status !== 'failed') byId('workflowStatus').textContent = 'Professional source refreshed; waiting for the rendered basemap if still loading.';
     return true;
   } catch (error) {
@@ -581,7 +621,7 @@ function initialiseControls() {
   byId('overlayClass').addEventListener('change', () => { byId('overlayColour').value = OVERLAY_CLASSES[byId('overlayClass').value].colour; });
   byId('modeSelect').addEventListener('change', event => {
     captureMetadata(); state.modeId = event.target.value; state.metadataByMode[state.modeId] ||= defaultMetadata(state.modeId);
-    populateMetadata(); populateOverlayClassOptions(); mapUi.setSource(currentSource().features); renderSourceStatus(); renderRoutingTools(); persist(); renderPreview();
+    populateMetadata(); populateOverlayClassOptions(); mapUi.setSource(reviewedSourceFeatures()); renderSourceStatus(); renderRoutingTools(); persist(); renderPreview();
   });
   metaInputs.forEach(input => input.addEventListener('input', captureMetadata));
   byId('searchAddress').addEventListener('click', searchAddress);
@@ -632,10 +672,11 @@ setTimeout(() => mapUi.invalidate(), 100);
 if (['localhost', '127.0.0.1'].includes(location.hostname)) {
   Object.defineProperty(window, '__DG0_ACCEPTANCE__', {
     value: Object.freeze({
-      setMode(id) { if (!DRAWING_MODES[id]) throw new Error('Invalid mode'); state.modeId = id; byId('modeSelect').value = id; populateMetadata(); populateOverlayClassOptions(); mapUi.setSource(currentSource().features); renderSourceStatus(); renderRoutingTools(); renderPreview(); },
+      setMode(id) { if (!DRAWING_MODES[id]) throw new Error('Invalid mode'); state.modeId = id; byId('modeSelect').value = id; populateMetadata(); populateOverlayClassOptions(); mapUi.setSource(reviewedSourceFeatures()); renderSourceStatus(); renderRoutingTools(); renderPreview(); },
       setLocation(lat, lon, label = 'Acceptance QA location') { setLocation(lat, lon, label); },
       setSite(geometry) { acceptSite(geometry, 'Synthetic acceptance fixture'); },
-      setSource(features, snapshot = {}) { state.sourcesByMode[state.modeId] = { status: 'success', features, snapshot: { attribution: OSM_ATTRIBUTION, provider: 'Synthetic acceptance fixture', ...snapshot } }; mapUi.setSource(features); renderSourceStatus(); renderPreview(); },
+      setSource(features, snapshot = {}) { state.sourcesByMode[state.modeId] = { status: 'success', features: assessStationRailConsistency(features), snapshot: { attribution: OSM_ATTRIBUTION, provider: 'Synthetic acceptance fixture', ...snapshot } }; mapUi.setSource(reviewedSourceFeatures()); renderSourceStatus(); renderPreview(); },
+      setSourceReview(sourceId, reviewState) { setSourceReviewState(sourceId, reviewState); },
       addOverlay(feature, metadata) { const record = state.overlayStore.add(feature, metadata); renderOverlayRows(); return record; },
       async addRoughRoute(geometry, className) {
         if (!['route-to-site', 'route-from-site'].includes(className)) throw new Error('Invalid route class');
@@ -656,7 +697,7 @@ if (['localhost', '127.0.0.1'].includes(location.hostname)) {
       setRoadRoutingProvider(provider) { state.roadRoutingProvider = Object.freeze({ ...DEFAULT_ROAD_ROUTING_PROVIDER, ...provider }); },
       requestBasemap() { const basemap = currentBasemap(); basemap.requested = true; basemap.status = 'loading'; renderPreview(); },
       render: renderPreview,
-      snapshot: () => ({ modeId: state.modeId, site: state.site, location: state.location, overlays: state.overlayStore.list(), source: currentSource(), basemap: { ...currentBasemap(), providerId: state.basemapProvider.id, zoom: state.lastRender?.result.basemap?.zoom || null, tileCount: state.lastRender?.result.basemap?.tileCount || 0, maxAlignmentError: state.lastRender?.result.basemap?.maxAlignmentError || null }, metadata: structuredClone(metadata()), status: STATUS, drawingActive: mapUi.isDrawingActive(), navigationEnabled: mapUi.navigationEnabled(), routingVisible: !byId('routingTools').hidden, advancedOpen: byId('advancedTools').open })
+      snapshot: () => ({ modeId: state.modeId, site: state.site, location: state.location, overlays: state.overlayStore.list(), source: currentSource(), reviewedSourceFeatures: reviewedSourceFeatures(), sourceReview: structuredClone(state.sourceReview), basemap: { ...currentBasemap(), providerId: state.basemapProvider.id, zoom: state.lastRender?.result.basemap?.zoom || null, tileCount: state.lastRender?.result.basemap?.tileCount || 0, maxAlignmentError: state.lastRender?.result.basemap?.maxAlignmentError || null }, metadata: structuredClone(metadata()), status: STATUS, drawingActive: mapUi.isDrawingActive(), navigationEnabled: mapUi.navigationEnabled(), routingVisible: !byId('routingTools').hidden, advancedOpen: byId('advancedTools').open })
     }), configurable: false, enumerable: false, writable: false
   });
 }

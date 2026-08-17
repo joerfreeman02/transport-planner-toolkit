@@ -69,14 +69,17 @@ function feature(element, className, geometry, extra = {}) {
   };
 }
 
-function labelFromReferenceAndName(tags, fallback) {
-  const ref = String(tags.ref || '').trim();
-  const name = String(tags.name || '').trim();
-  return ref && name ? `${ref} - ${name}` : ref || name || fallback;
+function firstReference(ref, expression) {
+  const match = String(ref || '').trim().match(expression);
+  return match ? match[1].toUpperCase() : '';
 }
 
-function isExplicitAReference(ref) {
-  return /(^|[;\s])A\d{1,4}[A-Z]?(?=$|[;\s])/i.test(String(ref || '').trim());
+function explicitAReference(ref) {
+  return firstReference(ref, /(?:^|[;,\s])(A\d{1,4}[A-Z]?)(?=$|[;,\s])/i);
+}
+
+function motorwayReference(ref) {
+  return firstReference(ref, /(?:^|[;,\s])(M\d{1,4}[A-Z]?)(?=$|[;,\s])/i);
 }
 
 function cycleNetwork(tags) {
@@ -101,10 +104,13 @@ export function classifyOverpassElement(element) {
   const geometry = lineGeometry(element);
   if (!geometry) return [];
   if (tags.highway) {
-    if (/^motorway/.test(tags.highway)) return [feature(element, 'motorway', geometry, { motorwayLabel: labelFromReferenceAndName(tags, ''), label: labelFromReferenceAndName(tags, '') })];
+    if (/^motorway/.test(tags.highway)) {
+      const reference = motorwayReference(tags.ref);
+      return [feature(element, 'motorway', geometry, { motorwayLabel: reference, label: reference })];
+    }
     if (/^(trunk|primary)/.test(tags.highway)) {
-      const roadLabel = labelFromReferenceAndName(tags, '');
-      return [feature(element, 'main-road', geometry, { roadFunction: tags.highway, officialARef: isExplicitAReference(tags.ref) ? String(tags.ref).trim() : '', roadLabel, label: roadLabel })];
+      const reference = explicitAReference(tags.ref);
+      return [feature(element, 'main-road', geometry, { roadFunction: tags.highway, officialARef: reference, roadLabel: reference, label: reference })];
     }
     if (/^(secondary|tertiary)/.test(tags.highway)) return [feature(element, 'context-road-major', geometry, { contextType: tags.highway })];
     if (/^(unclassified|residential|living_street)$/.test(tags.highway)) return [feature(element, 'context-road-minor', geometry, { contextType: tags.highway })];

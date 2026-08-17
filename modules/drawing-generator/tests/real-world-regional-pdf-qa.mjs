@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const root = process.env.TPT_REVIEW_ROOT || 'http://127.0.0.1:8768/';
 const output = path.resolve(process.env.DG0_PDF_OUTPUT || 'output/pdf');
-const pdfPath = path.join(output, 'drawing-generator-regional-plan-DG0C3.1-real-world-Milton-Keynes-QA.pdf');
+const pdfPath = path.join(output, 'drawing-generator-regional-plan-DG0C3.2-real-world-Milton-Keynes-QA.pdf');
 fs.mkdirSync(output, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, ...(process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
@@ -43,11 +43,11 @@ try {
     client: 'EAS INTERNAL QA',
     architect: 'N/A',
     project: 'MILTON KEYNES LIVE OSM QA',
-    projectNumber: 'DG0C3.1-LIVE-QA',
+    projectNumber: 'DG0C3.2-LIVE-QA',
     designedBy: 'QA',
     drawnBy: 'QA',
-    revision: 'C3.1',
-    revisionDescription: 'Real OSM and synthetic-site alignment QA',
+    revision: 'C3.2',
+    revisionDescription: 'Real OSM, source QA and synthetic-site alignment',
     drawingStatus: 'WORK IN PROGRESS'
   };
   for (const [name, value] of Object.entries(metadata)) await page.locator(`[data-meta="${name}"]`).fill(value);
@@ -64,11 +64,14 @@ try {
   assert.ok(snapshot.basemap.tileCount > 0 && snapshot.basemap.tileCount <= 80);
   assert.ok(liveTileUrls.length > 0 && new Set(liveTileUrls).size <= 80, `Live tile viewport issued ${new Set(liveTileUrls).size} unique tile URLs.`);
   assert.ok(sourceRequests.length >= 1, 'Expected one live source retrieval workflow.');
-  assert.match(await page.locator('#sheetAttribution').innerText(), /OpenStreetMap contributors/);
+  assert.match(await page.locator('#drawingSvg .osm-attribution').textContent(), /OpenStreetMap contributors/);
+  const flagged = await page.locator('#sourceReviewRows .review-warning').count();
+  assert.ok(flagged > 0, 'Expected at least one real returned station to require explicit source review.');
+  assert.ok(await page.locator('#sourceReviewRows .source-review-card').count() >= flagged, 'Source review did not expose station candidates.');
   await page.emulateMedia({ media: 'print' });
   await page.pdf({ path: pdfPath, format: 'A3', landscape: true, printBackground: true, preferCSSPageSize: true, margin: { top: '0', right: '0', bottom: '0', left: '0' } });
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ pdfPath, location: 'Milton Keynes, UK', realSourceFeatures: snapshot.source.features.length, sourceProvider: snapshot.source.snapshot.provider, uniqueLiveOsmTiles: new Set(liveTileUrls).size, composedTileCount: snapshot.basemap.tileCount, zoom: snapshot.basemap.zoom }, null, 2));
+  console.log(JSON.stringify({ pdfPath, location: 'Milton Keynes, UK', realSourceFeatures: snapshot.source.features.length, sourceProvider: snapshot.source.snapshot.provider, sourceReviewFlags: flagged, uniqueLiveOsmTiles: new Set(liveTileUrls).size, composedTileCount: snapshot.basemap.tileCount, zoom: snapshot.basemap.zoom }, null, 2));
 } finally {
   await browser.close();
 }

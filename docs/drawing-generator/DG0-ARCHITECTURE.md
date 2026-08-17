@@ -1,7 +1,7 @@
 # DG-0 architecture
 
 Status: **Proposed live-review candidate; not an accepted baseline.**
-Version/build: `DRAW-0.1.0` / `DRAW-0.1.0-DG0C3.1-20260816`.
+Version/build: `DRAW-0.1.0` / `DRAW-0.1.0-DG0C3.2-20260817`.
 
 ## Road-geometry assistance boundary
 
@@ -21,8 +21,9 @@ The module does not select professional HGV routes, infer a site polygon from an
 4. The basemap compositor selects only XYZ tiles intersecting the exact BNG-derived frame, at fixed z13/z17. Each 256 px tile receives its own affine transform from its projected north-west, north-east and south-west corners. A maximum 80-tile viewport cap prevents bulk retrieval.
 5. The Overpass adapter requests only structured professional transport/candidate vectors for that exact extent, classifies supported evidence and creates a checksummed source snapshot. It no longer harvests landuse/place/minor-road geometry to imitate a basemap. Failure, malformed, timeout and genuine zero states remain distinct.
 6. User-drawn or imported Point/LineString/MultiLineString/Polygon/MultiPolygon overlays carry a controlled class, colour, label, layer name and visibility state. They persist across mode changes. Routing modes also expose primary Draw To, Draw From, Cancel and Delete/Redraw controls.
-7. A pure presentation stage groups only connected like-for-like linework, removes coincident duplicate station labels, caps repeated labels and withholds colliding/out-of-frame labels. Original feature/source identifiers remain in the source snapshot and presentation metadata.
-8. The renderer composes the raster tiles beneath BNG-projected, clipped controlled vectors in one SVG and records provider, zoom, tile count and maximum affine-centre error. Tile failure preserves vector overlays, blocks print and displays `BASEMAP FAILED TO LOAD - REVIEW REQUIRED`.
+7. `source-review.js` derives a deterministic station-to-returned-rail proximity assessment (200 m default) without changing station geometry or the provider snapshot. A no-nearby-rail warning defaults that source ID to excluded; Advanced diagnostics exposes the stable ID, name/mode, warning/distance and Include/Exclude action. Local storage retains only the planner decision and re-applies it on retrieval/mode change.
+8. A pure presentation stage filters source-review exclusions, groups only connected like-for-like linework, removes coincident duplicate station labels, caps repeated labels and withholds colliding/out-of-frame labels. Original feature/source identifiers remain in the source snapshot and presentation metadata. Regional road labelling is limited to returned A/M references, with no geographic road/junction/roundabout names and one repeated reference normally permitted.
+9. The renderer composes the raster tiles beneath BNG-projected, clipped controlled vectors in one SVG and records provider, zoom, tile count and maximum affine-centre error. It carries a separate map-corner OpenStreetMap attribution rather than mixing copyright text with engineering provenance. Tile failure preserves vector overlays, blocks print and displays `BASEMAP FAILED TO LOAD - REVIEW REQUIRED`.
 9. CSS composes one `420mm x 297mm` landscape sheet. Browser Print / Save PDF uses `@page { size: A3 landscape; margin: 0; }`.
 
 ## Components
@@ -33,6 +34,7 @@ The module does not select professional HGV routes, infer a site polygon from an
 - `scale-engine.js`: pure paper/ground calculations and centred projected extents.
 - `basemap-compositor.js`: provider abstraction, exact tile coverage, fixed zooms, affine placement and retrieval cap.
 - `source-adapter.js`: Overpass provider failover, source classification, provenance and checksum.
+- `source-review.js`: immutable-input station/rail consistency QA and planner include/exclude presentation filter.
 - `cartography.js`: deterministic source-way presentation grouping, station de-duplication and managed label placement.
 - `railway-adapter.js`: local pure adapter matching current Railway evidence/mode semantics; equivalence tested against the existing module.
 - `overlay-store.js`: validated controlled overlay model with import/edit/delete/visibility/export.

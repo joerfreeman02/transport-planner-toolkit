@@ -104,6 +104,10 @@ try {
   assert.ok(interceptedTileRequests.some(url => url.startsWith('https://tiles.test/')), 'Expected composed drawing tiles to use the mock provider');
   assert.equal(await page.locator('#downloadSnapshot').isEnabled(), true);
   assert.ok((await page.locator('#sheetLegend .legend-row').count()) >= 7);
+  assert.equal(await page.locator('#drawingSvg .osm-attribution').count(), 1);
+  assert.match(await page.locator('#drawingSvg .osm-attribution').textContent(), /OpenStreetMap contributors/);
+  assert.ok(await page.locator('#sourceReviewPanel').isVisible());
+  assert.ok(await page.locator('#sourceReviewRows .source-review-card').count() >= 1);
   assert.equal(await page.locator('#drawingSvg').getAttribute('data-contextual-basemap'), 'rendered-osm-raster-tiles');
   assert.equal(await page.locator('#drawingSvg').getAttribute('data-basemap-provider'), 'test-tiles');
   assert.equal(await page.locator('#drawingSvg').getAttribute('data-basemap-status'), 'success');
@@ -141,7 +145,8 @@ try {
     assert.equal(await svg.getAttribute('data-basemap-zoom'), mode.startsWith('regional-') ? '13' : '17');
     assert.ok(Number(await svg.getAttribute('data-basemap-tile-count')) <= 80);
     assert.equal(await page.locator('#drawingSheet .title-block').count(), 1);
-    assert.match(await page.locator('#sheetAttribution').innerText(), /OpenStreetMap/);
+    assert.match(await page.locator('#sheetAttribution').innerText(), /Professional source|reviewed\/manual evidence/);
+    assert.match(await svg.locator('.osm-attribution').textContent(), /OpenStreetMap contributors/);
     assert.equal(await page.locator('[data-sheet-meta="drawingTitle"]').first().innerText(), details.title);
     assert.equal(await page.locator('[data-sheet-meta="drawingNumber"]').first().innerText(), details.number);
     assert.equal(await page.locator('[data-sheet-meta="scale"]').first().innerText(), details.scale);
@@ -156,6 +161,23 @@ try {
       assert.deepEqual(await page.evaluate(() => { const snapshot = window.__DG0_ACCEPTANCE__.snapshot(); return [snapshot.drawingActive, snapshot.navigationEnabled]; }), [false, true]);
     }
   }
+  await page.evaluate(() => {
+    const api = window.__DG0_ACCEPTANCE__;
+    api.setMode('regional-plan');
+    api.setSource([
+      { type: 'Feature', id: 'way/qa-rail', properties: { class: 'railway', sourceId: 'way/qa-rail' }, geometry: { type: 'LineString', coordinates: [[-.101, 51.5], [-.099, 51.5]] } },
+      { type: 'Feature', id: 'node/qa-remote', properties: { class: 'station-national-rail', sourceId: 'node/qa-remote', name: 'QA remote station', mode: 'National Rail' }, geometry: { type: 'Point', coordinates: [-.09, 51.5] } }
+    ], { provider: 'Synthetic source-review fixture' });
+  });
+  assert.match(await page.locator('#sourceReviewRows').innerText(), /QA remote station.*REVIEW REQUIRED - NO NEARBY RETURNED RAIL GEOMETRY/s);
+  assert.match(await page.locator('#sourceReviewRows').innerText(), /EXCLUDED/);
+  assert.equal(await page.locator('#drawingSvg [class*="layer-station-national-rail"]').count(), 0);
+  await page.locator('#sourceReviewRows .source-review-card button').click();
+  assert.equal((await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot())).sourceReview['node/qa-remote'], 'included');
+  assert.equal(await page.locator('#drawingSvg [class*="layer-station-national-rail"]').count(), 1);
+  await page.locator('#modeSelect').selectOption('local-context');
+  await page.locator('#modeSelect').selectOption('regional-plan');
+  assert.equal((await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot())).sourceReview['node/qa-remote'], 'included');
   await page.evaluate(async () => {
     const api = window.__DG0_ACCEPTANCE__;
     api.setMode('regional-routing');
@@ -212,7 +234,7 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Print / Save PDF' }).count(), 1);
   assert.deepEqual(badLocalResponses, []);
   assert.equal(errors.length, 0, errors.join('\n'));
-  console.log(JSON.stringify({ modes: Object.keys(expected), defaultNavigation: true, drawingCancellation: true, routeCancellation: true, roadSnapMocked: interceptedRouteRequests.length, routeDirectionNormalised: true, routeModePersistence: true, manualFallback: true, importRestoresNavigation: true, advancedDefaultCollapsed: true, siteImport: true, renderedBasemap: true, mockedTiles: interceptedTileRequests.length, basemapFailureSafe: true, sourceSnapshot: true, overlayImport: 2, badLocalResponses, pageErrors: errors }, null, 2));
+  console.log(JSON.stringify({ modes: Object.keys(expected), defaultNavigation: true, drawingCancellation: true, routeCancellation: true, roadSnapMocked: interceptedRouteRequests.length, routeDirectionNormalised: true, routeModePersistence: true, manualFallback: true, importRestoresNavigation: true, advancedDefaultCollapsed: true, siteImport: true, renderedBasemap: true, mockedTiles: interceptedTileRequests.length, basemapFailureSafe: true, sourceSnapshot: true, sourceReviewPersistence: true, overlayImport: 2, badLocalResponses, pageErrors: errors }, null, 2));
 } finally {
   await browser.close();
 }

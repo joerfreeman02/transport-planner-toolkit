@@ -20,6 +20,7 @@ const basemap = await import('../assets/js/basemap-compositor.js');
 const { renderDrawingSvg } = await import('../assets/js/svg-renderer.js');
 const routeGeometry = await import('../assets/js/route-geometry.js');
 const routeSnap = await import('../assets/js/route-snap-adapter.js');
+const sourceReview = await import('../assets/js/source-review.js');
 
 let passed = 0;
 async function test(name, fn) {
@@ -172,9 +173,32 @@ await test('main-road labels preserve only an evidenced A-road reference and mot
   const aRoad = source.classifyOverpassElement({ type: 'way', id: 6, tags: { highway: 'primary', ref: 'A406', name: 'North Circular Road' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
   const nonA = source.classifyOverpassElement({ type: 'way', id: 7, tags: { highway: 'primary', ref: 'B123', name: 'Example Road' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
   const motorway = source.classifyOverpassElement({ type: 'way', id: 8, tags: { highway: 'motorway', ref: 'M25', name: 'London Orbital Motorway' }, geometry: [{ lon: -.1, lat: 51.5 }, { lon: -.09, lat: 51.51 }] })[0];
-  assert.deepEqual([aRoad.properties.class, aRoad.properties.officialARef, aRoad.properties.label], ['main-road', 'A406', 'A406 - North Circular Road']);
-  assert.deepEqual([nonA.properties.class, nonA.properties.officialARef, nonA.properties.label], ['main-road', '', 'B123 - Example Road']);
-  assert.deepEqual([motorway.properties.class, motorway.properties.label], ['motorway', 'M25 - London Orbital Motorway']);
+  assert.deepEqual([aRoad.properties.class, aRoad.properties.officialARef, aRoad.properties.label], ['main-road', 'A406', 'A406']);
+  assert.deepEqual([nonA.properties.class, nonA.properties.officialARef, nonA.properties.label], ['main-road', '', '']);
+  assert.deepEqual([motorway.properties.class, motorway.properties.label], ['motorway', 'M25']);
+});
+await test('source review withholds a station without nearby returned railway geometry without moving the raw feature', () => {
+  const raw = [
+    { type: 'Feature', id: 'way/rail', properties: { class: 'railway', sourceId: 'way/rail' }, geometry: { type: 'LineString', coordinates: [[-.101, 51.5], [-.099, 51.5]] } },
+    { type: 'Feature', id: 'node/station', properties: { class: 'station-national-rail', sourceId: 'node/station', name: 'Remote evidence', mode: 'National Rail' }, geometry: { type: 'Point', coordinates: [-.09, 51.5] } }
+  ];
+  const before = structuredClone(raw);
+  const assessed = sourceReview.assessStationRailConsistency(raw, 200);
+  assert.deepEqual(raw, before);
+  assert.equal(assessed[1].properties.stationQa.warning, sourceReview.NO_NEARBY_RAIL_WARNING);
+  assert.deepEqual(assessed[1].geometry, before[1].geometry);
+  assert.equal(sourceReview.resolveSourcePresentation(assessed).some(item => item.id === 'node/station'), false);
+  assert.equal(sourceReview.resolveSourcePresentation(assessed, { 'node/station': 'included' }).some(item => item.id === 'node/station'), true);
+  assert.equal(sourceReview.stationReviewCandidates(assessed)[0].state, 'excluded');
+});
+await test('source review retains a compatible nearby station and explicit exclusions remove it from presentation', () => {
+  const assessed = sourceReview.assessStationRailConsistency([
+    { type: 'Feature', id: 'way/rail', properties: { class: 'railway', sourceId: 'way/rail' }, geometry: { type: 'LineString', coordinates: [[-.101, 51.5], [-.099, 51.5]] } },
+    { type: 'Feature', id: 'node/station', properties: { class: 'station-underground', sourceId: 'node/station', name: 'Near evidence', mode: 'London Underground' }, geometry: { type: 'Point', coordinates: [-.1, 51.5002] } }
+  ]);
+  assert.equal(assessed[1].properties.stationQa.reviewRequired, false);
+  assert.equal(sourceReview.resolveSourcePresentation(assessed).some(item => item.id === 'node/station'), true);
+  assert.equal(sourceReview.resolveSourcePresentation(assessed, { 'node/station': 'excluded' }).some(item => item.id === 'node/station'), false);
 });
 await test('structured source query includes professional transport evidence but no pseudo-basemap harvest', () => {
   const query = source.buildOverpassQuery('local-context', extent);
@@ -209,9 +233,9 @@ await test('presentation generalisation de-duplicates coincident station labels'
   assert.equal(result[0].properties.class, 'station-underground');
 });
 await test('managed labels are bounded, collision-controlled and repeat-limited', () => {
-  const features = [0, 1, 2].map(index => ({ type: 'Feature', id: `road/${index}`, properties: { class: 'main-road', ref: 'A1' }, geometry: { type: 'LineString', coordinates: [[10 + index * 100, 30], [80 + index * 100, 30]] } }));
+  const features = [0, 1, 2].map(index => ({ type: 'Feature', id: `road/${index}`, properties: { class: 'main-road', ref: 'A1', officialARef: 'A1' }, geometry: { type: 'LineString', coordinates: [[10 + index * 100, 30], [80 + index * 100, 30]] } }));
   const placements = cartography.createLabelPlacements(features, point => point, 'regional-plan', 400, 200);
-  assert.equal(placements.length, 2);
+  assert.equal(placements.length, 1);
   assert.ok(placements.every(item => item.box.x1 >= 7 && item.box.x2 <= 393 && item.box.y1 >= 7 && item.box.y2 <= 193));
 });
 
@@ -227,6 +251,8 @@ for (const modeId of Object.keys(DRAWING_MODES)) await test(`${modeId} renders o
   assert.match(result.markup, /data-contextual-basemap="rendered-osm-raster-tiles"/);
   assert.match(result.markup, /data-basemap-provider="osm-standard"/);
   assert.match(result.markup, /class="osm-rendered-tile"/);
+  assert.match(result.markup, /class="osm-attribution"/);
+  assert.match(result.markup, /© OpenStreetMap contributors/);
   assert.ok(result.basemap.tileCount > 0 && result.basemap.tileCount <= 80);
   assert.equal((result.markup.match(/<svg/g) || []).length, 1);
 });

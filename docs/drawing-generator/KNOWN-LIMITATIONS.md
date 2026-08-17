@@ -26,7 +26,7 @@
 
 - OSM classification is only as complete/current as the returned tags and Overpass response.
 - Relation geometries may be discontinuous MultiLineStrings. Presentation grouping combines only connected like-for-like segments; it is not GIS conflation and does not alter source records.
-- Station modes follow current Railway tag semantics, but ambiguous/poorly tagged stations may need reviewed overlays.
+- Station modes follow current Railway tag semantics, but ambiguous/poorly tagged stations may need reviewed overlays. The 200 m returned-rail check is deterministic QA, not a topology or ownership proof: mapped rail geometry may be incomplete, and an explicitly included flagged station remains a planner decision.
 - Automatic bus retrieval is limited to OSM bus-route relations and may omit services or contain stale geometry.
 - Waterway navigability is conservative: all unproven rivers and canals remain review-only.
 - No authoritative traffic-order, restriction, bridge-height/weight or swept-path evidence is used. The tool cannot determine HGV suitability.

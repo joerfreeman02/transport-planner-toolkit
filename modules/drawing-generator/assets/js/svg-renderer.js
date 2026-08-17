@@ -4,6 +4,7 @@ import { modeConfig } from './drawing-modes.js';
 import { createLabelPlacements, generalisePresentationFeatures } from './cartography.js';
 import { basemapProvider as defaultBasemapProvider, basemapTileMarkup, tileManifestForDrawing } from './basemap-compositor.js';
 import { routeArrowPlacements } from './route-geometry.js';
+import { resolveSourcePresentation } from './source-review.js';
 
 const STYLE = Object.freeze({
   'context-area': { stroke: '#d7d9d5', fill: '#eceee9', width: .35, label: '' },
@@ -137,21 +138,21 @@ function siteFeature(site) {
   return site ? { type: 'Feature', properties: { class: 'site', label: 'SITE' }, geometry: site } : null;
 }
 
-export function legendItemsForDrawing(modeId, sourceFeatures = [], overlays = [], hasSite = false) {
-  const present = new Set(sourceFeatures.filter(item => sourceVisible(modeId, item.properties?.class)).map(item => item.properties.class));
+export function legendItemsForDrawing(modeId, sourceFeatures = [], overlays = [], hasSite = false, sourceReview = {}) {
+  const present = new Set(resolveSourcePresentation(sourceFeatures, sourceReview).filter(item => sourceVisible(modeId, item.properties?.class)).map(item => item.properties.class));
   overlays.filter(item => item.properties?.visible !== false && sourceVisible(modeId, item.properties?.class)).forEach(item => present.add(item.properties.class));
   if (hasSite) present.add('site');
   const priority = ['site', 'main-road', 'motorway', 'cycle-network-primary', 'cycle-network-local', 'strategic-cycle', 'cycle-route', 'waterway', 'railway', 'station-national-rail', 'station-overground', 'station-underground', 'station-dlr', 'station-tram', 'bus-route', 'community', 'route-to-site', 'route-from-site', 'custom-line', 'custom-point', 'custom-area'];
   return priority.filter(className => present.has(className) && STYLE[className]).map(className => ({ className, ...STYLE[className] }));
 }
 
-export function renderDrawingSvg({ modeId, centerBng, site = null, sourceFeatures = [], overlays = [], sourceStatus = 'not-loaded', includeBasemap = true, basemapProvider = defaultBasemapProvider(), basemapStatus = includeBasemap ? 'loading' : 'not-requested' }) {
+export function renderDrawingSvg({ modeId, centerBng, site = null, sourceFeatures = [], sourceReview = {}, overlays = [], sourceStatus = 'not-loaded', includeBasemap = true, basemapProvider = defaultBasemapProvider(), basemapStatus = includeBasemap ? 'loading' : 'not-requested' }) {
   const mode = modeConfig(modeId);
   const extent = extentForDrawing(centerBng, modeId);
   const viewWidth = 1000;
   const viewHeight = viewWidth * mode.mapFrameMm.height / mode.mapFrameMm.width;
   const project = projector(extent, viewWidth, viewHeight);
-  const visibleSource = sourceFeatures.filter(item => sourceVisible(modeId, item.properties?.class) && !item.properties?.class?.startsWith('context-'));
+  const visibleSource = resolveSourcePresentation(sourceFeatures, sourceReview).filter(item => sourceVisible(modeId, item.properties?.class) && !item.properties?.class?.startsWith('context-'));
   const visibleOverlays = overlays.filter(item => item.properties?.visible !== false && sourceVisible(modeId, item.properties?.class));
   const features = generalisePresentationFeatures([...visibleSource, ...visibleOverlays, siteFeature(site)].filter(Boolean));
   const controlledFeatures = features;
@@ -173,13 +174,14 @@ export function renderDrawingSvg({ modeId, centerBng, site = null, sourceFeature
     <g clip-path="url(#map-clip)" aria-label="Rendered OpenStreetMap basemap and controlled EAS overlays"><g class="rendered-osm-basemap" aria-label="OpenStreetMap Standard rendered tile context">${basemap ? basemapTileMarkup(basemap) : ''}</g>${gridMarkup(extent, viewWidth, viewHeight, mode)}<g class="controlled-eas-overlays">${controlledFeatures.map((item, index) => featureMarkup(item, project, index, mode.family)).join('')}</g><g class="controlled-labels">${labelMarkup(labels)}</g></g>
     <g class="north-arrow" aria-label="North arrow" transform="translate(38 34)"><path d="M0,-23 L-13,7 L0,1 L13,7 Z" fill="#8d8d8d" stroke="#333" stroke-width="1"/><text x="0" y="31" text-anchor="middle">N</text></g>
     <g class="scale-bar" data-paper-mm="${scaleBar.paperMm}" data-ground-metres="${scaleBar.groundMetres}"><line x1="${barX}" y1="${barY}" x2="${(barX + barWidth).toFixed(3)}" y2="${barY}" stroke="#111" stroke-width="2" vector-effect="non-scaling-stroke"/><line x1="${barX}" y1="${barY - 5}" x2="${barX}" y2="${barY + 5}" stroke="#111" stroke-width="1"/><line x1="${(barX + barWidth).toFixed(3)}" y1="${barY - 5}" x2="${(barX + barWidth).toFixed(3)}" y2="${barY + 5}" stroke="#111" stroke-width="1"/><text x="${barX}" y="${barY - 9}" class="scale-label">${scaleBar.label}</text></g>
+    <g class="osm-attribution" aria-label="OpenStreetMap attribution" transform="translate(${viewWidth - 196} ${(viewHeight - 24).toFixed(2)})"><rect width="187" height="17" rx="2"/><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener"><text x="7" y="11.5">© OpenStreetMap contributors</text></a></g>
     ${warning ? `<text x="${viewWidth - 15}" y="20" text-anchor="end" class="source-warning">${warning}</text>` : ''}
     ${routeFailure ? `<text x="${viewWidth - 15}" y="38" text-anchor="end" class="source-warning route-review-warning">ROAD SNAP FAILED - ROUTE REQUIRES MANUAL REVIEW</text>` : ''}
     ${routeDirectionReview ? `<text x="${viewWidth - 15}" y="56" text-anchor="end" class="source-warning route-review-warning">ROUTE DIRECTION REQUIRES REVIEW</text>` : ''}
     <g id="basemapFailureWarning" class="basemap-failure-warning" visibility="${basemapStatus === 'failed' ? 'visible' : 'hidden'}"><rect x="180" y="${(viewHeight / 2 - 24).toFixed(2)}" width="640" height="48" rx="4"/><text x="500" y="${(viewHeight / 2 + 4).toFixed(2)}" text-anchor="middle">BASEMAP FAILED TO LOAD - REVIEW REQUIRED</text></g>
     <rect x=".5" y=".5" width="${viewWidth - 1}" height="${(viewHeight - 1).toFixed(3)}" fill="none" stroke="#222" stroke-width="1" vector-effect="non-scaling-stroke"/>
   </svg>`;
-  return { markup, extent, legend: legendItemsForDrawing(modeId, sourceFeatures, overlays, Boolean(site)), scaleBar, presentationFeatures: features, labels, basemap };
+  return { markup, extent, legend: legendItemsForDrawing(modeId, sourceFeatures, overlays, Boolean(site), sourceReview), scaleBar, presentationFeatures: features, labels, basemap };
 }
 
 // Bind separately so the map callback receives the current projector and index.

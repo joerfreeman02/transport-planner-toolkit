@@ -130,3 +130,12 @@ C3 starts exactly at `090a2f1ecfb299ed7119a0199c50ae11e916ef29` and preserves th
 - Removed the right-sidebar duplicate company/logo block and retained one current EAS title-block logo in all four layouts.
 - Added unit/browser/live QA, one-page A3 artifacts, source/provider documentation and an ADR. Generated artifacts remain untracked.
 - No protected module identity, historic client data, main-branch merge or new sprint was introduced.
+
+# DG-0C3.2 pre-merge author-control delta
+
+- Added `source-review.js` and an Advanced diagnostics source-review panel. It reports stable source ID, station name/mode, include/exclude state and returned-rail QA, defaults only no-nearby-rail stations to withheld, and persists explicit planner decisions in local storage.
+- Preserved source geometry and snapshot provenance: station QA is an immutable-input presentation assessment; excluded source records are removed consistently from editor map, issued SVG and legend without altering provider evidence.
+- Added a dedicated, readable `© OpenStreetMap contributors` SVG map-corner attribution in all modes. The sheet footer now holds engineering/provider provenance only.
+- Reduced controlled road labelling: Regional/Local context road names are suppressed; Regional primary/motorway labels use returned A/M refs only with a one-reference normal cap and reduced label budget.
+- Updated all four deterministic and two Milton Keynes live QA PDF drivers to the C3.2 build; the live regional proof reports visible flagged source-review candidates.
+- No GitHub workflow/tooling files changed: Dependabot was retained; Codecov, OpenSSF Scorecard, Sentry and Renovate remain deferred/not installed under the existing governance boundary. Generated PDFs/renders remain untracked.

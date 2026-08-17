@@ -66,6 +66,20 @@ pre { max-height:260px; overflow:auto; padding:.8rem; background:#101820; color:
 .candidate-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:.5rem; }
 .candidate-card { border:1px solid #ccd5dc; padding:.65rem; display:grid; gap:.35rem; }
 .candidate-card strong { color:var(--navy); }
+.source-review-panel { margin-top:1rem; padding:.85rem; border:1px solid #9aabb8; background:#f8fbfd; }
+.source-review-panel h3 { margin:0; color:var(--navy); font-size:1rem; }
+.source-review-panel>p { margin:.35rem 0 .7rem; color:#4e5e6b; font-size:.82rem; }
+.source-review-list { display:grid; gap:.45rem; max-height:360px; overflow:auto; }
+.source-review-card { display:grid; grid-template-columns:minmax(160px,1fr) minmax(150px,1fr) minmax(260px,2fr) auto; align-items:center; gap:.65rem; padding:.6rem; border:1px solid #c4d0d8; background:#fff; }
+.source-review-card div:first-child { display:grid; gap:.12rem; }
+.source-review-card strong { color:var(--navy); }
+.source-review-card span,.source-review-card code { color:#4e5e6b; font-size:.76rem; overflow-wrap:anywhere; }
+.source-review-card p { margin:0; font-size:.78rem; font-weight:700; }
+.review-warning { color:#9b2b00; }
+.review-ok { color:#176b35; }
+.source-review-action { display:grid; grid-template-columns:auto auto; align-items:center; gap:.45rem; }
+.source-review-action b { color:var(--navy); font-size:.72rem; }
+.source-review-action button { padding:.38rem .6rem; font-size:.78rem; }
 .table-wrap { overflow:auto; }
 table { width:100%; border-collapse:collapse; font-size:.82rem; }
 th,td { padding:.55rem; border:1px solid #ccd5dc; text-align:left; vertical-align:middle; }
@@ -131,6 +145,8 @@ td input,td select { min-height:2rem; padding:.3rem; }
 .basemap-failure-warning text { fill:#b0000a; font:800 13px Arial,sans-serif; letter-spacing:.03em; }
 .north-arrow text { font-size:22px; font-family:Arial,sans-serif; fill:#333; }
 .scale-label { font-size:8px; font-family:Arial,sans-serif; fill:#111; }
+.osm-attribution rect { fill:rgba(255,255,255,.88); stroke:#454545; stroke-width:.6; vector-effect:non-scaling-stroke; }
+.osm-attribution text { fill:#151515; font:700 9px Arial,sans-serif; letter-spacing:.01em; }
 .source-warning { fill:#b0000a; font-size:7px; font-weight:800; }
 .dg-map-marker span { display:block; width:12px; height:12px; border:2px solid #fff; border-radius:50%; background:#555; box-shadow:0 0 0 1px #333; }
 .dg-map-marker.station-national-rail span { background:#888; }

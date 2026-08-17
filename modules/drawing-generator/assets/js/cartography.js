@@ -212,6 +212,8 @@ function labelForFeature(feature) {
   if (className.startsWith('context-road')) return '';
   if (className === 'context-place') return properties.name || '';
   if (className.startsWith('station-')) return properties.name || properties.ref || '';
+  if (className === 'main-road') return properties.officialARef || properties.roadLabel || '';
+  if (className === 'motorway') return properties.motorwayLabel || properties.ref || '';
   if (className === 'railway') return properties.name || properties.ref || '';
   if (className === 'site') return properties.label || 'SITE';
   return properties.label || properties.routeLabel || properties.ref || properties.name || '';
@@ -230,8 +232,9 @@ function boxesOverlap(left, right) {
   return left.x1 < right.x2 && left.x2 > right.x1 && left.y1 < right.y2 && left.y2 > right.y1;
 }
 
-function maximumForClass(className) {
-  if (className === 'main-road' || className === 'motorway' || className.startsWith('cycle-network')) return 2;
+function maximumForClass(className, modeId) {
+  if (className === 'main-road' || className === 'motorway') return 1;
+  if (className.startsWith('cycle-network')) return modeId.startsWith('regional-') ? 1 : 2;
   return 1;
 }
 
@@ -244,14 +247,14 @@ export function createLabelPlacements(features, project, modeId, viewWidth, view
     return anchor ? [{ feature, index, className, label, key: `${className}|${normalise(label)}`, priority, ...anchor }] : [];
   }).sort((left, right) => right.priority - left.priority || right.length - left.length || left.label.localeCompare(right.label) || left.index - right.index);
 
-  const limit = modeId.startsWith('regional-') ? 30 : 42;
+  const limit = modeId.startsWith('regional-') ? 16 : 32;
   const counts = new Map();
   const boxes = [];
   const placements = [];
   for (const candidate of candidates) {
     if (placements.length >= limit) break;
     const count = counts.get(candidate.key) || 0;
-    if (count >= maximumForClass(candidate.className)) continue;
+    if (count >= maximumForClass(candidate.className, modeId)) continue;
     const width = Math.min(150, Math.max(22, candidate.label.length * 4.3 + 8));
     const box = { x1: candidate.x - 4, y1: candidate.y - 11, x2: candidate.x + width, y2: candidate.y + 4 };
     if (box.x1 < 7 || box.y1 < 7 || box.x2 > viewWidth - 7 || box.y2 > viewHeight - 7) continue;

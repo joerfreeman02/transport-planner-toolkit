@@ -24,8 +24,8 @@ export function pointInPolygon(point, geometry) {
   return polygons.some(rings => rings.length && pointInRing(point, rings[0]) && !rings.slice(1).some(ring => pointInRing(point, ring)));
 }
 
-function evidence(candidateSourceId, buildingSourceId, associationMethod, reviewState, reviewReason = '') {
-  return { candidateSourceId, buildingSourceId, associationMethod, reviewState, reviewRequired: reviewState !== 'ready', reviewReason };
+function evidence(candidateSourceId, buildingSourceId, associationMethod, reviewState, reviewReason = '', extra = {}) {
+  return { candidateSourceId, buildingSourceId, associationMethod, reviewState, reviewRequired: reviewState !== 'ready', reviewReason, ...extra };
 }
 
 function readyPolygonCandidate(candidate) {
@@ -65,9 +65,16 @@ export function resolveCommunityCandidateGeometry(features) {
     const reason = containing.length
       ? 'COMMUNITY FOOTPRINT REQUIRES REVIEW - MULTIPLE CONTAINING BUILDINGS'
       : 'COMMUNITY FOOTPRINT REQUIRES REVIEW - NO CONTAINING BUILDING';
+    const footprintChoices = containing.map(item => ({
+      sourceId: item.properties.sourceId,
+      geometry: structuredClone(item.geometry)
+    }));
     return {
       ...candidate,
-      properties: { ...candidate.properties, communityEvidence: evidence(candidateSourceId, '', containing.length ? 'ambiguous-containing-buildings' : 'none', 'review-required', reason) }
+      properties: { ...candidate.properties, communityEvidence: evidence(
+        candidateSourceId, '', containing.length ? 'ambiguous-containing-buildings' : 'none', 'review-required', reason,
+        footprintChoices.length ? { footprintChoices } : {}
+      ) }
     };
   });
   return [...other, ...resolved];

@@ -470,7 +470,7 @@ await test('basemap appearance is optional, defaults to colour and leaves profes
   const colour = renderDrawingSvg({ modeId: 'local-context', centerBng, sourceFeatures }).markup;
   const greyscale = renderDrawingSvg({ modeId: 'local-context', centerBng, sourceFeatures, basemapAppearance: { colour: 'greyscale', emphasis: 'normal' } }).markup;
   assert.deepEqual(presentation.normaliseBasemapAppearance(), { colour: 'colour', emphasis: 'faded' });
-  assert.match(colour, /data-basemap-colour="colour"[\s\S]*opacity:0\.8/);
+  assert.match(colour, /data-basemap-colour="colour"[\s\S]*opacity:0\.6/);
   assert.match(greyscale, /data-basemap-colour="greyscale"[\s\S]*style="opacity:1" filter="url\(#basemap-greyscale\)"/);
   assert.match(greyscale, /layer-cycle-network-primary[\s\S]*stroke="#00a651"/);
 });

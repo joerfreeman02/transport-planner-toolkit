@@ -113,7 +113,7 @@ function isCommunityCandidate(tags) {
 }
 
 function busColour(reference) {
-  const palette = ['#ed1c24', '#7f2a90', '#00a651', '#00a9e0'];
+  const palette = ['#ed1c24', '#0057e7', '#7f2a90', '#ec1ce8'];
   const hash = [...String(reference || 'BUS')].reduce((value, character) => ((value * 31) + character.charCodeAt(0)) >>> 0, 0);
   return palette[hash % palette.length];
 }

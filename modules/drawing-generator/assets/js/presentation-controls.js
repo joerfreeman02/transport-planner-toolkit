@@ -1,4 +1,4 @@
-const CONTROLLED_BUS_COLOURS = Object.freeze(['#7f2a90', '#00a651', '#00a9e0', '#f58220']);
+const CONTROLLED_BUS_COLOURS = Object.freeze(['#ed1c24', '#0057e7', '#7f2a90', '#ec1ce8']);
 
 export const BASEMAP_APPEARANCE_DEFAULT = Object.freeze({ colour: 'colour', emphasis: 'faded' });
 

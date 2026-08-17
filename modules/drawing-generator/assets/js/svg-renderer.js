@@ -134,7 +134,8 @@ function featureMarkup(item, project, index, family, modeId = '') {
   const routeStatus = item.properties?.route?.status || '';
   const reviewDash = marker && ['rough', 'snapping', 'snap-failed', 'snap-review-required', 'direction-review'].includes(routeStatus) ? '6 3' : style.dash;
   const markup = `<path d="${path}" fill="${isArea ? escapeXml(item.properties?.colour || style.fill || 'none') : 'none'}" fill-opacity="${isArea ? '.34' : '0'}" fill-rule="evenodd" stroke="${escapeXml(colour)}" stroke-width="${className === 'bus-route' ? 1.7 : style.width}"${reviewDash ? ` stroke-dasharray="${reviewDash}"` : ''} stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${marker ? routeArrowMarkup(item, project, family, marker, colour) : ''}`;
-  return `<g class="layer-${escapeXml(className)}" data-feature-index="${index}"${routeStatus ? ` data-route-status="${escapeXml(routeStatus)}"` : ''}>${markup}</g>`;
+  const offset = className === 'bus-route' ? Number(item.properties?.presentationBusOffset || 0) : 0;
+  return `<g class="layer-${escapeXml(className)}" data-feature-index="${index}"${routeStatus ? ` data-route-status="${escapeXml(routeStatus)}"` : ''}${offset ? ` transform="translate(0 ${offset.toFixed(2)})"` : ''}>${markup}</g>`;
 }
 
 function labelMarkup(placements) {

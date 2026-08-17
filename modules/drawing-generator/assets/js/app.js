@@ -192,10 +192,26 @@ function monitorBasemapTiles(result) {
     if (settled < images.length) return updateDrawingReadiness();
     const paint = () => requestAnimationFrame(() => requestAnimationFrame(() => {
       if (token !== state.basemapRenderToken) return;
-      basemap.status = failed ? 'failed' : 'success';
+      const image = byId('sheetMap').querySelector('.issued-basemap-image');
+      basemap.status = failed || !image || !image.complete || image.naturalWidth < 1 || image.naturalHeight < 1 ? 'failed' : 'success';
+      if (basemap.status === 'failed') basemap.error ||= 'Issued basemap image is incomplete.';
       setBasemapDomStatus(basemap.status); updateDrawingReadiness();
     }));
-    paint();
+    if (!failed) {
+      const canvas = document.createElement('canvas'); canvas.width = Math.ceil(result.viewWidth * 2); canvas.height = Math.ceil(result.viewHeight * 2);
+      const context = canvas.getContext('2d');
+      try {
+        images.forEach((image, index) => { const m = result.basemap.tiles[index].matrix; context.setTransform(m.a * 2, m.b * 2, m.c * 2, m.d * 2, m.e * 2, m.f * 2); context.drawImage(image, 0, 0, result.basemap.provider.tileSize, result.basemap.provider.tileSize); });
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        canvas.toBlob(blob => {
+          if (token !== state.basemapRenderToken || !blob) return;
+          const url = URL.createObjectURL(blob); const image = document.createElement('img'); image.className = 'issued-basemap-image'; image.alt = 'Rendered OpenStreetMap issued basemap'; image.width = canvas.width; image.height = canvas.height;
+          image.onload = async () => { try { await image.decode(); const map = byId('sheetMap'); const old = map.querySelector('.issued-basemap-image'); image.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:1;object-fit:fill;print-color-adjust:exact;-webkit-print-color-adjust:exact;'; map.style.position = 'relative'; map.style.overflow = 'hidden'; const svg = byId('drawingSvg'); svg.style.position = 'relative'; svg.style.zIndex = '2'; const background = [...svg.children].find(child => child.tagName?.toLowerCase() === 'rect'); if (background) background.setAttribute('fill', 'none'); map.prepend(image); map.dataset.basemapImageReady = 'true'; if (old) { const previous = old.src; old.remove(); if (previous.startsWith('blob:')) URL.revokeObjectURL(previous); } paint(); } catch (error) { basemap.status = 'failed'; basemap.error = error.message; setBasemapDomStatus('failed'); updateDrawingReadiness(); } };
+          image.onerror = () => { basemap.status = 'failed'; basemap.error = 'Issued basemap image failed to decode.'; setBasemapDomStatus('failed'); updateDrawingReadiness(); };
+          image.src = url;
+        }, 'image/png');
+      } catch (error) { failed = true; basemap.error = error.message; paint(); }
+    } else paint();
   };
   images.forEach((image, index) => {
     image.addEventListener('load', () => settle(''), { once: true });

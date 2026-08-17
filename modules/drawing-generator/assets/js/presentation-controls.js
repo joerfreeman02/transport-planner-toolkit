@@ -30,7 +30,8 @@ export function normaliseBusGroups(groups = []) {
 
 export function applyBusPresentationGroups(features = [], groups = []) {
   const normalised = normaliseBusGroups(groups);
-  const byReference = new Map(normalised.flatMap(group => group.routeRefs.map(ref => [ref, group])));
+  const offsets = normalised.map((group, index) => ({ ...group, presentationOffset: normalised.length === 1 ? 0 : (index - (normalised.length - 1) / 2) * (normalised.length === 2 ? 3 : 2.5) }));
+  const byReference = new Map(offsets.flatMap(group => group.routeRefs.map(ref => [ref, group])));
   return features.map(feature => {
     if (feature.properties?.class !== 'bus-route') return feature;
     const reference = routeReference(feature);
@@ -51,7 +52,7 @@ export function applyBusPresentationGroups(features = [], groups = []) {
         }
       };
     }
-    return { ...feature, properties: { ...feature.properties, presentationBusGroup: group.id, presentationBusLabel: group.label, presentationBusRouteRefs: [...group.routeRefs], colour: group.colour } };
+    return { ...feature, properties: { ...feature.properties, presentationBusGroup: group.id, presentationBusLabel: group.label, presentationBusRouteRefs: [...group.routeRefs], presentationBusOffset: group.presentationOffset, colour: group.colour } };
   });
 }
 

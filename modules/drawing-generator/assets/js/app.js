@@ -185,42 +185,25 @@ function monitorBasemapTiles(result) {
   if (!images.length) {
     basemap.status = 'failed'; basemap.error = 'No tile images were composed.'; setBasemapDomStatus('failed'); updateDrawingReadiness(); return;
   }
-  let settled = 0;
-  let failed = false;
-  const settle = error => {
+  const prepare = async (image, index) => {
+    const response = await fetch(image.getAttribute('href'), { mode: 'cors', cache: 'no-store' });
+    if (!response.ok) throw new Error(`Tile ${index + 1} failed.`);
+    const blob = await response.blob();
+    if (blob.size < 256) throw new Error(`Tile ${index + 1} has unusable image content.`);
+    const dataUrl = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); });
+    const probe = new Image(); probe.src = dataUrl; await probe.decode();
+    if (probe.naturalWidth < 128 || probe.naturalHeight < 128) throw new Error(`Tile ${index + 1} is incomplete or unusable.`);
+    image.setAttribute('href', dataUrl);
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  };
+  Promise.allSettled(images.map(prepare)).then(results => {
     if (token !== state.basemapRenderToken) return;
-    settled += 1;
-    if (error) { failed = true; basemap.error ||= error; }
-    else basemap.loaded += 1;
-    if (settled < images.length) { updateDrawingReadiness(); return; }
-    basemap.status = failed ? 'failed' : 'success';
+    const failed = results.find(result => result.status === 'rejected');
+    basemap.loaded = results.filter(result => result.status === 'fulfilled').length;
+    basemap.status = failed ? 'failed' : 'success'; basemap.error = failed ? failed.reason?.message || 'Basemap embedding failed.' : '';
     setBasemapDomStatus(basemap.status);
     byId('workflowStatus').textContent = failed ? 'Basemap incomplete — print blocked. Retry basemap; professional overlays remain intact.' : `Drawing basemap ready from ${state.basemapProvider.name}. Review professional overlays before printing.`;
     updateDrawingReadiness();
-  };
-  images.forEach((image, index) => {
-    let completed = false;
-    let timeout;
-    const complete = error => { if (completed) return; completed = true; clearTimeout(timeout); settle(error); };
-    const validate = async () => {
-      try {
-        if (typeof image.decode === 'function') await image.decode();
-        if (image.naturalWidth < 128 || image.naturalHeight < 128) return complete(`Tile ${index + 1} is incomplete or unusable.`);
-        const response = await fetch(image.getAttribute('href'), { mode: 'cors', cache: 'no-store' });
-        if (!response.ok) return complete(`Tile ${index + 1} could not be embedded.`);
-        const blob = await response.blob();
-        if (blob.size < 256) return complete(`Tile ${index + 1} has unusable image content.`);
-        const dataUrl = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob); });
-        image.setAttribute('href', dataUrl);
-        if (typeof image.decode === 'function') await image.decode();
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        complete('');
-      } catch { complete(`Tile ${index + 1} could not be decoded.`); }
-    };
-    timeout = setTimeout(() => complete(`Tile ${index + 1} timed out or remained undecoded.`), 15000);
-    image.addEventListener('load', validate, { once: true });
-    image.addEventListener('error', () => complete(`Tile ${index + 1} failed.`), { once: true });
-    if (image.complete) validate();
   });
 }
 

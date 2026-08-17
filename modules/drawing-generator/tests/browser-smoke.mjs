@@ -53,7 +53,9 @@ try {
   assert.match(await page.locator('.candidate-banner').innerText(), /WORK IN PROGRESS \/ LIVE REVIEW - NOT ACCEPTED BASELINE/);
   assert.equal(await page.locator('#editingMap.leaflet-container').count(), 1);
   const editorBox = await page.locator('#editingMap').boundingBox();
-  assert.ok(Math.abs(editorBox.width - editorBox.height) <= 2, JSON.stringify(editorBox));
+  assert.ok(editorBox.width >= 1200, JSON.stringify(editorBox));
+  assert.ok(editorBox.height >= 520, JSON.stringify(editorBox));
+  assert.ok(editorBox.width > editorBox.height * 1.5, JSON.stringify(editorBox));
   const layerLabels = await page.locator('.leaflet-control-layers-overlays label').allTextContents();
   for (const label of ['Roads', 'Cycle', 'Rail', 'Bus', 'Water', 'Community candidates', 'ISSUED DRAWING EXTENT']) assert.ok(layerLabels.some(value => value.includes(label)), `${label}: ${layerLabels.join(', ')}`);
   assert.equal(await page.locator('#editingMap path.issued-drawing-extent').count(), 1);

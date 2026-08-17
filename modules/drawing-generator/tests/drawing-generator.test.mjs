@@ -202,12 +202,15 @@ await test('controlled bus presentation groups preserve source identity and prev
   assert.equal(grouped[0].properties.presentationBusLabel, 'ALL BUS ROUTES');
   assert.deepEqual(presentation.busRouteReferences(features), ['10', '20']);
 });
-await test('ungrouped bus services retain a single clean ALL BUS ROUTES presentation fallback', () => {
+await test('ungrouped bus services retain individual identities and geometry', () => {
   const features = ['97', '179'].map(ref => ({ type: 'Feature', properties: { class: 'bus-route', ref, sourceId: `relation/${ref}` }, geometry: { type: 'LineString', coordinates: [[-.1, 51.5], [-.09, 51.51]] } }));
   const result = presentation.applyBusPresentationGroups(features);
-  assert.ok(result.every(item => item.properties.presentationBusLabel === 'ALL BUS ROUTES' && item.properties.colour === '#ed1c24'));
+  assert.deepEqual(result.map(item => item.properties.presentationBusLabel), ['BUS ROUTE 97', 'BUS ROUTE 179']);
+  assert.ok(result.every(item => item.properties.colour === '#ed1c24'));
+  assert.deepEqual(result.map(item => item.geometry), features.map(item => item.geometry));
+  assert.ok(result.every(item => item.properties.presentationBusLabel !== 'ALL BUS ROUTES'));
   const legend = renderDrawingSvg({ modeId: 'local-context', centerBng: crs.wgs84ToBng([-.1, 51.5]), sourceFeatures: features }).legend.filter(item => item.className === 'bus-route');
-  assert.deepEqual(legend.map(item => item.label), ['ALL BUS ROUTES — 97, 179']);
+  assert.deepEqual(legend.map(item => item.label), ['BUS ROUTE 97', 'BUS ROUTE 179']);
 });
 await test('clipped relation null geometry placeholders are ignored safely', () => {
   const item = source.classifyOverpassElement({
@@ -516,7 +519,7 @@ await test('dashboard registers exactly one WIP drawing card while preserving es
   assert.equal((dashboard.match(/data-module="drawing-generator"/g) || []).length, 1);
   assert.match(dashboard, /data-module="drawing-generator"[\s\S]*WORK IN PROGRESS[\s\S]*Drawing Generator/);
   for (const title of ['Combined Site Research', 'Accessibility Assessment', 'STATS19 Collision Record Cards', 'Railway Assessment', 'Bus Assessment', 'Library Explorer', 'Library Manager']) assert.match(dashboard, new RegExp(title));
-  assert.deepEqual(modules.modules.drawingGenerator, { version: '0.1.0', build: BUILD, status: 'work-in-progress-live-review', path: 'modules/drawing-generator/index.html' });
+  assert.deepEqual(modules.modules.drawingGenerator, { version: '0.1.0', build: 'DRAW-0.1.0-DG0C3.3A-20260817', status: 'work-in-progress-live-review', path: 'modules/drawing-generator/index.html' });
 });
 
 console.log(`\n${passed} Drawing Generator tests passed.`);

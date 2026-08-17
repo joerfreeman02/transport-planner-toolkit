@@ -70,6 +70,8 @@
         <div class="form-grid compact appearance-controls">
           <label>Basemap colour<select id="basemapColour"><option value="colour">Colour</option><option value="greyscale">Greyscale</option></select></label>
           <label>Map emphasis<select id="basemapEmphasis"><option value="faded">Faded - recommended</option><option value="normal">Normal</option></select></label>
+          <label>Output purpose<select id="outputPurpose"><option value="internal">Internal QA / Live Review</option><option value="client">Client / Professional Issue</option></select></label>
+          <label id="issueConfirmation" hidden><input id="issueConfirmed" type="checkbox"> I have professionally reviewed this drawing for issue.</label>
           <div class="field-action"><button id="loadSources" type="button">Refresh drawing evidence</button></div>
         </div>
         <p id="sourceStatus" class="status-message warning">Refresh drawing evidence after locating the site.</p>

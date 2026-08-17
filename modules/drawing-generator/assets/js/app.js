@@ -30,6 +30,7 @@ const state = {
   sourceReview: persisted.sourceReview || {},
   appearanceByMode: persisted.appearanceByMode || {},
   busGroupsByMode: persisted.busGroupsByMode || {},
+  outputByMode: persisted.outputByMode || {},
   sourcesByMode: {},
   overlayStore: createOverlayStore(persisted.overlays || []),
   basemapByMode: {},
@@ -43,7 +44,7 @@ Object.keys(DRAWING_MODES).forEach(id => { state.metadataByMode[id] = { ...defau
 
 function persist() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ modeId: state.modeId, location: state.location, site: state.site, metadataByMode: state.metadataByMode, sourceReview: state.sourceReview, appearanceByMode: state.appearanceByMode, busGroupsByMode: state.busGroupsByMode, overlays: state.overlayStore.list() }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ modeId: state.modeId, location: state.location, site: state.site, metadataByMode: state.metadataByMode, sourceReview: state.sourceReview, appearanceByMode: state.appearanceByMode, busGroupsByMode: state.busGroupsByMode, outputByMode: state.outputByMode, overlays: state.overlayStore.list() }));
   } catch { setMessage('overlayStatus', 'The browser could not persist the current editable geometry. Download the overlay file before closing.', 'warning'); }
 }
 
@@ -81,6 +82,7 @@ function currentBusGroups() {
   state.busGroupsByMode[state.modeId] = normaliseBusGroups(state.busGroupsByMode[state.modeId] || []);
   return state.busGroupsByMode[state.modeId];
 }
+function currentOutput() { state.outputByMode[state.modeId] ||= { purpose: 'internal', confirmed: false }; return state.outputByMode[state.modeId]; }
 
 function reviewedSourceFeatures() {
   return resolveSourcePresentation(currentSource().features, state.sourceReview);
@@ -130,7 +132,7 @@ function renderPreview() {
   const result = renderDrawingSvg({ modeId: state.modeId, centerBng: drawingCentre(), site: state.site, sourceFeatures: source.features, sourceReview: state.sourceReview, overlays: state.overlayStore.list(), sourceStatus: source.status, includeBasemap: basemap.requested, basemapProvider: state.basemapProvider, basemapStatus: basemap.status, basemapAppearance: currentAppearance(), busGroups: currentBusGroups() });
   byId('sheetMap').innerHTML = result.markup;
   byId('sheetLegend').innerHTML = legendMarkup(result.legend);
-  byId('drawingSheet').className = `drawing-sheet layout-${mode.family}`;
+  byId('drawingSheet').className = `drawing-sheet layout-${mode.family}${currentOutput().purpose === 'client' && currentOutput().confirmed ? ' client-issue' : ''}`;
   document.querySelectorAll('[data-sheet-meta]').forEach(element => { const value = metadata()[element.dataset.sheetMeta]; element.textContent = value || '-'; });
   const routeProviders = isRoutingMode() ? [...new Set(routeOverlays().map(item => item.properties.route?.provenance?.providerName).filter(Boolean))] : [];
   const routeAttribution = routeProviders.length ? `; road geometry: ${routeProviders.join(', ')} (geometry assistance only - planner selected/approved)` : '';
@@ -151,7 +153,7 @@ function updateDrawingReadiness() {
   const mode = modeConfig(state.modeId);
   const basemap = currentBasemap();
   const routeBlock = routingIssue();
-  const blockPrint = !record.scaleMatches || basemap.status !== 'success' || Boolean(routeBlock);
+  const blockPrint = !record.scaleMatches || basemap.status !== 'success' || Boolean(routeBlock) || (currentOutput().purpose === 'client' && !currentOutput().confirmed);
   byId('printDrawing').disabled = blockPrint;
   if (!record.scaleMatches) setMessage('drawingStatus', `Print blocked: scale metadata must be 1:${mode.scale.toLocaleString('en-GB')} for ${mode.title}.`, 'error');
   else if (basemap.status === 'failed') setMessage('drawingStatus', 'BASEMAP INCOMPLETE — PRINT BLOCKED. Controlled overlays remain intact; use Retry basemap.', 'error');
@@ -159,6 +161,7 @@ function updateDrawingReadiness() {
   else if (basemap.status === 'loading') setMessage('drawingStatus', `Loading rendered OpenStreetMap basemap (${basemap.loaded}/${basemap.total || record.result.basemap?.tileCount || 0} tiles).`, 'warning');
   else if (!state.site) setMessage('drawingStatus', `Not issue-ready: no confirmed site boundary. Missing layer evidence: ${record.missing.join(', ') || 'none'}.`, 'warning');
   else if (routeBlock) setMessage('drawingStatus', `Print blocked: ${routeBlock}`, 'error');
+  else if (currentOutput().purpose === 'client' && !currentOutput().confirmed) setMessage('drawingStatus', 'Print blocked: confirm professional review for Client / Professional Issue.', 'error');
   else if (record.missing.length) setMessage('drawingStatus', `Basemap ready. Required professional layers without current evidence: ${record.missing.join(', ')}. Add reviewed overlays or retrieve source data.`, 'warning');
   else setMessage('drawingStatus', 'Basemap and configured layer classes are present. Professional content and route approval are still required.', 'success');
 }
@@ -750,6 +753,7 @@ function populateAppearanceControls() {
   const appearance = currentAppearance();
   byId('basemapColour').value = appearance.colour;
   byId('basemapEmphasis').value = appearance.emphasis;
+  const output = currentOutput(); byId('outputPurpose').value = output.purpose; byId('issueConfirmed').checked = output.confirmed; byId('issueConfirmation').hidden = output.purpose !== 'client';
 }
 
 function initialiseControls() {
@@ -794,6 +798,8 @@ function initialiseControls() {
   byId('downloadOverlays').addEventListener('click', () => downloadJson(`drawing-overlays-${BUILD}.geojson`, state.overlayStore.exportGeoJson()));
   byId('basemapColour').addEventListener('change', () => { state.appearanceByMode[state.modeId] = normaliseBasemapAppearance({ ...currentAppearance(), colour: byId('basemapColour').value }); persist(); renderPreview(); });
   byId('basemapEmphasis').addEventListener('change', () => { state.appearanceByMode[state.modeId] = normaliseBasemapAppearance({ ...currentAppearance(), emphasis: byId('basemapEmphasis').value }); persist(); renderPreview(); });
+  byId('outputPurpose').addEventListener('change', () => { state.outputByMode[state.modeId] = { purpose: byId('outputPurpose').value, confirmed: false }; persist(); populateAppearanceControls(); renderPreview(); });
+  byId('issueConfirmed').addEventListener('change', () => { currentOutput().confirmed = byId('issueConfirmed').checked; persist(); renderPreview(); });
   byId('groupSelectedBusRoutes').addEventListener('click', groupSelectedBusRoutes);
   byId('loadSources').addEventListener('click', retrieveSources);
   byId('generateDrawing').addEventListener('click', retrieveSources);

@@ -29,7 +29,7 @@ export function modeForRailGeometryTags(tags = {}) {
   if (summary.includes('docklands light railway') || /\bdlr\b/.test(summary)) return 'DLR';
   if (summary.includes('london overground') || /\boverground\b/.test(summary)) return 'London Overground';
   if (tags.railway === 'subway' || summary.includes('london underground') || /\bunderground\b/.test(summary)) return 'London Underground';
-  if (/\b(national rail|network rail|great western|northern|southern|thameslink|southeastern|greater anglia|avanti|chiltern)\b/.test(summary)) return 'National Rail';
+  if (/\b(national rail|great western|northern|southern|thameslink|southeastern|greater anglia|avanti|chiltern)\b/.test(summary)) return 'National Rail';
   return '';
 }
 

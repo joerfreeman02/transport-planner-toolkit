@@ -101,6 +101,7 @@ td input,td select { min-height:2rem; padding:.3rem; }
 .preview-panel { overflow:hidden; }
 .sheet-stage { overflow:auto; padding:14px; background:#9ea5aa; }
 .drawing-sheet { position:relative; width:420mm; height:297mm; margin:0 auto; padding:6mm; color:#111; background:white; box-shadow:0 3px 14px rgba(0,0,0,.28); font-family:Arial,Helvetica,sans-serif; }
+.drawing-sheet.client-issue .candidate-stamp,.drawing-sheet.client-issue .build-id { display:none!important; }
 .drawing-sheet::before { content:""; position:absolute; inset:5.5mm; border:.35mm solid #222; pointer-events:none; }
 .sheet-grid { position:relative; z-index:1; display:grid; width:408mm; height:285mm; overflow:hidden; }
 .layout-regional .sheet-grid { grid-template-columns:336mm 72mm; grid-template-rows:245mm 40mm; }

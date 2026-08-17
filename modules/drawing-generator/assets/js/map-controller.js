@@ -1,5 +1,6 @@
 import { generalisePresentationFeatures } from './cartography.js';
 import { basemapProvider } from './basemap-compositor.js';
+import { issuedExtentGeoJson } from './scale-engine.js';
 
 const SOURCE_STYLES = Object.freeze({
   'context-area': { color: '#b6b6a9', weight: .7, opacity: .55, fillColor: '#e8e8df', fillOpacity: .32 },
@@ -7,11 +8,42 @@ const SOURCE_STYLES = Object.freeze({
   'context-road-minor': { color: '#c9c9c2', weight: 1.2, opacity: .7 },
   'context-place': { color: '#777', weight: 1, opacity: .6 },
   'main-road': { color: '#ed1c24', weight: 2, opacity: .8 }, motorway: { color: '#ec1ce8', weight: 3, opacity: .85 },
-  railway: { color: '#777', weight: 2, dashArray: '5 3' }, waterway: { color: '#0047bb', weight: 2 },
-  'cycle-network-primary': { color: '#f0a500', weight: 2.5 }, 'cycle-network-local': { color: '#d98600', weight: 2, dashArray: '7 4' },
-  'strategic-cycle': { color: '#f0a500', weight: 2 }, 'cycle-route': { color: '#0057e7', weight: 2 },
-  'bus-route': { color: '#7f2a90', weight: 3 }
+  railway: { color: '#666', weight: 2.4, dashArray: '7 3' }, waterway: { color: '#00a9e0', weight: 2.6 }, 'waterway-review': { color: '#00a9e0', weight: 1.8, dashArray: '3 4' },
+  'cycle-network-primary': { color: '#00a651', weight: 3 }, 'cycle-network-local': { color: '#00a651', weight: 2.5, dashArray: '7 4' },
+  'strategic-cycle': { color: '#00a651', weight: 2.8 }, 'cycle-route': { color: '#00a651', weight: 2.5, dashArray: '7 4' }, 'cycle-review': { color: '#7f2a90', weight: 1.8, dashArray: '3 4' },
+  'bus-route': { color: '#7f2a90', weight: 3.4 }, 'bus-route-review': { color: '#ed1c24', weight: 2, dashArray: '3 4' },
+  'community-candidate': { color: '#666', weight: 1.5, fillColor: '#999', fillOpacity: .12 }
 });
+
+const SOURCE_GROUPS = Object.freeze({
+  Roads: new Set(['context-road-major', 'context-road-minor', 'main-road', 'motorway']),
+  Cycle: new Set(['cycle-network-primary', 'cycle-network-local', 'strategic-cycle', 'cycle-route', 'cycle-review']),
+  Rail: new Set(['railway', 'station-national-rail', 'station-overground', 'station-underground', 'station-dlr', 'station-tram']),
+  Bus: new Set(['bus-route', 'bus-route-review']),
+  Water: new Set(['waterway', 'waterway-review']),
+  Community: new Set(['community-candidate'])
+});
+
+function groupForFeature(feature) {
+  const className = feature.properties?.class;
+  return Object.keys(SOURCE_GROUPS).find(name => SOURCE_GROUPS[name].has(className)) || '';
+}
+
+function sourceStyle(feature) {
+  const className = feature.properties?.class;
+  if (className === 'railway') {
+    const railMode = feature.properties?.railMode || '';
+    const colour = { 'London Overground': '#f58220', 'London Underground': '#0057e7', DLR: '#00a4a7', 'Tram/light rail': '#5a8f29', 'National Rail': '#666' }[railMode] || '#666';
+    return { ...(SOURCE_STYLES.railway || {}), color: colour, ...(railMode ? { dashArray: '' } : {}) };
+  }
+  return { ...(SOURCE_STYLES[className] || { color: '#777', weight: 1.5 }), ...(feature.properties?.colour ? { color: feature.properties.colour } : {}) };
+}
+
+function defaultGroups(modeId) {
+  if (modeId === 'regional-plan') return new Set(['Roads', 'Cycle', 'Rail', 'Water']);
+  if (modeId === 'local-context') return new Set(['Cycle', 'Rail', 'Bus', 'Water', 'Community']);
+  return new Set();
+}
 
 function collectSiteGeometry(editableGroup) {
   const geometries = [];
@@ -26,22 +58,29 @@ function pointIcon(className = 'source') {
   return L.divIcon({ className: `dg-map-marker ${className}`, html: '<span></span>', iconSize: [14, 14], iconAnchor: [7, 7] });
 }
 
-export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCreated, onOverlayChanged, onOverlayDeleted, onDrawingStateChanged = () => {} }) {
+export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCreated, onOverlayChanged, onOverlayDeleted, onDrawingStateChanged = () => {}, onMapCenterChanged = () => {} }) {
   const map = L.map('editingMap', { zoomControl: true }).setView([52.2, -1.4], 6);
   const provider = basemapProvider();
   const base = L.tileLayer(provider.urlTemplate, { minZoom: provider.minZoom, maxZoom: provider.maxZoom, crossOrigin: true, opacity: 1, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
   const editable = L.featureGroup().addTo(map);
-  const source = L.geoJSON(null, {
-    style: feature => SOURCE_STYLES[feature.properties?.class] || { color: '#777', weight: 1.5 },
+  const sourceGroups = Object.fromEntries(Object.keys(SOURCE_GROUPS).map(name => [name, L.geoJSON(null, {
+    style: sourceStyle,
     pointToLayer: (feature, latlng) => L.marker(latlng, { icon: pointIcon(feature.properties?.class || 'source') }),
     onEachFeature: (feature, layer) => { const label = feature.properties?.name || feature.properties?.routeLabel || feature.properties?.class; if (label) layer.bindTooltip(label); }
-  }).addTo(map);
-  L.control.layers({ OpenStreetMap: base }, { 'Structured vector source': source, 'Editable geometry': editable }, { collapsed: true }).addTo(map);
+  })]));
+  const issuedExtent = L.geoJSON(null, { style: { className: 'issued-drawing-extent', color: '#082c66', weight: 2, opacity: .85, fill: false, dashArray: '9 7', interactive: false } }).addTo(map);
+  const overlayControls = {
+    Roads: sourceGroups.Roads, Cycle: sourceGroups.Cycle, Rail: sourceGroups.Rail, Bus: sourceGroups.Bus,
+    Water: sourceGroups.Water, 'Community candidates': sourceGroups.Community,
+    'ISSUED DRAWING EXTENT': issuedExtent, 'Editable geometry': editable
+  };
+  L.control.layers({ OpenStreetMap: base }, overlayControls, { collapsed: true }).addTo(map);
   map.addControl(new L.Control.Draw({ draw: false, edit: { featureGroup: editable, remove: true } }));
   L.control.scale({ imperial: false }).addTo(map);
 
   let pending = null;
   let activeHandler = null;
+  let currentIssuedExtent = null;
 
   function finishDrawingState() {
     const completed = pending;
@@ -65,7 +104,8 @@ export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCre
     cancelDrawing();
     pending = nextPending;
     activeHandler = handler;
-    if (map.dragging) map.dragging.disable();
+    const routeNavigation = nextPending.kind === 'overlay' && ['route-to-site', 'route-from-site'].includes(nextPending.metadata?.className);
+    if (map.dragging) routeNavigation ? map.dragging.enable() : map.dragging.disable();
     handler.enable();
     onDrawingStateChanged(true, pending);
   }
@@ -104,6 +144,10 @@ export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCre
     });
     if (siteDeleted && !collectSiteGeometry(editable)) onSiteDeleted();
   });
+  map.on('moveend', () => {
+    const center = map.getCenter();
+    onMapCenterChanged({ lat: center.lat, lon: center.lng });
+  });
 
   function addGeoJsonToEditable(feature, kind, id = '') {
     const group = L.geoJSON(feature, {
@@ -129,7 +173,21 @@ export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCre
       [...editable.getLayers()].filter(layer => layer._dgKind === 'overlay').forEach(layer => editable.removeLayer(layer));
       overlays.forEach(overlay => { if (overlay.properties.visible !== false) addGeoJsonToEditable(overlay, 'overlay', overlay.id); });
     },
-    setSource(features) { source.clearLayers(); source.addData({ type: 'FeatureCollection', features: generalisePresentationFeatures(features) }); },
+    setSource(features, modeId = 'regional-plan') {
+      Object.values(sourceGroups).forEach(group => { group.clearLayers(); map.removeLayer(group); });
+      generalisePresentationFeatures(features).forEach(feature => {
+        const groupName = groupForFeature(feature);
+        if (groupName) sourceGroups[groupName].addData(feature);
+      });
+      defaultGroups(modeId).forEach(name => sourceGroups[name].addTo(map));
+    },
+    setIssuedDrawingExtent(centerBng, modeId) {
+      const feature = issuedExtentGeoJson(centerBng, modeId);
+      currentIssuedExtent = feature;
+      issuedExtent.clearLayers(); issuedExtent.addData(feature);
+      issuedExtent.bindTooltip(feature.properties.label, { sticky: true });
+      return feature;
+    },
     startSiteDrawing() { startDrawing(new L.Draw.Polygon(map, { allowIntersection: false, shapeOptions: { color: '#ed1c24', weight: 4 } }), { kind: 'site' }); },
     startOverlayDrawing(type, metadata) {
       const handlers = {
@@ -143,6 +201,9 @@ export function createMapController({ onSiteChanged, onSiteDeleted, onOverlayCre
     cancelDrawing,
     isDrawingActive() { return Boolean(activeHandler); },
     navigationEnabled() { return Boolean(map.dragging?.enabled()); },
+    activeVertexCount() { return activeHandler?._markers?.length || 0; },
+    mapCenter() { const center = map.getCenter(); return { lat: center.lat, lon: center.lng }; },
+    issuedExtent() { return currentIssuedExtent ? structuredClone(currentIssuedExtent) : null; },
     clearSite() {
       cancelDrawing();
       [...editable.getLayers()].filter(layer => layer._dgKind === 'site').forEach(layer => editable.removeLayer(layer));

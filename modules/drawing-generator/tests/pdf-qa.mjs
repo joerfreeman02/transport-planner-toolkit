@@ -10,12 +10,7 @@ const modes = (process.env.DG0_PDF_MODES || 'regional-plan,regional-routing,loca
 fs.mkdirSync(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, ...(process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
 
-function mockedOsmTile(url) {
-  const match = url.match(/\/(\d+)\/(\d+)\/(\d+)\.png/);
-  const [, z = '0', x = '0', y = '0'] = match || [];
-  const offset = (Number(x) * 17 + Number(y) * 31) % 100;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><rect width="256" height="256" fill="#eef0e8"/><path d="M0 ${40 + offset} C80 ${10 + offset / 2} 160 ${160 - offset / 2} 256 ${110 + offset / 3}" fill="none" stroke="#fff" stroke-width="13"/><path d="M0 ${40 + offset} C80 ${10 + offset / 2} 160 ${160 - offset / 2} 256 ${110 + offset / 3}" fill="none" stroke="#e6b8a7" stroke-width="7"/><path d="M${20 + offset} 0 C${80 + offset / 2} 90 ${30 + offset / 3} 170 ${170 + offset / 2} 256" fill="none" stroke="#fff" stroke-width="8"/><path d="M${20 + offset} 0 C${80 + offset / 2} 90 ${30 + offset / 3} 170 ${170 + offset / 2} 256" fill="none" stroke="#d1d1cb" stroke-width="3"/><path d="M0 ${210 - offset / 2} Q110 ${120 + offset / 3} 256 ${180 - offset / 4}" fill="none" stroke="#b7d6ea" stroke-width="7"/><rect x="24" y="26" width="62" height="40" fill="#d9e8cf" stroke="#c5d7b8"/><text x="128" y="142" text-anchor="middle" font-family="Arial" font-size="11" fill="#59605b">QA MAP ${z}/${x}/${y}</text></svg>`;
-}
+const genuinePngTile = fs.readFileSync(new URL('../assets/images/eas-primary.png', import.meta.url));
 
 const site = { type: 'Polygon', coordinates: [[[-.1011, 51.4997], [-.09985, 51.4997], [-.09985, 51.50045], [-.1011, 51.50045], [-.1011, 51.4997]]] };
 const lines = {
@@ -52,14 +47,20 @@ const sourceFeatures = [
 const overlays = [
   [{ type: 'Feature', properties: {}, geometry: lines.route }, { className: 'route-to-site', label: 'ROUTE TO SITE', layerName: 'Planner-guided road routing', colour: '#ed1c24', source: 'Mock road geometry; automated QA only', route: { status: 'approved', directionStatus: 'confirmed', selectionAuthority: 'planner', providerPurpose: 'geometry-assistance-only', provenance: { providerName: 'Mock road geometry', providerId: 'qa-mock', providerPurpose: 'geometry-assistance-only', waypointOrderPreserved: true, maxGuidanceDeviationMetres: 0 } } }],
   [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [...lines.route.coordinates].reverse() } }, { className: 'route-from-site', label: 'ROUTE FROM SITE', layerName: 'Planner-guided road routing', colour: '#0057e7', source: 'Mock road geometry; automated QA only', route: { status: 'approved', directionStatus: 'confirmed', selectionAuthority: 'planner', providerPurpose: 'geometry-assistance-only', provenance: { providerName: 'Mock road geometry', providerId: 'qa-mock', providerPurpose: 'geometry-assistance-only', waypointOrderPreserved: true, maxGuidanceDeviationMetres: 0 } } }],
-  [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [-.1025, 51.501] } }, { className: 'community', label: 'COMMUNITY FACILITY', layerName: 'Selected considerations', colour: '#666666' }]
+  [{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[-.1029, 51.5007], [-.1021, 51.5007], [-.1021, 51.5013], [-.1029, 51.5013], [-.1029, 51.5007]]] } }, { className: 'community', label: 'COMMUNITY FACILITY', layerName: 'Selected considerations', colour: '#666666' }]
 ];
 
 try {
   for (const mode of modes) {
+    const modeOverlays = structuredClone(overlays);
+    if (mode === 'regional-routing') {
+      const regionalRoute = [[-.202, 51.463], [-.174, 51.479], [-.142, 51.489], [-.1005, 51.5001]];
+      modeOverlays[0][0].geometry.coordinates = regionalRoute;
+      modeOverlays[1][0].geometry.coordinates = [...regionalRoute].reverse();
+    }
     const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
     await page.addInitScript(() => localStorage.clear());
-    await page.route(/https:\/\/(?:tile\.openstreetmap\.org|tiles\.test)\/\d+\/\d+\/\d+\.png/, route => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: mockedOsmTile(route.request().url()) }));
+    await page.route(/https:\/\/(?:tile\.openstreetmap\.org|tiles\.test)\/\d+\/\d+\/\d+\.png/, route => route.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: genuinePngTile }));
     await page.goto(new URL('modules/drawing-generator/', root).href, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => Boolean(window.__DG0_ACCEPTANCE__));
     await page.locator('#advancedTools > summary').click();
@@ -68,7 +69,7 @@ try {
       api.setBasemapProvider({ id: 'qa-mocked-osm', name: 'Mocked OSM tile fixture', urlTemplate: 'https://tiles.test/{z}/{x}/{y}.png', attribution: 'Automated QA tile fixture - no public tile retrieval', tileSize: 256, minZoom: 0, maxZoom: 19, maxTilesPerView: 80 });
       api.setMode(mode); api.setLocation(51.5, -.1); api.setSite(site); api.setSource(sourceFeatures, { retrievedAt: '2026-08-16T12:00:00Z' });
       overlays.forEach(([feature, metadata]) => api.addOverlay(feature, metadata));
-    }, { mode, site, sourceFeatures, overlays });
+    }, { mode, site, sourceFeatures, overlays: modeOverlays });
     await page.locator('[data-meta="client"]').fill('Synthetic QA Client');
     await page.locator('[data-meta="project"]').fill('Drawing Generator QA Site');
     await page.locator('[data-meta="projectNumber"]').fill('DG0-QA');
@@ -85,7 +86,7 @@ try {
     if (await page.locator('#drawingSheet .identity img').count() !== 1) throw new Error(`${mode} did not contain exactly one issued title-block logo.`);
     if (!await page.locator('#drawingSvg .osm-attribution').count()) throw new Error(`${mode} did not render the distinct OpenStreetMap attribution.`);
     if (!await page.locator('#drawingSvg .osm-attribution').textContent().then(text => /OpenStreetMap contributors/.test(text || ''))) throw new Error(`${mode} did not retain readable OpenStreetMap attribution text.`);
-    await page.pdf({ path: path.join(output, `drawing-generator-${mode}-DG0C3.2-live-review.pdf`), format: 'A3', landscape: true, printBackground: true, preferCSSPageSize: true, margin: { top: '0', right: '0', bottom: '0', left: '0' } });
+    await page.pdf({ path: path.join(output, `drawing-generator-${mode}-DG0C3.3A-live-review.pdf`), format: 'A3', landscape: true, printBackground: true, preferCSSPageSize: true, margin: { top: '0', right: '0', bottom: '0', left: '0' } });
     await page.close();
   }
   console.log(`Created ${modes.length} A3 live-review QA PDF${modes.length === 1 ? '' : 's'} in ${output}`);

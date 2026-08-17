@@ -30,7 +30,7 @@ export const DRAWING_MODES = Object.freeze({
     scale: 2500,
     mapFrameMm: Object.freeze({ width: 318, height: 285 }),
     requiredClasses: Object.freeze(['site', 'bus-route', 'railway', 'cycle-route', 'community']),
-    visibleClasses: Object.freeze(['context-area', 'context-road-major', 'context-road-minor', 'context-place', 'site', 'main-road', 'cycle-network-primary', 'cycle-network-local', 'cycle-route', 'railway', 'station-national-rail', 'station-overground', 'station-underground', 'station-dlr', 'station-tram', 'bus-route', 'community', 'custom-line', 'custom-point', 'custom-area'])
+    visibleClasses: Object.freeze(['site', 'cycle-network-primary', 'cycle-network-local', 'cycle-route', 'railway', 'station-national-rail', 'station-overground', 'station-underground', 'station-dlr', 'station-tram', 'bus-route', 'community', 'custom-line', 'custom-point', 'custom-area'])
   }),
   'local-routing': Object.freeze({
     id: 'local-routing',

@@ -30,12 +30,12 @@ await page.route(/https:\/\/[^/]*overpass[^/]*\/api\/interpreter/, route => {
   interceptedSourceBodies.push(route.request().postData() || '');
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) });
 });
-const transparentPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+const rasterTile = fs.readFileSync(new URL('../assets/images/eas-primary.png', import.meta.url));
 await page.route(/https:\/\/(?:tile\.openstreetmap\.org|tiles\.test)\/\d+\/\d+\/\d+\.png/, route => {
   interceptedTileRequests.push(route.request().url());
-  return route.fulfill({ status: 200, contentType: 'image/png', body: transparentPng });
+  return route.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: rasterTile });
 });
-await page.route(/https:\/\/tiles-fail\.test\/\d+\/\d+\/\d+\.png/, route => route.fulfill({ status: 503, contentType: 'text/plain', body: 'mock tile failure' }));
+await page.route(/https:\/\/tiles-fail\.test\/\d+\/\d+\/\d+\.png/, route => route.fulfill(expectedTileFailure ? { status: 503, contentType: 'text/plain', body: 'mock tile failure' } : { status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: rasterTile }));
 await page.route(/https:\/\/routing\.test\/route\/v1\/driving\/.+/, route => {
   interceptedRouteRequests.push(route.request().url());
   const coordinatePart = new URL(route.request().url()).pathname.split('/driving/')[1];
@@ -52,8 +52,25 @@ try {
   await page.evaluate(() => window.__DG0_ACCEPTANCE__.setBasemapProvider({ id: 'test-tiles', name: 'Mock OSM tiles', urlTemplate: 'https://tiles.test/{z}/{x}/{y}.png', attribution: 'Map data (c) OpenStreetMap contributors', tileSize: 256, minZoom: 0, maxZoom: 19, maxTilesPerView: 80 }));
   assert.match(await page.locator('.candidate-banner').innerText(), /WORK IN PROGRESS \/ LIVE REVIEW - NOT ACCEPTED BASELINE/);
   assert.equal(await page.locator('#editingMap.leaflet-container').count(), 1);
+  const editorBox = await page.locator('#editingMap').boundingBox();
+  assert.ok(Math.abs(editorBox.width - editorBox.height) <= 2, JSON.stringify(editorBox));
+  const layerLabels = await page.locator('.leaflet-control-layers-overlays label').allTextContents();
+  for (const label of ['Roads', 'Cycle', 'Rail', 'Bus', 'Water', 'Community candidates', 'ISSUED DRAWING EXTENT']) assert.ok(layerLabels.some(value => value.includes(label)), `${label}: ${layerLabels.join(', ')}`);
+  assert.equal(await page.locator('#editingMap path.issued-drawing-extent').count(), 1);
   assert.equal(await page.locator('#advancedTools').evaluate(element => element.open), false);
   assert.deepEqual(await page.evaluate(() => { const snapshot = window.__DG0_ACCEPTANCE__.snapshot(); return [snapshot.drawingActive, snapshot.navigationEnabled, snapshot.advancedOpen]; }), [false, true, false]);
+  assert.deepEqual(await page.locator('[data-workflow-step]').evaluateAll(items => items.map(item => item.dataset.workflowStep)), ['1', '2', '3', '4', '5']);
+  assert.equal(await page.locator('#sourcesAudit').isVisible(), true);
+  assert.equal(await page.locator('#basemapColour').inputValue(), 'colour');
+  assert.equal(await page.locator('#basemapEmphasis').inputValue(), 'faded');
+  for (const mode of ['regional-plan', 'regional-routing', 'local-context', 'local-routing']) {
+    await page.locator('#modeSelect').selectOption(mode);
+    assert.equal(await page.locator('#modeSelect').inputValue(), mode);
+    assert.equal(await page.locator('#advancedTools').evaluate(element => element.open), false);
+    assert.match(await page.locator('#project-heading').innerText(), /Choose the drawing/);
+  }
+  await page.locator('#modeSelect').selectOption('regional-plan');
+  assert.match(await page.locator('#sourcesAuditRows').innerText(), /OpenStreetMap.*TfL Cycle.*TPT Railway/s);
   await page.locator('#drawSite').click();
   assert.deepEqual(await page.evaluate(() => { const snapshot = window.__DG0_ACCEPTANCE__.snapshot(); return [snapshot.drawingActive, snapshot.navigationEnabled]; }), [true, false]);
   assert.equal(await page.locator('#cancelDrawing').isVisible(), true);
@@ -111,6 +128,8 @@ try {
   assert.equal(await page.locator('#drawingSvg').getAttribute('data-contextual-basemap'), 'rendered-osm-raster-tiles');
   assert.equal(await page.locator('#drawingSvg').getAttribute('data-basemap-provider'), 'test-tiles');
   assert.equal(await page.locator('#drawingSvg').getAttribute('data-basemap-status'), 'success');
+  assert.equal(await page.locator('#drawingSvg').getAttribute('data-basemap-colour'), 'colour');
+  assert.equal(await page.locator('#drawingSvg').getAttribute('data-basemap-emphasis'), 'faded');
   assert.ok(Number(await page.locator('#drawingSvg').getAttribute('data-basemap-tile-count')) > 0);
   assert.equal(await page.locator('#printDrawing').isEnabled(), true);
 
@@ -135,7 +154,11 @@ try {
       await page.waitForFunction(() => /classified vector features loaded/i.test(document.querySelector('#sourceStatus')?.textContent || ''));
       await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'success');
     }
+    await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'success');
     const svg = page.locator('#drawingSvg');
+    const issued = await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().issuedExtent.properties);
+    assert.deepEqual([issued.groundWidth, issued.groundHeight, issued.scale], mode.startsWith('regional-') ? [16800, 12250, 50000] : [795, 712.5, 2500]);
+    assert.match(issued.label, mode.startsWith('regional-') ? /1:50,000/ : /1:2,500/);
     assert.equal(await svg.getAttribute('data-mode'), mode);
     assert.equal(await svg.getAttribute('data-scale'), details.denominator);
     assert.equal(await svg.locator('.scale-bar').getAttribute('data-paper-mm'), '20');
@@ -150,15 +173,47 @@ try {
     assert.equal(await page.locator('[data-sheet-meta="drawingTitle"]').first().innerText(), details.title);
     assert.equal(await page.locator('[data-sheet-meta="drawingNumber"]').first().innerText(), details.number);
     assert.equal(await page.locator('[data-sheet-meta="scale"]').first().innerText(), details.scale);
+    assert.match(await page.locator('.title-cell.issue').innerText(), /DESIGN \/ DRAWN/);
     const currentDate = await page.locator('[data-meta="date"]').inputValue();
     assert.match(currentDate, /^\d{2}\/\d{2}\/\d{4}$/);
     assert.equal(await page.locator('[data-sheet-meta="date"]').first().innerText(), currentDate);
     if (mode.endsWith('-routing')) {
       await page.locator('#drawRouteTo').click();
-      assert.deepEqual(await page.evaluate(() => { const snapshot = window.__DG0_ACCEPTANCE__.snapshot(); return [snapshot.drawingActive, snapshot.navigationEnabled]; }), [true, false]);
+      assert.deepEqual(await page.evaluate(() => { const snapshot = window.__DG0_ACCEPTANCE__.snapshot(); return [snapshot.drawingActive, snapshot.navigationEnabled]; }), [true, true]);
+      if (mode === 'regional-routing') {
+        const mapBox = await page.locator('#editingMap').boundingBox();
+        await page.mouse.click(mapBox.x + mapBox.width * .45, mapBox.y + mapBox.height * .45);
+        assert.equal((await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot())).activeRouteVertexCount, 1);
+        const beforePanSnapshot = await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot());
+        const beforePan = beforePanSnapshot.mapCenter;
+        await page.mouse.move(mapBox.x + mapBox.width * .7, mapBox.y + mapBox.height * .55);
+        await page.mouse.down();
+        await page.mouse.move(mapBox.x + mapBox.width * .55, mapBox.y + mapBox.height * .55, { steps: 8 });
+        await page.mouse.up();
+        const afterPan = await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot());
+        assert.equal(afterPan.activeRouteVertexCount, 1);
+        assert.ok(Math.abs(afterPan.mapCenter.lon - beforePan.lon) > 1e-5 || Math.abs(afterPan.mapCenter.lat - beforePan.lat) > 1e-5, JSON.stringify({ beforePan, afterPan: afterPan.mapCenter }));
+        assert.deepEqual(afterPan.issuedExtent.geometry, beforePanSnapshot.issuedExtent.geometry, 'Panning navigates the editor but must not move the site-centred issued frame.');
+      }
       assert.equal(await page.locator('#cancelRouteDrawing').isVisible(), true);
       await page.locator('#cancelRouteDrawing').click();
       assert.deepEqual(await page.evaluate(() => { const snapshot = window.__DG0_ACCEPTANCE__.snapshot(); return [snapshot.drawingActive, snapshot.navigationEnabled]; }), [false, true]);
+    }
+    if (mode === 'local-context') {
+      assert.equal(await page.locator('#busPresentationPanel').isVisible(), true);
+      assert.equal(await page.locator('#drawingSvg .north-arrow-panel').count(), 1);
+      assert.equal(await page.locator('#drawingSvg .scale-bar-panel').count(), 1);
+      assert.ok(await page.locator('#communityPanel').isVisible());
+      const candidate = page.locator('#communityCandidates .candidate-card').filter({ hasText: 'Test School' });
+      assert.equal(await candidate.count(), 1);
+      await candidate.locator('button').click();
+      const selected = await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().overlays.find(item => item.id === 'community:node/109'));
+      assert.equal(selected.geometry.type, 'Polygon');
+      assert.deepEqual([selected.properties.community.candidateSourceId, selected.properties.community.buildingSourceId, selected.properties.community.associationMethod], ['node/109', 'way/116', 'single-containing-building']);
+      assert.match(await candidate.locator('button').innerText(), /Added/);
+      assert.ok(await page.locator('#drawingSvg .layer-community').count() >= 1);
+      await candidate.locator('button').click();
+      assert.equal(await page.evaluate(() => Boolean(window.__DG0_ACCEPTANCE__.snapshot().overlays.find(item => item.id === 'community:node/109'))), false);
     }
   }
   await page.evaluate(() => {
@@ -194,6 +249,9 @@ try {
   assert.equal(routeSnapshot.find(item => item.properties.class === 'route-from-site').properties.route.reversedByNormalization, true);
   assert.equal(interceptedRouteRequests.length, 2);
   assert.equal(await page.locator('#drawingSvg .route-direction-arrow').count() > 0, true);
+  assert.equal(await page.locator('#drawingSvg .route-direction-arrow-halo').count() > 0, true);
+  assert.equal(await page.locator('#drawingSvg [data-cartographic-offset="3.2"]').count() > 0, true);
+  assert.equal(await page.locator('#drawingSvg [data-cartographic-offset="-3.2"]').count() > 0, true);
   assert.equal(await page.locator('#drawingSvg [class*="layer-main-road"], #drawingSvg [class*="layer-railway"], #drawingSvg [class*="layer-station-"]').count(), 0);
   await page.locator('#approveSnappedRoutes').click();
   routeSnapshot = await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().overlays.filter(item => item.properties.class.startsWith('route-')));
@@ -219,7 +277,7 @@ try {
   assert.deepEqual(failedRoute.geometry, failedRoute.properties.route.roughGeometry);
   await page.locator('#acceptManualFallback').click();
   assert.equal((await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().overlays[0].properties.route.status)), 'manual-approved');
-  const overlayCountBeforeFailure = (await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot())).overlays.length;
+  await page.evaluate(() => window.__DG0_ACCEPTANCE__.clearOverlays());
   expectedTileFailure = true;
   await page.evaluate(() => {
     const api = window.__DG0_ACCEPTANCE__;
@@ -227,14 +285,19 @@ try {
     api.requestBasemap();
   });
   await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'failed');
-  assert.match(await page.locator('#basemapFailureWarning').textContent(), /BASEMAP FAILED TO LOAD - REVIEW REQUIRED/);
+  assert.match(await page.locator('#basemapFailureWarning').textContent(), /BASEMAP INCOMPLETE — PRINT BLOCKED/);
   assert.equal(await page.locator('#basemapFailureWarning').getAttribute('visibility'), 'visible');
   assert.equal(await page.locator('#printDrawing').isDisabled(), true);
-  assert.equal((await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot())).overlays.length, overlayCountBeforeFailure);
+  assert.equal(await page.locator('#retryBasemap').isVisible(), true);
+  expectedTileFailure = false;
+  await page.locator('#retryBasemap').click();
+  await page.waitForFunction(() => window.__DG0_ACCEPTANCE__.snapshot().basemap.status === 'success');
+  assert.equal(await page.locator('#retryBasemap').isVisible(), false);
+  assert.equal((await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot())).overlays.length, 0);
   assert.equal(await page.getByRole('button', { name: 'Print / Save PDF' }).count(), 1);
   assert.deepEqual(badLocalResponses, []);
   assert.equal(errors.length, 0, errors.join('\n'));
-  console.log(JSON.stringify({ modes: Object.keys(expected), defaultNavigation: true, drawingCancellation: true, routeCancellation: true, roadSnapMocked: interceptedRouteRequests.length, routeDirectionNormalised: true, routeModePersistence: true, manualFallback: true, importRestoresNavigation: true, advancedDefaultCollapsed: true, siteImport: true, renderedBasemap: true, mockedTiles: interceptedTileRequests.length, basemapFailureSafe: true, sourceSnapshot: true, sourceReviewPersistence: true, overlayImport: 2, badLocalResponses, pageErrors: errors }, null, 2));
+  console.log(JSON.stringify({ modes: Object.keys(expected), firstTimePlannerWorkflow: true, defaultNavigation: true, drawingCancellation: true, routeCancellation: true, routePanWithoutVertex: true, issuedExtentParity: true, communityAreaAddRemove: true, editorLayerControls: true, roadSnapMocked: interceptedRouteRequests.length, routeDirectionNormalised: true, coincidentArrowPresentation: true, routeModePersistence: true, manualFallback: true, importRestoresNavigation: true, advancedDefaultCollapsed: true, siteImport: true, renderedBasemap: true, optionalBasemapAppearance: true, mockedTiles: interceptedTileRequests.length, basemapFailureSafe: true, sourceSnapshot: true, sourceReviewPersistence: true, overlayImport: 2, badLocalResponses, pageErrors: errors }, null, 2));
 } finally {
   await browser.close();
 }

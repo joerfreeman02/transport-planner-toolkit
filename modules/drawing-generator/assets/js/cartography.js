@@ -215,7 +215,7 @@ function labelForFeature(feature) {
   if (className === 'main-road') return properties.officialARef || properties.roadLabel || '';
   if (className === 'motorway') return properties.motorwayLabel || properties.ref || '';
   if (className === 'railway') return properties.name || properties.ref || '';
-  if (className === 'site') return properties.label || 'SITE';
+  if (className === 'site') return '';
   return properties.label || properties.routeLabel || properties.ref || properties.name || '';
 }
 

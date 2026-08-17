@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const root = process.env.TPT_REVIEW_ROOT || 'http://127.0.0.1:8768/';
 const output = path.resolve(process.env.DG0_PDF_OUTPUT || 'output/pdf');
-const pdfPath = path.join(output, 'drawing-generator-regional-routing-DG0C3.2-real-world-Milton-Keynes-QA.pdf');
+const pdfPath = path.join(output, 'drawing-generator-regional-routing-DG0C3.3-real-world-Milton-Keynes-QA.pdf');
 fs.mkdirSync(output, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, ...(process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
@@ -66,8 +66,8 @@ try {
   assert.match(await page.locator('#sheetAttribution').innerText(), /OpenStreetMap road geometry via OSRM.*geometry assistance only/i);
   assert.equal(await page.locator('#printDrawing').isEnabled(), true);
   const metadata = {
-    client: 'EAS INTERNAL QA', project: 'MILTON KEYNES LIVE ROUTING QA', projectNumber: 'DG0C3.2-ROUTE-QA',
-    designedBy: 'QA', drawnBy: 'QA', revision: 'C3.2', revisionDescription: 'Real OSM and road-snapped route QA', drawingStatus: 'WORK IN PROGRESS'
+    client: 'EAS INTERNAL QA', project: 'MILTON KEYNES LIVE ROUTING QA', projectNumber: 'DG0C3.3-ROUTE-QA',
+    designedBy: 'QA', drawnBy: 'QA', revision: 'C3.3', revisionDescription: 'Real OSM and road-snapped route QA', drawingStatus: 'WORK IN PROGRESS'
   };
   for (const [name, value] of Object.entries(metadata)) await page.locator(`[data-meta="${name}"]`).fill(value);
   await page.emulateMedia({ media: 'print' });

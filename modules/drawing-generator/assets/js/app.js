@@ -11,6 +11,7 @@ import { basemapProvider, validateBasemapProvider } from './basemap-compositor.j
 import { normaliseRouteDirection } from './route-geometry.js';
 import { DEFAULT_ROAD_ROUTING_PROVIDER, snapRouteThroughGuidance } from './route-snap-adapter.js';
 import { assessStationRailConsistency, resolveSourcePresentation, stationReviewCandidates } from './source-review.js';
+import { BASEMAP_APPEARANCE_DEFAULT, busRouteReferences, nextBusGroupId, normaliseBasemapAppearance, normaliseBusGroups } from './presentation-controls.js';
 
 configureProj4(globalThis.proj4);
 const byId = id => document.getElementById(id);
@@ -27,6 +28,9 @@ const state = {
   site: persisted.site || null,
   metadataByMode: persisted.metadataByMode || {},
   sourceReview: persisted.sourceReview || {},
+  appearanceByMode: persisted.appearanceByMode || {},
+  busGroupsByMode: persisted.busGroupsByMode || {},
+  outputByMode: persisted.outputByMode || {},
   sourcesByMode: {},
   overlayStore: createOverlayStore(persisted.overlays || []),
   basemapByMode: {},
@@ -40,7 +44,7 @@ Object.keys(DRAWING_MODES).forEach(id => { state.metadataByMode[id] = { ...defau
 
 function persist() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ modeId: state.modeId, location: state.location, site: state.site, metadataByMode: state.metadataByMode, sourceReview: state.sourceReview, overlays: state.overlayStore.list() }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ modeId: state.modeId, location: state.location, site: state.site, metadataByMode: state.metadataByMode, sourceReview: state.sourceReview, appearanceByMode: state.appearanceByMode, busGroupsByMode: state.busGroupsByMode, outputByMode: state.outputByMode, overlays: state.overlayStore.list() }));
   } catch { setMessage('overlayStatus', 'The browser could not persist the current editable geometry. Download the overlay file before closing.', 'warning'); }
 }
 
@@ -68,6 +72,17 @@ function drawingCentre() {
 }
 
 function currentSource() { return state.sourcesByMode[state.modeId] || { status: 'not-loaded', features: [], snapshot: null }; }
+
+function currentAppearance() {
+  state.appearanceByMode[state.modeId] = normaliseBasemapAppearance(state.appearanceByMode[state.modeId] || BASEMAP_APPEARANCE_DEFAULT);
+  return state.appearanceByMode[state.modeId];
+}
+
+function currentBusGroups() {
+  state.busGroupsByMode[state.modeId] = normaliseBusGroups(state.busGroupsByMode[state.modeId] || []);
+  return state.busGroupsByMode[state.modeId];
+}
+function currentOutput() { state.outputByMode[state.modeId] ||= { purpose: 'internal', confirmed: false }; return state.outputByMode[state.modeId]; }
 
 function reviewedSourceFeatures() {
   return resolveSourcePresentation(currentSource().features, state.sourceReview);
@@ -111,12 +126,13 @@ function scaleMetadataMatches(mode) {
 
 function renderPreview() {
   const mode = modeConfig(state.modeId);
+  mapUi.setIssuedDrawingExtent(drawingCentre(), state.modeId);
   const source = currentSource();
   const basemap = currentBasemap();
-  const result = renderDrawingSvg({ modeId: state.modeId, centerBng: drawingCentre(), site: state.site, sourceFeatures: source.features, sourceReview: state.sourceReview, overlays: state.overlayStore.list(), sourceStatus: source.status, includeBasemap: basemap.requested, basemapProvider: state.basemapProvider, basemapStatus: basemap.status });
+  const result = renderDrawingSvg({ modeId: state.modeId, centerBng: drawingCentre(), site: state.site, sourceFeatures: source.features, sourceReview: state.sourceReview, overlays: state.overlayStore.list(), sourceStatus: source.status, includeBasemap: basemap.requested, basemapProvider: state.basemapProvider, basemapStatus: basemap.status, basemapAppearance: currentAppearance(), busGroups: currentBusGroups() });
   byId('sheetMap').innerHTML = result.markup;
   byId('sheetLegend').innerHTML = legendMarkup(result.legend);
-  byId('drawingSheet').className = `drawing-sheet layout-${mode.family}`;
+  byId('drawingSheet').className = `drawing-sheet layout-${mode.family}${currentOutput().purpose === 'client' && currentOutput().confirmed ? ' client-issue' : ''}`;
   document.querySelectorAll('[data-sheet-meta]').forEach(element => { const value = metadata()[element.dataset.sheetMeta]; element.textContent = value || '-'; });
   const routeProviders = isRoutingMode() ? [...new Set(routeOverlays().map(item => item.properties.route?.provenance?.providerName).filter(Boolean))] : [];
   const routeAttribution = routeProviders.length ? `; road geometry: ${routeProviders.join(', ')} (geometry assistance only - planner selected/approved)` : '';
@@ -125,6 +141,8 @@ function renderPreview() {
   const missing = mode.requiredClasses.filter(className => !availableClasses().has(className));
   const scaleMatches = scaleMetadataMatches(mode);
   state.lastRender = { modeId: state.modeId, result, missing, scaleMatches };
+  renderSourcesAudit();
+  renderBusPresentationGroups();
   updateDrawingReadiness();
   monitorBasemapTiles(result);
 }
@@ -135,14 +153,15 @@ function updateDrawingReadiness() {
   const mode = modeConfig(state.modeId);
   const basemap = currentBasemap();
   const routeBlock = routingIssue();
-  const blockPrint = !record.scaleMatches || basemap.status !== 'success' || Boolean(routeBlock);
+  const blockPrint = !record.scaleMatches || basemap.status !== 'success' || Boolean(routeBlock) || (currentOutput().purpose === 'client' && !currentOutput().confirmed);
   byId('printDrawing').disabled = blockPrint;
   if (!record.scaleMatches) setMessage('drawingStatus', `Print blocked: scale metadata must be 1:${mode.scale.toLocaleString('en-GB')} for ${mode.title}.`, 'error');
-  else if (basemap.status === 'failed') setMessage('drawingStatus', 'BASEMAP FAILED TO LOAD - REVIEW REQUIRED. Controlled overlays remain intact; retry Generate / refresh drawing.', 'error');
+  else if (basemap.status === 'failed') setMessage('drawingStatus', 'BASEMAP INCOMPLETE — PRINT BLOCKED. Controlled overlays remain intact; use Retry basemap.', 'error');
   else if (!basemap.requested) setMessage('drawingStatus', 'Generate the drawing to load the rendered OpenStreetMap basemap before printing.', 'warning');
   else if (basemap.status === 'loading') setMessage('drawingStatus', `Loading rendered OpenStreetMap basemap (${basemap.loaded}/${basemap.total || record.result.basemap?.tileCount || 0} tiles).`, 'warning');
   else if (!state.site) setMessage('drawingStatus', `Not issue-ready: no confirmed site boundary. Missing layer evidence: ${record.missing.join(', ') || 'none'}.`, 'warning');
   else if (routeBlock) setMessage('drawingStatus', `Print blocked: ${routeBlock}`, 'error');
+  else if (currentOutput().purpose === 'client' && !currentOutput().confirmed) setMessage('drawingStatus', 'Print blocked: confirm professional review for Client / Professional Issue.', 'error');
   else if (record.missing.length) setMessage('drawingStatus', `Basemap ready. Required professional layers without current evidence: ${record.missing.join(', ')}. Add reviewed overlays or retrieve source data.`, 'warning');
   else setMessage('drawingStatus', 'Basemap and configured layer classes are present. Professional content and route approval are still required.', 'success');
 }
@@ -153,35 +172,58 @@ function setBasemapDomStatus(status) {
   svg.dataset.basemapStatus = status;
   const warning = byId('basemapFailureWarning');
   if (warning) warning.setAttribute('visibility', status === 'failed' ? 'visible' : 'hidden');
+  byId('retryBasemap').hidden = status !== 'failed';
 }
 
 function monitorBasemapTiles(result) {
   const basemap = currentBasemap();
   if (!basemap.requested || !result.basemap) return updateDrawingReadiness();
-  const images = [...byId('sheetMap').querySelectorAll('[data-basemap-tile]')];
+  const tiles = result.basemap.tiles || [];
   const token = ++state.basemapRenderToken;
-  basemap.status = 'loading'; basemap.loaded = 0; basemap.total = images.length; basemap.error = '';
+  basemap.status = 'loading'; basemap.loaded = 0; basemap.total = tiles.length; basemap.error = '';
   setBasemapDomStatus('loading'); updateDrawingReadiness();
-  if (!images.length) {
+  if (!tiles.length) {
     basemap.status = 'failed'; basemap.error = 'No tile images were composed.'; setBasemapDomStatus('failed'); updateDrawingReadiness(); return;
   }
-  let settled = 0;
-  let failed = false;
-  const settle = error => {
+  Promise.all(tiles.map(async (tile, index) => {
+    const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetch(tile.url, { mode: 'cors', cache: 'no-store', signal: controller.signal });
+      if (!response.ok) throw new Error(`Tile ${index + 1} failed.`);
+      const blob = await response.blob();
+      const bitmap = await createImageBitmap(blob);
+      if (bitmap.width < 128 || bitmap.height < 128) { bitmap.close(); throw new Error(`Tile ${index + 1} is incomplete.`); }
+      return bitmap;
+    } catch (error) { if (error.name === 'AbortError') throw new Error(`Tile ${index + 1} timed out.`); throw error; }
+    finally { clearTimeout(timeout); }
+  })).then(bitmaps => {
     if (token !== state.basemapRenderToken) return;
-    settled += 1;
-    if (error) { failed = true; basemap.error ||= error; }
-    else basemap.loaded += 1;
-    if (settled < images.length) { updateDrawingReadiness(); return; }
-    basemap.status = failed ? 'failed' : 'success';
-    setBasemapDomStatus(basemap.status);
-    byId('workflowStatus').textContent = failed ? 'Basemap failed to load. Retry; professional overlays remain intact.' : `Drawing basemap ready from ${state.basemapProvider.name}. Review professional overlays before printing.`;
-    updateDrawingReadiness();
-  };
-  images.forEach((image, index) => {
-    image.addEventListener('load', () => settle(''), { once: true });
-    image.addEventListener('error', () => settle(`Tile ${index + 1} failed.`), { once: true });
-  });
+    basemap.loaded = bitmaps.length;
+    const paint = () => requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (token !== state.basemapRenderToken) return;
+      const image = byId('sheetMap').querySelector('.issued-basemap-image');
+      basemap.status = !image || !image.complete || image.naturalWidth < 1 || image.naturalHeight < 1 ? 'failed' : 'success';
+      if (basemap.status === 'failed') basemap.error ||= 'Issued basemap image is incomplete.';
+      setBasemapDomStatus(basemap.status); updateDrawingReadiness();
+    }));
+    {
+      const canvas = document.createElement('canvas'); canvas.width = Math.ceil(result.viewWidth * 2); canvas.height = Math.ceil(result.viewHeight * 2);
+      const context = canvas.getContext('2d');
+      try {
+        bitmaps.forEach((bitmap, index) => { const m = tiles[index].matrix; context.setTransform(m.a * 2, m.b * 2, m.c * 2, m.d * 2, m.e * 2, m.f * 2); context.drawImage(bitmap, 0, 0, result.basemap.provider.tileSize, result.basemap.provider.tileSize); bitmap.close(); });
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        canvas.toBlob(blob => {
+          if (token !== state.basemapRenderToken || !blob) return;
+          const url = URL.createObjectURL(blob); const image = document.createElement('img'); image.className = 'issued-basemap-image'; image.alt = 'Rendered OpenStreetMap issued basemap'; image.width = canvas.width; image.height = canvas.height;
+          image.onload = async () => { try { await image.decode(); const map = byId('sheetMap'); const old = map.querySelector('.issued-basemap-image'); image.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:1;object-fit:fill;print-color-adjust:exact;-webkit-print-color-adjust:exact;'; map.style.position = 'relative'; map.style.overflow = 'hidden'; const svg = byId('drawingSvg'); svg.style.position = 'relative'; svg.style.zIndex = '2'; const background = [...svg.children].find(child => child.tagName?.toLowerCase() === 'rect'); if (background) background.setAttribute('fill', 'none'); map.prepend(image); map.dataset.basemapImageReady = 'true'; if (old) { const previous = old.src; old.remove(); if (previous.startsWith('blob:')) URL.revokeObjectURL(previous); } paint(); } catch (error) { basemap.status = 'failed'; basemap.error = error.message; setBasemapDomStatus('failed'); updateDrawingReadiness(); } };
+          image.onerror = () => { basemap.status = 'failed'; basemap.error = 'Issued basemap image failed to decode.'; setBasemapDomStatus('failed'); updateDrawingReadiness(); };
+          image.src = url;
+        }, 'image/png');
+      } catch (error) { basemap.status = 'failed'; basemap.error = error.message; setBasemapDomStatus('failed'); updateDrawingReadiness(); }
+    }
+  }).catch(error => { if (token !== state.basemapRenderToken) return; basemap.status = 'failed'; basemap.error = error.message || 'Basemap tile decode failed.'; setBasemapDomStatus('failed'); updateDrawingReadiness(); });
+  byId('workflowStatus').textContent = 'Loading complete issued OpenStreetMap tile coverage…';
+  updateDrawingReadiness();
 }
 
 function renderOverlayRows() {
@@ -228,6 +270,13 @@ function overlayMetadata() {
 }
 
 const mapUi = createMapController({
+  onMapCenterChanged: center => {
+    if (state.site) return;
+    if (state.location && Math.abs(state.location.lat - center.lat) < 1e-9 && Math.abs(state.location.lon - center.lon) < 1e-9) return;
+    state.location = { ...center, label: 'Interactive map centre' };
+    invalidateBasemaps(); state.sourcesByMode[state.modeId] = undefined;
+    persist(); renderSourceStatus(); renderPreview();
+  },
   onSiteChanged: geometry => acceptSite(geometry, 'Edited boundary'),
   onSiteDeleted: () => clearSite(),
   onOverlayCreated: (feature, meta) => {
@@ -259,7 +308,7 @@ const mapUi = createMapController({
     byId('drawRouteTo').disabled = active;
     byId('drawRouteFrom').disabled = active;
     if (active && detail?.kind === 'site') setMessage('siteStatus', 'Site drawing active. Complete the polygon or choose Cancel drawing to return to map navigation.', 'warning');
-    if (routeDrawing) setMessage('routeStatus', `${detail.metadata.label} drawing active. Complete the line or choose Cancel route drawing.`, 'warning');
+    if (routeDrawing) setMessage('routeStatus', `${detail.metadata.label} drawing active. Click to add waypoints; drag to pan and use the mouse wheel to zoom. Navigation does not add route vertices.`, 'warning');
     if (!active) renderRoutingTools();
   }
 });
@@ -326,13 +375,95 @@ function renderSourceStatus() {
   else setMessage('sourceStatus', 'No vector snapshot loaded. Required layers may be added through reviewed overlays.', 'warning');
   renderProfessionalSourceReview();
   renderCommunityCandidates();
+  renderSourcesAudit();
+  renderBusPresentationGroups();
+}
+
+function sourceLink(sourceId) {
+  const match = String(sourceId || '').match(/^(node|way|relation)\/(\d+)$/);
+  return match ? `https://www.openstreetmap.org/${match[1]}/${match[2]}` : 'https://www.openstreetmap.org/';
+}
+
+function featureCoordinate(feature) {
+  const geometry = feature?.geometry;
+  if (geometry?.type === 'Point') return geometry.coordinates;
+  const values = [];
+  const visit = value => {
+    if (Array.isArray(value) && value.length >= 2 && Number.isFinite(value[0]) && Number.isFinite(value[1])) values.push(value);
+    else if (Array.isArray(value)) value.forEach(visit);
+  };
+  visit(geometry?.coordinates);
+  return values.length ? values.reduce((total, point) => [total[0] + point[0] / values.length, total[1] + point[1] / values.length], [0, 0]) : null;
+}
+
+function googleMapsLink(feature) {
+  const coordinate = featureCoordinate(feature);
+  return coordinate ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${coordinate[1].toFixed(6)},${coordinate[0].toFixed(6)}`)}` : 'https://www.google.com/maps';
+}
+
+function sourceUsage() {
+  const source = currentSource();
+  if (source.status !== 'success') return 'Not yet refreshed';
+  const classes = new Set(source.features.map(item => item.properties?.class));
+  const used = [];
+  if (classes.has('main-road') || classes.has('motorway')) used.push('road');
+  if (classes.has('railway') || [...classes].some(value => value?.startsWith('station-'))) used.push('rail');
+  if (classes.has('cycle-network-primary') || classes.has('cycle-network-local') || classes.has('cycle-route')) used.push('cycle');
+  if (classes.has('bus-route')) used.push('bus');
+  if (classes.has('community-candidate')) used.push('community');
+  return used.length ? `Used for ${used.join(', ')} geometry` : 'Used - no applicable classified layer';
+}
+
+function auditRow(source, usedFor, status, href, action) {
+  return `<article class="sources-audit-row"><strong>${escapeHtml(source)}</strong><span>${escapeHtml(usedFor)}</span><b class="audit-status">${escapeHtml(status)}</b><a href="${escapeHtml(href)}" target="_blank" rel="noopener">${escapeHtml(action)}</a></article>`;
+}
+
+function renderSourcesAudit() {
+  const target = byId('sourcesAuditRows');
+  if (!target) return;
+  const source = currentSource();
+  const basemap = currentBasemap();
+  const routingUsed = isRoutingMode() && routeOverlays().some(item => item.properties.route?.provenance?.providerId);
+  target.innerHTML = [
+    auditRow('OpenStreetMap', 'Issued basemap', basemap.status === 'success' ? 'USED' : 'Ready when drawing is generated', 'https://www.openstreetmap.org/copyright', 'Open copyright/source'),
+    auditRow('OpenStreetMap via Overpass', sourceUsage(), source.status === 'success' ? 'USED' : source.status === 'failed' ? 'Review required' : 'Not used yet', 'https://overpass-api.de/', 'Open source information'),
+    auditRow('TfL Cycle Routes', 'Independent London cycle verification', 'REFERENCE - NOT USED', 'https://tfl.gov.uk/info-for/open-data-users/our-open-data?intcmp=3671', 'Open official TfL source'),
+    auditRow('TfL', 'London bus service verification', 'REFERENCE - NOT USED', 'https://tfl.gov.uk/info-for/open-data-users/unified-api?intcmp=29422', 'Open official TfL source'),
+    auditRow('TPT Railway evidence', 'Rail-mode classification support', source.status === 'success' ? 'USED WHERE APPLICABLE' : 'Not used yet', '../railway/', 'Open Railway module'),
+    auditRow('OSRM', 'Planner-guided road geometry assistance', routingUsed ? 'USED IN ROUTING DRAWING' : 'NOT USED IN THIS DRAWING', 'https://project-osrm.org/', 'Open provider information')
+  ].join('');
+}
+
+function renderBusPresentationGroups() {
+  const panel = byId('busPresentationPanel');
+  const refs = state.modeId === 'local-context' ? busRouteReferences(currentSource().features) : [];
+  panel.hidden = !refs.length;
+  if (!refs.length) return;
+  const groups = currentBusGroups();
+  const occupied = new Set(groups.flatMap(group => group.routeRefs));
+  byId('busRouteSelection').innerHTML = refs.map(ref => `<label class="bus-route-choice"><input type="checkbox" value="${escapeHtml(ref)}" ${occupied.has(ref) ? 'disabled' : ''}>${escapeHtml(ref)}${occupied.has(ref) ? ' - grouped' : ''}</label>`).join('');
+  byId('busGroupRows').innerHTML = groups.map(group => `<article class="bus-group-row" data-group-id="${escapeHtml(group.id)}"><i style="--group-colour:${escapeHtml(group.colour)}"></i><strong>${escapeHtml(group.label)}</strong><span>${escapeHtml(group.routeRefs.join(', '))}</span><button type="button">Remove group</button></article>`).join('') || '<p class="hint">Ungrouped services remain visible individually.</p>';
+  byId('busGroupRows').querySelectorAll('button').forEach(button => button.addEventListener('click', event => {
+    const id = event.currentTarget.closest('[data-group-id]').dataset.groupId;
+    state.busGroupsByMode[state.modeId] = groups.filter(group => group.id !== id); persist(); renderPreview();
+  }));
+}
+
+function groupSelectedBusRoutes() {
+  const selected = [...byId('busRouteSelection').querySelectorAll('input:checked')].map(input => input.value);
+  if (!selected.length) return setMessage('sourceStatus', 'Select one or more ungrouped bus routes first.', 'warning');
+  const groups = currentBusGroups();
+  const label = byId('busGroupLabel').value.trim() || `BUS ROUTES ${selected.join(', ')}`;
+  groups.push({ id: nextBusGroupId(groups), label, routeRefs: selected, colour: byId('busGroupColour').value });
+  state.busGroupsByMode[state.modeId] = normaliseBusGroups(groups);
+  byId('busGroupLabel').value = ''; persist(); renderPreview();
 }
 
 function setSourceReviewState(sourceId, reviewState) {
   if (!sourceId || !['included', 'excluded'].includes(reviewState)) return;
   state.sourceReview[sourceId] = reviewState;
   persist();
-  mapUi.setSource(reviewedSourceFeatures());
+  mapUi.setSource(reviewedSourceFeatures(), state.modeId);
   renderSourceStatus();
   renderPreview();
 }
@@ -376,12 +507,12 @@ async function retrieveSources() {
   const adapter = new OverpassTransportAdapter();
   try {
     const source = await adapter.retrieve(state.modeId, extentForDrawing(drawingCentre(), state.modeId), BUILD);
-    state.sourcesByMode[state.modeId] = { ...source, features: assessStationRailConsistency(source.features) }; mapUi.setSource(reviewedSourceFeatures()); renderSourceStatus(); renderPreview();
+    state.sourcesByMode[state.modeId] = { ...source, features: assessStationRailConsistency(source.features) }; mapUi.setSource(reviewedSourceFeatures(), state.modeId); renderSourceStatus(); renderPreview();
     if (currentBasemap().status !== 'failed') byId('workflowStatus').textContent = 'Professional source refreshed; waiting for the rendered basemap if still loading.';
     return true;
   } catch (error) {
     state.sourcesByMode[state.modeId] = { status: 'failed', features: [], snapshot: null, error: `${error.message}${error.details?.failures ? ` ${error.details.failures.map(item => `${item.endpoint}: ${item.kind}`).join('; ')}` : ''}` };
-    mapUi.setSource([]); renderSourceStatus(); renderPreview();
+    mapUi.setSource([], state.modeId); renderSourceStatus(); renderPreview();
     byId('workflowStatus').textContent = 'Professional vector evidence could not be loaded. The rendered basemap and reviewed manual overlays remain separate.';
     return false;
   } finally { byId('loadSources').disabled = false; byId('generateDrawing').disabled = false; }
@@ -390,11 +521,26 @@ async function retrieveSources() {
 function renderCommunityCandidates() {
   const candidates = currentSource().features.filter(item => item.properties?.class === 'community-candidate');
   byId('communityPanel').hidden = state.modeId !== 'local-context' || !candidates.length;
-  byId('communityCandidates').innerHTML = candidates.map((item, index) => `<div class="candidate-card" data-index="${index}"><strong>${escapeHtml(item.properties.name || 'Unnamed mapped feature')}</strong><span>${escapeHtml(item.properties.category || 'Unclassified')}</span><button>Add as reviewed consideration</button></div>`).join('');
+  const selected = new Set(state.overlayStore.list().map(item => item.properties.community?.candidateSourceId).filter(Boolean));
+  byId('communityCandidates').innerHTML = candidates.map((item, index) => {
+    const evidence = item.properties.communityEvidence || {};
+    const sourceId = item.properties.sourceId;
+    const added = selected.has(sourceId);
+    const disabled = evidence.reviewRequired;
+    const status = disabled ? 'Review required' : evidence.associationMethod === 'source-area' ? 'Source area' : 'Single containing building';
+    return `<div class="candidate-card${added ? ' is-selected' : ''}${disabled ? ' requires-review' : ''}" data-index="${index}"><strong>${escapeHtml(item.properties.name || 'Unnamed mapped feature')}</strong><span>${escapeHtml(item.properties.category || 'Unclassified')}</span><small>OSM source ID: ${escapeHtml(sourceId)}</small><small>Geometry: ${escapeHtml(status)}${disabled ? ` - ${escapeHtml(evidence.reviewReason || '')}` : ''}</small><div class="candidate-audit-actions"><a href="${escapeHtml(sourceLink(sourceId))}" target="_blank" rel="noopener">Open OSM</a><a href="${escapeHtml(googleMapsLink(item))}" target="_blank" rel="noopener">Open in Google Maps</a></div><button ${disabled ? 'disabled' : ''}>${disabled ? 'Footprint requires review' : added ? 'Added — Remove' : 'Add as reviewed area'}</button></div>`;
+  }).join('');
   byId('communityCandidates').querySelectorAll('.candidate-card').forEach(card => card.querySelector('button').addEventListener('click', () => {
     const item = candidates[Number(card.dataset.index)];
-    state.overlayStore.add(item, { className: 'community', label: item.properties.name || item.properties.category, layerName: 'Community considerations', colour: '#666666', source: item.properties.sourceId });
-    persist(); renderOverlayRows();
+    const sourceId = item.properties.sourceId;
+    const overlayId = `community:${sourceId}`;
+    if (state.overlayStore.get(overlayId)) state.overlayStore.remove(overlayId);
+    else state.overlayStore.add(item, {
+      id: overlayId, className: 'community', label: item.properties.name || item.properties.category,
+      layerName: 'Community considerations', colour: '#666666', source: sourceId,
+      community: structuredClone(item.properties.communityEvidence)
+    });
+    persist(); renderOverlayRows(); renderCommunityCandidates();
   }));
 }
 
@@ -614,14 +760,23 @@ function populateOverlayClassOptions() {
   if (selected) byId('overlayColour').value = selected.colour;
 }
 
+function populateAppearanceControls() {
+  const appearance = currentAppearance();
+  byId('basemapColour').value = appearance.colour;
+  byId('basemapEmphasis').value = appearance.emphasis;
+  const output = currentOutput(); byId('outputPurpose').value = output.purpose; byId('issueConfirmed').checked = output.confirmed; byId('issueConfirmation').hidden = output.purpose !== 'client';
+}
+
 function initialiseControls() {
   byId('modeSelect').value = state.modeId;
   byId('overlayColour').innerHTML = CONTROLLED_COLOURS.map(colour => `<option value="${colour}">${colour}</option>`).join('');
+  byId('busGroupColour').innerHTML = ['#ed1c24', '#0057e7', '#7f2a90', '#ec1ce8'].map(colour => `<option value="${colour}">${colour}</option>`).join('');
+  populateAppearanceControls();
   populateOverlayClassOptions();
   byId('overlayClass').addEventListener('change', () => { byId('overlayColour').value = OVERLAY_CLASSES[byId('overlayClass').value].colour; });
   byId('modeSelect').addEventListener('change', event => {
     captureMetadata(); state.modeId = event.target.value; state.metadataByMode[state.modeId] ||= defaultMetadata(state.modeId);
-    populateMetadata(); populateOverlayClassOptions(); mapUi.setSource(reviewedSourceFeatures()); renderSourceStatus(); renderRoutingTools(); persist(); renderPreview();
+    populateMetadata(); populateOverlayClassOptions(); populateAppearanceControls(); mapUi.setSource(reviewedSourceFeatures(), state.modeId); renderSourceStatus(); renderRoutingTools(); persist(); renderPreview();
   });
   metaInputs.forEach(input => input.addEventListener('input', captureMetadata));
   byId('searchAddress').addEventListener('click', searchAddress);
@@ -652,8 +807,14 @@ function initialiseControls() {
     event.target.value = '';
   });
   byId('downloadOverlays').addEventListener('click', () => downloadJson(`drawing-overlays-${BUILD}.geojson`, state.overlayStore.exportGeoJson()));
+  byId('basemapColour').addEventListener('change', () => { state.appearanceByMode[state.modeId] = normaliseBasemapAppearance({ ...currentAppearance(), colour: byId('basemapColour').value }); persist(); renderPreview(); });
+  byId('basemapEmphasis').addEventListener('change', () => { state.appearanceByMode[state.modeId] = normaliseBasemapAppearance({ ...currentAppearance(), emphasis: byId('basemapEmphasis').value }); persist(); renderPreview(); });
+  byId('outputPurpose').addEventListener('change', () => { state.outputByMode[state.modeId] = { purpose: byId('outputPurpose').value, confirmed: false }; persist(); populateAppearanceControls(); renderPreview(); });
+  byId('issueConfirmed').addEventListener('change', () => { currentOutput().confirmed = byId('issueConfirmed').checked; persist(); renderPreview(); });
+  byId('groupSelectedBusRoutes').addEventListener('click', groupSelectedBusRoutes);
   byId('loadSources').addEventListener('click', retrieveSources);
   byId('generateDrawing').addEventListener('click', retrieveSources);
+  byId('retryBasemap').addEventListener('click', () => { const basemap = currentBasemap(); basemap.requested = true; basemap.status = 'loading'; basemap.loaded = 0; basemap.total = 0; basemap.error = ''; renderPreview(); });
   byId('downloadSnapshot').addEventListener('click', () => { if (currentSource().snapshot) downloadJson(`drawing-source-${state.modeId}-${BUILD}.json`, { ...currentSource().snapshot, features: currentSource().features }); });
   byId('refreshPreview').addEventListener('click', renderPreview);
   byId('printDrawing').addEventListener('click', () => {
@@ -672,10 +833,10 @@ setTimeout(() => mapUi.invalidate(), 100);
 if (['localhost', '127.0.0.1'].includes(location.hostname)) {
   Object.defineProperty(window, '__DG0_ACCEPTANCE__', {
     value: Object.freeze({
-      setMode(id) { if (!DRAWING_MODES[id]) throw new Error('Invalid mode'); state.modeId = id; byId('modeSelect').value = id; populateMetadata(); populateOverlayClassOptions(); mapUi.setSource(reviewedSourceFeatures()); renderSourceStatus(); renderRoutingTools(); renderPreview(); },
+      setMode(id) { if (!DRAWING_MODES[id]) throw new Error('Invalid mode'); state.modeId = id; byId('modeSelect').value = id; populateMetadata(); populateOverlayClassOptions(); populateAppearanceControls(); mapUi.setSource(reviewedSourceFeatures(), state.modeId); renderSourceStatus(); renderRoutingTools(); renderPreview(); },
       setLocation(lat, lon, label = 'Acceptance QA location') { setLocation(lat, lon, label); },
       setSite(geometry) { acceptSite(geometry, 'Synthetic acceptance fixture'); },
-      setSource(features, snapshot = {}) { state.sourcesByMode[state.modeId] = { status: 'success', features: assessStationRailConsistency(features), snapshot: { attribution: OSM_ATTRIBUTION, provider: 'Synthetic acceptance fixture', ...snapshot } }; mapUi.setSource(reviewedSourceFeatures()); renderSourceStatus(); renderPreview(); },
+      setSource(features, snapshot = {}) { state.sourcesByMode[state.modeId] = { status: 'success', features: assessStationRailConsistency(features), snapshot: { attribution: OSM_ATTRIBUTION, provider: 'Synthetic acceptance fixture', ...snapshot } }; mapUi.setSource(reviewedSourceFeatures(), state.modeId); renderSourceStatus(); renderPreview(); },
       setSourceReview(sourceId, reviewState) { setSourceReviewState(sourceId, reviewState); },
       addOverlay(feature, metadata) { const record = state.overlayStore.add(feature, metadata); renderOverlayRows(); return record; },
       async addRoughRoute(geometry, className) {
@@ -697,7 +858,7 @@ if (['localhost', '127.0.0.1'].includes(location.hostname)) {
       setRoadRoutingProvider(provider) { state.roadRoutingProvider = Object.freeze({ ...DEFAULT_ROAD_ROUTING_PROVIDER, ...provider }); },
       requestBasemap() { const basemap = currentBasemap(); basemap.requested = true; basemap.status = 'loading'; renderPreview(); },
       render: renderPreview,
-      snapshot: () => ({ modeId: state.modeId, site: state.site, location: state.location, overlays: state.overlayStore.list(), source: currentSource(), reviewedSourceFeatures: reviewedSourceFeatures(), sourceReview: structuredClone(state.sourceReview), basemap: { ...currentBasemap(), providerId: state.basemapProvider.id, zoom: state.lastRender?.result.basemap?.zoom || null, tileCount: state.lastRender?.result.basemap?.tileCount || 0, maxAlignmentError: state.lastRender?.result.basemap?.maxAlignmentError || null }, metadata: structuredClone(metadata()), status: STATUS, drawingActive: mapUi.isDrawingActive(), navigationEnabled: mapUi.navigationEnabled(), routingVisible: !byId('routingTools').hidden, advancedOpen: byId('advancedTools').open })
+      snapshot: () => ({ modeId: state.modeId, site: state.site, location: state.location, overlays: state.overlayStore.list(), source: currentSource(), reviewedSourceFeatures: reviewedSourceFeatures(), sourceReview: structuredClone(state.sourceReview), busGroups: structuredClone(currentBusGroups()), basemapAppearance: structuredClone(currentAppearance()), issuedExtent: mapUi.issuedExtent(), basemap: { ...currentBasemap(), providerId: state.basemapProvider.id, zoom: state.lastRender?.result.basemap?.zoom || null, tileCount: state.lastRender?.result.basemap?.tileCount || 0, maxAlignmentError: state.lastRender?.result.basemap?.maxAlignmentError || null }, metadata: structuredClone(metadata()), status: STATUS, drawingActive: mapUi.isDrawingActive(), navigationEnabled: mapUi.navigationEnabled(), activeRouteVertexCount: mapUi.activeVertexCount(), mapCenter: mapUi.mapCenter(), routingVisible: !byId('routingTools').hidden, advancedOpen: byId('advancedTools').open })
     }), configurable: false, enumerable: false, writable: false
   });
 }

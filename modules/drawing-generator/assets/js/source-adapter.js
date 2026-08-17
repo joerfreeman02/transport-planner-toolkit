@@ -1,6 +1,7 @@
 import { OVERPASS_ENDPOINTS, OSM_ATTRIBUTION } from './config.js';
 import { bngToWgs84 } from './crs.js';
-import { hasRailEvidence, modeForTags, RAIL_MODE_CLASS } from './railway-adapter.js';
+import { hasRailEvidence, modeForTags, modeForRailGeometryTags, RAIL_MODE_CLASS } from './railway-adapter.js';
+import { resolveCommunityCandidateGeometry } from './community-association.js';
 
 export class SourceError extends Error {
   constructor(kind, message, details = {}) { super(message); this.name = 'SourceError'; this.kind = kind; this.details = details; }
@@ -21,18 +22,18 @@ export function buildOverpassQuery(modeId, extent) {
   const bbox = bboxWgs84(extent);
   const bounds = `${bbox.south.toFixed(7)},${bbox.west.toFixed(7)},${bbox.north.toFixed(7)},${bbox.east.toFixed(7)}`;
   const local = modeId.startsWith('local-') ? `
-    relation["route"="bus"](${bounds});
-    nwr["amenity"~"^(school|college|university|hospital|clinic|library|community_centre|place_of_worship|police)$"](${bounds});
-    nwr["shop"~"^(supermarket|convenience)$"](${bounds});` : '';
-  return `[out:json][timeout:45];(
+    node["amenity"~"^(school|college|university|hospital|clinic|library|community_centre|place_of_worship|police)$"](${bounds})->.communityAmenityNodes;
+    node["shop"~"^(supermarket|convenience)$"](${bounds})->.communityShopNodes;` : '';
+  return `[out:json][timeout:45];${local}(
     way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link)$"](${bounds});
     way["railway"~"^(rail|subway|light_rail|tram)$"](${bounds});
     nwr["railway"~"^(station|halt|tram_stop)$"](${bounds});
     nwr["public_transport"="station"](${bounds});
     way["waterway"~"^(river|canal)$"](${bounds});
-    way["highway"="cycleway"](${bounds});
-    relation["route"="bicycle"](${bounds});${local}
-  );out tags center geom;`;
+    ${modeId.startsWith('local-') ? 'way["highway"="cycleway"](' + bounds + ');' : ''}
+    relation["route"="bicycle"](${bounds});
+    ${modeId.startsWith('local-') ? 'relation["route"="bus"](' + bounds + ');\n    nwr["amenity"~"^(school|college|university|hospital|clinic|library|community_centre|place_of_worship|police)$"](' + bounds + ');\n    nwr["shop"~"^(supermarket|convenience)$"](' + bounds + ');\n    way(around.communityAmenityNodes:100)["building"];\n    way(around.communityShopNodes:100)["building"];' : ''}
+  );out body center geom(${bounds});`;
 }
 
 function pointGeometry(element) {
@@ -42,11 +43,11 @@ function pointGeometry(element) {
 
 function lineGeometry(element) {
   if (Array.isArray(element.geometry)) {
-    const coordinates = element.geometry.map(point => [Number(point.lon), Number(point.lat)]).filter(point => point.every(Number.isFinite));
+    const coordinates = element.geometry.filter(Boolean).map(point => [Number(point.lon), Number(point.lat)]).filter(point => point.every(Number.isFinite));
     if (coordinates.length >= 2) return { type: 'LineString', coordinates };
   }
   if (Array.isArray(element.members)) {
-    const lines = element.members.map(member => (member.geometry || []).map(point => [Number(point.lon), Number(point.lat)]).filter(point => point.every(Number.isFinite))).filter(line => line.length >= 2);
+    const lines = element.members.filter(Boolean).map(member => (member.geometry || []).filter(Boolean).map(point => [Number(point.lon), Number(point.lat)]).filter(point => point.every(Number.isFinite))).filter(line => line.length >= 2);
     if (lines.length) return { type: 'MultiLineString', coordinates: lines };
   }
   return pointGeometry(element);
@@ -54,11 +55,18 @@ function lineGeometry(element) {
 
 function polygonGeometry(element) {
   if (!Array.isArray(element.geometry)) return null;
-  const coordinates = element.geometry.map(point => [Number(point.lon), Number(point.lat)]).filter(point => point.every(Number.isFinite));
+  const coordinates = element.geometry.filter(Boolean).map(point => [Number(point.lon), Number(point.lat)]).filter(point => point.every(Number.isFinite));
   if (coordinates.length < 4) return null;
   const first = coordinates[0], last = coordinates.at(-1);
   if (first[0] !== last[0] || first[1] !== last[1]) return null;
   return { type: 'Polygon', coordinates: [coordinates] };
+}
+
+function memberPolygonGeometry(element) {
+  if (!Array.isArray(element.members)) return null;
+  const rings = element.members.filter(Boolean).map(member => (member.geometry || []).filter(Boolean).map(point => [Number(point.lon), Number(point.lat)]).filter(point => point.every(Number.isFinite))).filter(ring => ring.length >= 4 && ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1]);
+  if (!rings.length) return null;
+  return rings.length === 1 ? { type: 'Polygon', coordinates: [rings[0]] } : { type: 'MultiPolygon', coordinates: rings.map(ring => [ring]) };
 }
 
 function feature(element, className, geometry, extra = {}) {
@@ -99,9 +107,50 @@ function hasNavigableWaterwayEvidence(tags) {
   return tags.boat === 'yes' || tags.motorboat === 'yes';
 }
 
+function isCommunityCandidate(tags) {
+  return /^(school|college|university|hospital|clinic|library|community_centre|place_of_worship|police)$/.test(tags.amenity || '')
+    || /^(supermarket|convenience)$/.test(tags.shop || '');
+}
+
+function busColour(reference) {
+  const palette = ['#ed1c24', '#0057e7', '#7f2a90', '#ec1ce8'];
+  const hash = [...String(reference || 'BUS')].reduce((value, character) => ((value * 31) + character.charCodeAt(0)) >>> 0, 0);
+  return palette[hash % palette.length];
+}
+
 export function classifyOverpassElement(element) {
   const tags = element?.tags || {};
   const geometry = lineGeometry(element);
+  if (tags.route === 'bus') {
+    const routeLabel = tags.ref || tags.name || 'Bus route';
+    if (geometry && ['LineString', 'MultiLineString'].includes(geometry.type)) return [feature(element, 'bus-route', geometry, { routeLabel, routeGroup: tags.ref || routeLabel, colour: busColour(tags.ref || routeLabel), geometryEvidence: 'osm-clipped-route-relation' })];
+    const reviewGeometry = pointGeometry(element);
+    return reviewGeometry ? [feature(element, 'bus-route-review', reviewGeometry, { routeLabel, reviewRequired: true, reviewReason: 'BUS ROUTE GEOMETRY REQUIRES REVIEW' })] : [];
+  }
+  if (tags.route === 'bicycle') {
+    const network = cycleNetwork(tags);
+    const metadata = {
+      network: network || tags.network || 'unclassified', ref: tags.ref || '', name: tags.name || '', operator: tags.operator || '',
+      cycleNetwork: tags.cycle_network || '', routeLabel: tags.ref || tags.name || ''
+    };
+    if (!geometry || !['LineString', 'MultiLineString'].includes(geometry.type)) {
+      const reviewGeometry = pointGeometry(element);
+      return reviewGeometry ? [feature(element, 'cycle-review', reviewGeometry, { ...metadata, reviewRequired: true, reviewReason: 'cycle-route-geometry-missing' })] : [];
+    }
+    if (!isCurrentCycleRelation(tags)) return [feature(element, 'cycle-review', geometry, { ...metadata, reviewRequired: true, reviewReason: 'non-current-route' })];
+    if (network) return [feature(element, network === 'lcn' ? 'cycle-network-local' : 'cycle-network-primary', geometry, { ...metadata, hierarchyEvidence: 'osm-route-network', currentStatusEvidence: 'no-non-current-lifecycle-tags' })];
+    return [feature(element, 'cycle-review', geometry, { ...metadata, reviewRequired: true, reviewReason: 'unsupported-network-hierarchy' })];
+  }
+  if (isCommunityCandidate(tags)) {
+    const area = polygonGeometry(element) || memberPolygonGeometry(element);
+    const point = pointGeometry(element);
+    const communityGeometry = area || point;
+    return communityGeometry ? [feature(element, 'community-candidate', communityGeometry, { category: tags.amenity || tags.shop, originalGeometryType: area ? area.type : 'Point' })] : [];
+  }
+  if (tags.building) {
+    const area = polygonGeometry(element) || memberPolygonGeometry(element);
+    return area ? [feature(element, 'building-support', area, { supportOnly: true })] : [];
+  }
   if (!geometry) return [];
   if (tags.highway) {
     if (/^motorway/.test(tags.highway)) {
@@ -114,24 +163,13 @@ export function classifyOverpassElement(element) {
     }
     if (/^(secondary|tertiary)/.test(tags.highway)) return [feature(element, 'context-road-major', geometry, { contextType: tags.highway })];
     if (/^(unclassified|residential|living_street)$/.test(tags.highway)) return [feature(element, 'context-road-minor', geometry, { contextType: tags.highway })];
-    if (tags.highway === 'cycleway') return [feature(element, 'cycle-route', geometry, { network: 'local' })];
+    if (tags.highway === 'cycleway') return [feature(element, isCurrentCycleRelation(tags) ? 'cycle-route' : 'cycle-review', geometry, { network: 'local', currentStatusEvidence: 'no-non-current-lifecycle-tags', ...(isCurrentCycleRelation(tags) ? {} : { reviewRequired: true, reviewReason: 'non-current-route' }) })];
   }
-  if (tags.route === 'bicycle') {
-    const network = cycleNetwork(tags);
-    const metadata = {
-      network: network || tags.network || 'unclassified',
-      ref: tags.ref || '',
-      name: tags.name || '',
-      operator: tags.operator || '',
-      cycleNetwork: tags.cycle_network || '',
-      routeLabel: tags.ref || tags.name || ''
-    };
-    if (!isCurrentCycleRelation(tags)) return [feature(element, 'cycle-review', geometry, { ...metadata, reviewRequired: true, reviewReason: 'non-current-route' })];
-    if (network) return [feature(element, network === 'lcn' ? 'cycle-network-local' : 'cycle-network-primary', geometry, { ...metadata, hierarchyEvidence: 'osm-route-network' })];
-    return [feature(element, 'cycle-review', geometry, { ...metadata, reviewRequired: true, reviewReason: 'unsupported-network-hierarchy' })];
+  if (tags.railway && /^(rail|subway|light_rail|tram)$/.test(tags.railway)) {
+    const serviceTrack = /^(siding|yard|spur|crossover)$/.test(tags.service || '');
+    const railMode = modeForRailGeometryTags(tags);
+    return [feature(element, serviceTrack ? 'railway-support' : 'railway', geometry, { railType: tags.railway, railMode, usage: tags.usage || '', service: tags.service || '', supportOnly: serviceTrack })];
   }
-  if (tags.route === 'bus') return [feature(element, 'bus-route', geometry, { routeLabel: tags.ref || tags.name || 'Bus route' })];
-  if (tags.railway && /^(rail|subway|light_rail|tram)$/.test(tags.railway)) return [feature(element, 'railway', geometry, { railType: tags.railway })];
   if (hasRailEvidence(tags) && (tags.railway === 'station' || tags.railway === 'halt' || tags.railway === 'tram_stop' || tags.public_transport === 'station')) {
     const mode = modeForTags(tags);
     return [feature(element, RAIL_MODE_CLASS[mode] || 'station-national-rail', pointGeometry(element) || geometry, { mode })];
@@ -145,7 +183,6 @@ export function classifyOverpassElement(element) {
     if (area) return [feature(element, 'context-area', area, { contextType: tags.landuse || tags.natural })];
   }
   if (tags.place) return [feature(element, 'context-place', pointGeometry(element) || geometry, { contextType: tags.place })];
-  if (tags.amenity || tags.shop) return [feature(element, 'community-candidate', pointGeometry(element) || geometry, { category: tags.amenity || tags.shop })];
   return [];
 }
 
@@ -179,7 +216,7 @@ export class OverpassTransportAdapter {
         let payload;
         try { payload = await response.json(); } catch { throw new SourceError('malformed', 'The provider returned invalid JSON.'); }
         if (!payload || !Array.isArray(payload.elements)) throw new SourceError('malformed', 'The provider response has no elements array.');
-        const features = payload.elements.flatMap(classifyOverpassElement);
+        const features = resolveCommunityCandidateGeometry(payload.elements.flatMap(classifyOverpassElement));
         const retrievedAt = new Date().toISOString();
         const snapshotCore = {
           schema: 'tpt-drawing-source-snapshot-v1', version: 1, drawingBuild: build, drawingType: modeId,
@@ -190,13 +227,15 @@ export class OverpassTransportAdapter {
           warnings: [
             ...(features.some(item => item.properties.class === 'waterway-review') ? ['Some waterways are not evidenced as navigable and remain review-only.'] : []),
             ...(features.some(item => item.properties.class === 'cycle-review') ? ['Some bicycle-route relations are non-current or lack a supported OSM network hierarchy and remain review-only.'] : [])
+            ,...(features.some(item => item.properties.class === 'bus-route-review') ? ['BUS ROUTE GEOMETRY REQUIRES REVIEW.'] : [])
+            ,...(features.some(item => item.properties.class === 'community-candidate' && item.properties.communityEvidence?.reviewRequired) ? ['Some community candidates have no single evidenced footprint and remain review-only.'] : [])
           ],
           attribution: OSM_ATTRIBUTION
         };
         const snapshot = { ...snapshotCore, checksum: await checksum(JSON.stringify(snapshotCore)) };
         return { status: payload.elements.length ? 'success' : 'zero', features, snapshot };
       } catch (error) {
-        const kind = error.name === 'AbortError' ? 'timeout' : error.kind || (error instanceof TypeError ? 'network' : 'provider');
+        const kind = error.name === 'AbortError' ? 'timeout' : error.kind || (error instanceof TypeError && /fetch|network|load failed/i.test(error.message) ? 'network' : 'normalisation');
         failures.push({ endpoint, kind, message: error.message, elapsedMs: Date.now() - started });
       } finally { clearTimeout(timer); }
     }

@@ -51,7 +51,7 @@
     },
     "drawingGenerator": {
       "version": "0.1.0",
-      "build": "DRAW-0.1.0-DG0C3.2-20260817",
+      "build": "DRAW-0.1.0-DG0C3.3A-20260817",
       "status": "work-in-progress-live-review",
       "path": "modules/drawing-generator/index.html"
     }

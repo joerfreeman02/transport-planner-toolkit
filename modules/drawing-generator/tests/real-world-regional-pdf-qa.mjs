@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const root = process.env.TPT_REVIEW_ROOT || 'http://127.0.0.1:8768/';
 const output = path.resolve(process.env.DG0_PDF_OUTPUT || 'output/pdf');
-const pdfPath = path.join(output, 'drawing-generator-regional-plan-DG0C3.2-real-world-Milton-Keynes-QA.pdf');
+const pdfPath = path.join(output, 'drawing-generator-regional-plan-DG0C3.3-real-world-Milton-Keynes-QA.pdf');
 fs.mkdirSync(output, { recursive: true });
 
 const browser = await chromium.launch({ headless: true, ...(process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.TPT_PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
@@ -43,10 +43,10 @@ try {
     client: 'EAS INTERNAL QA',
     architect: 'N/A',
     project: 'MILTON KEYNES LIVE OSM QA',
-    projectNumber: 'DG0C3.2-LIVE-QA',
+    projectNumber: 'DG0C3.3-LIVE-QA',
     designedBy: 'QA',
     drawnBy: 'QA',
-    revision: 'C3.2',
+    revision: 'C3.3',
     revisionDescription: 'Real OSM, source QA and synthetic-site alignment',
     drawingStatus: 'WORK IN PROGRESS'
   };

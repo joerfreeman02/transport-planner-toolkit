@@ -139,3 +139,20 @@ C3 starts exactly at `090a2f1ecfb299ed7119a0199c50ae11e916ef29` and preserves th
 - Reduced controlled road labelling: Regional/Local context road names are suppressed; Regional primary/motorway labels use returned A/M refs only with a one-reference normal cap and reduced label budget.
 - Updated all four deterministic and two Milton Keynes live QA PDF drivers to the C3.2 build; the live regional proof reports visible flagged source-review candidates.
 - No GitHub workflow/tooling files changed: Dependabot was retained; Codecov, OpenSSF Scorecard, Sentry and Renovate remain deferred/not installed under the existing governance boundary. Generated PDFs/renders remain untracked.
+
+# DG-0C3.3 functional recovery delta
+
+- Baseline is exactly `6a3c55ecbcb1587f449c8d69121e85c98d0e76a3`; build only advances to `DRAW-0.1.0-DG0C3.3-20260817`. Status/version remain unchanged and unaccepted.
+- `source-adapter.js` replaces full relation geometry with exact-frame clipped relation bodies, safely ignores clipped null placeholders, preserves current lifecycle status, groups bus routes by reference/controlled colour, surfaces missing bus geometry, withholds service rail tracks and retrieves only nearby building support for community nodes.
+- New `community-association.js` preserves exact amenity/shop areas or associates a node with exactly one containing building. Zero/multiple matches remain review-only; no buffer or fabricated polygon exists.
+- `app.js`, `overlay-store.js`, `map-controller.js` and `scale-engine.js` add immediate/deduplicated community selection with persisted provenance, planner-facing source layer controls, route-time map panning without vertex creation, and a toggleable issued-area footprint from the PDF extent engine.
+- `drawing-modes.js`, `cartography.js` and `svg-renderer.js` recover the Local Context hierarchy, external deterministic site callout, bus route legend/group presentation, combined Design/Drawn title cell, and haloed/oppositely offset TO/FROM arrows. Arrow offsets are presentation-only and retained route geometry is untouched.
+- `index.html` and `drawing-generator.css` carry the C3.3 identity, near-square editor, selected/review community states and title/callout presentation. `config/modules.json` advances only the WIP Drawing Generator build.
+- Tests/fixtures add the C3.3 deterministic/browser/PDF acceptance without weakening existing assertions. The two guarded Milton Keynes drivers are relabelled for the current build only.
+- `CURRENT-SOURCE-MAPPING.md`, architecture, README, manual acceptance and test evidence document current-source colour/status mapping, the TfL credential decision, route navigation, exact issued extent, confidentiality and results.
+- No Accessibility, Railway, Bus, STATS19, Library Manager, Shared Library, Site Research, Dashboard implementation, production identity, `.github` workflow or dependency-tooling file is modified. Dependabot is retained; Codecov/OpenSSF/Sentry remain deferred and Renovate remains uninstalled.
+- Historic reference PDFs, client-specific content, live source payloads, temporary QA scripts, six generated PDFs and rendered PNGs are untracked and excluded from the commit.
+
+# DG-0C3.3A release-candidate allowlist
+
+The C3.3A candidate changes only Drawing Generator implementation, its sanitised fixtures/tests and Drawing Generator documentation. It adds `presentation-controls.js` for renderer-only bus/basemap presentation state. No protected module, production identity, Dashboard implementation, shared data, workflow, dependency or generated client artifact is changed. Temporary/PDF outputs remain untracked.

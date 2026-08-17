@@ -4,9 +4,9 @@ import { validateGeometry } from './geometry.js';
 export const OVERLAY_CLASSES = Object.freeze({
   'main-road': { label: 'Main road / A road', geometry: ['LineString', 'MultiLineString'], colour: '#ed1c24' },
   motorway: { label: 'Motorway', geometry: ['LineString', 'MultiLineString'], colour: '#ec1ce8' },
-  'cycle-network-primary': { label: 'National / regional cycle network', geometry: ['LineString', 'MultiLineString'], colour: '#f0a500' },
-  'cycle-network-local': { label: 'Local cycle network', geometry: ['LineString', 'MultiLineString'], colour: '#f0a500' },
-  'strategic-cycle': { label: 'Strategic cycle route', geometry: ['LineString', 'MultiLineString'], colour: '#f0a500' },
+  'cycle-network-primary': { label: 'National / regional cycle network', geometry: ['LineString', 'MultiLineString'], colour: '#00a651' },
+  'cycle-network-local': { label: 'Local cycle network', geometry: ['LineString', 'MultiLineString'], colour: '#00a651' },
+  'strategic-cycle': { label: 'Strategic cycle route', geometry: ['LineString', 'MultiLineString'], colour: '#00a651' },
   waterway: { label: 'Navigable waterway', geometry: ['LineString', 'MultiLineString'], colour: '#0057e7' },
   railway: { label: 'Railway', geometry: ['LineString', 'MultiLineString'], colour: '#666666' },
   'station-national-rail': { label: 'National Rail station', geometry: ['Point'], colour: '#888888' },
@@ -17,8 +17,8 @@ export const OVERLAY_CLASSES = Object.freeze({
   'route-to-site': { label: 'Route to site', geometry: ['LineString', 'MultiLineString'], colour: '#ed1c24' },
   'route-from-site': { label: 'Route from site', geometry: ['LineString', 'MultiLineString'], colour: '#0057e7' },
   'bus-route': { label: 'Bus route', geometry: ['LineString', 'MultiLineString'], colour: '#7f2a90' },
-  'cycle-route': { label: 'Cycle route', geometry: ['LineString', 'MultiLineString'], colour: '#f58220' },
-  community: { label: 'Community consideration', geometry: ['Point', 'Polygon', 'MultiPolygon'], colour: '#666666' },
+  'cycle-route': { label: 'Cycle route', geometry: ['LineString', 'MultiLineString'], colour: '#00a651' },
+  community: { label: 'Community consideration area', geometry: ['Polygon', 'MultiPolygon'], colour: '#666666' },
   'custom-line': { label: 'Reviewed line', geometry: ['LineString', 'MultiLineString'], colour: '#111111' },
   'custom-point': { label: 'Reviewed point', geometry: ['Point'], colour: '#666666' },
   'custom-area': { label: 'Reviewed area', geometry: ['Polygon', 'MultiPolygon'], colour: '#00a651' }
@@ -44,7 +44,8 @@ export function normaliseOverlay(feature, metadata = {}) {
       layerName: String(metadata.layerName ?? feature?.properties?.layerName ?? definition.label).trim() || definition.label,
       colour, visible: metadata.visible ?? feature?.properties?.visible ?? true,
       source: metadata.source || feature?.properties?.source || 'manual/reviewed user input',
-      route: structuredClone(metadata.route ?? feature?.properties?.route ?? null)
+      route: structuredClone(metadata.route ?? feature?.properties?.route ?? null),
+      community: structuredClone(metadata.community ?? feature?.properties?.community ?? null)
     },
     geometry
   };
@@ -65,7 +66,7 @@ export function createOverlayStore(initial = []) {
     update(overlayId, patch = {}) {
       const current = records.get(overlayId); if (!current) throw new Error('Overlay not found.');
       const feature = { ...current, properties: { ...current.properties, ...(patch.properties || patch) }, geometry: patch.geometry || current.geometry };
-      const next = normaliseOverlay(feature, { id: overlayId, className: feature.properties.class, label: feature.properties.label, layerName: feature.properties.layerName, colour: feature.properties.colour, visible: feature.properties.visible, source: feature.properties.source, route: feature.properties.route });
+      const next = normaliseOverlay(feature, { id: overlayId, className: feature.properties.class, label: feature.properties.label, layerName: feature.properties.layerName, colour: feature.properties.colour, visible: feature.properties.visible, source: feature.properties.source, route: feature.properties.route, community: feature.properties.community });
       records.set(overlayId, next); return structuredClone(next);
     },
     remove(overlayId) { return records.delete(overlayId); },

@@ -35,7 +35,22 @@ export function applyBusPresentationGroups(features = [], groups = []) {
     if (feature.properties?.class !== 'bus-route') return feature;
     const reference = routeReference(feature);
     const group = byReference.get(reference);
-    if (!group) { const identity = reference || 'UNREFERENCED'; return { ...feature, properties: { ...feature.properties, presentationBusGroup: `ungrouped-${identity}`, presentationBusLabel: `BUS ROUTE ${identity}`, presentationBusRouteRefs: reference ? [reference] : [], colour: '#ed1c24' } }; }
+    if (!group) {
+      const identity = reference || 'UNREFERENCED';
+      return {
+        ...feature,
+        properties: {
+          ...feature.properties,
+          presentationBusGroup: `ungrouped-${identity}`,
+          presentationBusLabel: `BUS ROUTE ${identity}`,
+          presentationBusRouteRefs: reference ? [reference] : [],
+          // Preserve the deterministic current-source route colour. This keeps
+          // separate services visually distinguishable at real junctions while
+          // leaving planner-created grouping as presentation-only.
+          colour: feature.properties?.colour || '#ed1c24'
+        }
+      };
+    }
     return { ...feature, properties: { ...feature.properties, presentationBusGroup: group.id, presentationBusLabel: group.label, presentationBusRouteRefs: [...group.routeRefs], colour: group.colour } };
   });
 }

@@ -16,6 +16,7 @@ import { BASEMAP_APPEARANCE_DEFAULT, BUS_COLOUR_OPTIONS, busRouteReferences, nex
 configureProj4(globalThis.proj4);
 const byId = id => document.getElementById(id);
 const metaInputs = [...document.querySelectorAll('[data-meta]')];
+const SHARED_METADATA_FIELDS = Object.freeze(['project', 'client']);
 
 function loadPersisted() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
@@ -27,6 +28,7 @@ const state = {
   location: persisted.location && Number.isFinite(persisted.location.lat) && Number.isFinite(persisted.location.lon) ? persisted.location : null,
   site: persisted.site || null,
   metadataByMode: persisted.metadataByMode || {},
+  sharedMetadata: persisted.sharedMetadata || {},
   sourceReview: persisted.sourceReview || {},
   appearanceByMode: persisted.appearanceByMode || {},
   busGroupsByMode: persisted.busGroupsByMode || {},
@@ -41,10 +43,17 @@ const state = {
   activeDrawing: null
 };
 Object.keys(DRAWING_MODES).forEach(id => { state.metadataByMode[id] = { ...defaultMetadata(id), ...(state.metadataByMode[id] || {}) }; });
+SHARED_METADATA_FIELDS.forEach(field => {
+  const currentModeValue = String(state.metadataByMode[state.modeId]?.[field] || '').trim();
+  const migratedValue = String(state.sharedMetadata[field] || currentModeValue
+    || Object.values(state.metadataByMode).map(values => values?.[field]).find(value => String(value || '').trim()) || '').trim();
+  state.sharedMetadata[field] = migratedValue;
+  Object.values(state.metadataByMode).forEach(values => { values[field] = migratedValue; });
+});
 
 function persist() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ modeId: state.modeId, location: state.location, site: state.site, metadataByMode: state.metadataByMode, sourceReview: state.sourceReview, appearanceByMode: state.appearanceByMode, busGroupsByMode: state.busGroupsByMode, outputByMode: state.outputByMode, overlays: state.overlayStore.list() }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ modeId: state.modeId, location: state.location, site: state.site, metadataByMode: state.metadataByMode, sharedMetadata: state.sharedMetadata, sourceReview: state.sourceReview, appearanceByMode: state.appearanceByMode, busGroupsByMode: state.busGroupsByMode, outputByMode: state.outputByMode, overlays: state.overlayStore.list() }));
   } catch { setMessage('overlayStatus', 'The browser could not persist the current editable geometry. Download the overlay file before closing.', 'warning'); }
 }
 
@@ -61,7 +70,15 @@ function populateMetadata() {
 
 function captureMetadata() {
   const values = metadata();
-  metaInputs.forEach(input => { values[input.dataset.meta] = input.value.trim(); });
+  metaInputs.forEach(input => {
+    const field = input.dataset.meta;
+    const value = input.value.trim();
+    values[field] = value;
+    if (SHARED_METADATA_FIELDS.includes(field)) {
+      state.sharedMetadata[field] = value;
+      Object.values(state.metadataByMode).forEach(modeValues => { modeValues[field] = value; });
+    }
+  });
   persist(); renderPreview();
 }
 
@@ -673,7 +690,7 @@ async function processRouteOverlay(id) {
         status, roughGeometry, snappedGeometry: structuredClone(direction.geometry), directionStatus: direction.status,
         directionNormalization: direction.normalization || direction.reason, reversedByNormalization: direction.reversed,
         provenance: snapped.provenance, error: '', approvedAt: null,
-        reviewReason: snapped.reviewRequired ? 'The snapped geometry materially departed from one or more planner guidance points.' : ''
+        reviewReason: snapped.reviewRequired ? (snapped.reviewReason || 'The snapped geometry materially departed from the planner-selected corridor.') : ''
       }
     });
   })().finally(() => routeJobs.delete(id));
@@ -784,7 +801,7 @@ function renderRoutingTools() {
     const snapping = routes.find(item => item.properties.route?.status === 'snapping');
     if (failed) setMessage('routeStatus', `ROAD SNAP FAILED — ROUTE REQUIRES MANUAL REVIEW. ${failed.properties.route.error || ''}`.trim(), 'error');
     else if (direction) setMessage('routeStatus', 'ROUTE DIRECTION REQUIRES REVIEW', 'error');
-    else if (deviation) setMessage('routeStatus', 'Road snap requires review: add/edit waypoint guidance, redraw, or retry before approval.', 'error');
+    else if (deviation) setMessage('routeStatus', `Road snap withheld for review. ${deviation.properties.route?.reviewReason || 'Add a waypoint at the intended junction, redraw, or retry.'}`, 'error');
     else if (snapping) setMessage('routeStatus', 'Following the planner waypoint guidance along mapped roads...', 'warning');
     else if (routes.some(item => item.properties.route?.status === 'snapped-review')) setMessage('routeStatus', 'Road-snapped geometry is ready. Review it, then explicitly approve it for the drawing.', 'warning');
     else setMessage('routeStatus', routes.length

@@ -100,15 +100,22 @@ function sourceVisible(modeId, className) {
 
 export const classVisibleForDrawing = sourceVisible;
 
-function routeArrowMarkup(item, project, family, marker, colour) {
+function routeArrowMarkup(item, project, family, colour) {
   if (item.geometry?.type !== 'LineString') return '';
   return routeArrowPlacements(item.geometry, family).map(placement => {
     const start = project(placement.start), end = project(placement.end);
     const dx = end[0] - start[0], dy = end[1] - start[1], length = Math.hypot(dx, dy) || 1;
-    const cartographicOffset = item.properties?.class === 'route-from-site' ? 3.2 : -3.2;
-    const offsetX = -dy / length * cartographicOffset, offsetY = dx / length * cartographicOffset;
-    const [x1, y1, x2, y2] = [start[0] + offsetX, start[1] + offsetY, end[0] + offsetX, end[1] + offsetY];
-    return `<g class="route-direction-arrow-set" data-cartographic-offset="${cartographicOffset}"><line class="route-direction-arrow-halo" x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="#ffffff" stroke-width="4.4" marker-end="url(#arrow-halo)" vector-effect="non-scaling-stroke"/><line class="route-direction-arrow" data-distance-m="${placement.distanceMetres.toFixed(1)}" x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="${escapeXml(colour)}" stroke-width="1.9" marker-end="${marker}" vector-effect="non-scaling-stroke"/></g>`;
+    const unitX = dx / length, unitY = dy / length;
+    const normalX = -unitY, normalY = unitX;
+    const centreX = (start[0] + end[0]) / 2, centreY = (start[1] + end[1]) / 2;
+    const size = family === 'local' ? 6 : 5.2;
+    const half = size / 2, wing = size * .58;
+    const tipX = centreX + unitX * half, tipY = centreY + unitY * half;
+    const baseX = centreX - unitX * half, baseY = centreY - unitY * half;
+    const leftX = baseX + normalX * wing, leftY = baseY + normalY * wing;
+    const rightX = baseX - normalX * wing, rightY = baseY - normalY * wing;
+    const chevron = `M${leftX.toFixed(2)},${leftY.toFixed(2)} L${tipX.toFixed(2)},${tipY.toFixed(2)} L${rightX.toFixed(2)},${rightY.toFixed(2)}`;
+    return `<g class="route-direction-chevron-set" data-distance-m="${placement.distanceMetres.toFixed(1)}"><path class="route-direction-chevron-halo" d="${chevron}" fill="none" stroke="#ffffff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path class="route-direction-chevron" d="${chevron}" fill="none" stroke="${escapeXml(colour)}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></g>`;
   }).join('');
 }
 
@@ -151,7 +158,7 @@ function featureMarkup(item, project, index, family, modeId = '') {
   const marker = className === 'route-to-site' ? 'url(#arrow-to)' : className === 'route-from-site' ? 'url(#arrow-from)' : '';
   const routeStatus = item.properties?.route?.status || '';
   const reviewDash = marker && ['rough', 'snapping', 'snap-failed', 'snap-review-required', 'direction-review'].includes(routeStatus) ? '6 3' : style.dash;
-  const markup = `<path d="${path}" fill="${isArea ? escapeXml(item.properties?.colour || style.fill || 'none') : 'none'}" fill-opacity="${isArea ? '.34' : '0'}" fill-rule="evenodd" stroke="${escapeXml(colour)}" stroke-width="${className === 'bus-route' ? 1.7 : style.width}"${reviewDash ? ` stroke-dasharray="${reviewDash}"` : ''} stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${marker ? routeArrowMarkup(item, project, family, marker, colour) : ''}`;
+  const markup = `<path d="${path}" fill="${isArea ? escapeXml(item.properties?.colour || style.fill || 'none') : 'none'}" fill-opacity="${isArea ? '.34' : '0'}" fill-rule="evenodd" stroke="${escapeXml(colour)}" stroke-width="${className === 'bus-route' ? 1.7 : style.width}"${reviewDash ? ` stroke-dasharray="${reviewDash}"` : ''} stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>${marker ? routeArrowMarkup(item, project, family, colour) : ''}`;
   return `<g class="layer-${escapeXml(className)}" data-feature-index="${index}"${routeStatus ? ` data-route-status="${escapeXml(routeStatus)}"` : ''}>${markup}</g>`;
 }
 

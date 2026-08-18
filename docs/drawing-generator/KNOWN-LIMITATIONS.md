@@ -42,12 +42,12 @@
 
 - Approved hosted raster/vector provider, a status-safe TfL Cycle Routes/CID adapter, authoritative bus sources, waterway reconciliation, OSTN15 support, topology-aware cartographic generalisation, curved/leader-line labels, direct PDF generation, project storage/versioning and a formally extracted shared spatial package.
 - Codecov and OpenSSF Scorecard adoption remain governance decisions; Sentry/telemetry require a separate privacy decision.
-# DG-0C3.3B HF4 routing limitations
+# DG-0C3.3B HF4A routing limitations
 
-- Road geometry assistance map-matches a planner-selected trace to the current provider's car-road graph. It does not assess height, width, weight, loading, turning, access, time, traffic, temporary restrictions, permits or HGV suitability.
-- The original planner geometry remains authoritative and recoverable. Correct-looking matched geometry still requires explicit planner approval before issue.
-- Detailed planner traces are internally sampled/chunked; there is no user-facing 50-point routing limit. Very long/detailed routes may require several sequential public provider requests and therefore take longer.
-- Public routing and map services have no SLA. Match may return no result, split sub-traces or unmatched tracepoints. Unsafe joins, unmatched original planner points and provider failures are deliberately non-destructive and require retry, clearer guidance, redraw or explicit manual fallback.
-- Planner-point proximity/order/endpoints and match continuity are safety checks; they do not prove that the chosen road is legally or operationally suitable. Rough-line length ratio and straight-chord corridor deviation are diagnostic only.
+- Road geometry assistance uses dense planner-guided OSRM Route requests. The planner selects the roads; the software adds internal control points and asks the provider to follow those ordered controls. It does not assess height, width, weight, loading, turning, access, time, traffic, temporary restrictions, permits or HGV suitability.
+- Original planner geometry remains authoritative and recoverable. Correct-looking road-snapped geometry still requires explicit planner approval before issue.
+- Detailed planner traces are internally sampled/chunked; there is no user-facing 50-point limit. Multi-chunk requests are sequential and therefore may take longer.
+- The primary and fallback OSRM endpoints are no-key/no-cost public services, but they remain fair-use third-party services with no contractual uptime or unlimited-use guarantee. Provider failure is non-destructive and manual geometry remains available.
+- Planner/prepared-guidance proximity and order plus chunk continuity are safety checks; they do not prove legal or operational suitability. Rough-line length ratio and straight-chord corridor deviation are diagnostic only.
 - Site endpoint direction uses geometric proximity to the confirmed polygon; equal/ambiguous endpoint proximity is blocked for review.
 - Local Routing may show a community/manual overlay only after explicit planner selection; relevance remains a professional judgement.

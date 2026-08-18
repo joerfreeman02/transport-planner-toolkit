@@ -167,3 +167,13 @@ The C3.3A candidate changes only Drawing Generator implementation, its sanitised
 - Renderer, basemap, exact scale/extents, Regional Plan, Local Context, community, bus, rail, cycle, title block, shared Project/Client persistence and protected Toolkit modules are outside HF4 and are not redesigned.
 - No client address, boundary, source snapshot, historic drawing or live route coordinates are committed. HF4 regression geometry is synthetic.
 - GitHub tooling position is unchanged: Dependabot adopted; Codecov/OpenSSF Scorecard/Sentry deferred; Renovate not installed.
+
+# DG-0C3.3B HF4A provider-compatible guided-routing recovery
+
+- Starting main is `f2e602308e0b6ef5f7d3054962a933f01ee184c7` (merged HF4). Build advances only to `DRAW-0.1.0-DG0C3.3B-HF4A-20260818`; status remains WIP/live review/not accepted.
+- The failing public Match service path is replaced at the isolated provider boundary by the previously proven FOSSGIS OSRM Route service, now constrained with dense internal planner guidance rather than sparse route-selection waypoints.
+- Detailed planner traces are chunked internally with overlap at planner points; the former 50-point user limit does not return.
+- FOSSGIS remains primary. `router.project-osrm.org` is availability fallback only. Both are no-key/no-cost public endpoints; no unlimited/always-on SLA is claimed.
+- Provider error JSON is surfaced, candidate/original state remains separate, planner approval remains mandatory, and route-length/corridor metrics remain diagnostic only.
+- Renderer, basemap, community, buses, rail, cycles, source classification, title block, metadata persistence, chevrons and protected TPT modules are unchanged.
+- CI routing mocks are migrated as one coherent contract; a guarded one-route live-provider smoke is excluded from CI and is used only during controlled pre-deployment verification.

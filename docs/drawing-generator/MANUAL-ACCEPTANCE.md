@@ -3,7 +3,7 @@
 Drawing Generator is a live-review candidate and must not be accepted merely because these steps complete.
 
 1. Open the deployed direct Drawing Generator URL in Chrome or Edge.
-2. Confirm the banner says `WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE` and the build says `DRAW-0.1.0-DG0C3.3B-HF4-20260818`.
+2. Confirm the banner says `WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE` and the build says `DRAW-0.1.0-DG0C3.3B-HF4A-20260818`.
 3. Without opening **Advanced controls and diagnostics**, switch through Regional Plan, Regional Routing, Local Context and Local Routing. Confirm the normal five steps are visible: choose drawing, locate site, confirm site/routes, set appearance/check sources, then generate/review/issue.
 4. Confirm Colour and Faded are the initial basemap choices. Switch to Greyscale only when desired and confirm Colour remains selectable; the site, routes and controlled coloured overlays must not change.
 5. In Local Context, optionally make a bus presentation group. Confirm a route cannot be added to two groups, ungrouped routes remain shown and the group does not change route source identity or geometry.
@@ -14,14 +14,14 @@ Drawing Generator is a live-review candidate and must not be accepted merely bec
 
 1. Confirm a real site polygon, then choose Regional Routing or Local Routing.
 2. Draw Route To Site through the roads selected by the planner. Add points at meaningful turns/junctions; a detailed route may contain more than 50 planner points. Repeat for Route From Site. While drawing, pan/zoom without accidentally adding vertices.
-3. Confirm the application map-matches the planner trace to clean road-following geometry and reports that explicit planner approval is required. A valid candidate must not be rejected merely because the road is longer than straight planner chords or curves away from those chords.
+3. Confirm the application adds internal guidance and road-snaps through the planner-selected trace to clean road-following geometry, then reports that explicit planner approval is required. A valid candidate must not be rejected merely because the road is longer than straight planner chords or curves away from those chords.
 4. Confirm Route To ends nearest the site and Route From starts nearest the site. If a line is deterministically reversed, confirm the overlay record reports that normalization.
 5. Confirm direction marks are small route-centred `>` chevrons that follow the final retained geometry. No long arrow shafts or cartographic offsets should appear; where TO and FROM overlap, red remains primary and blue remains subordinate/readable.
 6. Test a deliberately detailed route with more than 50 planner points. Confirm it is processed without the former waypoint-limit error and that the final candidate still follows the selected roads.
 7. Confirm Regional Routing contains no automatic road/motorway/cycle/water/rail/station thematic overlays. In Local Routing, retain a community/manual overlay only where explicitly selected and relevant.
-8. Approve the matched routes. Confirm print becomes available only when both route directions, basemap, scale and site are ready.
-9. Edit/redraw a route to add guidance and confirm matching reruns and previous approval is cleared. Change Regional Routing to Local Routing and back; confirm retained route geometry is unchanged.
-10. Simulate provider `NoMatch`/failure in the mocked test environment. Confirm the original planner geometry remains visible, print stays blocked, and retry/redraw/manual fallback remain available. Manual acceptance must still pass the site-direction check.
+8. Approve the road-snapped routes. Confirm print becomes available only when both route directions, basemap, scale and site are ready.
+9. Edit/redraw a route to add guidance and confirm road snapping reruns and previous approval is cleared. Change Regional Routing to Local Routing and back; confirm retained route geometry is unchanged.
+10. Simulate provider `NoRoute`/HTTP failure in the mocked test environment. Confirm the original planner geometry remains visible, print stays blocked, and retry/redraw/manual fallback remain available. Manual acceptance must still pass the site-direction check.
 11. Clear the site and confirm `ROUTE DIRECTION REQUIRES REVIEW` blocks readiness. Toggle **ISSUED DRAWING EXTENT** and confirm Regional reports 16,800 m × 12,250 m at 1:50,000 and Local reports 795 m × 712.5 m at 1:2,500.
 
 3. Confirm **Advanced editing / source diagnostics** starts closed, the map can pan immediately, and **Draw site boundary** begins an explicit drawing state. Choose **Cancel drawing** and confirm normal map navigation returns.

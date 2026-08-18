@@ -1,5 +1,5 @@
 export const VERSION = 'DRAW-0.1.0';
-export const BUILD = 'DRAW-0.1.0-DG0C3.3B-HF1-20260817';
+export const BUILD = 'DRAW-0.1.0-DG0C3.3B-HF2-20260818';
 export const STATUS = 'WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE';
 
 export const OVERPASS_ENDPOINTS = Object.freeze([

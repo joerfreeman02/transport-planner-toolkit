@@ -1,9 +1,17 @@
 function pointOnSegment(point, start, end) {
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  const squaredLength = dx ** 2 + dy ** 2;
+  // Closed OSM rings repeat the first coordinate as the final coordinate.
+  // The previous implementation treated that zero-length closing segment as
+  // containing EVERY point (cross=0, dot=0), which made one church appear to
+  // sit inside every nearby building. A degenerate segment contains only its
+  // actual coordinate.
+  if (squaredLength <= 1e-20) return Math.abs(point[0] - start[0]) <= 1e-10 && Math.abs(point[1] - start[1]) <= 1e-10;
   const cross = (point[1] - start[1]) * (end[0] - start[0]) - (point[0] - start[0]) * (end[1] - start[1]);
   if (Math.abs(cross) > 1e-10) return false;
   const dot = (point[0] - start[0]) * (end[0] - start[0]) + (point[1] - start[1]) * (end[1] - start[1]);
   if (dot < 0) return false;
-  const squaredLength = (end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2;
   return dot <= squaredLength;
 }
 

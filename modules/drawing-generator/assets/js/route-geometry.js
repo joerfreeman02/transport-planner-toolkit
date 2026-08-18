@@ -135,13 +135,28 @@ function nearestMeasure(point, coordinates) {
   return best;
 }
 
+export function geometryCorridorDeviationMetres(sourceGeometry, targetGeometry, maxSamples = 200) {
+  const sourceCoordinates = asRouteCoordinates(sourceGeometry);
+  const targetCoordinates = asRouteCoordinates(targetGeometry);
+  const sourceLength = routeLengthMetres(sourceGeometry);
+  const sampleCount = Math.max(2, Math.min(maxSamples, Math.ceil(sourceLength / 80) + 1));
+  let maximum = 0;
+  for (let index = 0; index < sampleCount; index += 1) {
+    const distance = sourceLength * index / (sampleCount - 1);
+    maximum = Math.max(maximum, nearestMeasure(coordinateAtDistance(sourceCoordinates, distance), targetCoordinates).distanceMetres);
+  }
+  return maximum;
+}
+
 export function assessGuidanceOrder(guidanceCoordinates, snappedGeometry) {
   const snappedCoordinates = asRouteCoordinates(snappedGeometry);
   const measures = guidanceCoordinates.map(coordinate => nearestMeasure(coordinate, snappedCoordinates));
   const orderPreserved = measures.every((measurement, index) => index === 0 || measurement.measureMetres + 5 >= measures[index - 1].measureMetres);
+  const roughGeometry = { type: 'LineString', coordinates: guidanceCoordinates.map(coordinate => [...coordinate]) };
   return {
     orderPreserved,
     maxGuidanceDeviationMetres: Math.max(0, ...measures.map(measurement => measurement.distanceMetres)),
+    maxSnappedCorridorDeviationMetres: geometryCorridorDeviationMetres(snappedGeometry, roughGeometry),
     measuresMetres: measures.map(measurement => measurement.measureMetres)
   };
 }

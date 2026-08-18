@@ -1,4 +1,4 @@
-import { assessGuidanceOrder } from './route-geometry.js';
+import { assessGuidanceOrder, routeLengthMetres } from './route-geometry.js';
 
 export const DEFAULT_ROAD_ROUTING_PROVIDER = Object.freeze({
   id: 'osm-osrm-car',
@@ -12,11 +12,20 @@ export const DEFAULT_ROAD_ROUTING_PROVIDER = Object.freeze({
   maximumWaypoints: 50
 });
 
-export function roadSnapRequestUrl(geometry, provider = DEFAULT_ROAD_ROUTING_PROVIDER) {
+export function guidanceToleranceMetres(geometry) {
+  const length = routeLengthMetres(geometry);
+  if (length <= 2500) return 30;
+  if (length <= 8000) return 60;
+  return 100;
+}
+
+export function roadSnapRequestUrl(geometry, provider = DEFAULT_ROAD_ROUTING_PROVIDER, options = {}) {
   if (geometry?.type !== 'LineString' || geometry.coordinates.length < 2) throw new Error('At least two route-guidance points are required.');
   if (geometry.coordinates.length > provider.maximumWaypoints) throw new Error(`No more than ${provider.maximumWaypoints} route-guidance points may be sent.`);
   const coordinates = geometry.coordinates.map(([longitude, latitude]) => `${Number(longitude).toFixed(7)},${Number(latitude).toFixed(7)}`).join(';');
-  return `${provider.endpoint}/${coordinates}?overview=full&geometries=geojson&steps=false&alternatives=false&continue_straight=true`;
+  const radius = Number(options.snapRadiusMetres);
+  const radiuses = Number.isFinite(radius) && radius > 0 ? `&radiuses=${geometry.coordinates.map(() => radius.toFixed(0)).join(';')}` : '';
+  return `${provider.endpoint}/${coordinates}?overview=full&geometries=geojson&steps=false&alternatives=false&continue_straight=true${radiuses}`;
 }
 
 export async function snapRouteThroughGuidance(roughGeometry, options = {}) {
@@ -25,7 +34,9 @@ export async function snapRouteThroughGuidance(roughGeometry, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 20000);
   try {
-    const requestUrl = roadSnapRequestUrl(roughGeometry, provider);
+    const toleranceMetres = options.maximumGuidanceDeviationMetres ?? guidanceToleranceMetres(roughGeometry);
+    const snapRadiusMetres = options.snapRadiusMetres ?? toleranceMetres;
+    const requestUrl = roadSnapRequestUrl(roughGeometry, provider, { snapRadiusMetres });
     const response = await fetchImpl(requestUrl, { signal: controller.signal, headers: { Accept: 'application/json' } });
     if (!response.ok) throw new Error(`Road routing returned HTTP ${response.status}.`);
     const data = await response.json();
@@ -34,14 +45,25 @@ export async function snapRouteThroughGuidance(roughGeometry, options = {}) {
       throw new Error(data?.message || 'Road routing did not return usable geometry.');
     }
     const assessment = assessGuidanceOrder(roughGeometry.coordinates, route.geometry);
+    const reviewRequired = !assessment.orderPreserved
+      || assessment.maxGuidanceDeviationMetres > toleranceMetres
+      || assessment.maxSnappedCorridorDeviationMetres > toleranceMetres;
     return {
-      status: 'snapped-review', geometry: route.geometry,
-      reviewRequired: !assessment.orderPreserved || assessment.maxGuidanceDeviationMetres > provider.maximumGuidanceDeviationMetres,
+      status: 'snapped-review',
+      // Fail safe: never replace the planner's visible route with a provider
+      // candidate that departs materially from the drawn corridor. The bad
+      // candidate remains available for diagnostics, while the planner sees
+      // and can edit the guidance they actually selected.
+      geometry: reviewRequired ? structuredClone(roughGeometry) : route.geometry,
+      candidateGeometry: structuredClone(route.geometry),
+      reviewRequired,
       provenance: {
         providerId: provider.id, providerName: provider.name, profile: provider.profile,
         providerPurpose: provider.purpose, attribution: provider.attribution, reportIssueUrl: provider.reportIssueUrl,
         waypointCount: roughGeometry.coordinates.length, waypointOrderPreserved: assessment.orderPreserved,
         maxGuidanceDeviationMetres: assessment.maxGuidanceDeviationMetres,
+        maxSnappedCorridorDeviationMetres: assessment.maxSnappedCorridorDeviationMetres,
+        guidanceToleranceMetres: toleranceMetres, snapRadiusMetres,
         distanceMetres: Number(route.distance || 0), durationSeconds: Number(route.duration || 0),
         retrievedAt: new Date().toISOString()
       }

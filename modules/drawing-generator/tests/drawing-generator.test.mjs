@@ -393,18 +393,30 @@ await test('retained overlays are isolated to appropriate drawing modes', () => 
   assert.match(localRouting, /layer-route-to-site/); assert.match(localRouting, /layer-community/); assert.doesNotMatch(localRouting, /layer-bus-route/);
 });
 
-await test('road-snap adapter follows planner waypoints in order through a provider-neutral mocked boundary', async () => {
+await test('road map-matching adapter retains planner point order through a provider-neutral mocked boundary', async () => {
   const rough = { type: 'LineString', coordinates: [[-0.11, 51.5], [-0.105, 51.502], [-0.1, 51.501]] };
   let requestedUrl = '';
   const fetchImpl = async url => {
     requestedUrl = url;
-    return { ok: true, json: async () => ({ code: 'Ok', routes: [{ distance: 1400, duration: 180, geometry: { type: 'LineString', coordinates: [[-0.11, 51.5], [-0.108, 51.501], [-0.105, 51.502], [-0.102, 51.5015], [-0.1, 51.501]] } }] }) };
+    const guidance = new URL(url).pathname.split('/driving/')[1].split(';').map(value => value.split(',').map(Number));
+    const coordinates = guidance.flatMap((coordinate, index) => index === guidance.length - 1 ? [coordinate] : [coordinate, [(coordinate[0] + guidance[index + 1][0]) / 2, (coordinate[1] + guidance[index + 1][1]) / 2]]);
+    return { ok: true, json: async () => ({
+      code: 'Ok',
+      tracepoints: guidance.map((coordinate, index) => ({ location: coordinate, matchings_index: 0, waypoint_index: index, alternatives_count: 0 })),
+      matchings: [{ confidence: .98, distance: 1400, duration: 180, geometry: { type: 'LineString', coordinates } }]
+    }) };
   };
-  const result = await routeSnap.snapRouteThroughGuidance(rough, { fetchImpl, provider: { ...routeSnap.DEFAULT_ROAD_ROUTING_PROVIDER, endpoint: 'https://routing.test/route/v1/driving' } });
+  const result = await routeSnap.snapRouteThroughGuidance(rough, {
+    fetchImpl,
+    provider: { ...routeSnap.DEFAULT_ROAD_ROUTING_PROVIDER, endpoint: 'https://routing.test/match/v1/driving', minimumRequestIntervalMs: 0 },
+    traceOptions: { maxInternalPerSegment: 0 }
+  });
   assert.equal(result.status, 'snapped-review');
   assert.equal(result.provenance.providerPurpose, 'geometry-assistance-only');
+  assert.equal(result.provenance.providerService, 'match');
   assert.equal(result.provenance.waypointOrderPreserved, true);
-  assert.match(requestedUrl, /-0\.1100000,51\.5000000;-0\.1050000,51\.5020000;-0\.1000000,51\.5010000/);
+  assert.match(requestedUrl, /\/match\/v1\/driving\//);
+  assert.doesNotMatch(requestedUrl, /continue_straight|alternatives=/);
   assert.equal(result.geometry.coordinates.length, 5);
 });
 
@@ -427,7 +439,7 @@ await test('route direction normalization deterministically reverses both route 
   assert.equal(routeGeometry.normaliseRouteDirection(siteLast, 'route-to-site', null).reason, 'ROUTE DIRECTION REQUIRES REVIEW');
 });
 
-await test('route arrows use distance cadence on final geometry and follow coordinate direction', () => {
+await test('route chevrons use distance cadence on final geometry and follow coordinate direction', () => {
   const sparse = { type: 'LineString', coordinates: [[-0.11, 51.5], [-0.1, 51.5]] };
   const dense = { type: 'LineString', coordinates: Array.from({ length: 101 }, (_, index) => [-0.11 + (index / 10000), 51.5]) };
   const sparseArrows = routeGeometry.routeArrowPlacements(sparse, 'local');
@@ -489,7 +501,7 @@ await test('community annotations use a leader and a readable backed label', () 
   assert.match(markup, /community-annotation-leader/);
   assert.match(markup, /community-annotation-backing/);
 });
-await test('coincident TO and FROM arrows use opposing presentation-only offsets and white halos', () => {
+await test('coincident TO and FROM routes use centred chevrons with white halos and no geometry offsets', () => {
   const centerBng = crs.wgs84ToBng([-.1, 51.5]);
   const geometry = { type: 'LineString', coordinates: [[-.12, 51.5], [-.08, 51.5]] };
   const overlays = [

@@ -1,11 +1,11 @@
 # DG-0 architecture
 
 Status: **Proposed live-review candidate; not an accepted baseline.**
-Version/build: `DRAW-0.1.0` / `DRAW-0.1.0-DG0C3.3A-20260817`.
+Version/build: `DRAW-0.1.0` / `DRAW-0.1.0-DG0C3.3B-HF4-20260818`.
 
 ## Road-geometry assistance boundary
 
-`route-snap-adapter.js` owns the replaceable external provider boundary, request construction, bounded failure handling and provenance. `route-geometry.js` is network-free and owns route length, waypoint-order/deviation checks, site-direction normalization and distance-based arrow placement. `app.js` owns user intent and state transitions (`rough` → `snapping` → `snapped-review` → `approved`, with explicit failure/review/manual branches). `svg-renderer.js` consumes final retained geometry without mutating it. Provider output can never self-approve or change the planner's ordered waypoint choice.
+`route-snap-adapter.js` owns the replaceable external provider boundary and uses OSRM Match semantics for planner-guided road geometry. It preserves every original planner point, adds bounded internal samples only for matching assistance, splits large prepared traces into overlapping provider-safe chunks, serialises public requests, assembles only continuous sub-traces/chunks and retains provider provenance. `route-geometry.js` is network-free and owns route length, planner-point order/deviation checks, site-direction normalization and distance-based chevron placement. `app.js` owns user intent and state transitions (`rough` → `snapping` → `snapped-review` → `approved`, with explicit failure/review/manual branches) and retains rough, candidate and approved/final geometry distinctly. `svg-renderer.js` consumes final retained geometry without mutating it. Provider output can never self-approve or change the planner's route-selection authority; rough-line length ratio and straight-chord corridor deviation are diagnostics, not independent rejection rules.
 
 ## Scope and boundaries
 
@@ -41,6 +41,7 @@ The module does not select professional HGV routes, infer a site polygon from an
 - `cartography.js`: deterministic source-way presentation grouping, station de-duplication and managed label placement.
 - `railway-adapter.js`: local pure adapter matching current Railway evidence/mode semantics; equivalence tested against the existing module.
 - `overlay-store.js`: validated controlled overlay model with import/edit/delete/visibility/export.
+- `route-snap-adapter.js`: provider-neutral planner-trace map matching, internal sampling, bounded chunking, sequential/rate-controlled requests, continuity validation and non-destructive fallback.
 - `svg-renderer.js`: hybrid rendered-OSM/controlled-vector composition with auditable basemap metadata, legend, north arrow and physical scale bar.
 - `app.js`: user workflow, metadata, persistence, diagnostics and print orchestration.
 

@@ -156,3 +156,14 @@ C3 starts exactly at `090a2f1ecfb299ed7119a0199c50ae11e916ef29` and preserves th
 # DG-0C3.3A release-candidate allowlist
 
 The C3.3A candidate changes only Drawing Generator implementation, its sanitised fixtures/tests and Drawing Generator documentation. It adds `presentation-controls.js` for renderer-only bus/basemap presentation state. No protected module, production identity, Dashboard implementation, shared data, workflow, dependency or generated client artifact is changed. Temporary/PDF outputs remain untracked.
+
+# DG-0C3.3B HF4 planner-guided map-matching corrective delta
+
+- Recovery baseline is `cb927bcd712946458f6a7e3c017be696796e1b57`. Candidate build advances only to `DRAW-0.1.0-DG0C3.3B-HF4-20260818`; status remains **WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE**.
+- Routing-provider semantics change from OSRM Route to OSRM Match so the planner-selected trace is map-matched instead of asking the provider to select a fastest path between sparse coordinates.
+- The original planner LineString is preserved. Bounded internal samples, provider-safe overlapping chunks and a sequential provider scheduler remove the former 50-point user limit while retaining planner point/order/endpoints and continuity as acceptance controls.
+- HF3's 1.60 route-length ratio and straight-chord corridor threshold are removed as hard blockers; both remain diagnostic evidence only. A materially bad candidate still falls back non-destructively to the planner geometry.
+- HF2/HF3 routing mocks, deterministic routing checks, browser smoke and CI are deliberately migrated to Match response semantics in the same correction. HF4 adds explicit Local-false-positive, long-route, >50-point, chunk/throttle, outlier/sub-trace and bad-candidate regressions.
+- Renderer, basemap, exact scale/extents, Regional Plan, Local Context, community, bus, rail, cycle, title block, shared Project/Client persistence and protected Toolkit modules are outside HF4 and are not redesigned.
+- No client address, boundary, source snapshot, historic drawing or live route coordinates are committed. HF4 regression geometry is synthetic.
+- GitHub tooling position is unchanged: Dependabot adopted; Codecov/OpenSSF Scorecard/Sentry deferred; Renovate not installed.

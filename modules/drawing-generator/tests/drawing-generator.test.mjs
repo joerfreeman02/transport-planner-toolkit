@@ -445,7 +445,7 @@ await test('routing drawings suppress automatic thematic overlays and rendering 
   assert.match(result.markup, /layer-route-to-site/);
   assert.doesNotMatch(result.markup, /layer-(main-road|station-underground)/);
   assert.doesNotMatch(result.markup, /marker-mid=/);
-  assert.match(result.markup, /class="route-direction-arrow"/);
+  assert.match(result.markup, /class="route-direction-chevron"/);
   assert.deepEqual(route.geometry, original);
 });
 await test('Local Context preserves hierarchy with green cycles and evidence-led rail styling', () => {
@@ -498,9 +498,8 @@ await test('coincident TO and FROM arrows use opposing presentation-only offsets
   ];
   const before = structuredClone(overlays.map(item => item.geometry));
   const markup = renderDrawingSvg({ modeId: 'regional-routing', centerBng, overlays }).markup;
-  assert.match(markup, /data-cartographic-offset="-3\.2"/);
-  assert.match(markup, /data-cartographic-offset="3\.2"/);
-  assert.match(markup, /route-direction-arrow-halo/);
+  assert.doesNotMatch(markup, /data-cartographic-offset=/);
+  assert.match(markup, /route-direction-chevron-halo/);
   assert.deepEqual(overlays.map(item => item.geometry), before);
 });
 await test('site uses an external leader callout and no generic polygon-centre SITE label', () => {

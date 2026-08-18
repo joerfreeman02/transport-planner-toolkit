@@ -104,6 +104,12 @@ try {
   await page.locator('[data-meta="project"]').fill('Synthetic Review Project');
   await page.locator('[data-meta="projectNumber"]').fill('DG0-QA');
   await page.locator('[data-meta="drawnBy"]').fill('QA');
+  for (const mode of ['regional-plan', 'regional-routing', 'local-context', 'local-routing']) {
+    await page.locator('#modeSelect').selectOption(mode);
+    assert.equal(await page.locator('[data-meta="project"]').inputValue(), 'Synthetic Review Project');
+    assert.equal(await page.locator('[data-meta="client"]').inputValue(), 'Synthetic Client');
+  }
+  await page.locator('#modeSelect').selectOption('regional-plan');
 
   await page.locator('#generateDrawing').click();
   try {
@@ -250,10 +256,10 @@ try {
   assert.deepEqual(routeSnapshot.find(item => item.properties.class === 'route-from-site').geometry.coordinates[0], [-.1005, 51.5001]);
   assert.equal(routeSnapshot.find(item => item.properties.class === 'route-from-site').properties.route.reversedByNormalization, true);
   assert.equal(interceptedRouteRequests.length, 2);
-  assert.equal(await page.locator('#drawingSvg .route-direction-arrow').count() > 0, true);
-  assert.equal(await page.locator('#drawingSvg .route-direction-arrow-halo').count() > 0, true);
-  assert.equal(await page.locator('#drawingSvg [data-cartographic-offset="3.2"]').count() > 0, true);
-  assert.equal(await page.locator('#drawingSvg [data-cartographic-offset="-3.2"]').count() > 0, true);
+  assert.ok(await page.locator('#drawingSvg .route-direction-chevron').count() > 0);
+  assert.ok(await page.locator('#drawingSvg .route-direction-chevron-halo').count() > 0);
+  assert.equal(await page.locator('#drawingSvg [data-cartographic-offset]').count(), 0);
+  assert.equal(await page.locator('#drawingSvg .route-direction-arrow').count(), 0);
   assert.equal(await page.locator('#drawingSvg [class*="layer-main-road"], #drawingSvg [class*="layer-railway"], #drawingSvg [class*="layer-station-"]').count(), 0);
   await page.locator('#approveSnappedRoutes').click();
   routeSnapshot = await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().overlays.filter(item => item.properties.class.startsWith('route-')));

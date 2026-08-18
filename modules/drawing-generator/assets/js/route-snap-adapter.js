@@ -19,6 +19,13 @@ export function guidanceToleranceMetres(geometry) {
   return 100;
 }
 
+export function corridorToleranceMetres(geometry) {
+  const length = routeLengthMetres(geometry);
+  if (length <= 2500) return 90;
+  if (length <= 8000) return 220;
+  return 450;
+}
+
 export function roadSnapRequestUrl(geometry, provider = DEFAULT_ROAD_ROUTING_PROVIDER, options = {}) {
   if (geometry?.type !== 'LineString' || geometry.coordinates.length < 2) throw new Error('At least two route-guidance points are required.');
   if (geometry.coordinates.length > provider.maximumWaypoints) throw new Error(`No more than ${provider.maximumWaypoints} route-guidance points may be sent.`);
@@ -35,6 +42,8 @@ export async function snapRouteThroughGuidance(roughGeometry, options = {}) {
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 20000);
   try {
     const toleranceMetres = options.maximumGuidanceDeviationMetres ?? guidanceToleranceMetres(roughGeometry);
+    const corridorTolerance = options.maximumCorridorDeviationMetres ?? corridorToleranceMetres(roughGeometry);
+    const maximumRouteLengthRatio = options.maximumRouteLengthRatio ?? 1.6;
     const snapRadiusMetres = options.snapRadiusMetres ?? toleranceMetres;
     const requestUrl = roadSnapRequestUrl(roughGeometry, provider, { snapRadiusMetres });
     const response = await fetchImpl(requestUrl, { signal: controller.signal, headers: { Accept: 'application/json' } });
@@ -45,9 +54,21 @@ export async function snapRouteThroughGuidance(roughGeometry, options = {}) {
       throw new Error(data?.message || 'Road routing did not return usable geometry.');
     }
     const assessment = assessGuidanceOrder(roughGeometry.coordinates, route.geometry);
-    const reviewRequired = !assessment.orderPreserved
-      || assessment.maxGuidanceDeviationMetres > toleranceMetres
-      || assessment.maxSnappedCorridorDeviationMetres > toleranceMetres;
+    const roughLengthMetres = routeLengthMetres(roughGeometry);
+    const snappedLengthMetres = routeLengthMetres(route.geometry);
+    const routeLengthRatio = roughLengthMetres ? snappedLengthMetres / roughLengthMetres : Number.POSITIVE_INFINITY;
+    const reviewReasons = [];
+    if (!assessment.orderPreserved) reviewReasons.push('The snapped route did not preserve planner waypoint order.');
+    if (assessment.maxGuidanceDeviationMetres > toleranceMetres) {
+      reviewReasons.push(`A planner waypoint snapped ${assessment.maxGuidanceDeviationMetres.toFixed(0)} m away (limit ${toleranceMetres.toFixed(0)} m).`);
+    }
+    if (assessment.maxSnappedCorridorDeviationMetres > corridorTolerance) {
+      reviewReasons.push(`The snapped route left the selected corridor by ${assessment.maxSnappedCorridorDeviationMetres.toFixed(0)} m (review limit ${corridorTolerance.toFixed(0)} m).`);
+    }
+    if (routeLengthRatio > maximumRouteLengthRatio) {
+      reviewReasons.push(`The snapped road route is ${routeLengthRatio.toFixed(2)}x the planner guidance length (review limit ${maximumRouteLengthRatio.toFixed(2)}x).`);
+    }
+    const reviewRequired = reviewReasons.length > 0;
     return {
       status: 'snapped-review',
       // Fail safe: never replace the planner's visible route with a provider
@@ -57,13 +78,17 @@ export async function snapRouteThroughGuidance(roughGeometry, options = {}) {
       geometry: reviewRequired ? structuredClone(roughGeometry) : route.geometry,
       candidateGeometry: structuredClone(route.geometry),
       reviewRequired,
+      reviewReason: reviewReasons.join(' '),
       provenance: {
         providerId: provider.id, providerName: provider.name, profile: provider.profile,
         providerPurpose: provider.purpose, attribution: provider.attribution, reportIssueUrl: provider.reportIssueUrl,
         waypointCount: roughGeometry.coordinates.length, waypointOrderPreserved: assessment.orderPreserved,
         maxGuidanceDeviationMetres: assessment.maxGuidanceDeviationMetres,
         maxSnappedCorridorDeviationMetres: assessment.maxSnappedCorridorDeviationMetres,
-        guidanceToleranceMetres: toleranceMetres, snapRadiusMetres,
+        guidanceToleranceMetres: toleranceMetres,
+        corridorToleranceMetres: corridorTolerance,
+        routeLengthRatio, maximumRouteLengthRatio,
+        snapRadiusMetres,
         distanceMetres: Number(route.distance || 0), durationSeconds: Number(route.duration || 0),
         retrievedAt: new Date().toISOString()
       }

@@ -46,10 +46,10 @@ function coordinateAtDistance(coordinates, requestedDistance) {
 export function routeArrowPlacements(geometry, family = 'regional') {
   const coordinates = asRouteCoordinates(geometry);
   const length = routeLengthMetres(geometry);
-  const preferredSpacing = family === 'local' ? 105 : 1700;
-  const count = Math.max(1, Math.min(10, Math.floor(length / preferredSpacing)));
+  const preferredSpacing = family === 'local' ? 180 : 2500;
+  const count = Math.max(1, Math.min(7, Math.floor(length / preferredSpacing)));
   const spacing = length / (count + 1);
-  const tangentDistance = Math.max(family === 'local' ? 7 : 100, Math.min(spacing * 0.16, family === 'local' ? 22 : 340));
+  const tangentDistance = Math.max(family === 'local' ? 5 : 60, Math.min(spacing * 0.08, family === 'local' ? 12 : 180));
   return Array.from({ length: count }, (_, index) => {
     const distance = spacing * (index + 1);
     return {

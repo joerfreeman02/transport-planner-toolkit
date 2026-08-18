@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="../../assets/vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="assets/vendor/leaflet.draw.css">
   <link rel="stylesheet" href="assets/css/drawing-generator.css">
-  <style id="dg-hf2-routing-presentation">
+  <style id="dg-hf3-routing-presentation">
     /* Golden-plan hierarchy: red is the primary routing corridor. The blue
        return line stays visible but subordinate; its direction arrows remain
        full strength because they sit in their own SVG groups. */
@@ -21,7 +21,7 @@
   <header class="app-header">
     <img src="assets/images/eas-primary.png" alt="EAS Consulting Engineers">
     <div><a href="../../">Transport Planner Toolkit</a><h1>Drawing Generator</h1><p>Planner-first professional drawing workflow</p></div>
-    <div class="build"><strong>DRAW-0.1.0</strong><span>DRAW-0.1.0-DG0C3.3B-HF2-20260818</span></div>
+    <div class="build"><strong>DRAW-0.1.0</strong><span>DRAW-0.1.0-DG0C3.3B-HF3-20260818</span></div>
   </header>
   <div class="candidate-banner" role="status">WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE</div>
 
@@ -38,6 +38,7 @@
         <label>Project<input data-meta="project" placeholder="Project or site name"></label>
         <label>Client<input data-meta="client" placeholder="Client name"></label>
       </div>
+      <p class="hint">Project and client are retained when you switch between the four drawings for the same job.</p>
       <h3 data-workflow-step="2">Locate the site</h3>
       <div class="locate-grid">
         <label>Project/site address<input id="addressInput" autocomplete="street-address" placeholder="Search centre only"></label>
@@ -57,7 +58,7 @@
       <p class="hint">The map normally pans and zooms. Drawing starts only after you choose Draw site boundary; use Cancel drawing at any time.</p>
       <section id="routingTools" class="routing-tools" aria-labelledby="routing-heading" hidden>
         <h3 id="routing-heading">Planner-guided road routing</h3>
-        <p>Draw rough waypoints through the roads you select. Add a waypoint at every important turn or junction. The software may tidy the line onto mapped roads, but it will withhold a snap that leaves your selected corridor.</p>
+        <p>Draw the route roughly along the roads you want, adding a waypoint at each important turn or junction. The software tidies that guidance onto mapped roads and withholds only a materially different route.</p>
         <p class="route-safety-note"><strong>Geometry assistance only.</strong> The planner selects and approves the route. HGV restrictions, suitability, access and safety are not assessed by the routing service.</p>
         <div class="toolbar">
           <button id="drawRouteTo" class="primary route-to">Draw Route To Site</button>
@@ -168,7 +169,7 @@
               <div class="title-cell project"><small>PROJECT</small><strong data-sheet-meta="project">-</strong><small>PROJECT No.</small><span data-sheet-meta="projectNumber">-</span></div>
               <div class="title-cell drawing"><small>TITLE</small><strong data-sheet-meta="drawingTitle">REGIONAL PLAN</strong><small>DRAWING No.</small><span data-sheet-meta="drawingNumber">EAS-SK-H-101</span></div>
               <div class="title-cell issue"><small>DRAWING STATUS</small><strong data-sheet-meta="drawingStatus">LIVE REVIEW</strong><div class="mini-grid"><span><small>SCALE @ A3</small><b data-sheet-meta="scale">1:50,000</b></span><span><small>DESIGN / DRAWN</small><b><span data-sheet-meta="designedBy">-</span> / <span data-sheet-meta="drawnBy">-</span></b></span><span><small>DATE</small><b data-sheet-meta="date">-</b></span></div></div>
-              <div class="title-cell revision"><div class="revision-head"><small>REV</small><small>DATE</small><small>BY</small><small>DESCRIPTION</small></div><div class="revision-row"><b data-sheet-meta="revision">P01</b><span data-sheet-meta="date">-</span><span data-sheet-meta="drawnBy">-</span><span data-sheet-meta="revisionDescription">Live review candidate</span></div><small class="build-id">DRAW-0.1.0-DG0C3.3B-HF2-20260818</small></div>
+              <div class="title-cell revision"><div class="revision-head"><small>REV</small><small>DATE</small><small>BY</small><small>DESCRIPTION</small></div><div class="revision-row"><b data-sheet-meta="revision">P01</b><span data-sheet-meta="date">-</span><span data-sheet-meta="drawnBy">-</span><span data-sheet-meta="revisionDescription">Live review candidate</span></div><small class="build-id">DRAW-0.1.0-DG0C3.3B-HF3-20260818</small></div>
             </section>
           </div>
           <div class="sheet-attribution"><span id="sheetAttribution">No external source loaded.</span><span id="sheetExtent">Scale-driven projected extent.</span></div>
@@ -176,7 +177,7 @@
       </div>
     </section>
   </main>
-  <footer>Transport Planner Toolkit - Drawing Generator DG-0C3.3B HF2 - work in progress / professional review required</footer>
+  <footer>Transport Planner Toolkit - Drawing Generator DG-0C3.3B HF3 - work in progress / professional review required</footer>
   <script src="assets/vendor/proj4.js"></script>
   <script src="../../assets/vendor/leaflet/leaflet.js"></script>
   <script src="assets/vendor/leaflet.draw.js"></script>

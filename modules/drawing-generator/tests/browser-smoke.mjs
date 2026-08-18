@@ -36,18 +36,17 @@ await page.route(/https:\/\/(?:tile\.openstreetmap\.org|tiles\.test)\/\d+\/\d+\/
   return route.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: rasterTile });
 });
 await page.route(/https:\/\/tiles-fail\.test\/\d+\/\d+\/\d+\.png/, route => route.fulfill(expectedTileFailure ? { status: 503, contentType: 'text/plain', body: 'mock tile failure' } : { status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: rasterTile }));
-await page.route(/https:\/\/routing\.test\/match\/v1\/driving\/.+/, route => {
+await page.route(/https:\/\/routing\.test\/route\/v1\/driving\/.+/, route => {
   interceptedRouteRequests.push(route.request().url());
   const coordinatePart = new URL(route.request().url()).pathname.split('/driving/')[1];
   const guidance = coordinatePart.split(';').map(value => value.split(',').map(Number));
-  const coordinates = guidance.flatMap((coordinate, index) => index === guidance.length - 1 ? [coordinate] : [coordinate, [(coordinate[0] + guidance[index + 1][0]) / 2, (coordinate[1] + guidance[index + 1][1]) / 2]]);
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
     code: 'Ok',
-    tracepoints: guidance.map((coordinate, index) => ({ location: coordinate, matchings_index: 0, waypoint_index: index, alternatives_count: 0 })),
-    matchings: [{ confidence: .98, distance: 900, duration: 120, geometry: { type: 'LineString', coordinates } }]
+    waypoints: guidance.map(location => ({ location })),
+    routes: [{ distance: 900, duration: 120, geometry: { type: 'LineString', coordinates: guidance } }]
   }) });
 });
-await page.route(/https:\/\/routing-fail\.test\/match\/v1\/driving\/.+/, route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'NoMatch', message: 'mock map-match failure' }) }));
+await page.route(/https:\/\/routing-fail\.test\/route\/v1\/driving\/.+/, route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'NoRoute', message: 'mock guided-route failure' }) }));
 await page.addInitScript(() => localStorage.clear());
 
 try {
@@ -249,7 +248,7 @@ try {
     const api = window.__DG0_ACCEPTANCE__;
     api.setMode('regional-routing');
     api.clearOverlays();
-    api.setRoadRoutingProvider({ id: 'mock-road-matching', name: 'Mock road map matching', endpoint: 'https://routing.test/match/v1/driving', attribution: 'Mock road geometry', reportIssueUrl: 'https://example.test/fix', maximumMatchLocations: 40, minimumRequestIntervalMs: 0 });
+    api.setRoadRoutingProvider({ id: 'mock-guided-road-routing', name: 'Mock guided road routing', endpoint: 'https://routing.test/route/v1/driving', endpoints: ['https://routing.test/route/v1/driving'], attribution: 'Mock road geometry', reportIssueUrl: 'https://example.test/fix', maximumRouteLocations: 40, minimumRequestIntervalMs: 0 });
     await api.addRoughRoute({ type: 'LineString', coordinates: [[-.112, 51.504], [-.106, 51.502], [-.1005, 51.5001]] }, 'route-to-site');
     await api.addRoughRoute({ type: 'LineString', coordinates: [[-.112, 51.496], [-.106, 51.498], [-.1005, 51.5001]] }, 'route-from-site');
   });
@@ -260,9 +259,9 @@ try {
   assert.deepEqual(routeSnapshot.find(item => item.properties.class === 'route-from-site').geometry.coordinates[0], [-.1005, 51.5001]);
   assert.equal(routeSnapshot.find(item => item.properties.class === 'route-from-site').properties.route.reversedByNormalization, true);
   assert.equal(interceptedRouteRequests.length, 2);
-  assert.ok(interceptedRouteRequests.every(url => /\/match\/v1\/driving\//.test(url)));
-  assert.ok(interceptedRouteRequests.every(url => !/\/route\/v1\/driving\//.test(url)));
-  assert.ok(routeSnapshot.every(item => item.properties.route.provenance.providerService === 'match'));
+  assert.ok(interceptedRouteRequests.every(url => /\/route\/v1\/driving\//.test(url)));
+  assert.ok(interceptedRouteRequests.every(url => !/\/match\/v1\/driving\//.test(url)));
+  assert.ok(routeSnapshot.every(item => item.properties.route.provenance.providerService === 'route-guided'));
   assert.ok(routeSnapshot.every(item => item.properties.route.candidateGeometry?.type === 'LineString'));
   assert.ok(await page.locator('#drawingSvg .route-direction-chevron').count() > 0);
   assert.ok(await page.locator('#drawingSvg .route-direction-chevron-halo').count() > 0);
@@ -286,7 +285,7 @@ try {
   await page.evaluate(async () => {
     const api = window.__DG0_ACCEPTANCE__;
     api.clearOverlays();
-    api.setRoadRoutingProvider({ id: 'mock-detailed-road-matching', name: 'Mock detailed road map matching', endpoint: 'https://routing.test/match/v1/driving', maximumMatchLocations: 20, minimumRequestIntervalMs: 0 });
+    api.setRoadRoutingProvider({ id: 'mock-detailed-guided-routing', name: 'Mock detailed guided road routing', endpoint: 'https://routing.test/route/v1/driving', endpoints: ['https://routing.test/route/v1/driving'], maximumRouteLocations: 20, minimumRequestIntervalMs: 0 });
     const start = [-.112, 51.504], end = [-.1005, 51.5001];
     const coordinates = Array.from({ length: 60 }, (_, index) => {
       const ratio = index / 59;
@@ -297,14 +296,14 @@ try {
   const detailedRoute = await page.evaluate(() => window.__DG0_ACCEPTANCE__.snapshot().overlays[0]);
   assert.equal(detailedRoute.properties.route.status, 'snapped-review');
   assert.equal(detailedRoute.properties.route.provenance.waypointCount, 60);
-  assert.ok(detailedRoute.properties.route.provenance.matchRequestCount >= 3);
+  assert.ok(detailedRoute.properties.route.provenance.routeRequestCount >= 3);
   assert.ok(interceptedRouteRequests.length - requestsBeforeDetailedRoute >= 3);
   assert.equal(/No more than 50/i.test(await page.locator('#routeStatus').innerText()), false);
 
   await page.evaluate(async () => {
     const api = window.__DG0_ACCEPTANCE__;
     api.clearOverlays();
-    api.setRoadRoutingProvider({ id: 'mock-road-matching-failure', name: 'Mock failed road map matching', endpoint: 'https://routing-fail.test/match/v1/driving', minimumRequestIntervalMs: 0 });
+    api.setRoadRoutingProvider({ id: 'mock-guided-routing-failure', name: 'Mock failed guided road routing', endpoint: 'https://routing-fail.test/route/v1/driving', endpoints: ['https://routing-fail.test/route/v1/driving'], minimumRequestIntervalMs: 0 });
     await api.addRoughRoute({ type: 'LineString', coordinates: [[-.112, 51.504], [-.106, 51.502], [-.1005, 51.5001]] }, 'route-to-site');
   });
   assert.match(await page.locator('#routeStatus').innerText(), /ROAD SNAP FAILED — ROUTE REQUIRES MANUAL REVIEW/);

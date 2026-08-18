@@ -393,31 +393,29 @@ await test('retained overlays are isolated to appropriate drawing modes', () => 
   assert.match(localRouting, /layer-route-to-site/); assert.match(localRouting, /layer-community/); assert.doesNotMatch(localRouting, /layer-bus-route/);
 });
 
-await test('road map-matching adapter retains planner point order through a provider-neutral mocked boundary', async () => {
+await test('dense guided Route adapter retains planner point order through a provider-neutral mocked boundary', async () => {
   const rough = { type: 'LineString', coordinates: [[-0.11, 51.5], [-0.105, 51.502], [-0.1, 51.501]] };
   let requestedUrl = '';
   const fetchImpl = async url => {
     requestedUrl = url;
     const guidance = new URL(url).pathname.split('/driving/')[1].split(';').map(value => value.split(',').map(Number));
-    const coordinates = guidance.flatMap((coordinate, index) => index === guidance.length - 1 ? [coordinate] : [coordinate, [(coordinate[0] + guidance[index + 1][0]) / 2, (coordinate[1] + guidance[index + 1][1]) / 2]]);
-    return { ok: true, json: async () => ({
-      code: 'Ok',
-      tracepoints: guidance.map((coordinate, index) => ({ location: coordinate, matchings_index: 0, waypoint_index: index, alternatives_count: 0 })),
-      matchings: [{ confidence: .98, distance: 1400, duration: 180, geometry: { type: 'LineString', coordinates } }]
+    return { ok: true, status: 200, clone() { return this; }, text: async () => '', json: async () => ({
+      code: 'Ok', waypoints: guidance.map(location => ({ location })),
+      routes: [{ distance: 1400, duration: 180, geometry: { type: 'LineString', coordinates: guidance } }]
     }) };
   };
   const result = await routeSnap.snapRouteThroughGuidance(rough, {
     fetchImpl,
-    provider: { ...routeSnap.DEFAULT_ROAD_ROUTING_PROVIDER, endpoint: 'https://routing.test/match/v1/driving', minimumRequestIntervalMs: 0 },
+    provider: { ...routeSnap.DEFAULT_ROAD_ROUTING_PROVIDER, endpoint: 'https://routing.test/route/v1/driving', endpoints: ['https://routing.test/route/v1/driving'], minimumRequestIntervalMs: 0 },
     traceOptions: { maxInternalPerSegment: 0 }
   });
   assert.equal(result.status, 'snapped-review');
   assert.equal(result.provenance.providerPurpose, 'geometry-assistance-only');
-  assert.equal(result.provenance.providerService, 'match');
+  assert.equal(result.provenance.providerService, 'route-guided');
   assert.equal(result.provenance.waypointOrderPreserved, true);
-  assert.match(requestedUrl, /\/match\/v1\/driving\//);
-  assert.doesNotMatch(requestedUrl, /continue_straight|alternatives=/);
-  assert.equal(result.geometry.coordinates.length, 5);
+  assert.match(requestedUrl, /\/route\/v1\/driving\//);
+  assert.doesNotMatch(requestedUrl, /\/match\/v1\/driving\//);
+  assert.match(requestedUrl, /continue_straight=false/);
 });
 
 await test('road-snap failure preserves the planner rough geometry for manual review', async () => {

@@ -14,56 +14,40 @@ assert.equal(missing.properties.communityEvidence.footprintChoices, undefined);
 
 const localRough = { type: 'LineString', coordinates: [[-0.1000, 51.5000], [-0.0950, 51.5000], [-0.0900, 51.5000]] };
 assert.equal(guidanceToleranceMetres(localRough), 50);
-const provider = { ...DEFAULT_ROAD_ROUTING_PROVIDER, endpoint: 'https://routing.test/match/v1/driving', minimumRequestIntervalMs: 0 };
+const provider = { ...DEFAULT_ROAD_ROUTING_PROVIDER, endpoint: 'https://routing.test/route/v1/driving', endpoints: ['https://routing.test/route/v1/driving'], minimumRequestIntervalMs: 0 };
 const request = roadSnapRequestUrl(localRough, provider, { maxInternalPerSegment: 0 });
-assert.match(request, /\/match\/v1\/driving\//);
+assert.match(request, /\/route\/v1\/driving\//);
 assert.match(request, /radiuses=50;50;50/);
-assert.doesNotMatch(request, /continue_straight|alternatives=/);
-
-function responseWith(inputCoordinates, geometry) {
-  return {
-    ok: true,
-    json: async () => ({
-      code: 'Ok',
-      tracepoints: inputCoordinates.map((coordinate, index) => ({
-        location: coordinate,
-        matchings_index: 0,
-        waypoint_index: index,
-        alternatives_count: 0
-      })),
-      matchings: [{ confidence: 0.95, distance: 1500, duration: 180, geometry }]
-    })
-  };
-}
+assert.match(request, /continue_straight=false/);
+assert.doesNotMatch(request, /\/match\/v1\/driving\//);
 
 function coordinatesFromUrl(url) {
   return new URL(url).pathname.split('/driving/')[1].split(';').map(value => value.split(',').map(Number));
 }
+function responseWith(url, geometry) {
+  const guidance = coordinatesFromUrl(url);
+  return {
+    ok: true, status: 200,
+    clone() { return this; },
+    text: async () => '',
+    json: async () => ({ code: 'Ok', waypoints: guidance.map(location => ({ location })), routes: [{ distance: 1500, duration: 180, geometry }] })
+  };
+}
 
-const wrongCandidate = {
-  type: 'LineString',
-  coordinates: [[-0.1000, 51.5000], [-0.0950, 51.5040], [-0.0900, 51.5000]]
-};
+const wrongCandidate = { type: 'LineString', coordinates: [[-0.1000, 51.5000], [-0.0950, 51.5040], [-0.0900, 51.5000]] };
 const rejected = await snapRouteThroughGuidance(localRough, {
-  fetchImpl: async url => responseWith(coordinatesFromUrl(url), wrongCandidate),
-  provider,
-  traceOptions: { maxInternalPerSegment: 0 }
+  fetchImpl: async url => responseWith(url, wrongCandidate), provider, traceOptions: { maxInternalPerSegment: 0 }
 });
 assert.equal(rejected.reviewRequired, true);
 assert.deepEqual(rejected.geometry, localRough, 'unsafe provider candidate must not replace visible planner guidance');
 assert.deepEqual(rejected.candidateGeometry, wrongCandidate);
 
-const tidy = {
-  type: 'LineString',
-  coordinates: [[-0.1000, 51.5000], [-0.0950, 51.50005], [-0.0900, 51.5000]]
-};
+const tidy = { type: 'LineString', coordinates: [[-0.1000, 51.5000], [-0.0950, 51.50005], [-0.0900, 51.5000]] };
 const accepted = await snapRouteThroughGuidance(localRough, {
-  fetchImpl: async url => responseWith(coordinatesFromUrl(url), tidy),
-  provider,
-  traceOptions: { maxInternalPerSegment: 0 }
+  fetchImpl: async url => responseWith(url, tidy), provider, traceOptions: { maxInternalPerSegment: 0 }
 });
 assert.equal(accepted.reviewRequired, false);
 assert.deepEqual(accepted.geometry, tidy);
-assert.equal(accepted.provenance.providerService, 'match');
+assert.equal(accepted.provenance.providerService, 'route-guided');
 
 console.log('HF2 community containment and planner-authority routing regressions passed.');

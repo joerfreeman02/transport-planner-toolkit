@@ -40,8 +40,10 @@ jobs:
         run: node modules/drawing-generator/tests/hf2-route-community.test.mjs
       - name: HF3 routing polish regressions
         run: node modules/drawing-generator/tests/hf3-routing-polish.test.mjs
-      - name: HF4 planner-guided map-matching regressions
+      - name: HF4 planner-authority regressions
         run: node modules/drawing-generator/tests/hf4-map-matching.test.mjs
+      - name: HF4A dense guided-route regressions
+        run: node modules/drawing-generator/tests/hf4a-guided-route.test.mjs
       - name: Critical existing deterministic regressions
         run: |
           node tests/run-tests.mjs

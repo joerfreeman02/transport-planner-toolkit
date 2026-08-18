@@ -677,7 +677,7 @@ async function processRouteOverlay(id) {
     if (snapped.status === 'snap-failed') {
       return updateRouteRecord(id, {
         geometry: roughGeometry,
-        source: 'Planner-drawn guidance; road map matching failed and manual review is required',
+        source: 'Planner-drawn guidance; guided road snapping failed and manual review is required',
         route: {
           status: 'snap-failed', roughGeometry, candidateGeometry: null, snappedGeometry: null,
           directionStatus: state.site ? 'pending' : 'review-required', error: snapped.error, provenance: null
@@ -699,7 +699,7 @@ async function processRouteOverlay(id) {
         directionStatus: direction.status,
         directionNormalization: direction.normalization || direction.reason, reversedByNormalization: direction.reversed,
         provenance: snapped.provenance, error: '', approvedAt: null,
-        reviewReason: snapped.reviewRequired ? (snapped.reviewReason || 'The map-matched geometry materially departed from the planner-selected route.') : ''
+        reviewReason: snapped.reviewRequired ? (snapped.reviewReason || 'The road-snapped geometry materially departed from the planner-selected guidance.') : ''
       }
     });
   })().finally(() => routeJobs.delete(id));

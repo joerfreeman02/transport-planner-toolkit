@@ -164,3 +164,22 @@ HF4 replaces Route-service mocks/behaviour with planner-guided Match-service sem
 - `git diff --check`: **PASS**.
 
 These are local branch engineering gates only. Remote CI, Pages deployment and Product Owner real-world Local/Regional/>50-point routing acceptance remain separate and pending.
+
+# DG-0C3.3B HF4A guided-routing recovery
+
+Build/status: `DRAW-0.1.0-DG0C3.3B-HF4A-20260818`; **WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE**.
+
+## HF4A local automated verification
+
+- HF4A dense guided-route regression: **PASS**.
+- HF4 planner-authority regression under the current adapter: **PASS**.
+- HF2 protected community/routing regression: **PASS**.
+- HF3 protected routing/presentation regression: **PASS**.
+- Drawing Generator deterministic suite: **PASS**.
+- Guarded non-client live no-key OSRM Route provider smoke: **PASS**.
+- Browser smoke: **PASS**.
+- Four-mode PDF QA: **PASS; exactly 4 QA PDFs produced**.
+- Protected root/foundation/Bus/Railway/Accessibility regressions: **PASS**.
+- `git diff --check`: **PASS**.
+
+These are local branch engineering gates only. Remote CI, Pages deployment, and Product Owner live Local/Regional/>50-point routing acceptance remain separate and pending.

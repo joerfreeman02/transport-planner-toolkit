@@ -1,15 +1,18 @@
 import { assessGuidanceOrder, geometryCorridorDeviationMetres, haversineMetres, routeLengthMetres } from './route-geometry.js';
 
+const PRIMARY_ROUTE_ENDPOINT = 'https://routing.openstreetmap.de/routed-car/route/v1/driving';
+const FALLBACK_ROUTE_ENDPOINT = 'https://router.project-osrm.org/route/v1/driving';
+
 export const DEFAULT_ROAD_ROUTING_PROVIDER = Object.freeze({
-  id: 'osm-osrm-car-match',
-  name: 'OpenStreetMap road geometry via OSRM map matching',
-  endpoint: 'https://routing.openstreetmap.de/routed-car/match/v1/driving',
+  id: 'osm-osrm-car-guided-route',
+  name: 'OpenStreetMap road geometry via OSRM guided routing',
+  endpoint: PRIMARY_ROUTE_ENDPOINT,
+  endpoints: Object.freeze([PRIMARY_ROUTE_ENDPOINT, FALLBACK_ROUTE_ENDPOINT]),
   profile: 'driving',
-  attribution: 'Road geometry (c) OpenStreetMap contributors; map matched by OSRM',
+  attribution: 'Road geometry (c) OpenStreetMap contributors; routed by OSRM',
   reportIssueUrl: 'https://www.openstreetmap.org/fixthemap',
   purpose: 'geometry-assistance-only',
-  maximumMatchLocations: 40,
-  maximumMatchRequestsPerRoute: 12,
+  maximumRouteLocations: 40,
   minimumRequestIntervalMs: 1000
 });
 
@@ -18,7 +21,7 @@ function guidanceCoordinates(geometry) {
     throw new Error('At least two route-guidance points are required.');
   }
   return geometry.coordinates.map(coordinate => {
-    if (!Array.isArray(coordinate) || coordinate.length < 2 || !coordinate.every(Number.isFinite)) {
+    if (!Array.isArray(coordinate) || coordinate.length < 2 || !coordinate.slice(0, 2).every(Number.isFinite)) {
       throw new Error('Route guidance contains an invalid coordinate.');
     }
     return [Number(coordinate[0]), Number(coordinate[1])];
@@ -32,15 +35,11 @@ export function guidanceToleranceMetres(geometry) {
   return 150;
 }
 
-export function tracePreparationProfile(geometry) {
+export function guidancePreparationProfile(geometry) {
   const length = routeLengthMetres(geometry);
-  if (length <= 2500) {
-    return Object.freeze({ sampleSpacingMetres: 120, originalRadiusMetres: 50, internalRadiusMetres: 180 });
-  }
-  if (length <= 8000) {
-    return Object.freeze({ sampleSpacingMetres: 250, originalRadiusMetres: 80, internalRadiusMetres: 300 });
-  }
-  return Object.freeze({ sampleSpacingMetres: 500, originalRadiusMetres: 150, internalRadiusMetres: 500 });
+  if (length <= 2500) return Object.freeze({ sampleSpacingMetres: 35, originalRadiusMetres: 50, internalRadiusMetres: 85 });
+  if (length <= 8000) return Object.freeze({ sampleSpacingMetres: 120, originalRadiusMetres: 80, internalRadiusMetres: 160 });
+  return Object.freeze({ sampleSpacingMetres: 220, originalRadiusMetres: 150, internalRadiusMetres: 280 });
 }
 
 function interpolate(start, end, ratio) {
@@ -50,31 +49,23 @@ function interpolate(start, end, ratio) {
   ];
 }
 
-export function prepareMatchTrace(geometry, options = {}) {
+export function prepareGuidedRouteTrace(geometry, options = {}) {
   const coordinates = guidanceCoordinates(geometry);
-  const defaults = tracePreparationProfile(geometry);
+  const defaults = guidancePreparationProfile(geometry);
   const sampleSpacingMetres = Number(options.sampleSpacingMetres ?? defaults.sampleSpacingMetres);
   const originalRadiusMetres = Number(options.originalRadiusMetres ?? defaults.originalRadiusMetres);
   const internalRadiusMetres = Number(options.internalRadiusMetres ?? defaults.internalRadiusMetres);
-  const maxInternalPerSegment = Math.max(0, Math.floor(options.maxInternalPerSegment ?? 8));
+  const maxInternalPerSegment = Math.max(0, Math.floor(options.maxInternalPerSegment ?? 16));
   if (!(sampleSpacingMetres > 0) || !(originalRadiusMetres > 0) || !(internalRadiusMetres > 0)) {
-    throw new Error('Map-matching trace preparation requires positive spacing and radius values.');
+    throw new Error('Guided road snapping requires positive spacing and radius values.');
   }
 
-  const trace = [{
-    coordinate: [...coordinates[0]],
-    originalIndex: 0,
-    radiusMetres: originalRadiusMetres
-  }];
-
+  const trace = [{ coordinate: [...coordinates[0]], originalIndex: 0, radiusMetres: originalRadiusMetres }];
   for (let index = 1; index < coordinates.length; index += 1) {
     const start = coordinates[index - 1];
     const end = coordinates[index];
     const distance = haversineMetres(start, end);
-    const internalCount = Math.min(
-      maxInternalPerSegment,
-      Math.max(0, Math.ceil(distance / sampleSpacingMetres) - 1)
-    );
+    const internalCount = Math.min(maxInternalPerSegment, Math.max(0, Math.ceil(distance / sampleSpacingMetres) - 1));
     for (let step = 1; step <= internalCount; step += 1) {
       trace.push({
         coordinate: interpolate(start, end, step / (internalCount + 1)),
@@ -82,11 +73,7 @@ export function prepareMatchTrace(geometry, options = {}) {
         radiusMetres: internalRadiusMetres
       });
     }
-    trace.push({
-      coordinate: [...end],
-      originalIndex: index,
-      radiusMetres: originalRadiusMetres
-    });
+    trace.push({ coordinate: [...end], originalIndex: index, radiusMetres: originalRadiusMetres });
   }
   return trace;
 }
@@ -98,285 +85,230 @@ function previousOriginalTraceIndex(trace, fromIndex, lowerBound) {
   return null;
 }
 
-export function chunkPreparedTrace(trace, maximumLocations = DEFAULT_ROAD_ROUTING_PROVIDER.maximumMatchLocations) {
-  if (!Array.isArray(trace) || trace.length < 2) throw new Error('Prepared map-matching trace requires at least two locations.');
+export function chunkGuidedRouteTrace(trace, maximumLocations = DEFAULT_ROAD_ROUTING_PROVIDER.maximumRouteLocations) {
+  if (!Array.isArray(trace) || trace.length < 2) throw new Error('Prepared guided route requires at least two locations.');
   const maximum = Math.max(4, Math.floor(maximumLocations));
   const chunks = [];
   let startIndex = 0;
-
   while (startIndex < trace.length - 1) {
     let endIndex = Math.min(trace.length - 1, startIndex + maximum - 1);
     if (endIndex < trace.length - 1) {
       const originalBoundary = previousOriginalTraceIndex(trace, endIndex, startIndex);
       if (originalBoundary !== null) endIndex = originalBoundary;
     }
-    if (endIndex <= startIndex) throw new Error('Could not create a bounded map-matching request chunk.');
-    chunks.push({
-      startIndex,
-      endIndex,
-      items: trace.slice(startIndex, endIndex + 1)
-    });
+    if (endIndex <= startIndex) throw new Error('Could not create a bounded guided-routing request chunk.');
+    chunks.push({ startIndex, endIndex, items: trace.slice(startIndex, endIndex + 1) });
     if (endIndex === trace.length - 1) break;
-
-    // Overlap at one planner-authored point. This is a provider implementation
-    // detail only; the stored planner geometry is never shortened or rewritten.
-    startIndex = endIndex;
+    startIndex = endIndex; // one planner-authored overlap point
   }
-
   return chunks;
 }
 
-export function matchRequestUrl(traceItems, provider = DEFAULT_ROAD_ROUTING_PROVIDER) {
-  if (!Array.isArray(traceItems) || traceItems.length < 2) throw new Error('At least two map-matching locations are required.');
-  if (traceItems.length > provider.maximumMatchLocations) {
-    throw new Error('Prepared map-matching chunk exceeds the provider request limit.');
-  }
-  const coordinates = traceItems
-    .map(item => item.coordinate)
+function providerEndpoints(provider, suppliedProvider = {}) {
+  if (Array.isArray(suppliedProvider.endpoints) && suppliedProvider.endpoints.length) return suppliedProvider.endpoints;
+  if (typeof suppliedProvider.endpoint === 'string' && suppliedProvider.endpoint.trim()) return [suppliedProvider.endpoint.trim()];
+  if (Array.isArray(provider.endpoints) && provider.endpoints.length) return provider.endpoints;
+  return [provider.endpoint];
+}
+
+export function routeRequestUrl(traceItems, endpoint = DEFAULT_ROAD_ROUTING_PROVIDER.endpoint) {
+  if (!Array.isArray(traceItems) || traceItems.length < 2) throw new Error('At least two guided-routing locations are required.');
+  const coordinates = traceItems.map(item => item.coordinate)
     .map(([longitude, latitude]) => `${Number(longitude).toFixed(7)},${Number(latitude).toFixed(7)}`)
     .join(';');
   const radiuses = traceItems.map(item => Number(item.radiusMetres).toFixed(0)).join(';');
-  return `${provider.endpoint}/${coordinates}?overview=full&geometries=geojson&steps=false&gaps=split&tidy=false&generate_hints=false&radiuses=${radiuses}`;
+  return `${endpoint}/${coordinates}?overview=full&geometries=geojson&steps=false&alternatives=false&continue_straight=false&generate_hints=false&radiuses=${radiuses}`;
 }
 
-// Compatibility export retained for deterministic callers. The application
-// itself uses prepared/chunked Match requests via snapRouteThroughGuidance.
+// Compatibility export for deterministic callers. For large/dense planner traces,
+// snapRouteThroughGuidance performs the required internal chunking automatically.
 export function roadSnapRequestUrl(geometry, provider = DEFAULT_ROAD_ROUTING_PROVIDER, options = {}) {
-  const trace = prepareMatchTrace(geometry, options);
-  if (trace.length > provider.maximumMatchLocations) {
-    throw new Error('Prepared trace needs multiple map-matching requests; use snapRouteThroughGuidance.');
-  }
-  return matchRequestUrl(trace, provider);
+  const trace = prepareGuidedRouteTrace(geometry, options);
+  const maximum = Number(provider.maximumRouteLocations ?? DEFAULT_ROAD_ROUTING_PROVIDER.maximumRouteLocations);
+  if (trace.length > maximum) throw new Error('Prepared guidance requires multiple route requests; use snapRouteThroughGuidance.');
+  return routeRequestUrl(trace, provider.endpoint || DEFAULT_ROAD_ROUTING_PROVIDER.endpoint);
 }
 
-function matchingGeometry(value) {
-  return value?.geometry?.type === 'LineString' && value.geometry.coordinates?.length >= 2
-    ? value.geometry.coordinates.map(coordinate => [...coordinate])
-    : null;
-}
+const endpointQueues = new Map();
+const endpointLastStartedAt = new Map();
 
-function orientCoordinates(coordinates, firstLocation, lastLocation) {
-  if (!firstLocation || !lastLocation) return coordinates;
-  const forward = haversineMetres(coordinates[0], firstLocation)
-    + haversineMetres(coordinates.at(-1), lastLocation);
-  const reverse = haversineMetres(coordinates.at(-1), firstLocation)
-    + haversineMetres(coordinates[0], lastLocation);
-  return reverse + 0.5 < forward ? [...coordinates].reverse() : coordinates;
-}
-
-function assembleChunkMatch(data, chunk, options = {}) {
-  if (data?.code !== 'Ok') throw new Error(data?.message || `Road map matching returned ${data?.code || 'an unknown error'}.`);
-  if (!Array.isArray(data.tracepoints) || data.tracepoints.length !== chunk.items.length) {
-    throw new Error('Road map matching returned an invalid tracepoint set.');
-  }
-  if (!Array.isArray(data.matchings) || !data.matchings.length) {
-    throw new Error('Road map matching returned no usable matching geometry.');
-  }
-
-  const unmatchedOriginalIndices = [];
-  let unmatchedInternalTracepoints = 0;
-  chunk.items.forEach((item, index) => {
-    if (data.tracepoints[index]) return;
-    if (item.originalIndex === null || item.originalIndex === undefined) unmatchedInternalTracepoints += 1;
-    else unmatchedOriginalIndices.push(item.originalIndex);
-  });
-
-  const matchingGroups = new Map();
-  data.tracepoints.forEach((tracepoint, traceIndex) => {
-    if (!tracepoint || !Number.isInteger(tracepoint.matchings_index)) return;
-    const list = matchingGroups.get(tracepoint.matchings_index) || [];
-    list.push(traceIndex);
-    matchingGroups.set(tracepoint.matchings_index, list);
-  });
-  const orderedMatchingIndices = [...matchingGroups.entries()]
-    .sort((a, b) => Math.min(...a[1]) - Math.min(...b[1]))
-    .map(([matchingIndex]) => matchingIndex);
-
-  if (!orderedMatchingIndices.length) throw new Error('Road map matching returned no ordered matching geometry.');
-
-  const joinToleranceMetres = Number(options.subtraceJoinToleranceMetres ?? 5);
-  let geometryCoordinates = [];
-  const confidences = [];
-
-  orderedMatchingIndices.forEach((matchingIndex, orderIndex) => {
-    const matching = data.matchings[matchingIndex];
-    const coordinates = matchingGeometry(matching);
-    if (!coordinates) throw new Error('Road map matching returned malformed matching geometry.');
-    if (Number.isFinite(Number(matching.confidence))) confidences.push(Number(matching.confidence));
-
-    const traceIndices = matchingGroups.get(matchingIndex);
-    const firstTracepoint = data.tracepoints[Math.min(...traceIndices)]?.location;
-    const lastTracepoint = data.tracepoints[Math.max(...traceIndices)]?.location;
-    const oriented = orientCoordinates(coordinates, firstTracepoint, lastTracepoint);
-
-    if (orderIndex === 0) {
-      geometryCoordinates = oriented;
-      return;
-    }
-
-    const separation = haversineMetres(geometryCoordinates.at(-1), oriented[0]);
-    if (separation > joinToleranceMetres) {
-      throw new Error(`Road map matching split the selected trace into discontinuous sub-traces (${separation.toFixed(0)} m gap).`);
-    }
-    geometryCoordinates.push(...oriented.slice(1));
-  });
-
-  return {
-    geometry: { type: 'LineString', coordinates: geometryCoordinates },
-    tracepoints: data.tracepoints,
-    unmatchedOriginalIndices,
-    unmatchedInternalTracepoints,
-    matchingCount: orderedMatchingIndices.length,
-    minimumConfidence: confidences.length ? Math.min(...confidences) : null
-  };
-}
-
-function stitchChunkMatches(results, options = {}) {
-  if (!results.length) throw new Error('Road map matching returned no chunks.');
-  const joinToleranceMetres = Number(options.chunkJoinToleranceMetres ?? 5);
-  let coordinates = results[0].geometry.coordinates.map(coordinate => [...coordinate]);
-
-  for (let index = 1; index < results.length; index += 1) {
-    const next = results[index].geometry.coordinates;
-    const separation = haversineMetres(coordinates.at(-1), next[0]);
-    if (separation > joinToleranceMetres) {
-      throw new Error(`Road map-matching chunks could not be joined safely (${separation.toFixed(0)} m gap).`);
-    }
-    coordinates.push(...next.slice(1).map(coordinate => [...coordinate]));
-  }
-  return { type: 'LineString', coordinates };
-}
-
-
-const providerRequestQueues = new Map();
-const providerLastRequestStartedAt = new Map();
-
-async function runScheduledProviderRequest(provider, task, options = {}) {
-  const intervalMs = Math.max(0, Number(options.throttleMs ?? provider.minimumRequestIntervalMs ?? 0));
-  if (intervalMs === 0) return task();
-
-  const key = `${provider.id || 'provider'}|${provider.endpoint}`;
+async function runScheduledRequest(endpoint, intervalMs, task, options = {}) {
+  const waitInterval = Math.max(0, Number(options.throttleMs ?? intervalMs ?? 0));
+  if (waitInterval === 0) return task();
   const sleepImpl = options.sleepImpl || (milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)));
   const nowImpl = options.nowImpl || Date.now;
-  const previous = providerRequestQueues.get(key) || Promise.resolve();
-
+  const previous = endpointQueues.get(endpoint) || Promise.resolve();
   const scheduled = previous.catch(() => {}).then(async () => {
-    const previousStart = providerLastRequestStartedAt.get(key);
+    const previousStart = endpointLastStartedAt.get(endpoint);
     if (Number.isFinite(previousStart)) {
-      const waitMs = Math.max(0, intervalMs - (nowImpl() - previousStart));
+      const waitMs = Math.max(0, waitInterval - (nowImpl() - previousStart));
       if (waitMs > 0) await sleepImpl(waitMs);
     }
-    providerLastRequestStartedAt.set(key, nowImpl());
+    endpointLastStartedAt.set(endpoint, nowImpl());
     return task();
   });
-
-  providerRequestQueues.set(key, scheduled.then(() => undefined, () => undefined));
+  endpointQueues.set(endpoint, scheduled.then(() => undefined, () => undefined));
   return scheduled;
 }
 
-async function fetchMatch(url, fetchImpl, timeoutMs) {
+async function responseError(response) {
+  let detail = '';
+  try {
+    const payload = await response.clone().json();
+    detail = [payload?.code, payload?.message].filter(Boolean).join(' — ');
+  } catch {
+    try { detail = String(await response.clone().text()).trim().slice(0, 300); } catch { /* no-op */ }
+  }
+  return `HTTP ${response.status}${detail ? `: ${detail}` : ''}`;
+}
+
+async function fetchRoute(url, fetchImpl, timeoutMs) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetchImpl(url, { signal: controller.signal, headers: { Accept: 'application/json' } });
-    if (!response.ok) throw new Error(`Road map matching returned HTTP ${response.status}.`);
-    return await response.json();
+    if (!response.ok) throw new Error(await responseError(response));
+    const data = await response.json();
+    if (data?.code !== 'Ok') throw new Error([data?.code, data?.message].filter(Boolean).join(' — ') || 'OSRM routing did not return a usable route.');
+    const route = data.routes?.[0];
+    if (route?.geometry?.type !== 'LineString' || route.geometry.coordinates?.length < 2) {
+      throw new Error('OSRM routing did not return usable LineString geometry.');
+    }
+    return { data, route };
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('Road routing timed out.');
+    throw error;
   } finally {
     clearTimeout(timeout);
   }
 }
 
+function orientGeometry(geometry, start, end) {
+  const coordinates = geometry.coordinates.map(coordinate => [...coordinate]);
+  const forward = haversineMetres(coordinates[0], start) + haversineMetres(coordinates.at(-1), end);
+  const reverse = haversineMetres(coordinates.at(-1), start) + haversineMetres(coordinates[0], end);
+  return { type: 'LineString', coordinates: reverse + 0.5 < forward ? coordinates.reverse() : coordinates };
+}
+
+async function routeChunk(chunk, provider, endpoints, fetchImpl, timeoutMs, options) {
+  const failures = [];
+  for (const endpoint of endpoints) {
+    const url = routeRequestUrl(chunk.items, endpoint);
+    try {
+      const result = await runScheduledRequest(
+        endpoint,
+        provider.minimumRequestIntervalMs,
+        () => fetchRoute(url, fetchImpl, timeoutMs),
+        options
+      );
+      const start = chunk.items[0].coordinate;
+      const end = chunk.items.at(-1).coordinate;
+      return {
+        geometry: orientGeometry(result.route.geometry, start, end),
+        endpoint,
+        distanceMetres: Number(result.route.distance || 0),
+        durationSeconds: Number(result.route.duration || 0),
+        waypointCount: Array.isArray(result.data.waypoints) ? result.data.waypoints.length : null
+      };
+    } catch (error) {
+      failures.push(`${endpoint}: ${error?.message || error}`);
+    }
+  }
+  throw new Error(`All free OSRM route providers failed for one guidance chunk. ${failures.join(' | ')}`);
+}
+
+function stitchChunkRoutes(results, options = {}) {
+  if (!results.length) throw new Error('Road routing returned no route chunks.');
+  const joinToleranceMetres = Number(options.chunkJoinToleranceMetres ?? 15);
+  let coordinates = results[0].geometry.coordinates.map(coordinate => [...coordinate]);
+  for (let index = 1; index < results.length; index += 1) {
+    let next = results[index].geometry.coordinates.map(coordinate => [...coordinate]);
+    const direct = haversineMetres(coordinates.at(-1), next[0]);
+    const reversed = haversineMetres(coordinates.at(-1), next.at(-1));
+    if (reversed < direct) next = next.reverse();
+    const separation = haversineMetres(coordinates.at(-1), next[0]);
+    if (separation > joinToleranceMetres) {
+      throw new Error(`Guided-routing chunks could not be joined safely (${separation.toFixed(0)} m gap).`);
+    }
+    coordinates.push(...next.slice(1));
+  }
+  return { type: 'LineString', coordinates };
+}
+
 export async function snapRouteThroughGuidance(roughGeometry, options = {}) {
-  const provider = Object.freeze({ ...DEFAULT_ROAD_ROUTING_PROVIDER, ...(options.provider || {}) });
+  const suppliedProvider = options.provider || {};
+  const provider = Object.freeze({ ...DEFAULT_ROAD_ROUTING_PROVIDER, ...suppliedProvider });
+  const endpoints = providerEndpoints(provider, suppliedProvider);
   const fetchImpl = options.fetchImpl || globalThis.fetch;
-  const timeoutMs = options.timeoutMs ?? 20000;
+  const timeoutMs = Number(options.timeoutMs ?? 20000);
 
   try {
     const roughCoordinates = guidanceCoordinates(roughGeometry);
-    const preparedTrace = prepareMatchTrace(roughGeometry, options.traceOptions || {});
-    const chunks = chunkPreparedTrace(preparedTrace, options.maximumMatchLocations ?? provider.maximumMatchLocations);
-    const maximumRequestsPerRoute = Math.max(1, Math.floor(options.maximumMatchRequestsPerRoute ?? provider.maximumMatchRequestsPerRoute ?? 12));
-    if (chunks.length > maximumRequestsPerRoute) {
-      throw new Error(`Planner route requires ${chunks.length} map-matching requests, above the public-provider safety cap of ${maximumRequestsPerRoute}. Use a less dense trace or an approved higher-capacity provider.`);
-    }
+    const preparedTrace = prepareGuidedRouteTrace(roughGeometry, options.traceOptions || {});
+    const maximumLocations = Number(options.maximumRouteLocations ?? provider.maximumRouteLocations ?? 40);
+    const chunks = chunkGuidedRouteTrace(preparedTrace, maximumLocations);
     const chunkResults = [];
-    let unmatchedInternalTracepoints = 0;
-    let matchingCount = 0;
-    let minimumConfidence = null;
-
-    for (let index = 0; index < chunks.length; index += 1) {
-      const chunk = chunks[index];
-      const requestUrl = matchRequestUrl(chunk.items, provider);
-      const data = await runScheduledProviderRequest(
-        provider,
-        () => fetchMatch(requestUrl, fetchImpl, timeoutMs),
-        options
-      );
-      const result = assembleChunkMatch(data, chunk, options);
-      if (result.unmatchedOriginalIndices.length) {
-        throw new Error(`Road map matching could not match planner point${result.unmatchedOriginalIndices.length === 1 ? '' : 's'} ${result.unmatchedOriginalIndices.join(', ')}.`);
-      }
-      unmatchedInternalTracepoints += result.unmatchedInternalTracepoints;
-      matchingCount += result.matchingCount;
-      if (Number.isFinite(result.minimumConfidence)) {
-        minimumConfidence = minimumConfidence === null
-          ? result.minimumConfidence
-          : Math.min(minimumConfidence, result.minimumConfidence);
-      }
-      chunkResults.push(result);
+    for (const chunk of chunks) {
+      chunkResults.push(await routeChunk(chunk, provider, endpoints, fetchImpl, timeoutMs, options));
     }
 
-    const candidateGeometry = stitchChunkMatches(chunkResults, options);
-    const assessment = assessGuidanceOrder(roughCoordinates, candidateGeometry);
-    const toleranceMetres = Number(options.maximumGuidanceDeviationMetres ?? guidanceToleranceMetres(roughGeometry));
-    const endpointToleranceMetres = Number(options.endpointToleranceMetres ?? toleranceMetres);
-    const startDeviationMetres = haversineMetres(roughCoordinates[0], candidateGeometry.coordinates[0]);
-    const endDeviationMetres = haversineMetres(roughCoordinates.at(-1), candidateGeometry.coordinates.at(-1));
-    const roughLengthMetres = routeLengthMetres(roughGeometry);
-    const matchedLengthMetres = routeLengthMetres(candidateGeometry);
-    const routeLengthRatio = roughLengthMetres ? matchedLengthMetres / roughLengthMetres : Number.POSITIVE_INFINITY;
-    const corridorDiagnosticMetres = geometryCorridorDeviationMetres(candidateGeometry, roughGeometry);
+    const candidateGeometry = stitchChunkRoutes(chunkResults, options);
+    const originalAssessment = assessGuidanceOrder(roughCoordinates, candidateGeometry);
+    const preparedCoordinates = preparedTrace.map(item => item.coordinate);
+    const preparedAssessment = assessGuidanceOrder(preparedCoordinates, candidateGeometry);
+    const originalToleranceMetres = Number(options.maximumGuidanceDeviationMetres ?? guidanceToleranceMetres(roughGeometry));
+    const internalToleranceMetres = Number(options.maximumPreparedDeviationMetres
+      ?? Math.max(...preparedTrace.map(item => item.radiusMetres)) + 10);
 
     const reviewReasons = [];
-    if (!assessment.orderPreserved) reviewReasons.push('The map-matched route did not preserve planner point order.');
-    if (assessment.maxGuidanceDeviationMetres > toleranceMetres) {
-      reviewReasons.push(`A planner point matched ${assessment.maxGuidanceDeviationMetres.toFixed(0)} m away (limit ${toleranceMetres.toFixed(0)} m).`);
+    if (!originalAssessment.orderPreserved) reviewReasons.push('The road-snapped route did not preserve planner point order.');
+    if (originalAssessment.maxGuidanceDeviationMetres > originalToleranceMetres) {
+      reviewReasons.push(`A planner point snapped ${originalAssessment.maxGuidanceDeviationMetres.toFixed(0)} m away (review limit ${originalToleranceMetres.toFixed(0)} m).`);
     }
-    if (startDeviationMetres > endpointToleranceMetres || endDeviationMetres > endpointToleranceMetres) {
-      reviewReasons.push('The map-matched route endpoints departed materially from the planner-selected endpoints.');
+    if (!preparedAssessment.orderPreserved) reviewReasons.push('The road-snapped route did not preserve the internally prepared guidance order.');
+    if (preparedAssessment.maxGuidanceDeviationMetres > internalToleranceMetres) {
+      reviewReasons.push(`The road-snapped route departed materially from prepared guidance (${preparedAssessment.maxGuidanceDeviationMetres.toFixed(0)} m).`);
     }
 
+    const roughLengthMetres = routeLengthMetres(roughGeometry);
+    const snappedLengthMetres = routeLengthMetres(candidateGeometry);
+    const routeLengthRatio = roughLengthMetres ? snappedLengthMetres / roughLengthMetres : Number.POSITIVE_INFINITY;
+    const corridorDiagnosticMetres = geometryCorridorDeviationMetres(candidateGeometry, roughGeometry);
     const reviewRequired = reviewReasons.length > 0;
+
     return {
       status: 'snapped-review',
-      geometry: reviewRequired ? structuredClone(roughGeometry) : structuredClone(candidateGeometry),
+      geometry: reviewRequired ? structuredClone(roughGeometry) : candidateGeometry,
       candidateGeometry: structuredClone(candidateGeometry),
       reviewRequired,
       reviewReason: reviewReasons.join(' '),
       provenance: {
         providerId: provider.id,
         providerName: provider.name,
-        profile: provider.profile,
+        providerService: 'route-guided',
         providerPurpose: provider.purpose,
         attribution: provider.attribution,
         reportIssueUrl: provider.reportIssueUrl,
-        providerService: 'match',
+        endpointsTried: [...new Set(chunkResults.map(item => item.endpoint))],
+        primaryEndpoint: endpoints[0],
+        fallbackConfigured: endpoints.length > 1,
         waypointCount: roughCoordinates.length,
-        preparedTracePointCount: preparedTrace.length,
-        matchRequestCount: chunks.length,
-        maximumMatchLocations: provider.maximumMatchLocations,
-        maximumMatchRequestsPerRoute: maximumRequestsPerRoute,
-        waypointOrderPreserved: assessment.orderPreserved,
-        maxGuidanceDeviationMetres: assessment.maxGuidanceDeviationMetres,
-        guidanceToleranceMetres: toleranceMetres,
-        startDeviationMetres,
-        endDeviationMetres,
-        unmatchedInternalTracepoints,
-        matchingCount,
-        minimumConfidence,
+        preparedGuidanceCount: preparedTrace.length,
+        routeRequestCount: chunks.length,
+        maximumRouteLocations: maximumLocations,
+        waypointOrderPreserved: originalAssessment.orderPreserved,
+        preparedOrderPreserved: preparedAssessment.orderPreserved,
+        maxGuidanceDeviationMetres: originalAssessment.maxGuidanceDeviationMetres,
+        maxPreparedGuidanceDeviationMetres: preparedAssessment.maxGuidanceDeviationMetres,
+        guidanceToleranceMetres: originalToleranceMetres,
         maxSnappedCorridorDeviationMetres: corridorDiagnosticMetres,
+        corridorDeviationDiagnosticOnly: true,
         routeLengthRatio,
         routeLengthRatioDiagnosticOnly: true,
+        roughLengthMetres,
+        matchedLengthMetres: snappedLengthMetres,
+        distanceMetres: chunkResults.reduce((sum, item) => sum + item.distanceMetres, 0),
+        durationSeconds: chunkResults.reduce((sum, item) => sum + item.durationSeconds, 0),
         retrievedAt: new Date().toISOString()
       }
     };
@@ -385,7 +317,10 @@ export async function snapRouteThroughGuidance(roughGeometry, options = {}) {
       status: 'snap-failed',
       geometry: structuredClone(roughGeometry),
       candidateGeometry: null,
-      error: error?.name === 'AbortError' ? 'Road map matching timed out.' : String(error?.message || error)
+      reviewRequired: true,
+      reviewReason: error?.message || 'Road snapping failed.',
+      error: error?.message || 'Road snapping failed.',
+      provenance: null
     };
   }
 }

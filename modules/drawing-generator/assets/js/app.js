@@ -677,20 +677,29 @@ async function processRouteOverlay(id) {
     if (snapped.status === 'snap-failed') {
       return updateRouteRecord(id, {
         geometry: roughGeometry,
-        source: 'Planner-drawn waypoint guidance; road snap failed and manual review is required',
-        route: { status: 'snap-failed', roughGeometry, directionStatus: state.site ? 'pending' : 'review-required', error: snapped.error, provenance: null }
+        source: 'Planner-drawn guidance; road map matching failed and manual review is required',
+        route: {
+          status: 'snap-failed', roughGeometry, candidateGeometry: null, snappedGeometry: null,
+          directionStatus: state.site ? 'pending' : 'review-required', error: snapped.error, provenance: null
+        }
       });
     }
     const direction = normaliseRouteDirection(snapped.geometry, current.properties.class, state.site);
+    const candidateDirection = snapped.candidateGeometry
+      ? normaliseRouteDirection(snapped.candidateGeometry, current.properties.class, state.site)
+      : null;
     const status = direction.status !== 'confirmed' ? 'direction-review' : snapped.reviewRequired ? 'snap-review-required' : 'snapped-review';
     return updateRouteRecord(id, {
       geometry: direction.geometry,
       source: `${snapped.provenance.providerName}; geometry assistance only; planner selection and approval required`,
       route: {
-        status, roughGeometry, snappedGeometry: structuredClone(direction.geometry), directionStatus: direction.status,
+        status, roughGeometry,
+        candidateGeometry: candidateDirection ? structuredClone(candidateDirection.geometry) : null,
+        snappedGeometry: snapped.reviewRequired ? null : structuredClone(direction.geometry),
+        directionStatus: direction.status,
         directionNormalization: direction.normalization || direction.reason, reversedByNormalization: direction.reversed,
         provenance: snapped.provenance, error: '', approvedAt: null,
-        reviewReason: snapped.reviewRequired ? (snapped.reviewReason || 'The snapped geometry materially departed from the planner-selected corridor.') : ''
+        reviewReason: snapped.reviewRequired ? (snapped.reviewReason || 'The map-matched geometry materially departed from the planner-selected route.') : ''
       }
     });
   })().finally(() => routeJobs.delete(id));

@@ -143,3 +143,24 @@ Build/status: `DRAW-0.1.0-DG0C3.3A-20260817`; **WORK IN PROGRESS / LIVE REVIEW -
 - `browser-smoke.mjs`: passed with no page errors/bad local responses. A first-time-user check switches through all four modes and confirms the five normal planner steps are available without opening Advanced controls. It also verifies default colour/faded basemap appearance, source-audit visibility, routing navigation and issued-extent parity.
 - TfL cycle/bus data remains reference-only because the official Unified API requires credentials; no uncredentialed proxy or synthetic TfL route geometry was added.
 - Generated PDFs/screenshots and any real-world source payload remain untracked and excluded from commit. Protected modules and production identity remain untouched.
+
+# DG-0C3.3B HF4 map-matching corrective evidence
+
+Prepared recovery baseline: `cb927bcd712946458f6a7e3c017be696796e1b57`. Candidate build: `DRAW-0.1.0-DG0C3.3B-HF4-20260818`. Status remains **WORK IN PROGRESS / LIVE REVIEW - NOT ACCEPTED BASELINE**.
+
+Product Owner live testing of HF3 established three routing defects before HF4: a valid Local route was withheld by the 90 m straight-chord corridor rule despite preserved planner-point order and approximately 1.65 m maximum planner-point deviation; a Regional route was withheld by the 1.60 route-length-ratio rule at approximately 1.89; and the implementation contained a hard 50-planner-point input limit. Exact client route/source payloads remain outside the repository.
+
+HF4 replaces Route-service mocks/behaviour with planner-guided Match-service semantics, retains the original planner geometry, adds bounded chunking/sequential request control and converts route-length/corridor metrics to diagnostics. The new synthetic HF4 regression covers the three defect classes plus chunk failure, original/internal outliers, discontinuous sub-traces, materially wrong candidates and provider timeout.
+
+## HF4 local automated verification
+
+- `hf4-map-matching.test.mjs`: **PASS**.
+- `hf2-route-community.test.mjs`: **PASS**.
+- `hf3-routing-polish.test.mjs`: **PASS**.
+- `drawing-generator.test.mjs`: **PASS**.
+- `browser-smoke.mjs`: **PASS** against the local mocked provider/tile environment.
+- `pdf-qa.mjs`: **PASS; 4 A3 QA PDFs produced in the temporary test directory**.
+- Protected root/foundation/Bus/Railway/Accessibility CI regressions: **PASS**.
+- `git diff --check`: **PASS**.
+
+These are local branch engineering gates only. Remote CI, Pages deployment and Product Owner real-world Local/Regional/>50-point routing acceptance remain separate and pending.

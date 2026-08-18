@@ -81,7 +81,10 @@ try {
     if (mode.endsWith('-routing')) {
       const classes = await page.locator('#drawingSvg .controlled-eas-overlays > g').evaluateAll(groups => groups.map(group => group.getAttribute('class')));
       if (classes.some(value => /main-road|motorway|cycle|waterway|railway|station/.test(value || ''))) throw new Error(`${mode} retained a suppressed thematic overlay.`);
-      if (!await page.locator('#drawingSvg .route-direction-arrow').count()) throw new Error(`${mode} did not render distance-based route arrows.`);
+      if (!await page.locator('#drawingSvg .route-direction-chevron').count()) throw new Error(`${mode} did not render route-aligned direction chevrons.`);
+      if (!await page.locator('#drawingSvg .route-direction-chevron-halo').count()) throw new Error(`${mode} did not render chevron halos.`);
+      if (await page.locator('#drawingSvg .route-direction-arrow').count()) throw new Error(`${mode} still rendered obsolete route arrows.`);
+      if (await page.locator('#drawingSvg [data-cartographic-offset]').count()) throw new Error(`${mode} still rendered obsolete cartographic offsets.`);
     }
     if (await page.locator('#drawingSheet .identity img').count() !== 1) throw new Error(`${mode} did not contain exactly one issued title-block logo.`);
     if (!await page.locator('#drawingSvg .osm-attribution').count()) throw new Error(`${mode} did not render the distinct OpenStreetMap attribution.`);

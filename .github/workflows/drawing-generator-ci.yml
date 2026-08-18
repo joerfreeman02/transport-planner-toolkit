@@ -36,6 +36,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Drawing Generator deterministic tests
         run: node modules/drawing-generator/tests/drawing-generator.test.mjs
+      - name: HF2 golden-route and community regressions
+        run: node modules/drawing-generator/tests/hf2-route-community.test.mjs
       - name: Critical existing deterministic regressions
         run: |
           node tests/run-tests.mjs

@@ -498,9 +498,8 @@ await test('coincident TO and FROM arrows use opposing presentation-only offsets
   ];
   const before = structuredClone(overlays.map(item => item.geometry));
   const markup = renderDrawingSvg({ modeId: 'regional-routing', centerBng, overlays }).markup;
-  assert.match(markup, /data-cartographic-offset="-3\.2"/);
-  assert.match(markup, /data-cartographic-offset="3\.2"/);
-  assert.match(markup, /route-direction-arrow-halo/);
+  assert.doesNotMatch(markup, /data-cartographic-offset=/);
+  assert.match(markup, /route-direction-chevron-halo/);
   assert.deepEqual(overlays.map(item => item.geometry), before);
 });
 await test('site uses an external leader callout and no generic polygon-centre SITE label', () => {

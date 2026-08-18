@@ -445,7 +445,7 @@ await test('routing drawings suppress automatic thematic overlays and rendering 
   assert.match(result.markup, /layer-route-to-site/);
   assert.doesNotMatch(result.markup, /layer-(main-road|station-underground)/);
   assert.doesNotMatch(result.markup, /marker-mid=/);
-  assert.match(result.markup, /class="route-direction-arrow"/);
+  assert.match(result.markup, /class="route-direction-chevron"/);
   assert.deepEqual(route.geometry, original);
 });
 await test('Local Context preserves hierarchy with green cycles and evidence-led rail styling', () => {

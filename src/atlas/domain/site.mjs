@@ -96,6 +96,7 @@ export function createSite(input = {}) {
       sourceIdentifier: clean(input.geocodingSourceIdentifier ?? geocodingInput.sourceIdentifier) || null,
       sourceEndpoint: clean(input.geocodingSourceEndpoint ?? geocodingInput.sourceEndpoint) || null,
       query: clean(input.geocodingQuery ?? geocodingInput.query) || null,
+      strategy: clean(input.geocodingStrategy ?? geocodingInput.strategy) || null,
       latitude: geocodedPoint.latitude,
       longitude: geocodedPoint.longitude,
       retrievedAt,

@@ -4,4 +4,5 @@ await import('./source-adapter.test.mjs');
 await import('./nominatim-geocoding-adapter.test.mjs');
 await import('./tfl-bus-stop-adapter.test.mjs');
 await import('./legacy-isolation.test.mjs');
+await import('./review-environment.test.mjs');
 console.log('ATLAS Alpha.1 deterministic suite passed.');

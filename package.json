@@ -4,7 +4,12 @@
   "type": "module",
   "scripts": {
     "test:bus": "node tests/bus-foundation.test.mjs",
-    "test:browser": "node tests/bus-browser-smoke.mjs"
+    "test:browser": "node tests/bus-browser-smoke.mjs",
+    "test:atlas": "node tests/atlas/run-all.mjs",
+    "test:atlas:browser": "node tests/atlas/atlas-browser-smoke.mjs",
+    "test:atlas:live": "node tests/atlas/live/tfl-crystal-palace-smoke.mjs",
+    "test:atlas:live-browser": "node tests/atlas/live/browser-cors-smoke.mjs",
+    "test:atlas:isolation": "node tests/atlas/legacy-isolation.test.mjs"
   },
   "devDependencies": {
     "playwright": "1.58.2"

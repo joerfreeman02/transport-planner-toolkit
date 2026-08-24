@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#002060">
+  <meta name="description" content="ATLAS 2.0 data-led transport assessment foundation.">
+  <title>ATLAS 2.0 — Data-Led Foundation</title>
+  <link rel="stylesheet" href="../assets/css/eas-theme.css">
+  <link rel="stylesheet" href="assets/css/atlas-shell.css?build=ATLAS-2.0.0-alpha.1-20260824">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="app-header">
+    <div class="header-inner">
+      <a class="brand" href="#modules" aria-label="ATLAS home">
+        <img src="../assets/images/eas-white.png" alt="EAS Transport Planning">
+        <span><b>ATLAS</b><small>Authoritative data in. Deterministic assessment out.</small></span>
+      </a>
+      <nav aria-label="ATLAS sections">
+        <button type="button" data-view="report-builder">Report Builder</button>
+        <button type="button" data-view="modules" class="active">Modules</button>
+        <button type="button" data-view="projects">Projects</button>
+      </nav>
+      <div class="build" aria-label="ATLAS version and build"><b>2.0.0-alpha.1</b><span>ATLAS-2.0.0-alpha.1-20260824</span></div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="view" data-view-panel="report-builder" hidden>
+      <div class="page-heading"><p class="eyebrow">Controlled output</p><h1>Report Builder</h1><p>Planned. Future report content will consume locked, verified evidence; it will not establish transport facts.</p></div>
+      <article class="placeholder"><span class="status planned">Planned</span><h2>No report generation in Alpha.1</h2><p>This area is intentionally inactive while the evidence foundation is established.</p></article>
+    </section>
+
+    <section class="view" data-view-panel="projects" hidden>
+      <div class="page-heading"><p class="eyebrow">Reusable context</p><h1>Projects</h1><p>Planned. A project will establish its Site once for use across future ATLAS modules.</p></div>
+      <article class="placeholder"><span class="status planned">Planned</span><h2>No managed project store in Alpha.1</h2><p>The current proof of concept keeps the confirmed Site in this browser session only.</p></article>
+    </section>
+
+    <section class="view" data-view-panel="modules">
+      <div class="page-heading heading-row">
+        <div><p class="eyebrow">Data-led foundation</p><h1>Modules</h1><p>Alpha.1 proves authoritative stop retrieval without changing the legacy product.</p></div>
+        <a class="legacy-link" href="../">Open legacy Toolkit</a>
+      </div>
+
+      <section class="module-grid" aria-label="ATLAS module status">
+        <article><span class="status legacy">Legacy</span><h2>Accessibility</h2><p>Existing and proven. Migration is planned, not started.</p></article>
+        <article class="featured"><span class="status development">Data Engine development</span><h2>Bus</h2><p>Official TfL nearby-stop evidence proof of concept.</p><a href="#bus-proof">Open proof of concept</a></article>
+        <article><span class="status planned">Planned</span><h2>Rail</h2><p>Legacy Railway Assessment remains available; no migration yet.</p></article>
+        <article><span class="status legacy">Legacy</span><h2>Road Safety</h2><p>STATS19 remains in the legacy Toolkit; future integration is planned.</p></article>
+        <article><span class="status wip">WIP / legacy</span><h2>Drawings</h2><p>Drawing Generator remains a live-review candidate, not an accepted baseline.</p></article>
+      </section>
+
+      <section class="workspace" id="bus-proof" aria-labelledby="bus-title">
+        <div class="workspace-header">
+          <div><p class="eyebrow">Authoritative-data proof</p><h2 id="bus-title">Nearby TfL bus stops</h2><p>Address → confirmed Site → official TfL source → structured Evidence records.</p></div>
+          <span class="status development">Alpha.1</span>
+        </div>
+
+        <div class="steps">
+          <section class="step-card" aria-labelledby="site-step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h3 id="site-step">Find and confirm the Site</h3>
+              <p class="supporting">Address lookup is user-triggered. ATLAS never silently selects a candidate.</p>
+              <form id="addressForm" class="address-form">
+                <label for="address">Site address</label>
+                <div class="field-row"><input id="address" name="address" value="33 Westow Street, Crystal Palace, London" autocomplete="street-address"><button class="primary" type="submit">Find address</button></div>
+              </form>
+              <div id="geocodeStatus" class="callout neutral" role="status">Enter an address and choose Find address.</div>
+              <div id="candidateList" class="candidate-list" aria-live="polite"></div>
+              <div id="confirmedSite" class="confirmed-site" hidden></div>
+            </div>
+          </section>
+
+          <section class="step-card" aria-labelledby="stops-step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h3 id="stops-step">Retrieve current TfL stop evidence</h3>
+              <p class="supporting">No API key is embedded. A stale cache is never silently presented as live.</p>
+              <div class="stop-controls">
+                <label for="radius">Radius (metres)<input id="radius" type="number" min="100" max="2000" step="50" value="700"></label>
+                <button id="findStops" class="primary" type="button" disabled>Find nearby bus stops</button>
+                <button id="refreshStops" class="secondary" type="button" disabled>Refresh live TfL data</button>
+              </div>
+              <div id="stopStatus" class="callout neutral" role="status">Confirm a Site before requesting stop evidence.</div>
+            </div>
+          </section>
+        </div>
+
+        <section id="evidencePanel" class="evidence-panel" hidden aria-labelledby="evidence-heading">
+          <div class="evidence-heading"><div><p class="eyebrow">Controlled evidence table</p><h3 id="evidence-heading">Nearby bus stops</h3></div><div id="evidenceSummary"></div></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Stop</th><th>Identifier</th><th>Distance</th><th>Location</th><th>Source</th><th>Retrieved</th><th>State</th></tr></thead>
+              <tbody id="evidenceRows"></tbody>
+            </table>
+          </div>
+          <details><summary>Provenance and warnings</summary><div id="provenance"></div></details>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <footer><span>ATLAS 2.0.0-alpha.1 · Engineering development baseline</span><span>Not Product Owner accepted · No AI dependency</span></footer>
+  <script type="module" src="assets/js/app.mjs?build=ATLAS-2.0.0-alpha.1-20260824"></script>
+</body>
+</html>

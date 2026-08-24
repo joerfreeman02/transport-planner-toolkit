@@ -3,11 +3,15 @@ import { SITE_LOCATION_METHODS } from '../../../src/atlas/domain/site.mjs';
 import { createJsonCache } from '../../../src/atlas/infrastructure/cache.mjs';
 import { createNominatimGeocodingAdapter } from '../../../src/atlas/adapters/nominatim-geocoding-adapter.mjs';
 import { createTflBusStopAdapter } from '../../../src/atlas/adapters/tfl-bus-stop-adapter.mjs';
+import { createNaptanBusStopAdapter } from '../../../src/atlas/adapters/naptan-bus-stop-adapter.mjs';
+import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-discovery.mjs';
 
 const $ = id => document.getElementById(id);
-const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha2' });
+const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha3' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tfl = createTflBusStopAdapter({ cache });
+const naptan = createNaptanBusStopAdapter({ cache });
+const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: naptan });
 const selector = createSiteSelector();
 const views = ['report-builder', 'modules', 'projects', 'about'];
 const METHOD_LABELS = Object.freeze({
@@ -19,6 +23,7 @@ const METHOD_LABELS = Object.freeze({
 let confirmedSite = null;
 let map = null;
 let assessmentMarker = null;
+let busStopMarkers = [];
 
 function showView(name) {
   const selected = views.includes(name) ? name : 'modules';
@@ -49,6 +54,8 @@ function formatTime(value) {
 function plannerFailure(kind, result) {
   if (result.code === 'invalid_request') return result.message.replace(/Site/g, 'site');
   if (kind === 'address') return 'Site search is temporarily unavailable. You can still choose the assessment point on the map.';
+  if (result.code === 'coverage_not_implemented') return 'Bus-stop coverage outside Greater London is not connected in this browser yet. The confirmed point was not treated as a zero-stop result.';
+  if (result.code === 'invalid_response') return 'The authoritative bus source returned information ATLAS could not safely interpret. No result has been assumed.';
   return 'Bus information is temporarily unavailable. Please try again shortly.';
 }
 
@@ -56,8 +63,13 @@ function plannerStopWarning(warning) {
   if (/incomplete/i.test(warning)) return 'Some incomplete stop records were left out.';
   if (/duplicate/i.test(warning)) return 'Repeated stop records were counted once.';
   if (/no bus stops/i.test(warning)) return 'No bus stops were found within the selected distance.';
-  if (/dataset timestamp|dataset.*version/i.test(warning)) return 'Transport for London did not include a publication date with this result.';
+  if (/dataset timestamp|dataset.*version/i.test(warning)) return 'The source did not include a publication date with this result.';
+  if (/No zero-stop conclusion/i.test(warning)) return warning;
   return warning.replace(/TfL/g, 'Transport for London');
+}
+
+function providerLabel(result) {
+  return result?.provenance?.providerAdapter?.startsWith('naptan') ? 'Department for Transport NaPTAN' : 'Transport for London';
 }
 
 function assessmentMethod(site) {
@@ -68,11 +80,44 @@ function assessmentMethod(site) {
 function clearBusEvidence(message = 'Confirm the assessment point before checking nearby bus stops.') {
   const hadEvidence = !$('evidencePanel').hidden;
   confirmedSite = null;
+  busStopMarkers.forEach(marker => map?.removeLayer(marker));
+  busStopMarkers = [];
   $('findStops').disabled = true;
   $('refreshStops').disabled = true;
   $('evidencePanel').hidden = true;
   $('evidenceRows').replaceChildren();
   setCallout($('stopStatus'), hadEvidence ? 'The assessment point changed, so the earlier bus results were cleared. Confirm the new point before checking again.' : message, hadEvidence ? 'warning' : 'neutral');
+}
+
+function googleMapsUrl(stop) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(String(stop.latitude) + ',' + String(stop.longitude))}`;
+}
+
+function renderBusStopMarkers(stops) {
+  busStopMarkers.forEach(marker => map.removeLayer(marker));
+  busStopMarkers = [];
+  for (const stop of stops) {
+    const marker = window.L.marker([stop.latitude, stop.longitude], {
+      title: `${stop.name}${stop.indicator ? ` — ${stop.indicator}` : ''}`,
+      icon: window.L.divIcon({ className: '', html: '<div class="bus-stop-marker" aria-hidden="true"><span></span></div>', iconSize: [22, 22], iconAnchor: [11, 11], popupAnchor: [0, -10] })
+    }).addTo(map);
+    const popup = document.createElement('div');
+    popup.className = 'bus-stop-popup';
+    const name = document.createElement('strong');
+    name.textContent = stop.name;
+    const detail = document.createElement('p');
+    detail.textContent = [stop.indicator, stop.direction].filter(Boolean).join(' · ') || 'Direction not provided';
+    const services = document.createElement('p');
+    services.textContent = stop.routes?.length ? `Routes: ${stop.routes.join(', ')}` : 'Routes not available from this source check';
+    const link = document.createElement('a');
+    link.href = googleMapsUrl(stop);
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'Open in Google Maps';
+    popup.append(name, detail, services, link);
+    marker.bindPopup(popup);
+    busStopMarkers.push(marker);
+  }
 }
 
 function clearSelection() {
@@ -211,25 +256,31 @@ function renderEvidence(result) {
   for (const evidence of result.evidence) {
     const stop = evidence.value;
     const row = document.createElement('tr');
-    const cells = [[stop.name, ''], [stop.indicator || 'Not provided', ''], [`${stop.distanceMetres.toLocaleString('en-GB')} m`, 'Straight-line distance'], [stop.id, '']];
-    const labels = ['Stop', 'Direction / stop letter', 'Distance', 'Stop reference'];
+    const direction = [stop.indicator, stop.direction].filter(Boolean).join(' · ') || 'Not provided';
+    const mapLink = document.createElement('a');
+    mapLink.href = googleMapsUrl(stop); mapLink.target = '_blank'; mapLink.rel = 'noopener noreferrer'; mapLink.textContent = 'Open map';
+    const cells = [[stop.name, ''], [direction, ''], [`${stop.distanceMetres.toLocaleString('en-GB')} m`, 'Straight-line discovery distance'], [stop.routes?.length ? stop.routes.join(', ') : 'Not available', ''], [mapLink, ''], [stop.sourceId || stop.id, '']];
+    const labels = ['Stop', 'Direction / stop letter', 'Discovery distance', 'Routes serving stop', 'Google Maps', 'Source stop ID'];
     cells.forEach(([primary, secondary], index) => {
       const cell = document.createElement('td');
       cell.dataset.label = labels[index];
-      const text = document.createElement('span'); text.textContent = primary; cell.append(text);
+      if (primary instanceof Node) cell.append(primary);
+      else { const text = document.createElement('span'); text.textContent = primary; cell.append(text); }
       if (secondary) { const small = document.createElement('small'); small.textContent = secondary; cell.append(small); }
       row.append(cell);
     });
     rows.append(row);
   }
+  renderBusStopMarkers(result.data);
   const checked = formatTime(result.provenance.retrievedAt);
+  const sourceName = providerLabel(result);
   $('evidenceSummary').textContent = `${result.evidence.length} stop${result.evidence.length === 1 ? '' : 's'} found`;
-  $('resultSource').textContent = 'Transport for London';
+  $('resultSource').textContent = sourceName;
   $('resultChecked').textContent = checked;
   $('resultFreshness').textContent = `Up to date — checked ${checked}`;
   const plannerChecks = $('plannerChecks');
   plannerChecks.replaceChildren();
-  const source = document.createElement('p'); source.innerHTML = '<strong>Source:</strong> Transport for London';
+  const source = document.createElement('p'); source.innerHTML = `<strong>Source:</strong> ${sourceName}`;
   const checkedLine = document.createElement('p'); checkedLine.innerHTML = `<strong>Checked:</strong> ${checked}`;
   const status = document.createElement('p'); status.innerHTML = '<strong>Status:</strong> Up to date';
   plannerChecks.append(source, checkedLine, status);
@@ -248,7 +299,8 @@ function renderEvidence(result) {
   endpoint.append('Source endpoint: ', endpointLink);
   const request = document.createElement('p'); request.textContent = `HTTP status: ${result.provenance.httpStatus ?? 'not supplied'} · Cache status: ${result.cache.status} · Anonymous request: ${result.provenance.anonymousRequest ? 'yes' : 'no'} · Embedded API key: ${result.provenance.apiKeyEmbedded ? 'yes' : 'no'}`;
   const retrieval = document.createElement('p'); retrieval.textContent = `Exact retrieval timestamp: ${result.provenance.retrievedAt}`;
-  diagnostics.append(endpoint, request, retrieval);
+  const routing = document.createElement('p'); routing.textContent = `Provider routing: ${result.provenance.providerSelectedBy}`;
+  diagnostics.append(endpoint, request, retrieval, routing);
 }
 
 async function searchAddress(event) {
@@ -307,13 +359,15 @@ function confirmAssessmentPoint() {
 }
 
 async function loadStops(forceRefresh) {
-  setCallout($('stopStatus'), forceRefresh ? 'Checking Transport for London again…' : 'Checking Transport for London…', 'neutral');
+  setCallout($('stopStatus'), forceRefresh ? 'Checking the authoritative bus source again…' : 'Checking the authoritative bus source…', 'neutral');
   $('findStops').disabled = true;
   $('refreshStops').disabled = true;
   try {
-    const result = await tfl.nearbyStops(confirmedSite, { radius: $('radius').value, forceRefresh });
+    const result = await busStops.nearbyStops(confirmedSite, { radius: $('radius').value, forceRefresh });
     if (!result.ok) {
       $('evidencePanel').hidden = true;
+      busStopMarkers.forEach(marker => map.removeLayer(marker));
+      busStopMarkers = [];
       const stale = result.cache?.staleAvailable ? ' An earlier result is now out of date and has not been shown.' : '';
       setCallout($('stopStatus'), `${plannerFailure('bus', result)}${stale}`, 'error');
       return;

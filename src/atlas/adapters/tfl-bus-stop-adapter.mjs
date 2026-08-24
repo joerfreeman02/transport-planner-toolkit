@@ -36,7 +36,7 @@ export function createTflBusStopAdapter({
     url.searchParams.set('useStopPointHierarchy', 'false');
     url.searchParams.set('modes', 'bus');
     url.searchParams.set('categories', 'none');
-    url.searchParams.set('returnLines', 'false');
+    url.searchParams.set('returnLines', 'true');
     url.searchParams.set('lat', String(site.latitude));
     url.searchParams.set('lon', String(site.longitude));
     const endpoint = url.toString();
@@ -67,13 +67,20 @@ export function createTflBusStopAdapter({
           continue;
         }
         const distance = distanceMetres(site, { latitude, longitude });
+        const routes = [...new Set((Array.isArray(raw.lines) ? raw.lines : [])
+          .map(line => String(line?.name ?? line?.id ?? '').trim())
+          .filter(Boolean))].sort((a, b) => a.localeCompare(b, 'en-GB', { numeric: true }));
         records.set(id, {
           id,
+          naptanCode: String(raw?.naptanId ?? id).trim() || id,
           name,
           indicator: String(raw.indicator ?? raw.stopLetter ?? '').trim() || null,
+          direction: String(raw?.towards ?? '').trim() || null,
           latitude,
           longitude,
           stopType: String(raw.stopType ?? '').trim() || null,
+          sourceId: id,
+          routes,
           distanceMetres: distance
         });
       }
@@ -105,7 +112,7 @@ export function createTflBusStopAdapter({
         data: stops,
         evidence,
         warnings,
-        provenance: { ...provenance, endpoint, retrievedAt, httpStatus: response.status, resultCount: stops.length, anonymousRequest: true, apiKeyEmbedded: false }
+        provenance: { ...provenance, endpoint, retrievedAt, httpStatus: response.status, resultCount: stops.length, serviceDiscovery: 'available-from-stop-records', anonymousRequest: true, apiKeyEmbedded: false }
       });
     }});
   }

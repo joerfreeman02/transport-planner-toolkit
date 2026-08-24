@@ -17,8 +17,13 @@ await test('valid nearby stops become sorted Evidence records with provenance', 
   assert.equal(result.data.length, 2);
   assert.equal(result.evidence.length, 2);
   assert.ok(result.data[0].distanceMetres <= result.data[1].distanceMetres);
+  assert.deepEqual(result.data[0].routes, ['322', '450']);
+  assert.equal(result.data[0].direction, 'Crystal Palace');
+  assert.equal(result.data[0].sourceId, result.data[0].id);
   assert.equal(result.evidence[0].source.authoritative, true);
   assert.match(result.provenance.endpoint, /api\.tfl\.gov\.uk\/StopPoint/);
+  assert.match(result.provenance.endpoint, /returnLines=true/);
+  assert.equal(result.provenance.serviceDiscovery, 'available-from-stop-records');
 });
 await test('malformed response is rejected', async () => assert.equal((await make(async () => response({ wrong: [] })).nearbyStops(confirmed)).code, 'invalid_response'));
 await test('empty result is an explicit successful zero', async () => {

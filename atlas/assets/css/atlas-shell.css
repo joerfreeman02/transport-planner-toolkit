@@ -123,6 +123,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .assessment-point-marker { position: relative; width: 34px; height: 40px; filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .28)); }
 .assessment-point-marker::before { content: ''; position: absolute; left: 5px; top: 1px; width: 24px; height: 24px; border: 3px solid #fff; border-radius: 50% 50% 50% 0; background: var(--atlas-blue); transform: rotate(-45deg); }
 .assessment-point-marker span { position: absolute; z-index: 1; left: 14px; top: 10px; width: 7px; height: 7px; border-radius: 50%; background: var(--atlas-lime); }
+.bus-stop-marker { width: 22px; height: 22px; display: grid; place-items: center; border: 3px solid #fff; border-radius: 50%; background: #1672b8; box-shadow: 0 2px 6px rgba(0, 32, 96, .35); }
+.bus-stop-marker span { width: 6px; height: 6px; border-radius: 50%; background: #fff; }
+.bus-stop-popup { min-width: 190px; }
+.bus-stop-popup p { margin: 5px 0; }
+.bus-stop-popup a { color: var(--atlas-blue); font-weight: 800; }
 .confirmed-site { margin-top: 14px; border: 1px solid #9ccbb2; background: #f1faf5; border-radius: 8px; padding: 14px; }
 .confirmed-site > strong { color: var(--atlas-good); }
 .confirmed-site dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 9px 0 0; font-size: .84rem; }
@@ -141,7 +146,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .check-summary span { color: var(--atlas-muted); font-size: .74rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
 .check-summary strong { color: var(--atlas-blue); font-size: .88rem; }
 .table-wrap { overflow: auto; border: 1px solid var(--atlas-line); border-radius: 8px; }
-table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .84rem; }
+table { border-collapse: collapse; width: 100%; min-width: 900px; font-size: .84rem; }
 th { background: var(--atlas-blue) !important; color: #fff !important; text-align: left; padding: 10px 11px; }
 td { border-top: 1px solid var(--atlas-line); padding: 10px 11px; vertical-align: top; }
 tbody tr:nth-child(even) { background: #f8fafc; }

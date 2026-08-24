@@ -35,7 +35,7 @@ await page.route('https://api.tfl.gov.uk/**', route => {
 
 try {
   await page.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.2/);
+  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.3/);
   for (const section of ['Report Builder', 'Modules', 'Projects', 'About']) {
     await page.getByRole('button', { name: section }).click();
     assert.equal(await page.getByRole('heading', { name: section === 'About' ? 'ATLAS — Automated Transport & Location Assessment System' : section, exact: true }).isVisible(), true);
@@ -59,6 +59,9 @@ try {
   await page.getByRole('button', { name: 'Check nearby bus stops' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 10000 });
   assert.equal(await page.locator('#evidenceRows tr').count(), 2);
+  assert.equal(await page.locator('#siteMap .bus-stop-marker').count(), 2);
+  assert.equal(await page.locator('#evidenceRows a[href*="google.com/maps/search"]').count(), 2);
+  assert.match(await page.locator('#evidenceRows tr').first().innerText(), /322, 450/);
   assert.equal(tflRequests, 1);
   assert.equal(await page.locator('#resultSource').innerText(), 'Transport for London');
   assert.match(await page.locator('#resultFreshness').innerText(), /^Up to date — checked/);
@@ -101,6 +104,23 @@ try {
   assert.equal(failurePageErrors.length, 0);
   await failurePage.close();
 
+  const nonLondonPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+  const nonLondonErrors = [];
+  nonLondonPage.on('pageerror', error => nonLondonErrors.push(error.message));
+  await mockMapTiles(nonLondonPage);
+  await nonLondonPage.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await nonLondonPage.getByText('Enter coordinates instead', { exact: true }).click();
+  await nonLondonPage.getByLabel('Latitude').fill('51.686');
+  await nonLondonPage.getByLabel('Longitude').fill('-0.034');
+  await nonLondonPage.getByRole('button', { name: 'Use these coordinates' }).click();
+  await nonLondonPage.getByRole('button', { name: 'Confirm assessment point' }).click();
+  await nonLondonPage.getByRole('button', { name: 'Check nearby bus stops' }).click();
+  await nonLondonPage.getByText('Bus-stop coverage outside Greater London is not connected in this browser yet. The confirmed point was not treated as a zero-stop result.', { exact: true }).waitFor({ timeout: 10000 });
+  assert.equal(await nonLondonPage.locator('#evidencePanel').isHidden(), true);
+  assert.doesNotMatch(await nonLondonPage.locator('#stopStatus').innerText(), /^0 nearby/);
+  assert.equal(nonLondonErrors.length, 0);
+  await nonLondonPage.close();
+
   const legacyHref = await page.getByRole('link', { name: 'Open legacy Toolkit' }).getAttribute('href');
   assert.equal(new URL(legacyHref, page.url()).href, root);
   await page.goto(root, { waitUntil: 'domcontentloaded' });
@@ -117,9 +137,13 @@ try {
     mapComfortableAtDesktopAndLaptop: true,
     explicitAssessmentPointConfirmation: true,
     evidenceRows: 2,
+    busStopMarkers: 2,
+    googleMapsLinks: 2,
+    serviceDiscovery: 'TfL stop records',
     sourcesAndChecks: true,
     repeatedCheckPlainEnglish: true,
     plainFailureMessage: true,
+    nonLondonCoverageBlockerExplicit: true,
     prohibitedVisibleTerms: [],
     legacyToolkitOpened: true,
     pageErrors,

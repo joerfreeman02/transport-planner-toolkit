@@ -27,7 +27,7 @@ await page.route('https://api.tfl.gov.uk/**', route => {
 
 try {
   await page.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.2/);
+  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.3/);
   await page.getByRole('button', { name: 'Report Builder' }).click();
   assert.equal(await page.getByRole('heading', { name: 'Report Builder', exact: true }).isVisible(), true);
   await page.getByRole('button', { name: 'About' }).click();
@@ -46,13 +46,16 @@ try {
   await page.getByRole('button', { name: 'Check nearby bus stops' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 5000 });
   assert.equal(await page.locator('#evidenceRows tr').count(), 2);
+  assert.equal(await page.locator('#siteMap .bus-stop-marker').count(), 2);
+  assert.equal(await page.locator('#evidenceRows a[href*="google.com/maps/search"]').count(), 2);
+  assert.match(await page.locator('#evidenceRows tr').first().innerText(), /322, 450/);
   assert.equal(tflRequests, 1);
   assert.equal(await page.locator('#resultSource').innerText(), 'Transport for London');
   assert.match(await page.locator('#resultFreshness').innerText(), /Up to date — checked/);
   await page.getByRole('button', { name: 'Check nearby bus stops' }).click();
   assert.equal(tflRequests, 1, 'A valid cache hit should not make another TfL request.');
   assert.equal(errors.length, 0);
-  console.log(JSON.stringify({ versionVisible: true, navigation: true, aboutAndCreator: true, mapLoaded: true, explicitAssessmentPointConfirmation: true, geocodeRequests, tflRequests, evidenceRows: 2, plainEnglishFreshness: true, pageErrors: errors }, null, 2));
+  console.log(JSON.stringify({ versionVisible: true, navigation: true, aboutAndCreator: true, mapLoaded: true, explicitAssessmentPointConfirmation: true, geocodeRequests, tflRequests, evidenceRows: 2, busMarkers: 2, googleMapsLinks: 2, serviceDiscovery: true, plainEnglishFreshness: true, pageErrors: errors }, null, 2));
 } finally {
   await browser.close();
 }

@@ -6,7 +6,7 @@ const { chromium } = require('playwright');
 const root = process.env.ATLAS_REVIEW_ROOT || 'http://127.0.0.1:8769/';
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({
-  userAgent: 'ATLAS/2.0.0-alpha.2 browser live verification',
+  userAgent: 'ATLAS/2.0.0-alpha.3 browser live verification',
   viewport: { width: 1440, height: 1000 }
 });
 const page = await context.newPage();
@@ -41,6 +41,8 @@ try {
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 30000 });
   const evidenceRows = await page.locator('#evidenceRows tr').count();
   assert.ok(evidenceRows > 0, 'Live browser workflow returned no stop evidence.');
+  assert.equal(await page.locator('#siteMap .bus-stop-marker').count(), evidenceRows);
+  assert.equal(await page.locator('#evidenceRows a[href*="google.com/maps/search"]').count(), evidenceRows);
   assert.equal(await page.locator('#resultSource').innerText(), 'Transport for London');
   assert.match(await page.locator('#resultFreshness').innerText(), /^Up to date — checked/);
   assert.equal(pageErrors.length, 0, `Page errors: ${pageErrors.join('; ')}`);
@@ -53,6 +55,9 @@ try {
   console.log(JSON.stringify({
     exactPropertyCandidate: candidate,
     evidenceRows,
+    busStopMarkers: evidenceRows,
+    googleMapsLinks: evidenceRows,
+    firstRoutes: await page.locator('#evidenceRows tr').first().locator('td').nth(3).innerText(),
     sourceResponses: sourceResponses.map(response => ({ source: response.url.includes('nominatim') ? 'Nominatim' : 'TfL', status: response.status })),
     failedRequests,
     pageErrors

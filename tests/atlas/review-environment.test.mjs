@@ -19,7 +19,7 @@ try {
   assert.equal(review.reused, false);
   assert.match(review.url, /^http:\/\/127\.0\.0\.1:\d+\/atlas\/#modules$/);
   assert.equal(existsSync(stateFile), true);
-  assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).version, '2.0.0-alpha.2');
+  assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).version, '2.0.0-alpha.3');
   pass('starts on an available loopback address');
 
   const atlas = await fetch(review.url);

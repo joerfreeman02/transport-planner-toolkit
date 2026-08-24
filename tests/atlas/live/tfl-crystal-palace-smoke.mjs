@@ -5,7 +5,7 @@ import { createTflBusStopAdapter } from '../../../src/atlas/adapters/tfl-bus-sto
 
 const identifiedFetch = (url, options = {}) => fetch(url, {
   ...options,
-  headers: { ...(options.headers || {}), 'User-Agent': 'ATLAS/2.0.0-alpha.2 live verification' }
+  headers: { ...(options.headers || {}), 'User-Agent': 'ATLAS/2.0.0-alpha.3 live verification' }
 });
 const cache = createJsonCache({ storage: createMemoryStorage(), namespace: 'atlas-live' });
 const geocoder = createNominatimGeocodingAdapter({ fetchImpl: identifiedFetch, cache });
@@ -27,6 +27,6 @@ console.log(JSON.stringify({
   completedAt: new Date().toISOString(),
   address,
   site: { displayAddress: site.displayAddress, latitude: site.latitude, longitude: site.longitude, source: site.geocoding.source, sourceIdentifier: site.geocoding.sourceIdentifier, endpoint: site.geocoding.sourceEndpoint },
-  tfl: { endpoint: stops.provenance.endpoint, httpStatus: stops.provenance.httpStatus, stopCount: stops.data.length, firstStops: stops.data.slice(0, 5).map(stop => ({ id: stop.id, name: stop.name, distanceMetres: stop.distanceMetres })), anonymousRequest: stops.provenance.anonymousRequest, apiKeyEmbedded: stops.provenance.apiKeyEmbedded },
+  tfl: { endpoint: stops.provenance.endpoint, httpStatus: stops.provenance.httpStatus, stopCount: stops.data.length, serviceDiscovery: stops.provenance.serviceDiscovery, firstStops: stops.data.slice(0, 5).map(stop => ({ id: stop.id, name: stop.name, indicator: stop.indicator, direction: stop.direction, distanceMetres: stop.distanceMetres, routes: stop.routes })), anonymousRequest: stops.provenance.anonymousRequest, apiKeyEmbedded: stops.provenance.apiKeyEmbedded },
   warnings: [...geocoding.warnings, ...stops.warnings]
 }, null, 2));

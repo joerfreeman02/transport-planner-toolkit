@@ -1,6 +1,6 @@
 import { evidenceFromCache } from '../domain/evidence.mjs';
 
-export const SOURCE_FAILURE_CODES = Object.freeze(['timeout', 'http_failure', 'invalid_response', 'unavailable_source', 'invalid_request']);
+export const SOURCE_FAILURE_CODES = Object.freeze(['timeout', 'http_failure', 'invalid_response', 'unavailable_source', 'invalid_request', 'coverage_not_implemented']);
 
 export function sourceSuccess({ data, evidence = [], provenance, warnings = [], cache = { status: 'not-used' } }) {
   return Object.freeze({ ok: true, data, evidence, provenance, warnings, cache });

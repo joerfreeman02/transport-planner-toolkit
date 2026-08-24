@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const APP_ID = 'eas-atlas-review-v1';
-const APP_VERSION = '2.0.0-alpha.2';
+const APP_VERSION = '2.0.0-alpha.3';
 const STATUS_PATH = '/__atlas-review/status';
 const STOP_PATH = '/__atlas-review/stop';
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));

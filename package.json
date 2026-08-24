@@ -12,6 +12,7 @@
     "test:atlas:review-server": "node tests/atlas/review-environment.test.mjs",
     "test:atlas:review-browser": "node tests/atlas/review-environment-browser.mjs",
     "test:atlas:live": "node tests/atlas/live/tfl-crystal-palace-smoke.mjs",
+    "test:atlas:live-non-london": "node tests/atlas/live/naptan-waltham-cross-smoke.mjs",
     "test:atlas:live-millers": "node tests/atlas/live/nominatim-millers-house-smoke.mjs",
     "test:atlas:live-browser": "node tests/atlas/live/browser-cors-smoke.mjs",
     "test:atlas:isolation": "node tests/atlas/legacy-isolation.test.mjs"

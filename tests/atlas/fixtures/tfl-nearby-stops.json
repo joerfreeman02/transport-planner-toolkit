@@ -7,18 +7,22 @@
       "naptanId": "490TEST001",
       "commonName": "Fixture Westow Street",
       "indicator": "Stop H",
+      "towards": "Crystal Palace",
       "lat": 51.41784,
       "lon": -0.08217,
-      "stopType": "NaptanPublicBusCoachTram"
+      "stopType": "NaptanPublicBusCoachTram",
+      "lines": [{ "id": "450", "name": "450" }, { "id": "322", "name": "322" }, { "id": "450", "name": "450" }]
     },
     {
       "id": "490TEST002",
       "naptanId": "490TEST002",
       "commonName": "Fixture Westow Hill",
       "indicator": "Stop G",
+      "towards": "Upper Norwood",
       "lat": 51.41902,
       "lon": -0.07939,
-      "stopType": "NaptanPublicBusCoachTram"
+      "stopType": "NaptanPublicBusCoachTram",
+      "lines": [{ "id": "3", "name": "3" }, { "id": "N3", "name": "N3" }]
     }
   ]
 }

@@ -5,7 +5,7 @@ import { createTflBusStopAdapter } from '../../../src/atlas/adapters/tfl-bus-sto
 
 const identifiedFetch = (url, options = {}) => fetch(url, {
   ...options,
-  headers: { ...(options.headers || {}), 'User-Agent': 'ATLAS/2.0.0-alpha.1 live verification' }
+  headers: { ...(options.headers || {}), 'User-Agent': 'ATLAS/2.0.0-alpha.2 live verification' }
 });
 const cache = createJsonCache({ storage: createMemoryStorage(), namespace: 'atlas-live' });
 const geocoder = createNominatimGeocodingAdapter({ fetchImpl: identifiedFetch, cache });

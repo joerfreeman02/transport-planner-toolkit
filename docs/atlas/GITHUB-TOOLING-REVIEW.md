@@ -12,13 +12,13 @@ Installation milestone: already reached and configured; retain.
 
 ATLAS now has meaningful deterministic domain and adapter tests, so coverage reporting would help reveal untested branches as the new architecture grows. However, the repository does not yet have one unified coverage-instrumented command and several legacy regression expectations are stale. First define the coverage scope, exclusions, CI command and threshold policy.
 
-Installation milestone: reached for a controlled pilot proposal, not for automatic installation. Obtain approval before adding the app/action or uploading coverage.
+Installation milestone: reached for a controlled future pilot. Alpha.1 now has 33 deterministic checks and meaningful browser safeguards, so coverage reporting could add value once a single coverage command, scope and threshold policy are approved. Do not install automatically.
 
 ## OpenSSF Scorecard — readiness review reached, installation deferred
 
 Formal architecture, CI and Dependabot make a Scorecard review timely. Before installation, confirm repository visibility, workflow token permissions, branch protection and which findings can be public or actionable.
 
-Installation milestone: reached for security-owner review; not yet for unattended installation.
+Installation milestone: reached for security-owner review; not yet for unattended installation. Preserving an unmerged remote development branch improves reviewability but does not itself change the repository's production exposure or resolve branch-protection and workflow-permission questions.
 
 ## Sentry — milestone not reached
 
@@ -31,4 +31,3 @@ Installation milestone: not reached. Require a separate privacy/telemetry decisi
 Dependabot already covers both dependency ecosystems in scope. Renovate would overlap without a documented capability gap and increase automation noise.
 
 Installation milestone: not reached. Reconsider only if Dependabot cannot support an agreed update policy.
-

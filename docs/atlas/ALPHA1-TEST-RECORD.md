@@ -60,10 +60,10 @@ Command: `node tests/atlas/run-all.mjs`
 - Site: 6 passed
 - Evidence: 6 passed
 - source-adapter contract: 7 passed
-- Nominatim adapter: 5 passed
+- Nominatim adapter: 6 passed, including the country-scoped fallback for `33 Westow Street, Crystal Palace`
 - TfL adapter: 7 passed
 - legacy isolation: 1 passed, all 12 protected path groups match the baseline
-- total: 32 checks passed
+- total: 33 checks passed
 
 Normal automated tests use fixtures/mocked responses and do not depend on a public API.
 
@@ -95,3 +95,20 @@ Result: pass on 2026-08-24. Three Nominatim and one TfL responses were HTTP 200,
 
 The documented legacy failures exist at the verified pre-ATLAS commit and are isolated from the additive implementation. ATLAS deterministic, browser, live adapter and live browser/CORS verification all passed. This is an engineering-complete candidate, not Product Owner acceptance.
 
+## Day Zero closure rerun — 2026-08-24
+
+The planner-language and About amendments were verified without changing the Alpha.1 architecture.
+
+| Check | Result |
+|---|---:|
+| `node tests/atlas/run-all.mjs` | Pass; 33 checks across Site, Evidence, adapter contract, geocoding, TfL and isolation |
+| `node tests/atlas/atlas-browser-smoke.mjs` | Pass; About/creator, navigation, confirmation, evidence and plain-English freshness; zero page errors |
+| `node tests/atlas/planner-ux-browser.mjs` | Pass; complete non-technical planner substitute, software-language guard, repeat check, source failure and legacy link |
+| Desktop 1440 px | Pass; planner workflow, evidence table and Sources and checks readable |
+| Laptop 1024 px | Pass; About identity, creator, version and acknowledgements readable |
+| Mobile 390 px | Pass after correction; navigation wraps and stop evidence uses labelled cards without page overflow |
+| Live Node source smoke | Pass at `2026-08-24T10:37:07.864Z`; exact property and 31 TfL stops, HTTP 200 |
+| Live browser/CORS smoke | Pass; shortened address, three Nominatim HTTP 200 responses, one TfL HTTP 200 response, 31 rows, no failed requests or page errors |
+| `git diff --check` | Pass |
+
+The browser substitute identified the product and version, visited all four primary sections, found and confirmed the exact property, displayed stop results, opened Sources and checks, repeated the check with plain-English freshness, verified a plain failure message and opened the legacy Toolkit. No prohibited software term was visible in the normal planner view. Automated success is not equivalent to a real colleague beta test; a later Product Owner spot-check remains required.

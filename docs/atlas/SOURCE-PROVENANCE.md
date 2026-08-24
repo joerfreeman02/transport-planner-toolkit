@@ -1,4 +1,4 @@
-# Alpha.1 source and provenance design
+# Alpha.3 source and provenance design
 
 Reviewed: 2026-08-24
 
@@ -22,7 +22,7 @@ ATLAS warns that a locality qualifier was removed and does not silently choose t
 
 ## Transport source
 
-Nearby stops use the official [TfL Unified API](https://api-portal.tfl.gov.uk/) `StopPoint` GeoPoint operation documented in the [TfL Swagger definition](https://api.tfl.gov.uk/swagger/docs/v1). The request is limited to nearby public bus/coach/tram stop points and asks for no lines, routes, frequencies or timetables.
+Nearby stops use the official [TfL Unified API](https://api-portal.tfl.gov.uk/) `StopPoint` GeoPoint operation documented in the [TfL Swagger definition](https://api.tfl.gov.uk/swagger/docs/v1). The request is limited to nearby public bus/coach/tram stop points and asks TfL to return the lines recorded against each stop. It does not request frequencies or timetables.
 
 Live endpoint shape:
 
@@ -33,7 +33,7 @@ https://api.tfl.gov.uk/StopPoint
   &useStopPointHierarchy=false
   &modes=bus
   &categories=none
-  &returnLines=false
+  &returnLines=true
   &lat=51.4184213
   &lon=-0.0821281
 ```
@@ -46,7 +46,15 @@ TfL data attribution is retained in Evidence and follows TfL's [open-data inform
 
 Each stop Evidence record retains stop identifier and coordinates, source name and attribution, exact request endpoint, retrieval time, any source dataset timestamp/version, Haversine distance method, validation/confidence, warnings, and freshness/cache state.
 
-TfL did not provide a dataset timestamp/version in this response, so ATLAS records that absence as a warning. It does not fabricate one.
+TfL did not provide a dataset timestamp/version in this response, so ATLAS records that absence as a warning. It does not fabricate one. Routes are labelled only as serving the stop; Alpha.3 does not claim a service frequency, destination or operating period.
+
+## National routing and boundary source
+
+Provider choice is made from the user-confirmed assessment point and is hidden from the user. Points inside the official Greater London boundary use TfL; points outside use the NaPTAN adapter. The boundary is generated from the Greater London Authority boundary dataset, converted to British National Grid for the point-in-polygon test, simplified deterministically, and stored locally with source, licence and attribution metadata.
+
+The current official NaPTAN v1 API exposes access-node files by ATCO area, not a browser-safe geographic or bounding-box query. Those responses also do not advertise cross-origin browser access. Alpha.3 therefore defines and tests the national adapter contract and CSV parser, but deliberately returns `coverage_not_implemented` until a trusted gateway can resolve the confirmed point to authoritative ATCO-area data. That state is distinct from a genuine zero-stop result, source unavailability and malformed data.
+
+NaPTAN records retain ATCO code, NaPTAN code, common name, indicator, bearing, coordinates and source identity. Deduplication is by authoritative ATCO identity only, so opposite-direction stops with the same name remain separate.
 
 ## Cache contract
 

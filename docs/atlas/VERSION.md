@@ -1,6 +1,17 @@
 # ATLAS version and build record
 
-## Current SITE-1 development increment
+## Current BUS-1 development increment
+
+| Field | Value |
+|---|---|
+| Product line | ATLAS 2.0 |
+| Version | `2.0.0-alpha.3` |
+| Visible build | `ATLAS-2.0.0-alpha.3-20260824` |
+| Starting checkpoint | `8f8fc868ea787f8ce3175e50de1809da8d2624de` |
+| Branch | `codex/atlas-bus-1-complete` |
+| Status | BUS-1 safe engineering checkpoint; London discovery works, national discovery is explicitly blocked pending a trusted NaPTAN geographic gateway; not Product Owner accepted or merged |
+
+## SITE-1 Alpha.2 record
 
 | Field | Value |
 |---|---|
@@ -8,6 +19,7 @@
 | Version | `2.0.0-alpha.2` |
 | Visible build | `ATLAS-2.0.0-alpha.2-20260824` |
 | Starting checkpoint | `8fd8fe94a6b623819ca3e779348f00206bed39fd` |
+| Implementation commit | `8f8fc868ea787f8ce3175e50de1809da8d2624de` |
 | Branch | `codex/atlas-site-1-selector` |
 | Status | SITE-1 engineering candidate; not Product Owner accepted or merged |
 

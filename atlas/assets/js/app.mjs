@@ -157,9 +157,7 @@ function renderCandidates(result) {
     const detail = document.createElement('div');
     const address = document.createElement('p');
     address.textContent = candidate.displayAddress;
-    const meta = document.createElement('small');
-    meta.textContent = 'Possible match — not yet confirmed';
-    detail.append(address, meta);
+    detail.append(address);
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = 'Use this result';

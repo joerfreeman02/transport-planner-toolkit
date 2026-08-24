@@ -31,11 +31,14 @@ try {
   await page.getByRole('button', { name: 'Report Builder' }).click();
   assert.equal(await page.getByRole('heading', { name: 'Report Builder', exact: true }).isVisible(), true);
   await page.getByRole('button', { name: 'About' }).click();
-  assert.equal(await page.getByRole('heading', { name: 'Created by Joe Freeman' }).isVisible(), true);
+  assert.equal(await page.getByRole('heading', { name: 'ATLAS — Automated Transport & Location Assessment System' }).isVisible(), true);
+  assert.equal(await page.getByRole('heading', { name: 'Joe Freeman', exact: true }).isVisible(), true);
+  assert.equal(await page.getByAltText('Portrait of Joe Freeman').isVisible(), true);
   await page.getByRole('button', { name: 'Modules' }).click();
   assert.equal(await page.locator('#siteMap.leaflet-container').isVisible(), true);
   await page.getByRole('button', { name: 'Find site' }).click();
   await page.getByRole('button', { name: 'Use this result' }).waitFor({ timeout: 5000 });
+  assert.equal(await page.getByText('Possible match — not yet confirmed', { exact: true }).count(), 0);
   assert.equal(geocodeRequests, 3);
   assert.equal(await page.getByRole('button', { name: 'Check nearby bus stops' }).isDisabled(), true);
   await chooseFirstCandidateAndConfirm(page);

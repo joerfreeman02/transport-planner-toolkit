@@ -38,9 +38,10 @@ try {
   assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.2/);
   for (const section of ['Report Builder', 'Modules', 'Projects', 'About']) {
     await page.getByRole('button', { name: section }).click();
-    assert.equal(await page.getByRole('heading', { name: section === 'About' ? 'About ATLAS' : section, exact: true }).isVisible(), true);
+    assert.equal(await page.getByRole('heading', { name: section === 'About' ? 'ATLAS — Automated Transport & Location Assessment System' : section, exact: true }).isVisible(), true);
   }
-  assert.equal(await page.getByRole('heading', { name: 'Created by Joe Freeman' }).isVisible(), true);
+  assert.equal(await page.getByRole('heading', { name: 'Joe Freeman', exact: true }).isVisible(), true);
+  assert.equal(await page.getByAltText('Portrait of Joe Freeman').isVisible(), true);
 
   await page.getByRole('button', { name: 'Modules' }).click();
   const desktopMap = await page.locator('#siteMap').boundingBox();
@@ -49,6 +50,7 @@ try {
   await page.getByRole('button', { name: 'Find site' }).click();
   await page.getByRole('button', { name: 'Use this result' }).waitFor({ timeout: 10000 });
   assert.match(await page.locator('.candidate p').first().innerText(), /^33, Westow Street/i);
+  assert.equal(await page.getByText('Possible match — not yet confirmed', { exact: true }).count(), 0);
   assert.equal(geocodeRequests, 3);
   assert.equal(await page.getByRole('button', { name: 'Check nearby bus stops' }).isDisabled(), true);
   await chooseFirstCandidateAndConfirm(page);
@@ -75,6 +77,7 @@ try {
   if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'atlas-site-selector-laptop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true, 'Mobile page has horizontal document overflow.');
+  if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'atlas-site-selector-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   await page.getByRole('button', { name: 'Check nearby bus stops' }).click();

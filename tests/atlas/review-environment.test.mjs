@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createServer as createNetServer } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,6 +19,7 @@ try {
   assert.equal(review.reused, false);
   assert.match(review.url, /^http:\/\/127\.0\.0\.1:\d+\/atlas\/#modules$/);
   assert.equal(existsSync(stateFile), true);
+  assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).version, '2.0.0-alpha.2');
   pass('starts on an available loopback address');
 
   const atlas = await fetch(review.url);
@@ -34,6 +35,9 @@ try {
     ['/atlas/assets/css/atlas-shell.css', /^text\/css/],
     ['/atlas/assets/js/app.mjs', /^application\/javascript/],
     ['/src/atlas/domain/site.mjs', /^application\/javascript/],
+    ['/src/atlas/application/site-selector.mjs', /^application\/javascript/],
+    ['/assets/vendor/leaflet/leaflet.css', /^text\/css/],
+    ['/assets/vendor/leaflet/leaflet.js', /^application\/javascript/],
     ['/assets/css/eas-theme.css', /^text\/css/],
     ['/assets/images/eas-white.png', /^image\/png/]
   ];

@@ -6,7 +6,7 @@ const { chromium } = require('playwright');
 const root = process.env.ATLAS_REVIEW_ROOT || 'http://127.0.0.1:8769/';
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({
-  userAgent: 'ATLAS/2.0.0-alpha.1 browser live verification',
+  userAgent: 'ATLAS/2.0.0-alpha.2 browser live verification',
   viewport: { width: 1440, height: 1000 }
 });
 const page = await context.newPage();
@@ -30,12 +30,13 @@ try {
   await page.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.getByLabel('Site address').fill('33 Westow Street, Crystal Palace');
-  await page.getByRole('button', { name: 'Find address' }).click();
-  await page.getByRole('button', { name: 'Confirm this site' }).waitFor({ timeout: 30000 });
+  await page.getByLabel('Site address or name').fill('33 Westow Street, Crystal Palace');
+  await page.getByRole('button', { name: 'Find site' }).click();
+  await page.getByRole('button', { name: 'Use this result' }).waitFor({ timeout: 30000 });
   const candidate = await page.locator('.candidate p').first().innerText();
   assert.match(candidate, /^33, Westow Street/i, 'The exact property candidate was not returned.');
-  await page.getByRole('button', { name: 'Confirm this site' }).click();
+  await page.getByRole('button', { name: 'Use this result' }).click();
+  await page.getByRole('button', { name: 'Confirm assessment point' }).click();
   await page.getByRole('button', { name: 'Check nearby bus stops' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 30000 });
   const evidenceRows = await page.locator('#evidenceRows tr').count();

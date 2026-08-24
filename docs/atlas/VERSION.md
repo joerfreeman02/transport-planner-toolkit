@@ -1,5 +1,18 @@
 # ATLAS version and build record
 
+## Current SITE-1 development increment
+
+| Field | Value |
+|---|---|
+| Product line | ATLAS 2.0 |
+| Version | `2.0.0-alpha.2` |
+| Visible build | `ATLAS-2.0.0-alpha.2-20260824` |
+| Starting checkpoint | `8fd8fe94a6b623819ca3e779348f00206bed39fd` |
+| Branch | `codex/atlas-site-1-selector` |
+| Status | SITE-1 engineering candidate; not Product Owner accepted or merged |
+
+## Frozen Alpha.1 record
+
 | Field | Value |
 |---|---|
 | Product line | ATLAS 2.0 |

@@ -1,13 +1,24 @@
+import { createSiteSelector } from '../../../src/atlas/application/site-selector.mjs';
+import { SITE_LOCATION_METHODS } from '../../../src/atlas/domain/site.mjs';
 import { createJsonCache } from '../../../src/atlas/infrastructure/cache.mjs';
 import { createNominatimGeocodingAdapter } from '../../../src/atlas/adapters/nominatim-geocoding-adapter.mjs';
 import { createTflBusStopAdapter } from '../../../src/atlas/adapters/tfl-bus-stop-adapter.mjs';
 
 const $ = id => document.getElementById(id);
-const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha1' });
+const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha2' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tfl = createTflBusStopAdapter({ cache });
+const selector = createSiteSelector();
 const views = ['report-builder', 'modules', 'projects', 'about'];
+const METHOD_LABELS = Object.freeze({
+  [SITE_LOCATION_METHODS.GEOCODED_CANDIDATE]: 'From address result',
+  [SITE_LOCATION_METHODS.PLANNER_ADJUSTED]: 'Adjusted on map',
+  [SITE_LOCATION_METHODS.MAP_SELECTED]: 'Chosen on map',
+  [SITE_LOCATION_METHODS.COORDINATES_ENTERED]: 'Entered coordinates'
+});
 let confirmedSite = null;
+let map = null;
+let assessmentMarker = null;
 
 function showView(name) {
   const selected = views.includes(name) ? name : 'modules';
@@ -19,6 +30,7 @@ function showView(name) {
     else button.removeAttribute('aria-current');
   });
   if (location.hash !== `#${selected}`) history.replaceState(null, '', `#${selected}`);
+  if (selected === 'modules' && map) setTimeout(() => map.invalidateSize({ pan: false, animate: false }), 0);
 }
 
 function setCallout(element, message, state = 'neutral') {
@@ -36,7 +48,7 @@ function formatTime(value) {
 
 function plannerFailure(kind, result) {
   if (result.code === 'invalid_request') return result.message.replace(/Site/g, 'site');
-  if (kind === 'address') return 'Address search is temporarily unavailable. Please try again shortly.';
+  if (kind === 'address') return 'Site search is temporarily unavailable. You can still choose the assessment point on the map.';
   return 'Bus information is temporarily unavailable. Please try again shortly.';
 }
 
@@ -48,20 +60,97 @@ function plannerStopWarning(warning) {
   return warning.replace(/TfL/g, 'Transport for London');
 }
 
+function assessmentMethod(site) {
+  if (site?.assessmentPoint?.method === SITE_LOCATION_METHODS.GEOCODED_CANDIDATE && site.validation?.state === 'confirmed') return 'Confirmed from address';
+  return METHOD_LABELS[site?.assessmentPoint?.method] || 'Selected by planner';
+}
+
+function clearBusEvidence(message = 'Confirm the assessment point before checking nearby bus stops.') {
+  const hadEvidence = !$('evidencePanel').hidden;
+  confirmedSite = null;
+  $('findStops').disabled = true;
+  $('refreshStops').disabled = true;
+  $('evidencePanel').hidden = true;
+  $('evidenceRows').replaceChildren();
+  setCallout($('stopStatus'), hadEvidence ? 'The assessment point changed, so the earlier bus results were cleared. Confirm the new point before checking again.' : message, hadEvidence ? 'warning' : 'neutral');
+}
+
+function clearSelection() {
+  selector.reset();
+  confirmedSite = null;
+  if (assessmentMarker) {
+    map.removeLayer(assessmentMarker);
+    assessmentMarker = null;
+  }
+  $('selectedLocation').hidden = true;
+  $('confirmedSite').hidden = true;
+  $('confirmAssessmentPoint').disabled = true;
+  $('latitude').value = '';
+  $('longitude').value = '';
+  setCallout($('mapStatus'), 'Choose a possible match or click the map to place the assessment point.', 'neutral');
+  setCallout($('confirmationStatus'), 'Select an assessment point before confirming.', 'neutral');
+  clearBusEvidence();
+}
+
+function ensureMarker(latitude, longitude, centreMap = false) {
+  const leaflet = window.L;
+  if (assessmentMarker) assessmentMarker.setLatLng([latitude, longitude]);
+  else {
+    assessmentMarker = leaflet.marker([latitude, longitude], {
+      draggable: true,
+      title: 'Assessment point — drag to move',
+      icon: leaflet.divIcon({ className: '', html: '<div class="assessment-point-marker" aria-hidden="true"><span></span></div>', iconSize: [34, 42], iconAnchor: [17, 38] })
+    }).addTo(map);
+    assessmentMarker.on('dragend', () => {
+      const point = assessmentMarker.getLatLng();
+      chooseMapPoint(point.lat, point.lng, 'The marker was moved. Check the new assessment point, then confirm it.');
+    });
+  }
+  if (centreMap) map.setView([latitude, longitude], 17);
+}
+
+function renderDraftSite(site, { centreMap = false, message } = {}) {
+  ensureMarker(site.latitude, site.longitude, centreMap);
+  $('latitude').value = site.latitude.toFixed(6);
+  $('longitude').value = site.longitude.toFixed(6);
+  $('selectedIdentity').textContent = site.displayAddress || site.suppliedAddress;
+  $('selectedMethod').textContent = assessmentMethod(site);
+  $('selectedCoordinates').textContent = `${site.latitude.toFixed(6)}, ${site.longitude.toFixed(6)}`;
+  $('selectedLocation').hidden = false;
+  $('confirmedSite').hidden = true;
+  $('confirmAssessmentPoint').disabled = false;
+  setCallout($('mapStatus'), message || 'Check the marker carefully. Drag it or click the map to move it.', site.assessmentPoint.adjustedFromCandidate ? 'warning' : 'success');
+  setCallout($('confirmationStatus'), 'The assessment point has not been confirmed yet.', 'warning');
+  clearBusEvidence();
+}
+
+function mapIdentity() {
+  return $('address').value.trim() || 'Site selected on map';
+}
+
+function chooseMapPoint(latitude, longitude, message = 'Assessment point chosen on the map. Check it carefully, then confirm it.') {
+  try {
+    const site = selector.chooseOnMap({ latitude, longitude, suppliedAddress: mapIdentity(), displayAddress: mapIdentity() });
+    renderDraftSite(site, { message });
+  } catch {
+    setCallout($('mapStatus'), 'That point could not be used. Choose a valid location on the map.', 'error');
+  }
+}
+
 function renderCandidates(result) {
   const list = $('candidateList');
   list.replaceChildren();
   if (!result.data.length) {
-    setCallout($('geocodeStatus'), 'We could not find a matching UK address. Check the address and try again.', 'warning');
+    setCallout($('geocodeStatus'), "We could not find a suitable match. Your description is still recorded — choose the site on the map instead.", 'warning');
     return;
   }
-  const adjusted = result.warnings.length > 0;
+  const relaxed = Boolean(result.provenance?.relaxed);
   const message = result.data.length > 1
-    ? 'We found more than one possible location. Please choose the correct site.'
-    : adjusted
-      ? 'We adjusted the address wording to find a possible match. Check the property carefully before continuing.'
-      : 'We found one possible location. Check it carefully before continuing.';
-  setCallout($('geocodeStatus'), message, result.data.length > 1 || adjusted ? 'warning' : 'success');
+    ? 'We found more than one possible match. Choose the best result, then check the map.'
+    : relaxed
+      ? 'We found a possible match using the building or location details. Please check the map before confirming.'
+      : 'We found one possible match. Choose it, then check the map.';
+  setCallout($('geocodeStatus'), message, result.data.length > 1 || relaxed ? 'warning' : 'success');
   result.data.forEach(candidate => {
     const card = document.createElement('article');
     card.className = 'candidate';
@@ -69,50 +158,51 @@ function renderCandidates(result) {
     const address = document.createElement('p');
     address.textContent = candidate.displayAddress;
     const meta = document.createElement('small');
-    meta.textContent = 'Possible address match';
+    meta.textContent = 'Possible match — not yet confirmed';
     detail.append(address, meta);
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = 'Confirm this site';
-    button.addEventListener('click', () => confirmCandidate(candidate));
+    button.textContent = 'Use this result';
+    button.addEventListener('click', () => {
+      const site = selector.selectCandidate(candidate);
+      list.replaceChildren();
+      renderDraftSite(site, { centreMap: true, message: 'Possible match placed on the map. Check the marker and move it if the access point is elsewhere.' });
+      setCallout($('geocodeStatus'), 'Possible match selected. Now check the assessment point on the map.', 'success');
+    });
     card.append(detail, button);
     list.append(card);
   });
 }
 
-function confirmCandidate(candidate) {
-  confirmedSite = geocoder.confirm(candidate);
-  $('candidateList').replaceChildren();
-  setCallout($('geocodeStatus'), 'Site confirmed. You can now check nearby bus stops.', 'success');
+function renderConfirmedSite(site) {
   const panel = $('confirmedSite');
   panel.hidden = false;
   panel.replaceChildren();
   const strong = document.createElement('strong');
-  strong.textContent = 'Confirmed site';
+  strong.textContent = 'Confirmed assessment point';
   const address = document.createElement('p');
-  address.textContent = confirmedSite.displayAddress;
+  address.textContent = site.displayAddress || site.suppliedAddress;
   const details = document.createElement('dl');
   const rows = [
-    ['Location', `${confirmedSite.latitude.toFixed(6)}, ${confirmedSite.longitude.toFixed(6)}`],
-    ['Address source', 'OpenStreetMap'],
-    ['Checked', formatTime(confirmedSite.geocoding.retrievedAt)]
+    ['Location', assessmentMethod(site)],
+    ['Coordinates', `${site.latitude.toFixed(6)}, ${site.longitude.toFixed(6)}`],
+    ['Confirmed', formatTime(site.assessmentPoint.confirmedAt)]
   ];
   rows.forEach(([term, value]) => {
     const dt = document.createElement('dt'); dt.textContent = term;
     const dd = document.createElement('dd'); dd.textContent = value;
     details.append(dt, dd);
   });
-  const technical = document.createElement('details');
-  technical.className = 'technical-details';
-  const summary = document.createElement('summary');
-  summary.textContent = 'View address check details';
-  const diagnostic = document.createElement('p');
-  diagnostic.textContent = `Coordinate system: WGS84 · Source record: ${confirmedSite.geocoding.sourceIdentifier} · Search used: ${confirmedSite.geocoding.query}`;
-  technical.append(summary, diagnostic);
-  panel.append(strong, address, details, technical);
-  $('findStops').disabled = false;
-  $('refreshStops').disabled = false;
-  setCallout($('stopStatus'), 'Ready to check nearby bus stops.', 'neutral');
+  if (site.geocoding.source) {
+    const technical = document.createElement('details');
+    technical.className = 'technical-details';
+    const summary = document.createElement('summary');
+    summary.textContent = 'View address check details';
+    const diagnostic = document.createElement('p');
+    diagnostic.textContent = `Address source: ${site.geocoding.source}. Original address point: ${site.geocoding.latitude.toFixed(6)}, ${site.geocoding.longitude.toFixed(6)}. Source record: ${site.geocoding.sourceIdentifier}. Search used: ${site.geocoding.query}.`;
+    technical.append(summary, diagnostic);
+    panel.append(strong, address, details, technical);
+  } else panel.append(strong, address, details);
 }
 
 function renderEvidence(result) {
@@ -123,81 +213,99 @@ function renderEvidence(result) {
   for (const evidence of result.evidence) {
     const stop = evidence.value;
     const row = document.createElement('tr');
-    const cells = [
-      [stop.name, ''],
-      [stop.indicator || 'Not provided', ''],
-      [`${stop.distanceMetres.toLocaleString('en-GB')} m`, 'Straight-line distance'],
-      [stop.id, '']
-    ];
+    const cells = [[stop.name, ''], [stop.indicator || 'Not provided', ''], [`${stop.distanceMetres.toLocaleString('en-GB')} m`, 'Straight-line distance'], [stop.id, '']];
     const labels = ['Stop', 'Direction / stop letter', 'Distance', 'Stop reference'];
     cells.forEach(([primary, secondary], index) => {
       const cell = document.createElement('td');
       cell.dataset.label = labels[index];
-      const text = document.createElement('span');
-      text.textContent = primary;
-      cell.append(text);
+      const text = document.createElement('span'); text.textContent = primary; cell.append(text);
       if (secondary) { const small = document.createElement('small'); small.textContent = secondary; cell.append(small); }
       row.append(cell);
     });
     rows.append(row);
   }
-
   const checked = formatTime(result.provenance.retrievedAt);
   $('evidenceSummary').textContent = `${result.evidence.length} stop${result.evidence.length === 1 ? '' : 's'} found`;
   $('resultSource').textContent = 'Transport for London';
   $('resultChecked').textContent = checked;
   $('resultFreshness').textContent = `Up to date — checked ${checked}`;
-
   const plannerChecks = $('plannerChecks');
   plannerChecks.replaceChildren();
-  const source = document.createElement('p');
-  source.innerHTML = '<strong>Source:</strong> Transport for London';
-  const checkedLine = document.createElement('p');
-  checkedLine.innerHTML = `<strong>Checked:</strong> ${checked}`;
-  const status = document.createElement('p');
-  status.innerHTML = '<strong>Status:</strong> Up to date';
+  const source = document.createElement('p'); source.innerHTML = '<strong>Source:</strong> Transport for London';
+  const checkedLine = document.createElement('p'); checkedLine.innerHTML = `<strong>Checked:</strong> ${checked}`;
+  const status = document.createElement('p'); status.innerHTML = '<strong>Status:</strong> Up to date';
   plannerChecks.append(source, checkedLine, status);
   const plannerWarnings = [...new Set(result.warnings.map(plannerStopWarning))];
   if (plannerWarnings.length) {
-    const heading = document.createElement('strong');
-    heading.textContent = 'Points to note';
+    const heading = document.createElement('strong'); heading.textContent = 'Points to note';
     const list = document.createElement('ul');
     plannerWarnings.forEach(warning => { const item = document.createElement('li'); item.textContent = warning; list.append(item); });
     plannerChecks.append(heading, list);
   }
-
   const diagnostics = $('diagnostics');
   diagnostics.replaceChildren();
   const endpoint = document.createElement('p');
   const endpointLink = document.createElement('a');
-  endpointLink.href = result.provenance.endpoint;
-  endpointLink.target = '_blank';
-  endpointLink.rel = 'noopener noreferrer';
-  endpointLink.textContent = result.provenance.endpoint;
+  endpointLink.href = result.provenance.endpoint; endpointLink.target = '_blank'; endpointLink.rel = 'noopener noreferrer'; endpointLink.textContent = result.provenance.endpoint;
   endpoint.append('Source endpoint: ', endpointLink);
-  const request = document.createElement('p');
-  request.textContent = `HTTP status: ${result.provenance.httpStatus ?? 'not supplied'} · Cache status: ${result.cache.status} · Anonymous request: ${result.provenance.anonymousRequest ? 'yes' : 'no'} · Embedded API key: ${result.provenance.apiKeyEmbedded ? 'yes' : 'no'}`;
-  const retrieval = document.createElement('p');
-  retrieval.textContent = `Exact retrieval timestamp: ${result.provenance.retrievedAt}`;
+  const request = document.createElement('p'); request.textContent = `HTTP status: ${result.provenance.httpStatus ?? 'not supplied'} · Cache status: ${result.cache.status} · Anonymous request: ${result.provenance.anonymousRequest ? 'yes' : 'no'} · Embedded API key: ${result.provenance.apiKeyEmbedded ? 'yes' : 'no'}`;
+  const retrieval = document.createElement('p'); retrieval.textContent = `Exact retrieval timestamp: ${result.provenance.retrievedAt}`;
   diagnostics.append(endpoint, request, retrieval);
 }
 
 async function searchAddress(event) {
   event.preventDefault();
-  confirmedSite = null;
-  $('confirmedSite').hidden = true;
-  $('findStops').disabled = true;
-  $('refreshStops').disabled = true;
-  $('evidencePanel').hidden = true;
-  $('candidateList').replaceChildren();
-  setCallout($('geocodeStatus'), 'Searching for the address…', 'neutral');
-  const result = await geocoder.searchAddress($('address').value);
-  if (!result.ok) {
-    const stale = result.cache?.staleAvailable ? ' An earlier result is now out of date and has not been shown.' : '';
-    setCallout($('geocodeStatus'), `${plannerFailure('address', result)}${stale}`, 'error');
+  const query = $('address').value.trim();
+  if (!query) {
+    setCallout($('geocodeStatus'), 'Enter a site address or name before searching.', 'error');
     return;
   }
-  renderCandidates(result);
+  clearSelection();
+  $('candidateList').replaceChildren();
+  setCallout($('geocodeStatus'), 'Searching for the site…', 'neutral');
+  const submit = event.submitter;
+  if (submit) submit.disabled = true;
+  try {
+    const result = await geocoder.searchAddress(query);
+    if (!result.ok) {
+      const stale = result.cache?.staleAvailable ? ' An earlier result is now out of date and has not been shown.' : '';
+      setCallout($('geocodeStatus'), `${plannerFailure('address', result)}${stale}`, 'error');
+      return;
+    }
+    renderCandidates(result);
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+}
+
+function enterCoordinates(event) {
+  event.preventDefault();
+  try {
+    const site = selector.enterCoordinates({
+      latitude: $('latitude').value,
+      longitude: $('longitude').value,
+      suppliedAddress: mapIdentity(),
+      displayAddress: mapIdentity()
+    });
+    $('coordinateStatus').textContent = 'Coordinates applied. Check the marker on the map, then confirm the assessment point.';
+    renderDraftSite(site, { centreMap: true, message: 'Coordinates applied. Check the marker, then confirm the assessment point.' });
+  } catch {
+    $('coordinateStatus').textContent = 'Enter valid decimal coordinates. Latitude must be between -90 and 90; longitude between -180 and 180.';
+  }
+}
+
+function confirmAssessmentPoint() {
+  try {
+    confirmedSite = selector.confirm();
+    renderConfirmedSite(confirmedSite);
+    $('confirmAssessmentPoint').disabled = true;
+    $('findStops').disabled = false;
+    $('refreshStops').disabled = false;
+    setCallout($('confirmationStatus'), `${assessmentMethod(confirmedSite)}. The assessment point is confirmed.`, 'success');
+    setCallout($('stopStatus'), 'Ready to check nearby bus stops from the confirmed assessment point.', 'neutral');
+  } catch {
+    setCallout($('confirmationStatus'), 'Select a valid assessment point before confirming.', 'error');
+  }
 }
 
 async function loadStops(forceRefresh) {
@@ -221,9 +329,43 @@ async function loadStops(forceRefresh) {
   }
 }
 
+function initMap() {
+  const leaflet = window.L;
+  if (!leaflet) {
+    setCallout($('mapStatus'), 'The map could not start. Refresh the page or ask for support.', 'error');
+    return;
+  }
+  map = leaflet.map('siteMap', { zoomControl: true, preferCanvas: true }).setView([52.5, -1.5], 6);
+  const tiles = leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors',
+    crossOrigin: 'anonymous',
+    updateWhenIdle: true,
+    keepBuffer: 2
+  });
+  tiles.addTo(map);
+  leaflet.control.scale({ imperial: false }).addTo(map);
+  map.on('click', event => chooseMapPoint(event.latlng.lat, event.latlng.lng));
+  const refresh = () => requestAnimationFrame(() => map.invalidateSize({ pan: false, animate: false }));
+  if ('ResizeObserver' in window) new ResizeObserver(refresh).observe($('siteMap'));
+  window.addEventListener('resize', refresh, { passive: true });
+  setTimeout(refresh, 0);
+  setTimeout(refresh, 250);
+}
+
 document.querySelectorAll('nav [data-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
 $('addressForm').addEventListener('submit', searchAddress);
+$('chooseOnMap').addEventListener('click', () => {
+  setCallout($('mapStatus'), 'Pan or zoom if needed, then click the map to place the assessment point.', 'warning');
+  $('siteMap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  $('siteMap').focus({ preventScroll: true });
+});
+$('coordinatesForm').addEventListener('submit', enterCoordinates);
+$('confirmAssessmentPoint').addEventListener('click', confirmAssessmentPoint);
 $('findStops').addEventListener('click', () => loadStops(false));
 $('refreshStops').addEventListener('click', () => loadStops(true));
 window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
+initMap();
 showView(location.hash.slice(1));
+
+window.__ATLAS_SITE_SELECTOR__ = Object.freeze({ getSnapshot: selector.getSnapshot, getMap: () => map });

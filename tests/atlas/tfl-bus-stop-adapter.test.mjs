@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
+import { createSite, confirmSite, setAssessmentPoint } from '../../src/atlas/domain/site.mjs';
 import { createTflBusStopAdapter } from '../../src/atlas/adapters/tfl-bus-stop-adapter.mjs';
 import { createJsonCache, createMemoryStorage } from '../../src/atlas/infrastructure/cache.mjs';
 
@@ -40,6 +40,15 @@ await test('timeout remains explicit', async () => {
 await test('an unconfirmed Site is rejected before network access', async () => {
   const candidate = createSite({ ...confirmed, suppliedAddress: 'Fixture', displayAddress: 'Fixture', geocodingSource: 'Fixture', geocodingSourceIdentifier: 'fixture/1', geocodingSourceEndpoint: 'https://fixture.test', retrievedAt: '2026-08-24T10:00:00Z', validationState: 'candidate' });
   assert.equal((await make(async () => response(fixture)).nearbyStops(candidate)).code, 'invalid_request');
+});
+await test('nearby-stop query uses the final moved and confirmed assessment point', async () => {
+  const moved = confirmSite(setAssessmentPoint(confirmed, { latitude: 51.4205, longitude: -0.0795 }), { confirmedAt: '2026-08-24T10:04:00Z' });
+  let requested;
+  const result = await make(async url => { requested = new URL(url); return response(fixture); }).nearbyStops(moved);
+  assert.equal(result.ok, true);
+  assert.equal(requested.searchParams.get('lat'), '51.4205');
+  assert.equal(requested.searchParams.get('lon'), '-0.0795');
+  assert.notEqual(requested.searchParams.get('lat'), String(moved.geocoding.latitude));
 });
 
 console.log(`${passed} TfL adapter tests passed.`);

@@ -12,7 +12,9 @@ function punctuationVariant(query) {
 function conservativeVariants(query) {
   const punctuated = punctuationVariant(query);
   const parts = punctuated.split(',').map(part => part.trim()).filter(Boolean);
-  const localityReduced = parts.length >= 4 && /^\d+[a-z]?$/i.test(parts[0]) ? `${parts[0]}, ${parts[1]}, ${parts.at(-1)}` : punctuated;
+  const localityReduced = parts.length >= 3 && /^\d+[a-z]?$/i.test(parts[0])
+    ? `${parts[0]}, ${parts[1]}, ${parts.length >= 4 ? parts.at(-1) : 'UK'}`
+    : punctuated;
   return [...new Set([query, punctuated, localityReduced])];
 }
 

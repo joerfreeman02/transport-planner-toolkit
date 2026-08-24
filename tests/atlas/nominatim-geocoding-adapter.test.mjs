@@ -23,6 +23,19 @@ await test('rate-limited normalised retries resolve the approved address without
   assert.match(result.warnings.join(' '), /normalised query retry/);
   assert.match(result.warnings.join(' '), /neighbourhood qualifier/);
 });
+await test('short locality wording uses a country-scoped fallback and still requires confirmation', async () => {
+  const queries = [];
+  const adapter = createNominatimGeocodingAdapter({
+    fetchImpl: async url => { queries.push(new URL(url).searchParams.get('q')); return response(queries.length < 3 ? [] : fixture); },
+    cache: createJsonCache({ storage: createMemoryStorage() }),
+    sleep: async () => {}
+  });
+  const result = await adapter.searchAddress('33 Westow Street, Crystal Palace');
+  assert.equal(result.ok, true);
+  assert.deepEqual(queries, ['33 Westow Street, Crystal Palace', '33, Westow Street, Crystal Palace', '33, Westow Street, UK']);
+  assert.equal(result.data[0].validation.state, 'candidate');
+  assert.match(result.warnings.join(' '), /neighbourhood qualifier/);
+});
 await test('multiple candidates require explicit selection', async () => {
   const adapter = createNominatimGeocodingAdapter({ fetchImpl: async () => response([...fixture, { ...fixture[0], place_id: 2, osm_id: 3 }]), sleep: async () => {} });
   const result = await adapter.searchAddress('Westow Street');

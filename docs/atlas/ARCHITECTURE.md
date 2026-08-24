@@ -10,6 +10,12 @@ ATLAS progressively establishes transport facts through deterministic retrieval,
 
 Alpha.1 is additive. The existing Toolkit dashboard and legacy modules remain the recoverable product while ATLAS modules are introduced and accepted through controlled increments.
 
+## Permanent product-language requirement
+
+ATLAS must speak transport-planner language, not software language. Normal workflows must present the site, assessment action, professional result, source, checked time, status and relevant cautions without requiring knowledge of APIs, endpoints, schemas, adapters, caches, HTTP or other implementation details.
+
+Technical provenance remains available through progressive disclosure for audit and diagnosis. This presentation rule does not weaken the Site, Evidence, source-adapter, freshness or failure contracts described below. The formal non-technical planner usability test is defined in [UX-PRINCIPLES.md](UX-PRINCIPLES.md).
+
 ## Alpha.1 structure
 
 ```text
@@ -75,4 +81,3 @@ Report generation, frequency analysis, timetables, professional route grouping, 
 No protected legacy module file is changed by Alpha.1. The isolation test compares twelve protected path groups with baseline `551b7cbf6646e72f21842bf77b93633373a9cac2`.
 
 The Shared Library is not deleted. Its eventual role should move away from volatile Bus/Rail facts and toward stable methodology or configuration where justified. Existing functionality remains recoverable until replacements are accepted.
-

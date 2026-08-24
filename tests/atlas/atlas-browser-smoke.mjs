@@ -27,24 +27,26 @@ try {
   await page.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
   assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.1/);
   await page.getByRole('button', { name: 'Report Builder' }).click();
-  assert.equal(await page.getByRole('heading', { name: 'Report Builder' }).isVisible(), true);
+  assert.equal(await page.getByRole('heading', { name: 'Report Builder', exact: true }).isVisible(), true);
+  await page.getByRole('button', { name: 'About' }).click();
+  assert.equal(await page.getByRole('heading', { name: 'Created by Joe Freeman' }).isVisible(), true);
   await page.getByRole('button', { name: 'Modules' }).click();
   await page.getByRole('button', { name: 'Find address' }).click();
-  await page.getByRole('button', { name: 'Confirm this Site' }).waitFor({ timeout: 5000 });
+  await page.getByRole('button', { name: 'Confirm this site' }).waitFor({ timeout: 5000 });
   assert.equal(geocodeRequests, 3);
-  await page.getByRole('button', { name: 'Confirm this Site' }).click();
-  assert.equal(await page.getByText('Confirmed Site', { exact: true }).isVisible(), true);
-  await page.getByRole('button', { name: 'Find nearby bus stops' }).click();
+  await page.getByRole('button', { name: 'Confirm this site' }).click();
+  assert.equal(await page.getByText('Confirmed site', { exact: true }).isVisible(), true);
+  await page.getByRole('button', { name: 'Check nearby bus stops' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 5000 });
   assert.equal(await page.locator('#evidenceRows tr').count(), 2);
   assert.equal(tflRequests, 1);
-  assert.match(await page.locator('#evidencePanel').innerText(), /Transport for London Unified API/);
-  assert.match(await page.locator('#evidencePanel').innerText(), /Live · current/);
-  await page.getByRole('button', { name: 'Find nearby bus stops' }).click();
+  assert.equal(await page.locator('#resultSource').innerText(), 'Transport for London');
+  assert.match(await page.locator('#resultFreshness').innerText(), /Up to date — checked/);
+  await page.getByRole('button', { name: 'Check nearby bus stops' }).click();
   assert.equal(tflRequests, 1, 'A valid cache hit should not make another TfL request.');
-  assert.match(await page.locator('#evidencePanel').innerText(), /Cached · valid/);
+  assert.match(await page.locator('#resultFreshness').innerText(), /Up to date — checked/);
   assert.equal(errors.length, 0);
-  console.log(JSON.stringify({ versionVisible: true, navigation: true, explicitSiteConfirmation: true, geocodeRequests, tflRequests, evidenceRows: 2, liveAndCacheStates: true, pageErrors: errors }, null, 2));
+  console.log(JSON.stringify({ versionVisible: true, navigation: true, aboutAndCreator: true, explicitSiteConfirmation: true, geocodeRequests, tflRequests, evidenceRows: 2, plainEnglishFreshness: true, pageErrors: errors }, null, 2));
 } finally {
   await browser.close();
 }

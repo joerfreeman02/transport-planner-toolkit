@@ -1,0 +1,56 @@
+# BUS-1 authoritative bus-assessment architecture
+
+Reviewed: 2026-09-04
+
+## Source hierarchy and cost position
+
+- A confirmed assessment point inside the official Greater London boundary uses TfL StopPoint for live authoritative stop discovery and routes recorded against each stop.
+- A confirmed point outside Greater London uses the prepared national NaPTAN index for authoritative stop discovery.
+- Current scheduled-service evidence in both areas comes from the official BODS regional GTFS bulk downloads, joined by authoritative NaPTAN/ATCO stop identity.
+- Walking and cycling use separate public OSRM profiles over OpenStreetMap data, following the proven legacy Accessibility routing pattern.
+- Address search remains user-triggered Nominatim. Google Maps links are verification aids, not factual inputs.
+
+No paid source, backend, account, user key, personal BODS credential, or generative AI is required. Public BODS bulk GTFS downloads are used without authentication. Secrets must never enter the repository or browser assets.
+
+## Controlled national preparation
+
+`tools/atlas-bus-data/build_static_index.py` takes an official NaPTAN CSV and the nine BODS regional GTFS archives. It validates required files, hashes every input, selects the next representative Monday-Sunday week from the declared snapshot date, applies GTFS calendars and date exceptions, removes records not active in that week, joins services to NaPTAN identities, and emits deterministic gzip files plus a manifest.
+
+NaPTAN records with WGS84 coordinates are retained directly. Current bus records that contain British National Grid coordinates but omit longitude/latitude are converted deterministically from EPSG:27700/OSGB36 to WGS84 using the published Helmert transformation. The per-stop conversion method remains recorded. Stops are divided into 0.25-degree cells; services are divided by the first five characters of the authoritative stop ID and region. The browser loads only intersecting stop cells and service prefixes. Raw CSV/ZIP inputs are build inputs and are not committed.
+
+The manifest records source URLs, hashes, preparation time, representative dates, region/feed validity, record counts, sharding rules and an eight-day refresh threshold. Formal assessments should rebuild from current official downloads when the warning threshold is exceeded. The generation command is `npm run build:atlas:bus-data` after placing the documented raw inputs in `tmp/bus-data`.
+
+## Stops, direction and grouping
+
+Candidate discovery uses haversine distance only to decide which authoritative stops fall inside the selected radius. It is always described as straight-line discovery distance and is never presented as walking or cycling distance. Deduplication and presentation use authoritative stop IDs, never names. Same-name and opposite-direction records therefore remain separate, traceable and reversible. Indicator and bearing are retained where supplied.
+
+## Timetables and deterministic summaries
+
+Every prepared service retains route number, operator where supplied, direction, origin, destination, calling pattern, principal locations, per-stop scheduled departures for each represented day, validity, source identifiers, circular status and material qualifications. Short workings and route variants remain separate source records. Summary grouping combines only records with the same route, operator, origin and destination; variants remain listed in technical provenance and trigger a qualification where material.
+
+Operating periods use the earliest and latest scheduled departure at the selected stops for each day. Times beyond 24:00 remain ordered and render as after-midnight clock times, with an overnight note. Missing days say `No scheduled service`; missing timetable evidence is not inferred.
+
+Principal locations come only from the actual calling pattern. The deterministic rule first selects intermediate named stations, interchanges, town/city centres, hospitals, airports, universities and shopping centres; then locality transitions; then quarter/mid/three-quarter calls when needed. Endpoints are not repeated and a maximum of seven locations is used.
+
+Material qualifications generate one conditional full-width `Service note:` row. This includes school-day/date exceptions, weekday-only or limited operation, no weekend service, circular patterns, overnight journeys, route variants, or missing operator/timetable information. Normal services do not receive empty note rows.
+
+Frequency capability filters scheduled departures within caller-supplied `startMinute` and `endMinute`, then calculates buses per hour and approximate headway. There is deliberately no default window until Technical Director/Product Owner approval. Output says `buses per hour`; `tph` and invented `bph` terminology are prohibited. Frequency is not a column in the canonical Bus Service Summary.
+
+## Routed access, map and output
+
+The same confirmed assessment point is the origin for walking and cycling. Each mode uses its own OSRM table request, in batches of at most 40 stops. Failure produces an unavailable result and a plain-English retry message; straight-line distance is never substituted. A planner may request a route line on the map for inspection without changing the assessment evidence.
+
+The site marker remains dominant and stop markers subordinate. Popups show stop/direction, routes, routed access, route-line controls and Google Maps verification.
+
+The canonical Bus Stop Summary columns are Stop name; Direction; Walking distance / time; Cycling distance / time; Routes serving stop. The canonical Bus Service Summary columns are Route; Operator; Origin / destination; Principal locations; Operating period. These follow the supplied Plaistow Transport Assessment as an output precedent only; no Plaistow fact is embedded in production logic.
+
+Controlled prose uses only verified route numbers and principal locations. It does not claim excellence, sustainability, frequency or quality. Normal UI messages follow the Pat test: what happened and what to do next are plain English; source mechanics remain under optional technical details.
+
+## Failure and limitation contract
+
+Genuine zero stops, source unavailability, malformed prepared data, missing timetable coverage, partial routing and complete results are distinct. TfL stop responses do not provide a dataset publication time, so that remains a visible caution. Public Nominatim, TfL and OSRM services have no contractual uptime; failures remain non-destructive. The prepared timetable describes the declared representative week and must be refreshed and date-checked for formal work, particularly where GTFS date exceptions are present.
+
+Legacy access remains visible and the 12 protected legacy path groups are byte-for-byte checked against baseline `551b7cbf6646e72f21842bf77b93633373a9cac2`.
+## Alpha.6 BODS-primary and TNDS-supplement architecture
+
+NaPTAN remains authoritative for physical stops. BODS is the primary timetable source and TNDS v2.5 supplements genuinely missing patterns; deterministic fingerprints suppress equivalent duplicates while retaining source provenance. Nearest mode selects the nearest currently served logical group using routed walking access, never straight-line distance. Physical stops without current service remain explicit rather than being presented as active service. The Windows maintenance updater prompts for FTP credentials at runtime, keeps raw archives outside Git, validates staged output, and preserves the previous prepared dataset for rollback. Browser automation remains subject to the known process-launch limitation.

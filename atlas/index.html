@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#002060">
+  <meta name="description" content="ATLAS helps transport planners establish development-site assessment points and check trusted transport information.">
+  <title>ATLAS — Transport and Location Assessment</title>
+  <link rel="stylesheet" href="../assets/css/eas-theme.css">
+  <link rel="stylesheet" href="../assets/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="assets/css/atlas-shell.css?build=ATLAS-2.0.0-alpha.6-20260904">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="app-header">
+    <div class="header-inner">
+      <a class="brand" href="#modules" aria-label="ATLAS home">
+        <img src="../assets/images/eas-white.png" alt="EAS Transport Planning">
+        <span><b>ATLAS</b><small>Trusted transport information for development sites.</small></span>
+      </a>
+      <nav aria-label="ATLAS sections">
+        <button type="button" data-view="report-builder">Report Builder</button>
+        <button type="button" data-view="modules" class="active">Modules</button>
+        <button type="button" data-view="projects">Projects</button>
+        <button type="button" data-view="about">About</button>
+      </nav>
+      <div class="build" aria-label="ATLAS version and build"><b>2.0.0-alpha.6</b><span>ATLAS-2.0.0-alpha.6-20260904</span></div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="view" data-view-panel="report-builder" hidden>
+      <div class="page-heading"><p class="eyebrow">Future assessment output</p><h1>Report Builder</h1><p>This planned section will help prepare consistent transport assessment outputs from checked project information.</p></div>
+      <article class="placeholder"><span class="status planned">Planned</span><h2>Report Builder is not available yet</h2><p>It will be added in a future development stage. Bus tables and wording can be reviewed in the Bus assessment workspace.</p></article>
+    </section>
+
+    <section class="view" data-view-panel="projects" hidden>
+      <div class="page-heading"><p class="eyebrow">Future project workspace</p><h1>Projects</h1><p>This planned section will save a development site's details for use across ATLAS assessments.</p></div>
+      <article class="placeholder"><span class="status planned">Planned</span><h2>Project saving is not available yet</h2><p>For Alpha.4, a confirmed site is kept only while this page is open.</p></article>
+    </section>
+
+    <section class="view" data-view-panel="about" hidden>
+      <div class="page-heading"><p class="eyebrow">About ATLAS</p><h1>ATLAS — Automated Transport &amp; Location Assessment System</h1><p>ATLAS is EAS's internal transport-planning platform for faster, more consistent site assessment and research.</p></div>
+      <div class="about-grid">
+        <article class="about-card product-identity">
+          <span class="status development">In development</span>
+          <h2>Authoritative research, controlled workflow</h2>
+          <p>ATLAS brings authoritative transport sources and controlled, repeatable calculations into one practical assessment workflow. It reduces repetitive research and makes the evidence behind each result easier to review.</p>
+          <p>ATLAS supports professional work; the transport planner checks the evidence, resolves uncertainty and retains responsibility for judgement.</p>
+        </article>
+        <article class="about-card forge-card">
+          <p class="eyebrow">EAS FORGE</p>
+          <h2>Built through EAS's internal R&amp;D programme</h2>
+          <p><strong>Framework for Operational Research, Governance &amp; Engineering</strong></p>
+          <p>EAS FORGE develops focused consultancy software that makes established workflows faster and more consistent while keeping professional judgement with EAS staff.</p>
+        </article>
+        <article class="about-card creator-card">
+          <img src="assets/images/joe-freeman.png" alt="Portrait of Joe Freeman">
+          <div>
+            <p class="eyebrow">Creator</p>
+            <h2>Joe Freeman</h2>
+            <p class="creator-role">Graduate Transport Planner · Creator of ATLAS &amp; EAS FORGE</p>
+            <p>Joe Freeman is a Graduate Transport Planner at EAS and the creator of the EAS FORGE internal software programme. Alongside transport planning work, he develops practical internal tools with management and end users, turning recurring consultancy research into controlled, tested software.</p>
+            <strong>Created by Joe Freeman · EAS FORGE</strong>
+          </div>
+        </article>
+        <article class="about-card"><p class="eyebrow">Current status</p><h2>Alpha.6 Bus Assessment</h2><dl><dt>Version</dt><dd>2.0.0-alpha.6</dd><dt>Build</dt><dd>ATLAS-2.0.0-alpha.6-20260904</dd><dt>Status</dt><dd>Product Owner acceptance candidate</dd></dl></article>
+        <article class="about-card"><p class="eyebrow">Data acknowledgements</p><h2>Trusted sources used today</h2><p>Address search, maps and access routing use OpenStreetMap data. London stop discovery is provided by Transport for London. National stops use Department for Transport NaPTAN; timetables use the Department for Transport Bus Open Data Service. Official GLA boundary data selects the stop source.</p><p class="acknowledgement">© OpenStreetMap contributors · Routed by OSRM · Data provided by Transport for London · NaPTAN and BODS © Department for Transport · Contains National Statistics and Ordnance Survey data © Crown copyright and database right 2015</p></article>
+      </div>
+    </section>
+
+    <section class="view" data-view-panel="modules">
+      <div class="page-heading heading-row">
+        <div><p class="eyebrow">Assessment tools</p><h1>Modules</h1><p>Establish the shared site assessment point, then use the available development workflow.</p></div>
+        <a class="legacy-link" href="../">Open legacy Toolkit</a>
+      </div>
+
+      <section class="module-grid" aria-label="ATLAS module status">
+        <article><span class="status legacy">Existing Toolkit</span><h2>Accessibility</h2><p>Available in the existing Toolkit. Moving it into ATLAS is planned, not started.</p></article>
+        <article class="featured"><span class="status development">In development</span><h2>Bus</h2><p>Check authoritative nearby bus stops and available routes from the confirmed assessment point.</p><a href="#site-workspace">Establish the site</a></article>
+        <article><span class="status planned">Planned</span><h2>Rail</h2><p>The existing Railway Assessment remains available. Moving it into ATLAS has not started.</p></article>
+        <article><span class="status legacy">Existing Toolkit</span><h2>Road Safety</h2><p>The existing STATS19 tool remains available. Future ATLAS integration is planned.</p></article>
+        <article><span class="status wip">Under review</span><h2>Drawings</h2><p>The existing Drawing Generator is still being reviewed and is not approved for normal use.</p></article>
+      </section>
+
+      <section class="workspace" id="site-workspace" aria-labelledby="site-selector-title">
+        <div class="workspace-header">
+          <div><p class="eyebrow">Shared ATLAS site</p><h2 id="site-selector-title">Establish the assessment point</h2><p>Identify the development, check its access on the map, then confirm the exact point ATLAS should use.</p></div>
+          <span class="status development">Alpha.6 demo candidate</span>
+        </div>
+
+        <div class="steps">
+          <section class="step-card" aria-labelledby="find-site-step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h3 id="find-site-step">Find the site</h3>
+              <p class="supporting">Search using an address, postcode, building name or site description. ATLAS will not choose a result for you.</p>
+              <form id="addressForm" class="address-form">
+                <label for="address">Site address or name</label>
+                <div class="field-row"><input id="address" name="address" value="33 Westow Street, Crystal Palace, London" autocomplete="street-address"><button class="primary" type="submit">Find site</button></div>
+              </form>
+              <div id="geocodeStatus" class="callout neutral" role="status">Enter the site address or name and choose Find site.</div>
+              <div id="candidateList" class="candidate-list" aria-live="polite"></div>
+              <button id="chooseOnMap" class="map-fallback" type="button">Can't find the site? Choose it on the map</button>
+            </div>
+          </section>
+
+          <section class="step-card" aria-labelledby="check-location-step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h3 id="check-location-step">Check the location</h3>
+              <p class="supporting">Check the marker is at the point you want ATLAS to assess. Drag it or click the map to move it if required.</p>
+              <div class="site-selector-grid">
+                <div>
+                  <div id="siteMap" class="site-map" role="application" aria-label="Interactive map for choosing the assessment point" tabindex="0"></div>
+                  <p class="map-attribution-note">Map data © OpenStreetMap contributors.</p>
+                </div>
+                <aside class="location-panel" aria-label="Selected assessment point">
+                  <div id="mapStatus" class="callout neutral" role="status">Choose a possible match or click the map to place the assessment point.</div>
+                  <div id="selectedLocation" class="selected-location" hidden>
+                    <strong>Assessment point selected</strong>
+                    <p id="selectedIdentity"></p>
+                    <dl><dt>Location</dt><dd id="selectedMethod"></dd><dt>Coordinates</dt><dd id="selectedCoordinates"></dd></dl>
+                  </div>
+                  <details class="coordinate-details">
+                    <summary>Enter coordinates instead</summary>
+                    <form id="coordinatesForm" class="coordinates-form">
+                      <label for="latitude">Latitude<input id="latitude" name="latitude" inputmode="decimal" autocomplete="off"></label>
+                      <label for="longitude">Longitude<input id="longitude" name="longitude" inputmode="decimal" autocomplete="off"></label>
+                      <button class="secondary" type="submit">Use these coordinates</button>
+                    </form>
+                    <div id="coordinateStatus" class="coordinate-status" role="status"></div>
+                  </details>
+                </aside>
+              </div>
+            </div>
+          </section>
+
+          <section class="step-card" aria-labelledby="confirm-point-step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <h3 id="confirm-point-step">Confirm the assessment point</h3>
+              <p class="supporting">Only confirm when the marker is at the access or frontage you want later ATLAS assessments to use.</p>
+              <button id="confirmAssessmentPoint" class="primary" type="button" disabled>Confirm assessment point</button>
+              <div id="confirmationStatus" class="callout neutral" role="status">Select an assessment point before confirming.</div>
+              <div id="confirmedSite" class="confirmed-site" hidden></div>
+            </div>
+          </section>
+
+          <section class="step-card" aria-labelledby="stops-step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <h3 id="stops-step">Build the Bus assessment</h3>
+              <p class="supporting">Choose a full nearby-stop assessment or ask ATLAS for the nearest logical stop group. Nearest mode keeps all matching stop records or bus-station stands so routes are not lost.</p>
+              <div class="stop-controls">
+                <label for="radius">Radius (metres)<input id="radius" type="number" min="100" max="2000" step="50" value="700"></label>
+                <div class="assessment-actions"><button id="findNearestStops" class="secondary" type="button" disabled>Find nearest bus stop(s)</button><button id="findStops" class="primary" type="button" disabled>Build full Bus assessment</button><button id="refreshStops" class="secondary" type="button" disabled>Check again</button></div>
+              </div>
+              <p class="control-hint">Nearest mode is based on routed walking access. ATLAS then keeps the complete logical stop group, including opposite directions or interchange stands where identified.</p>
+              <div id="stopStatus" class="callout neutral" role="status">Confirm the assessment point before checking nearby bus stops.</div>
+              <section class="data-status" aria-labelledby="data-status-heading">
+                <div class="data-status-heading"><div><p class="eyebrow">Bus data status</p><h3 id="data-status-heading">Bus Data Status</h3></div><div class="data-status-actions"><button id="updateBusData" class="secondary compact" type="button">Update Bus data</button><button id="refreshDataStatus" class="secondary compact" type="button">Refresh data status</button></div></div>
+                <p id="dataStatusMessage" role="status">Checking prepared Bus data status…</p>
+                <dl><dt>NaPTAN / BODS</dt><dd id="preparedDataDate">Not supplied</dd><dt>TNDS supplementary</dt><dd id="tndsDataDate">Not supplied</dd></dl>
+              </section>
+            </div>
+          </section>
+        </div>
+
+        <section id="evidencePanel" class="evidence-panel" hidden aria-labelledby="evidence-heading">
+          <div class="evidence-heading"><div><p class="eyebrow">Bus assessment</p><h3 id="evidence-heading">Stops and services near the assessment point</h3></div><div class="evidence-actions"><div id="evidenceSummary"></div><button id="exportBusWord" class="secondary compact" type="button" disabled>Export Word (.docx)</button></div></div>
+          <div class="check-summary" aria-label="Result source and status"><div><span>Source</span><strong id="resultSource">Authoritative source</strong></div><div><span>Checked</span><strong id="resultChecked"></strong></div><div><span>Status</span><strong id="resultFreshness"></strong></div></div>
+          <section class="assessment-output" aria-labelledby="stop-summary-heading">
+            <div class="output-heading"><div><p class="eyebrow">Table 3.2</p><h4 id="stop-summary-heading">Bus Stop Summary</h4></div><button id="clearRoutes" class="secondary compact" type="button" hidden>Clear route lines</button></div>
+          <div class="table-wrap">
+            <table class="bus-stop-summary">
+              <thead><tr><th>Include</th><th>Stop name</th><th>Direction</th><th>Walking distance / time</th><th>Cycling distance / time</th><th>Routes serving stop</th><th>Timetable match</th></tr></thead>
+              <tbody id="evidenceRows"></tbody>
+            </table>
+          </div>
+          </section>
+          <section class="assessment-output" aria-labelledby="service-summary-heading">
+            <div class="output-heading"><div><p class="eyebrow">Table 3.3</p><h4 id="service-summary-heading">Bus Service Summary</h4></div><div class="selection-actions"><button id="recommendedSelection" class="secondary compact" type="button">Recommended selection</button><button id="selectAllRows" class="secondary compact" type="button">Select all</button><button id="clearAllRows" class="secondary compact" type="button">Clear all</button></div></div>
+            <div class="table-wrap"><table class="bus-service-summary"><thead><tr><th>Include</th><th>Route</th><th>Operator</th><th>Origin / destination</th><th>Principal locations</th><th>Operating period</th></tr></thead><tbody id="serviceRows"></tbody></table></div>
+          </section>
+          <section class="assessment-wording" aria-labelledby="wording-heading"><p class="eyebrow">Controlled wording</p><h4 id="wording-heading">Assessment wording</h4><p id="assessmentWording"></p></section>
+          <details><summary>Sources and checks</summary><div id="plannerChecks"></div><details class="technical-details"><summary>View technical details</summary><div id="diagnostics"></div></details></details>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <footer><span>ATLAS 2.0.0-alpha.6 · Development software</span><span class="creator-credit">Created by Joe Freeman · EAS FORGE</span><span>Awaiting Product Owner review</span></footer>
+  <script src="../assets/vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="assets/js/app.mjs?build=ATLAS-2.0.0-alpha.6-20260904"></script>
+</body>
+</html>

@@ -4,7 +4,20 @@
   "type": "module",
   "scripts": {
     "test:bus": "node tests/bus-foundation.test.mjs",
-    "test:browser": "node tests/bus-browser-smoke.mjs"
+    "test:browser": "node tests/bus-browser-smoke.mjs",
+    "test:atlas": "node tests/atlas/run-all.mjs",
+    "test:atlas:browser": "node tests/atlas/atlas-browser-smoke.mjs",
+    "test:atlas:site-browser": "node tests/atlas/site-selector-browser.mjs",
+    "test:atlas:ux": "node tests/atlas/planner-ux-browser.mjs",
+    "test:atlas:review-server": "node tests/atlas/review-environment.test.mjs",
+    "test:atlas:review-browser": "node tests/atlas/review-environment-browser.mjs",
+    "test:atlas:live": "node tests/atlas/live/tfl-crystal-palace-smoke.mjs",
+    "test:atlas:live-non-london": "node tests/atlas/live/naptan-waltham-cross-smoke.mjs",
+    "test:atlas:live-third-area": "node tests/atlas/live/cambridge-national-smoke.mjs",
+    "test:atlas:live-millers": "node tests/atlas/live/nominatim-millers-house-smoke.mjs",
+    "test:atlas:live-browser": "node tests/atlas/live/browser-cors-smoke.mjs",
+    "test:atlas:isolation": "node tests/atlas/legacy-isolation.test.mjs",
+    "build:atlas:bus-data": "node tools/atlas-bus-data/run-build.mjs"
   },
   "devDependencies": {
     "playwright": "1.58.2"

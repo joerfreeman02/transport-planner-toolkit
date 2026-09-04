@@ -8,7 +8,7 @@
   <title>ATLAS — Transport and Location Assessment</title>
   <link rel="stylesheet" href="../assets/css/eas-theme.css">
   <link rel="stylesheet" href="../assets/vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="assets/css/atlas-shell.css?build=ATLAS-2.0.0-alpha.3-20260824">
+  <link rel="stylesheet" href="assets/css/atlas-shell.css?build=ATLAS-2.0.0-alpha.4-20260904">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -24,19 +24,19 @@
         <button type="button" data-view="projects">Projects</button>
         <button type="button" data-view="about">About</button>
       </nav>
-      <div class="build" aria-label="ATLAS version and build"><b>2.0.0-alpha.3</b><span>ATLAS-2.0.0-alpha.3-20260824</span></div>
+      <div class="build" aria-label="ATLAS version and build"><b>2.0.0-alpha.4</b><span>ATLAS-2.0.0-alpha.4-20260904</span></div>
     </div>
   </header>
 
   <main id="main">
     <section class="view" data-view-panel="report-builder" hidden>
       <div class="page-heading"><p class="eyebrow">Future assessment output</p><h1>Report Builder</h1><p>This planned section will help prepare consistent transport assessment outputs from checked project information.</p></div>
-      <article class="placeholder"><span class="status planned">Planned</span><h2>Report Builder is not available yet</h2><p>It will be added in a future development stage. No report is produced by Alpha.3.</p></article>
+      <article class="placeholder"><span class="status planned">Planned</span><h2>Report Builder is not available yet</h2><p>It will be added in a future development stage. Bus tables and wording can be reviewed in the Bus assessment workspace.</p></article>
     </section>
 
     <section class="view" data-view-panel="projects" hidden>
       <div class="page-heading"><p class="eyebrow">Future project workspace</p><h1>Projects</h1><p>This planned section will save a development site's details for use across ATLAS assessments.</p></div>
-      <article class="placeholder"><span class="status planned">Planned</span><h2>Project saving is not available yet</h2><p>For Alpha.3, a confirmed site is kept only while this page is open.</p></article>
+      <article class="placeholder"><span class="status planned">Planned</span><h2>Project saving is not available yet</h2><p>For Alpha.4, a confirmed site is kept only while this page is open.</p></article>
     </section>
 
     <section class="view" data-view-panel="about" hidden>
@@ -51,6 +51,7 @@
         <article class="about-card forge-card">
           <p class="eyebrow">EAS FORGE</p>
           <h2>Built through EAS's internal R&amp;D programme</h2>
+          <p><strong>Framework for Operational Research, Governance &amp; Engineering</strong></p>
           <p>EAS FORGE develops focused consultancy software that makes established workflows faster and more consistent while keeping professional judgement with EAS staff.</p>
         </article>
         <article class="about-card creator-card">
@@ -63,8 +64,8 @@
             <strong>Created by Joe Freeman · EAS FORGE</strong>
           </div>
         </article>
-        <article class="about-card"><p class="eyebrow">Current status</p><h2>Alpha.3 Bus Assessment</h2><dl><dt>Version</dt><dd>2.0.0-alpha.3</dd><dt>Build</dt><dd>ATLAS-2.0.0-alpha.3-20260824</dd><dt>Status</dt><dd>Development software — not a finished production release</dd></dl></article>
-        <article class="about-card"><p class="eyebrow">Data acknowledgements</p><h2>Trusted sources used today</h2><p>Address search and the interactive map use OpenStreetMap data. London bus-stop information is provided by Transport for London. National stop architecture uses Department for Transport NaPTAN, with official GLA boundary data selecting the source.</p><p class="acknowledgement">© OpenStreetMap contributors · Data provided by Transport for London · NaPTAN © Department for Transport · Contains National Statistics and Ordnance Survey data © Crown copyright and database right 2015</p></article>
+        <article class="about-card"><p class="eyebrow">Current status</p><h2>Alpha.4 Bus Assessment</h2><dl><dt>Version</dt><dd>2.0.0-alpha.4</dd><dt>Build</dt><dd>ATLAS-2.0.0-alpha.4-20260904</dd><dt>Status</dt><dd>Product Owner acceptance candidate</dd></dl></article>
+        <article class="about-card"><p class="eyebrow">Data acknowledgements</p><h2>Trusted sources used today</h2><p>Address search, maps and access routing use OpenStreetMap data. London stop discovery is provided by Transport for London. National stops use Department for Transport NaPTAN; timetables use the Department for Transport Bus Open Data Service. Official GLA boundary data selects the stop source.</p><p class="acknowledgement">© OpenStreetMap contributors · Routed by OSRM · Data provided by Transport for London · NaPTAN and BODS © Department for Transport · Contains National Statistics and Ordnance Survey data © Crown copyright and database right 2015</p></article>
       </div>
     </section>
 
@@ -85,7 +86,7 @@
       <section class="workspace" id="site-workspace" aria-labelledby="site-selector-title">
         <div class="workspace-header">
           <div><p class="eyebrow">Shared ATLAS site</p><h2 id="site-selector-title">Establish the assessment point</h2><p>Identify the development, check its access on the map, then confirm the exact point ATLAS should use.</p></div>
-          <span class="status development">Alpha.3</span>
+          <span class="status development">Alpha.4</span>
         </div>
 
         <div class="steps">
@@ -149,11 +150,11 @@
           <section class="step-card" aria-labelledby="stops-step">
             <div class="step-number">4</div>
             <div class="step-content">
-              <h3 id="stops-step">Find nearby bus stops</h3>
-              <p class="supporting">ATLAS selects the authoritative source from the confirmed assessment point and shows when the information was last checked. Discovery distance is straight-line only.</p>
+              <h3 id="stops-step">Build the Bus assessment</h3>
+              <p class="supporting">ATLAS checks nearby authoritative stops, current scheduled services and routed walking and cycling access from the confirmed assessment point.</p>
               <div class="stop-controls">
                 <label for="radius">Radius (metres)<input id="radius" type="number" min="100" max="2000" step="50" value="700"></label>
-                <button id="findStops" class="primary" type="button" disabled>Check nearby bus stops</button>
+                <button id="findStops" class="primary" type="button" disabled>Build Bus assessment</button>
                 <button id="refreshStops" class="secondary" type="button" disabled>Check again</button>
               </div>
               <div id="stopStatus" class="callout neutral" role="status">Confirm the assessment point before checking nearby bus stops.</div>
@@ -162,22 +163,30 @@
         </div>
 
         <section id="evidencePanel" class="evidence-panel" hidden aria-labelledby="evidence-heading">
-          <div class="evidence-heading"><div><p class="eyebrow">Bus-stop results</p><h3 id="evidence-heading">Stops near the assessment point</h3></div><div id="evidenceSummary"></div></div>
+          <div class="evidence-heading"><div><p class="eyebrow">Bus assessment</p><h3 id="evidence-heading">Stops and services near the assessment point</h3></div><div id="evidenceSummary"></div></div>
           <div class="check-summary" aria-label="Result source and status"><div><span>Source</span><strong id="resultSource">Authoritative source</strong></div><div><span>Checked</span><strong id="resultChecked"></strong></div><div><span>Status</span><strong id="resultFreshness"></strong></div></div>
+          <section class="assessment-output" aria-labelledby="stop-summary-heading">
+            <div class="output-heading"><div><p class="eyebrow">Table 1</p><h4 id="stop-summary-heading">Bus Stop Summary</h4></div><button id="clearRoutes" class="secondary compact" type="button" hidden>Clear route lines</button></div>
           <div class="table-wrap">
-            <table>
-              <thead><tr><th>Stop</th><th>Direction / stop letter</th><th>Discovery distance</th><th>Routes serving stop</th><th>Google Maps</th><th>Source stop ID</th></tr></thead>
+            <table class="bus-stop-summary">
+              <thead><tr><th>Stop name</th><th>Direction</th><th>Walking distance / time</th><th>Cycling distance / time</th><th>Routes serving stop</th></tr></thead>
               <tbody id="evidenceRows"></tbody>
             </table>
           </div>
+          </section>
+          <section class="assessment-output" aria-labelledby="service-summary-heading">
+            <div class="output-heading"><div><p class="eyebrow">Table 2</p><h4 id="service-summary-heading">Bus Service Summary</h4></div></div>
+            <div class="table-wrap"><table class="bus-service-summary"><thead><tr><th>Route</th><th>Operator</th><th>Origin / destination</th><th>Principal locations</th><th>Operating period</th></tr></thead><tbody id="serviceRows"></tbody></table></div>
+          </section>
+          <section class="assessment-wording" aria-labelledby="wording-heading"><p class="eyebrow">Controlled wording</p><h4 id="wording-heading">Assessment wording</h4><p id="assessmentWording"></p></section>
           <details><summary>Sources and checks</summary><div id="plannerChecks"></div><details class="technical-details"><summary>View technical details</summary><div id="diagnostics"></div></details></details>
         </section>
       </section>
     </section>
   </main>
 
-  <footer><span>ATLAS 2.0.0-alpha.3 · Development software</span><span>Awaiting Product Owner review</span></footer>
+  <footer><span>ATLAS 2.0.0-alpha.4 · Development software</span><span>Awaiting Product Owner review</span></footer>
   <script src="../assets/vendor/leaflet/leaflet.js"></script>
-  <script type="module" src="assets/js/app.mjs?build=ATLAS-2.0.0-alpha.3-20260824"></script>
+  <script type="module" src="assets/js/app.mjs?build=ATLAS-2.0.0-alpha.4-20260904"></script>
 </body>
 </html>

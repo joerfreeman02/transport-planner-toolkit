@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const APP_ID = 'eas-atlas-review-v1';
-const APP_VERSION = '2.0.0-alpha.3';
+const APP_VERSION = '2.0.0-alpha.4';
 const STATUS_PATH = '/__atlas-review/status';
 const STOP_PATH = '/__atlas-review/stop';
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
@@ -16,6 +16,7 @@ const ALLOWED_ROOTS = Object.freeze(['assets', 'atlas', 'config', 'data', 'modul
 const MIME_TYPES = Object.freeze({
   '.css': 'text/css; charset=utf-8',
   '.gif': 'image/gif',
+  '.gz': 'application/gzip',
   '.html': 'text/html; charset=utf-8',
   '.ico': 'image/x-icon',
   '.jpeg': 'image/jpeg',

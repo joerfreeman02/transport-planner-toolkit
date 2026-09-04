@@ -13,9 +13,11 @@
     "test:atlas:review-browser": "node tests/atlas/review-environment-browser.mjs",
     "test:atlas:live": "node tests/atlas/live/tfl-crystal-palace-smoke.mjs",
     "test:atlas:live-non-london": "node tests/atlas/live/naptan-waltham-cross-smoke.mjs",
+    "test:atlas:live-third-area": "node tests/atlas/live/cambridge-national-smoke.mjs",
     "test:atlas:live-millers": "node tests/atlas/live/nominatim-millers-house-smoke.mjs",
     "test:atlas:live-browser": "node tests/atlas/live/browser-cors-smoke.mjs",
-    "test:atlas:isolation": "node tests/atlas/legacy-isolation.test.mjs"
+    "test:atlas:isolation": "node tests/atlas/legacy-isolation.test.mjs",
+    "build:atlas:bus-data": "python tools/atlas-bus-data/build_static_index.py --naptan tmp/bus-data/naptan.csv --gtfs-dir tmp/bus-data --output atlas/data/bus --snapshot-date 2026-09-04"
   },
   "devDependencies": {
     "playwright": "1.58.2"

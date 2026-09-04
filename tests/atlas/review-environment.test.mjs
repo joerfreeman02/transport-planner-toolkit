@@ -19,7 +19,7 @@ try {
   assert.equal(review.reused, false);
   assert.match(review.url, /^http:\/\/127\.0\.0\.1:\d+\/atlas\/#modules$/);
   assert.equal(existsSync(stateFile), true);
-  assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).version, '2.0.0-alpha.3');
+  assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).version, '2.0.0-alpha.4');
   pass('starts on an available loopback address');
 
   const atlas = await fetch(review.url);
@@ -34,6 +34,7 @@ try {
   const assets = [
     ['/atlas/assets/css/atlas-shell.css', /^text\/css/],
     ['/atlas/assets/js/app.mjs', /^application\/javascript/],
+    ['/atlas/data/bus/manifest.json', /^application\/json/],
     ['/src/atlas/domain/site.mjs', /^application\/javascript/],
     ['/src/atlas/application/site-selector.mjs', /^application\/javascript/],
     ['/assets/vendor/leaflet/leaflet.css', /^text\/css/],

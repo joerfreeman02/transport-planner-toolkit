@@ -1,50 +1,15 @@
-# BUS-1 continuation checkpoint
+# BUS-1 completion checkpoint
 
-Recorded: 2026-08-24
+Recorded: 2026-09-04
 
-## Outcome
+BUS-1 Alpha.4 was interrupted during national-data regeneration and is preserved as WIP on `codex/atlas-bus-1-rescue-20260904`. It starts at recoverable Alpha.3 commit `4fddd0cd3a8eb4f9dd624212cf414c0f60319bb7`. The current prepared dataset has service shards only and no manifest or stop shards, so the branch is not runnable as a complete Bus assessment and must not be merged.
 
-BUS-1 Gate 1 is complete for confirmed assessment points inside Greater London. The application selects the authoritative provider from the confirmed point, retrieves nearby TfL stop records, retains authoritative stop identity and provenance, derives service numbers from TfL's stop `lines`, and presents map markers, an evidence table and Google Maps links.
+The intended architecture uses a controlled static-data preparation process. Official national NaPTAN and all nine English BODS regional GTFS downloads are transformed into deterministic, gzip-compressed spatial and stop-identity shards. The transformer and application code are preserved, but the final build and regression/live revalidation remain incomplete. No backend, account, API key, paid service, AI research, or planner-entered credential was introduced.
 
-The national architecture is in place, but production discovery outside London is deliberately blocked. The official NaPTAN v1 interface supplies bulk or ATCO-area files and no browser-safe geographic lookup. Until ATLAS has a trusted point-to-ATCO-area gateway, the NaPTAN adapter returns `coverage_not_implemented`; it never converts that limitation into a zero-stop conclusion.
+Completed workflow:
 
-## Provider and evidence contract
+confirmed SITE-1 assessment point → TfL or prepared NaPTAN stop discovery → prepared BODS scheduled services → deterministic directional summaries → OSRM walking/cycling routes → map and Google Maps verification → canonical EAS tables → controlled wording.
 
-- The provider decision is made after the assessment point is confirmed.
-- The official Greater London boundary determines TfL versus NaPTAN; no postcode or bounding-box heuristic is used.
-- Stop records keep authoritative IDs, name, indicator/direction, coordinates, routes, source, retrieval time and validation warnings.
-- Same-name opposite-direction stops remain distinct because deduplication uses the ATCO/source stop ID.
-- Discovery distance is explicitly straight-line. Walking and cycling fields must remain absent until routed distance and time are available.
-- UI states distinguish genuine zero results, national coverage not implemented, source unavailable and malformed source data.
+The detailed implementation and refresh contract are in [BUS-1-ARCHITECTURE.md](BUS-1-ARCHITECTURE.md) and [ADR-011](../adr/ADR-011-prepared-national-bus-data.md). The remaining methodology approval is the exact representative weekday frequency window. The calculation accepts an explicit approved window, but production does not silently choose one and the canonical service table has no frequency column.
 
-## Plaistow assessment schemas
-
-The supplied Plaistow Transport Assessment is an output exemplar, not an implementation instruction. Its eventual stop table structure is:
-
-1. Stop name
-2. Direction
-3. Walking distance/time
-4. Cycling distance/time
-5. Routes serving stop
-
-Its eventual service summary structure is:
-
-1. Route
-2. Operator
-3. Origin/destination
-4. Principal locations
-5. Operating period
-
-A material qualification belongs in a conditional full-width secondary row beginning `Service note:`. Do not add a frequency column to this canonical service summary. If frequency is later supported elsewhere, write it as `6 buses per hour (approximately every 10 minutes)`; do not use `tph` or `bph`.
-
-## Service discovery status
-
-London service-number discovery is safely supported from TfL stop records. Frequencies, destinations, operating periods and routed walk/cycle measures are not implemented. Outside London, BODS service discovery is also deferred: its key is account-bound and must not be embedded in the static browser or repository.
-
-## Next engineering gate
-
-Provide a trusted, documented server-side gateway that can resolve a confirmed WGS84 point and radius to current authoritative NaPTAN stop records. Then connect it to the existing injected NaPTAN area resolver/fetch contract, add a real non-London control with known nearby stops, and only after that evaluate BODS service enrichment.
-
-## Tooling decision
-
-No repository service was installed. Retain Dependabot. Codecov and OpenSSF Scorecard remain candidates for separately approved pilots. Sentry remains deferred pending privacy and telemetry decisions. Renovate remains deferred because it overlaps Dependabot.
+Rollback is Alpha.3 commit `4fddd0cd3a8eb4f9dd624212cf414c0f60319bb7`. No Foundation, SITE-1, legacy Toolkit, or protected legacy module file was rewritten.

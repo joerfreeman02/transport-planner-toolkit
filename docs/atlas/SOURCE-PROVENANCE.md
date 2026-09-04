@@ -1,62 +1,31 @@
-# Alpha.3 source and provenance design
+# Alpha.4 source and provenance design
 
-Reviewed: 2026-08-24
+Reviewed: 2026-09-04
 
-## Address source
+## Address and confirmed point
 
-ATLAS uses the public [OpenStreetMap Nominatim Search API](https://nominatim.org/release-docs/latest/api/Search/) through a replaceable adapter. The [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/) requires moderate, user-triggered use, meaningful identification, attribution, caching and no client-side autocomplete. Alpha.1 therefore searches only when the user presses **Find address**, rate-limits retry requests to at least 1.1 seconds apart, caches current results, and performs no autocomplete.
+Address search remains user-triggered OpenStreetMap Nominatim with conservative query normalisation, rate limiting and explicit candidate selection. A geocoded candidate is never automatically the transport origin. The final confirmed SITE-1 point—including any planner drag, map click or manually entered coordinate—is the origin used by Bus.
 
-The supplied test address did not return a result verbatim. The adapter tried only user-derived normalisations:
+## London stop source
 
-1. `33 Westow Street, Crystal Palace, London`
-2. `33, Westow Street, Crystal Palace, London`
-3. `33, Westow Street, London`
+Points inside the official Greater London boundary use the TfL Unified API StopPoint operation for nearby bus stops and routes recorded against each stop. Records retain TfL/NaPTAN identity, name, indicator, coordinates, route list, request reference, checked time and attribution. TfL supplied no dataset publication timestamp in the verified response, so ATLAS shows that caution instead of inventing a date. Anonymous live access worked on 2026-09-04; no TfL key is embedded.
 
-The third query returned the property:
+## National stop source
 
-- display: `33, Westow Street, Upper Norwood, London Borough of Croydon, Greater London, England, SE19 3RW, United Kingdom`
-- WGS84: `51.4184213, -0.0821281`
-- source record: OpenStreetMap `way/189209061`
+Outside Greater London, stops come from the official DfT NaPTAN national CSV prepared on 2026-09-04. Active bus stop records retain ATCO code, NaPTAN code, name, indicator, bearing, stop type, locality, coordinates, modification time, source hash and coordinate method. Supplied WGS84 is used where present; missing WGS84 is deterministically derived from supplied British National Grid coordinates. Spatial discovery uses 0.25-degree shards and then exact WGS84 haversine filtering. Same-name opposite directions remain separate because identity is the authoritative stop code.
 
-ATLAS warns that a locality qualifier was removed and does not silently choose the result. The user must confirm it. Coordinates are never hard-coded for this test.
+Haversine distance is discovery evidence only. Routed walking and cycling measurements are separate facts and never fall back to that distance.
 
-## Transport source
+## Timetable source
 
-Nearby stops use the official [TfL Unified API](https://api-portal.tfl.gov.uk/) `StopPoint` GeoPoint operation documented in the [TfL Swagger definition](https://api.tfl.gov.uk/swagger/docs/v1). The request is limited to nearby public bus/coach/tram stop points and asks TfL to return the lines recorded against each stop. It does not request frequencies or timetables.
+The official public BODS regional GTFS downloads provide current English local-bus schedules. All nine regions were downloaded and hashed. Preparation applies GTFS `calendar` and `calendar_dates` to the representative week beginning 2026-09-07, rejects schedules not active in that week, and joins by authoritative stop identity. Retained evidence includes route/operator, endpoints, calling pattern, scheduled departures, validity, source region/route, circular status and qualifications. No BODS account or key is required by the chosen bulk-download path.
 
-Live endpoint shape:
+The prepared snapshot warns after eight days. Date-specific exceptions are flagged for planner checking. Rebuilding from current official inputs changes the recorded hashes and preparation time; old information is not silently presented as live.
 
-```text
-https://api.tfl.gov.uk/StopPoint
-  ?stopTypes=NaptanPublicBusCoachTram
-  &radius=700
-  &useStopPointHierarchy=false
-  &modes=bus
-  &categories=none
-  &returnLines=true
-  &lat=51.4184213
-  &lon=-0.0821281
-```
+## Routing and boundary
 
-TfL recommends portal registration and documents the general plan as 500 requests per minute. On 2026-08-24, the controlled request succeeded anonymously and returned `Access-Control-Allow-Origin: *`, so the Alpha.1 static-browser proof works without exposing a key. This observed anonymous behaviour is not treated as a permanent service guarantee. No `app_key`, `app_id` or secret is embedded.
+The Greater London selection boundary is the locally prepared official GLA boundary with source/licence metadata. Walking uses the public OSRM foot service and cycling the public OSRM bike service, both based on OpenStreetMap. Requests retain their service references and attribution. An unavailable route remains unavailable; ATLAS never labels straight-line distance as routed access.
 
-TfL data attribution is retained in Evidence and follows TfL's [open-data information](https://tfl.gov.uk/info-for/open-data-users/our-open-data?intcmp=3671) and [data sources](https://tfl.gov.uk/corporate/data-sources).
+## Presentation contract
 
-## Provenance retained per fact
-
-Each stop Evidence record retains stop identifier and coordinates, source name and attribution, exact request endpoint, retrieval time, any source dataset timestamp/version, Haversine distance method, validation/confidence, warnings, and freshness/cache state.
-
-TfL did not provide a dataset timestamp/version in this response, so ATLAS records that absence as a warning. It does not fabricate one. Routes are labelled only as serving the stop; Alpha.3 does not claim a service frequency, destination or operating period.
-
-## National routing and boundary source
-
-Provider choice is made from the user-confirmed assessment point and is hidden from the user. Points inside the official Greater London boundary use TfL; points outside use the NaPTAN adapter. The boundary is generated from the Greater London Authority boundary dataset, converted to British National Grid for the point-in-polygon test, simplified deterministically, and stored locally with source, licence and attribution metadata.
-
-The current official NaPTAN v1 API exposes access-node files by ATCO area, not a browser-safe geographic or bounding-box query. Those responses also do not advertise cross-origin browser access. Alpha.3 therefore defines and tests the national adapter contract and CSV parser, but deliberately returns `coverage_not_implemented` until a trusted gateway can resolve the confirmed point to authoritative ATCO-area data. That state is distinct from a genuine zero-stop result, source unavailability and malformed data.
-
-NaPTAN records retain ATCO code, NaPTAN code, common name, indicator, bearing, coordinates and source identity. Deduplication is by authoritative ATCO identity only, so opposite-direction stops with the same name remain separate.
-
-## Cache contract
-
-The address cache TTL is 15 minutes and the TfL proof TTL is 5 minutes. These are conservative Alpha.1 operational values, not approved evidence-methodology windows. Valid cache hits keep their original retrieval time. Stale entries may be reported but cannot replace failed live data without an explicit future policy decision.
-
+Sources, checked time, completeness and professional cautions remain visible in plain English. Exact source references, hashes, region details and routing request references are secondary technical details. Google Maps links use authoritative stop coordinates as a human verification aid only.

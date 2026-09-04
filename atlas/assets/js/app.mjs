@@ -3,15 +3,19 @@ import { SITE_LOCATION_METHODS } from '../../../src/atlas/domain/site.mjs';
 import { createJsonCache } from '../../../src/atlas/infrastructure/cache.mjs';
 import { createNominatimGeocodingAdapter } from '../../../src/atlas/adapters/nominatim-geocoding-adapter.mjs';
 import { createTflBusStopAdapter } from '../../../src/atlas/adapters/tfl-bus-stop-adapter.mjs';
-import { createNaptanBusStopAdapter } from '../../../src/atlas/adapters/naptan-bus-stop-adapter.mjs';
+import { createPreparedBusDataAdapter } from '../../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
+import { createOsrmAccessRoutingAdapter } from '../../../src/atlas/adapters/osrm-access-routing-adapter.mjs';
 import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-discovery.mjs';
+import { createBusAssessment } from '../../../src/atlas/application/bus-assessment.mjs';
 
 const $ = id => document.getElementById(id);
-const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha3' });
+const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha4' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tfl = createTflBusStopAdapter({ cache });
-const naptan = createNaptanBusStopAdapter({ cache });
-const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: naptan });
+const preparedBusData = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url) });
+const accessRouting = createOsrmAccessRoutingAdapter();
+const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: preparedBusData });
+const busAssessment = createBusAssessment({ stopDiscovery: busStops, timetableData: preparedBusData, accessRouting });
 const selector = createSiteSelector();
 const views = ['report-builder', 'modules', 'projects', 'about'];
 const METHOD_LABELS = Object.freeze({
@@ -24,6 +28,7 @@ let confirmedSite = null;
 let map = null;
 let assessmentMarker = null;
 let busStopMarkers = [];
+let routeLayers = [];
 
 function showView(name) {
   const selected = views.includes(name) ? name : 'modules';
@@ -64,12 +69,14 @@ function plannerStopWarning(warning) {
   if (/duplicate/i.test(warning)) return 'Repeated stop records were counted once.';
   if (/no bus stops/i.test(warning)) return 'No bus stops were found within the selected distance.';
   if (/dataset timestamp|dataset.*version/i.test(warning)) return 'The source did not include a publication date with this result.';
+  if (/prepared bus dataset is .*days old/i.test(warning)) return 'The prepared national bus information should be refreshed before formal use.';
+  if (/date-specific exceptions/i.test(warning)) return 'Some timetables contain date-specific changes. Check the assessment date before formal use.';
   if (/No zero-stop conclusion/i.test(warning)) return warning;
   return warning.replace(/TfL/g, 'Transport for London');
 }
 
 function providerLabel(result) {
-  return result?.provenance?.providerAdapter?.startsWith('naptan') ? 'Department for Transport NaPTAN' : 'Transport for London';
+  return /naptan|prepared-national/i.test(result?.provenance?.providerAdapter || '') ? 'Department for Transport NaPTAN' : 'Transport for London';
 }
 
 function assessmentMethod(site) {
@@ -82,15 +89,48 @@ function clearBusEvidence(message = 'Confirm the assessment point before checkin
   confirmedSite = null;
   busStopMarkers.forEach(marker => map?.removeLayer(marker));
   busStopMarkers = [];
+  routeLayers.forEach(layer => map?.removeLayer(layer));
+  routeLayers = [];
   $('findStops').disabled = true;
   $('refreshStops').disabled = true;
   $('evidencePanel').hidden = true;
   $('evidenceRows').replaceChildren();
+  $('serviceRows').replaceChildren();
+  $('assessmentWording').textContent = '';
+  $('clearRoutes').hidden = true;
   setCallout($('stopStatus'), hadEvidence ? 'The assessment point changed, so the earlier bus results were cleared. Confirm the new point before checking again.' : message, hadEvidence ? 'warning' : 'neutral');
 }
 
 function googleMapsUrl(stop) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(String(stop.latitude) + ',' + String(stop.longitude))}`;
+}
+
+function formatAccess(route) {
+  if (route?.status !== 'routed') return 'Route unavailable';
+  const minutes = Math.max(1, Math.round(route.durationSeconds / 60));
+  return `${route.distanceMetres.toLocaleString('en-GB')} m · ${minutes} min${minutes === 1 ? '' : 's'}`;
+}
+
+function clearRouteLines() {
+  routeLayers.forEach(layer => map.removeLayer(layer));
+  routeLayers = [];
+  $('clearRoutes').hidden = true;
+}
+
+async function showAccessRoute(stop, mode) {
+  const label = mode === 'walk' ? 'walking' : 'cycling';
+  setCallout($('stopStatus'), `Checking the ${label} route to ${stop.name}…`, 'neutral');
+  const result = await accessRouting.geometry(confirmedSite, stop, mode);
+  if (!result.ok) {
+    setCallout($('stopStatus'), `The ${label} route line is temporarily unavailable. The assessment results have not been changed.`, 'warning');
+    return;
+  }
+  clearRouteLines();
+  const layer = window.L.geoJSON(result.geometry, { style: { color: mode === 'walk' ? '#146b63' : '#9a6517', weight: 5, dashArray: mode === 'cycle' ? '8 6' : null, opacity: .9 } }).addTo(map);
+  routeLayers.push(layer);
+  $('clearRoutes').hidden = false;
+  map.fitBounds(layer.getBounds().pad(.2));
+  setCallout($('stopStatus'), `${mode === 'walk' ? 'Walking' : 'Cycling'} route shown for ${stop.name}.`, 'success');
 }
 
 function renderBusStopMarkers(stops) {
@@ -109,12 +149,22 @@ function renderBusStopMarkers(stops) {
     detail.textContent = [stop.indicator, stop.direction].filter(Boolean).join(' · ') || 'Direction not provided';
     const services = document.createElement('p');
     services.textContent = stop.routes?.length ? `Routes: ${stop.routes.join(', ')}` : 'Routes not available from this source check';
+    const access = document.createElement('p');
+    access.textContent = `Walk: ${formatAccess(stop.walking)} · Cycle: ${formatAccess(stop.cycling)}`;
     const link = document.createElement('a');
     link.href = googleMapsUrl(stop);
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.textContent = 'Open in Google Maps';
-    popup.append(name, detail, services, link);
+    const actions = document.createElement('div');
+    actions.className = 'route-actions';
+    for (const [mode, label] of [['walk', 'Show walking route'], ['cycle', 'Show cycling route']]) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.textContent = label;
+      button.addEventListener('click', () => showAccessRoute(stop, mode));
+      actions.append(button);
+    }
+    popup.append(name, detail, services, access, link, actions);
     marker.bindPopup(popup);
     busStopMarkers.push(marker);
   }
@@ -248,42 +298,77 @@ function renderConfirmedSite(site) {
   } else panel.append(strong, address, details);
 }
 
-function renderEvidence(result) {
+function appendCell(row, label, value, secondary = '') {
+  const cell = document.createElement('td');
+  cell.dataset.label = label;
+  if (value instanceof Node) cell.append(value);
+  else cell.textContent = value;
+  if (secondary) { const small = document.createElement('small'); small.textContent = secondary; cell.append(small); }
+  row.append(cell);
+  return cell;
+}
+
+function renderAssessment(result) {
   const panel = $('evidencePanel');
   const rows = $('evidenceRows');
+  const serviceRows = $('serviceRows');
   panel.hidden = false;
   rows.replaceChildren();
-  for (const evidence of result.evidence) {
-    const stop = evidence.value;
+  serviceRows.replaceChildren();
+  for (const stop of result.stops) {
     const row = document.createElement('tr');
-    const direction = [stop.indicator, stop.direction].filter(Boolean).join(' · ') || 'Not provided';
-    const mapLink = document.createElement('a');
-    mapLink.href = googleMapsUrl(stop); mapLink.target = '_blank'; mapLink.rel = 'noopener noreferrer'; mapLink.textContent = 'Open map';
-    const cells = [[stop.name, ''], [direction, ''], [`${stop.distanceMetres.toLocaleString('en-GB')} m`, 'Straight-line discovery distance'], [stop.routes?.length ? stop.routes.join(', ') : 'Not available', ''], [mapLink, ''], [stop.sourceId || stop.id, '']];
-    const labels = ['Stop', 'Direction / stop letter', 'Discovery distance', 'Routes serving stop', 'Google Maps', 'Source stop ID'];
-    cells.forEach(([primary, secondary], index) => {
-      const cell = document.createElement('td');
-      cell.dataset.label = labels[index];
-      if (primary instanceof Node) cell.append(primary);
-      else { const text = document.createElement('span'); text.textContent = primary; cell.append(text); }
-      if (secondary) { const small = document.createElement('small'); small.textContent = secondary; cell.append(small); }
-      row.append(cell);
-    });
+    const stopCell = document.createElement('span');
+    const stopName = document.createElement('strong'); stopName.textContent = stop.name;
+    const mapLink = document.createElement('a'); mapLink.href = googleMapsUrl(stop); mapLink.target = '_blank'; mapLink.rel = 'noopener noreferrer'; mapLink.textContent = 'Open in Google Maps';
+    stopCell.append(stopName, document.createElement('br'), mapLink);
+    appendCell(row, 'Stop name', stopCell);
+    appendCell(row, 'Direction', stop.displayDirection);
+    const walking = appendCell(row, 'Walking distance / time', formatAccess(stop.walking));
+    const cycling = appendCell(row, 'Cycling distance / time', formatAccess(stop.cycling));
+    if (stop.walking.status !== 'routed') walking.classList.add('route-unavailable');
+    if (stop.cycling.status !== 'routed') cycling.classList.add('route-unavailable');
+    appendCell(row, 'Routes serving stop', stop.routes?.length ? stop.routes.join(', ') : 'Timetable route match unavailable');
     rows.append(row);
   }
-  renderBusStopMarkers(result.data);
-  const checked = formatTime(result.provenance.retrievedAt);
-  const sourceName = providerLabel(result);
-  $('evidenceSummary').textContent = `${result.evidence.length} stop${result.evidence.length === 1 ? '' : 's'} found`;
-  $('resultSource').textContent = sourceName;
+  if (!result.stops.length) {
+    const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 5; cell.textContent = 'No authoritative bus stops were found within the selected discovery radius.'; row.append(cell); rows.append(row);
+  }
+  for (const service of result.serviceSummaries) {
+    const row = document.createElement('tr');
+    appendCell(row, 'Route', service.routeNumber);
+    appendCell(row, 'Operator', service.operator);
+    const originDestination = `${service.origin} - ${service.destination}${service.circular && service.direction ? ` (${service.direction})` : ''}`;
+    appendCell(row, 'Origin / destination', originDestination);
+    appendCell(row, 'Principal locations', service.principalLocations.length ? service.principalLocations.join(', ') : 'No additional principal locations identified');
+    const periods = document.createElement('ul'); periods.className = 'period-lines';
+    service.operatingPeriodLines.forEach(line => { const item = document.createElement('li'); item.textContent = line; periods.append(item); });
+    appendCell(row, 'Operating period', periods);
+    serviceRows.append(row);
+    if (service.serviceNote) {
+      const noteRow = document.createElement('tr'); noteRow.className = 'service-note';
+      const noteCell = document.createElement('td'); noteCell.colSpan = 5;
+      const label = document.createElement('strong'); label.textContent = 'Service note: ';
+      noteCell.append(label, service.serviceNote); noteRow.append(noteCell); serviceRows.append(noteRow);
+    }
+  }
+  if (!result.serviceSummaries.length) {
+    const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 5; cell.textContent = 'No matched timetable summary is available. Review Sources and checks before using the stop information.'; row.append(cell); serviceRows.append(row);
+  }
+  renderBusStopMarkers(result.stops);
+  $('assessmentWording').textContent = result.wording;
+  const stopProvenance = result.provenance.stops ?? {};
+  const timetableProvenance = result.provenance.timetables ?? {};
+  const checked = formatTime(stopProvenance.retrievedAt || timetableProvenance.retrievedAt);
+  const stopSource = providerLabel({ provenance: stopProvenance });
+  $('evidenceSummary').textContent = `${result.stops.length} stop${result.stops.length === 1 ? '' : 's'} · ${result.serviceSummaries.length} directional service summar${result.serviceSummaries.length === 1 ? 'y' : 'ies'}`;
+  $('resultSource').textContent = `${stopSource}; Department for Transport bus timetables; OpenStreetMap routing`;
   $('resultChecked').textContent = checked;
-  $('resultFreshness').textContent = `Up to date — checked ${checked}`;
+  $('resultFreshness').textContent = result.status === 'complete' ? 'Assessment complete' : 'Partial assessment - review points to note';
   const plannerChecks = $('plannerChecks');
   plannerChecks.replaceChildren();
-  const source = document.createElement('p'); source.innerHTML = `<strong>Source:</strong> ${sourceName}`;
-  const checkedLine = document.createElement('p'); checkedLine.innerHTML = `<strong>Checked:</strong> ${checked}`;
-  const status = document.createElement('p'); status.innerHTML = '<strong>Status:</strong> Up to date';
-  plannerChecks.append(source, checkedLine, status);
+  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableProvenance.source || 'Department for Transport Bus Open Data Service'], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', result.status === 'complete' ? 'Complete for the information shown' : 'Partial - use the points to note below']]) {
+    const line = document.createElement('p'); const label = document.createElement('strong'); label.textContent = `${labelText}: `; line.append(label, value); plannerChecks.append(line);
+  }
   const plannerWarnings = [...new Set(result.warnings.map(plannerStopWarning))];
   if (plannerWarnings.length) {
     const heading = document.createElement('strong'); heading.textContent = 'Points to note';
@@ -293,14 +378,16 @@ function renderEvidence(result) {
   }
   const diagnostics = $('diagnostics');
   diagnostics.replaceChildren();
-  const endpoint = document.createElement('p');
-  const endpointLink = document.createElement('a');
-  endpointLink.href = result.provenance.endpoint; endpointLink.target = '_blank'; endpointLink.rel = 'noopener noreferrer'; endpointLink.textContent = result.provenance.endpoint;
-  endpoint.append('Source endpoint: ', endpointLink);
-  const request = document.createElement('p'); request.textContent = `HTTP status: ${result.provenance.httpStatus ?? 'not supplied'} · Cache status: ${result.cache.status} · Anonymous request: ${result.provenance.anonymousRequest ? 'yes' : 'no'} · Embedded API key: ${result.provenance.apiKeyEmbedded ? 'yes' : 'no'}`;
-  const retrieval = document.createElement('p'); retrieval.textContent = `Exact retrieval timestamp: ${result.provenance.retrievedAt}`;
-  const routing = document.createElement('p'); routing.textContent = `Provider routing: ${result.provenance.providerSelectedBy}`;
-  diagnostics.append(endpoint, request, retrieval, routing);
+  const diagnosticLines = [
+    `Stop source reference: ${stopProvenance.endpoint || 'not supplied'}`,
+    `Timetable source reference: ${timetableProvenance.endpoint || 'not supplied'}`,
+    `Prepared dataset time: ${timetableProvenance.dataPreparedAt || stopProvenance.dataPreparedAt || 'not supplied'}`,
+    `Representative timetable dates: ${JSON.stringify(timetableProvenance.representativeDates || {})}`,
+    `Source stop IDs: ${result.stops.map(stop => stop.id).join(', ')}`,
+    `Provider routing: ${stopProvenance.providerSelectedBy || 'not supplied'}`,
+    `Embedded API key: ${stopProvenance.apiKeyEmbedded || timetableProvenance.apiKeyEmbedded ? 'yes' : 'no'}`
+  ];
+  diagnosticLines.forEach(value => { const line = document.createElement('p'); line.textContent = value; diagnostics.append(line); });
 }
 
 async function searchAddress(event) {
@@ -363,18 +450,21 @@ async function loadStops(forceRefresh) {
   $('findStops').disabled = true;
   $('refreshStops').disabled = true;
   try {
-    const result = await busStops.nearbyStops(confirmedSite, { radius: $('radius').value, forceRefresh });
+    const result = await busAssessment.assess(confirmedSite, { radius: $('radius').value, forceRefresh });
     if (!result.ok) {
       $('evidencePanel').hidden = true;
       busStopMarkers.forEach(marker => map.removeLayer(marker));
       busStopMarkers = [];
-      const stale = result.cache?.staleAvailable ? ' An earlier result is now out of date and has not been shown.' : '';
+      const stale = result.stopsResult?.cache?.staleAvailable ? ' An earlier result is now out of date and has not been shown.' : '';
       setCallout($('stopStatus'), `${plannerFailure('bus', result)}${stale}`, 'error');
       return;
     }
-    renderEvidence(result);
-    const checked = formatTime(result.provenance.retrievedAt);
-    setCallout($('stopStatus'), `${result.data.length} nearby stop${result.data.length === 1 ? '' : 's'} found. Up to date — checked ${checked}.`, result.warnings.length ? 'warning' : 'success');
+    renderAssessment(result);
+    const checked = formatTime(result.provenance.stops?.retrievedAt || result.provenance.timetables?.retrievedAt);
+    const message = result.status === 'complete'
+      ? `${result.stops.length} nearby stop${result.stops.length === 1 ? '' : 's'} assessed. Complete - checked ${checked}.`
+      : `${result.stops.length} nearby stop${result.stops.length === 1 ? '' : 's'} found. Part of the assessment is unavailable; review the points to note.`;
+    setCallout($('stopStatus'), message, result.status === 'complete' && !result.warnings.length ? 'success' : 'warning');
   } finally {
     $('findStops').disabled = !confirmedSite;
     $('refreshStops').disabled = !confirmedSite;
@@ -416,6 +506,7 @@ $('coordinatesForm').addEventListener('submit', enterCoordinates);
 $('confirmAssessmentPoint').addEventListener('click', confirmAssessmentPoint);
 $('findStops').addEventListener('click', () => loadStops(false));
 $('refreshStops').addEventListener('click', () => loadStops(true));
+$('clearRoutes').addEventListener('click', clearRouteLines);
 window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
 initMap();
 showView(location.hash.slice(1));

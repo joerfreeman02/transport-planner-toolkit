@@ -1,19 +1,19 @@
-# Product Owner manual acceptance
+# Product Owner manual acceptance — BUS-1 Alpha.4
 
-No developer tools or terminal commands are required.
+No developer tools are required. Open the supplied review link and record browser, date, unexpected wording and the step number. Acceptance is only complete when the Product Owner explicitly records it.
 
-Open the supplied remote ATLAS review link. Do not try to open `atlas/index.html` directly from a downloaded folder: the browser protects local files from loading the separate ATLAS modules and external information sources. Engineers may use a small local static server, but this is not the ordinary Product Owner review method.
+1. Confirm the header shows `2.0.0-alpha.4` and `ATLAS-2.0.0-alpha.4-20260904`.
+2. Open Report Builder, Modules, Projects and About. Confirm About shows `EAS FORGE — Framework for Operational Research, Governance & Engineering` and the approved creator profile.
+3. In Modules, confirm the five cards remain correctly labelled and **Open legacy Toolkit** is clearly visible.
+4. Enter `33 Westow Street, Crystal Palace`, select **Find site**, choose the property beginning `33, Westow Street`, check the point and confirm it. Do not accept a materially different address.
+5. Select **Build Bus assessment**. Confirm nearby stop markers are subordinate to the site marker; stop rows show name, direction/letter, routed walking distance/time, routed cycling distance/time and routes; each stop has Google Maps verification.
+6. Confirm the Bus Service Summary has only Route, Operator, Origin/destination, Principal locations and Operating period. Material qualifications must appear as full-width `Service note:` rows; normal rows must not show empty notes. No frequency column or bus `tph`/`bph` wording is permitted.
+7. Read Assessment wording and Sources and checks. Confirm the normal wording is understandable without software knowledge, uses only evidenced routes/places, and does not claim service quality. Technical details should remain closed unless diagnosing.
+8. Change the assessment point and confirm the earlier Bus result disappears until the changed point is reconfirmed and rebuilt.
+9. Use manual coordinates `51.6857829, -0.0330001` for the Waltham Cross town-centre control. Confirm the point is outside Greater London, authoritative NaPTAN stops and BODS timetable summaries appear, opposite directions remain separate, and walking/cycling values are routed.
+10. Use manual coordinates `52.2053, 0.1218` for the Cambridge regional-city control. Confirm national stops, services and routed access appear without any London-specific behaviour.
+11. Temporarily disconnect networking or ask engineering to exercise the controlled failure fixture. Confirm ATLAS distinguishes unavailable stop information, unavailable timetable information and unavailable routing from a genuine zero result, explains what to do next, and never substitutes straight-line access.
+12. Check approximately 1440 px, 1024 px and mobile width. Confirm no horizontal overflow, table catastrophe, unusable map or dominant technical diagnostics.
+13. Select **Open legacy Toolkit**. Confirm the dashboard and established legacy Accessibility, Railway, Bus, STATS19, Drawing Generator and Shared Library access remain available.
 
-1. Open the supplied ATLAS review link and confirm the header shows `2.0.0-alpha.3` and build `ATLAS-2.0.0-alpha.3-20260824`.
-2. Select **Report Builder**, **Modules** and **Projects**. Confirm each opens cleanly and that planned areas are clearly labelled rather than presented as complete.
-3. Open **About**. Confirm the full product name, EAS FORGE programme, **Created by Joe Freeman**, version, development status and data acknowledgements are clear.
-4. Return to **Modules**. Confirm Accessibility and Road Safety are in the Existing Toolkit, Bus is In development, Rail is Planned, and Drawings is Under review.
-5. Enter `33 Westow Street, Crystal Palace` and select **Find site**. Allow several seconds for the controlled search.
-6. Check that the returned property begins `33, Westow Street`, select **Use this result**, check the map, and select **Confirm assessment point**. Do not continue if a materially different address or point is shown.
-7. Select **Check nearby bus stops**. Confirm the table shows stop names, direction/stop letter, straight-line discovery distance, routes serving the stop, Google Maps link and source stop ID, with Transport for London, the checked time and **Up to date** shown above it. Confirm the map keeps the assessment point dominant and uses smaller markers for stops.
-8. Open **Sources and checks**. Confirm the source, checked time and any professional points to note are understandable. Technical details should remain closed unless needed for diagnosis.
-9. Select **Check nearby bus stops** again. Confirm the result still says **Up to date** and retains the original checked time. **Check again** should perform a new source check.
-10. For a confirmed point outside the official Greater London boundary, confirm ATLAS routes to NaPTAN and reports **National coverage is not implemented yet**. It must not report that there are zero stops.
-11. Select **Open legacy Toolkit** and confirm the existing dashboard remains available.
-
-Record the browser, date, any unexpected message and the step number. This review is Product Owner acceptance only when explicitly recorded as such.
+Frequency methodology note: the deterministic calculation is implemented, but production deliberately shows no typical-weekday frequency until an exact representative window is approved.

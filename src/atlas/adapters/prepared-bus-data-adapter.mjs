@@ -3,6 +3,7 @@ import { isConfirmedSite } from '../domain/site.mjs';
 import { requestJson } from '../infrastructure/http-client.mjs';
 import { distanceMetres } from './tfl-bus-stop-adapter.mjs';
 import { sourceFailure, sourceSuccess } from './source-adapter.mjs';
+import { mergeBusTimetableSources } from '../domain/bus-timetable-merge.mjs';
 
 const STOP_SOURCE = 'Department for Transport NaPTAN';
 const TIMETABLE_SOURCE = 'Department for Transport Bus Open Data Service';
@@ -50,6 +51,7 @@ async function requestPreparedJson({ url, fetchImpl, timeoutMs }) {
 export function createPreparedBusDataAdapter({
   fetchImpl = globalThis.fetch,
   baseUrl,
+  tndsBaseUrl = null,
   clock = () => new Date(),
   timeoutMs = 20000
 } = {}) {
@@ -162,12 +164,22 @@ export function createPreparedBusDataAdapter({
       if (!existing) services.set(service.id, structuredClone(service));
       else Object.assign(existing.stopSchedules, service.stopSchedules);
     }
+    let mergedServices = [...services.values()];
+    let tndsProvenance = null;
+    if (tndsBaseUrl) {
+      const tndsManifest = await requestJson({ url: resolveUrl(tndsBaseUrl, 'manifest.json'), fetchImpl, timeoutMs });
+      if (tndsManifest.ok && tndsManifest.data?.schema === 'atlas-prepared-bus-tnds-v1') {
+        const tndsRows = (await Promise.all((tndsManifest.data.services || []).map(file => requestJson({ url: resolveUrl(tndsBaseUrl, file), fetchImpl, timeoutMs })))).filter(row => row.ok).map(row => row.data).filter(service => Object.keys(service.stopSchedules || {}).some(id => stopIds.has(id)));
+        mergedServices = mergeBusTimetableSources({ bods: mergedServices, tnds: tndsRows });
+        tndsProvenance = { source: 'Traveline National Dataset supplementary data', dataPreparedAt: tndsManifest.data.generatedAt, regions: tndsManifest.data.regions };
+      }
+    }
     const checkedAt = clock().toISOString();
     const warnings = snapshotWarnings(index);
     if (!services.size) warnings.push('No current BODS timetable records matched the selected authoritative stop identifiers.');
     return sourceSuccess({
-      data: [...services.values()], evidence: [], warnings,
-      provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, datasetVersion: index.sources.bods.sha256, regions: index.sources.bods.regions, representativeDates: index.representativeDates, anonymousRequest: true, apiKeyEmbedded: false, attribution: TIMETABLE_ATTRIBUTION }
+      data: mergedServices, evidence: [], warnings,
+      provenance: { source: tndsProvenance ? `${TIMETABLE_SOURCE}; ${tndsProvenance.source}` : TIMETABLE_SOURCE, endpoint: index.sources.bods.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, tndsPreparedAt: tndsProvenance?.dataPreparedAt || null, datasetVersion: index.sources.bods.sha256, regions: index.sources.bods.regions, representativeDates: index.representativeDates, anonymousRequest: true, apiKeyEmbedded: false, attribution: TIMETABLE_ATTRIBUTION }
     });
   }
 

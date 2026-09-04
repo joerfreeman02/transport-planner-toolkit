@@ -14,7 +14,7 @@ const $ = id => document.getElementById(id);
 const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha5' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tfl = createTflBusStopAdapter({ cache });
-const preparedBusData = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url) });
+const preparedBusData = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url), tndsBaseUrl: new URL('../../data/bus-tnds/', import.meta.url) });
 const accessRouting = createOsrmAccessRoutingAdapter();
 const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: preparedBusData });
 const busAssessment = createBusAssessment({ stopDiscovery: busStops, timetableData: preparedBusData, accessRouting });

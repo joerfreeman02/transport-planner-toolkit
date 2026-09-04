@@ -218,6 +218,9 @@ footer { max-width: 1600px; margin: auto; padding: 0 24px 34px; color: var(--atl
   .confirmed-site dl, .about-card dl { grid-template-columns: 1fr; gap: 2px; }
   .confirmed-site dd, .about-card dd { margin-bottom: 6px; }
   .evidence-panel { padding: 22px 18px; }
+  .data-status-heading { display: block; }
+  .data-status-actions { justify-content: flex-start; margin-top: 10px; }
+  .selection-actions { justify-content: flex-start; margin-top: 8px; }
   .check-summary { grid-template-columns: 1fr; }
   .table-wrap { border: 0; overflow: visible; }
   table { min-width: 0; }
@@ -238,3 +241,13 @@ footer { max-width: 1600px; margin: auto; padding: 0 24px 34px; color: var(--atl
 .control-hint { margin: 8px 0 0; color: var(--atlas-muted); font-size: .82rem; }
 .evidence-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; text-align: right; }
 .creator-credit { font-weight: 800; color: var(--atlas-blue); }
+.data-status { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--atlas-line); border-radius: 9px; background: #f8fafc; }
+.data-status-heading { display: flex; justify-content: space-between; gap: 14px; align-items: start; }
+.data-status-heading h3 { margin: 2px 0 0; color: var(--atlas-blue); font-size: 1rem; }
+.data-status-actions, .selection-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.data-status p { margin: 8px 0; font-weight: 800; }
+.data-status dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; font-size: .8rem; }
+.data-status dt { font-weight: 800; color: var(--atlas-muted); }
+.data-status dd { margin: 0; }
+.status-message.success { color: var(--atlas-good); }
+.status-message.warning { color: #7b5500; }

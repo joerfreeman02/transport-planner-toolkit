@@ -40,6 +40,26 @@ test('genuine authoritative zero remains complete and distinct from source failu
   assert.equal(result.stops.length, 0);
 });
 
+test('timetable routes propagate to exact stop rows and orphan services are excluded', async () => {
+  const stops = [
+    { ...stop, id: 'STOP-A', name: 'Woodside Road', routes: ['230'] },
+    { ...stop, id: 'STOP-B', name: 'Woodside Road', routes: [] }
+  ];
+  const services = [
+    { ...service, id: 'tnds-231', routeNumber: '231', operator: 'South Beds Dial-a-Ride', stopSchedules: { 'STOP-A': service.stopSchedules['2100A'] } },
+    { ...service, id: 'orphan', routeNumber: '999', stopSchedules: { 'NOT-IN-ASSESSMENT': service.stopSchedules['2100A'] } }
+  ];
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: stops, evidence: [], warnings: [], provenance: {} }) },
+    timetableData: { servicesForStops: async selected => ({ ok: true, data: services.filter(row => Object.keys(row.stopSchedules).some(id => selected.some(item => item.id === id))), warnings: [], provenance: {} }) },
+    accessRouting: { matrix: async (_site, selected) => ({ ok: true, routes: selected.map(() => ({ status: 'routed', distanceMetres: 100, durationSeconds: 60 })), warnings: [], provenance: {} }) }
+  });
+  const result = await assessment.assess({});
+  assert.deepEqual(result.stops.map(item => item.routes), [['230', '231'], []]);
+  assert.deepEqual(result.serviceSummaries.map(item => item.routeNumber), ['231']);
+  assert.deepEqual(result.serviceSummaries[0].stopIds, ['STOP-A']);
+});
+
 for (const [name, fn] of tests) {
   await fn();
   console.log(`PASS Bus assessment - ${name}`);

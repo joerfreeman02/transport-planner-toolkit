@@ -5,7 +5,7 @@ import { createServer as createNetServer } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { startReviewServer, stopReviewServer } from '../../tools/atlas-review/review-server.mjs';
+import { approvedBusUpdaterPath, startReviewServer, stopReviewServer } from '../../tools/atlas-review/review-server.mjs';
 
 const rootDir = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
 let passed = 0;
@@ -13,9 +13,10 @@ const pass = name => { passed += 1; console.log(`PASS Review environment — ${n
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'atlas-review-test-'));
 const stateFile = path.join(temporary, 'review-state.json');
 let review;
+let updaterOpened = null;
 
 try {
-  review = await startReviewServer({ rootDir, preferredPort: 0, maximumPort: 0, stateFile, openBrowser: false });
+  review = await startReviewServer({ rootDir, preferredPort: 0, maximumPort: 0, stateFile, openBrowser: false, updaterLauncher: root => { updaterOpened = root; } });
   assert.equal(review.reused, false);
   assert.match(review.url, /^http:\/\/127\.0\.0\.1:\d+\/atlas\/#modules$/);
   assert.equal(existsSync(stateFile), true);
@@ -29,6 +30,10 @@ try {
   assert.match(atlasHtml, /ATLAS — Transport and Location Assessment/);
   assert.match(atlasHtml, /2\.0\.0-alpha\.6/);
   assert.match(atlasHtml, /ATLAS-2\.0\.0-alpha\.6-20260904/);
+  const updateResponse = await fetch(new URL('/__atlas-review/update-bus-data', review.url), { method: 'POST' });
+  assert.equal(updateResponse.status, 200);
+  assert.equal(updaterOpened, rootDir);
+  assert.equal(approvedBusUpdaterPath(rootDir), path.join(rootDir, 'tools', 'atlas-bus-data', 'UPDATE ATLAS BUS DATA.bat'));
   const legacy = await fetch(new URL('/', review.url));
   assert.equal(legacy.status, 200);
   assert.match(await legacy.text(), /Transport Planner Toolkit/);

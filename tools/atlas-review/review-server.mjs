@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const APP_ID = 'eas-atlas-review-v1';
 const APP_VERSION = '2.0.0-alpha.6';
+const UPDATE_BUS_DATA_PATH = path.join('tools', 'atlas-bus-data', 'UPDATE ATLAS BUS DATA.bat');
 const STATUS_PATH = '/__atlas-review/status';
 const STOP_PATH = '/__atlas-review/stop';
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
@@ -96,6 +97,16 @@ function openDefaultBrowser(url) {
   child.unref();
 }
 
+export function approvedBusUpdaterPath(rootDir = DEFAULT_ROOT) { return path.join(path.resolve(rootDir), UPDATE_BUS_DATA_PATH); }
+
+export function launchBusUpdater(rootDir = DEFAULT_ROOT) {
+  const updater = approvedBusUpdaterPath(rootDir);
+  if (process.platform !== 'win32' || !existsSync(updater)) throw new Error('The local Bus data updater is not available.');
+  const child = spawn('cmd.exe', ['/d', '/c', updater], { detached: true, stdio: 'ignore', windowsHide: false });
+  child.unref();
+  return updater;
+}
+
 function plainResponse(response, statusCode, message) {
   response.writeHead(statusCode, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
   response.end(message);
@@ -122,7 +133,7 @@ async function resolveStaticFile(rootDir, pathname) {
   return details.isFile() ? { file: candidateReal, size: details.size } : null;
 }
 
-function createRequestHandler({ rootDir, rootId, stopToken, closeServer }) {
+function createRequestHandler({ rootDir, rootId, stopToken, closeServer, updaterLauncher = launchBusUpdater }) {
   return async (request, response) => {
     const method = request.method || 'GET';
     let pathname;
@@ -139,6 +150,15 @@ function createRequestHandler({ rootDir, rootId, stopToken, closeServer }) {
       response.end(JSON.stringify({ stopped: true }));
       setTimeout(closeServer, 25);
       return;
+    }
+    if (pathname === '/__atlas-review/update-bus-data' && method === 'POST') {
+      try {
+        updaterLauncher(rootDir);
+        response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        return response.end(JSON.stringify({ opened: true }));
+      } catch {
+        return plainResponse(response, 503, 'The local ATLAS maintenance environment is not available.');
+      }
     }
     if (!['GET', 'HEAD'].includes(method)) return plainResponse(response, 405, 'This ATLAS review action is not available.');
 
@@ -186,7 +206,8 @@ export async function startReviewServer({
   preferredPort = 8769,
   maximumPort = 8789,
   stateFile = reviewStateFile(rootDir),
-  openBrowser = true
+  openBrowser = true,
+  updaterLauncher = launchBusUpdater
 } = {}) {
   const resolvedRoot = path.resolve(rootDir);
   if (!existsSync(path.join(resolvedRoot, 'atlas', 'index.html'))) throw new Error('ATLAS application files were not found.');
@@ -204,7 +225,7 @@ export async function startReviewServer({
   let resolveClosed;
   const closed = new Promise(resolve => { resolveClosed = resolve; });
   const closeServer = () => { if (server?.listening) server.close(); else resolveClosed(); };
-  server = createServer(createRequestHandler({ rootDir: resolvedRoot, rootId, stopToken, closeServer }));
+  server = createServer(createRequestHandler({ rootDir: resolvedRoot, rootId, stopToken, closeServer, updaterLauncher }));
   const port = await listen(server, preferredPort, maximumPort);
   const url = `http://127.0.0.1:${port}/atlas/#modules`;
   await writeState(stateFile, { appId: APP_ID, version: APP_VERSION, rootId, port, processId: process.pid, stopToken, startedAt: new Date().toISOString() });

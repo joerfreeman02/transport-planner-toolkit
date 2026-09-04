@@ -74,7 +74,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
           assessmentMode,
           discoveredStopCount: enrichedDiscoveredStops.length,
           nearestGroup: null,
-          stops: Object.freeze(enrichedDiscoveredStops),
+          stops: Object.freeze(enrichedDiscoveredStops.map(stop => Object.freeze({ ...stop, timetableMatch: false }))),
           services: Object.freeze([]),
           serviceSummaries: Object.freeze([]),
           wording: buildControlledBusWording([]),
@@ -96,6 +96,17 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
       services = services.filter(service => Object.keys(service.stopSchedules ?? {}).some(id => selectedIds.has(id)));
     }
     const serviceSummaries = buildServiceSummaries(selectedStops, services);
+    const routesByStop = new Map(selectedStops.map(stop => [String(stop.id || stop.sourceId), new Set()]));
+    for (const service of services) {
+      for (const stopId of Object.keys(service.stopSchedules ?? {})) {
+        if (routesByStop.has(stopId) && service.routeNumber) routesByStop.get(stopId).add(String(service.routeNumber));
+      }
+    }
+    selectedStops = selectedStops.map(stop => Object.freeze({
+      ...stop,
+      routes: [...new Set([...(stop.routes ?? []), ...(routesByStop.get(String(stop.id || stop.sourceId)) ?? new Set())])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+      timetableMatch: (routesByStop.get(String(stop.id || stop.sourceId))?.size ?? 0) > 0
+    }));
     const warnings = [...new Set([
       ...(stopsResult.warnings ?? []),
       ...(servicesResult.warnings ?? []),

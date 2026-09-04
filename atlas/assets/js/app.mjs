@@ -8,10 +8,11 @@ import { createOsrmAccessRoutingAdapter } from '../../../src/atlas/adapters/osrm
 import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-discovery.mjs';
 import { createBusAssessment } from '../../../src/atlas/application/bus-assessment.mjs';
 import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
+import { buildControlledBusWording } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
-const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha5' });
+const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha6' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tfl = createTflBusStopAdapter({ cache });
 const preparedBusData = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url), tndsBaseUrl: new URL('../../data/bus-tnds/', import.meta.url) });
@@ -33,6 +34,41 @@ let busStopMarkers = [];
 let routeLayers = [];
 let currentBusResult = null;
 let lastAssessmentMode = 'full';
+let selectedStopIds = new Set();
+let selectedServiceIds = new Set();
+let selectionInitialised = false;
+
+function stopKey(stop) { return String(stop?.id || stop?.sourceId || ''); }
+function serviceKey(service) { return String(service?.id || `${service?.routeNumber}|${service?.operator}|${service?.origin}|${service?.destination}`); }
+function selectedResult() {
+  if (!currentBusResult) return null;
+  const stops = currentBusResult.stops.filter(stop => selectedStopIds.has(stopKey(stop)));
+  const stopIds = new Set(stops.map(stopKey));
+  const serviceSummaries = currentBusResult.serviceSummaries.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => stopIds.has(String(id))));
+  return { ...currentBusResult, stops, serviceSummaries, wording: buildControlledBusWording(serviceSummaries, { nearestGroupName: currentBusResult.nearestGroup?.name ?? null }) };
+}
+
+async function refreshDataStatus() {
+  const message = $('dataStatusMessage');
+  try {
+    const [prepared, tnds] = await Promise.all([fetch('data/bus/manifest.json', { cache: 'no-store' }), fetch('data/bus-tnds/manifest.json', { cache: 'no-store' })]);
+    if (!prepared.ok || !tnds.ok) throw new Error('status unavailable');
+    const preparedData = await prepared.json(); const tndsData = await tnds.json();
+    $('preparedDataDate').textContent = formatTime(preparedData.generatedAt);
+    $('tndsDataDate').textContent = `${formatTime(tndsData.generatedAt)} · ${Array.isArray(tndsData.services) ? tndsData.services.length : 0} prepared service file(s)`;
+    message.textContent = 'Bus data current'; message.className = 'status-message success';
+  } catch { message.textContent = 'Bus data status is temporarily unavailable.'; message.className = 'status-message warning'; }
+}
+
+async function updateBusData() {
+  const button = $('updateBusData'); button.disabled = true;
+  try {
+    const response = await fetch('/__atlas-review/update-bus-data', { method: 'POST' });
+    if (!response.ok) throw new Error('unavailable');
+    setCallout($('stopStatus'), 'Bus data updater opened in a secure local window. Complete the update there, then return here and refresh the data status.', 'success');
+  } catch { setCallout($('stopStatus'), 'Bus data updates are available from the local ATLAS maintenance environment.', 'warning'); }
+  finally { button.disabled = false; }
+}
 
 function showView(name) {
   const selected = views.includes(name) ? name : 'modules';
@@ -106,6 +142,7 @@ function clearBusEvidence(message = 'Confirm the assessment point before checkin
   $('serviceRows').replaceChildren();
   $('assessmentWording').textContent = '';
   $('clearRoutes').hidden = true;
+  selectedStopIds = new Set(); selectedServiceIds = new Set(); selectionInitialised = false;
   setCallout($('stopStatus'), hadEvidence ? 'The assessment point changed, so the earlier bus results were cleared. Confirm the new point before checking again.' : message, hadEvidence ? 'warning' : 'neutral');
 }
 
@@ -318,6 +355,14 @@ function appendCell(row, label, value, secondary = '') {
 
 function renderAssessment(result) {
   currentBusResult = result;
+  if (!selectionInitialised) {
+    selectedStopIds = new Set(result.stops.filter(stop => stop.timetableMatch !== false).map(stopKey));
+    selectedServiceIds = new Set(result.serviceSummaries.map(serviceKey));
+    selectionInitialised = true;
+  }
+  for (const service of result.serviceSummaries) {
+    if (!service.stopIds?.some(id => selectedStopIds.has(String(id)))) selectedServiceIds.delete(serviceKey(service));
+  }
   $('exportBusWord').disabled = false;
   const panel = $('evidencePanel');
   const rows = $('evidenceRows');
@@ -327,6 +372,9 @@ function renderAssessment(result) {
   serviceRows.replaceChildren();
   for (const stop of result.stops) {
     const row = document.createElement('tr');
+    const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedStopIds.has(stopKey(stop)); include.setAttribute('aria-label', `Include ${stop.name}`);
+    include.addEventListener('change', () => { if (include.checked) selectedStopIds.add(stopKey(stop)); else selectedStopIds.delete(stopKey(stop)); renderAssessment(result); });
+    appendCell(row, 'Include', include);
     const stopCell = document.createElement('span');
     const stopName = document.createElement('strong'); stopName.textContent = stop.name;
     const mapLink = document.createElement('a'); mapLink.href = googleMapsUrl(stop); mapLink.target = '_blank'; mapLink.rel = 'noopener noreferrer'; mapLink.textContent = 'Open in Google Maps';
@@ -338,13 +386,18 @@ function renderAssessment(result) {
     if (stop.walking.status !== 'routed') walking.classList.add('route-unavailable');
     if (stop.cycling.status !== 'routed') cycling.classList.add('route-unavailable');
     appendCell(row, 'Routes serving stop', stop.routes?.length ? stop.routes.join(', ') : 'Timetable route match unavailable');
+    appendCell(row, 'Timetable match', stop.timetableMatch === false ? 'NO CURRENT SCHEDULED TIMETABLE MATCH' : 'CURRENT SCHEDULED SERVICE MATCHED', stop.timetableMatch === false ? 'No current BODS/TNDS service was matched to this stop. Review before including it in the report.' : '');
     rows.append(row);
   }
   if (!result.stops.length) {
-    const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 5; cell.textContent = 'No authoritative bus stops were found within the selected discovery radius.'; row.append(cell); rows.append(row);
+    const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 7; cell.textContent = 'No authoritative bus stops were found within the selected discovery radius.'; row.append(cell); rows.append(row);
   }
   for (const service of result.serviceSummaries) {
     const row = document.createElement('tr');
+    const supported = service.stopIds?.some(id => selectedStopIds.has(String(id)));
+    const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedServiceIds.has(serviceKey(service)) && supported; include.disabled = !supported; include.setAttribute('aria-label', `Include route ${service.routeNumber}`);
+    include.addEventListener('change', () => { if (include.checked) selectedServiceIds.add(serviceKey(service)); else selectedServiceIds.delete(serviceKey(service)); renderAssessment(result); });
+    appendCell(row, 'Include', include);
     appendCell(row, 'Route', service.routeNumber);
     appendCell(row, 'Operator', service.operator);
     const originDestination = `${service.origin} - ${service.destination}${service.circular && service.direction ? ` (${service.direction})` : ''}`;
@@ -362,10 +415,10 @@ function renderAssessment(result) {
     }
   }
   if (!result.serviceSummaries.length) {
-    const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 5; cell.textContent = 'No matched timetable summary is available. Review Sources and checks before using the stop information.'; row.append(cell); serviceRows.append(row);
+    const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 6; cell.textContent = 'No matched timetable summary is available. Review Sources and checks before using the stop information.'; row.append(cell); serviceRows.append(row);
   }
   renderBusStopMarkers(result.stops);
-  $('assessmentWording').textContent = result.wording;
+  $('assessmentWording').textContent = buildControlledBusWording(result.serviceSummaries.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => selectedStopIds.has(String(id)))), { nearestGroupName: result.nearestGroup?.name ?? null });
   const stopProvenance = result.provenance.stops ?? {};
   const timetableProvenance = result.provenance.timetables ?? {};
   const checked = formatTime(stopProvenance.retrievedAt || timetableProvenance.retrievedAt);
@@ -494,7 +547,9 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode) {
 
 function exportBusWord() {
   if (!currentBusResult?.ok || !confirmedSite) return setCallout($('stopStatus'), 'Build a Bus assessment before exporting to Word.', 'warning');
-  downloadWordDocument(busWordFilename(confirmedSite), 'ATLAS Bus Assessment', buildBusWordTables(currentBusResult), currentBusResult.wording);
+  const report = selectedResult();
+  if (!report.stops.length && !report.serviceSummaries.length) return setCallout($('stopStatus'), 'Select at least one stop or service before exporting.', 'warning');
+  downloadWordDocument(busWordFilename(confirmedSite), 'ATLAS Bus Assessment', buildBusWordTables(report), report.wording);
   setCallout($('stopStatus'), 'Word export created from the checked Bus assessment.', 'success');
 }
 
@@ -536,8 +591,14 @@ $('findStops').addEventListener('click', () => loadStops(false, 'full'));
 $('refreshStops').addEventListener('click', () => loadStops(true, lastAssessmentMode));
 $('exportBusWord').addEventListener('click', exportBusWord);
 $('clearRoutes').addEventListener('click', clearRouteLines);
+$('recommendedSelection').addEventListener('click', () => { selectionInitialised = false; renderAssessment(currentBusResult); });
+$('selectAllRows').addEventListener('click', () => { selectedStopIds = new Set(currentBusResult?.stops.map(stopKey) ?? []); selectedServiceIds = new Set(currentBusResult?.serviceSummaries.map(serviceKey) ?? []); selectionInitialised = true; renderAssessment(currentBusResult); });
+$('clearAllRows').addEventListener('click', () => { selectedStopIds = new Set(); selectedServiceIds = new Set(); selectionInitialised = true; renderAssessment(currentBusResult); });
+$('refreshDataStatus').addEventListener('click', refreshDataStatus);
+$('updateBusData').addEventListener('click', updateBusData);
 window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
 initMap();
 showView(location.hash.slice(1));
+refreshDataStatus();
 
 window.__ATLAS_SITE_SELECTOR__ = Object.freeze({ getSnapshot: selector.getSnapshot, getMap: () => map });

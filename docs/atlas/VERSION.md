@@ -24,3 +24,11 @@
 ## Earlier accepted-history dependencies
 
 Alpha.4 is descended from the SITE-1 checkpoint `8f8fc868ea787f8ce3175e50de1809da8d2624de`, the ATLAS Foundation history, and legacy baseline `551b7cbf6646e72f21842bf77b93633373a9cac2`. Historical Toolkit identity `TPT-2.7.1` and module versions are unchanged.
+## BUS-1 Alpha.6 engineering checkpoint
+
+| Field | Value |
+|---|---|
+| Version | `2.0.0-alpha.6` |
+| Build | `ATLAS-2.0.0-alpha.6-20260904` |
+| Branch | `codex/atlas-bus-1-alpha6-tnds` |
+| Status | Core TNDS/parser, merge, nearest-served and day-range checkpoint; Product Owner acceptance pending. |

@@ -26,6 +26,7 @@ export function nearbyGridCellKeys(site, radiusMetres, gridSize = 0.1) {
 }
 
 function resolveUrl(baseUrl, relativePath) { return new URL(relativePath, baseUrl).toString(); }
+function sourceTimestamp(value) { const text = String(value ?? '').trim(); return text && !Number.isNaN(Date.parse(text)) ? text : null; }
 
 async function requestPreparedJson({ url, fetchImpl, timeoutMs }) {
   const controller = new AbortController();
@@ -117,7 +118,7 @@ export function createPreparedBusDataAdapter({
       evidenceType: 'bus.stop.nearby',
       value: stop,
       units: 'metres',
-      source: { name: STOP_SOURCE, authoritative: true, recordIdentifier: stop.id, endpoint: index.sources.naptan.url, datasetTimestamp: index.sources.naptan.downloadedAt, datasetVersion: index.sources.naptan.sha256, attribution: STOP_ATTRIBUTION },
+      source: { name: STOP_SOURCE, authoritative: true, recordIdentifier: stop.id, endpoint: index.sources.naptan.url, datasetTimestamp: sourceTimestamp(stop.modifiedAt), datasetVersion: index.sources.naptan.sha256, attribution: STOP_ATTRIBUTION },
       retrievedAt: checkedAt,
       calculationMethodology: 'Straight-line discovery distance calculated using the WGS84 haversine formula from the confirmed assessment point to the authoritative NaPTAN stop coordinate.',
       validationStatus: 'validated', confidenceStatus: 'authoritative', warnings,
@@ -133,12 +134,26 @@ export function createPreparedBusDataAdapter({
     const stopIds = new Set((stops ?? []).map(stop => String(stop.id || stop.sourceId || '')).filter(Boolean));
     const prefixLength = Number(index.serviceShardKeyLength || 3);
     const shardKeys = [...new Set((stops ?? []).map(stop => String(stop.id || stop.sourceId || '').slice(0, prefixLength)).filter(code => code.length === prefixLength))];
+    const missingShardKeys = shardKeys.filter(code => {
+      const configured = index.serviceShards?.[code];
+      return Array.isArray(configured) ? configured.length === 0 : !configured;
+    });
+    if (!shardKeys.length || missingShardKeys.length) {
+      return sourceFailure({
+        code: 'unavailable_source',
+        message: 'Bus timetable information could not be checked. Please try again.',
+        provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url },
+        warnings: [missingShardKeys.length
+          ? `Prepared timetable coverage is unavailable for ${missingShardKeys.length} selected stop area${missingShardKeys.length === 1 ? '' : 's'}. No zero-service conclusion has been assumed.`
+          : 'No prepared timetable area could be identified for the selected stops.']
+      });
+    }
     const paths = [...new Set(shardKeys.flatMap(code => {
       const configured = index.serviceShards?.[code];
       return Array.isArray(configured) ? configured : configured ? [configured] : [];
     }))];
     const responses = await Promise.all(paths.map(path => loadJson(path, forceRefresh)));
-    if (!paths.length || responses.some(response => !response.ok)) return sourceFailure({ code: 'unavailable_source', message: 'Bus timetable information could not be checked. Please try again.', provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url }, warnings: ['No prepared timetable file was available for one or more stop areas.'] });
+    if (!paths.length || responses.some(response => !response.ok)) return sourceFailure({ code: 'unavailable_source', message: 'Bus timetable information could not be checked. Please try again.', provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url }, warnings: ['One or more prepared timetable files could not be loaded.'] });
     if (responses.some(response => response.data?.schema !== 'atlas-prepared-bus-data-v1' || !Array.isArray(response.data?.services))) return sourceFailure({ code: 'invalid_response', message: 'Bus timetable information could not be safely interpreted. Please try again.', provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url }, warnings: ['A prepared timetable file was incomplete or malformed.'] });
     const services = new Map();
     for (const response of responses) for (const service of response.data?.services ?? []) {

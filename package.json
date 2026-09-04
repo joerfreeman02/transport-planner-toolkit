@@ -17,7 +17,7 @@
     "test:atlas:live-millers": "node tests/atlas/live/nominatim-millers-house-smoke.mjs",
     "test:atlas:live-browser": "node tests/atlas/live/browser-cors-smoke.mjs",
     "test:atlas:isolation": "node tests/atlas/legacy-isolation.test.mjs",
-    "build:atlas:bus-data": "python tools/atlas-bus-data/build_static_index.py --naptan tmp/bus-data/naptan.csv --gtfs-dir tmp/bus-data --output atlas/data/bus --snapshot-date 2026-09-04"
+    "build:atlas:bus-data": "node tools/atlas-bus-data/run-build.mjs"
   },
   "devDependencies": {
     "playwright": "1.58.2"

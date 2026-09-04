@@ -5,8 +5,8 @@
 | Field | Value |
 |---|---|
 | Product line | ATLAS 2.0 |
-| Version | `2.0.0-alpha.4` |
-| Visible build | `ATLAS-2.0.0-alpha.4-20260904` |
+| Version | `2.0.0-alpha.6` |
+| Visible build | `ATLAS-2.0.0-alpha.6-20260904` |
 | Starting checkpoint | `4fddd0cd3a8eb4f9dd624212cf414c0f60319bb7` |
 | Branch | `codex/atlas-bus-1-finish` |
 | Status | Interrupted BUS-1 WIP preserved on rescue branch; prepared national dataset is incomplete and this is not a merge-ready candidate |

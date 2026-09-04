@@ -26,7 +26,7 @@ const identifiedFetch = (url, options = {}) => fetch(url, {
   ...options,
   headers: {
     ...(options.headers || {}),
-    'User-Agent': 'ATLAS/2.0.0-alpha.4 Crystal Palace live verification'
+    'User-Agent': 'ATLAS/2.0.0-alpha.6 Crystal Palace live verification'
   }
 });
 

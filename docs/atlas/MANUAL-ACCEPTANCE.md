@@ -2,7 +2,7 @@
 
 No developer tools are required. Open the supplied review link and record browser, date, unexpected wording and the step number. Acceptance is only complete when the Product Owner explicitly records it.
 
-1. Confirm the header shows `2.0.0-alpha.4` and `ATLAS-2.0.0-alpha.4-20260904`.
+1. Confirm the header shows `2.0.0-alpha.6` and `ATLAS-2.0.0-alpha.6-20260904`.
 2. Open Report Builder, Modules, Projects and About. Confirm About shows `EAS FORGE — Framework for Operational Research, Governance & Engineering` and the approved creator profile.
 3. In Modules, confirm the five cards remain correctly labelled and **Open legacy Toolkit** is clearly visible.
 4. Enter `33 Westow Street, Crystal Palace`, select **Find site**, choose the property beginning `33, Westow Street`, check the point and confirm it. Do not accept a materially different address.

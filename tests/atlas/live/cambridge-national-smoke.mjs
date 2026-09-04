@@ -14,7 +14,7 @@ import { startReviewServer } from '../../../tools/atlas-review/review-server.mjs
 const rootDir = path.resolve(fileURLToPath(new URL('../../../', import.meta.url)));
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'atlas-cambridge-live-'));
 const review = await startReviewServer({ rootDir, preferredPort: 0, maximumPort: 0, stateFile: path.join(temporary, 'review-state.json'), openBrowser: false });
-const identifiedFetch = (url, options = {}) => fetch(url, { ...options, headers: { ...(options.headers || {}), 'User-Agent': 'ATLAS/2.0.0-alpha.4 Cambridge live verification' } });
+const identifiedFetch = (url, options = {}) => fetch(url, { ...options, headers: { ...(options.headers || {}), 'User-Agent': 'ATLAS/2.0.0-alpha.6 Cambridge live verification' } });
 const site = confirmSite(createSite({ suppliedAddress: 'Cambridge regional-city control point', displayAddress: 'Cambridge city-centre control point', latitude: 52.2053, longitude: 0.1218, locationMethod: 'coordinates_entered' }), { confirmedAt: new Date().toISOString() });
 const prepared = createPreparedBusDataAdapter({ fetchImpl: identifiedFetch, baseUrl: new URL('data/bus/', review.url) });
 const discovery = createBusStopDiscovery({ tflAdapter: { id: 'unused-tfl', nearbyStops() { throw new Error('Cambridge must not use TfL.'); } }, naptanAdapter: prepared });

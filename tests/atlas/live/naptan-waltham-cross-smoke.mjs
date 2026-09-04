@@ -14,7 +14,7 @@ import { startReviewServer } from '../../../tools/atlas-review/review-server.mjs
 const rootDir = path.resolve(fileURLToPath(new URL('../../../', import.meta.url)));
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'atlas-national-live-'));
 const review = await startReviewServer({ rootDir, preferredPort: 0, maximumPort: 0, stateFile: path.join(temporary, 'review-state.json'), openBrowser: false });
-const identifiedFetch = (url, options = {}) => fetch(url, { ...options, headers: { ...(options.headers || {}), 'User-Agent': 'ATLAS/2.0.0-alpha.4 national live verification' } });
+const identifiedFetch = (url, options = {}) => fetch(url, { ...options, headers: { ...(options.headers || {}), 'User-Agent': 'ATLAS/2.0.0-alpha.6 national live verification' } });
 const site = confirmSite(createSite({ suppliedAddress: 'Waltham Cross manual control point', displayAddress: 'Waltham Cross town centre control point', latitude: 51.6857829, longitude: -0.0330001, locationMethod: 'coordinates_entered' }), { confirmedAt: new Date().toISOString() });
 const prepared = createPreparedBusDataAdapter({ fetchImpl: identifiedFetch, baseUrl: new URL('data/bus/', review.url) });
 const discovery = createBusStopDiscovery({ tflAdapter: { id: 'unused-tfl', nearbyStops() { throw new Error('Waltham Cross must not use TfL.'); } }, naptanAdapter: prepared });

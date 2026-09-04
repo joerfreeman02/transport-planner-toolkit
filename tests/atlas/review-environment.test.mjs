@@ -19,13 +19,16 @@ try {
   assert.equal(review.reused, false);
   assert.match(review.url, /^http:\/\/127\.0\.0\.1:\d+\/atlas\/#modules$/);
   assert.equal(existsSync(stateFile), true);
-  assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).version, '2.0.0-alpha.5');
+  assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).version, '2.0.0-alpha.6');
   pass('starts on an available loopback address');
 
   const atlas = await fetch(review.url);
   assert.equal(atlas.status, 200);
   assert.match(atlas.headers.get('content-type'), /^text\/html/);
-  assert.match(await atlas.text(), /ATLAS — Transport and Location Assessment/);
+  const atlasHtml = await atlas.text();
+  assert.match(atlasHtml, /ATLAS — Transport and Location Assessment/);
+  assert.match(atlasHtml, /2\.0\.0-alpha\.6/);
+  assert.match(atlasHtml, /ATLAS-2\.0\.0-alpha\.6-20260904/);
   const legacy = await fetch(new URL('/', review.url));
   assert.equal(legacy.status, 200);
   assert.match(await legacy.text(), /Transport Planner Toolkit/);

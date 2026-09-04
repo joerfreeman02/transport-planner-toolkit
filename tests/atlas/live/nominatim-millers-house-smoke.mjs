@@ -7,7 +7,7 @@ const sourceResponses = [];
 const identifiedFetch = async (url, options = {}) => {
   const response = await fetch(url, {
     ...options,
-    headers: { ...(options.headers || {}), 'User-Agent': 'ATLAS/2.0.0-alpha.4 SITE-1 live verification' }
+    headers: { ...(options.headers || {}), 'User-Agent': 'ATLAS/2.0.0-alpha.6 SITE-1 live verification' }
   });
   sourceResponses.push({ query: new URL(url).searchParams.get('q'), status: response.status });
   return response;

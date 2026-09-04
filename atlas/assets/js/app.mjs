@@ -7,9 +7,11 @@ import { createPreparedBusDataAdapter } from '../../../src/atlas/adapters/prepar
 import { createOsrmAccessRoutingAdapter } from '../../../src/atlas/adapters/osrm-access-routing-adapter.mjs';
 import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-discovery.mjs';
 import { createBusAssessment } from '../../../src/atlas/application/bus-assessment.mjs';
+import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
+import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
-const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha4' });
+const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha5' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tfl = createTflBusStopAdapter({ cache });
 const preparedBusData = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url) });
@@ -29,6 +31,8 @@ let map = null;
 let assessmentMarker = null;
 let busStopMarkers = [];
 let routeLayers = [];
+let currentBusResult = null;
+let lastAssessmentMode = 'full';
 
 function showView(name) {
   const selected = views.includes(name) ? name : 'modules';
@@ -58,7 +62,8 @@ function formatTime(value) {
 
 function plannerFailure(kind, result) {
   if (result.code === 'invalid_request') return result.message.replace(/Site/g, 'site');
-  if (kind === 'address') return 'Site search is temporarily unavailable. You can still choose the assessment point on the map.';
+  if (kind === 'address') return 'Site search is temporarily unavailable. Try Find site again, or choose the assessment point on the map.';
+  if (result.stage === 'nearest') return 'Walking routes could not be checked, so ATLAS did not choose a nearest bus stop group. Try again or use the full Bus assessment.';
   if (result.code === 'coverage_not_implemented') return 'Bus-stop coverage outside Greater London is not connected in this browser yet. The confirmed point was not treated as a zero-stop result.';
   if (result.code === 'invalid_response') return 'The authoritative bus source returned information ATLAS could not safely interpret. No result has been assumed.';
   return 'Bus information is temporarily unavailable. Please try again shortly.';
@@ -68,7 +73,7 @@ function plannerStopWarning(warning) {
   if (/incomplete/i.test(warning)) return 'Some incomplete stop records were left out.';
   if (/duplicate/i.test(warning)) return 'Repeated stop records were counted once.';
   if (/no bus stops/i.test(warning)) return 'No bus stops were found within the selected distance.';
-  if (/dataset timestamp|dataset.*version/i.test(warning)) return 'The source did not include a publication date with this result.';
+  if (/dataset timestamp|dataset.*version/i.test(warning)) return '';
   if (/prepared bus dataset is .*days old/i.test(warning)) return 'The prepared national bus information should be refreshed before formal use.';
   if (/date-specific exceptions/i.test(warning)) return 'Some timetables contain date-specific changes. Check the assessment date before formal use.';
   if (/No zero-stop conclusion/i.test(warning)) return warning;
@@ -87,12 +92,15 @@ function assessmentMethod(site) {
 function clearBusEvidence(message = 'Confirm the assessment point before checking nearby bus stops.') {
   const hadEvidence = !$('evidencePanel').hidden;
   confirmedSite = null;
+  currentBusResult = null;
   busStopMarkers.forEach(marker => map?.removeLayer(marker));
   busStopMarkers = [];
   routeLayers.forEach(layer => map?.removeLayer(layer));
   routeLayers = [];
   $('findStops').disabled = true;
+  $('findNearestStops').disabled = true;
   $('refreshStops').disabled = true;
+  $('exportBusWord').disabled = true;
   $('evidencePanel').hidden = true;
   $('evidenceRows').replaceChildren();
   $('serviceRows').replaceChildren();
@@ -309,6 +317,8 @@ function appendCell(row, label, value, secondary = '') {
 }
 
 function renderAssessment(result) {
+  currentBusResult = result;
+  $('exportBusWord').disabled = false;
   const panel = $('evidencePanel');
   const rows = $('evidenceRows');
   const serviceRows = $('serviceRows');
@@ -360,7 +370,9 @@ function renderAssessment(result) {
   const timetableProvenance = result.provenance.timetables ?? {};
   const checked = formatTime(stopProvenance.retrievedAt || timetableProvenance.retrievedAt);
   const stopSource = providerLabel({ provenance: stopProvenance });
-  $('evidenceSummary').textContent = `${result.stops.length} stop${result.stops.length === 1 ? '' : 's'} · ${result.serviceSummaries.length} directional service summar${result.serviceSummaries.length === 1 ? 'y' : 'ies'}`;
+  $('evidenceSummary').textContent = result.assessmentMode === 'nearest'
+    ? `Nearest stop group: ${result.nearestGroup?.name || 'selected group'} · ${result.stops.length} stop record${result.stops.length === 1 ? '' : 's'} · ${result.serviceSummaries.length} directional service summar${result.serviceSummaries.length === 1 ? 'y' : 'ies'}`
+    : `${result.stops.length} stop${result.stops.length === 1 ? '' : 's'} · ${result.serviceSummaries.length} directional service summar${result.serviceSummaries.length === 1 ? 'y' : 'ies'}`;
   $('resultSource').textContent = `${stopSource}; Department for Transport bus timetables; OpenStreetMap routing`;
   $('resultChecked').textContent = checked;
   $('resultFreshness').textContent = result.status === 'complete' ? 'Assessment complete' : 'Partial assessment - review points to note';
@@ -369,7 +381,7 @@ function renderAssessment(result) {
   for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableProvenance.source || 'Department for Transport Bus Open Data Service'], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', result.status === 'complete' ? 'Complete for the information shown' : 'Partial - use the points to note below']]) {
     const line = document.createElement('p'); const label = document.createElement('strong'); label.textContent = `${labelText}: `; line.append(label, value); plannerChecks.append(line);
   }
-  const plannerWarnings = [...new Set(result.warnings.map(plannerStopWarning))];
+  const plannerWarnings = [...new Set(result.warnings.map(plannerStopWarning).filter(Boolean))];
   if (plannerWarnings.length) {
     const heading = document.createElement('strong'); heading.textContent = 'Points to note';
     const list = document.createElement('ul');
@@ -382,6 +394,8 @@ function renderAssessment(result) {
     `Stop source reference: ${stopProvenance.endpoint || 'not supplied'}`,
     `Timetable source reference: ${timetableProvenance.endpoint || 'not supplied'}`,
     `Prepared dataset time: ${timetableProvenance.dataPreparedAt || stopProvenance.dataPreparedAt || 'not supplied'}`,
+    `Assessment mode: ${result.assessmentMode || 'full'}`,
+    `Nearest stop-group method: ${result.nearestGroup?.basis || 'not applicable'}`,
     `Representative timetable dates: ${JSON.stringify(timetableProvenance.representativeDates || {})}`,
     `Source stop IDs: ${result.stops.map(stop => stop.id).join(', ')}`,
     `Provider routing: ${stopProvenance.providerSelectedBy || 'not supplied'}`,
@@ -437,6 +451,7 @@ function confirmAssessmentPoint() {
     renderConfirmedSite(confirmedSite);
     $('confirmAssessmentPoint').disabled = true;
     $('findStops').disabled = false;
+    $('findNearestStops').disabled = false;
     $('refreshStops').disabled = false;
     setCallout($('confirmationStatus'), `${assessmentMethod(confirmedSite)}. The assessment point is confirmed.`, 'success');
     setCallout($('stopStatus'), 'Ready to check nearby bus stops from the confirmed assessment point.', 'neutral');
@@ -445,14 +460,19 @@ function confirmAssessmentPoint() {
   }
 }
 
-async function loadStops(forceRefresh) {
-  setCallout($('stopStatus'), forceRefresh ? 'Checking the authoritative bus source again…' : 'Checking the authoritative bus source…', 'neutral');
+async function loadStops(forceRefresh, mode = lastAssessmentMode) {
+  lastAssessmentMode = mode === 'nearest' ? 'nearest' : 'full';
+  const action = lastAssessmentMode === 'nearest' ? 'nearest bus stop group' : 'full Bus assessment';
+  setCallout($('stopStatus'), forceRefresh ? `Checking the ${action} again…` : `Building the ${action}…`, 'neutral');
   $('findStops').disabled = true;
+  $('findNearestStops').disabled = true;
   $('refreshStops').disabled = true;
+  $('exportBusWord').disabled = true;
   try {
-    const result = await busAssessment.assess(confirmedSite, { radius: $('radius').value, forceRefresh });
+    const result = await busAssessment.assess(confirmedSite, { radius: $('radius').value, forceRefresh, mode: lastAssessmentMode });
     if (!result.ok) {
       $('evidencePanel').hidden = true;
+      currentBusResult = null;
       busStopMarkers.forEach(marker => map.removeLayer(marker));
       busStopMarkers = [];
       const stale = result.stopsResult?.cache?.staleAvailable ? ' An earlier result is now out of date and has not been shown.' : '';
@@ -461,14 +481,21 @@ async function loadStops(forceRefresh) {
     }
     renderAssessment(result);
     const checked = formatTime(result.provenance.stops?.retrievedAt || result.provenance.timetables?.retrievedAt);
-    const message = result.status === 'complete'
-      ? `${result.stops.length} nearby stop${result.stops.length === 1 ? '' : 's'} assessed. Complete - checked ${checked}.`
-      : `${result.stops.length} nearby stop${result.stops.length === 1 ? '' : 's'} found. Part of the assessment is unavailable; review the points to note.`;
+    const modeText = result.assessmentMode === 'nearest' ? `Nearest stop group "${result.nearestGroup?.name || 'selected group'}"` : `${result.stops.length} nearby stop${result.stops.length === 1 ? '' : 's'}`;
+    const message = result.status === 'complete' ? `${modeText} assessed. Complete - checked ${checked}.` : `${modeText} assessed. Part of the assessment is unavailable; review the points to note.`;
     setCallout($('stopStatus'), message, result.status === 'complete' && !result.warnings.length ? 'success' : 'warning');
   } finally {
     $('findStops').disabled = !confirmedSite;
+    $('findNearestStops').disabled = !confirmedSite;
     $('refreshStops').disabled = !confirmedSite;
+    $('exportBusWord').disabled = !currentBusResult;
   }
+}
+
+function exportBusWord() {
+  if (!currentBusResult?.ok || !confirmedSite) return setCallout($('stopStatus'), 'Build a Bus assessment before exporting to Word.', 'warning');
+  downloadWordDocument(busWordFilename(confirmedSite), 'ATLAS Bus Assessment', buildBusWordTables(currentBusResult), currentBusResult.wording);
+  setCallout($('stopStatus'), 'Word export created from the checked Bus assessment.', 'success');
 }
 
 function initMap() {
@@ -504,8 +531,10 @@ $('chooseOnMap').addEventListener('click', () => {
 });
 $('coordinatesForm').addEventListener('submit', enterCoordinates);
 $('confirmAssessmentPoint').addEventListener('click', confirmAssessmentPoint);
-$('findStops').addEventListener('click', () => loadStops(false));
-$('refreshStops').addEventListener('click', () => loadStops(true));
+$('findNearestStops').addEventListener('click', () => loadStops(false, 'nearest'));
+$('findStops').addEventListener('click', () => loadStops(false, 'full'));
+$('refreshStops').addEventListener('click', () => loadStops(true, lastAssessmentMode));
+$('exportBusWord').addEventListener('click', exportBusWord);
 $('clearRoutes').addEventListener('click', clearRouteLines);
 window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
 initMap();

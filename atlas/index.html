@@ -151,22 +151,22 @@
             <div class="step-number">4</div>
             <div class="step-content">
               <h3 id="stops-step">Build the Bus assessment</h3>
-              <p class="supporting">ATLAS checks nearby authoritative stops, current scheduled services and routed walking and cycling access from the confirmed assessment point.</p>
+              <p class="supporting">Choose a full nearby-stop assessment or ask ATLAS for the nearest logical stop group. Nearest mode keeps all matching stop records or bus-station stands so routes are not lost.</p>
               <div class="stop-controls">
                 <label for="radius">Radius (metres)<input id="radius" type="number" min="100" max="2000" step="50" value="700"></label>
-                <button id="findStops" class="primary" type="button" disabled>Build Bus assessment</button>
-                <button id="refreshStops" class="secondary" type="button" disabled>Check again</button>
+                <div class="assessment-actions"><button id="findNearestStops" class="secondary" type="button" disabled>Find nearest bus stop(s)</button><button id="findStops" class="primary" type="button" disabled>Build full Bus assessment</button><button id="refreshStops" class="secondary" type="button" disabled>Check again</button></div>
               </div>
+              <p class="control-hint">Nearest mode is based on routed walking access. ATLAS then keeps the complete logical stop group, including opposite directions or interchange stands where identified.</p>
               <div id="stopStatus" class="callout neutral" role="status">Confirm the assessment point before checking nearby bus stops.</div>
             </div>
           </section>
         </div>
 
         <section id="evidencePanel" class="evidence-panel" hidden aria-labelledby="evidence-heading">
-          <div class="evidence-heading"><div><p class="eyebrow">Bus assessment</p><h3 id="evidence-heading">Stops and services near the assessment point</h3></div><div id="evidenceSummary"></div></div>
+          <div class="evidence-heading"><div><p class="eyebrow">Bus assessment</p><h3 id="evidence-heading">Stops and services near the assessment point</h3></div><div class="evidence-actions"><div id="evidenceSummary"></div><button id="exportBusWord" class="secondary compact" type="button" disabled>Export Word (.docx)</button></div></div>
           <div class="check-summary" aria-label="Result source and status"><div><span>Source</span><strong id="resultSource">Authoritative source</strong></div><div><span>Checked</span><strong id="resultChecked"></strong></div><div><span>Status</span><strong id="resultFreshness"></strong></div></div>
           <section class="assessment-output" aria-labelledby="stop-summary-heading">
-            <div class="output-heading"><div><p class="eyebrow">Table 1</p><h4 id="stop-summary-heading">Bus Stop Summary</h4></div><button id="clearRoutes" class="secondary compact" type="button" hidden>Clear route lines</button></div>
+            <div class="output-heading"><div><p class="eyebrow">Table 3.2</p><h4 id="stop-summary-heading">Bus Stop Summary</h4></div><button id="clearRoutes" class="secondary compact" type="button" hidden>Clear route lines</button></div>
           <div class="table-wrap">
             <table class="bus-stop-summary">
               <thead><tr><th>Stop name</th><th>Direction</th><th>Walking distance / time</th><th>Cycling distance / time</th><th>Routes serving stop</th></tr></thead>
@@ -175,7 +175,7 @@
           </div>
           </section>
           <section class="assessment-output" aria-labelledby="service-summary-heading">
-            <div class="output-heading"><div><p class="eyebrow">Table 2</p><h4 id="service-summary-heading">Bus Service Summary</h4></div></div>
+            <div class="output-heading"><div><p class="eyebrow">Table 3.3</p><h4 id="service-summary-heading">Bus Service Summary</h4></div></div>
             <div class="table-wrap"><table class="bus-service-summary"><thead><tr><th>Route</th><th>Operator</th><th>Origin / destination</th><th>Principal locations</th><th>Operating period</th></tr></thead><tbody id="serviceRows"></tbody></table></div>
           </section>
           <section class="assessment-wording" aria-labelledby="wording-heading"><p class="eyebrow">Controlled wording</p><h4 id="wording-heading">Assessment wording</h4><p id="assessmentWording"></p></section>
@@ -185,8 +185,8 @@
     </section>
   </main>
 
-  <footer><span>ATLAS 2.0.0-alpha.4 · Development software</span><span>Awaiting Product Owner review</span></footer>
+  <footer><span>ATLAS 2.0.0-alpha.5 · Development software</span><span class="creator-credit">Created by Joe Freeman · EAS FORGE</span><span>Awaiting Product Owner review</span></footer>
   <script src="../assets/vendor/leaflet/leaflet.js"></script>
-  <script type="module" src="assets/js/app.mjs?build=ATLAS-2.0.0-alpha.4-20260904"></script>
+  <script type="module" src="assets/js/app.mjs?build=ATLAS-2.0.0-alpha.5-20260904"></script>
 </body>
 </html>

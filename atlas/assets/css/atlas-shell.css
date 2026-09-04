@@ -233,3 +233,8 @@ footer { max-width: 1600px; margin: auto; padding: 0 24px 34px; color: var(--atl
   footer { display: block; padding-left: 14px; padding-right: 14px; }
   footer span { display: block; margin-top: 5px; }
 }
+/* ATLAS Alpha.5 Bus controls */
+.assessment-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.control-hint { margin: 8px 0 0; color: var(--atlas-muted); font-size: .82rem; }
+.evidence-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; text-align: right; }
+.creator-credit { font-weight: 800; color: var(--atlas-blue); }

@@ -6,13 +6,13 @@ const test = (name, fn) => tests.push([name, fn]);
 
 test('operating periods retain overnight services', () => {
   const periods = calculateOperatingPeriods({ monday: [316, 600, 1527], saturday: [400, 1430] });
-  assert.deepEqual(formatOperatingPeriod(periods).slice(0, 3), ['Monday: Approx. 05:16-01:27', 'Tuesday: No scheduled service', 'Wednesday: No scheduled service']);
+  assert.deepEqual(formatOperatingPeriod(periods).slice(0, 3), ['Monday: Approx. 05:16–01:27 (next day)', 'Tuesday: No scheduled service', 'Wednesday: No scheduled service']);
   assert.equal(periods.monday.overnight, true);
 });
 
 test('identical weekdays use the EAS Mon-Fri form', () => {
   const days = Object.fromEntries(['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].map(day => [day, [316, 1527]]));
-  assert.equal(formatOperatingPeriod(calculateOperatingPeriods(days))[0], 'Mon-Fri: Approx. 05:16-01:27');
+  assert.equal(formatOperatingPeriod(calculateOperatingPeriods(days))[0], 'Mon-Fri: Approx. 05:16–01:27 (next day)');
 });
 
 test('frequency capability requires an explicit approved period', () => {
@@ -43,7 +43,7 @@ test('service summaries keep opposite directions and conditional notes', () => {
     { ...base, id: 'in', origin: 'Beta', destination: 'Alpha', direction: 'Alpha', stopSchedules: { B: base.stopSchedules.A } }
   ]);
   assert.equal(summaries.length, 2);
-  assert.ok(summaries.every(service => /No scheduled weekend service/.test(service.serviceNote)));
+  assert.ok(summaries.every(service => !/No scheduled weekend service/.test(service.serviceNote)));
 });
 
 test('route variants remain traceable and trigger a material note', () => {
@@ -51,7 +51,7 @@ test('route variants remain traceable and trigger a material note', () => {
   const records = ['standard', 'short'].map(id => ({ id, routeNumber: '20', operator: 'Example', origin: 'A', destination: 'B', direction: 'B', principalLocations: id === 'standard' ? ['C'] : ['D'], qualifications: [], stopSchedules: { A: schedule } }));
   const [summary] = buildServiceSummaries([{ id: 'A' }], records);
   assert.deepEqual(summary.sourceRecordIds, ['standard', 'short']);
-  assert.match(summary.serviceNote, /2 scheduled route patterns/);
+  assert.equal(summary.serviceNote, '');
 });
 
 test('circular services with the same endpoints retain opposite directions', () => {

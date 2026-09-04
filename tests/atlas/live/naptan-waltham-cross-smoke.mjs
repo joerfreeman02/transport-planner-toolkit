@@ -28,6 +28,15 @@ try {
   assert.ok(result.serviceSummaries.length > 0, 'Prepared BODS index returned no Waltham Cross services.');
   assert.ok(result.stops.some(stop => stop.walking.status === 'routed'));
   assert.ok(result.stops.some(stop => stop.cycling.status === 'routed'));
+  const nearest = await assessment.assess(site, { radius: 700, forceRefresh: false, mode: 'nearest' });
+  assert.equal(nearest.ok, true, nearest.message);
+  assert.equal(nearest.assessmentMode, 'nearest');
+  assert.match(nearest.nearestGroup?.name || '', /bus station/i);
+  assert.ok(nearest.stops.length >= 2, 'Nearest mode must retain multiple Bus Station stop/stand records.');
+  const nearestStopRoutes = [...new Set(nearest.stops.flatMap(stop => stop.routes ?? []))].sort((a, b) => a.localeCompare(b, 'en-GB', { numeric: true }));
+  const nearestSummaryRoutes = [...new Set(nearest.serviceSummaries.map(service => service.routeNumber))].sort((a, b) => a.localeCompare(b, 'en-GB', { numeric: true }));
+  assert.deepEqual(nearestStopRoutes.filter(route => !nearestSummaryRoutes.includes(route)), [], 'Nearest Bus Station routes missing from service summary.');
+  console.log(JSON.stringify({ control: 'Waltham Cross nearest group', group: nearest.nearestGroup, stopCount: nearest.stops.length, stopRoutes: nearestStopRoutes, serviceSummaryCount: nearest.serviceSummaries.length, routes: nearestSummaryRoutes }, null, 2));
   console.log(JSON.stringify({
     control: 'Waltham Cross', pointMethod: 'manual coordinates; no property was assumed', site: { latitude: site.latitude, longitude: site.longitude },
     provider: result.provenance.stops.providerAdapter, stopCount: result.stops.length, serviceSummaryCount: result.serviceSummaries.length,

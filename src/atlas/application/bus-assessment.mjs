@@ -44,8 +44,12 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
 
     let selectedStops = enrichedDiscoveredStops;
     let nearestGroup = null;
+    let servicesResult = await timetableData.servicesForStops(enrichedDiscoveredStops, { forceRefresh });
+    let services = servicesResult.ok ? servicesResult.data : [];
     if (assessmentMode === 'nearest') {
-      const selection = selectNearestStopGroup(enrichedDiscoveredStops);
+      const servedIds = new Set(services.flatMap(service => Object.keys(service.stopSchedules ?? {})));
+      const servedStops = enrichedDiscoveredStops.filter(stop => servedIds.has(String(stop.id || stop.sourceId)));
+      const selection = selectNearestStopGroup(servedStops);
       if (!selection.ok) return Object.freeze({
         ok: false,
         stage: 'nearest',
@@ -63,9 +67,10 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
         basis: selection.basis
       });
     }
-
-    const servicesResult = await timetableData.servicesForStops(selectedStops, { forceRefresh });
-    const services = servicesResult.ok ? servicesResult.data : [];
+    if (assessmentMode === 'nearest') {
+      const selectedIds = new Set(selectedStops.map(stop => String(stop.id || stop.sourceId)));
+      services = services.filter(service => Object.keys(service.stopSchedules ?? {}).some(id => selectedIds.has(id)));
+    }
     const serviceSummaries = buildServiceSummaries(selectedStops, services);
     const warnings = [...new Set([
       ...(stopsResult.warnings ?? []),

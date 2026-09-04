@@ -47,11 +47,17 @@ function periodText(period) {
 }
 
 export function formatOperatingPeriod(periods) {
-  const weekday = DAY_ORDER.slice(0, 5).map(day => periods?.[day]);
+  const labels = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
+  const days = DAY_ORDER;
   const lines = [];
-  if (weekday.every(value => samePeriod(value, weekday[0]))) lines.push(`Mon-Fri: ${periodText(weekday[0])}`);
-  else DAY_ORDER.slice(0, 5).forEach((day, index) => lines.push(`${DAY_LABELS[day]}: ${periodText(weekday[index])}`));
-  for (const day of ['saturday', 'sunday']) lines.push(`${DAY_LABELS[day]}: ${periodText(periods?.[day])}`);
+  let start = 0;
+  while (start < days.length) {
+    let end = start;
+    while (end + 1 < days.length && samePeriod(periods?.[days[end]], periods?.[days[end + 1]])) end += 1;
+    const label = start === end ? labels[days[start]] : `${labels[days[start]]}-${labels[days[end]]}`;
+    lines.push(`${label}: ${periodText(periods?.[days[start]])}`);
+    start = end + 1;
+  }
   return lines;
 }
 

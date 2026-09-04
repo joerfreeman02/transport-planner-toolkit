@@ -6,7 +6,7 @@ const test = (name, fn) => tests.push([name, fn]);
 
 test('operating periods retain overnight services', () => {
   const periods = calculateOperatingPeriods({ monday: [316, 600, 1527], saturday: [400, 1430] });
-  assert.deepEqual(formatOperatingPeriod(periods).slice(0, 3), ['Monday: Approx. 05:16–01:27 (next day)', 'Tuesday: No scheduled service', 'Wednesday: No scheduled service']);
+  assert.deepEqual(formatOperatingPeriod(periods), ['Mon: Approx. 05:16–01:27 (next day)', 'Tue-Fri: No scheduled service', 'Sat: Approx. 06:40–23:50', 'Sun: No scheduled service']);
   assert.equal(periods.monday.overnight, true);
 });
 

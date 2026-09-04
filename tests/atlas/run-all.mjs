@@ -16,6 +16,7 @@ await import('./bus-assessment.test.mjs');
 await import('./bus-alpha5-assessment.test.mjs');
 await import('./bus-word-export.test.mjs');
 await import('./playwright-launch.test.mjs');
+await import('./tnds-transxchange.test.mjs');
 await import('./legacy-isolation.test.mjs');
 await import('./review-environment.test.mjs');
 console.log('ATLAS Alpha.5 deterministic suite passed.');

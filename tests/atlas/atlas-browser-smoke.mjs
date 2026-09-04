@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { chooseFirstCandidateAndConfirm, mockAccessRouting, mockMapTiles, mockPreparedBusTimetables } from './browser-test-helpers.mjs';
+import { launchAtlasBrowser } from './playwright-launch.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const root = process.env.ATLAS_REVIEW_ROOT || 'http://127.0.0.1:8769/';
 const geocode = JSON.parse(fs.readFileSync(new URL('./fixtures/nominatim-candidate.json', import.meta.url), 'utf8'));
 const stops = JSON.parse(fs.readFileSync(new URL('./fixtures/tfl-nearby-stops.json', import.meta.url), 'utf8'));
-const browser = await chromium.launch({ headless: true });
+const browser = await launchAtlasBrowser(chromium, { headless: true });
 const page = await browser.newPage();
 const errors = [];
 let geocodeRequests = 0;

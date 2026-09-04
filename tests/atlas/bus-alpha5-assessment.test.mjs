@@ -48,6 +48,20 @@ test('nearest mode sends the complete nearest logical stop group to timetable pr
   assert.equal(result.nearestGroup.name, 'Bus Station');
 });
 
+test('nearest mode returns a partial result when no service is found within 2km', async () => {
+  const stop = { id: 'UNSERVED', name: 'Pipers Lane', locality: 'Example', latitude: site.latitude, longitude: site.longitude, routes: [] };
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { source: 'prepared' } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS' } }) },
+    accessRouting: { matrix: async () => ({ ok: true, warnings: [], provenance: { source: 'OSRM' }, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 80 }] }) }
+  });
+  const result = await assessment.assess(site, { mode: 'nearest', radius: 500 });
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 'partial');
+  assert.match(result.warnings.join(' '), /within the controlled 2,000 metre nearest-search limit/);
+  assert.equal(result.nearestGroup, null);
+});
+
 for (const [name, fn] of tests) {
   await fn();
   console.log(`PASS Alpha.5 Bus assessment - ${name}`);

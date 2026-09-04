@@ -29,6 +29,30 @@ export function nearbyGridCellKeys(site, radiusMetres, gridSize = 0.1) {
 function resolveUrl(baseUrl, relativePath) { return new URL(relativePath, baseUrl).toString(); }
 function sourceTimestamp(value) { const text = String(value ?? '').trim(); return text && !Number.isNaN(Date.parse(text)) ? text : null; }
 
+const SERVICE_DAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
+
+// BODS and TNDS are deliberately allowed to be sparse at the source boundary.
+// The assessment/presentation layers, however, consume one deterministic shape.
+export function normalisePreparedService(service = {}) {
+  const rawSchedules = service.stopSchedules && typeof service.stopSchedules === 'object' ? service.stopSchedules : {};
+  const stopSchedules = Object.fromEntries(Object.entries(rawSchedules).map(([stopId, schedule]) => [
+    String(stopId),
+    Object.fromEntries(SERVICE_DAYS.map(day => [day, Array.isArray(schedule?.[day]) ? schedule[day] : []]))
+  ]));
+  return {
+    ...service,
+    id: String(service.id ?? ''),
+    routeNumber: String(service.routeNumber ?? '').trim(),
+    operator: String(service.operator ?? '').trim(),
+    origin: String(service.origin ?? '').trim(),
+    destination: String(service.destination ?? '').trim(),
+    direction: String(service.direction ?? '').trim(),
+    principalLocations: Array.isArray(service.principalLocations) ? service.principalLocations : [],
+    qualifications: Array.isArray(service.qualifications) ? service.qualifications : [],
+    stopSchedules
+  };
+}
+
 async function requestPreparedJson({ url, fetchImpl, timeoutMs }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -158,7 +182,8 @@ export function createPreparedBusDataAdapter({
     if (!paths.length || responses.some(response => !response.ok)) return sourceFailure({ code: 'unavailable_source', message: 'Bus timetable information could not be checked. Please try again.', provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url }, warnings: ['One or more prepared timetable files could not be loaded.'] });
     if (responses.some(response => response.data?.schema !== 'atlas-prepared-bus-data-v1' || !Array.isArray(response.data?.services))) return sourceFailure({ code: 'invalid_response', message: 'Bus timetable information could not be safely interpreted. Please try again.', provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url }, warnings: ['A prepared timetable file was incomplete or malformed.'] });
     const services = new Map();
-    for (const response of responses) for (const service of response.data?.services ?? []) {
+    for (const response of responses) for (const rawService of response.data?.services ?? []) {
+      const service = normalisePreparedService(rawService);
       if (!Object.keys(service.stopSchedules ?? {}).some(id => stopIds.has(id))) continue;
       const existing = services.get(service.id);
       if (!existing) services.set(service.id, structuredClone(service));
@@ -169,7 +194,7 @@ export function createPreparedBusDataAdapter({
     if (tndsBaseUrl) {
       const tndsManifest = await requestJson({ url: resolveUrl(tndsBaseUrl, 'manifest.json'), fetchImpl, timeoutMs });
       if (tndsManifest.ok && tndsManifest.data?.schema === 'atlas-prepared-bus-tnds-v1') {
-        const tndsRows = (await Promise.all((tndsManifest.data.services || []).map(file => requestJson({ url: resolveUrl(tndsBaseUrl, file), fetchImpl, timeoutMs })))).filter(row => row.ok).map(row => row.data).filter(service => Object.keys(service.stopSchedules || {}).some(id => stopIds.has(id)));
+        const tndsRows = (await Promise.all((tndsManifest.data.services || []).map(file => requestJson({ url: resolveUrl(tndsBaseUrl, file), fetchImpl, timeoutMs })))).filter(row => row.ok).map(row => normalisePreparedService(row.data)).filter(service => Object.keys(service.stopSchedules || {}).some(id => stopIds.has(id)));
         mergedServices = mergeBusTimetableSources({ bods: mergedServices, tnds: tndsRows });
         tndsProvenance = { source: 'Traveline National Dataset supplementary data', dataPreparedAt: tndsManifest.data.generatedAt, regions: tndsManifest.data.regions };
       }

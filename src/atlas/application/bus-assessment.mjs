@@ -61,15 +61,28 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
       }
       const servedStops = enrichedDiscoveredStops.filter(stop => servedIds.has(String(stop.id || stop.sourceId)));
       const selection = selectNearestStopGroup(servedStops);
-      if (!selection.ok) return Object.freeze({
-        ok: false,
-        stage: 'nearest',
-        code: 'unavailable_source',
-        message: selection.message,
-        warnings: [...new Set([...(stopsResult.warnings ?? []), ...(walkingResult.warnings ?? []), ...(cyclingResult.warnings ?? [])])],
-        stopsResult,
-        servicesResult: null
-      });
+      if (!selection.ok) {
+        const warnings = [...new Set([
+          ...(stopsResult.warnings ?? []),
+          ...(walkingResult.warnings ?? []),
+          ...(cyclingResult.warnings ?? []),
+          'No matched scheduled bus service was found within the controlled 2,000 metre nearest-search limit. Service beyond 2,000 metres was not assessed.'
+        ])];
+        return Object.freeze({
+          ok: true,
+          status: 'partial',
+          assessmentMode,
+          discoveredStopCount: enrichedDiscoveredStops.length,
+          nearestGroup: null,
+          stops: Object.freeze(enrichedDiscoveredStops),
+          services: Object.freeze([]),
+          serviceSummaries: Object.freeze([]),
+          wording: buildControlledBusWording([]),
+          warnings: Object.freeze(warnings),
+          provenance: Object.freeze({ stops: stopsResult.provenance, timetables: servicesResult.provenance, walking: walkingResult.provenance, cycling: cyclingResult.provenance }),
+          evidence: Object.freeze(stopsResult.evidence ?? [])
+        });
+      }
       selectedStops = selection.stops;
       nearestGroup = Object.freeze({
         name: selection.groupName,

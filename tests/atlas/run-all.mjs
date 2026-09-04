@@ -8,6 +8,7 @@ await import('./geography.test.mjs');
 await import('./naptan-bus-stop-adapter.test.mjs');
 await import('./bus-stop-discovery.test.mjs');
 await import('./prepared-bus-data-adapter.test.mjs');
+await import('./bus-data-updater.test.mjs');
 await import('./prepared-bus-data-integrity.test.mjs');
 await import('./bus-service-assessment.test.mjs');
 await import('./bus-alpha5.test.mjs');

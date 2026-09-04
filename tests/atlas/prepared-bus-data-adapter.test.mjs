@@ -1,9 +1,16 @@
 import assert from 'node:assert/strict';
-import { createPreparedBusDataAdapter, nearbyGridCellKeys } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
+import { createPreparedBusDataAdapter, nearbyGridCellKeys, normalisePreparedService } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
 
 const tests = [];
+
 const test = (name, fn) => tests.push([name, fn]);
+test('sparse BODS/TNDS service records are normalised before presentation', () => {
+  const service = normalisePreparedService({ id: 'tnds:231', stopSchedules: { STOP: { monday: [480] } } });
+  assert.deepEqual(service.principalLocations, []);
+  assert.deepEqual(service.qualifications, []);
+  assert.deepEqual(service.stopSchedules.STOP, { monday: [480], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] });
+});
 const site = confirmSite(createSite({ suppliedAddress: 'Fixture', displayAddress: 'Fixture', latitude: 51.6858, longitude: -0.033, assessmentPoint: { method: 'coordinates_entered' } }), { confirmedAt: '2026-09-04T09:00:00Z' });
 const manifest = {
   schema: 'atlas-prepared-bus-data-v1', generatedAt: '2026-09-04T08:00:00Z', refreshAfterDays: 8, gridSize: 0.1, serviceShardKeyLength: 5,

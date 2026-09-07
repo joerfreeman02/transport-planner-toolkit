@@ -29,6 +29,8 @@ BODS_DOWNLOAD_ROOT = "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-f
 BODS_REGIONS = ("east_anglia", "east_midlands", "london", "north_east", "north_west", "south_east", "south_west", "west_midlands", "yorkshire")
 TNDS_HOST = "ftp.tnds.basemap.co.uk"
 TNDS_PATH = "/TNDSV2.5/"
+TNDS_TRANSFER_ATTEMPTS = 3
+TNDS_TRANSFER_BACKOFF_SECONDS = (1, 2)
 
 
 class RefreshError(RuntimeError):
@@ -74,6 +76,7 @@ def download(url: str, destination: Path, label: str = "authoritative source", o
 
 def safe_extract(archive: Path, destination: Path) -> None:
     try:
+        destination.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(archive) as source:
             for member in source.infolist():
                 target = (destination / member.filename).resolve()
@@ -101,6 +104,7 @@ def acquire_bods(staging: Path, download_fn=download) -> tuple[Path, dict]:
         except zipfile.BadZipFile as error:
             raise RefreshError(f"BODS {region} endpoint did not return a valid GTFS ZIP: {url}") from error
         metadata.append({"region": region, **source})
+    print(f"BODS: all {len(BODS_REGIONS)} regional GTFS feeds acquired", flush=True)
     aggregate = hashlib.sha256("".join(f"{item['region']}:{item['sourceHash']}" for item in metadata).encode("ascii")).hexdigest()
     return gtfs, {"identity": BODS_DOWNLOAD_ROOT, "regions": metadata, "sourceHash": aggregate}
 
@@ -121,7 +125,82 @@ def ftp_files(ftp_factory, username: str, password: str) -> list[str]:
         raise RefreshError("TNDS authentication or directory acquisition failed") from error
 
 
-def acquire_tnds(staging: Path, username: str, password: str, ftp_factory=ftplib.FTP) -> tuple[Path, dict]:
+def _safe_ftp_error(error: BaseException, username: str, password: str) -> str:
+    message = str(error).strip() or type(error).__name__
+    for secret in (username, password):
+        if secret:
+            message = message.replace(secret, "[redacted]")
+    return message
+
+
+def _is_retryable_ftp_error(error: BaseException) -> bool:
+    return isinstance(error, (ConnectionError, EOFError, TimeoutError, OSError, ftplib.error_temp))
+
+
+def _download_tnds_region(
+    raw: Path,
+    staging: Path,
+    region: str,
+    name: str,
+    username: str,
+    password: str,
+    ftp_factory,
+    sleep_fn=time.sleep,
+) -> int:
+    target = raw / name
+    partial = raw / f".{name}.part"
+    extracted = staging / "tnds-xml" / region
+    for attempt in range(1, TNDS_TRANSFER_ATTEMPTS + 1):
+        partial.unlink(missing_ok=True)
+        target.unlink(missing_ok=True)
+        try:
+            with ftp_factory(TNDS_HOST, timeout=120) as ftp:
+                ftp.login(username, password)
+                ftp.cwd(TNDS_PATH)
+                with partial.open("wb") as output:
+                    ftp.retrbinary(f"RETR {name}", output.write)
+            size = partial.stat().st_size
+            if size == 0:
+                raise RefreshError(f"TNDS {region} archive was empty")
+            partial.replace(target)
+            safe_extract(target, extracted)
+            print(f"TNDS {region}: transfer complete ({size} bytes)", flush=True)
+            return size
+        except RefreshError as error:
+            category = "archive validation"
+            retryable = False
+            message = _safe_ftp_error(error, username, password)
+        except Exception as error:
+            category = "transient FTP/network" if _is_retryable_ftp_error(error) else "FTP transfer"
+            retryable = _is_retryable_ftp_error(error)
+            message = _safe_ftp_error(error, username, password)
+        finally:
+            partial.unlink(missing_ok=True)
+            if target.exists() and not extracted.exists():
+                target.unlink(missing_ok=True)
+
+        print(
+            f"TNDS {region} download attempt {attempt}/{TNDS_TRANSFER_ATTEMPTS} failed "
+            f"({category}) for {name}: {message}",
+            file=sys.stderr,
+            flush=True,
+        )
+        if not retryable or attempt == TNDS_TRANSFER_ATTEMPTS:
+            raise RefreshError(
+                f"TNDS {region} archive acquisition failed after {attempt}/{TNDS_TRANSFER_ATTEMPTS} "
+                f"attempts ({name}; {category}: {message})"
+            )
+        sleep_fn(TNDS_TRANSFER_BACKOFF_SECONDS[attempt - 1])
+    raise AssertionError("unreachable")
+
+
+def acquire_tnds(
+    staging: Path,
+    username: str,
+    password: str,
+    ftp_factory=ftplib.FTP,
+    sleep_fn=time.sleep,
+) -> tuple[Path, dict]:
     if not username or not password:
         raise RefreshError("TNDS_USERNAME and TNDS_PASSWORD are required; no interactive prompt is available")
     raw = staging / "tnds-raw"
@@ -135,24 +214,21 @@ def acquire_tnds(staging: Path, username: str, password: str, ftp_factory=ftplib
     missing = [region for region in TNDS_REGIONS if region not in selected]
     if missing:
         raise RefreshError(f"TNDS acquisition is incomplete; missing regions: {', '.join(missing)}")
-    try:
-        with ftp_factory(TNDS_HOST, timeout=120) as ftp:
-            ftp.login(username, password)
-            ftp.cwd(TNDS_PATH)
-            for region, name in selected.items():
-                target = raw / name
-                with target.open("wb") as output:
-                    ftp.retrbinary(f"RETR {name}", output.write)
-                if target.stat().st_size == 0:
-                    raise RefreshError(f"TNDS archive for {region} was empty")
-                safe_extract(target, staging / "tnds-xml" / region)
-    except RefreshError:
-        raise
-    except Exception as error:
-        raise RefreshError("TNDS archive acquisition failed") from error
+    sizes = {}
+    for region in TNDS_REGIONS:
+        sizes[region] = _download_tnds_region(
+            raw,
+            staging,
+            region,
+            selected[region],
+            username,
+            password,
+            ftp_factory,
+            sleep_fn=sleep_fn,
+        )
     hashes = {region: sha256(raw / name) for region, name in selected.items()}
     aggregate = hashlib.sha256("".join(f"{region}:{hashes[region]}" for region in sorted(hashes)).encode("ascii")).hexdigest()
-    return staging / "tnds-xml", {"identity": f"ftp://{TNDS_HOST}{TNDS_PATH}", "regions": list(TNDS_REGIONS), "regionHashes": hashes, "sourceHash": aggregate}
+    return staging / "tnds-xml", {"identity": f"ftp://{TNDS_HOST}{TNDS_PATH}", "regions": list(TNDS_REGIONS), "regionHashes": hashes, "regionBytes": sizes, "sourceHash": aggregate}
 
 
 def candidate_metrics(site: Path) -> dict:

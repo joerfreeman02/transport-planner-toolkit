@@ -26,16 +26,44 @@ class CandidateValidatorTests(unittest.TestCase):
         (bus / 'manifest.json').write_text(json.dumps({'schema': 'atlas-prepared-bus-data-v1', 'stopShards': {'g1': 'stops/g1.json.gz'}, 'serviceShards': {'area': ['services/a.json.gz']}, 'sources': {'naptan': {'stopCount': 2000}, 'bods': {'regions': [{'serviceCount': 1000} for _ in range(8)]}}}))
         for index, region in enumerate(TNDS_REGIONS):
             name = f'services/{index}-{region.lower()}.json'
-            (self.root / 'atlas/data/bus-tnds' / name).write_text(json.dumps({'stopSchedules': {'STOP-1': {'monday': [600]}}, 'source': {'region': region}}))
+            (self.root / 'atlas/data/bus-tnds' / name).write_text(json.dumps({'id': f'tnds:{region}:fixture:1', 'stopSchedules': {'STOP-1': {'monday': [600]}}, 'source': {'region': region, 'serviceCode': f'fixture-{region}'}}))
         (self.root / 'atlas/data/bus-tnds/manifest.json').write_text(json.dumps({'schema': 'atlas-prepared-bus-tnds-v1', 'regions': list(TNDS_REGIONS), 'services': [f'services/{index}-{region.lower()}.json' for index, region in enumerate(TNDS_REGIONS)]}))
 
     def tearDown(self):
         shutil.rmtree(self.root, ignore_errors=True)
 
+    def _replace_first_tnds(self, payload):
+        target = self.root / 'atlas/data/bus-tnds/services/0-ea.json'
+        target.write_text(json.dumps(payload))
+
     def test_generated_candidate_passes_structural_validation(self):
         result = validate(self.root)
         self.assertEqual(result['serviceShardRecords'], 1)
         self.assertEqual(result['stopIds'], 1)
+
+    def test_fully_quarantined_tnds_service_passes_without_schedules(self):
+        self._replace_first_tnds({'id': 'tnds:EA:fixture:Q', 'stopSchedules': {}, 'source': {'region': 'EA', 'serviceCode': 'Q'}, 'tndsQuarantine': {'serviceQuarantined': True, 'affectedStopIds': ['STOP-1'], 'patterns': [{'patternId': 'JP-Q', 'reasonCode': 'incomplete_runtime_sequence', 'affectedStopIds': ['STOP-1']}]}})
+        self.assertEqual(validate(self.root)['stopIds'], 1)
+
+    def test_ordinary_empty_tnds_service_fails(self):
+        self._replace_first_tnds({'id': 'tnds:EA:fixture:empty', 'stopSchedules': {}, 'source': {'region': 'EA', 'serviceCode': 'empty'}})
+        with self.assertRaisesRegex(RefreshError, 'empty or malformed'):
+            validate(self.root)
+
+    def test_quarantine_without_affected_stops_fails(self):
+        self._replace_first_tnds({'id': 'tnds:EA:fixture:Q', 'stopSchedules': {}, 'source': {'region': 'EA', 'serviceCode': 'Q'}, 'tndsQuarantine': {'serviceQuarantined': True, 'affectedStopIds': [], 'patterns': [{'patternId': 'JP-Q', 'reasonCode': 'incomplete_runtime_sequence', 'affectedStopIds': []}]}})
+        with self.assertRaisesRegex(RefreshError, 'affectedStopIds'):
+            validate(self.root)
+
+    def test_malformed_quarantine_metadata_fails(self):
+        self._replace_first_tnds({'id': 'tnds:EA:fixture:Q', 'stopSchedules': {}, 'source': {'region': 'EA', 'serviceCode': 'Q'}, 'tndsQuarantine': {'serviceQuarantined': True, 'affectedStopIds': ['STOP-1'], 'patterns': [{'patternId': 'JP-Q', 'reasonCode': 'unknown_reason', 'affectedStopIds': ['STOP-1']}]}})
+        with self.assertRaisesRegex(RefreshError, 'pattern is malformed'):
+            validate(self.root)
+
+    def test_quarantine_with_fabricated_schedules_fails(self):
+        self._replace_first_tnds({'id': 'tnds:EA:fixture:Q', 'stopSchedules': {'STOP-1': {'monday': [600]}}, 'source': {'region': 'EA', 'serviceCode': 'Q'}, 'tndsQuarantine': {'serviceQuarantined': True, 'affectedStopIds': ['STOP-1'], 'patterns': [{'patternId': 'JP-Q', 'reasonCode': 'incomplete_runtime_sequence', 'affectedStopIds': ['STOP-1']}]}})
+        with self.assertRaisesRegex(RefreshError, 'fabricated timetable'):
+            validate(self.root)
 
     def test_raw_public_source_file_fails(self):
         (self.root / 'atlas/data/bus/raw.zip').write_bytes(b'not public data')

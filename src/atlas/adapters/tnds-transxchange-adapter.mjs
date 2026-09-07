@@ -41,11 +41,16 @@ function patternProfile(pattern, sections) {
     from: first(blocks(link, 'From')[0] || '', 'StopPointRef'), to: first(blocks(link, 'To')[0] || '', 'StopPointRef'),
     runTime: seconds(first(link, 'RunTime')), waitTime: seconds(first(link, 'WaitTime')) || 0,
   }))).filter(link => link.from && link.to);
-  const stopIds = links.length ? [links[0].from, ...links.map(link => link.to)] : [];
+  const explicitStopIds = [...new Set([...refs(pattern, 'StopPointRef'), ...sectionIds.flatMap(sectionId => refs(sections.get(sectionId) || '', 'StopPointRef'))])];
+  const stopIds = links.length ? [links[0].from, ...links.map(link => link.to)] : explicitStopIds;
   const offsets = new Map(stopIds.length ? [[stopIds[0], 0]] : []);
   let elapsed = 0;
-  for (const link of links) { if (link.runTime == null) throw new Error(`TNDS journey pattern ${attr(pattern, 'id') || 'unknown'} lacks a complete RunTime sequence.`); elapsed += link.runTime + link.waitTime; offsets.set(link.to, elapsed); }
-  return { direction: first(pattern, 'Direction'), destination: first(pattern, 'DestinationDisplay'), stopIds: [...new Set(stopIds)], offsets };
+  for (const link of links) {
+    if (link.runTime == null) return { direction: first(pattern, 'Direction'), destination: first(pattern, 'DestinationDisplay'), stopIds: [...new Set(stopIds)], offsets: new Map(), status: 'quarantine', reasonCode: 'incomplete_runtime_sequence' };
+    elapsed += link.runTime + link.waitTime;
+    offsets.set(link.to, elapsed);
+  }
+  return { direction: first(pattern, 'Direction'), destination: first(pattern, 'DestinationDisplay'), stopIds: [...new Set(stopIds)], offsets, status: links.length ? 'valid' : 'no_timing_links' };
 }
 
 function parseService({ source, serviceBlock, serviceBlocks, patternById, journeys, stops, multiService, region, sourceArchive, preparedAt }) {
@@ -72,22 +77,33 @@ function parseService({ source, serviceBlock, serviceBlocks, patternById, journe
   }
   if (multiService && !assignedJourneys.length) throw new Error(`TNDS service ${serviceCode || 'unknown'} has no deterministically associated VehicleJourneys.`);
   const serviceStopIds = new Set();
-  for (const patternId of servicePatternIds) for (const stopId of patternById.get(patternId)?.stopIds || []) serviceStopIds.add(stopId);
-  const serviceStops = serviceStopIds.size ? stops.filter(stop => serviceStopIds.has(stop.id)) : stops;
+  const serviceExplicitStopIds = new Set(refs(serviceBlock, 'StopPointRef'));
+  const quarantinePatterns = [];
+  for (const patternId of servicePatternIds) {
+    const profile = patternById.get(patternId);
+    if (!profile) continue;
+    if (profile.status === 'valid') for (const stopId of profile.stopIds) serviceStopIds.add(stopId);
+    if (profile.status === 'quarantine' || (profile.status === 'no_timing_links' && stops.length > 1)) quarantinePatterns.push({ patternId, reasonCode: profile.reasonCode || 'missing_timing_links', affectedStopIds: profile.stopIds.length ? profile.stopIds : [...serviceExplicitStopIds] });
+  }
+  const quarantineStopIds = new Set(quarantinePatterns.flatMap(pattern => pattern.affectedStopIds));
+  if (quarantinePatterns.some(pattern => !pattern.affectedStopIds.length)) throw new Error(`TNDS service ${serviceCode || 'unknown'} has a quarantined journey pattern with no deterministically identifiable affected StopPoint IDs.`);
+  if (!serviceStopIds.size && !quarantinePatterns.length) for (const stop of stops) serviceStopIds.add(stop.id);
+  const serviceStops = serviceStopIds.size ? stops.filter(stop => serviceStopIds.has(stop.id)) : [];
   const stopSchedules = Object.fromEntries(serviceStops.map(stop => [stop.id, Object.fromEntries(DAYS.map(day => [day, []]))]));
   for (const journey of assignedJourneys) {
     const patternRef = first(journey, 'JourneyPatternRef');
     const pattern = patternById.get(patternRef) || {};
+    if (multiService && !patternRef) throw new Error(`TNDS VehicleJourney ${first(journey, 'VehicleJourneyCode') || 'unknown'} has no JourneyPatternRef for deterministic service assignment.`);
+    if (patternRef && !patternById.has(patternRef)) throw new Error(`TNDS VehicleJourney ${first(journey, 'VehicleJourneyCode') || 'unknown'} references unknown JourneyPattern ${patternRef}.`);
+    if (pattern.status === 'quarantine' || (pattern.status === 'no_timing_links' && stops.length > 1)) continue;
     const departure = minutes(first(journey, 'DepartureTime'));
     if (departure == null) continue;
     const profile = blocks(journey, 'OperatingProfile')[0] || blocks(serviceBlock, 'OperatingProfile')[0] || '';
     const patternStopIds = pattern.stopIds?.length ? pattern.stopIds : serviceStops.map(stop => stop.id);
-    if (serviceStops.length > 1 && (!pattern.stopIds?.length || pattern.offsets.size !== pattern.stopIds.length)) throw new Error(`TNDS service ${serviceCode || 'unknown'} journey ${patternRef || 'unknown'} has no reliable stop-specific timing for a multi-stop service.`);
-    if (pattern.stopIds?.length && pattern.stopIds.length > 1 && pattern.offsets.size !== pattern.stopIds.length) throw new Error(`TNDS journey pattern ${patternRef || 'unknown'} has incomplete stop timing.`);
     for (const day of dayNames(profile)) for (const stopId of patternStopIds) if (stopSchedules[stopId]) stopSchedules[stopId][day].push(departure + Math.round((pattern.offsets?.get(stopId) ?? 0) / 60));
   }
   const pattern = patternById.get([...servicePatternIds][0]) || {};
-  return Object.freeze({ id: `tnds:${region || 'unknown'}:${sourceArchive || 'xml'}:${serviceCode || 'service'}`, routeNumber: text(first(serviceBlock, 'LineName') || first(serviceBlock, 'Line') || first(serviceBlock, 'PrivateCode')), operator: text(operator.name) || 'Operator not supplied', origin: first(serviceBlock, 'Origin') || first(serviceBlock, 'StandardService'), destination: first(serviceBlock, 'Destination') || pattern.destination, direction: text(pattern.direction), description: first(serviceBlock, 'Description'), validFrom: first(blocks(serviceBlock, 'OperatingPeriod')[0] || blocks(source, 'OperatingPeriod')[0] || '', 'StartDate') || null, validTo: first(blocks(serviceBlock, 'OperatingPeriod')[0] || blocks(source, 'OperatingPeriod')[0] || '', 'EndDate') || null, stopSchedules, stops: serviceStops, source: { type: 'TNDS', region, archive: sourceArchive, serviceCode, operatorCode: operator.code || operator.id, schemaVersion: '2.5', preparedAt } });
+  return Object.freeze({ id: `tnds:${region || 'unknown'}:${sourceArchive || 'xml'}:${serviceCode || 'service'}`, routeNumber: text(first(serviceBlock, 'LineName') || first(serviceBlock, 'Line') || first(serviceBlock, 'PrivateCode')), operator: text(operator.name) || 'Operator not supplied', origin: first(serviceBlock, 'Origin') || first(serviceBlock, 'StandardService'), destination: first(serviceBlock, 'Destination') || pattern.destination, direction: text(pattern.direction), description: first(serviceBlock, 'Description'), validFrom: first(blocks(serviceBlock, 'OperatingPeriod')[0] || blocks(source, 'OperatingPeriod')[0] || '', 'StartDate') || null, validTo: first(blocks(serviceBlock, 'OperatingPeriod')[0] || blocks(source, 'OperatingPeriod')[0] || '', 'EndDate') || null, stopSchedules, stops: serviceStops, tndsQuarantine: quarantinePatterns.length ? { serviceQuarantined: !serviceStopIds.size, affectedStopIds: [...quarantineStopIds], patterns: quarantinePatterns } : null, source: { type: 'TNDS', region, archive: sourceArchive, serviceCode, operatorCode: operator.code || operator.id, schemaVersion: '2.5', preparedAt } });
 }
 
 export function parseTndsTransXchangeServices(xml, { region = null, sourceArchive = null, preparedAt = new Date().toISOString() } = {}) {

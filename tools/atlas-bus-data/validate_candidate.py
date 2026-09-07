@@ -66,6 +66,11 @@ def validate(site: Path) -> dict:
         raise RefreshError("Candidate NaPTAN/BODS manifest schema is invalid")
     if tnds_manifest.get("schema") != "atlas-prepared-bus-tnds-v1":
         raise RefreshError("Candidate TNDS manifest schema is invalid")
+    if "services" in tnds_manifest or tnds_manifest.get("serviceShardKeyLength") != 5:
+        raise RefreshError("Candidate TNDS manifest must use five-character stop-prefix service shards")
+    service_shards = tnds_manifest.get("serviceShards")
+    if not isinstance(service_shards, dict) or not service_shards:
+        raise RefreshError("Candidate TNDS serviceShards are missing or malformed")
     metrics = candidate_metrics(site)
     if metrics["naptanStopCount"] < 1000 or metrics["bodsServiceCount"] < 1000:
         raise RefreshError("Candidate is below the expected national stop/service scale")
@@ -92,13 +97,31 @@ def validate(site: Path) -> dict:
                         raise RefreshError(f"Service-to-stop reference is missing from NaPTAN shards: {stop_id}")
     if service_count == 0:
         raise RefreshError("Candidate contains no prepared services")
-    for relative in tnds_manifest.get("services", []):
-        payload = read_json(tnds / relative)
-        validate_tnds_service(payload, relative)
-    forbidden = [path for path in data.rglob("*") if path.is_file() and path.suffix.lower() in {".csv", ".zip"}]
+    tnds_service_count = 0
+    for prefix, relative_paths in service_shards.items():
+        if not isinstance(prefix, str) or len(prefix) != tnds_manifest["serviceShardKeyLength"] or not isinstance(relative_paths, list) or not relative_paths:
+            raise RefreshError("Candidate TNDS serviceShards are malformed")
+        identities = set()
+        for relative in relative_paths:
+            payload = read_json(tnds / relative)
+            if payload.get("schema") != "atlas-prepared-bus-tnds-v1" or payload.get("stopPrefix") != prefix or not isinstance(payload.get("services"), list) or not payload["services"]:
+                raise RefreshError(f"Candidate TNDS shard is empty or malformed: {relative}")
+            for service in payload["services"]:
+                identity = service.get("id") or service.get("source", {}).get("serviceCode")
+                if not identity or identity in identities:
+                    raise RefreshError(f"Candidate TNDS shard contains a duplicate or missing service identity: {relative}")
+                identities.add(identity)
+                validate_tnds_service(service, relative)
+                relevant_ids = set(service.get("stopSchedules", {})) | set(service.get("tndsQuarantine", {}).get("affectedStopIds", []) if service.get("tndsQuarantine") else [])
+                if not any(str(stop_id).startswith(prefix) for stop_id in relevant_ids):
+                    raise RefreshError(f"Candidate TNDS shard contains a service unrelated to prefix {prefix}: {relative}")
+                tnds_service_count += 1
+    if not tnds_service_count or int(tnds_manifest.get("serviceCount", 0) or 0) < 1:
+        raise RefreshError("Candidate contains no prepared TNDS services")
+    forbidden = [path for path in data.rglob("*") if path.is_file() and path.suffix.lower() in {".csv", ".zip", ".xml"}]
     if forbidden:
         raise RefreshError(f"Raw source file leaked into public data: {forbidden[0].name}")
-    return {**metrics, "serviceShardRecords": service_count, "stopIds": len(stop_ids)}
+    return {**metrics, "serviceShardRecords": service_count, "tndsShardRecords": tnds_service_count, "stopIds": len(stop_ids)}
 
 
 def main() -> None:

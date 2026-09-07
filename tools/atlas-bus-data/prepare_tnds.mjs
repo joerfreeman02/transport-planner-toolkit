@@ -1,9 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import { parseTndsTransXchangeServices } from '../../src/atlas/adapters/tnds-transxchange-adapter.mjs';
 
 export const TNDS_REGIONS = Object.freeze(['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y']);
+export const TNDS_SERVICE_SHARD_KEY_LENGTH = 5;
 
 async function walk(root) {
   const result = [];
@@ -26,12 +27,15 @@ function regionFrom(file) {
 export async function prepareTnds({ input, output, preparedAt = new Date().toISOString() }) {
   const files = await walk(input);
   const regions = new Set();
-  const paths = [];
+  const shardFiles = new Map();
+  const serviceIds = new Set();
   const registeredPaths = new Set();
+  const work = path.join(output, '.tnds-shards-work');
   let quarantinedPatterns = 0;
   let quarantinedServices = 0;
   await fs.rm(output, { recursive: true, force: true });
   await fs.mkdir(path.join(output, 'services'), { recursive: true });
+  await fs.mkdir(work, { recursive: true });
   for (const file of files) {
     const region = regionFrom(file);
     if (!region) continue;
@@ -49,14 +53,24 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
           console.log(`TNDS ${path.basename(file)}: quarantined ${quarantine.patterns.length} pattern(s) for service ${service.source.serviceCode || service.id}.`);
         }
         regions.add(region);
-        const digest = createHash('sha256').update(service.id).digest('hex').slice(0, 12);
-        const relative = `services/${service.source.region.toLowerCase()}-${digest}.json`;
-        if (registeredPaths.has(relative) || await fs.access(path.join(output, relative)).then(() => true, () => false)) {
-          throw new Error(`TNDS prepared output collision ${relative}.`);
+        serviceIds.add(service.id);
+        const ids = [...Object.keys(service.stopSchedules || {}), ...(service.tndsQuarantine?.affectedStopIds || [])];
+        const shardKeys = [...new Set(ids.map(id => String(id).slice(0, TNDS_SERVICE_SHARD_KEY_LENGTH)).filter(Boolean))];
+        if (!shardKeys.length) throw new Error(`TNDS service ${service.source.serviceCode || service.id} has no shardable StopPoint IDs.`);
+        for (const shardKey of shardKeys) {
+          const scheduled = Object.fromEntries(Object.entries(service.stopSchedules || {}).filter(([stopId]) => stopId.startsWith(shardKey)));
+          const quarantine = service.tndsQuarantine ? {
+            ...service.tndsQuarantine,
+            affectedStopIds: service.tndsQuarantine.affectedStopIds.filter(stopId => stopId.startsWith(shardKey)),
+            patterns: service.tndsQuarantine.patterns.filter(pattern => pattern.affectedStopIds.some(stopId => stopId.startsWith(shardKey))).map(pattern => ({ ...pattern, affectedStopIds: pattern.affectedStopIds.filter(stopId => stopId.startsWith(shardKey)) }))
+          } : null;
+          const record = { ...service, stopSchedules: scheduled, tndsQuarantine: quarantine?.affectedStopIds.length ? quarantine : null };
+          if (!shardFiles.has(shardKey)) shardFiles.set(shardKey, { file: path.join(work, `${shardKey}.jsonl`), identities: new Set() });
+          const shard = shardFiles.get(shardKey);
+          if (shard.identities.has(record.id)) throw new Error(`TNDS prepared service ${record.id} was duplicated in shard ${shardKey}.`);
+          shard.identities.add(record.id);
+          await fs.appendFile(shard.file, `${JSON.stringify(record)}\n`);
         }
-        registeredPaths.add(relative);
-        await fs.writeFile(path.join(output, relative), `${JSON.stringify(service)}\n`, { flag: 'wx' });
-        paths.push(relative);
       }
     } catch (error) {
       if (error.message === 'TNDS XML contains no Service record.') {
@@ -66,15 +80,38 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
       throw new Error(`TNDS parser rejected ${path.basename(file)}: ${error.message}`);
     }
   }
-  if (!paths.length) throw new Error('TNDS preparation produced no services.');
+  if (!serviceIds.size) throw new Error('TNDS preparation produced no services.');
+  const serviceShards = {};
+  for (const shardKey of [...shardFiles.keys()].sort()) {
+    const byRegion = new Map();
+    const lines = (await fs.readFile(shardFiles.get(shardKey).file, 'utf8')).trim().split('\n').filter(Boolean);
+    for (const line of lines) {
+      const service = JSON.parse(line);
+      const region = service.source.region.toLowerCase();
+      if (!byRegion.has(region)) byRegion.set(region, []);
+      byRegion.get(region).push(service);
+    }
+    for (const [region, records] of byRegion) {
+      const relative = `services/${shardKey}-${region}.json.gz`;
+      if (registeredPaths.has(relative) || await fs.access(path.join(output, relative)).then(() => true, () => false)) throw new Error(`TNDS prepared output collision ${relative}.`);
+      registeredPaths.add(relative);
+      const payload = { schema: 'atlas-prepared-bus-tnds-v1', region: region.toUpperCase(), stopPrefix: shardKey, services: records.sort((left, right) => left.id.localeCompare(right.id)) };
+      await fs.writeFile(path.join(output, relative), gzipSync(`${JSON.stringify(payload)}\n`), { flag: 'wx' });
+      if (!serviceShards[shardKey]) serviceShards[shardKey] = [];
+      serviceShards[shardKey].push(relative);
+    }
+  }
+  await fs.rm(work, { recursive: true, force: true });
   await fs.writeFile(path.join(output, 'manifest.json'), `${JSON.stringify({
     schema: 'atlas-prepared-bus-tnds-v1',
     generatedAt: preparedAt,
     source: 'Traveline National Dataset v2.5',
     regions: [...regions].sort(),
-    services: paths
+    serviceCount: serviceIds.size,
+    serviceShardKeyLength: TNDS_SERVICE_SHARD_KEY_LENGTH,
+    serviceShards
   })}\n`);
-  return { services: paths.length, regions: [...regions].sort(), quarantinedPatterns, quarantinedServices };
+  return { services: serviceIds.size, shards: Object.values(serviceShards).flat().length, regions: [...regions].sort(), quarantinedPatterns, quarantinedServices };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

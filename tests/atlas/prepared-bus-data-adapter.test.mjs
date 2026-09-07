@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { gzipSync } from 'node:zlib';
 import { createPreparedBusDataAdapter, nearbyGridCellKeys, normalisePreparedService } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
 
@@ -93,9 +94,52 @@ test('TNDS quarantine warns only when an affected selected stop is assessed', as
   assert.equal(affected.data.some(service => service.id === quarantined.id), false);
   assert.equal(affected.warnings.filter(warning => /Supplementary timetable evidence is incomplete/.test(warning)).length, 1);
   assert.match(affected.warnings.join(' '), /one or more services/);
+  assert.equal(affected.provenance.tndsServing, 'bounded-legacy-manifest');
   assert.doesNotMatch(affected.warnings.join(' '), /JP-Q|quarantined\.json/);
   const unrelated = await adapter.servicesForStops([{ ...stop, id: '9990A' }]);
   assert.equal(unrelated.ok, false);
+});
+
+test('TNDS stop-prefix shards bound requests and preserve quarantine impact', async () => {
+  const calls = [];
+  const shardedManifest = { ...manifest, serviceShards: { ...manifest.serviceShards, Q0000: ['services/q-bods.json'] } };
+  const tndsManifest = { schema: 'atlas-prepared-bus-tnds-v1', generatedAt: '2026-09-07T00:00:00Z', regions: ['SE'], serviceCount: 2, serviceShardKeyLength: 5, serviceShards: { '2100A': ['services/2100A.json.gz'], Q0000: ['services/Q0000.json.gz'] } };
+  const validTnds = { id: 'tnds:SE:fixture:valid', routeNumber: '10', operator: 'Example', stopSchedules: { '2100A': { monday: [360] } }, tndsQuarantine: null };
+  const qTnds = { id: 'tnds:SE:fixture:q', routeNumber: 'Q', operator: 'Example', stopSchedules: {}, tndsQuarantine: { serviceQuarantined: true, affectedStopIds: ['Q0000'], patterns: [{ patternId: 'JP-Q', reasonCode: 'incomplete_runtime_sequence', affectedStopIds: ['Q0000'] }] } };
+  const gzipShard = payload => gzipSync(JSON.stringify(payload));
+  const validGzip = gzipShard({ schema: 'atlas-prepared-bus-tnds-v1', stopPrefix: '2100A', services: [validTnds] });
+  const quarantineGzip = gzipShard({ schema: 'atlas-prepared-bus-tnds-v1', stopPrefix: 'Q0000', services: [qTnds] });
+  assert.equal(validGzip[0], 0x1f);
+  assert.equal(validGzip[1], 0x8b);
+  const fetchSharded = async url => {
+    const pathname = new URL(url).pathname;
+    calls.push(pathname);
+    if (pathname === '/data/manifest.json') return new Response(JSON.stringify(shardedManifest), { status: 200 });
+    if (pathname === '/tnds/manifest.json') return new Response(JSON.stringify(tndsManifest), { status: 200 });
+    if (pathname.endsWith('/services/q-bods.json')) return new Response(JSON.stringify({ schema: 'atlas-prepared-bus-data-v1', services: [{ ...service, stopSchedules: { Q0000: { monday: [360] } } }] }), { status: 200 });
+    if (pathname.endsWith('/services/2100A.json.gz')) return new Response(validGzip, { status: 200, headers: { 'content-type': 'application/gzip' } });
+    if (pathname.endsWith('/services/Q0000.json.gz')) return new Response(quarantineGzip, { status: 200, headers: { 'content-type': 'application/gzip' } });
+    return fetchFixture(url);
+  };
+  const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchSharded, baseUrl: 'https://atlas.example/data/', tndsBaseUrl: 'https://atlas.example/tnds/' });
+  const normal = await adapter.servicesForStops([stop]);
+  assert.equal(normal.ok, true);
+  assert.equal(normal.data.some(row => row.id === validTnds.id), true);
+  assert.equal(calls.filter(pathname => pathname.includes('/tnds/services/')).length, 1);
+  assert.equal(calls.some(pathname => pathname.endsWith('/services/Q0000.json.gz')), false);
+  calls.length = 0;
+  const oppositePair = await adapter.servicesForStops([stop, { ...stop, id: '2100A-OP' }]);
+  assert.equal(oppositePair.ok, true);
+  assert.equal(calls.filter(pathname => pathname.includes('/tnds/services/')).length, 1);
+  calls.length = 0;
+  const affected = await adapter.servicesForStops([{ ...stop, id: 'Q0000' }]);
+  assert.equal(affected.ok, true);
+  assert.equal(affected.data.some(row => row.id === qTnds.id), false);
+  assert.equal(affected.warnings.filter(warning => /Supplementary timetable evidence is incomplete/.test(warning)).length, 1);
+  assert.equal(calls.filter(pathname => pathname.includes('/tnds/services/')).length, 1);
+  const malformedManifest = { ...tndsManifest, serviceShards: { '2100A': [] } };
+  const malformed = createPreparedBusDataAdapter({ fetchImpl: async url => new Response(JSON.stringify(new URL(url).pathname === '/tnds/manifest.json' ? malformedManifest : shardedManifest), { status: 200 }), baseUrl: 'https://atlas.example/data/', tndsBaseUrl: 'https://atlas.example/tnds/' });
+  assert.equal((await malformed.servicesForStops([stop])).ok, false);
 });
 
 test('missing prepared timetable area remains an unavailable source, not zero', async () => {

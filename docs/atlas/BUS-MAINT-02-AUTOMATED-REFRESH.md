@@ -12,6 +12,8 @@ The final parser audit used the local `Downloads/TNDS-SE-v2.5.zip` archive. Its 
 
 For each pattern, the parser orders `JourneyPatternTimingLink` records, starts the first stop at the `VehicleJourney` departure, and adds each supplied ISO-8601 `RunTime` plus any `WaitTime` before recording the next stop. A multi-stop pattern with missing runtime data fails safely; it is never filled with a copied origin departure. XML files containing more than one `Service` record also fail safely because the current accepted TNDS input contract is one service per file.
 
+Public ATLAS distributes prepared derivative TNDS information with attribution to the Traveline National Dataset (TNDS), which contains public sector information licensed under the Open Government Licence v3.0. This acknowledgement does not imply Traveline endorsement of ATLAS.
+
 The artifact preserves the legacy Toolkit at the root and ATLAS under `/atlas/`. Weekly generated datasets are not committed to `main`. The status manifest distinguishes authoritative source identity and acquisition time from any source publication date; no source publication date is fabricated. TfL remains the existing live/runtime adapter and is outside this refresh.
 
 Public ATLAS shows “Bus data updates automatically” and the last successful automated refresh. `Refresh data status` rereads the status display only. The manual updater remains available on the approved localhost maintenance server.

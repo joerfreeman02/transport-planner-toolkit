@@ -15,4 +15,7 @@ assert.deepEqual(multiPattern.stopSchedules['STOP-C'].monday, [492, 540]);
 assert.deepEqual(multiPattern.stopSchedules['STOP-C'].saturday, []);
 assert.equal(multiPattern.stopSchedules['STOP-C'].monday.includes(480), false);
 assert.throws(() => parseTndsTransXchange(multiPatternXml.replace('</Services>', '<Service><ServiceCode>SECOND</ServiceCode></Service></Services>'), { region: 'SE', sourceArchive: 'multi.xml' }), /multiple Service records/);
+const noTimingMultiStop = multiPatternXml.replace(/<JourneyPatternSections>[\s\S]*?<\/JourneyPatternSections>/, '<JourneyPatternSections></JourneyPatternSections>');
+assert.throws(() => parseTndsTransXchange(noTimingMultiStop, { region: 'SE', sourceArchive: 'missing-timing.xml' }), /no reliable stop-specific timing/);
+assert.doesNotThrow(() => parseTndsTransXchange(xml, { region: 'SE', sourceArchive: 'one-stop.xml' }));
 console.log('PASS TNDS parser, provenance, after-midnight and source merge tests.');

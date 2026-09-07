@@ -11,4 +11,6 @@ assert.match(app, /__atlas-review\/update-bus-data/);
 assert.doesNotMatch(app, /Traveline (username|password)/i);
 assert.match(app, /Checked successfully — no changes detected/);
 assert.match(app, /Live source — checked when a London assessment is run/);
+assert.match(html, /Traveline National Dataset \(TNDS\)/);
+assert.match(html, /Open Government Licence v3\.0/);
 console.log('PASS Bus UI contract - Alpha.7 status, selection and local maintenance controls are exposed without browser credentials.');

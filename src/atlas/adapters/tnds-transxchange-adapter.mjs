@@ -72,6 +72,7 @@ export function parseTndsTransXchange(xml, { region = null, sourceArchive = null
     if (departure == null) continue;
     const profile = blocks(journey, 'OperatingProfile')[0] || blocks(serviceBlock, 'OperatingProfile')[0] || '';
     const patternStopIds = pattern.stopIds?.length ? pattern.stopIds : stops.map(stop => stop.id);
+    if (stops.length > 1 && (!pattern.stopIds?.length || pattern.offsets.size !== pattern.stopIds.length)) throw new Error(`TNDS journey ${first(journey, 'JourneyPatternRef') || 'unknown'} has no reliable stop-specific timing for a multi-stop service.`);
     if (pattern.stopIds?.length && pattern.stopIds.length > 1 && pattern.offsets.size !== pattern.stopIds.length) throw new Error(`TNDS journey pattern ${first(journey, 'JourneyPatternRef') || 'unknown'} has incomplete stop timing.`);
     for (const day of dayNames(profile)) for (const stopId of patternStopIds) if (stopSchedules[stopId]) {
       const offset = pattern.offsets?.get(stopId) ?? 0;

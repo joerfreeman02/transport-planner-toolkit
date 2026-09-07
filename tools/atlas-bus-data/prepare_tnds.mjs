@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { parseTndsTransXchange } from '../../src/atlas/adapters/tnds-transxchange-adapter.mjs';
+import { createHash } from 'node:crypto';
+import { parseTndsTransXchangeServices } from '../../src/atlas/adapters/tnds-transxchange-adapter.mjs';
 
 export const TNDS_REGIONS = Object.freeze(['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y']);
 
@@ -24,31 +25,34 @@ function regionFrom(file) {
 
 export async function prepareTnds({ input, output, preparedAt = new Date().toISOString() }) {
   const files = await walk(input);
-  const services = [];
   const regions = new Set();
+  const paths = [];
+  await fs.rm(output, { recursive: true, force: true });
+  await fs.mkdir(path.join(output, 'services'), { recursive: true });
   for (const file of files) {
     const region = regionFrom(file);
     if (!region) continue;
     const xml = await fs.readFile(file, 'utf8');
     try {
-      const service = parseTndsTransXchange(xml, { region, sourceArchive: path.basename(file), preparedAt });
-      if (!service.stopSchedules || !Object.keys(service.stopSchedules).length) continue;
-      services.push(service);
-      regions.add(region);
+      const parsed = parseTndsTransXchangeServices(xml, { region, sourceArchive: path.basename(file), preparedAt });
+      if (parsed.length > 1) console.log(`TNDS ${path.basename(file)}: prepared ${parsed.length} Service records.`);
+      for (const service of parsed) {
+        if (!service.stopSchedules || !Object.keys(service.stopSchedules).length) continue;
+        regions.add(region);
+        const digest = createHash('sha256').update(service.id).digest('hex').slice(0, 12);
+        const relative = `services/${service.source.region.toLowerCase()}-${digest}.json`;
+        await fs.writeFile(path.join(output, relative), `${JSON.stringify(service)}\n`);
+        paths.push(relative);
+      }
     } catch (error) {
+      if (error.message === 'TNDS XML contains no Service record.') {
+        console.log(`TNDS ${path.basename(file)}: no Service record; ignored as non-timetable registration data.`);
+        continue;
+      }
       throw new Error(`TNDS parser rejected ${path.basename(file)}: ${error.message}`);
     }
   }
-  if (!services.length) throw new Error('TNDS preparation produced no services.');
-  await fs.rm(output, { recursive: true, force: true });
-  await fs.mkdir(path.join(output, 'services'), { recursive: true });
-  const paths = [];
-  for (const [index, service] of services.entries()) {
-    const safe = `${String(index + 1).padStart(5, '0')}-${service.source.region.toLowerCase()}.json`;
-    const relative = `services/${safe}`;
-    await fs.writeFile(path.join(output, relative), `${JSON.stringify(service)}\n`);
-    paths.push(relative);
-  }
+  if (!paths.length) throw new Error('TNDS preparation produced no services.');
   await fs.writeFile(path.join(output, 'manifest.json'), `${JSON.stringify({
     schema: 'atlas-prepared-bus-tnds-v1',
     generatedAt: preparedAt,
@@ -56,7 +60,7 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
     regions: [...regions].sort(),
     services: paths
   })}\n`);
-  return { services: services.length, regions: [...regions].sort() };
+  return { services: paths.length, regions: [...regions].sort() };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { gzipSync } from 'node:zlib';
 import { createPreparedBusDataAdapter, nearbyGridCellKeys, normalisePreparedService } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
 
@@ -105,20 +106,27 @@ test('TNDS stop-prefix shards bound requests and preserve quarantine impact', as
   const tndsManifest = { schema: 'atlas-prepared-bus-tnds-v1', generatedAt: '2026-09-07T00:00:00Z', regions: ['SE'], serviceCount: 2, serviceShardKeyLength: 5, serviceShards: { '2100A': ['services/2100A.json.gz'], Q0000: ['services/Q0000.json.gz'] } };
   const validTnds = { id: 'tnds:SE:fixture:valid', routeNumber: '10', operator: 'Example', stopSchedules: { '2100A': { monday: [360] } }, tndsQuarantine: null };
   const qTnds = { id: 'tnds:SE:fixture:q', routeNumber: 'Q', operator: 'Example', stopSchedules: {}, tndsQuarantine: { serviceQuarantined: true, affectedStopIds: ['Q0000'], patterns: [{ patternId: 'JP-Q', reasonCode: 'incomplete_runtime_sequence', affectedStopIds: ['Q0000'] }] } };
+  const gzipShard = payload => gzipSync(JSON.stringify(payload));
+  const validGzip = gzipShard({ schema: 'atlas-prepared-bus-tnds-v1', stopPrefix: '2100A', services: [validTnds] });
+  const quarantineGzip = gzipShard({ schema: 'atlas-prepared-bus-tnds-v1', stopPrefix: 'Q0000', services: [qTnds] });
+  assert.equal(validGzip[0], 0x1f);
+  assert.equal(validGzip[1], 0x8b);
   const fetchSharded = async url => {
     const pathname = new URL(url).pathname;
     calls.push(pathname);
     if (pathname === '/data/manifest.json') return new Response(JSON.stringify(shardedManifest), { status: 200 });
     if (pathname === '/tnds/manifest.json') return new Response(JSON.stringify(tndsManifest), { status: 200 });
     if (pathname.endsWith('/services/q-bods.json')) return new Response(JSON.stringify({ schema: 'atlas-prepared-bus-data-v1', services: [{ ...service, stopSchedules: { Q0000: { monday: [360] } } }] }), { status: 200 });
-    if (pathname.endsWith('/services/2100A.json.gz')) return new Response(JSON.stringify({ schema: 'atlas-prepared-bus-tnds-v1', stopPrefix: '2100A', services: [validTnds] }), { status: 200 });
-    if (pathname.endsWith('/services/Q0000.json.gz')) return new Response(JSON.stringify({ schema: 'atlas-prepared-bus-tnds-v1', stopPrefix: 'Q0000', services: [qTnds] }), { status: 200 });
+    if (pathname.endsWith('/services/2100A.json.gz')) return new Response(validGzip, { status: 200, headers: { 'content-type': 'application/gzip' } });
+    if (pathname.endsWith('/services/Q0000.json.gz')) return new Response(quarantineGzip, { status: 200, headers: { 'content-type': 'application/gzip' } });
     return fetchFixture(url);
   };
   const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchSharded, baseUrl: 'https://atlas.example/data/', tndsBaseUrl: 'https://atlas.example/tnds/' });
   const normal = await adapter.servicesForStops([stop]);
   assert.equal(normal.ok, true);
+  assert.equal(normal.data.some(row => row.id === validTnds.id), true);
   assert.equal(calls.filter(pathname => pathname.includes('/tnds/services/')).length, 1);
+  assert.equal(calls.some(pathname => pathname.endsWith('/services/Q0000.json.gz')), false);
   calls.length = 0;
   const oppositePair = await adapter.servicesForStops([stop, { ...stop, id: '2100A-OP' }]);
   assert.equal(oppositePair.ok, true);

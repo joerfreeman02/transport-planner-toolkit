@@ -38,12 +38,23 @@ jobs:
           rm -rf pages-site
           mkdir pages-site
           rsync -a --exclude='.git' --exclude='pages-site' ./ pages-site/
+      - name: Obtain last-known-good deployed metadata
+        shell: bash
+        run: |
+          rm -rf last-known-good
+          mkdir -p last-known-good/atlas/data/{status,bus,bus-tnds}
+          base='https://joerfreeman02.github.io/transport-planner-toolkit/atlas/data'
+          for item in status/manifest.json bus/manifest.json bus-tnds/manifest.json; do
+            curl --fail --silent --show-error --location "$base/$item" -o "last-known-good/atlas/data/$item" || rm -f "last-known-good/atlas/data/$item"
+          done
       - name: Acquire and build validated Bus candidate
         env:
           TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
           TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
           ATLAS_NODE: node
-        run: python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site
+        run: python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --previous-root last-known-good
+      - name: Validate generated candidate data
+        run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site
       - name: Run deterministic ATLAS checks
         run: node tests/atlas/run-all.mjs
       - name: Validate complete legacy and ATLAS artifact

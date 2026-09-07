@@ -36,15 +36,22 @@ export function parseTndsTransXchange(xml, { region = null, sourceArchive = null
   const validTo = first(operating, 'EndDate') || null;
   const stops = blocks(source, 'AnnotatedStopPointRef').map(block => ({ id: first(block, 'StopPointRef'), name: first(block, 'CommonName'), indicator: first(block, 'Indicator'), locality: first(block, 'LocalityName'), localityQualifier: first(block, 'LocalityQualifier') })).filter(stop => stop.id);
   const stopSchedules = Object.fromEntries(stops.map(stop => [stop.id, Object.fromEntries(DAYS.map(day => [day, []]))]));
+  const sections = new Map(blocks(source, 'JourneyPatternSection').map(section => [attr(section, 'id'), section]));
+  const sectionStops = section => [...blocks(section, 'From'), ...blocks(section, 'To')].map(call => first(call, 'StopPointRef')).filter(Boolean);
   const patterns = blocks(source, 'JourneyPattern');
-  const patternById = new Map(patterns.map(pattern => [attr(pattern, 'id'), { direction: first(pattern, 'Direction'), destination: first(pattern, 'DestinationDisplay'), routeRef: first(pattern, 'RouteRef') || attr(pattern, 'RouteRef') }]));
+  const patternById = new Map(patterns.map(pattern => {
+    const sectionIds = first(pattern, 'JourneyPatternSectionRefs').split(/\s+/).filter(Boolean);
+    const patternStops = [...new Set(sectionIds.flatMap(sectionId => sectionStops(sections.get(sectionId) || '')))];
+    return [attr(pattern, 'id'), { direction: first(pattern, 'Direction'), destination: first(pattern, 'DestinationDisplay'), routeRef: first(pattern, 'RouteRef') || attr(pattern, 'RouteRef'), stopIds: patternStops }];
+  }));
   const journeys = blocks(source, 'VehicleJourney');
   for (const journey of journeys) {
     const pattern = patternById.get(first(journey, 'JourneyPatternRef')) || {};
     const departure = minutes(first(journey, 'DepartureTime'));
     if (departure == null) continue;
     const profile = blocks(journey, 'OperatingProfile')[0] || blocks(serviceBlock, 'OperatingProfile')[0] || '';
-    for (const day of dayNames(profile)) for (const stop of stops) stopSchedules[stop.id][day].push(departure);
+    const patternStopIds = pattern.stopIds?.length ? pattern.stopIds : stops.map(stop => stop.id);
+    for (const day of dayNames(profile)) for (const stopId of patternStopIds) if (stopSchedules[stopId]) stopSchedules[stopId][day].push(departure);
   }
   return Object.freeze({ id: `tnds:${serviceCode || routeNumber}:${sourceArchive || 'xml'}`, routeNumber: text(routeNumber), operator: text(operator) || 'Operator not supplied', origin: first(serviceBlock, 'Origin') || first(serviceBlock, 'StandardService'), destination: first(serviceBlock, 'Destination'), direction: text(patternById.values().next().value?.direction), description, validFrom, validTo, stopSchedules, stops, source: { type: 'TNDS', region, archive: sourceArchive, serviceCode, operatorCode, schemaVersion: '2.5', preparedAt } });
 }

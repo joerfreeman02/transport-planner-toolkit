@@ -214,12 +214,14 @@ def source_outcome(source_hash: str, previous: dict | None) -> tuple[str, str | 
 def run(args: argparse.Namespace) -> dict:
     started = now_utc()
     site = Path(args.site_root).resolve()
-    previous_status_path = site / "atlas" / "data" / "status" / "manifest.json"
+    previous_root = Path(args.previous_root).resolve() if args.previous_root else None
+    previous_status_path = (previous_root or site) / "atlas" / "data" / "status" / "manifest.json"
     try:
         previous_status = json.loads(previous_status_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         previous_status = {}
-    baseline = baseline_metrics(site)
+    deployed_baseline = baseline_metrics(previous_root) if previous_root and previous_status else {}
+    baseline = deployed_baseline if deployed_baseline else baseline_metrics(site)
     staging = site.parent / f"atlas-bus-refresh-staging-{os.getpid()}"
     shutil.rmtree(staging, ignore_errors=True)
     staging.mkdir(parents=True)
@@ -264,6 +266,7 @@ def run(args: argparse.Namespace) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site-root", required=True)
+    parser.add_argument("--previous-root", help="Optional read-only copy of the last successful Pages deployment")
     args = parser.parse_args()
     try:
         print(json.dumps(run(args), indent=2))

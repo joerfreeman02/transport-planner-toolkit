@@ -8,8 +8,10 @@ Refresh sanity checks retain the existing prepared manifest as a baseline where 
 
 Each source records `UPDATED`, `CHECKED_NO_CHANGE`, or `FAILED`; TfL is recorded as `LIVE` because it is queried during London assessment. NaPTAN and BODS use downloaded-source hashes, while TNDS stores per-region archive hashes and a deterministic aggregate. Failed candidates never write a deployed successful status.
 
+The final parser audit used the local `Downloads/TNDS-SE-v2.5.zip` archive. Its `bed_51-231-_-y08-1.xml` contains one service, multiple journey patterns and pattern-section references; the parser now assigns each vehicle journey only to the stops in its referenced pattern section. The real file retained route `231`, operator `South Beds Dial-a-Ride`, and Woodside Road ATCO stops `021013518` and `021013519`. This is evidence for the current archive, not a permanent requirement that route 231 remain in every future refresh.
+
 The artifact preserves the legacy Toolkit at the root and ATLAS under `/atlas/`. Weekly generated datasets are not committed to `main`. The status manifest distinguishes authoritative source identity and acquisition time from any source publication date; no source publication date is fabricated. TfL remains the existing live/runtime adapter and is outside this refresh.
 
 Public ATLAS shows “Bus data updates automatically” and the last successful automated refresh. `Refresh data status` rereads the status display only. The manual updater remains available on the approved localhost maintenance server.
 
-The current programme tooling review remains unchanged: Dependabot, Codecov, OpenSSF Scorecard, Sentry and Renovate are not installed by this sprint; none is required to implement the refresh candidate. The workflow uses standard GitHub-hosted Ubuntu and the official Pages actions with no paid hosting assumption.
+Tooling review: Dependabot is adopted and configured for weekly npm and GitHub Actions updates in `.github/dependabot.yml`. Codecov remains a future controlled pilot; OpenSSF Scorecard is a future security/governance consideration; Sentry is deferred pending telemetry/location/privacy review; Renovate is deferred to avoid overlap with Dependabot. No new tooling is installed by this sprint. The workflow uses standard GitHub-hosted Ubuntu and the official Pages actions with no paid hosting assumption.

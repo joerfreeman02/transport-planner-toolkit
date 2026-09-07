@@ -1,5 +1,11 @@
 # Changelog
 
+## ATLAS 2.0.0-alpha.7 — automated Bus refresh candidate — 2026-09-07
+
+- Added headless NaPTAN, BODS and eight-region TNDS acquisition and isolated candidate validation for GitHub Actions.
+- Added Friday 06:17 UTC/manual-dispatch Pages artifact workflow with deployment gated on successful validation.
+- Public ATLAS now reports automatic refresh status and retains the manual updater only on localhost maintenance review.
+
 ## Toolkit 2.7.1 Site Research stabilisation — 2026-07-23
 
 - Fixed real Bus stop-pair persistence and added one-pack compound stop, Route and relationship research with strict partial-import validation.

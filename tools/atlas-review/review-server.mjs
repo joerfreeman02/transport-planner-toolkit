@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const APP_ID = 'eas-atlas-review-v1';
-const APP_VERSION = '2.0.0-alpha.6';
+const APP_VERSION = '2.0.0-alpha.7';
 const UPDATE_BUS_DATA_PATH = path.join('tools', 'atlas-bus-data', 'UPDATE ATLAS BUS DATA.bat');
 const STATUS_PATH = '/__atlas-review/status';
 const STOP_PATH = '/__atlas-review/stop';

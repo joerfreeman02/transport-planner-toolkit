@@ -1,0 +1,21 @@
+# BUS-MAINT-02 — Automated Bus refresh
+
+Alpha.7 builds an isolated GitHub Pages candidate every Friday at 06:17 UTC or on `workflow_dispatch`. The runner acquires the official NaPTAN CSV, the public DfT BODS timetable download, and all eight accepted England TNDS v2.5 regions (`EA`, `EM`, `NE`, `NW`, `SE`, `SW`, `WM`, `Y`). TNDS uses the existing legacy FTP source; the runner receives only `TNDS_USERNAME` and `TNDS_PASSWORD` as Actions secrets and the credentials are never written to manifests or Pages files.
+
+The candidate is staged outside the known-good deployment, prepared with the existing deterministic NaPTAN/BODS builder and TNDS TransXChange adapter, then checked for non-empty manifests, referenced files and complete regional scope. The Pages artifact is assembled only after those checks and the deterministic Bus suite pass. Deployment is a separate job with an explicit success dependency, so a failed refresh cannot replace the previous Pages deployment.
+
+Refresh sanity checks retain the existing prepared manifest as a baseline where meaningful. A candidate must retain at least 50% of the previous NaPTAN stop count and total BODS service count, and may not lose a previously present BODS region. TNDS must contain all eight accepted England regions. These thresholds catch catastrophic or truncated downloads while allowing ordinary timetable and stop-count changes; the first successful automated run establishes the source-hash baseline.
+
+Each source records `UPDATED`, `CHECKED_NO_CHANGE`, or `FAILED`; TfL is recorded as `LIVE` because it is queried during London assessment. NaPTAN and BODS use downloaded-source hashes, while TNDS stores per-region archive hashes and a deterministic aggregate. Failed candidates never write a deployed successful status.
+
+The final parser audit used the local `Downloads/TNDS-SE-v2.5.zip` archive. Its `bed_51-231-_-y08-1.xml` contains one service, multiple journey patterns and pattern-section references; the parser now assigns each vehicle journey only to the stops in its referenced pattern section. The real file retained route `231`, operator `South Beds Dial-a-Ride`, and Woodside Road ATCO stops `021013518` and `021013519`. This is evidence for the current archive, not a permanent requirement that route 231 remain in every future refresh.
+
+For each pattern, the parser orders `JourneyPatternTimingLink` records, starts the first stop at the `VehicleJourney` departure, and adds each supplied ISO-8601 `RunTime` plus any `WaitTime` before recording the next stop. A multi-stop pattern with missing runtime data fails safely; it is never filled with a copied origin departure. XML files containing more than one `Service` record also fail safely because the current accepted TNDS input contract is one service per file.
+
+Public ATLAS distributes prepared derivative TNDS information with attribution to the Traveline National Dataset (TNDS), which contains public sector information licensed under the Open Government Licence v3.0. This acknowledgement does not imply Traveline endorsement of ATLAS.
+
+The artifact preserves the legacy Toolkit at the root and ATLAS under `/atlas/`. Weekly generated datasets are not committed to `main`. The status manifest distinguishes authoritative source identity and acquisition time from any source publication date; no source publication date is fabricated. TfL remains the existing live/runtime adapter and is outside this refresh.
+
+Public ATLAS shows “Bus data updates automatically” and the last successful automated refresh. `Refresh data status` rereads the status display only. The manual updater remains available on the approved localhost maintenance server.
+
+Tooling review: Dependabot is adopted and configured for weekly npm and GitHub Actions updates in `.github/dependabot.yml`. Codecov remains a future controlled pilot; OpenSSF Scorecard is a future security/governance consideration; Sentry is deferred pending telemetry/location/privacy review; Renovate is deferred to avoid overlap with Dependabot. No new tooling is installed by this sprint. The workflow uses standard GitHub-hosted Ubuntu and the official Pages actions with no paid hosting assumption.

@@ -1,6 +1,6 @@
 # BUS-MAINT-02 — Automated Bus refresh
 
-Alpha.7 builds an isolated GitHub Pages candidate every Friday at 06:17 UTC or on `workflow_dispatch`. The runner acquires the official NaPTAN CSV, the public DfT BODS timetable download, and all eight accepted England TNDS v2.5 regions (`EA`, `EM`, `NE`, `NW`, `SE`, `SW`, `WM`, `Y`). TNDS uses the existing legacy FTP source; the runner receives only `TNDS_USERNAME` and `TNDS_PASSWORD` as Actions secrets and the credentials are never written to manifests or Pages files.
+Alpha.7 builds an isolated GitHub Pages candidate every Friday at 06:17 UTC or on `workflow_dispatch`. The runner acquires the official NaPTAN CSV, the DfT BODS regional GTFS ZIP endpoints under `https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/{region}/`, and all eight accepted England TNDS v2.5 regions (`EA`, `EM`, `NE`, `NW`, `SE`, `SW`, `WM`, `Y`). TNDS uses the existing legacy FTP source; the runner receives only `TNDS_USERNAME` and `TNDS_PASSWORD` as Actions secrets and the credentials are never written to manifests or Pages files.
 
 The candidate is staged outside the known-good deployment, prepared with the existing deterministic NaPTAN/BODS builder and TNDS TransXChange adapter, then checked for non-empty manifests, referenced files and complete regional scope. The Pages artifact is assembled only after those checks and the deterministic Bus suite pass. Deployment is a separate job with an explicit success dependency, so a failed refresh cannot replace the previous Pages deployment.
 

@@ -23,7 +23,7 @@ SCHEMA = "atlas-prepared-bus-data-v1"
 DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 MAJOR_NAME = ("bus station", "coach station", "rail station", "railway station", "town centre", "city centre", "hospital", "airport", "university", "interchange", "shopping centre")
 NAPTAN_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=csv"
-BODS_URL = "https://data.bus-data.dft.gov.uk/timetable/download/"
+BODS_URL = "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/"
 
 
 def sha256(path: Path) -> str:

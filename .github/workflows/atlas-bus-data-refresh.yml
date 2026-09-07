@@ -21,10 +21,6 @@ jobs:
       contents: read
       pages: write
       id-token: write
-    env:
-      TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
-      TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
-      ATLAS_NODE: node
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -43,6 +39,10 @@ jobs:
           mkdir pages-site
           rsync -a --exclude='.git' --exclude='pages-site' ./ pages-site/
       - name: Acquire and build validated Bus candidate
+        env:
+          TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
+          TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
+          ATLAS_NODE: node
         run: python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site
       - name: Run deterministic ATLAS checks
         run: node tests/atlas/run-all.mjs

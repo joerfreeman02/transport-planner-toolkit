@@ -19,6 +19,8 @@ assert.match(workflow, /workflow_dispatch/);
 assert.match(workflow, /cron: '17 6 \* \* 5'/);
 assert.match(workflow, /needs: build-validate/);
 assert.match(workflow, /if: needs\.build-validate\.result == 'success'/);
+assert.match(workflow, /name: Acquire and build validated Bus candidate[\s\S]*env:[\s\S]*TNDS_USERNAME/);
+assert.doesNotMatch(workflow.slice(0, workflow.indexOf('    steps:')), /TNDS_USERNAME|TNDS_PASSWORD/);
 assert.match(refresh, /TNDS_USERNAME/);
 assert.match(refresh, /TNDS_PASSWORD/);
 assert.match(refresh, /set\(TNDS_REGIONS\)/);

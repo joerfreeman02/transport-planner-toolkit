@@ -7,11 +7,11 @@ currently deployed dataset; Pages deployment is a later workflow job.
 from __future__ import annotations
 
 import argparse
-import csv
 import ftplib
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -93,7 +93,13 @@ def acquire_bods(staging: Path) -> tuple[Path, dict]:
     archives = sorted(gtfs.rglob("*.zip"))
     if not archives and not any((path / "routes.txt").is_file() for path in gtfs.rglob("*")):
         raise RefreshError("BODS acquisition produced no GTFS feed")
-    return gtfs, {"identity": BODS_URL, "sha256": sha256(download_path)}
+    return gtfs, {"identity": BODS_URL, "sourceHash": sha256(download_path)}
+
+
+def tnds_region_from_filename(name: str) -> str | None:
+    """Recognise a whole region token, including TNDS-EA-v2.5.zip."""
+    match = re.search(r"(?:^|[-_.])(EA|EM|NE|NW|SE|SW|WM|Y)(?:[-_.]|$)", Path(name).name, flags=re.IGNORECASE)
+    return match.group(1).upper() if match else None
 
 
 def ftp_files(ftp_factory, username: str, password: str) -> list[str]:
@@ -114,10 +120,9 @@ def acquire_tnds(staging: Path, username: str, password: str, ftp_factory=ftplib
     names = ftp_files(ftp_factory, username, password)
     selected = {}
     for name in names:
-        upper = name.upper()
-        for region in TNDS_REGIONS:
-            if f"-{region}." in upper or f"_{region}." in upper or upper.startswith(f"{region}."):
-                selected.setdefault(region, name)
+        region = tnds_region_from_filename(name)
+        if region in TNDS_REGIONS:
+            selected.setdefault(region, name)
     missing = [region for region in TNDS_REGIONS if region not in selected]
     if missing:
         raise RefreshError(f"TNDS acquisition is incomplete; missing regions: {', '.join(missing)}")
@@ -136,10 +141,12 @@ def acquire_tnds(staging: Path, username: str, password: str, ftp_factory=ftplib
         raise
     except Exception as error:
         raise RefreshError("TNDS archive acquisition failed") from error
-    return staging / "tnds-xml", {"identity": f"ftp://{TNDS_HOST}{TNDS_PATH}", "regions": list(TNDS_REGIONS)}
+    hashes = {region: sha256(raw / name) for region, name in selected.items()}
+    aggregate = hashlib.sha256("".join(f"{region}:{hashes[region]}" for region in sorted(hashes)).encode("ascii")).hexdigest()
+    return staging / "tnds-xml", {"identity": f"ftp://{TNDS_HOST}{TNDS_PATH}", "regions": list(TNDS_REGIONS), "regionHashes": hashes, "sourceHash": aggregate}
 
 
-def validate_candidate(site: Path) -> dict:
+def candidate_metrics(site: Path) -> dict:
     bus_manifest_path = site / "atlas" / "data" / "bus" / "manifest.json"
     tnds_manifest_path = site / "atlas" / "data" / "bus-tnds" / "manifest.json"
     try:
@@ -154,12 +161,65 @@ def validate_candidate(site: Path) -> dict:
     for relative in list(bus["stopShards"].values()) + [item for values in bus["serviceShards"].values() for item in values] + tnds["services"]:
         if not (site / "atlas" / "data" / ("bus-tnds" if relative in tnds["services"] else "bus") / relative).is_file():
             raise RefreshError(f"Prepared candidate references a missing file: {relative}")
-    return {"naptanStopCount": bus.get("sources", {}).get("naptan", {}).get("stopCount", 0), "bodsRegionCount": len(bus.get("sources", {}).get("bods", {}).get("regions", [])), "tndsServiceCount": len(tnds["services"])}
+    bods_regions = bus.get("sources", {}).get("bods", {}).get("regions", [])
+    return {"naptanStopCount": bus.get("sources", {}).get("naptan", {}).get("stopCount", 0), "bodsRegionCount": len(bods_regions), "bodsServiceCount": sum(int(region.get("serviceCount", 0) or 0) for region in bods_regions), "tndsRegionCount": len(tnds.get("regions", [])), "tndsServiceCount": len(tnds["services"])}
+
+
+def validate_candidate(site: Path, baseline: dict | None = None) -> dict:
+    metrics = candidate_metrics(site)
+    baseline = baseline or {}
+    for key in ("naptanStopCount", "bodsServiceCount", "tndsServiceCount"):
+        previous = int(baseline.get(key, 0) or 0)
+        current = int(metrics.get(key, 0) or 0)
+        if previous and current < previous * 0.5:
+            raise RefreshError(f"Candidate {key} collapsed from {previous} to {current}; below the 50% safety threshold")
+    previous_regions = int(baseline.get("bodsRegionCount", 0) or 0)
+    if previous_regions and metrics["bodsRegionCount"] < previous_regions:
+        raise RefreshError(f"Candidate BODS region count collapsed from {previous_regions} to {metrics['bodsRegionCount']}")
+    if metrics["tndsRegionCount"] != len(TNDS_REGIONS):
+        raise RefreshError("Prepared TNDS candidate does not contain all eight England regions")
+    return metrics
+
+
+def baseline_metrics(site: Path) -> dict:
+    manifest = site / "atlas" / "data" / "bus" / "manifest.json"
+    tnds_manifest = site / "atlas" / "data" / "bus-tnds" / "manifest.json"
+    if not manifest.is_file():
+        return {}
+    try:
+        bus = json.loads(manifest.read_text(encoding="utf-8"))
+        bods = bus.get("sources", {}).get("bods", {})
+        result = {
+            "naptanStopCount": bus.get("sources", {}).get("naptan", {}).get("stopCount", 0),
+            "bodsRegionCount": len(bods.get("regions", [])),
+            "bodsServiceCount": sum(int(region.get("serviceCount", 0) or 0) for region in bods.get("regions", [])),
+        }
+        if tnds_manifest.is_file():
+            tnds = json.loads(tnds_manifest.read_text(encoding="utf-8"))
+            if set(tnds.get("regions", [])) == set(TNDS_REGIONS):
+                result["tndsRegionCount"] = len(tnds["regions"])
+                result["tndsServiceCount"] = len(tnds.get("services", []))
+        return result
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return {}
+
+
+def source_outcome(source_hash: str, previous: dict | None) -> tuple[str, str | None]:
+    previous_hash = (previous or {}).get("sourceHash")
+    if not previous_hash:
+        return "UPDATED", "INITIAL AUTOMATED BASELINE"
+    return ("CHECKED_NO_CHANGE", None) if previous_hash == source_hash else ("UPDATED", None)
 
 
 def run(args: argparse.Namespace) -> dict:
     started = now_utc()
     site = Path(args.site_root).resolve()
+    previous_status_path = site / "atlas" / "data" / "status" / "manifest.json"
+    try:
+        previous_status = json.loads(previous_status_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        previous_status = {}
+    baseline = baseline_metrics(site)
     staging = site.parent / f"atlas-bus-refresh-staging-{os.getpid()}"
     shutil.rmtree(staging, ignore_errors=True)
     staging.mkdir(parents=True)
@@ -179,8 +239,20 @@ def run(args: argparse.Namespace) -> dict:
         prepared_manifest_path.write_text(json.dumps(prepared_manifest, separators=(",", ":")) + "\n", encoding="utf-8")
         node = os.environ.get("ATLAS_NODE", "node")
         subprocess.run([node, str(Path(__file__).with_name("prepare_tnds.mjs")), "--input", str(tnds_xml), "--output", str(site_tnds), "--preparedAt", started], check=True)
-        counts = validate_candidate(site)
-        status = {"schema": "atlas-bus-refresh-status-v1", "status": "validated", "successfulRefreshAt": started, "version": "2.0.0-alpha.7", "build": "ATLAS-2.0.0-alpha.7-20260907", "repositoryCommit": os.environ.get("GITHUB_SHA"), "workflowRun": os.environ.get("GITHUB_RUN_ID"), "sources": {"naptan": {"identity": NAPTAN_URL, "acquiredAt": started}, "bods": {**bods, "acquiredAt": started}, "tnds": {**tnds, "acquiredAt": started, "transport": "legacy FTP; credentials supplied only to the runner"}}, "preparedCounts": counts, "validation": "passed"}
+        counts = validate_candidate(site, baseline)
+        naptan_hash = sha256(naptan)
+        naptan_outcome, naptan_note = source_outcome(naptan_hash, previous_status.get("sources", {}).get("naptan"))
+        bods_outcome, bods_note = source_outcome(bods["sourceHash"], previous_status.get("sources", {}).get("bods"))
+        tnds_outcome, tnds_note = source_outcome(tnds["sourceHash"], previous_status.get("sources", {}).get("tnds"))
+        sources = {
+            "naptan": {"identity": NAPTAN_URL, "checkedAt": started, "sourceHash": naptan_hash, "outcome": naptan_outcome, "preparedCount": counts["naptanStopCount"]},
+            "bods": {"identity": BODS_URL, "checkedAt": started, "sourceHash": bods["sourceHash"], "outcome": bods_outcome, "preparedCount": {"regions": counts["bodsRegionCount"], "services": counts["bodsServiceCount"]}},
+            "tnds": {"identity": tnds["identity"], "checkedAt": started, "sourceHash": tnds["sourceHash"], "regionHashes": tnds["regionHashes"], "regionsChecked": tnds["regions"], "outcome": tnds_outcome, "preparedCount": counts["tndsServiceCount"], "transport": "legacy FTP; credentials supplied only to the runner"},
+            "tfl": {"outcome": "LIVE", "description": "Live source — checked when a London assessment is run"}
+        }
+        for source, note in (("naptan", naptan_note), ("bods", bods_note), ("tnds", tnds_note)):
+            if note: sources[source]["note"] = note
+        status = {"schema": "atlas-bus-refresh-status-v1", "status": "validated", "successfulRefreshAt": started, "version": "2.0.0-alpha.7", "build": "ATLAS-2.0.0-alpha.7-20260907", "repositoryCommit": os.environ.get("GITHUB_SHA"), "workflowRun": os.environ.get("GITHUB_RUN_ID"), "sources": sources, "preparedCounts": counts, "validation": "passed", "sanityThresholds": {"collapseMinimum": 0.5, "description": "Existing meaningful baselines must retain at least 50% of stop/service counts; BODS region count may not decrease."}}
         status_path = site / "atlas" / "data" / "status" / "manifest.json"
         status_path.parent.mkdir(parents=True, exist_ok=True)
         status_path.write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")

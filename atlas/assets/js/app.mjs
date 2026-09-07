@@ -55,9 +55,20 @@ async function refreshDataStatus() {
     if (!response.ok) throw new Error('status unavailable');
     const status = await response.json();
     $('preparedDataDate').textContent = formatTime(status.successfulRefreshAt);
-    $('tndsDataDate').textContent = 'NaPTAN · BODS · TNDS supplementary';
-    message.textContent = 'Bus data updates automatically. Refresh data status rereads this display only.';
-    message.className = 'status-message success';
+    const sourceMessage = (outcome, noun = 'data') => ({ UPDATED: `Updated successfully — new ${noun} detected`, CHECKED_NO_CHANGE: 'Checked successfully — no changes detected', FAILED: 'Refresh failed — last validated data remains in use', LIVE: 'Live source — checked when a London assessment is run' }[outcome] || 'Status not supplied');
+    $('naptanDataState').textContent = sourceMessage(status.sources?.naptan?.outcome, 'stop data');
+    $('bodsDataState').textContent = sourceMessage(status.sources?.bods?.outcome, 'timetable data');
+    const tnds = sourceMessage(status.sources?.tnds?.outcome, 'supplementary timetable data');
+    $('tndsDataDate').textContent = `${tnds} · ${status.sources?.tnds?.regionsChecked?.length || 0} England regions checked`;
+    $('tflDataState').textContent = sourceMessage(status.sources?.tfl?.outcome || 'LIVE');
+    const age = Date.now() - new Date(status.successfulRefreshAt).getTime();
+    if (Number.isFinite(age) && age > 8 * 24 * 60 * 60 * 1000) {
+      message.textContent = `Automatic data refresh may need attention. ATLAS is continuing to use the last validated dataset from ${formatTime(status.successfulRefreshAt)}.`;
+      message.className = 'status-message warning';
+    } else {
+      message.textContent = 'Bus data updates automatically. Refresh data status rereads this display only.';
+      message.className = 'status-message success';
+    }
   } catch { message.textContent = 'Bus data status is temporarily unavailable.'; message.className = 'status-message warning'; }
 }
 

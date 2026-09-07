@@ -1,9 +1,10 @@
 import json
 import unittest
 import shutil
+import zipfile
 from pathlib import Path
 
-from refresh_bus_data import RefreshError, TNDS_REGIONS, acquire_tnds, source_outcome, tnds_region_from_filename, validate_candidate
+from refresh_bus_data import BODS_DOWNLOAD_ROOT, BODS_REGIONS, RefreshError, TNDS_REGIONS, acquire_bods, acquire_tnds, source_outcome, tnds_region_from_filename, validate_candidate
 
 
 class IncompleteFtp:
@@ -38,6 +39,29 @@ class RefreshTests(unittest.TestCase):
     def test_missing_credentials_fails_without_network_or_prompt(self):
         with self.assertRaisesRegex(RefreshError, 'TNDS_USERNAME'):
             acquire_tnds(self.root, '', '', ftp_factory=lambda *_args, **_kwargs: self.fail('network called'))
+
+    def test_bods_uses_official_regional_gtfs_endpoints_and_validates_archives(self):
+        urls = []
+
+        def fake_download(url, destination, label):
+            urls.append(url)
+            with zipfile.ZipFile(destination, 'w') as archive:
+                for name in ('agency.txt', 'stops.txt', 'routes.txt', 'calendar.txt', 'trips.txt', 'stop_times.txt'):
+                    archive.writestr(name, '')
+            return {'identity': url, 'httpStatus': 200, 'contentType': 'application/zip', 'sourceHash': destination.name}
+
+        gtfs, metadata = acquire_bods(self.root, download_fn=fake_download)
+        self.assertEqual(urls, [f'{BODS_DOWNLOAD_ROOT}{region}/' for region in BODS_REGIONS])
+        self.assertEqual(len(list(gtfs.glob('*.zip'))), len(BODS_REGIONS))
+        self.assertEqual(len(metadata['regions']), len(BODS_REGIONS))
+
+    def test_bods_corrupt_regional_archive_fails_with_source_context(self):
+        def corrupt_download(url, destination, label):
+            destination.write_bytes(b'not-a-zip')
+            return {'identity': url, 'httpStatus': 200, 'contentType': 'application/octet-stream', 'sourceHash': 'bad'}
+
+        with self.assertRaisesRegex(RefreshError, 'BODS east_anglia endpoint'):
+            acquire_bods(self.root, download_fn=corrupt_download)
 
     def test_incomplete_regions_fail_before_download(self):
         with self.assertRaisesRegex(RefreshError, 'missing regions'):

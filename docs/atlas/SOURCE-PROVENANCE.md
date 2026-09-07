@@ -18,7 +18,7 @@ Haversine distance is discovery evidence only. Routed walking and cycling measur
 
 ## Timetable source
 
-The official public BODS regional GTFS downloads provide current English local-bus schedules. All nine regions were downloaded and hashed. Preparation applies GTFS `calendar` and `calendar_dates` to the representative week beginning 2026-09-07, rejects schedules not active in that week, and joins by authoritative stop identity. Retained evidence includes route/operator, endpoints, calling pattern, scheduled departures, validity, source region/route, circular status and qualifications. No BODS account or key is required by the chosen bulk-download path.
+The official public BODS regional GTFS downloads provide current English local-bus schedules. ATLAS downloads the nine DfT regional ZIP endpoints under `https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/{region}/`, validates the required GTFS files, and hashes each archive plus the aggregate. Preparation applies GTFS `calendar` and `calendar_dates` to the representative week beginning 2026-09-07, rejects schedules not active in that week, and joins by authoritative stop identity. Retained evidence includes route/operator, endpoints, calling pattern, scheduled departures, validity, source region/route, circular status and qualifications. No BODS account or key is required by the chosen bulk-download path.
 
 Supplementary timetable information is prepared from the Traveline National Dataset (TNDS). TNDS contains public sector information licensed under the Open Government Licence v3.0. This is an attribution statement only and does not imply Traveline endorsement of ATLAS.
 

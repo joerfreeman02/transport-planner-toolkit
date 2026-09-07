@@ -15,7 +15,9 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import urllib.request
+import urllib.error
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +25,8 @@ from pathlib import Path
 TNDS_REGIONS = ("EA", "EM", "NE", "NW", "SE", "SW", "WM", "Y")
 NAPTAN_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=csv"
 BODS_URL = "https://data.bus-data.dft.gov.uk/timetable/download/"
+BODS_DOWNLOAD_ROOT = "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/"
+BODS_REGIONS = ("east_anglia", "east_midlands", "london", "north_east", "north_west", "south_east", "south_west", "west_midlands", "yorkshire")
 TNDS_HOST = "ftp.tnds.basemap.co.uk"
 TNDS_PATH = "/TNDSV2.5/"
 
@@ -43,15 +47,29 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def download(url: str, destination: Path) -> None:
-    request = urllib.request.Request(url, headers={"User-Agent": "ATLAS-bus-refresh/2.0"})
-    try:
-        with urllib.request.urlopen(request, timeout=120) as response, destination.open("wb") as output:
-            shutil.copyfileobj(response, output)
-    except Exception as error:
-        raise RefreshError(f"Authoritative source could not be downloaded: {url}") from error
-    if destination.stat().st_size == 0:
-        raise RefreshError(f"Authoritative source was empty: {url}")
+def download(url: str, destination: Path, label: str = "authoritative source", opener=urllib.request.urlopen) -> dict:
+    request = urllib.request.Request(url, headers={"User-Agent": "ATLAS-bus-refresh/2.0 (+https://github.com/joerfreeman02/transport-planner-toolkit)"})
+    last_error = None
+    for attempt in range(3):
+        try:
+            with opener(request, timeout=120) as response, destination.open("wb") as output:
+                shutil.copyfileobj(response, output)
+                status = getattr(response, "status", None) or response.getcode()
+                content_type = response.headers.get("Content-Type") if response.headers else None
+            if destination.stat().st_size == 0:
+                raise RefreshError(f"{label} returned an empty response (HTTP {status}): {url}")
+            return {"identity": url, "httpStatus": status, "contentType": content_type, "sourceHash": sha256(destination)}
+        except urllib.error.HTTPError as error:
+            if error.code < 500 or attempt == 2:
+                raise RefreshError(f"{label} returned HTTP {error.code}: {url}") from error
+            last_error = error
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            if attempt == 2:
+                raise RefreshError(f"{label} could not be downloaded: {url}") from error
+            last_error = error
+        if last_error:
+            time.sleep(2 ** attempt)
+    raise RefreshError(f"{label} could not be downloaded: {url}") from last_error
 
 
 def safe_extract(archive: Path, destination: Path) -> None:
@@ -66,34 +84,25 @@ def safe_extract(archive: Path, destination: Path) -> None:
         raise RefreshError(f"Corrupt or unreadable archive: {archive.name}") from error
 
 
-def acquire_bods(staging: Path) -> tuple[Path, dict]:
-    download_path = staging / "bods-download"
-    download(BODS_URL, download_path)
+def acquire_bods(staging: Path, download_fn=download) -> tuple[Path, dict]:
     gtfs = staging / "gtfs"
-    gtfs.mkdir()
-    try:
-        with zipfile.ZipFile(download_path) as source:
-            names = source.namelist()
-            if {"routes.txt", "stops.txt", "trips.txt"}.issubset(names):
-                shutil.copy2(download_path, gtfs / "bods-download.zip")
-            else:
-                source.extractall(gtfs)
-                nested_archives = sorted(gtfs.rglob("*.zip"))
-                for nested in nested_archives:
-                    try:
-                        with zipfile.ZipFile(nested) as nested_zip:
-                            if not {"routes.txt", "stops.txt", "trips.txt"}.issubset(nested_zip.namelist()):
-                                raise RefreshError(f"BODS regional archive is missing required GTFS files: {nested.name}")
-                        if nested.parent != gtfs:
-                            shutil.copy2(nested, gtfs / nested.name)
-                    except zipfile.BadZipFile as error:
-                        raise RefreshError(f"BODS contained a corrupt regional archive: {nested.name}") from error
-    except zipfile.BadZipFile as error:
-        raise RefreshError("BODS download was not a valid ZIP/GTFS archive") from error
-    archives = sorted(gtfs.rglob("*.zip"))
-    if not archives and not any((path / "routes.txt").is_file() for path in gtfs.rglob("*")):
-        raise RefreshError("BODS acquisition produced no GTFS feed")
-    return gtfs, {"identity": BODS_URL, "sourceHash": sha256(download_path)}
+    gtfs.mkdir(parents=True)
+    metadata = []
+    for region in BODS_REGIONS:
+        url = f"{BODS_DOWNLOAD_ROOT}{region}/"
+        archive = gtfs / f"{region}.zip"
+        source = download_fn(url, archive, label=f"BODS {region} GTFS source")
+        try:
+            with zipfile.ZipFile(archive) as feed:
+                required = {"agency.txt", "stops.txt", "routes.txt", "calendar.txt", "trips.txt", "stop_times.txt"}
+                missing = sorted(required - set(feed.namelist()))
+                if missing:
+                    raise RefreshError(f"BODS {region} GTFS archive is missing required files: {', '.join(missing)}")
+        except zipfile.BadZipFile as error:
+            raise RefreshError(f"BODS {region} endpoint did not return a valid GTFS ZIP: {url}") from error
+        metadata.append({"region": region, **source})
+    aggregate = hashlib.sha256("".join(f"{item['region']}:{item['sourceHash']}" for item in metadata).encode("ascii")).hexdigest()
+    return gtfs, {"identity": BODS_DOWNLOAD_ROOT, "regions": metadata, "sourceHash": aggregate}
 
 
 def tnds_region_from_filename(name: str) -> str | None:
@@ -227,7 +236,7 @@ def run(args: argparse.Namespace) -> dict:
     staging.mkdir(parents=True)
     try:
         naptan = staging / "naptan.csv"
-        download(NAPTAN_URL, naptan)
+        naptan_source = download(NAPTAN_URL, naptan, label="NaPTAN source")
         gtfs, bods = acquire_bods(staging)
         tnds_xml, tnds = acquire_tnds(staging, os.environ.get("TNDS_USERNAME", ""), os.environ.get("TNDS_PASSWORD", ""))
         site_bus = site / "atlas" / "data" / "bus"
@@ -247,8 +256,8 @@ def run(args: argparse.Namespace) -> dict:
         bods_outcome, bods_note = source_outcome(bods["sourceHash"], previous_status.get("sources", {}).get("bods"))
         tnds_outcome, tnds_note = source_outcome(tnds["sourceHash"], previous_status.get("sources", {}).get("tnds"))
         sources = {
-            "naptan": {"identity": NAPTAN_URL, "checkedAt": started, "sourceHash": naptan_hash, "outcome": naptan_outcome, "preparedCount": counts["naptanStopCount"]},
-            "bods": {"identity": BODS_URL, "checkedAt": started, "sourceHash": bods["sourceHash"], "outcome": bods_outcome, "preparedCount": {"regions": counts["bodsRegionCount"], "services": counts["bodsServiceCount"]}},
+            "naptan": {"identity": NAPTAN_URL, "checkedAt": started, "httpStatus": naptan_source["httpStatus"], "contentType": naptan_source["contentType"], "sourceHash": naptan_hash, "outcome": naptan_outcome, "preparedCount": counts["naptanStopCount"]},
+            "bods": {"identity": bods["identity"], "checkedAt": started, "sourceHash": bods["sourceHash"], "outcome": bods_outcome, "regionsChecked": bods["regions"], "preparedCount": {"regions": counts["bodsRegionCount"], "services": counts["bodsServiceCount"]}},
             "tnds": {"identity": tnds["identity"], "checkedAt": started, "sourceHash": tnds["sourceHash"], "regionHashes": tnds["regionHashes"], "regionsChecked": tnds["regions"], "outcome": tnds_outcome, "preparedCount": counts["tndsServiceCount"], "transport": "legacy FTP; credentials supplied only to the runner"},
             "tfl": {"outcome": "LIVE", "description": "Live source — checked when a London assessment is run"}
         }

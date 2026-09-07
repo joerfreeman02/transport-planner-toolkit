@@ -95,6 +95,15 @@ export function parseTndsTransXchangeServices(xml, { region = null, sourceArchiv
   if (!/<TransXChange\b/i.test(source) || !/SchemaVersion\s*=\s*"2\.5"/i.test(source)) throw new Error('TNDS XML is not TransXChange schema 2.5.');
   const serviceBlocks = blocks(source, 'Service');
   if (!serviceBlocks.length) throw new Error('TNDS XML contains no Service record.');
+  const identities = new Set();
+  for (const serviceBlock of serviceBlocks) {
+    const serviceCode = first(serviceBlock, 'ServiceCode');
+    const serviceId = attr(serviceBlock, 'id');
+    if (serviceBlocks.length > 1 && !serviceCode && !serviceId) throw new Error('TNDS multi-Service document contains a Service without ServiceCode or Service @id.');
+    const identity = serviceCode || serviceId;
+    if (identity && identities.has(identity)) throw new Error(`TNDS duplicate Service identity ${identity}.`);
+    if (identity) identities.add(identity);
+  }
   const stops = blocks(source, 'AnnotatedStopPointRef').map(block => ({ id: first(block, 'StopPointRef'), name: first(block, 'CommonName'), indicator: first(block, 'Indicator'), locality: first(block, 'LocalityName'), localityQualifier: first(block, 'LocalityQualifier') })).filter(stop => stop.id);
   const sections = new Map(blocks(source, 'JourneyPatternSection').map(section => [attr(section, 'id'), section]));
   const patternById = new Map();

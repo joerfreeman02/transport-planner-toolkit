@@ -27,6 +27,7 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
   const files = await walk(input);
   const regions = new Set();
   const paths = [];
+  const registeredPaths = new Set();
   await fs.rm(output, { recursive: true, force: true });
   await fs.mkdir(path.join(output, 'services'), { recursive: true });
   for (const file of files) {
@@ -41,7 +42,11 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
         regions.add(region);
         const digest = createHash('sha256').update(service.id).digest('hex').slice(0, 12);
         const relative = `services/${service.source.region.toLowerCase()}-${digest}.json`;
-        await fs.writeFile(path.join(output, relative), `${JSON.stringify(service)}\n`);
+        if (registeredPaths.has(relative) || await fs.access(path.join(output, relative)).then(() => true, () => false)) {
+          throw new Error(`TNDS prepared output collision ${relative}.`);
+        }
+        registeredPaths.add(relative);
+        await fs.writeFile(path.join(output, relative), `${JSON.stringify(service)}\n`, { flag: 'wx' });
         paths.push(relative);
       }
     } catch (error) {

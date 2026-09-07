@@ -8,7 +8,7 @@
   <title>ATLAS — Transport and Location Assessment</title>
   <link rel="stylesheet" href="../assets/css/eas-theme.css">
   <link rel="stylesheet" href="../assets/vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="assets/css/atlas-shell.css?build=ATLAS-2.0.0-alpha.6-20260904">
+  <link rel="stylesheet" href="assets/css/atlas-shell.css?build=ATLAS-2.0.0-alpha.7-20260907">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -24,7 +24,7 @@
         <button type="button" data-view="projects">Projects</button>
         <button type="button" data-view="about">About</button>
       </nav>
-      <div class="build" aria-label="ATLAS version and build"><b>2.0.0-alpha.6</b><span>ATLAS-2.0.0-alpha.6-20260904</span></div>
+      <div class="build" aria-label="ATLAS version and build"><b>2.0.0-alpha.7</b><span>ATLAS-2.0.0-alpha.7-20260907</span></div>
     </div>
   </header>
 
@@ -64,7 +64,7 @@
             <strong>Created by Joe Freeman · EAS FORGE</strong>
           </div>
         </article>
-        <article class="about-card"><p class="eyebrow">Current status</p><h2>Alpha.6 Bus Assessment</h2><dl><dt>Version</dt><dd>2.0.0-alpha.6</dd><dt>Build</dt><dd>ATLAS-2.0.0-alpha.6-20260904</dd><dt>Status</dt><dd>Product Owner acceptance candidate</dd></dl></article>
+        <article class="about-card"><p class="eyebrow">Current status</p><h2>Alpha.7 Bus Assessment</h2><dl><dt>Version</dt><dd>2.0.0-alpha.7</dd><dt>Build</dt><dd>ATLAS-2.0.0-alpha.7-20260907</dd><dt>Status</dt><dd>WIP / Automated Bus Refresh Candidate</dd></dl></article>
         <article class="about-card"><p class="eyebrow">Data acknowledgements</p><h2>Trusted sources used today</h2><p>Address search, maps and access routing use OpenStreetMap data. London stop discovery is provided by Transport for London. National stops use Department for Transport NaPTAN; timetables use the Department for Transport Bus Open Data Service. Official GLA boundary data selects the stop source.</p><p class="acknowledgement">© OpenStreetMap contributors · Routed by OSRM · Data provided by Transport for London · NaPTAN and BODS © Department for Transport · Contains National Statistics and Ordnance Survey data © Crown copyright and database right 2015</p></article>
       </div>
     </section>
@@ -86,7 +86,7 @@
       <section class="workspace" id="site-workspace" aria-labelledby="site-selector-title">
         <div class="workspace-header">
           <div><p class="eyebrow">Shared ATLAS site</p><h2 id="site-selector-title">Establish the assessment point</h2><p>Identify the development, check its access on the map, then confirm the exact point ATLAS should use.</p></div>
-          <span class="status development">Alpha.6 demo candidate</span>
+          <span class="status development">Alpha.7 automated refresh candidate</span>
         </div>
 
         <div class="steps">
@@ -159,7 +159,7 @@
               <p class="control-hint">Nearest mode is based on routed walking access. ATLAS then keeps the complete logical stop group, including opposite directions or interchange stands where identified.</p>
               <div id="stopStatus" class="callout neutral" role="status">Confirm the assessment point before checking nearby bus stops.</div>
               <section class="data-status" aria-labelledby="data-status-heading">
-                <div class="data-status-heading"><div><p class="eyebrow">Bus data status</p><h3 id="data-status-heading">Bus Data Status</h3></div><div class="data-status-actions"><button id="updateBusData" class="secondary compact" type="button">Update Bus data</button><button id="refreshDataStatus" class="secondary compact" type="button">Refresh data status</button></div></div>
+                <div class="data-status-heading"><div><p class="eyebrow">Bus data status</p><h3 id="data-status-heading">Bus Data Status</h3></div><div class="data-status-actions"><button id="updateBusData" class="secondary compact" type="button" hidden>Update Bus data</button><button id="refreshDataStatus" class="secondary compact" type="button">Refresh data status</button></div></div>
                 <p id="dataStatusMessage" role="status">Checking prepared Bus data status…</p>
                 <dl><dt>NaPTAN / BODS</dt><dd id="preparedDataDate">Not supplied</dd><dt>TNDS supplementary</dt><dd id="tndsDataDate">Not supplied</dd></dl>
               </section>
@@ -190,8 +190,8 @@
     </section>
   </main>
 
-  <footer><span>ATLAS 2.0.0-alpha.6 · Development software</span><span class="creator-credit">Created by Joe Freeman · EAS FORGE</span><span>Awaiting Product Owner review</span></footer>
+  <footer><span>ATLAS 2.0.0-alpha.7 · WIP / Automated Bus Refresh Candidate</span><span class="creator-credit">Created by Joe Freeman · EAS FORGE</span><span>Awaiting live acceptance</span></footer>
   <script src="../assets/vendor/leaflet/leaflet.js"></script>
-  <script type="module" src="assets/js/app.mjs?build=ATLAS-2.0.0-alpha.6-20260904"></script>
+  <script type="module" src="assets/js/app.mjs?build=ATLAS-2.0.0-alpha.7-20260907"></script>
 </body>
 </html>

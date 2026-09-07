@@ -12,7 +12,7 @@ import { buildControlledBusWording } from '../../../src/atlas/domain/bus-service
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
-const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha6' });
+const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha7' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tfl = createTflBusStopAdapter({ cache });
 const preparedBusData = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url), tndsBaseUrl: new URL('../../data/bus-tnds/', import.meta.url) });
@@ -51,12 +51,13 @@ function selectedResult() {
 async function refreshDataStatus() {
   const message = $('dataStatusMessage');
   try {
-    const [prepared, tnds] = await Promise.all([fetch('data/bus/manifest.json', { cache: 'no-store' }), fetch('data/bus-tnds/manifest.json', { cache: 'no-store' })]);
-    if (!prepared.ok || !tnds.ok) throw new Error('status unavailable');
-    const preparedData = await prepared.json(); const tndsData = await tnds.json();
-    $('preparedDataDate').textContent = formatTime(preparedData.generatedAt);
-    $('tndsDataDate').textContent = `${formatTime(tndsData.generatedAt)} · ${Array.isArray(tndsData.services) ? tndsData.services.length : 0} prepared service file(s)`;
-    message.textContent = 'Bus data current'; message.className = 'status-message success';
+    const response = await fetch('data/status/manifest.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error('status unavailable');
+    const status = await response.json();
+    $('preparedDataDate').textContent = formatTime(status.successfulRefreshAt);
+    $('tndsDataDate').textContent = 'NaPTAN · BODS · TNDS supplementary';
+    message.textContent = 'Bus data updates automatically. Refresh data status rereads this display only.';
+    message.className = 'status-message success';
   } catch { message.textContent = 'Bus data status is temporarily unavailable.'; message.className = 'status-message warning'; }
 }
 
@@ -595,7 +596,10 @@ $('recommendedSelection').addEventListener('click', () => { selectionInitialised
 $('selectAllRows').addEventListener('click', () => { selectedStopIds = new Set(currentBusResult?.stops.map(stopKey) ?? []); selectedServiceIds = new Set(currentBusResult?.serviceSummaries.map(serviceKey) ?? []); selectionInitialised = true; renderAssessment(currentBusResult); });
 $('clearAllRows').addEventListener('click', () => { selectedStopIds = new Set(); selectedServiceIds = new Set(); selectionInitialised = true; renderAssessment(currentBusResult); });
 $('refreshDataStatus').addEventListener('click', refreshDataStatus);
-$('updateBusData').addEventListener('click', updateBusData);
+const localMaintenance = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+const updateButton = $('updateBusData');
+updateButton.hidden = !localMaintenance;
+if (localMaintenance) updateButton.addEventListener('click', updateBusData);
 window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
 initMap();
 showView(location.hash.slice(1));

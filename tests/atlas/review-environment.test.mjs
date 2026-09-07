@@ -20,7 +20,7 @@ try {
   assert.equal(review.reused, false);
   assert.match(review.url, /^http:\/\/127\.0\.0\.1:\d+\/atlas\/#modules$/);
   assert.equal(existsSync(stateFile), true);
-  assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).version, '2.0.0-alpha.6');
+  assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).version, '2.0.0-alpha.7');
   pass('starts on an available loopback address');
 
   const atlas = await fetch(review.url);
@@ -28,8 +28,8 @@ try {
   assert.match(atlas.headers.get('content-type'), /^text\/html/);
   const atlasHtml = await atlas.text();
   assert.match(atlasHtml, /ATLAS — Transport and Location Assessment/);
-  assert.match(atlasHtml, /2\.0\.0-alpha\.6/);
-  assert.match(atlasHtml, /ATLAS-2\.0\.0-alpha\.6-20260904/);
+  assert.match(atlasHtml, /2\.0\.0-alpha\.7/);
+  assert.match(atlasHtml, /ATLAS-2\.0\.0-alpha\.7-20260907/);
   const updateResponse = await fetch(new URL('/__atlas-review/update-bus-data', review.url), { method: 'POST' });
   assert.equal(updateResponse.status, 200);
   assert.equal(updaterOpened, rootDir);

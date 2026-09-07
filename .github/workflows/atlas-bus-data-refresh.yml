@@ -1,0 +1,76 @@
+name: ATLAS Bus data refresh
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 6 * * 5'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-bus-pages
+  cancel-in-progress: false
+
+jobs:
+  build-validate:
+    name: Build and validate Bus candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    env:
+      TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
+      TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
+      ATLAS_NODE: node
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Prepare isolated Pages site
+        shell: bash
+        run: |
+          rm -rf pages-site
+          mkdir pages-site
+          rsync -a --exclude='.git' --exclude='pages-site' ./ pages-site/
+      - name: Acquire and build validated Bus candidate
+        run: python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site
+      - name: Run deterministic ATLAS checks
+        run: node tests/atlas/run-all.mjs
+      - name: Validate complete legacy and ATLAS artifact
+        shell: bash
+        run: |
+          test -f pages-site/index.html
+          test -f pages-site/atlas/index.html
+          test -f pages-site/atlas/data/status/manifest.json
+          test -f pages-site/atlas/data/bus/manifest.json
+          test -f pages-site/atlas/data/bus-tnds/manifest.json
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Upload validated Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-site
+
+  deploy:
+    name: Deploy validated Pages artifact
+    needs: build-validate
+    if: needs.build-validate.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+    steps:
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4

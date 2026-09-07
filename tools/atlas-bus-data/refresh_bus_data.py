@@ -241,13 +241,17 @@ def candidate_metrics(site: Path) -> dict:
         raise RefreshError("Prepared candidate manifests are missing or invalid") from error
     if not bus.get("stopShards") or not bus.get("serviceShards"):
         raise RefreshError("Prepared NaPTAN/BODS candidate is empty")
-    if set(tnds.get("regions", [])) != set(TNDS_REGIONS) or not tnds.get("services"):
-        raise RefreshError("Prepared TNDS candidate does not contain all eight England regions")
-    for relative in list(bus["stopShards"].values()) + [item for values in bus["serviceShards"].values() for item in values] + tnds["services"]:
-        if not (site / "atlas" / "data" / ("bus-tnds" if relative in tnds["services"] else "bus") / relative).is_file():
+    tnds_shards = tnds.get("serviceShards")
+    if set(tnds.get("regions", [])) != set(TNDS_REGIONS) or not isinstance(tnds_shards, dict) or tnds.get("services"):
+        raise RefreshError("Prepared TNDS candidate does not contain the required stop-prefix shard architecture")
+    tnds_paths = [item for values in tnds_shards.values() for item in values] if all(isinstance(values, list) for values in tnds_shards.values()) else []
+    if not tnds_paths or not isinstance(tnds.get("serviceShardKeyLength"), int) or tnds["serviceShardKeyLength"] < 1:
+        raise RefreshError("Prepared TNDS candidate does not contain valid stop-prefix shards")
+    for relative in list(bus["stopShards"].values()) + [item for values in bus["serviceShards"].values() for item in values] + tnds_paths:
+        if not (site / "atlas" / "data" / ("bus-tnds" if relative in tnds_paths else "bus") / relative).is_file():
             raise RefreshError(f"Prepared candidate references a missing file: {relative}")
     bods_regions = bus.get("sources", {}).get("bods", {}).get("regions", [])
-    return {"naptanStopCount": bus.get("sources", {}).get("naptan", {}).get("stopCount", 0), "bodsRegionCount": len(bods_regions), "bodsServiceCount": sum(int(region.get("serviceCount", 0) or 0) for region in bods_regions), "tndsRegionCount": len(tnds.get("regions", [])), "tndsServiceCount": len(tnds["services"])}
+    return {"naptanStopCount": bus.get("sources", {}).get("naptan", {}).get("stopCount", 0), "bodsRegionCount": len(bods_regions), "bodsServiceCount": sum(int(region.get("serviceCount", 0) or 0) for region in bods_regions), "tndsRegionCount": len(tnds.get("regions", [])), "tndsServiceCount": int(tnds.get("serviceCount", 0) or 0)}
 
 
 def validate_candidate(site: Path, baseline: dict | None = None) -> dict:
@@ -283,7 +287,7 @@ def baseline_metrics(site: Path) -> dict:
             tnds = json.loads(tnds_manifest.read_text(encoding="utf-8"))
             if set(tnds.get("regions", [])) == set(TNDS_REGIONS):
                 result["tndsRegionCount"] = len(tnds["regions"])
-                result["tndsServiceCount"] = len(tnds.get("services", []))
+                result["tndsServiceCount"] = int(tnds.get("serviceCount", len(tnds.get("services", []))) or 0)
         return result
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return {}

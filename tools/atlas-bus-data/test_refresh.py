@@ -178,7 +178,7 @@ class RefreshTests(unittest.TestCase):
         (bus / 'services.json.gz').write_bytes(b'candidate')
         (tnds / 'service.json').write_text('{}')
         (bus / 'manifest.json').write_text(json.dumps({'stopShards': {'x': 'stops.json.gz'}, 'serviceShards': {'x': ['services.json.gz']}, 'sources': {'naptan': {'stopCount': 100}, 'bods': {'regions': [{'serviceCount': 100}]}}}))
-        (tnds.parent / 'manifest.json').write_text(json.dumps({'regions': list(TNDS_REGIONS), 'services': ['services/service.json']}))
+        (tnds.parent / 'manifest.json').write_text(json.dumps({'regions': list(TNDS_REGIONS), 'serviceCount': 1, 'serviceShardKeyLength': 5, 'serviceShards': {'x': ['services/service.json']}}))
         counts = validate_candidate(site)
         self.assertEqual(counts['tndsServiceCount'], 1)
 
@@ -193,7 +193,7 @@ class RefreshTests(unittest.TestCase):
         (tnds / 'service.json').write_text('{}')
         bods_regions = [{'serviceCount': services // regions} for _ in range(regions)]
         (bus / 'manifest.json').write_text(json.dumps({'stopShards': {'x': 'stops.json.gz'}, 'serviceShards': {'x': ['services.json.gz']}, 'sources': {'naptan': {'stopCount': naptan}, 'bods': {'regions': bods_regions}}}))
-        (tnds.parent / 'manifest.json').write_text(json.dumps({'regions': list(TNDS_REGIONS), 'services': ['services/service.json']}))
+        (tnds.parent / 'manifest.json').write_text(json.dumps({'regions': list(TNDS_REGIONS), 'serviceCount': 1, 'serviceShardKeyLength': 5, 'serviceShards': {'x': ['services/service.json']}}))
 
     def test_modest_change_passes_and_severe_naptan_collapse_fails(self):
         self._write_candidate(naptan=90, services=90)

@@ -24,17 +24,19 @@ class CandidateValidatorTests(unittest.TestCase):
             with gzip.open(target, 'wt', encoding='utf-8') as stream:
                 json.dump(payload, stream)
         (bus / 'manifest.json').write_text(json.dumps({'schema': 'atlas-prepared-bus-data-v1', 'stopShards': {'g1': 'stops/g1.json.gz'}, 'serviceShards': {'area': ['services/a.json.gz']}, 'sources': {'naptan': {'stopCount': 2000}, 'bods': {'regions': [{'serviceCount': 1000} for _ in range(8)]}}}))
+        tnds_paths = []
         for index, region in enumerate(TNDS_REGIONS):
             name = f'services/{index}-{region.lower()}.json'
-            (self.root / 'atlas/data/bus-tnds' / name).write_text(json.dumps({'id': f'tnds:{region}:fixture:1', 'stopSchedules': {'STOP-1': {'monday': [600]}}, 'source': {'region': region, 'serviceCode': f'fixture-{region}'}}))
-        (self.root / 'atlas/data/bus-tnds/manifest.json').write_text(json.dumps({'schema': 'atlas-prepared-bus-tnds-v1', 'regions': list(TNDS_REGIONS), 'services': [f'services/{index}-{region.lower()}.json' for index, region in enumerate(TNDS_REGIONS)]}))
+            (self.root / 'atlas/data/bus-tnds' / name).write_text(json.dumps({'schema': 'atlas-prepared-bus-tnds-v1', 'stopPrefix': 'STOP-', 'services': [{'id': f'tnds:{region}:fixture:1', 'stopSchedules': {'STOP-1': {'monday': [600]}}, 'source': {'region': region, 'serviceCode': f'fixture-{region}'}}]}))
+            tnds_paths.append(name)
+        (self.root / 'atlas/data/bus-tnds/manifest.json').write_text(json.dumps({'schema': 'atlas-prepared-bus-tnds-v1', 'regions': list(TNDS_REGIONS), 'serviceCount': len(TNDS_REGIONS), 'serviceShardKeyLength': 5, 'serviceShards': {'STOP-': tnds_paths}}))
 
     def tearDown(self):
         shutil.rmtree(self.root, ignore_errors=True)
 
     def _replace_first_tnds(self, payload):
         target = self.root / 'atlas/data/bus-tnds/services/0-ea.json'
-        target.write_text(json.dumps(payload))
+        target.write_text(json.dumps({'schema': 'atlas-prepared-bus-tnds-v1', 'stopPrefix': 'STOP-', 'services': [payload]}))
 
     def test_generated_candidate_passes_structural_validation(self):
         result = validate(self.root)
@@ -63,6 +65,24 @@ class CandidateValidatorTests(unittest.TestCase):
     def test_quarantine_with_fabricated_schedules_fails(self):
         self._replace_first_tnds({'id': 'tnds:EA:fixture:Q', 'stopSchedules': {'STOP-1': {'monday': [600]}}, 'source': {'region': 'EA', 'serviceCode': 'Q'}, 'tndsQuarantine': {'serviceQuarantined': True, 'affectedStopIds': ['STOP-1'], 'patterns': [{'patternId': 'JP-Q', 'reasonCode': 'incomplete_runtime_sequence', 'affectedStopIds': ['STOP-1']}]}})
         with self.assertRaisesRegex(RefreshError, 'fabricated timetable'):
+            validate(self.root)
+
+    def test_malformed_shard_prefix_membership_fails(self):
+        target = self.root / 'atlas/data/bus-tnds/services/0-ea.json'
+        payload = json.loads(target.read_text())
+        payload['stopPrefix'] = 'WRONG'
+        target.write_text(json.dumps(payload))
+        with self.assertRaisesRegex(RefreshError, 'shard is empty or malformed'):
+            validate(self.root)
+
+    def test_legacy_fetch_all_manifest_fails_national_validation(self):
+        manifest = self.root / 'atlas/data/bus-tnds/manifest.json'
+        payload = json.loads(manifest.read_text())
+        payload.pop('serviceShardKeyLength')
+        payload.pop('serviceShards')
+        payload['services'] = ['services/0-ea.json']
+        manifest.write_text(json.dumps(payload))
+        with self.assertRaisesRegex(RefreshError, 'stop-prefix service shards'):
             validate(self.root)
 
     def test_raw_public_source_file_fails(self):

@@ -39,7 +39,11 @@ const quarantineManifest = JSON.parse(await fs.readFile(path.join(quarantineOutp
 const quarantineServices = await Promise.all(quarantineManifest.services.map(relative => fs.readFile(path.join(quarantineOutput, relative), 'utf8').then(JSON.parse)));
 const quarantinedService = quarantineServices.find(service => service.source.serviceCode === 'SB');
 assert.ok(quarantinedService);
+assert.equal(quarantineServices.find(service => service.source.serviceCode === 'SA').tndsQuarantine, null);
 assert.deepEqual(quarantinedService.stopSchedules, {});
 assert.equal(quarantinedService.tndsQuarantine.serviceQuarantined, true);
 assert.deepEqual(quarantinedService.tndsQuarantine.affectedStopIds.sort(), ['B1', 'B2']);
+const unknownScope = xml.replace('<RunTime>PT12M</RunTime>', '').replace('<JourneyPatternSectionRefs>JSB</JourneyPatternSectionRefs>', '<JourneyPatternSectionRefs>MISSING</JourneyPatternSectionRefs>');
+await fs.writeFile(path.join(quarantineInput, 'unknown.xml'), unknownScope);
+await assert.rejects(() => prepareTnds({ input: quarantineInput, output: path.join(root, 'unknown-output') }), /no deterministically identifiable affected StopPoint IDs/);
 console.log('PASS TNDS preparation multi-Service output and collision tests.');

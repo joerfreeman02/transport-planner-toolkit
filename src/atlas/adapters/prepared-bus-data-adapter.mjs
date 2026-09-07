@@ -9,7 +9,7 @@ const STOP_SOURCE = 'Department for Transport NaPTAN';
 const TIMETABLE_SOURCE = 'Department for Transport Bus Open Data Service';
 const STOP_ATTRIBUTION = 'NaPTAN data provided by the Department for Transport under the Open Government Licence';
 const TIMETABLE_ATTRIBUTION = 'Bus timetable data provided by the Department for Transport Bus Open Data Service under the Open Government Licence';
-const TNDS_QUARANTINE_WARNING = 'Supplementary timetable evidence is incomplete for one service relevant to this assessment. ATLAS excluded the unsupported timetable pattern rather than estimating its timings.';
+const TNDS_QUARANTINE_WARNING = 'Supplementary timetable evidence is incomplete for one or more services relevant to this assessment. ATLAS excluded unsupported timetable patterns rather than estimating their timings.';
 
 function cellToken(value) { return value < 0 ? `m${Math.abs(value)}` : String(value); }
 export function gridCellKey(latitudeIndex, longitudeIndex) { return `g${cellToken(latitudeIndex)}_${cellToken(longitudeIndex)}`; }

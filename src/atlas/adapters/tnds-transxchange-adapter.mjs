@@ -41,7 +41,8 @@ function patternProfile(pattern, sections) {
     from: first(blocks(link, 'From')[0] || '', 'StopPointRef'), to: first(blocks(link, 'To')[0] || '', 'StopPointRef'),
     runTime: seconds(first(link, 'RunTime')), waitTime: seconds(first(link, 'WaitTime')) || 0,
   }))).filter(link => link.from && link.to);
-  const stopIds = links.length ? [links[0].from, ...links.map(link => link.to)] : [];
+  const explicitStopIds = [...new Set([...refs(pattern, 'StopPointRef'), ...sectionIds.flatMap(sectionId => refs(sections.get(sectionId) || '', 'StopPointRef'))])];
+  const stopIds = links.length ? [links[0].from, ...links.map(link => link.to)] : explicitStopIds;
   const offsets = new Map(stopIds.length ? [[stopIds[0], 0]] : []);
   let elapsed = 0;
   for (const link of links) {
@@ -76,16 +77,17 @@ function parseService({ source, serviceBlock, serviceBlocks, patternById, journe
   }
   if (multiService && !assignedJourneys.length) throw new Error(`TNDS service ${serviceCode || 'unknown'} has no deterministically associated VehicleJourneys.`);
   const serviceStopIds = new Set();
+  const serviceExplicitStopIds = new Set(refs(serviceBlock, 'StopPointRef'));
   const quarantinePatterns = [];
   for (const patternId of servicePatternIds) {
     const profile = patternById.get(patternId);
     if (!profile) continue;
     if (profile.status === 'valid') for (const stopId of profile.stopIds) serviceStopIds.add(stopId);
-    if (profile.status === 'quarantine' || (profile.status === 'no_timing_links' && stops.length > 1)) quarantinePatterns.push({ patternId, reasonCode: profile.reasonCode || 'missing_timing_links', affectedStopIds: profile.stopIds });
+    if (profile.status === 'quarantine' || (profile.status === 'no_timing_links' && stops.length > 1)) quarantinePatterns.push({ patternId, reasonCode: profile.reasonCode || 'missing_timing_links', affectedStopIds: profile.stopIds.length ? profile.stopIds : [...serviceExplicitStopIds] });
   }
   const quarantineStopIds = new Set(quarantinePatterns.flatMap(pattern => pattern.affectedStopIds));
+  if (quarantinePatterns.some(pattern => !pattern.affectedStopIds.length)) throw new Error(`TNDS service ${serviceCode || 'unknown'} has a quarantined journey pattern with no deterministically identifiable affected StopPoint IDs.`);
   if (!serviceStopIds.size && !quarantinePatterns.length) for (const stop of stops) serviceStopIds.add(stop.id);
-  if (!quarantineStopIds.size && quarantinePatterns.length) for (const stop of stops) quarantineStopIds.add(stop.id);
   const serviceStops = serviceStopIds.size ? stops.filter(stop => serviceStopIds.has(stop.id)) : [];
   const stopSchedules = Object.fromEntries(serviceStops.map(stop => [stop.id, Object.fromEntries(DAYS.map(day => [day, []]))]));
   for (const journey of assignedJourneys) {

@@ -77,12 +77,14 @@ test('prepared BODS lookup joins schedules by authoritative stop ID', async () =
 });
 
 test('TNDS quarantine warns only when an affected selected stop is assessed', async () => {
-  const tndsManifest = { schema: 'atlas-prepared-bus-tnds-v1', generatedAt: '2026-09-07T00:00:00Z', regions: ['SE'], services: ['services/quarantined.json'] };
+  const tndsManifest = { schema: 'atlas-prepared-bus-tnds-v1', generatedAt: '2026-09-07T00:00:00Z', regions: ['SE'], services: ['services/quarantined.json', 'services/quarantined-2.json'] };
   const quarantined = { id: 'tnds:SE:fixture:Q', routeNumber: 'Q', operator: 'Example', stopSchedules: {}, tndsQuarantine: { serviceQuarantined: true, affectedStopIds: ['2100A'], patterns: [{ patternId: 'JP-Q', reasonCode: 'incomplete_runtime_sequence', affectedStopIds: ['2100A'] }] } };
+  const quarantined2 = { ...quarantined, id: 'tnds:SE:fixture:Q2', tndsQuarantine: { ...quarantined.tndsQuarantine, patterns: [{ patternId: 'JP-Q2', reasonCode: 'missing_timing_links', affectedStopIds: ['2100A'] }] } };
   const fetchWithTnds = async url => {
     const pathname = new URL(url).pathname;
     if (pathname.endsWith('/manifest.json') && pathname.includes('/tnds/')) return new Response(JSON.stringify(tndsManifest), { status: 200 });
     if (pathname.endsWith('/services/quarantined.json')) return new Response(JSON.stringify(quarantined), { status: 200 });
+    if (pathname.endsWith('/services/quarantined-2.json')) return new Response(JSON.stringify(quarantined2), { status: 200 });
     return fetchFixture(url);
   };
   const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchWithTnds, baseUrl: 'https://atlas.example/data/', tndsBaseUrl: 'https://atlas.example/tnds/' });
@@ -90,6 +92,7 @@ test('TNDS quarantine warns only when an affected selected stop is assessed', as
   assert.equal(affected.ok, true);
   assert.equal(affected.data.some(service => service.id === quarantined.id), false);
   assert.equal(affected.warnings.filter(warning => /Supplementary timetable evidence is incomplete/.test(warning)).length, 1);
+  assert.match(affected.warnings.join(' '), /one or more services/);
   assert.doesNotMatch(affected.warnings.join(' '), /JP-Q|quarantined\.json/);
   const unrelated = await adapter.servicesForStops([{ ...stop, id: '9990A' }]);
   assert.equal(unrelated.ok, false);

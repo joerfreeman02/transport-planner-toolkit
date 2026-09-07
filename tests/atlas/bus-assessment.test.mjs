@@ -63,7 +63,7 @@ test('timetable routes propagate to exact stop rows and orphan services are excl
 test('timetable source warnings reach the assessment without raw parser diagnostics', async () => {
   const assessment = createBusAssessment({
     stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], evidence: [], warnings: [], provenance: {} }) },
-    timetableData: { servicesForStops: async () => ({ ok: true, data: [], warnings: ['Supplementary timetable evidence is incomplete for one service relevant to this assessment. ATLAS excluded the unsupported timetable pattern rather than estimating its timings.'], provenance: {} }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [], warnings: ['Supplementary timetable evidence is incomplete for one or more services relevant to this assessment. ATLAS excluded unsupported timetable patterns rather than estimating their timings.'], provenance: {} }) },
     accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 60 }], warnings: [], provenance: {} }) }
   });
   const result = await assessment.assess({});

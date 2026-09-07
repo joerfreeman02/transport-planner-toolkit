@@ -9,6 +9,8 @@ from pathlib import Path
 
 from refresh_bus_data import RefreshError, TNDS_REGIONS, candidate_metrics
 
+KNOWN_TNDS_QUARANTINE_REASONS = {"incomplete_runtime_sequence", "missing_timing_links"}
+
 
 def read_json(path: Path):
     try:
@@ -18,6 +20,40 @@ def read_json(path: Path):
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, gzip.BadGzipFile, json.JSONDecodeError) as error:
         raise RefreshError(f"Candidate data file is unreadable: {path}") from error
+
+
+def validate_tnds_service(service: dict, relative: str) -> None:
+    if not isinstance(service, dict) or not service.get("source", {}).get("region"):
+        raise RefreshError(f"Candidate TNDS service is empty or malformed: {relative}")
+    source = service.get("source", {})
+    if not service.get("id") and not source.get("serviceCode"):
+        raise RefreshError(f"Candidate TNDS service has no identity: {relative}")
+    schedules = service.get("stopSchedules")
+    if not isinstance(schedules, dict):
+        raise RefreshError(f"Candidate TNDS service has malformed stopSchedules: {relative}")
+    quarantine = service.get("tndsQuarantine")
+    if not quarantine:
+        if not schedules:
+            raise RefreshError(f"Candidate TNDS service is empty or malformed: {relative}")
+        return
+    if not isinstance(quarantine, dict) or quarantine.get("serviceQuarantined") not in {True, False}:
+        raise RefreshError(f"Candidate TNDS quarantine metadata is malformed: {relative}")
+    affected = quarantine.get("affectedStopIds")
+    patterns = quarantine.get("patterns")
+    if not isinstance(affected, list) or not affected or any(not isinstance(stop_id, str) or not stop_id for stop_id in affected) or len(set(affected)) != len(affected):
+        raise RefreshError(f"Candidate TNDS quarantine affectedStopIds are malformed: {relative}")
+    if not isinstance(patterns, list) or not patterns:
+        raise RefreshError(f"Candidate TNDS quarantine patterns are malformed: {relative}")
+    for pattern in patterns:
+        if not isinstance(pattern, dict) or not pattern.get("patternId") or pattern.get("reasonCode") not in KNOWN_TNDS_QUARANTINE_REASONS:
+            raise RefreshError(f"Candidate TNDS quarantine pattern is malformed: {relative}")
+        pattern_stops = pattern.get("affectedStopIds")
+        if not isinstance(pattern_stops, list) or not pattern_stops or any(stop_id not in affected for stop_id in pattern_stops):
+            raise RefreshError(f"Candidate TNDS quarantine pattern scope is malformed: {relative}")
+    if quarantine["serviceQuarantined"] and schedules:
+        raise RefreshError(f"Candidate TNDS quarantine contains fabricated timetable schedules: {relative}")
+    if not quarantine["serviceQuarantined"] and not schedules:
+        raise RefreshError(f"Candidate TNDS service is empty or malformed: {relative}")
 
 
 def validate(site: Path) -> dict:
@@ -58,8 +94,7 @@ def validate(site: Path) -> dict:
         raise RefreshError("Candidate contains no prepared services")
     for relative in tnds_manifest.get("services", []):
         payload = read_json(tnds / relative)
-        if not payload.get("stopSchedules") or not payload.get("source", {}).get("region"):
-            raise RefreshError(f"Candidate TNDS service is empty or malformed: {relative}")
+        validate_tnds_service(payload, relative)
     forbidden = [path for path in data.rglob("*") if path.is_file() and path.suffix.lower() in {".csv", ".zip"}]
     if forbidden:
         raise RefreshError(f"Raw source file leaked into public data: {forbidden[0].name}")

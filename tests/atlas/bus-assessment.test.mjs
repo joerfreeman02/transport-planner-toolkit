@@ -60,6 +60,17 @@ test('timetable routes propagate to exact stop rows and orphan services are excl
   assert.deepEqual(result.serviceSummaries[0].stopIds, ['STOP-A']);
 });
 
+test('timetable source warnings reach the assessment without raw parser diagnostics', async () => {
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], evidence: [], warnings: [], provenance: {} }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [], warnings: ['Supplementary timetable evidence is incomplete for one service relevant to this assessment. ATLAS excluded the unsupported timetable pattern rather than estimating its timings.'], provenance: {} }) },
+    accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 60 }], warnings: [], provenance: {} }) }
+  });
+  const result = await assessment.assess({});
+  assert.equal(result.warnings.filter(warning => /Supplementary timetable evidence is incomplete/.test(warning)).length, 1);
+  assert.doesNotMatch(result.warnings.join(' '), /JP-|\.xml|RunTime/);
+});
+
 for (const [name, fn] of tests) {
   await fn();
   console.log(`PASS Bus assessment - ${name}`);

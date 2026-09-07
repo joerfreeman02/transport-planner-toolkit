@@ -28,6 +28,8 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
   const regions = new Set();
   const paths = [];
   const registeredPaths = new Set();
+  let quarantinedPatterns = 0;
+  let quarantinedServices = 0;
   await fs.rm(output, { recursive: true, force: true });
   await fs.mkdir(path.join(output, 'services'), { recursive: true });
   for (const file of files) {
@@ -38,7 +40,14 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
       const parsed = parseTndsTransXchangeServices(xml, { region, sourceArchive: path.basename(file), preparedAt });
       if (parsed.length > 1) console.log(`TNDS ${path.basename(file)}: prepared ${parsed.length} Service records.`);
       for (const service of parsed) {
-        if (!service.stopSchedules || !Object.keys(service.stopSchedules).length) continue;
+        const hasSchedules = service.stopSchedules && Object.keys(service.stopSchedules).length > 0;
+        const quarantine = service.tndsQuarantine;
+        if (!hasSchedules && !quarantine?.affectedStopIds?.length) continue;
+        if (quarantine) {
+          quarantinedPatterns += quarantine.patterns.length;
+          if (quarantine.serviceQuarantined) quarantinedServices += 1;
+          console.log(`TNDS ${path.basename(file)}: quarantined ${quarantine.patterns.length} pattern(s) for service ${service.source.serviceCode || service.id}.`);
+        }
         regions.add(region);
         const digest = createHash('sha256').update(service.id).digest('hex').slice(0, 12);
         const relative = `services/${service.source.region.toLowerCase()}-${digest}.json`;
@@ -65,7 +74,7 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
     regions: [...regions].sort(),
     services: paths
   })}\n`);
-  return { services: paths.length, regions: [...regions].sort() };
+  return { services: paths.length, regions: [...regions].sort(), quarantinedPatterns, quarantinedServices };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

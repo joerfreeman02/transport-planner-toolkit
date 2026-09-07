@@ -72,6 +72,10 @@ Future TfL, NaPTAN, BODS, National Rail, Network Rail and STATS19 adapters can i
 
 ## Application shell
 
+## Maintenance reuse rule
+
+Maintenance work must first audit and reuse the existing source-adapter, prepared-data, assessment-warning, validation and deployment-status paths. A corrective change may adapt those boundaries when the existing contract is insufficient, but must not create a parallel diagnostics, fallback or deployment system without explicit architectural approval.
+
 `/atlas/` is independent from the legacy dashboard and provides Report Builder, Modules and Projects navigation. Only the Bus authoritative-data proof is active. Other statuses are deliberately honest: legacy, migration planned, planned, or WIP/legacy.
 
 Report generation, frequency analysis, timetables, professional route grouping, other module migrations, authentication and a backend are outside Alpha.1.

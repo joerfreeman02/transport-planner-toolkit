@@ -9,6 +9,7 @@ const STOP_SOURCE = 'Department for Transport NaPTAN';
 const TIMETABLE_SOURCE = 'Department for Transport Bus Open Data Service';
 const STOP_ATTRIBUTION = 'NaPTAN data provided by the Department for Transport under the Open Government Licence';
 const TIMETABLE_ATTRIBUTION = 'Bus timetable data provided by the Department for Transport Bus Open Data Service under the Open Government Licence';
+const TNDS_QUARANTINE_WARNING = 'Supplementary timetable evidence is incomplete for one service relevant to this assessment. ATLAS excluded the unsupported timetable pattern rather than estimating its timings.';
 
 function cellToken(value) { return value < 0 ? `m${Math.abs(value)}` : String(value); }
 export function gridCellKey(latitudeIndex, longitudeIndex) { return `g${cellToken(latitudeIndex)}_${cellToken(longitudeIndex)}`; }
@@ -191,16 +192,22 @@ export function createPreparedBusDataAdapter({
     }
     let mergedServices = [...services.values()];
     let tndsProvenance = null;
+    const tndsWarnings = new Set();
     if (tndsBaseUrl) {
       const tndsManifest = await requestJson({ url: resolveUrl(tndsBaseUrl, 'manifest.json'), fetchImpl, timeoutMs });
       if (tndsManifest.ok && tndsManifest.data?.schema === 'atlas-prepared-bus-tnds-v1') {
-        const tndsRows = (await Promise.all((tndsManifest.data.services || []).map(file => requestJson({ url: resolveUrl(tndsBaseUrl, file), fetchImpl, timeoutMs })))).filter(row => row.ok).map(row => normalisePreparedService(row.data)).filter(service => Object.keys(service.stopSchedules || {}).some(id => stopIds.has(id)));
+        const tndsRows = (await Promise.all((tndsManifest.data.services || []).map(file => requestJson({ url: resolveUrl(tndsBaseUrl, file), fetchImpl, timeoutMs })))).filter(row => row.ok).map(row => normalisePreparedService(row.data)).filter(service => {
+          const scheduledAtStop = Object.keys(service.stopSchedules || {}).some(id => stopIds.has(id));
+          const affectedAtStop = (service.tndsQuarantine?.affectedStopIds || []).some(id => stopIds.has(id));
+          if (affectedAtStop) tndsWarnings.add(TNDS_QUARANTINE_WARNING);
+          return scheduledAtStop && !service.tndsQuarantine?.serviceQuarantined;
+        });
         mergedServices = mergeBusTimetableSources({ bods: mergedServices, tnds: tndsRows });
         tndsProvenance = { source: 'Traveline National Dataset supplementary data', dataPreparedAt: tndsManifest.data.generatedAt, regions: tndsManifest.data.regions };
       }
     }
     const checkedAt = clock().toISOString();
-    const warnings = snapshotWarnings(index);
+    const warnings = [...snapshotWarnings(index), ...tndsWarnings];
     if (!services.size) warnings.push('No current BODS timetable records matched the selected authoritative stop identifiers.');
     return sourceSuccess({
       data: mergedServices, evidence: [], warnings,

@@ -35,6 +35,10 @@ assert.notEqual(result.data[0].origin, 'Crystal Palace', 'a selected mid-route s
 assert.deepEqual(result.data[0].routePatternStopIds, ['490TEST003', '490TEST006', '490TEST004']);
 assert.deepEqual(result.data[0].stopSchedules['490TEST003'].monday, [350, 370, 400, 1400], 'ordinary daytime chronology remains unchanged');
 assert.ok(result.data[0].principalLocations.includes('West Norwood Bus Station'));
+assert.deepEqual(result.data[0].frequencyEvidence, [{ day: 'monday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, source: 'TfL' }, { day: 'tuesday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, source: 'TfL' }, { day: 'wednesday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, source: 'TfL' }, { day: 'thursday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, source: 'TfL' }, { day: 'friday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, source: 'TfL' }]);
+const [frequencySummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], result.data);
+assert.match(frequencySummary.typicalFrequencyText, /Wednesday: Approx\. 6 buses\/hour \(every 10 mins\)/);
+assert.deepEqual(frequencySummary.departuresByDay.wednesday, [350, 370, 400, 1400], 'frequency-band evidence must not fabricate TfL departures');
 assert.equal(result.provenance.departureStopId, '490TEST003');
 assert.equal(result.provenance.timetableRequests, 1);
 assert.equal(result.provenance.routeMetadataRequests, 1);

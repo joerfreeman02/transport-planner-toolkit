@@ -14,6 +14,7 @@ const result = {
     origin: 'Here East, Hackney Wick',
     destination: 'Royal Crest Avenue, Silvertown',
     principalLocations: ['Stratford City', 'Stratford', 'Plaistow', 'Custom House'],
+    typicalFrequencyText: 'Wednesday: Approx. 4 buses/hour (every 15 mins)',
     operatingPeriodLines: ['Mon-Fri: Approx. 05:11–01:29 (next day)', 'Saturday: Approx. 05:09–01:29 (next day)', 'Sunday: Approx. 06:19–01:29 (next day)'],
     serviceNote: ''
   }]
@@ -27,9 +28,10 @@ assert.equal(tables[0].rows[0][0], 'Balaam Street');
 assert.equal(tables[0].rows[0][1], 'Stop S (Eastbound)');
 assert.equal(tables[0].rows[0][4], '262, 473');
 assert.equal(tables[1].caption, 'Table 3.3 - Bus Service Summary');
-assert.deepEqual(tables[1].headers, ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Operating period']);
+assert.deepEqual(tables[1].headers, ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period']);
 assert.match(tables[1].rows[0][2], /Here East, Hackney Wick – Royal Crest Avenue, Silvertown/);
-assert.match(tables[1].rows[0][4], /next day/);
+assert.match(tables[1].rows[0][4], /Approx\. 4 buses\/hour/);
+assert.match(tables[1].rows[0][5], /next day/);
 assert.equal(busWordFilename({ displayAddress: '100 High Street, Plaistow' }), 'ATLAS Bus Assessment - 100 High Street, Plaistow.docx');
 assert.equal(busWordFilename({ latitude: 51.7, longitude: -0.1 }), 'ATLAS Bus Assessment.docx');
 const filtered = buildBusWordTables({ ...result, stops: [result.stops[1]], serviceSummaries: [] });

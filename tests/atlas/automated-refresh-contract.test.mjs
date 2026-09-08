@@ -10,8 +10,8 @@ const workflow = fs.readFileSync(path.join(root, '.github/workflows/atlas-bus-da
 const refresh = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/refresh_bus_data.py'), 'utf8');
 const builder = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/build_static_index.py'), 'utf8');
 
-assert.match(html, /2\.0\.0-alpha\.9/);
-assert.match(html, /ATLAS-2\.0\.0-alpha\.9-20260908/);
+assert.match(html, /2\.0\.0-alpha\.10/);
+assert.match(html, /ATLAS-2\.0\.0-alpha\.10-20260908/);
 assert.match(html, /id="updateBusData"[^>]*hidden/);
 assert.match(app, /localMaintenance/);
 assert.match(app, /Bus data updates automatically/);

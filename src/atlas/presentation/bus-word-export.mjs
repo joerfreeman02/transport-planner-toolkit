@@ -34,6 +34,7 @@ export function buildBusWordTables(result) {
       service.operator,
       originDestination(service),
       principalLocationsText(service),
+      service.typicalFrequencyText || 'Frequency unavailable',
       (service.operatingPeriodLines ?? []).join('\n')
     ]);
     if (service.serviceNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.serviceNote}` });
@@ -48,9 +49,9 @@ export function buildBusWordTables(result) {
     },
     {
       caption: 'Table 3.3 - Bus Service Summary',
-      headers: ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Operating period'],
+      headers: ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period'],
       rows: serviceRows,
-      widths: [8, 18, 25, 25, 24]
+      widths: [7, 16, 23, 27, 12, 15]
     }
   ];
 }

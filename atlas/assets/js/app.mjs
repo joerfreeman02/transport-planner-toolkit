@@ -403,7 +403,7 @@ function renderAssessment(result) {
     if (stop.walking.status !== 'routed') walking.classList.add('route-unavailable');
     if (stop.cycling.status !== 'routed') cycling.classList.add('route-unavailable');
     appendCell(row, 'Routes serving stop', stop.routes?.length ? stop.routes.join(', ') : 'Timetable route match unavailable');
-    appendCell(row, 'Timetable match', stop.timetableMatch === false ? 'NO CURRENT SCHEDULED TIMETABLE MATCH' : 'CURRENT SCHEDULED SERVICE MATCHED', stop.timetableMatch === false ? 'No current BODS/TNDS service was matched to this stop. Review before including it in the report.' : '');
+    appendCell(row, 'Timetable evidence', stop.timetableEvidence || (stop.timetableMatch === false ? 'Timetable source unavailable' : 'Matched · timetable source'));
     rows.append(row);
   }
   if (!result.stops.length) {
@@ -420,19 +420,20 @@ function renderAssessment(result) {
     const originDestination = `${service.origin} - ${service.destination}${service.circular && service.direction ? ` (${service.direction})` : ''}`;
     appendCell(row, 'Origin / destination', originDestination);
     appendCell(row, 'Principal locations', service.presentation.principalLocationsText);
+    appendCell(row, 'Typical frequency', service.typicalFrequencyText || 'Frequency unavailable');
     const periods = document.createElement('ul'); periods.className = 'period-lines';
     service.operatingPeriodLines.forEach(line => { const item = document.createElement('li'); item.textContent = line; periods.append(item); });
     appendCell(row, 'Operating period', periods);
     serviceRows.append(row);
     if (service.serviceNote) {
       const noteRow = document.createElement('tr'); noteRow.className = 'service-note';
-      const noteCell = document.createElement('td'); noteCell.colSpan = 5;
+      const noteCell = document.createElement('td'); noteCell.colSpan = 7;
       const label = document.createElement('strong'); label.textContent = 'Service note: ';
       noteCell.append(label, service.serviceNote); noteRow.append(noteCell); serviceRows.append(noteRow);
     }
   }
   if (!result.serviceSummaries.length) {
-    const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 6; cell.textContent = 'No matched timetable summary is available. Review Sources and checks before using the stop information.'; row.append(cell); serviceRows.append(row);
+    const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 7; cell.textContent = 'No matched timetable summary is available. Review Sources and checks before using the stop information.'; row.append(cell); serviceRows.append(row);
   }
   renderBusStopMarkers(result.stops);
   $('assessmentWording').textContent = buildControlledBusWording(result.serviceSummaries.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => selectedStopIds.has(String(id)))), { nearestGroupName: result.nearestGroup?.name ?? null });

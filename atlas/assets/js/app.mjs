@@ -10,7 +10,7 @@ import { createOsrmAccessRoutingAdapter } from '../../../src/atlas/adapters/osrm
 import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-discovery.mjs';
 import { createBusAssessment } from '../../../src/atlas/application/bus-assessment.mjs';
 import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
-import { buildControlledBusWording } from '../../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildControlledBusWording, buildServicePresentation } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
@@ -270,7 +270,9 @@ function renderDraftSite(site, { centreMap = false, message } = {}) {
   ensureMarker(site.latitude, site.longitude, centreMap);
   $('latitude').value = site.latitude.toFixed(6);
   $('longitude').value = site.longitude.toFixed(6);
-  $('selectedIdentity').textContent = site.displayAddress || site.suppliedAddress;
+  const identity = site.displayAddress || site.suppliedAddress;
+  $('selectedIdentity').textContent = identity;
+  $('selectedIdentity').hidden = !identity;
   $('selectedMethod').textContent = assessmentMethod(site);
   $('selectedCoordinates').textContent = `${site.latitude.toFixed(6)}, ${site.longitude.toFixed(6)}`;
   $('selectedLocation').hidden = false;
@@ -281,13 +283,9 @@ function renderDraftSite(site, { centreMap = false, message } = {}) {
   clearBusEvidence();
 }
 
-function mapIdentity() {
-  return $('address').value.trim() || 'Site selected on map';
-}
-
 function chooseMapPoint(latitude, longitude, message = 'Assessment point chosen on the map. Check it carefully, then confirm it.') {
   try {
-    const site = selector.chooseOnMap({ latitude, longitude, suppliedAddress: mapIdentity(), displayAddress: mapIdentity() });
+    const site = selector.chooseOnMap({ latitude, longitude });
     renderDraftSite(site, { message });
   } catch {
     setCallout($('mapStatus'), 'That point could not be used. Choose a valid location on the map.', 'error');
@@ -335,8 +333,9 @@ function renderConfirmedSite(site) {
   panel.replaceChildren();
   const strong = document.createElement('strong');
   strong.textContent = 'Confirmed assessment point';
-  const address = document.createElement('p');
-  address.textContent = site.displayAddress || site.suppliedAddress;
+  const identity = site.displayAddress || site.suppliedAddress;
+  const address = identity ? document.createElement('p') : null;
+  if (address) address.textContent = identity;
   const details = document.createElement('dl');
   const rows = [
     ['Location', assessmentMethod(site)],
@@ -356,8 +355,8 @@ function renderConfirmedSite(site) {
     const diagnostic = document.createElement('p');
     diagnostic.textContent = `Address source: ${site.geocoding.source}. Original address point: ${site.geocoding.latitude.toFixed(6)}, ${site.geocoding.longitude.toFixed(6)}. Source record: ${site.geocoding.sourceIdentifier}. Search used: ${site.geocoding.query}.`;
     technical.append(summary, diagnostic);
-    panel.append(strong, address, details, technical);
-  } else panel.append(strong, address, details);
+    panel.append(strong, ...(address ? [address] : []), details, technical);
+  } else panel.append(strong, ...(address ? [address] : []), details);
 }
 
 function appendCell(row, label, value, secondary = '') {
@@ -372,12 +371,13 @@ function appendCell(row, label, value, secondary = '') {
 
 function renderAssessment(result) {
   currentBusResult = result;
+  const presentedServices = buildServicePresentation(result.serviceSummaries);
   if (!selectionInitialised) {
     selectedStopIds = new Set(result.stops.filter(stop => stop.timetableMatch !== false).map(stopKey));
     selectedServiceIds = new Set(result.serviceSummaries.map(serviceKey));
     selectionInitialised = true;
   }
-  for (const service of result.serviceSummaries) {
+  for (const service of presentedServices) {
     if (!service.stopIds?.some(id => selectedStopIds.has(String(id)))) selectedServiceIds.delete(serviceKey(service));
   }
   $('exportBusWord').disabled = false;
@@ -409,7 +409,7 @@ function renderAssessment(result) {
   if (!result.stops.length) {
     const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 7; cell.textContent = 'No authoritative bus stops were found within the selected discovery radius.'; row.append(cell); rows.append(row);
   }
-  for (const service of result.serviceSummaries) {
+  for (const service of presentedServices) {
     const row = document.createElement('tr');
     const supported = service.stopIds?.some(id => selectedStopIds.has(String(id)));
     const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedServiceIds.has(serviceKey(service)) && supported; include.disabled = !supported; include.setAttribute('aria-label', `Include route ${service.routeNumber}`);
@@ -419,7 +419,7 @@ function renderAssessment(result) {
     appendCell(row, 'Operator', service.operator);
     const originDestination = `${service.origin} - ${service.destination}${service.circular && service.direction ? ` (${service.direction})` : ''}`;
     appendCell(row, 'Origin / destination', originDestination);
-    appendCell(row, 'Principal locations', service.principalLocations.length ? service.principalLocations.join(', ') : 'No additional principal locations identified');
+    appendCell(row, 'Principal locations', service.presentation?.principalLocationsText || service.principalLocationsDisplay || (service.principalLocations.length ? service.principalLocations.join(', ') : 'Route endpoints only'));
     const periods = document.createElement('ul'); periods.className = 'period-lines';
     service.operatingPeriodLines.forEach(line => { const item = document.createElement('li'); item.textContent = line; periods.append(item); });
     appendCell(row, 'Operating period', periods);
@@ -505,9 +505,7 @@ function enterCoordinates(event) {
   try {
     const site = selector.enterCoordinates({
       latitude: $('latitude').value,
-      longitude: $('longitude').value,
-      suppliedAddress: mapIdentity(),
-      displayAddress: mapIdentity()
+      longitude: $('longitude').value
     });
     $('coordinateStatus').textContent = 'Coordinates applied. Check the marker on the map, then confirm the assessment point.';
     renderDraftSite(site, { centreMap: true, message: 'Coordinates applied. Check the marker, then confirm the assessment point.' });

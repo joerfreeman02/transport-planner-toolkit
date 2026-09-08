@@ -34,7 +34,9 @@ ATLAS never invents a postcode, town or candidate. Broader results remain possib
 
 The selector reuses the repository's local Leaflet 1.9.4 assets and the proven legacy behaviours: pan/zoom, map click, draggable marker, manual decimal coordinates and explicit confirmation. OpenStreetMap tiles are requested only for deliberate interactive review and retain attribution.
 
-If search returns no match or is unavailable, the supplied description remains recorded and the planner can choose the point directly on the map. Manual coordinates are secondary progressive disclosure. Invalid world coordinates are rejected.
+If search returns no match or is unavailable, the planner can choose the point directly on the map; any text still visible in the search field is not promoted to Site identity. Manual coordinates are secondary progressive disclosure. Invalid world coordinates are rejected.
+
+For map-selected and coordinates-entered Sites without geocoding provenance, an empty supplied/display address is a valid known state. The browser does not promote unverified search-field text to Site identity. A genuine geocoded identity remains attached when the planner adjusts the assessment point.
 
 ## Downstream gate
 

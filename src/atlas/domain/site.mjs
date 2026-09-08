@@ -49,8 +49,14 @@ export function createSite(input = {}) {
   const warnings = [...list(input.warnings ?? input.validation?.warnings)];
   const errors = [...list(input.errors ?? input.validation?.errors)];
 
-  if (!suppliedAddress) errors.push('A supplied address or site description is required.');
-  if (!displayAddress) errors.push('A display address or site description is required.');
+  const method = clean(input.locationMethod ?? assessmentInput.method)
+    || (geocodingSource ? SITE_LOCATION_METHODS.GEOCODED_CANDIDATE : SITE_LOCATION_METHODS.MAP_SELECTED);
+  const addressRequired = Boolean(geocodingSource)
+    || method === SITE_LOCATION_METHODS.GEOCODED_CANDIDATE
+    || method === SITE_LOCATION_METHODS.PLANNER_ADJUSTED;
+
+  if (addressRequired && !suppliedAddress) errors.push('A supplied address or site description is required for a geocoded Site.');
+  if (addressRequired && !displayAddress) errors.push('A display address or site description is required for a geocoded Site.');
   if (assessmentPoint.latitude === null) errors.push('Assessment-point latitude is required.');
   else if (assessmentPoint.latitude < -90 || assessmentPoint.latitude > 90) errors.push('Assessment-point latitude must be between -90 and 90.');
   if (assessmentPoint.longitude === null) errors.push('Assessment-point longitude is required.');
@@ -61,8 +67,6 @@ export function createSite(input = {}) {
   if ((geocodedPoint.latitude !== null || geocodedPoint.longitude !== null) && !geocodingSource) errors.push('Geocoding source is required when geocoding coordinates are recorded.');
   if (geocodingSource && (geocodedPoint.latitude === null || geocodedPoint.longitude === null)) errors.push('Both original geocoding coordinates are required when a geocoding source is recorded.');
 
-  const method = clean(input.locationMethod ?? assessmentInput.method)
-    || (geocodingSource ? SITE_LOCATION_METHODS.GEOCODED_CANDIDATE : SITE_LOCATION_METHODS.MAP_SELECTED);
   if (!VALID_METHODS.has(method)) errors.push(`Unsupported assessment-point method: ${method}.`);
 
   const retrievedAt = timestamp(input.retrievedAt ?? geocodingInput.retrievedAt, 'Geocoding retrieval timestamp', errors);

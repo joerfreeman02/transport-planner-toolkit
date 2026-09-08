@@ -28,12 +28,20 @@ test('map adjustment preserves original candidate evidence', () => {
   assert.equal(moved.assessmentPoint.method, SITE_LOCATION_METHODS.PLANNER_ADJUSTED);
   assert.deepEqual([moved.geocoding.latitude, moved.geocoding.longitude], [51.8, -0.08]);
 });
-test('failed-search path can establish a map-selected Site from the original description', () => {
+test('map-only selection does not copy arbitrary search-box text', () => {
   const selector = createSiteSelector();
-  const site = selector.chooseOnMap({ suppliedAddress: 'Land at the former works', latitude: 52, longitude: -0.1 });
-  assert.equal(site.suppliedAddress, 'Land at the former works');
+  const site = selector.chooseOnMap({ latitude: 52, longitude: -0.1 });
+  assert.equal(site.suppliedAddress, '');
+  assert.equal(site.displayAddress, '');
   assert.equal(site.geocoding.source, null);
   assert.equal(site.assessmentPoint.method, SITE_LOCATION_METHODS.MAP_SELECTED);
+});
+test('coordinate-only selection remains addressless', () => {
+  const selector = createSiteSelector();
+  const site = selector.enterCoordinates({ latitude: 52, longitude: -0.1 });
+  assert.equal(site.suppliedAddress, '');
+  assert.equal(site.displayAddress, '');
+  assert.equal(site.assessmentPoint.method, SITE_LOCATION_METHODS.COORDINATES_ENTERED);
 });
 test('manual coordinates remain secondary but auditable', () => {
   const selector = createSiteSelector();

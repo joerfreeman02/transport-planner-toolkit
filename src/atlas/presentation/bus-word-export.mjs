@@ -1,3 +1,5 @@
+import { buildServicePresentation } from '../domain/bus-service-assessment.mjs';
+
 function text(value) { return String(value ?? '').trim(); }
 
 function accessText(route) {
@@ -11,6 +13,12 @@ function originDestination(service) {
   return `${text(service.origin) || 'Origin not supplied'} – ${text(service.destination) || 'Destination not supplied'}${service.circular && service.direction ? ` (${service.direction})` : ''}`;
 }
 
+function principalLocationsText(service) {
+  return text(service?.presentation?.principalLocationsText)
+    || text(service?.principalLocationsDisplay)
+    || (service?.principalLocations?.length ? service.principalLocations.join(', ') : 'Route endpoints only');
+}
+
 export function buildBusWordTables(result) {
   if (!result?.ok) throw new Error('A completed Bus assessment is required for Word export.');
   const stopRows = (result.stops ?? []).map(stop => [
@@ -22,12 +30,12 @@ export function buildBusWordTables(result) {
   ]);
 
   const serviceRows = [];
-  for (const service of result.serviceSummaries ?? []) {
+  for (const service of buildServicePresentation(result.serviceSummaries ?? [])) {
     serviceRows.push([
       service.routeNumber,
       service.operator,
       originDestination(service),
-      service.principalLocations?.length ? service.principalLocations.join(', ') : 'No additional principal locations identified',
+      principalLocationsText(service),
       (service.operatingPeriodLines ?? []).join('\n')
     ]);
     if (service.serviceNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.serviceNote}` });
@@ -50,10 +58,10 @@ export function buildBusWordTables(result) {
 }
 
 export function busWordFilename(site) {
-  const identity = text(site?.displayAddress || site?.suppliedAddress || 'Site')
+  const identity = text(site?.displayAddress || site?.suppliedAddress)
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 70) || 'Site';
-  return `ATLAS Bus Assessment - ${identity}.docx`;
+    .slice(0, 70);
+  return identity ? `ATLAS Bus Assessment - ${identity}.docx` : 'ATLAS Bus Assessment.docx';
 }

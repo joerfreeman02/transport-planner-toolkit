@@ -71,18 +71,25 @@ function scheduleForPattern(route, pattern) {
   let ambiguous = false;
   let evidence = false;
   let hasPeriods = false;
+  let chronologyIncomplete = false;
   for (const schedule of schedules) {
     hasPeriods ||= Array.isArray(schedule?.periods) && schedule.periods.length > 0;
     const journeys = Array.isArray(schedule?.knownJourneys) ? schedule.knownJourneys : [];
+    const firstJourney = schedule?.firstJourney && belongsToPattern(schedule.firstJourney, pattern, pattern.count) ? schedule.firstJourney : null;
+    const lastJourney = schedule?.lastJourney && belongsToPattern(schedule.lastJourney, pattern, pattern.count) ? schedule.lastJourney : null;
+    const selectedKnown = journeys.filter(journey => belongsToPattern(journey, pattern, pattern.count));
     const entries = [...journeys, schedule?.firstJourney, schedule?.lastJourney].filter(Boolean);
-    const selected = entries.filter(journey => belongsToPattern(journey, pattern, pattern.count));
     if (pattern.multiple && entries.some(journey => !text(journey?.intervalId))) ambiguous = true;
-    const departures = selected.map(journeyMinutes).filter(Number.isFinite);
+    const first = journeyMinutes(firstJourney);
+    const last = journeyMinutes(lastJourney);
+    if (selectedKnown.length && (!Number.isFinite(first) || !Number.isFinite(last))) chronologyIncomplete = true;
+    const overnight = Number.isFinite(first) && Number.isFinite(last) && last < first;
+    const departures = [...selectedKnown, firstJourney, lastJourney].filter(Boolean).map(journeyMinutes).filter(Number.isFinite).map(value => overnight && value < first && value <= last ? value + 1440 : value);
     if (departures.length) evidence = true;
     for (const day of periodDays(schedule?.name ?? schedule?.period ?? schedule?.days)) result[day].push(...departures);
   }
   for (const day of DAYS) result[day] = [...new Set(result[day].map(Number))].sort((a, b) => a - b);
-  return { schedule: result, evidence, ambiguous, hasPeriods };
+  return { schedule: result, evidence, ambiguous, hasPeriods, chronologyIncomplete };
 }
 
 function sectionsFromMetadata(data, lineId) {
@@ -132,6 +139,7 @@ function routeRecords(response, stopPointId, metadataResult) {
         warnings.push('TfL returned competing timetable interval patterns without intervalId linkage for one or more journeys. The ambiguous pattern has not been guessed.');
         continue;
       }
+      if (timing.chronologyIncomplete) warnings.push('TfL supplied scheduled journeys without both deterministic first and last journey boundaries. ATLAS did not infer overnight chronology for those journeys.');
       if (!timing.evidence) {
         warnings.push('TfL returned an interval pattern without deterministically associated scheduled journeys. The pattern has not been presented as a scheduled service.');
         continue;

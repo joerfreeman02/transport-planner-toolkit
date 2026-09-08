@@ -257,7 +257,9 @@ function independentPrincipalLocationsText(service) {
   const pattern = Array.isArray(service?.routePatternStopIds)
     ? service.routePatternStopIds.map(text).filter(Boolean)
     : [];
-  return pattern.length === 2
+  const extent = service?.routePatternExtent;
+  const extentConfirmsTwoStops = extent === undefined || extent === null || Number(extent) === 2;
+  return pattern.length === 2 && extentConfirmsTwoStops
     ? 'Route endpoints only'
     : 'See route origin / destination';
 }

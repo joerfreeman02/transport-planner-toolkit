@@ -1,0 +1,24 @@
+{
+  "lineId": "322",
+  "lineName": "322",
+  "direction": "outbound",
+  "stations": [
+    { "id": "490TEST003", "name": "Crystal Palace", "locality": "Crystal Palace" },
+    { "id": "490TEST004", "name": "Clapham Common", "locality": "Clapham" },
+    { "id": "490TEST005", "name": "Short Working Terminus", "locality": "Norwood" }
+  ],
+  "timetable": {
+    "departureStopId": "490TEST003",
+    "routes": [
+      {
+        "stationIntervals": [
+          { "id": "full", "intervals": [{ "stopId": "490TEST003", "timeToArrival": 0 }, { "stopId": "490TEST004", "timeToArrival": 15 }] },
+          { "id": "short", "intervals": [{ "stopId": "490TEST003", "timeToArrival": 0 }, { "stopId": "490TEST005", "timeToArrival": 8 }] }
+        ],
+        "schedules": [
+          { "name": "Monday to Friday", "knownJourneys": [{ "hour": 6, "minute": 10 }] }
+        ]
+      }
+    ]
+  }
+}

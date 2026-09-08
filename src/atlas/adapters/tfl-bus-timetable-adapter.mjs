@@ -10,7 +10,6 @@ const DAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'frida
 const text = value => String(value ?? '').trim();
 const normal = value => text(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const emptySchedule = () => Object.fromEntries(DAYS.map(day => [day, []]));
-const unique = values => [...new Set(values.map(text).filter(Boolean))];
 
 function periodDays(name) {
   const value = normal(name);
@@ -34,60 +33,129 @@ function journeyMinutes(journey) {
   return null;
 }
 
-function stationsFor(route, response) {
+function stationsForPattern(pattern, response) {
   const details = [...(Array.isArray(response?.stations) ? response.stations : []), ...(Array.isArray(response?.stops) ? response.stops : [])];
   const byId = new Map(details.map(station => [text(station?.id ?? station?.stopPointId ?? station?.naptanId), station]));
-  const sequence = (Array.isArray(route?.stationIntervals) ? route.stationIntervals : []).flatMap(group => Array.isArray(group?.intervals) ? group.intervals : []).map(interval => text(interval?.stopId ?? interval?.id)).filter(Boolean);
-  const raw = sequence.length ? sequence.map(id => byId.get(id) ?? { id }) : [];
-  return (Array.isArray(raw) ? raw : []).map(station => ({
+  const sequence = (Array.isArray(pattern?.intervals) ? pattern.intervals : []).map(interval => text(interval?.stopId)).filter(Boolean);
+  return sequence.map(id => byId.get(id) ?? { id }).map(station => ({
     id: text(station?.id ?? station?.stopPointId ?? station?.naptanId),
     name: text(station?.name ?? station?.commonName),
     locality: text(station?.locality ?? station?.parentLocality)
   })).filter(station => station.id && station.name);
 }
 
-function knownJourneys(schedule) {
-  const rows = schedule?.knownJourneys ?? schedule?.journeys ?? schedule?.departures ?? [];
-  return (Array.isArray(rows) ? rows : []).map(journeyMinutes).filter(Number.isFinite);
+function timetablePatterns(route, response) {
+  const raw = Array.isArray(route?.stationIntervals) ? route.stationIntervals : [];
+  const ids = raw.map(pattern => text(pattern?.id));
+  const uniqueIds = new Set(ids.filter(Boolean));
+  const multiple = raw.length > 1;
+  return raw.map((pattern, index) => ({
+    id: ids[index] || (raw.length === 1 ? 'single-pattern' : ''),
+    sourceId: ids[index] || null,
+    stations: stationsForPattern(pattern, response),
+    usable: raw.length === 1 || Boolean(ids[index]) && uniqueIds.size === raw.length,
+    count: raw.length,
+    multiple
+  }));
 }
 
-function scheduleForRoute(route) {
+function belongsToPattern(journey, pattern, patternCount) {
+  const intervalId = text(journey?.intervalId);
+  if (!intervalId) return patternCount === 1;
+  return Boolean(pattern.sourceId) && intervalId === pattern.sourceId;
+}
+
+function scheduleForPattern(route, pattern) {
   const result = emptySchedule();
   const schedules = Array.isArray(route?.schedules) ? route.schedules : [];
+  let ambiguous = false;
+  let evidence = false;
+  let hasPeriods = false;
   for (const schedule of schedules) {
-    const scheduled = knownJourneys(schedule);
-    const boundaries = [journeyMinutes(schedule?.firstJourney), journeyMinutes(schedule?.lastJourney)].filter(Number.isFinite);
-    for (const day of periodDays(schedule?.name ?? schedule?.period ?? schedule?.days)) result[day].push(...scheduled, ...boundaries);
+    hasPeriods ||= Array.isArray(schedule?.periods) && schedule.periods.length > 0;
+    const journeys = Array.isArray(schedule?.knownJourneys) ? schedule.knownJourneys : [];
+    const entries = [...journeys, schedule?.firstJourney, schedule?.lastJourney].filter(Boolean);
+    const selected = entries.filter(journey => belongsToPattern(journey, pattern, pattern.count));
+    if (pattern.multiple && entries.some(journey => !text(journey?.intervalId))) ambiguous = true;
+    const departures = selected.map(journeyMinutes).filter(Number.isFinite);
+    if (departures.length) evidence = true;
+    for (const day of periodDays(schedule?.name ?? schedule?.period ?? schedule?.days)) result[day].push(...departures);
   }
   for (const day of DAYS) result[day] = [...new Set(result[day].map(Number))].sort((a, b) => a - b);
-  return result;
+  return { schedule: result, evidence, ambiguous, hasPeriods };
 }
 
-function routeRecords(response, stopPointId) {
+function sectionsFromMetadata(data, lineId) {
+  const lines = Array.isArray(data) ? data : [data];
+  return lines.filter(line => normal(line?.id ?? line?.name) === normal(lineId)).flatMap(line => Array.isArray(line?.routeSections) ? line.routeSections : []).map(section => ({
+    id: text(section?.id),
+    direction: text(section?.direction),
+    origin: text(section?.originationName),
+    destination: text(section?.destinationName),
+    validFrom: text(section?.validFrom) || null,
+    validTo: text(section?.validTo) || null
+  })).filter(section => section.origin && section.destination);
+}
+
+function identityForPattern(pattern, metadata, direction) {
+  const directed = (metadata ?? []).filter(section => !direction || normal(section.direction) === normal(direction));
+  const terminal = pattern.stations.at(-1)?.name;
+  const destinationMatched = terminal ? directed.filter(section => normal(section.destination) === normal(terminal)) : [];
+  const candidates = terminal ? destinationMatched : directed;
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+function routeRecords(response, stopPointId, metadataResult) {
   const routes = Array.isArray(response?.timetable?.routes) ? response.timetable.routes : Array.isArray(response?.routes) ? response.routes : [];
   const lineId = text(response?.lineId ?? response?.lineName);
   const lineName = text(response?.lineName ?? response?.lineId);
-  return routes.map((route, index) => {
-    const stations = stationsFor(route, response);
-    if (stations.length < 2) return null;
-    const origin = stations[0]?.name;
-    const destination = stations.at(-1)?.name;
-    const direction = text(response?.direction);
-    const hasPeriods = (route?.schedules ?? []).some(schedule => Array.isArray(schedule?.periods) && schedule.periods.length);
-    return {
-      id: `tfl:${lineId}:${normal(direction)}:${index}`,
-      routeNumber: lineName || lineId,
-      operator: text(route?.operator ?? response?.operator),
-      origin, destination, direction,
-      principalLocations: derivePrincipalLocations(stations),
-      stopSchedules: { [stopPointId]: scheduleForRoute(route) },
-      source: { provider: 'TfL', lineId, directionId: text(route?.directionId ?? response?.directionId) },
-      timetableSource: 'TfL',
-      qualifications: hasPeriods ? ['TfL supplied operating-period/frequency evidence; ATLAS retained only exact scheduled journeys and first/last journey boundaries, without synthesising departures from frequency ranges.'] : [],
-      validFrom: text(route?.validFrom ?? response?.validFrom) || null,
-      validTo: text(route?.validTo ?? response?.validTo) || null
-    };
-  }).filter(Boolean);
+  const direction = text(response?.direction);
+  const metadata = metadataResult?.ok ? sectionsFromMetadata(metadataResult.data, lineId) : [];
+  const warnings = [];
+  const services = [];
+  for (const route of routes) {
+    for (const [index, pattern] of timetablePatterns(route, response).entries()) {
+      if (!pattern.usable || pattern.stations.length < 2) {
+        warnings.push('TfL returned multiple timetable interval patterns without distinct deterministic interval identities. No route pattern or zero-service conclusion has been assumed.');
+        continue;
+      }
+      const timing = scheduleForPattern(route, pattern);
+      if (timing.ambiguous) {
+        warnings.push('TfL returned competing timetable interval patterns without intervalId linkage for one or more journeys. The ambiguous pattern has not been guessed.');
+        continue;
+      }
+      if (!timing.evidence) {
+        warnings.push('TfL returned an interval pattern without deterministically associated scheduled journeys. The pattern has not been presented as a scheduled service.');
+        continue;
+      }
+      const identity = identityForPattern(pattern, metadata, direction);
+      if (!identity) warnings.push(metadataResult?.ok
+        ? 'TfL route metadata did not establish one complete route identity for this timetable pattern. ATLAS retained the scheduled pattern without inventing full origin or destination.'
+        : 'TfL route metadata could not be checked. ATLAS retained the scheduled pattern without inventing full origin or destination.');
+      const hasPeriods = timing.hasPeriods;
+      services.push({
+        id: `tfl:${lineId}:${normal(direction)}:${normal(pattern.id || `pattern-${index + 1}`)}`,
+        routeNumber: lineName || lineId,
+        operator: text(route?.operator ?? response?.operator),
+        origin: identity?.origin ?? '',
+        destination: identity?.destination ?? '',
+        direction,
+        principalLocations: derivePrincipalLocations(pattern.stations),
+        routePatternStopIds: pattern.stations.map(station => station.id),
+        operatingPeriodEvidence: hasPeriods,
+        stopSchedules: { [stopPointId]: timing.schedule },
+        source: { provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId, routeMetadata: identity ? 'matched' : 'incomplete' },
+        timetableSource: 'TfL',
+        qualifications: [
+          ...(hasPeriods ? ['TfL supplied operating-period/frequency evidence; ATLAS retained only exact scheduled journeys and first/last journey boundaries, without synthesising departures from frequency ranges.'] : []),
+          ...(!identity ? ['Full TfL route origin and destination were not deterministically established for this selected-stop timetable pattern.'] : [])
+        ],
+        validFrom: identity?.validFrom ?? null,
+        validTo: identity?.validTo ?? null
+      });
+    }
+  }
+  return { services, warnings: [...new Set(warnings)] };
 }
 
 function validResponse(data) {
@@ -95,10 +163,30 @@ function validResponse(data) {
 }
 
 export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cache, clock = () => new Date(), timeoutMs = 12000, baseUrl = 'https://api.tfl.gov.uk' } = {}) {
-  async function servicesForStop({ lineId, stopPointId, forceRefresh = false } = {}) {
+  const metadataInflight = new Map();
+  async function routeMetadataForLines(lineIds, { forceRefresh = false } = {}) {
+    const lines = [...new Set((lineIds ?? []).map(text).filter(Boolean))].sort();
+    const provenance = { source: SOURCE, authoritativeFor: 'London bus route identity', endpoint: `${baseUrl}/Line/{ids}/Route`, anonymousRequest: true, apiKeyEmbedded: false };
+    if (!lines.length) return sourceSuccess({ data: [], warnings: [], provenance: { ...provenance, requestCount: 0 } });
+    const key = `tfl-route-metadata:${lines.join(',')}`;
+    if (!forceRefresh && metadataInflight.has(key)) return metadataInflight.get(key);
+    const task = runCachedSourceQuery({ cache, cacheKey: key, freshForMs: 5 * 60 * 1000, forceRefresh, load: async () => {
+      const endpoint = new URL(`/Line/${lines.map(encodeURIComponent).join(',')}/Route`, baseUrl).toString();
+      const response = await requestJson({ url: endpoint, fetchImpl, timeoutMs });
+      const source = { ...provenance, endpoint, retrievedAt: clock().toISOString(), httpStatus: response.status ?? null, requestCount: 1, lineIds: lines };
+      if (!response.ok) return sourceFailure({ code: response.code, message: `TfL route metadata could not be checked: ${response.message}`, status: response.status, provenance: source });
+      if (!Array.isArray(response.data)) return sourceFailure({ code: 'invalid_response', message: 'TfL returned route metadata that ATLAS could not safely interpret.', provenance: source });
+      return sourceSuccess({ data: response.data, warnings: [], provenance: source });
+    }});
+    metadataInflight.set(key, task);
+    try { return await task; } finally { metadataInflight.delete(key); }
+  }
+
+  async function servicesForStop({ lineId, stopPointId, forceRefresh = false, routeMetadata = null } = {}) {
     const line = text(lineId), stop = text(stopPointId);
     const provenance = { source: SOURCE, authoritativeFor: 'scheduled London bus timetables', endpoint: `${baseUrl}/Line/{id}/Timetable/{fromStopPointId}`, anonymousRequest: true, apiKeyEmbedded: false };
     if (!line || !stop) return sourceFailure({ code: 'invalid_request', message: 'A TfL line and StopPoint identity are required.', provenance });
+    const metadataResult = routeMetadata ?? await routeMetadataForLines([line], { forceRefresh });
     const endpoint = new URL(`/Line/${encodeURIComponent(line)}/Timetable/${encodeURIComponent(stop)}`, baseUrl).toString();
     return runCachedSourceQuery({ cache, cacheKey: `tfl-timetable:${line}:${stop}`, freshForMs: 5 * 60 * 1000, forceRefresh, load: async () => {
       const response = await requestJson({ url: endpoint, fetchImpl, timeoutMs });
@@ -106,11 +194,12 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
       if (!response.ok) return sourceFailure({ code: response.code, message: `TfL scheduled timetable could not be checked: ${response.message}`, status: response.status, provenance: source });
       if (!validResponse(response.data)) return sourceFailure({ code: 'invalid_response', message: 'TfL returned a scheduled timetable response that ATLAS could not safely interpret.', provenance: source });
       const departureStopId = text(response.data?.timetable?.departureStopId) || stop;
-      const services = routeRecords(response.data, departureStopId);
-      const warnings = services.length ? [] : ['TfL returned scheduled timetable data without a deterministically resolved route-specific stop sequence. No route or zero-service conclusion has been assumed.'];
-      const evidence = services.map(service => createEvidence({ subject: { entityType: 'bus-service', id: service.id, name: service.routeNumber }, evidenceType: 'bus.timetable.scheduled', value: service, source: { name: SOURCE, authoritative: true, recordIdentifier: service.id, endpoint, attribution: ATTRIBUTION }, retrievedAt: source.retrievedAt, calculationMethodology: 'TfL scheduled timetable routes, station order and known journeys were mapped to the existing ATLAS service shape; no arrival predictions were used.', validationStatus: 'validated', confidenceStatus: 'authoritative', freshness: { status: 'live-current', assessedAt: source.retrievedAt }, cache: { status: 'miss' } }));
-      return sourceSuccess({ data: services, evidence, warnings, provenance: { ...source, departureStopId, resultCount: services.length, serviceDiscovery: 'scheduled-timetable', realtimeArrivalsUsed: false } });
+      const parsed = routeRecords(response.data, departureStopId, metadataResult);
+      const warnings = parsed.services.length ? parsed.warnings : [...parsed.warnings, 'TfL returned scheduled timetable data without a deterministically resolved route pattern. No route or zero-service conclusion has been assumed.'];
+      const evidence = parsed.services.map(service => createEvidence({ subject: { entityType: 'bus-service', id: service.id, name: service.routeNumber }, evidenceType: 'bus.timetable.scheduled', value: service, source: { name: SOURCE, authoritative: true, recordIdentifier: service.id, endpoint, attribution: ATTRIBUTION }, retrievedAt: source.retrievedAt, calculationMethodology: 'TfL scheduled timetable journeys were associated only with their matching StationInterval pattern. TfL line-route metadata establishes complete route identity where deterministic; no arrival predictions were used.', validationStatus: 'validated', confidenceStatus: 'authoritative', freshness: { status: 'live-current', assessedAt: source.retrievedAt }, cache: { status: 'miss' } }));
+      const routeMetadataRequests = routeMetadata ? 0 : metadataResult.cache?.status === 'hit' ? 0 : 1;
+      return sourceSuccess({ data: parsed.services, evidence, warnings, provenance: { ...source, departureStopId, resultCount: parsed.services.length, serviceDiscovery: 'scheduled-timetable', timetableRequests: 1, routeMetadataRequests, realtimeArrivalsUsed: false } });
     }});
   }
-  return Object.freeze({ id: 'tfl-bus-timetable-v1', servicesForStop });
+  return Object.freeze({ id: 'tfl-bus-timetable-v1', servicesForStop, routeMetadataForLines });
 }

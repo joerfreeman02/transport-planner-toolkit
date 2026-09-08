@@ -145,6 +145,19 @@ function recordActivity(record, stopIds) {
   return total;
 }
 
+function serviceStopDirection(stop) {
+  if (!stop) return null;
+  const indicator = compassDirection(stop.indicator);
+  const direction = compassDirection(stop.direction);
+  if (indicator || direction) return indicator || direction;
+  if (text(stop.direction)) return displayStopDirection(stop);
+  return null;
+}
+
+function selectedStopDirectionKey(stop) {
+  return normal(serviceStopDirection(stop));
+}
+
 function representativeStop(stops, records) {
   const supporting = (stops ?? []).filter(stop => records.some(record => {
     const schedule = record.stopSchedules?.[text(stop.id || stop.sourceId)];
@@ -179,11 +192,13 @@ function representativeRecord(records, stopIds) {
 
 export function buildServiceSummaries(stops, serviceRecords) {
   const selectedIds = new Set((stops ?? []).map(stop => text(stop.id || stop.sourceId)).filter(Boolean));
+  const selectedStopsById = new Map((stops ?? []).map(stop => [text(stop.id || stop.sourceId), stop]));
   const groups = new Map();
   for (const service of serviceRecords ?? []) {
     const relevantStops = Object.keys(service.stopSchedules ?? {}).filter(id => selectedIds.has(id));
     if (!relevantStops.length) continue;
-    const identity = [service.routeNumber, service.operator, directionGroupKey(service)].map(value => text(value).toLowerCase()).join('|');
+    const stopDirections = unique(relevantStops.map(id => selectedStopDirectionKey(selectedStopsById.get(id))).filter(Boolean)).sort().join(',');
+    const identity = [service.routeNumber, service.operator, directionGroupKey(service), stopDirections].map(value => text(value).toLowerCase()).join('|');
     if (!groups.has(identity)) groups.set(identity, []);
     groups.get(identity).push({ ...service, relevantStops });
   }
@@ -195,7 +210,9 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const frequencyBasisStopId = text(frequencyStop?.id || frequencyStop?.sourceId) || stopIds[0] || null;
     const departuresByDay = mergeDepartures(records, frequencyBasisStopId ? [frequencyBasisStopId] : stopIds);
     const periods = calculateOperatingPeriods(departuresByDay);
-    const frequencyEvidence = records.flatMap(record => (record.frequencyEvidence ?? []).map(item => ({ ...item, source: item.source || record.timetableSource || record.source?.provider || null })));
+    const frequencyEvidence = records.flatMap(record => (record.frequencyEvidence ?? [])
+      .filter(item => !item.stopPointId || item.stopPointId === frequencyBasisStopId)
+      .map(item => ({ ...item, source: item.source || record.timetableSource || record.source?.provider || null })));
     const frequencyRepresentativeDay = representativeDay(departuresByDay);
     const typicalFrequency = frequencyRepresentativeDay
       ? calculateTypicalServiceFrequency(departuresByDay[frequencyRepresentativeDay], { day: frequencyRepresentativeDay, frequencyEvidence })
@@ -214,6 +231,8 @@ export function buildServiceSummaries(stops, serviceRecords) {
       origin: text(first.origin) || 'Origin not supplied',
       destination: text(first.destination) || 'Destination not supplied',
       direction: text(first.direction),
+      stopDirection: serviceStopDirection(frequencyStop),
+      stopDirectionEvidenceId: frequencyBasisStopId,
       circular: records.some(record => record.circular),
       principalLocations,
       directionFamily: directionGroupKey(first),
@@ -386,15 +405,25 @@ function intervals(values) {
 function deterministicFrequencyBand(evidence, day) {
   const bands = (evidence ?? []).filter(item => !item.day || item.day === day)
     .map(item => ({
+      periodType: text(item.periodType),
       fromMinute: Number(item.fromMinute),
       toMinute: Number(item.toMinute),
       lowestFrequency: Number(item.lowestFrequency),
       highestFrequency: Number(item.highestFrequency)
     }))
-    .filter(item => Number.isFinite(item.lowestFrequency) && item.lowestFrequency > 0
+    .filter(item => item.periodType === 'FrequencyMinutes'
+      && Number.isFinite(item.lowestFrequency) && item.lowestFrequency > 0
       && item.lowestFrequency === item.highestFrequency
       && (!Number.isFinite(item.fromMinute) || !Number.isFinite(item.toMinute) || item.toMinute > item.fromMinute));
-  return bands.length === 1 ? bands[0] : null;
+  const uniqueBands = [...new Map(bands.map(item => [JSON.stringify(item), item])).values()];
+  return uniqueBands.length === 1 ? uniqueBands[0] : null;
+}
+
+export function formatServiceOriginDestination(service, separator = ' - ') {
+  const origin = text(service?.origin) || 'Origin not supplied';
+  const destination = text(service?.destination) || 'Destination not supplied';
+  const base = `${origin}${separator}${destination}${service?.circular && service?.direction ? ` (${service.direction})` : ''}`;
+  return service?.stopDirection ? `${base} (${service.stopDirection})` : base;
 }
 
 /** Shared planner-facing frequency rule; no synthetic departures are created. */

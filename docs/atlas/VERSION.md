@@ -11,7 +11,7 @@
 | Branch | `codex/atlas-bus-qa-01-service-evidence-frequency-ui` |
 | Status | Candidate; Technical Director review and Product Owner acceptance required |
 
-This candidate adds equivalent BODS/TNDS/TfL principal-location contracts, representative-stop frequency evidence, limited-service wording, browser timetable-source audit labels and table-specific desktop sizing. The Word stop table remains canonical and excludes planner-only source evidence. BUS-LON-01 and BUS-MAINT-02 remain frozen except for the explicitly bounded TfL frequency-evidence support.
+This candidate adds equivalent BODS/TNDS/TfL principal-location contracts, representative-stop frequency evidence, limited-service wording, browser timetable-source audit labels and table-specific desktop sizing. The corrective review additionally preserves TfL `Period.type` and requested StopPoint identity, limits planner frequency bands to safe `FrequencyMinutes` evidence, prepares TNDS multi-pattern records separately, excludes unresolved StopPoint IDs from display locations, and appends selected-stop direction inside the existing Service Summary Origin / destination cell. The Word stop table remains canonical and excludes planner-only source evidence. BUS-LON-01 and BUS-MAINT-02 remain frozen except for these explicitly bounded corrections.
 
 ## Current BUS-1 completion candidate
 

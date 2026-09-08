@@ -10,7 +10,7 @@ import { createOsrmAccessRoutingAdapter } from '../../../src/atlas/adapters/osrm
 import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-discovery.mjs';
 import { createBusAssessment } from '../../../src/atlas/application/bus-assessment.mjs';
 import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
-import { buildControlledBusWording, buildServicePresentation } from '../../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
@@ -417,8 +417,7 @@ function renderAssessment(result) {
     appendCell(row, 'Include', include);
     appendCell(row, 'Route', service.routeNumber);
     appendCell(row, 'Operator', service.operator);
-    const originDestination = `${service.origin} - ${service.destination}${service.circular && service.direction ? ` (${service.direction})` : ''}`;
-    appendCell(row, 'Origin / destination', originDestination);
+    appendCell(row, 'Origin / destination', formatServiceOriginDestination(service));
     appendCell(row, 'Principal locations', service.presentation.principalLocationsText);
     appendCell(row, 'Typical frequency', service.typicalFrequencyText || 'Frequency unavailable');
     const periods = document.createElement('ul'); periods.className = 'period-lines';

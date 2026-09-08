@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { parseTndsTransXchange } from '../../src/atlas/adapters/tnds-transxchange-adapter.mjs';
-import { buildServiceSummaries } from '../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildServiceSummaries, formatServiceOriginDestination } from '../../src/atlas/domain/bus-service-assessment.mjs';
 import { createBusAssessment } from '../../src/atlas/application/bus-assessment.mjs';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
 
 const schedule = values => ({ monday: values, tuesday: values, wednesday: values, thursday: values, friday: values, saturday: [], sunday: [] });
 const stops = [
-  { id: 'A', name: 'Assessment Stop', walking: { status: 'routed', distanceMetres: 100 }, distanceMetres: 100 },
-  { id: 'B', name: 'Nearby Stop', walking: { status: 'routed', distanceMetres: 220 }, distanceMetres: 220 },
+  { id: 'A', name: 'Assessment Stop', indicator: 'S', walking: { status: 'routed', distanceMetres: 100 }, distanceMetres: 100 },
+  { id: 'B', name: 'Nearby Stop', indicator: 'N', walking: { status: 'routed', distanceMetres: 220 }, distanceMetres: 220 },
   { id: 'C', name: 'Fallback Stop', walking: { status: 'unavailable' }, distanceMetres: 310 },
   { id: 'D', name: 'No Match Stop', walking: { status: 'unavailable' }, distanceMetres: 410 }
 ];
@@ -25,6 +25,8 @@ const limited = {
 
 const summaries = buildServiceSummaries(stops, [bods]);
 assert.equal(summaries[0].frequencyBasisStopId, 'A');
+assert.equal(summaries[0].stopDirection, 'Southbound');
+assert.equal(formatServiceOriginDestination(summaries[0]), 'Rural Origin - Town Terminal (Southbound)');
 assert.equal(summaries[0].typicalFrequency.departureCount, 6, 'three selected stops must not triple-count one physical journey');
 assert.match(summaries[0].typicalFrequencyText, /Approx\. 4 buses\/hour/);
 assert.match(summaries[0].operatingPeriodLines.join(' '), /Approx\. 07:00–08:15/);
@@ -63,5 +65,6 @@ assert.equal(unavailableResult.stops[0].timetableEvidence, 'Timetable source una
 const wordTables = buildBusWordTables(result);
 assert.deepEqual(wordTables[0].headers, ['Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop']);
 assert.deepEqual(wordTables[1].headers, ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period']);
+assert.match(wordTables[1].rows[0][2], /\(Southbound\)$/);
 assert.doesNotMatch(wordTables[0].headers.join(' '), /Timetable evidence|Include/);
 console.log('PASS BUS-QA-01 TNDS/BODS principal-location parity, representative-stop frequency, source status and Word exclusion regressions.');

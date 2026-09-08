@@ -2,7 +2,7 @@
 
 BUS-LON-01 makes TfL the primary scheduled timetable authority for assessments inside the official Greater London boundary. TfL stop discovery remains authoritative there. Outside Greater London, the accepted NaPTAN → BODS primary → TNDS supplementary architecture is unchanged.
 
-The implementation uses the anonymous TfL Unified API scheduled timetable family `Line/{id}/Timetable/{fromStopPointId}` and the documented `Line/{ids}/Route` route-identity endpoint. The current TfL API Portal states that anonymous access is limited to 50 requests per minute; ATLAS therefore deduplicates line/StopPoint requests through the existing cache, batches route-identity metadata by line, and enforces a 20-request timetable assessment budget. No `app_id`, `app_key`, browser secret, GitHub secret, proxy, or backend is used.
+The implementation uses the anonymous TfL Unified API scheduled timetable family `Line/{id}/Timetable/{fromStopPointId}` and the documented `Line/{ids}/Route` route-identity endpoint. Route identity requests explicitly include both documented `serviceTypes=Regular` and `serviceTypes=Night` values in one batched request. The current TfL API Portal states that anonymous access is limited to 50 requests per minute; ATLAS therefore deduplicates line/StopPoint requests through the existing cache, batches route-identity metadata by line, and enforces a 20-request timetable assessment budget. No `app_id`, `app_key`, browser secret, GitHub secret, proxy, or backend is used.
 
 Only scheduled timetable response data is interpreted. Arrival predictions, vehicle positions, Countdown data, polling, and realtime Arrivals endpoints are excluded.
 

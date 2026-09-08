@@ -12,11 +12,11 @@
     "routes": [
       {
         "stationIntervals": [
-          { "id": "full", "intervals": [{ "stopId": "490TEST003", "timeToArrival": 0 }, { "stopId": "490TEST004", "timeToArrival": 15 }] },
-          { "id": "short", "intervals": [{ "stopId": "490TEST003", "timeToArrival": 0 }, { "stopId": "490TEST005", "timeToArrival": 8 }] }
+          { "id": "0", "intervals": [{ "stopId": "490TEST003", "timeToArrival": 0 }, { "stopId": "490TEST004", "timeToArrival": 15 }] },
+          { "id": "1", "intervals": [{ "stopId": "490TEST003", "timeToArrival": 0 }, { "stopId": "490TEST005", "timeToArrival": 8 }] }
         ],
         "schedules": [
-          { "name": "Monday to Friday", "knownJourneys": [{ "hour": 6, "minute": 10, "intervalId": "full" }, { "hour": 6, "minute": 20, "intervalId": "short" }], "firstJourney": { "hour": 5, "minute": 50, "intervalId": "full" }, "lastJourney": { "hour": 23, "minute": 20, "intervalId": "short" } }
+          { "name": "Monday to Friday", "knownJourneys": [{ "hour": 6, "minute": 10, "intervalId": 0 }, { "hour": 6, "minute": 20, "intervalId": 1 }], "firstJourney": { "hour": 5, "minute": 50, "intervalId": 0 }, "lastJourney": { "hour": 23, "minute": 20, "intervalId": 1 } }
         ]
       }
     ]

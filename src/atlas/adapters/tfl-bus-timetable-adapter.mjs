@@ -87,7 +87,7 @@ function scheduleForPattern(route, pattern) {
 
 function sectionsFromMetadata(data, lineId) {
   const lines = Array.isArray(data) ? data : [data];
-  return lines.filter(line => normal(line?.id ?? line?.name) === normal(lineId)).flatMap(line => Array.isArray(line?.routeSections) ? line.routeSections : []).map(section => ({
+  const sections = lines.filter(line => normal(line?.id ?? line?.name) === normal(lineId)).flatMap(line => Array.isArray(line?.routeSections) ? line.routeSections : []).map(section => ({
     id: text(section?.id),
     direction: text(section?.direction),
     origin: text(section?.originationName),
@@ -95,6 +95,14 @@ function sectionsFromMetadata(data, lineId) {
     validFrom: text(section?.validFrom) || null,
     validTo: text(section?.validTo) || null
   })).filter(section => section.origin && section.destination);
+  const identities = new Map();
+  for (const section of sections) {
+    const key = [normal(section.direction), normal(section.origin), normal(section.destination)].join('|');
+    const existing = identities.get(key);
+    if (!existing) identities.set(key, section);
+    else if (existing.validFrom !== section.validFrom || existing.validTo !== section.validTo) { existing.validFrom = null; existing.validTo = null; }
+  }
+  return [...identities.values()];
 }
 
 function identityForPattern(pattern, metadata, direction) {
@@ -171,7 +179,10 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
     const key = `tfl-route-metadata:${lines.join(',')}`;
     if (!forceRefresh && metadataInflight.has(key)) return metadataInflight.get(key);
     const task = runCachedSourceQuery({ cache, cacheKey: key, freshForMs: 5 * 60 * 1000, forceRefresh, load: async () => {
-      const endpoint = new URL(`/Line/${lines.map(encodeURIComponent).join(',')}/Route`, baseUrl).toString();
+      const endpointUrl = new URL(`/Line/${lines.map(encodeURIComponent).join(',')}/Route`, baseUrl);
+      endpointUrl.searchParams.append('serviceTypes', 'Regular');
+      endpointUrl.searchParams.append('serviceTypes', 'Night');
+      const endpoint = endpointUrl.toString();
       const response = await requestJson({ url: endpoint, fetchImpl, timeoutMs });
       const source = { ...provenance, endpoint, retrievedAt: clock().toISOString(), httpStatus: response.status ?? null, requestCount: 1, lineIds: lines };
       if (!response.ok) return sourceFailure({ code: response.code, message: `TfL route metadata could not be checked: ${response.message}`, status: response.status, provenance: source });

@@ -157,13 +157,22 @@ td small { display: block; color: var(--atlas-muted); }
 .output-heading { display: flex; justify-content: space-between; align-items: end; gap: 18px; margin-bottom: 10px; }
 .output-heading h4, .assessment-wording h4 { margin: 2px 0 0; color: var(--atlas-blue); font-size: 1.08rem; }
 button.compact { padding: 7px 10px; font-size: .78rem; }
-.bus-stop-summary th:nth-child(1) { width: 23%; }
-.bus-stop-summary th:nth-child(2) { width: 16%; }
-.bus-stop-summary th:nth-child(3), .bus-stop-summary th:nth-child(4) { width: 20%; }
-.bus-service-summary th:nth-child(1) { width: 8%; }
-.bus-service-summary th:nth-child(2) { width: 17%; }
-.bus-service-summary th:nth-child(3) { width: 24%; }
-.bus-service-summary th:nth-child(4) { width: 25%; }
+.bus-stop-summary { min-width: 1180px; table-layout: fixed; }
+.bus-stop-summary .col-include { width: 4%; }
+.bus-stop-summary .col-stop-name { width: 23%; }
+.bus-stop-summary .col-direction { width: 11%; }
+.bus-stop-summary .col-walk, .bus-stop-summary .col-cycle { width: 14%; }
+.bus-stop-summary .col-routes { width: 21%; }
+.bus-stop-summary .col-timetable-evidence { width: 13%; }
+.bus-service-summary { min-width: 1250px; table-layout: fixed; }
+.bus-service-summary .col-include { width: 4%; }
+.bus-service-summary .col-route { width: 6%; }
+.bus-service-summary .col-operator { width: 15%; }
+.bus-service-summary .col-origin { width: 21%; }
+.bus-service-summary .col-principal { width: 26%; }
+.bus-service-summary .col-frequency { width: 12%; }
+.bus-service-summary .col-operating-period { width: 16%; }
+.bus-stop-summary input[type="checkbox"], .bus-service-summary input[type="checkbox"] { width: 17px; height: 17px; margin: 0; }
 .period-lines { margin: 0; padding: 0; list-style: none; }
 .period-lines li + li { margin-top: 3px; }
 .service-note td { border-top: 0; background: #fff8e8; color: #614200; padding-top: 8px; padding-bottom: 9px; }
@@ -224,6 +233,7 @@ footer { max-width: 1600px; margin: auto; padding: 0 24px 34px; color: var(--atl
   .check-summary { grid-template-columns: 1fr; }
   .table-wrap { border: 0; overflow: visible; }
   table { min-width: 0; }
+  .bus-stop-summary, .bus-service-summary { min-width: 0; table-layout: auto; }
   thead { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   tbody { display: grid; gap: 10px; }
   tbody tr { display: block; padding: 9px; border: 1px solid var(--atlas-line); border-radius: 8px; background: #fff !important; }

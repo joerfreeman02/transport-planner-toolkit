@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildControlledBusWording, buildServiceSummaries, calculateOperatingPeriods, calculateScheduledFrequency, derivePrincipalLocations, formatOperatingPeriod, groupStopsForPresentation } from '../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildControlledBusWording, buildServiceSummaries, calculateOperatingPeriods, calculateScheduledFrequency, derivePrincipalLocations, formatOperatingPeriod, formatServiceOriginDestination, groupStopsForPresentation } from '../../src/atlas/domain/bus-service-assessment.mjs';
 
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
@@ -83,6 +83,37 @@ test('controlled wording uses only supplied routes and principal locations', () 
   assert.match(wording, /bus routes 10, 20/);
   assert.match(wording, /Hospital, Town Centre/);
   assert.doesNotMatch(wording, /excellent|highly sustainable|very frequent/i);
+});
+
+test('service summary direction comes from its representative selected stop', () => {
+  const schedule = { monday: [420, 435, 450, 465, 480, 495], tuesday: [420, 435, 450, 465, 480, 495], wednesday: [420, 435, 450, 465, 480, 495], thursday: [420, 435, 450, 465, 480, 495], friday: [420, 435, 450, 465, 480, 495], saturday: [], sunday: [] };
+  const [summary] = buildServiceSummaries([
+    { id: 'S', name: 'South stop', indicator: 'S', walking: { status: 'routed', distanceMetres: 100 } },
+    { id: 'N', name: 'North stop', indicator: 'N', walking: { status: 'routed', distanceMetres: 200 } }
+  ], [{ id: 'south', routeNumber: '10', operator: 'Example', origin: 'A', destination: 'B', direction: 'B', principalLocations: [], stopSchedules: { S: schedule } }]);
+  assert.equal(summary.frequencyBasisStopId, 'S');
+  assert.equal(summary.stopDirection, 'Southbound');
+  assert.equal(formatServiceOriginDestination(summary), 'A - B (Southbound)');
+});
+
+test('opposite selected stop directions remain separate service rows', () => {
+  const schedule = { monday: [420, 435, 450, 465, 480, 495], tuesday: [420, 435, 450, 465, 480, 495], wednesday: [420, 435, 450, 465, 480, 495], thursday: [420, 435, 450, 465, 480, 495], friday: [420, 435, 450, 465, 480, 495], saturday: [], sunday: [] };
+  const summaries = buildServiceSummaries([
+    { id: 'N', name: 'North stop', indicator: 'N', walking: { status: 'routed', distanceMetres: 100 } },
+    { id: 'S', name: 'South stop', indicator: 'S', walking: { status: 'routed', distanceMetres: 110 } }
+  ], [
+    { id: 'north-row', routeNumber: '10', operator: 'Example', origin: 'A', destination: 'B', direction: 'B', principalLocations: [], stopSchedules: { N: schedule } },
+    { id: 'south-row', routeNumber: '10', operator: 'Example', origin: 'B', destination: 'A', direction: 'A', principalLocations: [], stopSchedules: { S: schedule } }
+  ]);
+  assert.equal(summaries.length, 2);
+  assert.deepEqual(summaries.map(summary => summary.stopDirection).sort(), ['Northbound', 'Southbound']);
+  assert.deepEqual(summaries.map(summary => formatServiceOriginDestination(summary)).sort(), ['A - B (Northbound)', 'B - A (Southbound)']);
+});
+
+test('missing selected stop direction does not create guessed bracket text', () => {
+  const [summary] = buildServiceSummaries([{ id: 'A', name: 'Undirected', walking: { status: 'routed', distanceMetres: 100 } }], [{ id: 'undirected', routeNumber: '5', operator: 'Example', origin: 'A', destination: 'B', direction: 'B', principalLocations: [], stopSchedules: { A: { monday: [420], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] } } }]);
+  assert.equal(summary.stopDirection, null);
+  assert.equal(formatServiceOriginDestination(summary), 'A - B');
 });
 
 for (const [name, fn] of tests) {

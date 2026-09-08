@@ -35,10 +35,71 @@ assert.notEqual(result.data[0].origin, 'Crystal Palace', 'a selected mid-route s
 assert.deepEqual(result.data[0].routePatternStopIds, ['490TEST003', '490TEST006', '490TEST004']);
 assert.deepEqual(result.data[0].stopSchedules['490TEST003'].monday, [350, 370, 400, 1400], 'ordinary daytime chronology remains unchanged');
 assert.ok(result.data[0].principalLocations.includes('West Norwood Bus Station'));
+assert.deepEqual(result.data[0].frequencyEvidence, [{ periodType: 'FrequencyMinutes', day: 'monday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'tuesday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'wednesday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'thursday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'friday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }]);
+const [frequencySummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], result.data);
+assert.match(frequencySummary.typicalFrequencyText, /Wednesday: Approx\. 6 buses\/hour \(every 10 mins\)/);
+assert.deepEqual(frequencySummary.departuresByDay.wednesday, [350, 370, 400, 1400], 'frequency-band evidence must not fabricate TfL departures');
 assert.equal(result.provenance.departureStopId, '490TEST003');
 assert.equal(result.provenance.timetableRequests, 1);
 assert.equal(result.provenance.routeMetadataRequests, 1);
 assert.match(result.data[0].qualifications.join(' '), /frequency ranges/);
+const typedPeriod = async periodType => {
+  const typedFixture = structuredClone(withOperator);
+  typedFixture.timetable.routes[0].schedules[0].periods[0].type = periodType;
+  const typed = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => response(String(url).includes('/Route') ? routeFixture : typedFixture) });
+  return typed.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });
+};
+const hoursResult = await typedPeriod('FrequencyHours');
+assert.equal(hoursResult.data[0].frequencyEvidence[0].periodType, 'FrequencyHours');
+const [hoursSummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], hoursResult.data);
+assert.notEqual(hoursSummary.typicalFrequency.basis, 'frequency-band');
+assert.notEqual(hoursSummary.typicalFrequency.intervalMinutes, 2);
+const unknownResult = await typedPeriod('Unknown');
+const [unknownSummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], unknownResult.data);
+assert.equal(unknownResult.data[0].frequencyEvidence[0].periodType, 'Unknown');
+assert.notEqual(unknownSummary.typicalFrequency.basis, 'frequency-band');
+const normalResult = await typedPeriod('Normal');
+const [normalSummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], normalResult.data);
+assert.equal(normalResult.data[0].frequencyEvidence[0].periodType, 'Normal');
+assert.notEqual(normalSummary.typicalFrequency.basis, 'frequency-band');
+assert.deepEqual(normalSummary.departuresByDay.wednesday, [350, 370, 400, 1400], 'period types never create synthetic departures');
+const multiStopFixtures = new Map([
+  ['490TEST003', { periodType: 'FrequencyMinutes', lowestFrequency: 10 }],
+  ['490TEST004', { periodType: 'FrequencyMinutes', lowestFrequency: 5 }],
+  ['490TEST006', { periodType: 'FrequencyMinutes', lowestFrequency: 2 }]
+]);
+const multiStopTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => {
+  if (String(url).includes('/Route')) return response(routeFixture);
+  const stopPointId = [...multiStopFixtures.keys()].find(id => String(url).includes(id));
+  const typedFixture = structuredClone(withOperator);
+  typedFixture.timetable.departureStopId = stopPointId;
+  typedFixture.timetable.routes[0].schedules[0].periods[0].type = multiStopFixtures.get(stopPointId).periodType;
+  typedFixture.timetable.routes[0].schedules[0].periods[0].frequency.lowestFrequency = multiStopFixtures.get(stopPointId).lowestFrequency;
+  typedFixture.timetable.routes[0].schedules[0].periods[0].frequency.highestFrequency = multiStopFixtures.get(stopPointId).lowestFrequency;
+  return response(typedFixture);
+} });
+const multiStopRows = await Promise.all([...multiStopFixtures.keys()].map(stopPointId => multiStopTfl.servicesForStop({ lineId: '322', stopPointId })));
+const multiStopRecords = multiStopRows.flatMap(row => row.data);
+const [multiStopSummary] = buildServiceSummaries([
+  { id: '490TEST003', name: 'Nearest', direction: 'N', walking: { status: 'routed', distanceMetres: 100 } },
+  { id: '490TEST004', name: 'Other', direction: 'S', walking: { status: 'routed', distanceMetres: 200 } },
+  { id: '490TEST006', name: 'Third', direction: 'E', walking: { status: 'routed', distanceMetres: 300 } }
+], multiStopRecords);
+assert.equal(multiStopSummary.frequencyBasisStopId, '490TEST003');
+assert.equal(multiStopSummary.typicalFrequency.intervalMinutes, 10, 'only the representative StopPoint frequency band may influence the summary');
+assert.equal(multiStopSummary.stopDirection, 'Northbound');
+const sameStopDuplicate = structuredClone(withOperator);
+sameStopDuplicate.timetable.routes[0].schedules[0].periods.push(structuredClone(sameStopDuplicate.timetable.routes[0].schedules[0].periods[0]));
+const duplicateTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => response(String(url).includes('/Route') ? routeFixture : sameStopDuplicate) });
+const duplicateResult = await duplicateTfl.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });
+const [duplicateSummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], duplicateResult.data);
+assert.equal(duplicateSummary.typicalFrequency.intervalMinutes, 10, 'identical bands at one representative StopPoint are deduplicated');
+const distinctStopPeriods = structuredClone(withOperator);
+distinctStopPeriods.timetable.routes[0].schedules[0].periods.push({ type: 'FrequencyMinutes', fromTime: { hour: '10', minute: '00' }, toTime: { hour: '11', minute: '00' }, frequency: { lowestFrequency: 5, highestFrequency: 5 } });
+const distinctTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => response(String(url).includes('/Route') ? routeFixture : distinctStopPeriods) });
+const distinctResult = await distinctTfl.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });
+const [distinctSummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], distinctResult.data);
+assert.notEqual(distinctSummary.typicalFrequency.basis, 'frequency-band', 'different same-stop bands remain variable rather than being collapsed');
 assert.equal(timetableCalls, 1);
 assert.equal(routeCalls, 1);
 await tfl.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });

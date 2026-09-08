@@ -1,17 +1,17 @@
 # ATLAS version and build record
 
-## SITE-UX-01 / BUS-UX-02 Alpha.9 candidate
+## BUS-QA-01 Alpha.10 candidate
 
 | Field | Value |
 |---|---|
 | Product line | ATLAS 2.0 |
-| Version | `2.0.0-alpha.9` |
-| Visible build | `ATLAS-2.0.0-alpha.9-20260908` |
-| Starting main | `ff560900c5cd491635f85f786be6ff8415a7f105` |
-| Branch | `codex/atlas-bus-ux-01-site-presentation-closeout` |
+| Version | `2.0.0-alpha.10` |
+| Visible build | `ATLAS-2.0.0-alpha.10-20260908` |
+| Implementation base | `600a9104b390e24ef31ce1c1ae49451cfdb8a20b` (approved Alpha.9 tree; verified merge SHA unavailable locally) |
+| Branch | `codex/atlas-bus-qa-01-service-evidence-frequency-ui` |
 | Status | Candidate; Technical Director review and Product Owner acceptance required |
 
-This candidate makes addressless map/coordinate Site selection legitimate, preserves genuine geocoded identity after planner adjustment, and applies one evidence-controlled Bus service presentation decision to browser and Word. Underlying principal-location evidence is unchanged. BUS-LON-01 Alpha.8 and BUS-MAINT-02 remain frozen.
+This candidate adds equivalent BODS/TNDS/TfL principal-location contracts, representative-stop frequency evidence, limited-service wording, browser timetable-source audit labels and table-specific desktop sizing. The corrective review additionally preserves TfL `Period.type` and requested StopPoint identity, limits planner frequency bands to safe `FrequencyMinutes` evidence, prepares TNDS multi-pattern records separately, excludes unresolved StopPoint IDs from display locations, and appends selected-stop direction inside the existing Service Summary Origin / destination cell. The Word stop table remains canonical and excludes planner-only source evidence. BUS-LON-01 and BUS-MAINT-02 remain frozen except for these explicitly bounded corrections.
 
 ## Current BUS-1 completion candidate
 

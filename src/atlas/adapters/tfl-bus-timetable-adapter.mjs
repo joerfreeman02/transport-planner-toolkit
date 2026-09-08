@@ -21,6 +21,7 @@ function periodDays(name) {
 }
 
 function minutes(value) {
+  if (value && typeof value === 'object' && value.hour !== undefined && value.minute !== undefined) return Number(value.hour) * 60 + Number(value.minute);
   if (Number.isFinite(Number(value))) return Number(value) * 60;
   const match = text(value).match(/^(\d{1,2}):(\d{2})/);
   return match ? Number(match[1]) * 60 + Number(match[2]) : null;
@@ -65,8 +66,9 @@ function belongsToPattern(journey, pattern, patternCount) {
   return Boolean(pattern.sourceId) && intervalId === pattern.sourceId;
 }
 
-function scheduleForPattern(route, pattern) {
+function scheduleForPattern(route, pattern, stopPointId) {
   const result = emptySchedule();
+  const frequencyEvidence = [];
   const schedules = Array.isArray(route?.schedules) ? route.schedules : [];
   let ambiguous = false;
   let evidence = false;
@@ -87,9 +89,27 @@ function scheduleForPattern(route, pattern) {
     const departures = [...selectedKnown, firstJourney, lastJourney].filter(Boolean).map(journeyMinutes).filter(Number.isFinite).map(value => overnight && value < first && value <= last ? value + 1440 : value);
     if (departures.length) evidence = true;
     for (const day of periodDays(schedule?.name ?? schedule?.period ?? schedule?.days)) result[day].push(...departures);
+    for (const period of Array.isArray(schedule?.periods) ? schedule.periods : []) {
+      const lowestFrequency = Number(period?.frequency?.lowestFrequency);
+      const highestFrequency = Number(period?.frequency?.highestFrequency);
+      const fromMinute = minutes(period?.fromTime);
+      const toMinute = minutes(period?.toTime);
+      const periodType = text(period?.type) || 'Unknown';
+      if (!Number.isFinite(lowestFrequency) || !Number.isFinite(highestFrequency)) continue;
+      for (const day of periodDays(schedule?.name ?? schedule?.period ?? schedule?.days)) frequencyEvidence.push({
+        periodType,
+        day,
+        fromMinute,
+        toMinute,
+        lowestFrequency,
+        highestFrequency,
+        stopPointId,
+        source: 'TfL'
+      });
+    }
   }
   for (const day of DAYS) result[day] = [...new Set(result[day].map(Number))].sort((a, b) => a - b);
-  return { schedule: result, evidence, ambiguous, hasPeriods, chronologyIncomplete };
+  return { schedule: result, frequencyEvidence, evidence, ambiguous, hasPeriods, chronologyIncomplete };
 }
 
 function sectionsFromMetadata(data, lineId) {
@@ -134,7 +154,7 @@ function routeRecords(response, stopPointId, metadataResult) {
         warnings.push('TfL returned multiple timetable interval patterns without distinct deterministic interval identities. No route pattern or zero-service conclusion has been assumed.');
         continue;
       }
-      const timing = scheduleForPattern(route, pattern);
+      const timing = scheduleForPattern(route, pattern, stopPointId);
       if (timing.ambiguous) {
         warnings.push('TfL returned competing timetable interval patterns without intervalId linkage for one or more journeys. The ambiguous pattern has not been guessed.');
         continue;
@@ -160,6 +180,8 @@ function routeRecords(response, stopPointId, metadataResult) {
         routePatternStopIds: pattern.stations.map(station => station.id),
         operatingPeriodEvidence: hasPeriods,
         stopSchedules: { [stopPointId]: timing.schedule },
+        frequencyEvidence: timing.frequencyEvidence,
+        frequencyBasisStopId: stopPointId,
         source: { provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId, routeMetadata: identity ? 'matched' : 'incomplete' },
         timetableSource: 'TfL',
         qualifications: [

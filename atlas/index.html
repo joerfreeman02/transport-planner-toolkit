@@ -8,7 +8,7 @@
   <title>ATLAS — Transport and Location Assessment</title>
   <link rel="stylesheet" href="../assets/css/eas-theme.css">
   <link rel="stylesheet" href="../assets/vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="assets/css/atlas-shell.css?build=ATLAS-2.0.0-alpha.9-20260908">
+  <link rel="stylesheet" href="assets/css/atlas-shell.css?build=ATLAS-2.0.0-alpha.10-20260908">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -24,7 +24,7 @@
         <button type="button" data-view="projects">Projects</button>
         <button type="button" data-view="about">About</button>
       </nav>
-      <div class="build" aria-label="ATLAS version and build"><b>2.0.0-alpha.9</b><span>ATLAS-2.0.0-alpha.9-20260908</span></div>
+      <div class="build" aria-label="ATLAS version and build"><b>2.0.0-alpha.10</b><span>ATLAS-2.0.0-alpha.10-20260908</span></div>
     </div>
   </header>
 
@@ -64,7 +64,7 @@
             <strong>Created by Joe Freeman · EAS FORGE</strong>
           </div>
         </article>
-        <article class="about-card"><p class="eyebrow">Current status</p><h2>Alpha.9 Site + Bus presentation candidate</h2><dl><dt>Version</dt><dd>2.0.0-alpha.9</dd><dt>Build</dt><dd>ATLAS-2.0.0-alpha.9-20260908</dd><dt>Status</dt><dd>WIP / Technical Director review required</dd></dl></article>
+        <article class="about-card"><p class="eyebrow">Current status</p><h2>Alpha.10 Bus evidence and frequency candidate</h2><dl><dt>Version</dt><dd>2.0.0-alpha.10</dd><dt>Build</dt><dd>ATLAS-2.0.0-alpha.10-20260908</dd><dt>Status</dt><dd>WIP / Technical Director review required</dd></dl></article>
         <article class="about-card"><p class="eyebrow">Data acknowledgements</p><h2>Trusted sources used today</h2><p>Address search, maps and access routing use OpenStreetMap data. London stop discovery is provided by Transport for London. National stops use Department for Transport NaPTAN; timetables use the Department for Transport Bus Open Data Service and supplementary Traveline National Dataset (TNDS) information.</p><p class="acknowledgement">© OpenStreetMap contributors · Routed by OSRM · Data provided by Transport for London · NaPTAN and BODS © Department for Transport · Traveline National Dataset (TNDS) contains public sector information licensed under the Open Government Licence v3.0 · Contains National Statistics and Ordnance Survey data © Crown copyright and database right 2015</p></article>
       </div>
     </section>
@@ -86,7 +86,7 @@
       <section class="workspace" id="site-workspace" aria-labelledby="site-selector-title">
         <div class="workspace-header">
           <div><p class="eyebrow">Shared ATLAS site</p><h2 id="site-selector-title">Establish the assessment point</h2><p>Identify the development, check its access on the map, then confirm the exact point ATLAS should use.</p></div>
-          <span class="status development">Alpha.9 Site + Bus presentation candidate</span>
+          <span class="status development">Alpha.10 Bus evidence and frequency candidate</span>
         </div>
 
         <div class="steps">
@@ -174,14 +174,15 @@
             <div class="output-heading"><div><p class="eyebrow">Table 3.2</p><h4 id="stop-summary-heading">Bus Stop Summary</h4></div><button id="clearRoutes" class="secondary compact" type="button" hidden>Clear route lines</button></div>
           <div class="table-wrap">
             <table class="bus-stop-summary">
-              <thead><tr><th>Include</th><th>Stop name</th><th>Direction</th><th>Walking distance / time</th><th>Cycling distance / time</th><th>Routes serving stop</th><th>Timetable match</th></tr></thead>
+              <colgroup><col class="col-include"><col class="col-stop-name"><col class="col-direction"><col class="col-walk"><col class="col-cycle"><col class="col-routes"><col class="col-timetable-evidence"></colgroup>
+              <thead><tr><th>Include</th><th>Stop name</th><th>Direction</th><th>Walking distance / time</th><th>Cycling distance / time</th><th>Routes serving stop</th><th>Timetable evidence</th></tr></thead>
               <tbody id="evidenceRows"></tbody>
             </table>
           </div>
           </section>
           <section class="assessment-output" aria-labelledby="service-summary-heading">
             <div class="output-heading"><div><p class="eyebrow">Table 3.3</p><h4 id="service-summary-heading">Bus Service Summary</h4></div><div class="selection-actions"><button id="recommendedSelection" class="secondary compact" type="button">Recommended selection</button><button id="selectAllRows" class="secondary compact" type="button">Select all</button><button id="clearAllRows" class="secondary compact" type="button">Clear all</button></div></div>
-            <div class="table-wrap"><table class="bus-service-summary"><thead><tr><th>Include</th><th>Route</th><th>Operator</th><th>Origin / destination</th><th>Principal locations</th><th>Operating period</th></tr></thead><tbody id="serviceRows"></tbody></table></div>
+            <div class="table-wrap"><table class="bus-service-summary"><colgroup><col class="col-include"><col class="col-route"><col class="col-operator"><col class="col-origin"><col class="col-principal"><col class="col-frequency"><col class="col-operating-period"></colgroup><thead><tr><th>Include</th><th>Route</th><th>Operator</th><th>Origin / destination</th><th>Principal locations</th><th>Typical frequency</th><th>Operating period</th></tr></thead><tbody id="serviceRows"></tbody></table></div>
           </section>
           <section class="assessment-wording" aria-labelledby="wording-heading"><p class="eyebrow">Controlled wording</p><h4 id="wording-heading">Assessment wording</h4><p id="assessmentWording"></p></section>
           <details><summary>Sources and checks</summary><div id="plannerChecks"></div><details class="technical-details"><summary>View technical details</summary><div id="diagnostics"></div></details></details>
@@ -190,8 +191,8 @@
     </section>
   </main>
 
-  <footer><span>ATLAS 2.0.0-alpha.9 · Site + Bus presentation candidate</span><span class="creator-credit">Created by Joe Freeman · EAS FORGE</span><span>Awaiting Technical Director review</span></footer>
+  <footer><span>ATLAS 2.0.0-alpha.10 · Bus evidence and frequency candidate</span><span class="creator-credit">Created by Joe Freeman · EAS FORGE</span><span>Awaiting Technical Director review</span></footer>
   <script src="../assets/vendor/leaflet/leaflet.js"></script>
-  <script type="module" src="assets/js/app.mjs?build=ATLAS-2.0.0-alpha.9-20260908"></script>
+  <script type="module" src="assets/js/app.mjs?build=ATLAS-2.0.0-alpha.10-20260908"></script>
 </body>
 </html>

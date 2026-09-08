@@ -1,5 +1,12 @@
 # Changelog
 
+## ATLAS 2.0.0-alpha.10 — Bus evidence, frequency and table close-out — 2026-09-08
+
+- Added ordered TNDS pattern enrichment and shared principal-location parity with BODS and TfL, including rural/locality evidence and unchanged quarantine handling.
+- Added representative-stop, representative-day typical frequency with journeys/day handling for limited services and safe deterministic TfL frequency-band evidence.
+- Added browser-only timetable evidence labels, six-column service summaries and table-specific desktop proportions; Word stop-source columns remain excluded.
+- Corrected TfL period-type safety and representative-StopPoint frequency scope; separated TNDS pattern families, protected unresolved stop IDs, and added selected-stop direction inside the existing Origin / destination presentation.
+
 ## ATLAS 2.0.0-alpha.7 — automated Bus refresh candidate — 2026-09-07
 
 - Added headless NaPTAN, BODS and eight-region TNDS acquisition and isolated candidate validation for GitHub Actions.

@@ -1,4 +1,4 @@
-import { buildServicePresentation } from '../domain/bus-service-assessment.mjs';
+import { buildServicePresentation, formatServiceOriginDestination } from '../domain/bus-service-assessment.mjs';
 
 function text(value) { return String(value ?? '').trim(); }
 
@@ -7,10 +7,6 @@ function accessText(route) {
   const distance = Math.round(Number(route.distanceMetres));
   const minutes = Math.max(1, Math.round(Number(route.durationSeconds) / 60));
   return `${distance.toLocaleString('en-GB')} m · ${minutes} min${minutes === 1 ? '' : 's'}`;
-}
-
-function originDestination(service) {
-  return `${text(service.origin) || 'Origin not supplied'} – ${text(service.destination) || 'Destination not supplied'}${service.circular && service.direction ? ` (${service.direction})` : ''}`;
 }
 
 function principalLocationsText(service) {
@@ -32,8 +28,9 @@ export function buildBusWordTables(result) {
     serviceRows.push([
       service.routeNumber,
       service.operator,
-      originDestination(service),
+      formatServiceOriginDestination(service, ' – '),
       principalLocationsText(service),
+      service.typicalFrequencyText || 'Frequency unavailable',
       (service.operatingPeriodLines ?? []).join('\n')
     ]);
     if (service.serviceNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.serviceNote}` });
@@ -48,9 +45,9 @@ export function buildBusWordTables(result) {
     },
     {
       caption: 'Table 3.3 - Bus Service Summary',
-      headers: ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Operating period'],
+      headers: ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period'],
       rows: serviceRows,
-      widths: [8, 18, 25, 25, 24]
+      widths: [7, 16, 23, 27, 12, 15]
     }
   ];
 }

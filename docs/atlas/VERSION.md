@@ -32,3 +32,12 @@ Alpha.4 is descended from the SITE-1 checkpoint `8f8fc868ea787f8ce3175e50de1809d
 | Build | `ATLAS-2.0.0-alpha.7-20260907` |
 | Branch | `codex/atlas-bus-auto-refresh-alpha7` |
 | Status | WIP / Automated Bus Refresh Candidate; live GitHub Actions acceptance required. |
+
+## BUS-LON-01 Alpha.8 candidate
+
+| Field | Value |
+|---|---|
+| Version | `2.0.0-alpha.8` |
+| Build | `ATLAS-2.0.0-alpha.8-20260908` |
+| Branch | `codex/atlas-bus-lon-01-tfl-timetable-authority` |
+| Status | WIP / TfL scheduled London timetable candidate; Product Owner live acceptance required. |

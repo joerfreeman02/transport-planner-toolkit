@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startReviewServer } from '../../tools/atlas-review/review-server.mjs';
 import { chooseFirstCandidateAndConfirm, mockAccessRouting, mockMapTiles, mockPreparedBusTimetables } from './browser-test-helpers.mjs';
+import { launchAtlasBrowser } from './playwright-launch.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -15,7 +16,7 @@ const geocode = JSON.parse(fs.readFileSync(new URL('./fixtures/nominatim-candida
 const stops = JSON.parse(fs.readFileSync(new URL('./fixtures/tfl-nearby-stops.json', import.meta.url), 'utf8'));
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'atlas-review-browser-'));
 const review = await startReviewServer({ rootDir, preferredPort: 0, maximumPort: 0, stateFile: path.join(temporary, 'review-state.json'), openBrowser: false });
-const browser = await chromium.launch({ headless: true });
+const browser = await launchAtlasBrowser(chromium, { headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 const pageErrors = [];
 const failedLocalRequests = [];
@@ -40,7 +41,7 @@ await page.route('https://api.tfl.gov.uk/**', route => route.fulfill({ status: 2
 try {
   await page.goto(review.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   assert.equal(page.url(), review.url);
-  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.6/);
+  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.8/);
   assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--atlas-blue').trim()), '#002060');
   for (const section of ['Report Builder', 'Modules', 'Projects', 'About']) {
     await page.getByRole('button', { name: section }).click();

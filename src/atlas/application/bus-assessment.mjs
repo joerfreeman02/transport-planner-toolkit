@@ -44,7 +44,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
 
     let selectedStops = enrichedDiscoveredStops;
     let nearestGroup = null;
-    let servicesResult = await timetableData.servicesForStops(enrichedDiscoveredStops, { forceRefresh });
+    let servicesResult = await timetableData.servicesForStops(enrichedDiscoveredStops, { forceRefresh, site });
     let services = servicesResult.ok ? servicesResult.data : [];
     if (assessmentMode === 'nearest') {
       let servedIds = new Set(services.flatMap(service => Object.keys(service.stopSchedules ?? {})));
@@ -54,7 +54,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
           const expandedStops = groupStopsForPresentation(expanded.data);
           const [expandedWalk, expandedCycle] = await Promise.all([accessRouting.matrix(site, expandedStops, 'walk'), accessRouting.matrix(site, expandedStops, 'cycle')]);
           const enrichedExpanded = expandedStops.map((stop, index) => Object.freeze({ ...stop, walking: routingFor(expandedWalk, index), cycling: routingFor(expandedCycle, index) }));
-          const expandedServicesResult = await timetableData.servicesForStops(enrichedExpanded, { forceRefresh });
+          const expandedServicesResult = await timetableData.servicesForStops(enrichedExpanded, { forceRefresh, site });
           if (expandedServicesResult.ok) { servicesResult = expandedServicesResult; services = expandedServicesResult.data; servedIds = new Set(services.flatMap(service => Object.keys(service.stopSchedules ?? {}))); }
           if (servedIds.size) enrichedDiscoveredStops.splice(0, enrichedDiscoveredStops.length, ...enrichedExpanded);
         }

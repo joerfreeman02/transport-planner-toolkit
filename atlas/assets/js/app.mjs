@@ -4,6 +4,8 @@ import { createJsonCache } from '../../../src/atlas/infrastructure/cache.mjs';
 import { createNominatimGeocodingAdapter } from '../../../src/atlas/adapters/nominatim-geocoding-adapter.mjs';
 import { createTflBusStopAdapter } from '../../../src/atlas/adapters/tfl-bus-stop-adapter.mjs';
 import { createPreparedBusDataAdapter } from '../../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
+import { createTflBusTimetableAdapter } from '../../../src/atlas/adapters/tfl-bus-timetable-adapter.mjs';
+import { createAuthoritativeBusTimetableAdapter } from '../../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
 import { createOsrmAccessRoutingAdapter } from '../../../src/atlas/adapters/osrm-access-routing-adapter.mjs';
 import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-discovery.mjs';
 import { createBusAssessment } from '../../../src/atlas/application/bus-assessment.mjs';
@@ -12,13 +14,16 @@ import { buildControlledBusWording } from '../../../src/atlas/domain/bus-service
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
-const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha7' });
+const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha8' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tfl = createTflBusStopAdapter({ cache });
 const preparedBusData = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url), tndsBaseUrl: new URL('../../data/bus-tnds/', import.meta.url) });
+const preparedBodsOnly = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url) });
+const tflTimetable = createTflBusTimetableAdapter({ cache });
+const authoritativeTimetable = createAuthoritativeBusTimetableAdapter({ tflAdapter: tflTimetable, nationalAdapter: preparedBodsOnly });
 const accessRouting = createOsrmAccessRoutingAdapter();
 const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: preparedBusData });
-const busAssessment = createBusAssessment({ stopDiscovery: busStops, timetableData: preparedBusData, accessRouting });
+const busAssessment = createBusAssessment({ stopDiscovery: busStops, timetableData: authoritativeTimetable, accessRouting });
 const selector = createSiteSelector();
 const views = ['report-builder', 'modules', 'projects', 'about'];
 const METHOD_LABELS = Object.freeze({
@@ -438,7 +443,8 @@ function renderAssessment(result) {
   $('evidenceSummary').textContent = result.assessmentMode === 'nearest'
     ? `Nearest stop group: ${result.nearestGroup?.name || 'selected group'} · ${result.stops.length} stop record${result.stops.length === 1 ? '' : 's'} · ${result.serviceSummaries.length} directional service summar${result.serviceSummaries.length === 1 ? 'y' : 'ies'}`
     : `${result.stops.length} stop${result.stops.length === 1 ? '' : 's'} · ${result.serviceSummaries.length} directional service summar${result.serviceSummaries.length === 1 ? 'y' : 'ies'}`;
-  $('resultSource').textContent = `${stopSource}; Department for Transport bus timetables; OpenStreetMap routing`;
+  const timetableLabel = /TfL scheduled/i.test(timetableProvenance.source || '') ? 'TfL scheduled timetable authority' : 'Department for Transport bus timetables';
+  $('resultSource').textContent = `${stopSource}; ${timetableLabel}; OpenStreetMap routing`;
   $('resultChecked').textContent = checked;
   $('resultFreshness').textContent = result.status === 'complete' ? 'Assessment complete' : 'Partial assessment - review points to note';
   const plannerChecks = $('plannerChecks');

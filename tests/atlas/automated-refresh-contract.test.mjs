@@ -10,8 +10,8 @@ const workflow = fs.readFileSync(path.join(root, '.github/workflows/atlas-bus-da
 const refresh = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/refresh_bus_data.py'), 'utf8');
 const builder = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/build_static_index.py'), 'utf8');
 
-assert.match(html, /2\.0\.0-alpha\.7/);
-assert.match(html, /ATLAS-2\.0\.0-alpha\.7-20260907/);
+assert.match(html, /2\.0\.0-alpha\.8/);
+assert.match(html, /ATLAS-2\.0\.0-alpha\.8-20260908/);
 assert.match(html, /id="updateBusData"[^>]*hidden/);
 assert.match(app, /localMaintenance/);
 assert.match(app, /Bus data updates automatically/);
@@ -30,6 +30,7 @@ assert.match(refresh, /set\(TNDS_REGIONS\)/);
 assert.match(refresh, /atlas-bus-refresh-staging/);
 assert.match(refresh, /previous_root/);
 assert.match(refresh, /INITIAL AUTOMATED BASELINE/);
+assert.match(refresh, /2\.0\.0-alpha\.7/);
 assert.match(refresh, /timetable\/download\/gtfs-file\//);
 assert.match(refresh, /east_anglia.*east_midlands.*london.*north_east.*north_west.*south_east.*south_west.*west_midlands.*yorkshire/s);
 assert.match(builder, /timetable\/download\/gtfs-file\//);

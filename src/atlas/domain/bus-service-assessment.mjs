@@ -144,6 +144,8 @@ function recordActivity(record, stopIds) {
 
 function representativeRecord(records, stopIds) {
   return [...records].sort((a, b) => {
+    const patternDifference = (b.routePatternStopIds?.length ?? 0) - (a.routePatternStopIds?.length ?? 0);
+    if (patternDifference) return patternDifference;
     const locationDifference = (b.principalLocations?.length ?? 0) - (a.principalLocations?.length ?? 0);
     if (locationDifference) return locationDifference;
     const activityDifference = recordActivity(b, stopIds) - recordActivity(a, stopIds);
@@ -162,7 +164,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
     if (!groups.has(identity)) groups.set(identity, []);
     groups.get(identity).push({ ...service, relevantStops });
   }
-  return [...groups.values()].map(records => {
+  const summaries = [...groups.values()].map(records => {
     const stopIds = unique(records.flatMap(record => record.relevantStops));
     const first = representativeRecord(records, stopIds);
     const identity = [first.routeNumber, first.operator, directionGroupKey(first)].map(value => text(value).toLowerCase()).join('|');
@@ -184,6 +186,10 @@ export function buildServiceSummaries(stops, serviceRecords) {
       direction: text(first.direction),
       circular: records.some(record => record.circular),
       principalLocations,
+      directionFamily: directionGroupKey(first),
+      routePatternStopIds: Object.freeze([...(first.routePatternStopIds ?? [])]),
+      routePatternExtent: Math.max(0, ...records.map(record => Array.isArray(record.routePatternStopIds) ? record.routePatternStopIds.length : 0)),
+      recordActivity: Math.max(0, ...records.map(record => recordActivity(record, stopIds))),
       operatingPeriods: periods,
       operatingPeriodLines: formatOperatingPeriod(periods),
       serviceNote: unique(notes).join(' '),
@@ -192,7 +198,146 @@ export function buildServiceSummaries(stops, serviceRecords) {
       departuresByDay,
       validity: Object.freeze({ from: unique(records.map(record => record.validFrom)).sort()[0] || null, to: unique(records.map(record => record.validTo)).sort().at(-1) || null })
     });
-  }).sort((a, b) => a.routeNumber.localeCompare(b.routeNumber, undefined, { numeric: true }) || a.origin.localeCompare(b.origin));
+  });
+  return buildServicePresentation(summaries);
+}
+
+function presentationText(value) {
+  return normal(value);
+}
+
+function sameLocations(first = [], second = []) {
+  const left = first.map(presentationText).filter(Boolean);
+  const right = second.map(presentationText).filter(Boolean);
+  return left.length === right.length && left.every(value => right.includes(value));
+}
+
+function isSubset(first = [], second = []) {
+  const right = new Set(second.map(presentationText).filter(Boolean));
+  return first.map(presentationText).filter(Boolean).every(value => right.has(value));
+}
+
+function strictSubsequence(shorter = [], longer = []) {
+  if (!shorter.length || shorter.length >= longer.length) return false;
+  let cursor = 0;
+  for (const value of shorter) {
+    const index = longer.indexOf(value, cursor);
+    if (index < 0) return false;
+    cursor = index + 1;
+  }
+  return true;
+}
+
+function provenPatternRelationship(candidate, main) {
+  const candidateFamily = text(candidate?.directionFamily);
+  const mainFamily = text(main?.directionFamily);
+  if (candidateFamily && mainFamily && candidateFamily === mainFamily) return true;
+  const candidatePattern = (candidate?.routePatternStopIds ?? []).map(text).filter(Boolean);
+  const mainPattern = (main?.routePatternStopIds ?? []).map(text).filter(Boolean);
+  return Boolean(candidatePattern.length && mainPattern.length
+    && (strictSubsequence(candidatePattern, mainPattern) || strictSubsequence(mainPattern, candidatePattern)));
+}
+
+function comparePresentationRank(first, second) {
+  return (second.routePatternExtent ?? second.routePatternStopIds?.length ?? 0) - (first.routePatternExtent ?? first.routePatternStopIds?.length ?? 0)
+    || (second.principalLocations?.length ?? 0) - (first.principalLocations?.length ?? 0)
+    || (second.recordActivity ?? 0) - (first.recordActivity ?? 0)
+    || `${text(first.origin)}|${text(first.destination)}|${text(first.id)}`.localeCompare(`${text(second.origin)}|${text(second.destination)}|${text(second.id)}`);
+}
+
+function serviceFamilyKey(service) {
+  return [text(service?.routeNumber).toLowerCase(), text(service?.operator).toLowerCase(), text(service?.directionFamily || service?.direction || service?.destination || service?.origin).toLowerCase()].join('|');
+}
+
+function routeLabel(service) {
+  return text(service?.routeNumber) || 'the main service';
+}
+
+function independentPrincipalLocationsText(service) {
+  const pattern = Array.isArray(service?.routePatternStopIds)
+    ? service.routePatternStopIds.map(text).filter(Boolean)
+    : [];
+  const extent = service?.routePatternExtent;
+  const extentConfirmsTwoStops = extent === undefined || extent === null || Number(extent) === 2;
+  return pattern.length === 2 && extentConfirmsTwoStops
+    ? 'Route endpoints only'
+    : 'See route origin / destination';
+}
+
+function finalPrincipalLocationsText(service, main) {
+  const locations = service?.principalLocations ?? [];
+  if (!main || !provenPatternRelationship(service, main)) return locations.length ? locations.join(', ') : independentPrincipalLocationsText(service);
+  if (sameLocations(locations, main.principalLocations)) return `As main ${routeLabel(main)} service`;
+
+  const candidateNames = locations.map(presentationText).filter(Boolean);
+  const mainNames = (main.principalLocations ?? []).map(presentationText).filter(Boolean);
+  const candidateIsShorter = strictSubsequence(
+    (service.routePatternStopIds ?? []).map(text).filter(Boolean),
+    (main.routePatternStopIds ?? []).map(text).filter(Boolean)
+  );
+  if (candidateIsShorter && (!locations.length || isSubset(locations, main.principalLocations))) return `Short working of main ${routeLabel(main)} service`;
+  if (isSubset(main.principalLocations, locations)) {
+    const additions = locations.filter((location, index) => !mainNames.includes(candidateNames[index])).map(text).filter(Boolean);
+    if (additions.length && additions.length <= 3) return `As main ${routeLabel(main)} service, plus ${additions.join(', ')}`;
+  }
+  return locations.length ? locations.join(', ') : `Short working of main ${routeLabel(main)} service`;
+}
+
+/**
+ * One deterministic decision for the planner-facing Bus service table.
+ * It retains the authoritative principalLocations array and only adds
+ * presentation metadata; it does not infer or rewrite source evidence.
+ */
+export function buildServicePresentation(serviceSummaries = []) {
+  const routeFamilies = new Map();
+  for (const service of serviceSummaries ?? []) {
+    const routeKey = serviceFamilyKey(service).split('|').slice(0, 2).join('|');
+    const directionKey = text(service?.directionFamily || service?.direction || service?.destination || service?.origin).toLowerCase();
+    if (!routeFamilies.has(routeKey)) routeFamilies.set(routeKey, new Map());
+    const families = routeFamilies.get(routeKey);
+    if (!families.has(directionKey)) families.set(directionKey, []);
+    families.get(directionKey).push(service);
+  }
+  const presented = [];
+  for (const families of routeFamilies.values()) {
+    const components = [...families.values()].map(members => [...members]);
+    for (let index = 0; index < components.length; index += 1) {
+      for (let other = index + 1; other < components.length; other += 1) {
+        if (!components[index].some(first => components[other].some(second => provenPatternRelationship(first, second)))) continue;
+        components[index].push(...components[other]);
+        components.splice(other, 1);
+        other -= 1;
+      }
+    }
+    for (const component of components) {
+      const ranked = component.sort(comparePresentationRank);
+      const main = ranked[0];
+      ranked.forEach((service, index) => {
+        const relationshipMain = index === 0 ? null : (provenPatternRelationship(service, main) ? main : null);
+        const principalLocationsText = finalPrincipalLocationsText(service, relationshipMain);
+        presented.push(Object.freeze({
+          ...service,
+          presentation: Object.freeze({
+            rank: index,
+            familyKey: serviceFamilyKey(main),
+            mainServiceId: relationshipMain?.id ?? null,
+            principalLocationsText
+          }),
+          principalLocationsDisplay: principalLocationsText
+        }));
+      });
+    }
+  }
+  return presented.sort((a, b) => {
+    const route = text(a.routeNumber).localeCompare(text(b.routeNumber), undefined, { numeric: true });
+    if (route) return route;
+    const operator = text(a.operator).localeCompare(text(b.operator));
+    if (operator) return operator;
+    const family = text(a.presentation?.familyKey || a.directionFamily || a.direction || a.destination || a.origin).localeCompare(text(b.presentation?.familyKey || b.directionFamily || b.direction || b.destination || b.origin));
+    if (family) return family;
+    return (a.presentation?.rank ?? 0) - (b.presentation?.rank ?? 0)
+      || `${text(a.origin)}|${text(a.destination)}|${text(a.id)}`.localeCompare(`${text(b.origin)}|${text(b.destination)}|${text(b.id)}`);
+  });
 }
 
 function compassDirection(value) {

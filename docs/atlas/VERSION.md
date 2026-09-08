@@ -1,5 +1,18 @@
 # ATLAS version and build record
 
+## SITE-UX-01 / BUS-UX-02 Alpha.9 candidate
+
+| Field | Value |
+|---|---|
+| Product line | ATLAS 2.0 |
+| Version | `2.0.0-alpha.9` |
+| Visible build | `ATLAS-2.0.0-alpha.9-20260908` |
+| Starting main | `ff560900c5cd491635f85f786be6ff8415a7f105` |
+| Branch | `codex/atlas-bus-ux-01-site-presentation-closeout` |
+| Status | Candidate; Technical Director review and Product Owner acceptance required |
+
+This candidate makes addressless map/coordinate Site selection legitimate, preserves genuine geocoded identity after planner adjustment, and applies one evidence-controlled Bus service presentation decision to browser and Word. Underlying principal-location evidence is unchanged. BUS-LON-01 Alpha.8 and BUS-MAINT-02 remain frozen.
+
 ## Current BUS-1 completion candidate
 
 | Field | Value |

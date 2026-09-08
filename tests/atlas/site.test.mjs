@@ -36,10 +36,25 @@ test('geocoding provenance includes the original source coordinates', () => {
   assert.deepEqual([site.geocoding.latitude, site.geocoding.longitude], [51.4184213, -0.0821281]);
 });
 test('map-only Site is valid without fabricated geocoding evidence', () => {
-  const site = createSite({ suppliedAddress: 'Land north of the station', latitude: 51.75, longitude: -0.01, locationMethod: SITE_LOCATION_METHODS.MAP_SELECTED });
+  const site = createSite({ latitude: 51.75, longitude: -0.01, locationMethod: SITE_LOCATION_METHODS.MAP_SELECTED });
   assert.equal(site.validation.state, 'candidate');
+  assert.equal(site.suppliedAddress, '');
+  assert.equal(site.displayAddress, '');
   assert.equal(site.geocoding.source, null);
   assert.equal(site.assessmentPoint.method, SITE_LOCATION_METHODS.MAP_SELECTED);
+});
+test('coordinate-only Site is valid without fabricated identity', () => {
+  const site = createSite({ latitude: 51.76, longitude: -0.02, locationMethod: SITE_LOCATION_METHODS.COORDINATES_ENTERED });
+  assert.equal(site.validation.state, 'candidate');
+  assert.equal(site.suppliedAddress, '');
+  assert.equal(site.displayAddress, '');
+  assert.equal(site.assessmentPoint.method, SITE_LOCATION_METHODS.COORDINATES_ENTERED);
+});
+test('confirmed geocoded Site retains its real identity', () => {
+  const confirmed = confirmSite(createSite(base), { confirmedAt: '2026-08-24T10:01:00.000Z' });
+  assert.equal(confirmed.displayAddress, base.displayAddress);
+  assert.equal(confirmed.suppliedAddress, base.suppliedAddress);
+  assert.equal(confirmed.validation.state, 'confirmed');
 });
 test('moving the assessment point preserves original geocoding evidence', () => {
   const candidate = createSite(base);

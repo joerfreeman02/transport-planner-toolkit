@@ -37,6 +37,8 @@ try {
   await page.goto(review.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   assert.equal(await page.locator('#siteMap.leaflet-container').isVisible(), true);
   assert.equal(await page.locator('.leaflet-control-zoom').isVisible(), true);
+  assert.equal(await page.locator('#address').inputValue(), '');
+  assert.equal(await page.locator('#address').getAttribute('placeholder'), 'Enter site address or name');
 
   const productOwnerQuery = 'first floor millers house stanstead abbotts';
   await page.getByLabel('Site address or name').fill(productOwnerQuery);
@@ -90,8 +92,10 @@ try {
   await page.mouse.click(fallbackMapBox.x + fallbackMapBox.width * 0.55, fallbackMapBox.y + fallbackMapBox.height * 0.55);
   await page.waitForFunction(() => document.getElementById('selectedMethod').textContent === 'Chosen on map');
   const mapSelected = await page.evaluate(() => window.__ATLAS_SITE_SELECTOR__.getSnapshot().site);
-  assert.equal(mapSelected.suppliedAddress, 'Unknown former depot site');
+  assert.equal(mapSelected.suppliedAddress, '');
+  assert.equal(mapSelected.displayAddress, '');
   assert.equal(mapSelected.geocoding.source, null);
+  assert.equal(await page.locator('#selectedIdentity').isHidden(), true);
 
   await page.getByText('Enter coordinates instead', { exact: true }).click();
   await page.getByLabel('Latitude').fill('120');
@@ -106,6 +110,7 @@ try {
   assert.deepEqual([entered.latitude, entered.longitude], [51.791, 0.014]);
   await page.getByRole('button', { name: 'Confirm assessment point' }).click();
   assert.match(await page.locator('#confirmationStatus').innerText(), /Entered coordinates/);
+  assert.equal(await page.locator('#confirmedSite p').count(), 0);
 
   assert.equal(pageErrors.length, 0);
   assert.equal(failedRequests.length, 0);

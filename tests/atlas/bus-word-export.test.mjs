@@ -31,6 +31,7 @@ assert.deepEqual(tables[1].headers, ['Route', 'Operator', 'Origin / destination'
 assert.match(tables[1].rows[0][2], /Here East, Hackney Wick – Royal Crest Avenue, Silvertown/);
 assert.match(tables[1].rows[0][4], /next day/);
 assert.equal(busWordFilename({ displayAddress: '100 High Street, Plaistow' }), 'ATLAS Bus Assessment - 100 High Street, Plaistow.docx');
+assert.equal(busWordFilename({ latitude: 51.7, longitude: -0.1 }), 'ATLAS Bus Assessment.docx');
 const filtered = buildBusWordTables({ ...result, stops: [result.stops[1]], serviceSummaries: [] });
 assert.equal(filtered[0].rows.length, 1);
 assert.equal(filtered[0].rows[0][1], 'Stop T (Westbound)');

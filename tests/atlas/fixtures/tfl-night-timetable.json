@@ -1,0 +1,28 @@
+{
+  "lineId": "N123",
+  "lineName": "N123",
+  "direction": "outbound",
+  "stations": [
+    { "id": "490NIGHT001", "name": "Night Origin", "locality": "Night Origin" },
+    { "id": "490NIGHT002", "name": "Night Assessment Stop", "locality": "Central London" },
+    { "id": "490NIGHT003", "name": "Night Terminal", "locality": "Night Terminal" }
+  ],
+  "stops": [
+    { "id": "490NIGHT001", "name": "Night Origin", "locality": "Night Origin" },
+    { "id": "490NIGHT002", "name": "Night Assessment Stop", "locality": "Central London" },
+    { "id": "490NIGHT003", "name": "Night Terminal", "locality": "Night Terminal" }
+  ],
+  "timetable": {
+    "departureStopId": "490NIGHT002",
+    "routes": [
+      {
+        "stationIntervals": [
+          { "id": "2", "intervals": [{ "stopId": "490NIGHT002", "timeToArrival": 0 }, { "stopId": "490NIGHT003", "timeToArrival": 22 }] }
+        ],
+        "schedules": [
+          { "name": "Night", "knownJourneys": [{ "hour": 23, "minute": 50 }], "firstJourney": { "hour": 22, "minute": 30 }, "lastJourney": { "hour": 1, "minute": 20 } }
+        ]
+      }
+    ]
+  }
+}

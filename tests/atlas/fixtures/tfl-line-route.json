@@ -1,0 +1,51 @@
+[
+  {
+    "id": "322",
+    "name": "322",
+    "routeSections": [
+      {
+        "id": "322-outbound",
+        "lineId": "322",
+        "direction": "outbound",
+        "originationName": "Full Route Origin",
+        "destinationName": "Clapham Common",
+        "validFrom": "2026-09-01T00:00:00Z",
+        "validTo": "2026-12-31T00:00:00Z"
+      },
+      {
+        "id": "322-inbound",
+        "lineId": "322",
+        "direction": "inbound",
+        "originationName": "Clapham Common",
+        "destinationName": "Full Route Origin",
+        "validFrom": "2026-09-01T00:00:00Z",
+        "validTo": "2026-12-31T00:00:00Z"
+      },
+      {
+        "id": "322-outbound-night",
+        "lineId": "322",
+        "direction": "outbound",
+        "originationName": "Full Route Origin",
+        "destinationName": "Clapham Common",
+        "validFrom": "2027-01-01T00:00:00Z",
+        "validTo": "2027-12-31T00:00:00Z"
+      }
+    ]
+  },
+  {
+    "id": "N123",
+    "name": "N123",
+    "routeSections": [
+      {
+        "id": "N123-outbound-night",
+        "lineId": "N123",
+        "direction": "outbound",
+        "originationName": "Night Origin",
+        "destinationName": "Night Terminal",
+        "validFrom": "2026-09-01T00:00:00Z",
+        "validTo": "2026-12-31T00:00:00Z",
+        "serviceType": "Night"
+      }
+    ]
+  }
+]

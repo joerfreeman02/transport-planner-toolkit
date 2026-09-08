@@ -12,6 +12,8 @@ assert.doesNotMatch(html, /value="33 Westow Street, Crystal Palace, London"/);
 assert.doesNotMatch(html, /33 Westow Street, Crystal Palace, London/);
 assert.doesNotMatch(app, /Site selected on map/);
 assert.doesNotMatch(app, /No additional principal locations identified/);
+assert.match(app, /Try a different search, or choose the assessment point on the map instead/);
+assert.doesNotMatch(app, /Your description is still recorded/);
 assert.match(app, /buildServicePresentation/);
 assert.match(app, /__atlas-review\/update-bus-data/);
 assert.doesNotMatch(app, /Traveline (username|password)/i);

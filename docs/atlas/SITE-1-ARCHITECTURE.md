@@ -38,6 +38,8 @@ If search returns no match or is unavailable, the planner can choose the point d
 
 For map-selected and coordinates-entered Sites without geocoding provenance, an empty supplied/display address is a valid known state. The browser does not promote unverified search-field text to Site identity. A genuine geocoded identity remains attached when the planner adjusts the assessment point.
 
+When address search returns no match, the browser invites a different search or direct map selection; it does not describe the unverified search text as retained Site information.
+
 ## Downstream gate
 
 Bus controls are disabled until confirmation. A map click, marker drag or coordinate change returns the Site to an unconfirmed state, disables Bus, hides and clears earlier Bus evidence, and requires confirmation again. TfL requests use the final confirmed top-level coordinates.

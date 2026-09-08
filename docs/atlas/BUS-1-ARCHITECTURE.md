@@ -34,6 +34,8 @@ Principal locations come only from the actual calling pattern. The deterministic
 
 The shared Bus presentation decision ranks each route/operator/direction family by verified route-pattern extent, verified principal-location count, scheduled activity and a deterministic textual/id tie-breaker. It retains all legitimate rows, keeps opposite direction families distinct, and adds relational Principal locations wording only where route-pattern or direction evidence proves the relationship. Browser Table 3.3 and Word Table 3.3 consume that same decision; source principal-location arrays are not rewritten.
 
+Empty principal locations are context-sensitive: `Route endpoints only` is reserved for a verified two-stop route pattern. A multi-stop or unknown-extent pattern uses `See route origin / destination`, which does not imply a direct service. Rural locality transitions and representative quarter/mid/three-quarter calling points remain meaningful principal-location evidence when urban landmark keywords are absent.
+
 Material qualifications generate one conditional full-width `Service note:` row. This includes school-day/date exceptions, weekday-only or limited operation, no weekend service, circular patterns, overnight journeys, route variants, or missing operator/timetable information. Normal services do not receive empty note rows.
 
 Frequency capability filters scheduled departures within caller-supplied `startMinute` and `endMinute`, then calculates buses per hour and approximate headway. There is deliberately no default window until Technical Director/Product Owner approval. Output says `buses per hour`; `tph` and invented `bph` terminology are prohibited. Frequency is not a column in the canonical Bus Service Summary.

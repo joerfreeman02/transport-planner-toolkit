@@ -14,9 +14,7 @@ function originDestination(service) {
 }
 
 function principalLocationsText(service) {
-  return text(service?.presentation?.principalLocationsText)
-    || text(service?.principalLocationsDisplay)
-    || (service?.principalLocations?.length ? service.principalLocations.join(', ') : 'Route endpoints only');
+  return text(service?.presentation?.principalLocationsText);
 }
 
 export function buildBusWordTables(result) {

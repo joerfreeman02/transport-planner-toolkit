@@ -296,7 +296,7 @@ function renderCandidates(result) {
   const list = $('candidateList');
   list.replaceChildren();
   if (!result.data.length) {
-    setCallout($('geocodeStatus'), "We could not find a suitable match. Your description is still recorded — choose the site on the map instead.", 'warning');
+    setCallout($('geocodeStatus'), 'We could not find a suitable match. Try a different search, or choose the assessment point on the map instead.', 'warning');
     return;
   }
   const relaxed = Boolean(result.provenance?.relaxed);
@@ -419,7 +419,7 @@ function renderAssessment(result) {
     appendCell(row, 'Operator', service.operator);
     const originDestination = `${service.origin} - ${service.destination}${service.circular && service.direction ? ` (${service.direction})` : ''}`;
     appendCell(row, 'Origin / destination', originDestination);
-    appendCell(row, 'Principal locations', service.presentation?.principalLocationsText || service.principalLocationsDisplay || (service.principalLocations.length ? service.principalLocations.join(', ') : 'Route endpoints only'));
+    appendCell(row, 'Principal locations', service.presentation.principalLocationsText);
     const periods = document.createElement('ul'); periods.className = 'period-lines';
     service.operatingPeriodLines.forEach(line => { const item = document.createElement('li'); item.textContent = line; periods.append(item); });
     appendCell(row, 'Operating period', periods);

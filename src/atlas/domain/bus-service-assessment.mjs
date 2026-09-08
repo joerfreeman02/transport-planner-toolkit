@@ -253,9 +253,18 @@ function routeLabel(service) {
   return text(service?.routeNumber) || 'the main service';
 }
 
+function independentPrincipalLocationsText(service) {
+  const pattern = Array.isArray(service?.routePatternStopIds)
+    ? service.routePatternStopIds.map(text).filter(Boolean)
+    : [];
+  return pattern.length === 2
+    ? 'Route endpoints only'
+    : 'See route origin / destination';
+}
+
 function finalPrincipalLocationsText(service, main) {
   const locations = service?.principalLocations ?? [];
-  if (!main || !provenPatternRelationship(service, main)) return locations.length ? locations.join(', ') : 'Route endpoints only';
+  if (!main || !provenPatternRelationship(service, main)) return locations.length ? locations.join(', ') : independentPrincipalLocationsText(service);
   if (sameLocations(locations, main.principalLocations)) return `As main ${routeLabel(main)} service`;
 
   const candidateNames = locations.map(presentationText).filter(Boolean);

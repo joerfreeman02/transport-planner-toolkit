@@ -60,9 +60,11 @@ assert.equal(regular.intervalMinutes, 15);
 assert.match(regular.wording, /Approx\. 4 buses\/hour \(every 15 mins\)/);
 assert.equal(calculateTypicalServiceFrequency([], { day: 'sunday' }).wording, 'Sunday: No scheduled service');
 
-const tflSafe = calculateTypicalServiceFrequency(weekdayRegular, { day: 'monday', frequencyEvidence: [{ periodType: 'FrequencyMinutes', day: 'monday', lowestFrequency: 10, highestFrequency: 10 }] });
+const tflSafe = calculateTypicalServiceFrequency([350, 370, 400, 1400], { day: 'monday', frequencyEvidence: [{ periodType: 'FrequencyMinutes', day: 'monday', lowestFrequency: 10, highestFrequency: 10 }] });
 assert.equal(tflSafe.basis, 'frequency-band');
 assert.equal(tflSafe.intervalMinutes, 10);
+assert.equal(tflSafe.departureCount, 4);
+assert.equal(tflSafe.valueText, 'Approx. 6 buses/hour (every 10 mins)');
 for (const periodType of ['FrequencyHours', 'Unknown', 'Normal']) {
   const result = calculateTypicalServiceFrequency(weekdayRegular, { day: 'monday', frequencyEvidence: [{ periodType, day: 'monday', lowestFrequency: 2, highestFrequency: 2 }] });
   assert.notEqual(result.basis, 'frequency-band', `${periodType} must not become minute headway evidence`);

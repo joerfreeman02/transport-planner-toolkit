@@ -437,17 +437,17 @@ export function formatServiceOriginDestination(service, separator = ' - ') {
 /** Shared planner-facing frequency rule; no synthetic departures are created. */
 export function calculateTypicalServiceFrequency(departures, { day, label = '', frequencyEvidence = [] } = {}) {
   const scheduled = numeric(departures);
-  const dayText = dayLabel(day);
-  if (!scheduled.length) return Object.freeze({ day, dayLabel: dayText, departureCount: 0, basis: 'scheduled', classification: 'no-service', noService: true, busesPerHour: null, intervalMinutes: null, valueText: 'No scheduled service', wording: `${dayText}: No scheduled service` });
-  if (scheduled.length <= LIMITED_SERVICE_JOURNEY_THRESHOLD) {
-    const valueText = `${scheduled.length} journey${scheduled.length === 1 ? '' : 's'}/day`;
-    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'journeys-per-day', noService: false, busesPerHour: null, intervalMinutes: null, valueText, wording: `${dayText}: ${valueText}` });
-  }
   const band = deterministicFrequencyBand(frequencyEvidence, day);
+  const dayText = dayLabel(day);
   if (band) {
     const busesPerHour = 60 / band.lowestFrequency;
     const valueText = `Approx. ${Number(busesPerHour.toFixed(1))} buses/hour (every ${band.lowestFrequency} mins)`;
     return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'frequency-band', classification: 'regular-frequency', noService: false, busesPerHour: Number(busesPerHour.toFixed(2)), intervalMinutes: band.lowestFrequency, valueText, wording: `${dayText}: ${valueText}` });
+  }
+  if (!scheduled.length) return Object.freeze({ day, dayLabel: dayText, departureCount: 0, basis: 'scheduled', classification: 'no-service', noService: true, busesPerHour: null, intervalMinutes: null, valueText: 'No scheduled service', wording: `${dayText}: No scheduled service` });
+  if (scheduled.length <= LIMITED_SERVICE_JOURNEY_THRESHOLD) {
+    const valueText = `${scheduled.length} journey${scheduled.length === 1 ? '' : 's'}/day`;
+    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'journeys-per-day', noService: false, busesPerHour: null, intervalMinutes: null, valueText, wording: `${dayText}: ${valueText}` });
   }
   const gaps = intervals(scheduled);
   const median = gaps.length ? gaps.slice().sort((a, b) => a - b)[Math.floor(gaps.length / 2)] : null;

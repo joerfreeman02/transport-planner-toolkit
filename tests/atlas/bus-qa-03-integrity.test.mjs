@@ -115,12 +115,12 @@ const expandedAssessment = createBusAssessment({
   accessRouting: { matrix: routed }
 });
 const expandedResult = await expandedAssessment.assess({ latitude: 51.685, longitude: -0.033 }, { mode: 'nearest', radius: 400 });
-assert.deepEqual(expandedRadiusCalls, [400, 2000]);
+assert.deepEqual(expandedRadiusCalls, [400], 'an unqualified empty timetable result is unresolved, not a proven zero-service result that permits substitution');
 assert.equal(expandedResult.provenance.stops.selectedRadiusMetres, 400);
-assert.equal(expandedResult.provenance.stops.actualDiscoveryRadiusMetres, 2000);
-assert.equal(expandedResult.provenance.stops.radiusMetres, 2000);
-assert.match(expandedResult.warnings.join(' '), /Nearest search expanded from 400 m to 2,000 m because no matched scheduled service was established in the initial radius\./);
-assert.equal(expandedResult.serviceSummaries.length, 1);
+assert.equal(expandedResult.provenance.stops.actualDiscoveryRadiusMetres, 400);
+assert.equal(expandedResult.provenance.stops.radiusMetres, 400);
+assert.match(expandedResult.warnings.join(' '), /nearest candidate group was retained/i);
+assert.equal(expandedResult.serviceSummaries.length, 0);
 
 let clock = 0;
 const sleeps = [];

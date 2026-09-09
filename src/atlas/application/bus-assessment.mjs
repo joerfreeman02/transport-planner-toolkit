@@ -6,13 +6,13 @@ import {
   selectNearestStopGroup
 } from '../domain/bus-service-assessment.mjs';
 import { DEFAULT_TFL_REQUEST_LIMIT } from '../adapters/tfl-request-scheduler.mjs';
+import { hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
 
 export const TFL_REQUEST_WINDOW_LIMIT = DEFAULT_TFL_REQUEST_LIMIT;
 export const TFL_ASSESSMENT_FIXED_REQUESTS = 2;
 export const TFL_SAFE_DETAILED_PAIR_LIMIT = TFL_REQUEST_WINDOW_LIMIT - TFL_ASSESSMENT_FIXED_REQUESTS;
 
 function routingFor(result, index) { return result?.routes?.[index] ?? Object.freeze({ status: 'unavailable', distanceMetres: null, durationSeconds: null }); }
-function hasScheduledEvidence(schedule = {}) { return Object.values(schedule).some(day => Array.isArray(day) && day.length > 0); }
 function stopKey(stop) { return String(stop?.id || stop?.sourceId || ''); }
 function routePairs(stops) { return new Set((stops ?? []).flatMap(stop => (stop.routes ?? []).map(route => `${route}|${stopKey(stop)}`))); }
 function hasServiceForStops(services, stops) {
@@ -48,15 +48,22 @@ function incompleteTimetableIdentitiesForStop(stop, provenance = {}) {
   const identitySuffix = `|${stopKey(stop)}`;
   return [...new Set([
     ...(provenance.unresolvedRequestIdentities ?? []),
+    ...(provenance.nationalUnresolvedRequestIdentities ?? []),
     ...(provenance.unprocessedRequestIdentities ?? [])
   ].map(String).filter(identity => identity.endsWith(identitySuffix)))];
 }
 
+function hasNoCurrentTimetableConclusionForStop(stop, provenance = {}) {
+  const identitySuffix = `|${stopKey(stop)}`;
+  return (provenance.noCurrentRequestIdentities ?? []).map(String).some(identity => identity.endsWith(identitySuffix));
+}
+
 function timetableConclusion(result, selection) {
   const explicit = result?.timetableConclusion || result?.provenance?.timetableConclusion;
-  if (explicit === 'MATCHED' || explicit === 'NO_CURRENT_MATCH' || explicit === 'UNRESOLVED') return explicit;
   if (!result?.ok) return 'UNRESOLVED';
-  return hasServiceForStops(result.data, selection.stops) ? 'MATCHED' : 'NO_CURRENT_MATCH';
+  if (explicit === 'NO_CURRENT_MATCH') return 'NO_CURRENT_MATCH';
+  if (explicit === 'UNRESOLVED') return 'UNRESOLVED';
+  return hasServiceForStops(result.data, selection.stops) ? 'MATCHED' : 'UNRESOLVED';
 }
 
 function sourceLabel(service) {
@@ -97,7 +104,10 @@ function buildStopTimetableEvidence(stop, services, servicesResult) {
   if (incompleteCount) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: `Timetable source unavailable · ${incompleteLabel}`, sources: checked });
   if (Number(provenance.failedRequests || 0) > 0 || provenance.unavailable === true) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable', sources: checked });
   if (nationalIncomplete) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · required national evidence could not be checked', sources: checked });
-  return Object.freeze({ status: 'NO_CURRENT_MATCH', label: `No current match · ${checked.join('/') || 'timetable sources'} checked`, sources: checked });
+  if ((provenance.timetableConclusion || servicesResult?.timetableConclusion) === 'NO_CURRENT_MATCH' || hasNoCurrentTimetableConclusionForStop(stop, provenance)) {
+    return Object.freeze({ status: 'NO_CURRENT_MATCH', label: `No current match · ${checked.join('/') || 'timetable sources'} checked`, sources: checked });
+  }
+  return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · no scheduled evidence was established', sources: checked });
 }
 
 export function createBusAssessment({ stopDiscovery, timetableData, accessRouting } = {}) {
@@ -209,7 +219,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     }
     const serviceSummaries = buildServiceSummaries(selectedStops, services);
     const routesByStop = new Map(selectedStops.map(stop => [stopKey(stop), new Set()]));
-    for (const service of services) for (const id of Object.keys(service.stopSchedules ?? {})) if (routesByStop.has(id) && service.routeNumber) routesByStop.get(id).add(String(service.routeNumber));
+    for (const service of services) for (const [id, schedule] of Object.entries(service.stopSchedules ?? {})) if (routesByStop.has(id) && service.routeNumber && hasScheduledEvidence(schedule)) routesByStop.get(id).add(String(service.routeNumber));
     selectedStops = selectedStops.map(stop => {
       const timetableEvidence = buildStopTimetableEvidence(stop, services, servicesResult);
       return Object.freeze({ ...stop, routes: [...new Set([...(stop.routes ?? []), ...(routesByStop.get(stopKey(stop)) ?? new Set())])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })), timetableMatch: (routesByStop.get(stopKey(stop))?.size ?? 0) > 0, timetableEvidence: timetableEvidence.label, timetableEvidenceStatus: timetableEvidence.status, timetableEvidenceSources: timetableEvidence.sources ?? [] });
@@ -218,7 +228,11 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     const routingComplete = selectedStops.every(stop => stop.walking.status === 'routed' && stop.cycling.status === 'routed');
     const stopCoverageComplete = prepared.stopsResult.provenance?.stopCoverageComplete !== false;
     const nationalEvidenceComplete = servicesResult?.provenance?.nationalSourceAvailable !== false && !(servicesResult?.provenance?.nationalUnresolvedRoutes?.length);
-    const timetablesComplete = Boolean(servicesResult?.ok) && nationalEvidenceComplete && Number(servicesResult?.provenance?.unprocessedRequests || 0) === 0 && Number(servicesResult?.provenance?.unresolvedRequests || 0) === 0;
+    const unresolvedIdentityCount = new Set([
+      ...(servicesResult?.provenance?.unresolvedRequestIdentities ?? []),
+      ...(servicesResult?.provenance?.nationalUnresolvedRequestIdentities ?? [])
+    ].map(String)).size;
+    const timetablesComplete = Boolean(servicesResult?.ok) && nationalEvidenceComplete && Number(servicesResult?.provenance?.unprocessedRequests || 0) === 0 && Math.max(Number(servicesResult?.provenance?.unresolvedRequests || 0), unresolvedIdentityCount) === 0;
     const status = stopCoverageComplete && timetablesComplete && serviceSummaries.length && routingComplete ? 'complete' : 'partial';
     const selectedIds = new Set(selectedStops.map(stopKey));
     const routes = new Set(enrichedDiscoveredStops.flatMap(stop => stop.routes ?? []));

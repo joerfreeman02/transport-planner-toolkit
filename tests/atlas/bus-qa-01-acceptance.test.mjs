@@ -52,7 +52,7 @@ const assessment = createBusAssessment({
 const result = await assessment.assess({ latitude: 51.7, longitude: -0.1 });
 assert.equal(result.stops.find(stop => stop.id === 'A').timetableEvidence, 'Matched · BODS');
 assert.equal(result.stops.find(stop => stop.id === 'B').timetableEvidence, 'Matched · BODS + TNDS');
-assert.match(result.stops.find(stop => stop.id === 'D').timetableEvidence, /No current match · BODS\/TNDS checked/);
+assert.equal(result.stops.find(stop => stop.id === 'D').timetableEvidence, 'Timetable source unavailable · no scheduled evidence was established');
 
 const unavailable = createBusAssessment({
   stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stops[0]], warnings: [], provenance: { source: 'NaPTAN' } }) },

@@ -21,6 +21,16 @@ from pathlib import Path
 
 SCHEMA = "atlas-prepared-bus-data-v1"
 DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+
+
+def has_scheduled_evidence(stop_schedules: dict) -> bool:
+    """A StopPoint key is not timetable evidence unless a departure exists."""
+    return any(
+        isinstance(day_values, list)
+        and any(isinstance(value, (int, float)) and not isinstance(value, bool) for value in day_values)
+        for schedule in (stop_schedules or {}).values()
+        for day_values in (schedule or {}).values()
+    )
 MAJOR_NAME = ("bus station", "coach station", "rail station", "railway station", "town centre", "city centre", "hospital", "airport", "university", "interchange", "shopping centre")
 NAPTAN_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=csv"
 BODS_URL = "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/"
@@ -399,6 +409,8 @@ def process_region(path: Path, dates: dict[str, date], naptan_stops: dict, alias
         for schedule in record["stopSchedules"].values():
             for day in DAYS:
                 schedule[day] = sorted(set(schedule[day]))
+        if not has_scheduled_evidence(record["stopSchedules"]):
+            continue
         active_days_set = {day for schedule in record["stopSchedules"].values() for day in DAYS if schedule[day]}
         if active_days_set and not active_days_set.intersection({"saturday", "sunday"}):
             record["qualifications"].add("Weekday-only service in the prepared representative week.")

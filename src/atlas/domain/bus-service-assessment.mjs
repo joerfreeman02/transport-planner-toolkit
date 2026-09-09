@@ -1,3 +1,5 @@
+import { hasScheduledEvidence } from './scheduled-evidence.mjs';
+
 const DAY_ORDER = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 const DAY_LABELS = Object.freeze({ monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday' });
 const DAY_SHORT_LABELS = Object.freeze({ monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' });
@@ -211,10 +213,9 @@ function selectedStopDirectionKey(stop) {
 function representativeStop(stops, records) {
   const supporting = (stops ?? []).filter(stop => records.some(record => {
     const schedule = record.stopSchedules?.[text(stop.id || stop.sourceId)];
-    return schedule && Object.values(schedule).some(day => Array.isArray(day) && day.length);
+    return hasScheduledEvidence(schedule);
   }));
-  const fallback = supporting.length ? supporting : (stops ?? []).filter(stop => records.some(record => Object.prototype.hasOwnProperty.call(record.stopSchedules ?? {}, text(stop.id || stop.sourceId))));
-  return [...fallback].sort((a, b) => {
+  return [...supporting].sort((a, b) => {
     const walkingA = a.walking?.status === 'routed' ? Number(a.walking.distanceMetres) : Number.POSITIVE_INFINITY;
     const walkingB = b.walking?.status === 'routed' ? Number(b.walking.distanceMetres) : Number.POSITIVE_INFINITY;
     const validWalkingA = Number.isFinite(walkingA), validWalkingB = Number.isFinite(walkingB);
@@ -246,7 +247,9 @@ export function buildServiceSummaries(stops, serviceRecords) {
   const selectedStopsById = new Map((stops ?? []).map(stop => [text(stop.id || stop.sourceId), stop]));
   const groups = new Map();
   for (const service of preparedRecords) {
-    const relevantStops = Object.keys(service.stopSchedules ?? {}).filter(id => selectedIds.has(id));
+    const relevantStops = Object.entries(service.stopSchedules ?? {})
+      .filter(([id, schedule]) => selectedIds.has(id) && hasScheduledEvidence(schedule))
+      .map(([id]) => id);
     if (!relevantStops.length) continue;
     const stopDirections = unique(relevantStops.map(id => selectedStopDirectionKey(selectedStopsById.get(id))).filter(Boolean)).sort().join(',');
     const directionKey = directionGroupKey(service);

@@ -232,7 +232,16 @@ assert.equal(unresolved.data.length, 1);
 assert.equal(unresolved.warnings.filter(warning => /no defensible national fallback/.test(warning)).length, 1);
 
 const budgetCalls = [];
-const budgetTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => { budgetCalls.push(url); return response(String(url).includes('/Route') ? routeFixture : withOperator); } });
+const budgetTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => {
+  budgetCalls.push(url);
+  if (String(url).includes('/Route')) return response(routeFixture);
+  const match = String(url).match(/\/Line\/([^/]+)\/Timetable\/([^/?]+)/);
+  const payload = structuredClone(withOperator);
+  payload.lineId = decodeURIComponent(match?.[1] ?? payload.lineId);
+  payload.lineName = payload.lineId;
+  payload.timetable.departureStopId = decodeURIComponent(match?.[2] ?? payload.timetable.departureStopId);
+  return response(payload);
+} });
 const budgetAuthority = createAuthoritativeBusTimetableAdapter({ tflAdapter: budgetTfl, nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS' } }) }, requestLimit: 20 });
 const tooManyStops = Array.from({ length: 21 }, (_, index) => ({ id: `490TEST${String(index).padStart(3, '0')}`, routes: [`R${index}`] }));
 const budgetResult = await budgetAuthority.servicesForStops(tooManyStops, { site: { latitude: 51.418, longitude: -0.082 } });
@@ -255,7 +264,12 @@ const busyRouteUrls = [];
 const busyTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => {
   if (String(url).includes('/Route')) { busyRoute += 1; busyRouteUrls.push(String(url)); return response(routeFixture); }
   busyTimetable += 1;
-  return response(withOperator);
+  const match = String(url).match(/\/Line\/([^/]+)\/Timetable\/([^/?]+)/);
+  const payload = structuredClone(withOperator);
+  payload.lineId = decodeURIComponent(match?.[1] ?? payload.lineId);
+  payload.lineName = payload.lineId;
+  payload.timetable.departureStopId = decodeURIComponent(match?.[2] ?? payload.timetable.departureStopId);
+  return response(payload);
 } });
 const busyAuthority = createAuthoritativeBusTimetableAdapter({ tflAdapter: busyTfl, nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS' } }) } });
 const busyStops = Array.from({ length: 6 }, (_, index) => ({ id: `BUSY${index}`, routes: ['322', '323'] }));

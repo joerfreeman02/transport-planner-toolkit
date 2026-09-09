@@ -1,4 +1,5 @@
 import { derivePrincipalLocations } from '../domain/bus-service-assessment.mjs';
+import { hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
 
 const DAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 
@@ -147,7 +148,12 @@ function parseService({ source, serviceBlock, serviceBlocks, patternById, journe
       source: { type: 'TNDS', region, archive: sourceArchive, serviceCode, operatorCode: operator.code || operator.id, schemaVersion: '2.5', preparedAt, patternIds: [variant.patternId], patternVariantCount: patternVariants.length, patternVariantId: variant.patternId }
     });
   };
-  if (recordVariants.length) return recordVariants.map(createRecord);
+  if (recordVariants.length) {
+    const records = recordVariants.map(createRecord);
+    const scheduledRecords = records.filter(record => Object.values(record.stopSchedules ?? {}).some(hasScheduledEvidence));
+    if (scheduledRecords.length || !quarantine) return scheduledRecords;
+    return [records[0]];
+  }
   if (quarantine) {
     const variant = patternVariants[0] || { patternId: [...servicePatternIds][0] || null, status: 'quarantine', reasonCode: 'missing_pattern', direction: '', origin: '', destination: '', routePatternStopIds: [], calls: [], principalLocations: [] };
     return [createRecord({ ...variant, status: 'quarantine', routePatternStopIds: [] })];

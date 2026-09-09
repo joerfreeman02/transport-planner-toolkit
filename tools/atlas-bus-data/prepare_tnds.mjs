@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { parseTndsTransXchangeServices } from '../../src/atlas/adapters/tnds-transxchange-adapter.mjs';
+import { hasScheduledEvidence } from '../../src/atlas/domain/scheduled-evidence.mjs';
 
 export const TNDS_REGIONS = Object.freeze(['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y']);
 export const TNDS_SERVICE_SHARD_KEY_LENGTH = 5;
@@ -44,7 +45,7 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
       const parsed = parseTndsTransXchangeServices(xml, { region, sourceArchive: path.basename(file), preparedAt });
       if (parsed.length > 1) console.log(`TNDS ${path.basename(file)}: prepared ${parsed.length} Service records.`);
       for (const service of parsed) {
-        const hasSchedules = service.stopSchedules && Object.keys(service.stopSchedules).length > 0;
+        const hasSchedules = Object.values(service.stopSchedules ?? {}).some(hasScheduledEvidence);
         const quarantine = service.tndsQuarantine;
         if (!hasSchedules && !quarantine?.affectedStopIds?.length) continue;
         if (quarantine) {

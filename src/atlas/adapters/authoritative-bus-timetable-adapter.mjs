@@ -1,4 +1,5 @@
 import { isGreaterLondonPoint } from '../domain/geography.mjs';
+import { hasScheduledEvidenceAt, scheduledStopIds, scopedScheduledService } from '../domain/scheduled-evidence.mjs';
 import { sourceFailure, sourceSuccess } from './source-adapter.mjs';
 
 const text = value => String(value ?? '').trim();
@@ -53,7 +54,7 @@ function isTnds(service) { return /^tnds:/i.test(text(service?.id)) || /TNDS|Tra
 function isBods(service) { return !isTnds(service); }
 
 function matchNationalRequest(lineId, stopPointId, nationalServices) {
-  const candidates = (nationalServices ?? []).filter(service => normal(service.routeNumber) === normal(lineId) && Object.prototype.hasOwnProperty.call(service.stopSchedules ?? {}, stopPointId));
+  const candidates = (nationalServices ?? []).filter(service => normal(service.routeNumber) === normal(lineId) && hasScheduledEvidenceAt(service, stopPointId));
   for (const type of ['BODS', 'TNDS']) {
     const typed = candidates.filter(service => type === 'BODS' ? isBods(service) : isTnds(service));
     if (typed.length === 1) return typed[0];
@@ -64,7 +65,8 @@ function matchNationalRequest(lineId, stopPointId, nationalServices) {
 function requestIdentity(request) { return request?.lineId && request?.stopPointId ? `${request.lineId}|${request.stopPointId}` : null; }
 
 function matchBods(tfl, bods) {
-  const candidates = (bods ?? []).filter(service => normal(service.routeNumber) === normal(tfl.routeNumber) && Object.keys(service.stopSchedules ?? {}).some(id => Object.keys(tfl.stopSchedules ?? {}).includes(id)));
+  const tflStopIds = scheduledStopIds(tfl);
+  const candidates = (bods ?? []).filter(service => normal(service.routeNumber) === normal(tfl.routeNumber) && tflStopIds.some(id => hasScheduledEvidenceAt(service, id)));
   if (!candidates.length) return null;
   const sameDirection = candidates.filter(service => normal(service.direction || service.destination || service.origin) === normal(tfl.direction || tfl.destination || tfl.origin));
   return sameDirection.length === 1 ? sameDirection[0] : candidates.length === 1 ? candidates[0] : null;
@@ -88,16 +90,6 @@ function sameServiceIdentity(left, right) {
   return Boolean(matchBods(left, [right]));
 }
 
-function hasScheduledServiceAt(service, stopIds) {
-  return Object.entries(service?.stopSchedules ?? {}).some(([stopId, schedule]) => stopIds.has(stopId) && Object.values(schedule ?? {}).some(day => Array.isArray(day) && day.length));
-}
-
-function scheduledStopIds(service) {
-  return Object.entries(service?.stopSchedules ?? {})
-    .filter(([, schedule]) => Object.values(schedule ?? {}).some(day => Array.isArray(day) && day.length))
-    .map(([stopId]) => stopId);
-}
-
 function nationalRoutesForStop(stop) {
   if (stop?.routeAuthorities && typeof stop.routeAuthorities === 'object') {
     return Object.entries(stop.routeAuthorities)
@@ -106,12 +98,6 @@ function nationalRoutesForStop(stop) {
       .filter(Boolean);
   }
   return isTfLStop(stop) ? [] : (stop?.routes ?? []).map(text).filter(Boolean);
-}
-
-function nationalServiceCoveredByTfL(service, tflServices, selectedStopIds) {
-  const stopIds = scheduledStopIds(service).filter(stopId => selectedStopIds.has(stopId));
-  const matches = (tflServices ?? []).filter(tfl => sameServiceIdentity(tfl, service));
-  return matches.length > 0 && stopIds.length > 0 && stopIds.every(stopId => matches.some(tfl => hasScheduledServiceAt(tfl, new Set([stopId]))));
 }
 
 function sameText(left, right) { return normal(left) === normal(right); }
@@ -142,7 +128,43 @@ function fallbackService(service, request, reason = 'failure') {
   const provider = isTnds(service) ? 'TNDS' : 'BODS';
   const fallbackReason = reason === 'unresolved' ? 'TfL unresolved timetable result' : 'TfL scheduled timetable failure';
   const sourceLabel = reason === 'unresolved' ? 'TfL unresolved' : 'TfL failure';
-  return { ...service, timetableSource: `${provider} fallback after ${sourceLabel}`, source: { ...(service.source ?? {}), provider, fallbackFor: fallbackReason, requestedLineId: request.lineId, requestedStopPointId: request.stopPointId } };
+  return {
+    ...scopedScheduledService(service, [request.stopPointId]),
+    timetableSource: `${provider} fallback after ${sourceLabel}`,
+    source: {
+      ...(service.source ?? {}), provider, fallbackFor: fallbackReason,
+      fallbackSourceId: service.id, requestedLineId: request.lineId, requestedStopPointId: request.stopPointId
+    }
+  };
+}
+
+function scopeNationalResult(result, stops) {
+  if (!result?.ok) return result;
+  const selectedStopIds = new Set((stops ?? []).map(stopKey));
+  const data = (result.data ?? []).map(service => scopedScheduledService(service, selectedStopIds))
+    .filter(service => scheduledStopIds(service).length);
+  const unresolvedRequestIdentities = [...new Set([
+    ...(result.provenance?.unresolvedRequestIdentities ?? []),
+    ...(result.provenance?.nationalUnresolvedRequestIdentities ?? [])
+  ])].map(String);
+  const explicit = result.timetableConclusion || result.provenance?.timetableConclusion;
+  const timetableConclusion = data.length ? 'MATCHED' : (unresolvedRequestIdentities.length || explicit !== 'NO_CURRENT_MATCH' ? 'UNRESOLVED' : 'NO_CURRENT_MATCH');
+  return sourceSuccess({
+    ...result,
+    data,
+    provenance: { ...(result.provenance ?? {}), unresolvedRequestIdentities, nationalUnresolvedRequestIdentities: unresolvedRequestIdentities, timetableConclusion }
+  });
+}
+
+function nationalCoverageAfterAuthority(service, tflServices, fallbackServices, nationalStopIds) {
+  const candidateStopIds = scheduledStopIds(service).filter(stopId => nationalStopIds.has(stopId));
+  const fallbackSourceId = text(service.id);
+  const retainedStopIds = candidateStopIds.filter(stopId => {
+    const usedAsFallback = fallbackServices.some(fallback => text(fallback.source?.fallbackSourceId) === fallbackSourceId && hasScheduledEvidenceAt(fallback, stopId));
+    if (usedAsFallback) return false;
+    return !(tflServices ?? []).some(tfl => sameServiceIdentity(tfl, service) && hasScheduledEvidenceAt(tfl, stopId));
+  });
+  return retainedStopIds.length ? scopedScheduledService(service, retainedStopIds) : null;
 }
 
 export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAdapter, londonSupplementAdapter = nationalAdapter, londonCoverage = isGreaterLondonPoint, requestLimit = 20 } = {}) {
@@ -153,7 +175,7 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     const site = options.site ?? stops[0];
     const insideLondon = londonCoverage(site);
     const tflStops = insideLondon ? stops : stops.filter(isTfLStop);
-    if (!insideLondon && !tflStops.length) return nationalAdapter.servicesForStops(stops, options);
+    if (!insideLondon && !tflStops.length) return scopeNationalResult(await nationalAdapter.servicesForStops(stops, options), stops);
     const nationalStops = insideLondon ? stops : stops.filter(stop => !isTfLStop(stop) || isDualAuthorityStop(stop));
     const national = await (insideLondon ? londonSupplementAdapter : (nationalStops.length ? nationalAdapter : { ok: true, data: [], warnings: [], provenance: { source: 'National timetable authority', requestCount: 0 } })).servicesForStops(nationalStops.length ? nationalStops : stops, options);
     const nationalServices = national.ok ? national.data ?? [] : [];
@@ -180,30 +202,47 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     const results = resultEntries.map(entry => entry.result);
     const successful = resultEntries.filter(entry => entry.result.ok);
     const failed = resultEntries.filter(entry => !entry.result.ok);
-    const unresolvedObserved = resultEntries.filter(({ result }) => !result?.ok || result?.provenance?.timetableConclusion === 'UNRESOLVED');
-    const services = successful.flatMap(entry => entry.result.data ?? []);
-    const selectedStopIds = new Set(stops.map(stopKey));
-    const fallbackServices = resultEntries.flatMap(({ result, request }) => {
-      const unresolved = Boolean(result?.ok) && result?.provenance?.timetableConclusion === 'UNRESOLVED';
-      if ((!unresolved && result.ok) || !request) return [];
+    const actualTfLServices = entry => (entry.result?.data ?? [])
+      .filter(service => normal(service.routeNumber) === normal(entry.request?.lineId) && hasScheduledEvidenceAt(service, entry.request?.stopPointId))
+      .map(service => scopedScheduledService(service, [entry.request.stopPointId]));
+    const unresolvedObserved = resultEntries.filter(({ result, request }) => {
+      if (!result?.ok) return true;
+      if (result.provenance?.timetableConclusion === 'UNRESOLVED') return true;
+      if (result.provenance?.timetableConclusion === 'NO_CURRENT_MATCH') return false;
+      return !actualTfLServices({ result, request }).length;
+    });
+    const services = successful.flatMap(entry => actualTfLServices(entry));
+    const unresolvedEntries = unresolvedObserved.filter(({ request }) => !matchNationalRequest(request?.lineId, request?.stopPointId, nationalServices));
+    const tflUnresolvedRequestIdentities = unresolvedEntries.map(({ request }) => requestIdentity(request)).filter(Boolean);
+    const noCurrentRequestIdentities = resultEntries
+      .filter(({ result }) => result?.ok && (result.timetableConclusion || result.provenance?.timetableConclusion) === 'NO_CURRENT_MATCH')
+      .map(({ request }) => requestIdentity(request))
+      .filter(Boolean);
+    const rawNationalUnresolvedRequestIdentities = [...new Set([
+      ...(national.provenance?.unresolvedRequestIdentities ?? []),
+      ...(national.provenance?.nationalUnresolvedRequestIdentities ?? [])
+    ])].map(String);
+    const fallbackServices = unresolvedObserved.flatMap(({ result, request }) => {
+      if (!request) return [];
       const fallback = matchNationalRequest(request.lineId, request.stopPointId, nationalServices);
+      const unresolved = Boolean(result?.ok) && result?.provenance?.timetableConclusion === 'UNRESOLVED';
       return fallback ? [fallbackService(fallback, request, unresolved ? 'unresolved' : 'failure')] : [];
     });
-    const unresolvedEntries = unresolvedObserved.filter(({ request }) => !matchNationalRequest(request?.lineId, request?.stopPointId, nationalServices));
-    const unresolvedRequestIdentities = unresolvedEntries.map(({ request }) => requestIdentity(request)).filter(Boolean);
+    const nationalUnresolvedRequestIdentities = rawNationalUnresolvedRequestIdentities.filter(identity => !fallbackServices.some(fallback => `${fallback.source?.requestedLineId}|${fallback.source?.requestedStopPointId}` === identity));
+    const unresolvedRequestIdentities = [...new Set([...tflUnresolvedRequestIdentities, ...nationalUnresolvedRequestIdentities])];
     let conflicts = 0;
     const composed = services.map(service => { const result = supplement(service, bods); if (result.conflict) conflicts += 1; return result.service; });
     composed.push(...fallbackServices);
     if (!insideLondon) {
       const nationalOnlyStopIds = new Set(nationalStops.map(stopKey));
-      const fallbackIds = new Set(fallbackServices.map(service => text(service.id)));
-      composed.push(...nationalServices.filter(service => hasScheduledServiceAt(service, nationalOnlyStopIds)
-        && !fallbackIds.has(text(service.id))
-        && !nationalServiceCoveredByTfL(service, services, selectedStopIds)));
+      for (const service of nationalServices) {
+        const retained = nationalCoverageAfterAuthority(service, services, fallbackServices, nationalOnlyStopIds);
+        if (retained) composed.push(retained);
+      }
     }
     if (conflicts) warnings.push(conflictWarning);
     if (unresolvedObserved.length && (fallbackServices.length || unresolvedEntries.length)) warnings.push(partialWarning);
-    if (unresolvedEntries.length) warnings.push(incompleteWarning);
+    if (unresolvedEntries.length || nationalUnresolvedRequestIdentities.length) warnings.push(incompleteWarning);
     if (!nationalSourceAvailable) warnings.push(nationalUnavailableWarning);
     if (fallbackServices.length) warnings.push(fallbackWarning);
     if (unprocessed.length) warnings.push(`Unprocessed timetable scope: ${unprocessed.map(request => `${request.lineId}/${request.stopPointId}`).join(', ')}.`);
@@ -216,12 +255,18 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       unprocessedRequestIdentities: unprocessed.map(request => `${request.lineId}|${request.stopPointId}`), timetableRequests: results.length,
       routeMetadataRequests, totalTfLRequests: results.length + routeMetadataRequests, successfulRequests: successful.length, failedRequests: failed.length,
       unresolvedRequests: unresolvedRequestIdentities.length, unresolvedRequestIdentities,
+      noCurrentRequestIdentities: [...new Set(noCurrentRequestIdentities)],
+      nationalUnresolvedRequestIdentities,
       nationalSourceAvailable,
       nationalUnresolvedRoutes,
       realtimeArrivalsUsed: false, anonymousRequest: true, apiKeyEmbedded: false
     };
     provenance.timetableConclusion = composed.length ? 'MATCHED' : (unresolvedEntries.length ? 'UNRESOLVED' : 'NO_CURRENT_MATCH');
-    if (!composed.length && provenance.timetableConclusion === 'UNRESOLVED') return sourceFailure({ code: results[0]?.code || (!nationalSourceAvailable ? national?.code : null) || 'unavailable_source', message: 'TfL scheduled timetable information could not be checked. No London zero-service conclusion has been assumed.', warnings, provenance });
+    if (!composed.length && provenance.timetableConclusion === 'UNRESOLVED') {
+      const candidateCode = results[0]?.code || (!nationalSourceAvailable ? national?.code : null);
+      const code = ['timeout', 'http_failure', 'invalid_response', 'unavailable_source', 'invalid_request', 'coverage_not_implemented'].includes(candidateCode) ? candidateCode : 'unavailable_source';
+      return sourceFailure({ code, message: 'TfL scheduled timetable information could not be checked. No London zero-service conclusion has been assumed.', warnings, provenance });
+    }
     return sourceSuccess({ data: composed, warnings, provenance });
   }
   return Object.freeze({ id: 'authoritative-bus-timetable-v1', servicesForStops });

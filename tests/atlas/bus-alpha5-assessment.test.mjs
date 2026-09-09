@@ -52,7 +52,7 @@ test('nearest mode returns a partial result when no service is found within 2km'
   const stop = { id: 'UNSERVED', name: 'Pipers Lane', locality: 'Example', latitude: site.latitude, longitude: site.longitude, routes: [] };
   const assessment = createBusAssessment({
     stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { source: 'prepared' } }) },
-    timetableData: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS' } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS', timetableConclusion: 'NO_CURRENT_MATCH' } }) },
     accessRouting: { matrix: async () => ({ ok: true, warnings: [], provenance: { source: 'OSRM' }, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 80 }] }) }
   });
   const result = await assessment.assess(site, { mode: 'nearest', radius: 500 });

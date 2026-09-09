@@ -41,7 +41,7 @@ await page.route('https://api.tfl.gov.uk/**', route => route.fulfill({ status: 2
 try {
   await page.goto(review.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   assert.equal(page.url(), review.url);
-  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.11/);
+  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.12/);
   assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--atlas-blue').trim()), '#002060');
   for (const section of ['Report Builder', 'Modules', 'Projects', 'About']) {
     await page.getByRole('button', { name: section }).click();
@@ -54,7 +54,9 @@ try {
   await page.getByLabel('Site address or name').fill('33 Westow Street, Crystal Palace');
   await page.getByRole('button', { name: 'Find site' }).click();
   await chooseFirstCandidateAndConfirm(page);
-  await page.getByRole('button', { name: 'Build Bus assessment' }).click();
+  assert.equal(await page.locator('#radius').inputValue(), '400');
+  assert.equal(await page.locator('#siteMap svg').count(), 1);
+  await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.equal(await page.locator('#evidenceRows tr').count(), 2);
 

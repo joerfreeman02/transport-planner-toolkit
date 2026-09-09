@@ -28,5 +28,19 @@ await test('outside-London point selects NaPTAN and preserves coverage blocker',
   assert.equal(result.code, 'coverage_not_implemented');
   assert.equal(result.provenance.providerAdapter, 'naptan');
 });
+await test('outside-London point can retain returned TfL StopPoint authority alongside NaPTAN', async () => {
+  const discovery = createBusStopDiscovery({
+    tflAdapter: { id: 'tfl', nearbyStops: async () => ({ ...success('TfL'), data: [{ id: '490WC', name: 'Bus Station', latitude: 51.685, longitude: -0.034, routes: ['279'], timetableAuthority: 'TfL' }] }) },
+    naptanAdapter: { id: 'naptan', nearbyStops: async () => ({ ...success('NaPTAN'), data: [{ id: '2100WC', name: 'Bus Station', latitude: 51.6851, longitude: -0.0341, routes: ['217'], timetableAuthority: 'NaPTAN' }] }) },
+    londonCoverage: () => false,
+    crossBoundaryTfL: true
+  });
+  const result = await discovery.nearbyStops({ latitude: 51.685, longitude: -0.034 });
+  assert.equal(result.ok, true);
+  assert.equal(result.data.length, 2);
+  assert.deepEqual(result.data.map(stop => stop.timetableAuthority).sort(), ['NaPTAN', 'TfL']);
+  assert.equal(result.provenance.crossBoundaryTfL, true);
+  assert.match(result.warnings.join(' '), /outside the Greater London boundary/);
+});
 
 console.log(`${passed} bus discovery tests passed.`);

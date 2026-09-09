@@ -80,6 +80,7 @@ export function createTflBusStopAdapter({
           longitude,
           stopType: String(raw.stopType ?? '').trim() || null,
           sourceId: id,
+          timetableAuthority: 'TfL',
           routes,
           distanceMetres: distance
         });

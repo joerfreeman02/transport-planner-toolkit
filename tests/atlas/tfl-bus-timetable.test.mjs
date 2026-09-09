@@ -234,8 +234,9 @@ const budgetTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: asyn
 const budgetAuthority = createAuthoritativeBusTimetableAdapter({ tflAdapter: budgetTfl, nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS' } }) }, requestLimit: 20 });
 const tooManyStops = Array.from({ length: 21 }, (_, index) => ({ id: `490TEST${String(index).padStart(3, '0')}`, routes: [`R${index}`] }));
 const budgetResult = await budgetAuthority.servicesForStops(tooManyStops, { site: { latitude: 51.418, longitude: -0.082 } });
-assert.equal(budgetResult.ok, false);
-assert.equal(budgetCalls.length, 0, 'request-budget rejection must happen before any TfL HTTP request');
+assert.equal(budgetResult.ok, true, 'dense London discovery must produce a controlled result rather than a raw request-budget failure');
+assert.equal(budgetResult.provenance.detailedRequests, 20, 'the first deterministic request stage is bounded');
+assert.ok(budgetCalls.length > 0, 'the bounded candidate stage must be given a chance to produce authoritative evidence');
 
 let busyTimetable = 0, busyRoute = 0;
 const busyRouteUrls = [];

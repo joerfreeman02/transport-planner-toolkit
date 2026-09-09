@@ -58,7 +58,10 @@ test('nearest mode returns a partial result when no service is found within 2km'
   const result = await assessment.assess(site, { mode: 'nearest', radius: 500 });
   assert.equal(result.ok, true);
   assert.equal(result.status, 'partial');
-  assert.match(result.warnings.join(' '), /within the controlled 2,000 metre nearest-search limit/);
+  assert.match(result.warnings.join(' '), /Nearest search expanded from 500 m to 2,000 m because no matched scheduled service was established in the initial radius\./);
+  assert.equal(result.provenance.stops.selectedRadiusMetres, 500);
+  assert.equal(result.provenance.stops.actualDiscoveryRadiusMetres, 2000);
+  assert.equal(result.provenance.stops.radiusMetres, 2000);
   assert.equal(result.nearestGroup, null);
 });
 

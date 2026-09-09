@@ -8,8 +8,9 @@ import { createPreparedBusDataAdapter } from '../../../src/atlas/adapters/prepar
 import { createTflBusTimetableAdapter } from '../../../src/atlas/adapters/tfl-bus-timetable-adapter.mjs';
 import { createAuthoritativeBusTimetableAdapter } from '../../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
 import { createOsrmAccessRoutingAdapter } from '../../../src/atlas/adapters/osrm-access-routing-adapter.mjs';
+import { createTflRequestScheduler } from '../../../src/atlas/adapters/tfl-request-scheduler.mjs';
 import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-discovery.mjs';
-import { createBusAssessment } from '../../../src/atlas/application/bus-assessment.mjs';
+import { createBusAssessment, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/atlas/application/bus-assessment.mjs';
 import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
 import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
@@ -17,9 +18,10 @@ import { downloadWordDocument } from '../../../assets/js/word-export.js';
 const $ = id => document.getElementById(id);
 const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha12' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
-const tfl = createTflBusStopAdapter({ cache });
+const tflRequestScheduler = createTflRequestScheduler();
+const tfl = createTflBusStopAdapter({ cache, requestScheduler: tflRequestScheduler });
 const preparedBusData = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url), tndsBaseUrl: new URL('../../data/bus-tnds/', import.meta.url) });
-const tflTimetable = createTflBusTimetableAdapter({ cache });
+const tflTimetable = createTflBusTimetableAdapter({ cache, requestScheduler: tflRequestScheduler });
 const authoritativeTimetable = createAuthoritativeBusTimetableAdapter({ tflAdapter: tflTimetable, nationalAdapter: preparedBusData, londonSupplementAdapter: preparedBusData });
 const accessRouting = createOsrmAccessRoutingAdapter();
 const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: preparedBusData, crossBoundaryTfL: true });
@@ -174,9 +176,9 @@ function selectedRadius() {
   return Number.isFinite(value) ? Math.max(100, Math.min(2000, value)) : 700;
 }
 
-function syncRadiusCircle() {
+function syncRadiusCircle(radiusOverride = null) {
   if (!confirmedSite || !map || !window.L) return;
-  const radius = selectedRadius();
+  const radius = Number.isFinite(Number(radiusOverride)) ? Number(radiusOverride) : selectedRadius();
   if (!radiusCircle) {
     radiusCircle = window.L.circle([confirmedSite.latitude, confirmedSite.longitude], {
       radius,
@@ -522,7 +524,7 @@ function renderAssessment(result) {
     `Timetable source reference: ${timetableProvenance.endpoint || 'not supplied'}`,
     `Prepared dataset time: ${timetableProvenance.dataPreparedAt || stopProvenance.dataPreparedAt || 'not supplied'}`,
     `Assessment mode: ${result.assessmentMode || 'full'}`,
-    `Discovery radius: ${result.provenance.stops?.radiusMetres || selectedRadius()} metres`,
+    `Discovery radius: ${result.provenance.stops?.actualDiscoveryRadiusMetres || result.provenance.stops?.radiusMetres || selectedRadius()} metres`,
     `Nearest stop-group method: ${result.nearestGroup?.basis || 'not applicable'}`,
     `Representative timetable dates: ${JSON.stringify(timetableProvenance.representativeDates || {})}`,
     `Source stop IDs: ${result.stops.map(stop => stop.id).join(', ')}`,
@@ -608,8 +610,8 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
       const scopeBox = $('assessmentScope');
       scopeBox.textContent = `Selected radius: ${selectedRadius()} m · ${stopCount} stop${stopCount === 1 ? '' : 's'} · ${routeCount} distinct route${routeCount === 1 ? '' : 's'} · ${pairCount} detailed route × StopPoint pair${pairCount === 1 ? '' : 's'}.`;
       scopeBox.hidden = false;
-      if (pairCount > 45) {
-        scopeBox.append(' This full assessment exceeds the one-window safe request threshold. Reduce the radius, use nearest/recommended assessment, or continue the full staged assessment. ');
+      if (pairCount > TFL_SAFE_DETAILED_PAIR_LIMIT) {
+        scopeBox.append(' This assessment may require staged TfL requests. Reduce the radius, use nearest/recommended assessment, or continue the full staged assessment. ');
         const nearest = document.createElement('button'); nearest.type = 'button'; nearest.className = 'secondary compact'; nearest.textContent = 'Use nearest assessment'; nearest.addEventListener('click', () => loadStops(false, 'nearest'));
         const continueButton = document.createElement('button'); continueButton.type = 'button'; continueButton.className = 'primary compact'; continueButton.textContent = 'Continue full staged assessment'; continueButton.addEventListener('click', () => loadStops(forceRefresh, 'full', { skipScope: true }));
         scopeBox.append(nearest, continueButton);
@@ -627,6 +629,7 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
       return;
     }
     renderAssessment(result);
+    syncRadiusCircle(result.provenance.stops?.actualDiscoveryRadiusMetres ?? result.provenance.stops?.radiusMetres ?? selectedRadius());
     const checked = formatTime(result.provenance.stops?.retrievedAt || result.provenance.timetables?.retrievedAt);
     const modeText = result.assessmentMode === 'nearest' ? `Nearest stop group "${result.nearestGroup?.name || 'selected group'}"` : `${result.stops.length} nearby stop${result.stops.length === 1 ? '' : 's'}`;
     const message = result.status === 'complete' ? `${modeText} assessed. Complete - checked ${checked}.` : `${modeText} assessed. Part of the assessment is unavailable; review the points to note.`;

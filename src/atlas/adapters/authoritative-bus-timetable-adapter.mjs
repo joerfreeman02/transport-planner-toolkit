@@ -11,7 +11,11 @@ const incompleteWarning = 'TfL scheduled timetable information could not be chec
 const unprocessedWarning = 'Some detailed route/StopPoint timetable requests were not processed within the explicitly bounded assessment scope. The assessment is partial; unprocessed services were not treated as zero service.';
 const crossBoundaryWarning = 'TfL timetable authority was used only for returned TfL StopPoint records outside the Greater London boundary; national evidence remains supplementary or fallback evidence for other selected stops.';
 
-function isTfLStop(stop) { return String(stop?.timetableAuthority || '').toLowerCase() === 'tfl' || (stop?.timetableAuthorities ?? []).includes('TfL'); }
+function isTfLStop(stop) { return normal(stop?.timetableAuthority) === 'tfl' || (stop?.timetableAuthorities ?? []).some(authority => normal(authority) === 'tfl'); }
+function isDualAuthorityStop(stop) {
+  const authorities = new Set((stop?.timetableAuthorities ?? []).map(normal).filter(Boolean));
+  return authorities.has('tfl') && authorities.has('naptan');
+}
 function stopKey(stop) { return String(stop?.id || stop?.sourceId || ''); }
 function stopRank(stop) {
   const walking = stop?.walking?.status === 'routed' ? Number(stop.walking.distanceMetres) : Number.POSITIVE_INFINITY;
@@ -52,6 +56,26 @@ function matchBods(tfl, bods) {
   return sameDirection.length === 1 ? sameDirection[0] : candidates.length === 1 ? candidates[0] : null;
 }
 
+function serviceIdentity(service) {
+  return {
+    route: normal(service?.routeNumber),
+    direction: normal(service?.direction || service?.destination || service?.origin),
+    origin: normal(service?.origin),
+    destination: normal(service?.destination)
+  };
+}
+
+function sameServiceIdentity(left, right) {
+  const leftIdentity = serviceIdentity(left), rightIdentity = serviceIdentity(right);
+  if (!leftIdentity.route || leftIdentity.route !== rightIdentity.route) return false;
+  if (leftIdentity.origin && leftIdentity.destination && rightIdentity.origin && rightIdentity.destination) return leftIdentity.origin === rightIdentity.origin && leftIdentity.destination === rightIdentity.destination && (!leftIdentity.direction || !rightIdentity.direction || leftIdentity.direction === rightIdentity.direction);
+  return Boolean(matchBods(left, [right]));
+}
+
+function hasScheduledServiceAt(service, stopIds) {
+  return Object.entries(service?.stopSchedules ?? {}).some(([stopId, schedule]) => stopIds.has(stopId) && Object.values(schedule ?? {}).some(day => Array.isArray(day) && day.length));
+}
+
 function sameText(left, right) { return normal(left) === normal(right); }
 function sameSequence(left, right) { return Array.isArray(left) && Array.isArray(right) && left.length === right.length && left.every((value, index) => sameText(value, right[index])); }
 
@@ -90,7 +114,7 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     const insideLondon = londonCoverage(site);
     const tflStops = insideLondon ? stops : stops.filter(isTfLStop);
     if (!insideLondon && !tflStops.length) return nationalAdapter.servicesForStops(stops, options);
-    const nationalStops = insideLondon ? stops : stops.filter(stop => !isTfLStop(stop));
+    const nationalStops = insideLondon ? stops : stops.filter(stop => !isTfLStop(stop) || isDualAuthorityStop(stop));
     const national = await (insideLondon ? londonSupplementAdapter : (nationalStops.length ? nationalAdapter : { ok: true, data: [], warnings: [], provenance: { source: 'National timetable authority', requestCount: 0 } })).servicesForStops(nationalStops.length ? nationalStops : stops, options);
     const nationalServices = national.ok ? national.data ?? [] : [];
     const bods = nationalServices.filter(isBods);
@@ -123,6 +147,13 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     let conflicts = 0;
     const composed = services.map(service => { const result = supplement(service, bods); if (result.conflict) conflicts += 1; return result.service; });
     composed.push(...fallbackServices);
+    if (!insideLondon) {
+      const nationalOnlyStopIds = new Set(stops.filter(stop => !isTfLStop(stop)).map(stopKey));
+      const fallbackIds = new Set(fallbackServices.map(service => text(service.id)));
+      composed.push(...nationalServices.filter(service => hasScheduledServiceAt(service, nationalOnlyStopIds)
+        && !fallbackIds.has(text(service.id))
+        && !services.some(tfl => sameServiceIdentity(tfl, service))));
+    }
     if (conflicts) warnings.push(conflictWarning);
     if (failed.length && (fallbackServices.length || unresolvedFailure)) warnings.push(partialWarning);
     if (unresolvedFailure) warnings.push(incompleteWarning);

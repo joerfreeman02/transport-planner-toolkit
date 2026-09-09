@@ -1,5 +1,11 @@
 # Changelog
 
+## ATLAS 2.0.0-alpha.11 — Full-week frequency and service-note QA — 2026-09-09
+
+- Replaced single representative-day planner frequency wording with deterministic Monday-Sunday daily results and adjacent-day compression.
+- Preserved representative-stop authority, safe TfL `FrequencyMinutes` handling, exact scheduled fallback, browser seven-column proportions and Word six-column output.
+- Corrected service-note aggregation so component limited-service qualifications cannot contradict the final consolidated row; added Route 13/13B-style fixture coverage.
+
 ## ATLAS 2.0.0-alpha.10 — Bus evidence, frequency and table close-out — 2026-09-08
 
 - Added ordered TNDS pattern enrichment and shared principal-location parity with BODS and TfL, including rural/locality evidence and unchanged quarantine handling.

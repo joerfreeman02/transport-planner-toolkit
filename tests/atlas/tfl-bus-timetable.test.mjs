@@ -37,7 +37,9 @@ assert.deepEqual(result.data[0].stopSchedules['490TEST003'].monday, [350, 370, 4
 assert.ok(result.data[0].principalLocations.includes('West Norwood Bus Station'));
 assert.deepEqual(result.data[0].frequencyEvidence, [{ periodType: 'FrequencyMinutes', day: 'monday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'tuesday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'wednesday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'thursday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'friday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }]);
 const [frequencySummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], result.data);
-assert.match(frequencySummary.typicalFrequencyText, /Wednesday: Approx\. 6 buses\/hour \(every 10 mins\)/);
+assert.match(frequencySummary.typicalFrequencyText, /Mon-Fri: Approx\. 6 buses\/hour \(every 10 mins\)/);
+assert.equal(frequencySummary.typicalFrequency.basis, 'frequency-band');
+assert.equal(frequencySummary.typicalFrequency.departureCount, 4, 'exact known TfL journeys remain auditable');
 assert.deepEqual(frequencySummary.departuresByDay.wednesday, [350, 370, 400, 1400], 'frequency-band evidence must not fabricate TfL departures');
 assert.equal(result.provenance.departureStopId, '490TEST003');
 assert.equal(result.provenance.timetableRequests, 1);
@@ -54,14 +56,17 @@ assert.equal(hoursResult.data[0].frequencyEvidence[0].periodType, 'FrequencyHour
 const [hoursSummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], hoursResult.data);
 assert.notEqual(hoursSummary.typicalFrequency.basis, 'frequency-band');
 assert.notEqual(hoursSummary.typicalFrequency.intervalMinutes, 2);
+assert.match(hoursSummary.typicalFrequencyText, /Mon-Fri: 4 journeys\/day/);
 const unknownResult = await typedPeriod('Unknown');
 const [unknownSummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], unknownResult.data);
 assert.equal(unknownResult.data[0].frequencyEvidence[0].periodType, 'Unknown');
 assert.notEqual(unknownSummary.typicalFrequency.basis, 'frequency-band');
+assert.match(unknownSummary.typicalFrequencyText, /Mon-Fri: 4 journeys\/day/);
 const normalResult = await typedPeriod('Normal');
 const [normalSummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], normalResult.data);
 assert.equal(normalResult.data[0].frequencyEvidence[0].periodType, 'Normal');
 assert.notEqual(normalSummary.typicalFrequency.basis, 'frequency-band');
+assert.match(normalSummary.typicalFrequencyText, /Mon-Fri: 4 journeys\/day/);
 assert.deepEqual(normalSummary.departuresByDay.wednesday, [350, 370, 400, 1400], 'period types never create synthetic departures');
 const multiStopFixtures = new Map([
   ['490TEST003', { periodType: 'FrequencyMinutes', lowestFrequency: 10 }],
@@ -86,6 +91,7 @@ const [multiStopSummary] = buildServiceSummaries([
   { id: '490TEST006', name: 'Third', direction: 'E', walking: { status: 'routed', distanceMetres: 300 } }
 ], multiStopRecords);
 assert.equal(multiStopSummary.frequencyBasisStopId, '490TEST003');
+assert.equal(multiStopSummary.typicalFrequency.basis, 'frequency-band', 'the representative StopPoint band takes precedence over sparse exact points');
 assert.equal(multiStopSummary.typicalFrequency.intervalMinutes, 10, 'only the representative StopPoint frequency band may influence the summary');
 assert.equal(multiStopSummary.stopDirection, 'Northbound');
 const sameStopDuplicate = structuredClone(withOperator);

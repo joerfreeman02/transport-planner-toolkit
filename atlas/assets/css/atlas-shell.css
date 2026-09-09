@@ -175,6 +175,7 @@ button.compact { padding: 7px 10px; font-size: .78rem; }
 .bus-stop-summary input[type="checkbox"], .bus-service-summary input[type="checkbox"] { width: 17px; height: 17px; margin: 0; }
 .period-lines { margin: 0; padding: 0; list-style: none; }
 .period-lines li + li { margin-top: 3px; }
+.bus-service-summary .period-lines { font-size: .92em; }
 .service-note td { border-top: 0; background: #fff8e8; color: #614200; padding-top: 8px; padding-bottom: 9px; }
 .assessment-wording { margin-top: 24px; padding: 16px 18px; border-left: 4px solid var(--atlas-lime); background: #f4f8fd; }
 .assessment-wording p:last-child { margin: 8px 0 0; color: var(--atlas-ink); }

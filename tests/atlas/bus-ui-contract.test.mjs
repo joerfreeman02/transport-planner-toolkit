@@ -3,8 +3,8 @@ import fs from 'node:fs';
 
 const html = fs.readFileSync(new URL('../../atlas/index.html', import.meta.url), 'utf8');
 const app = fs.readFileSync(new URL('../../atlas/assets/js/app.mjs', import.meta.url), 'utf8');
-assert.match(html, /2\.0\.0-alpha\.10/);
-assert.match(html, /ATLAS-2\.0\.0-alpha\.10-20260908/);
+assert.match(html, /2\.0\.0-alpha\.11/);
+assert.match(html, /ATLAS-2\.0\.0-alpha\.11-20260909/);
 for (const id of ['dataStatusMessage', 'preparedDataDate', 'naptanDataState', 'bodsDataState', 'tndsDataDate', 'tflDataState', 'updateBusData', 'refreshDataStatus', 'recommendedSelection', 'selectAllRows', 'clearAllRows']) assert.match(html, new RegExp(`id="${id}"`));
 assert.match(html, /<th>Include<\/th>/);
 assert.match(html, /<th>Timetable evidence<\/th>/);
@@ -26,4 +26,4 @@ assert.match(app, /Checked successfully — no changes detected/);
 assert.match(app, /Live source — checked when a London assessment is run/);
 assert.match(html, /Traveline National Dataset \(TNDS\)/);
 assert.match(html, /Open Government Licence v3\.0/);
-console.log('PASS Bus UI contract - Alpha.10 status, selection, timetable evidence and local maintenance controls are exposed without browser credentials.');
+console.log('PASS Bus UI contract - Alpha.11 status, selection, full-week frequency and local maintenance controls are exposed without browser credentials.');

@@ -419,7 +419,9 @@ function renderAssessment(result) {
     appendCell(row, 'Operator', service.operator);
     appendCell(row, 'Origin / destination', formatServiceOriginDestination(service));
     appendCell(row, 'Principal locations', service.presentation.principalLocationsText);
-    appendCell(row, 'Typical frequency', service.typicalFrequencyText || 'Frequency unavailable');
+    const frequencies = document.createElement('ul'); frequencies.className = 'period-lines';
+    (service.typicalFrequencyLines || String(service.typicalFrequencyText || 'Frequency unavailable').split('\n')).forEach(line => { const item = document.createElement('li'); item.textContent = line; frequencies.append(item); });
+    appendCell(row, 'Typical frequency', frequencies);
     const periods = document.createElement('ul'); periods.className = 'period-lines';
     service.operatingPeriodLines.forEach(line => { const item = document.createElement('li'); item.textContent = line; periods.append(item); });
     appendCell(row, 'Operating period', periods);

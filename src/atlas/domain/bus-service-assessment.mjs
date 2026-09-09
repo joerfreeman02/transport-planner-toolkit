@@ -1,5 +1,6 @@
 const DAY_ORDER = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 const DAY_LABELS = Object.freeze({ monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday' });
+const DAY_SHORT_LABELS = Object.freeze({ monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' });
 const REPRESENTATIVE_DAY_ORDER = Object.freeze(['wednesday', 'tuesday', 'thursday', 'monday', 'friday', 'saturday', 'sunday']);
 const LIMITED_SERVICE_JOURNEY_THRESHOLD = 5;
 const REGULARITY_INTERVAL_TOLERANCE = 0.25;
@@ -213,11 +214,14 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const frequencyEvidence = records.flatMap(record => (record.frequencyEvidence ?? [])
       .filter(item => !item.stopPointId || item.stopPointId === frequencyBasisStopId)
       .map(item => ({ ...item, source: item.source || record.timetableSource || record.source?.provider || null })));
+    const frequencyByDay = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, calculateTypicalServiceFrequency(departuresByDay[day], { day, frequencyEvidence })])));
     const frequencyRepresentativeDay = representativeDay(departuresByDay);
     const typicalFrequency = frequencyRepresentativeDay
-      ? calculateTypicalServiceFrequency(departuresByDay[frequencyRepresentativeDay], { day: frequencyRepresentativeDay, frequencyEvidence })
-      : Object.freeze({ day: null, dayLabel: null, departureCount: 0, basis: 'unavailable', busesPerHour: null, intervalMinutes: null, wording: 'Frequency unavailable' });
-    const notes = unique(records.flatMap(record => record.qualifications ?? [])).filter(materialQualification);
+      ? frequencyByDay[frequencyRepresentativeDay]
+      : Object.freeze({ day: null, dayLabel: null, departureCount: 0, basis: 'unavailable', classification: 'unavailable', noService: true, busesPerHour: null, intervalMinutes: null, valueText: 'Frequency unavailable', wording: 'Frequency unavailable' });
+    const notes = unique(records.flatMap(record => record.qualifications ?? []))
+      .filter(materialQualification)
+      .filter(note => qualificationAppliesToFinalRow(note, departuresByDay));
     const endpointPatterns = unique(records.map(record => `${text(record.origin)} → ${text(record.destination)}`));
     if (endpointPatterns.length > 1) notes.push('Includes scheduled short workings or route variants in this direction; the main origin/destination shown is the most extensive pattern in the source timetable.');
     if (records.some(record => record.circular)) notes.push('Circular service pattern; the displayed origin and destination are the timetable pattern endpoints.');
@@ -241,8 +245,10 @@ export function buildServiceSummaries(stops, serviceRecords) {
       recordActivity: Math.max(0, ...records.map(record => recordActivity(record, stopIds))),
       operatingPeriods: periods,
       operatingPeriodLines: formatOperatingPeriod(periods),
+      frequencyByDay,
+      typicalFrequencyLines: formatTypicalFrequency(frequencyByDay),
       typicalFrequency,
-      typicalFrequencyText: typicalFrequency.wording,
+      typicalFrequencyText: formatTypicalFrequency(frequencyByDay).join('\n'),
       frequencyBasisStopId,
       frequencyBasisStopName: text(frequencyStop?.name) || null,
       frequencyEvidenceSource: unique(records.map(record => record.timetableSource || record.source?.provider)).join(' + ') || null,
@@ -397,6 +403,8 @@ export function buildServicePresentation(serviceSummaries = []) {
 
 function dayLabel(day) { return DAY_LABELS[day] || text(day); }
 
+function dayShortLabel(day) { return DAY_SHORT_LABELS[day] || text(day); }
+
 function intervals(values) {
   const ordered = numeric(values);
   return ordered.slice(1).map((value, index) => value - ordered[index]).filter(value => value > 0);
@@ -433,16 +441,62 @@ export function calculateTypicalServiceFrequency(departures, { day, label = '', 
   const dayText = dayLabel(day);
   if (band) {
     const busesPerHour = 60 / band.lowestFrequency;
-    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'frequency-band', busesPerHour: Number(busesPerHour.toFixed(2)), intervalMinutes: band.lowestFrequency, wording: `${dayText}: Approx. ${Number(busesPerHour.toFixed(1))} buses/hour (every ${band.lowestFrequency} mins)` });
+    const valueText = `Approx. ${Number(busesPerHour.toFixed(1))} buses/hour (every ${band.lowestFrequency} mins)`;
+    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'frequency-band', classification: 'regular-frequency', noService: false, busesPerHour: Number(busesPerHour.toFixed(2)), intervalMinutes: band.lowestFrequency, valueText, wording: `${dayText}: ${valueText}` });
   }
-  if (!scheduled.length) return Object.freeze({ day, dayLabel: dayText, departureCount: 0, basis: 'scheduled', busesPerHour: null, intervalMinutes: null, wording: 'No scheduled journeys evidenced' });
-  if (scheduled.length <= LIMITED_SERVICE_JOURNEY_THRESHOLD) return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', busesPerHour: null, intervalMinutes: null, wording: `${dayText}: ${scheduled.length} journey${scheduled.length === 1 ? '' : 's'}/day` });
+  if (!scheduled.length) return Object.freeze({ day, dayLabel: dayText, departureCount: 0, basis: 'scheduled', classification: 'no-service', noService: true, busesPerHour: null, intervalMinutes: null, valueText: 'No scheduled service', wording: `${dayText}: No scheduled service` });
+  if (scheduled.length <= LIMITED_SERVICE_JOURNEY_THRESHOLD) {
+    const valueText = `${scheduled.length} journey${scheduled.length === 1 ? '' : 's'}/day`;
+    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'journeys-per-day', noService: false, busesPerHour: null, intervalMinutes: null, valueText, wording: `${dayText}: ${valueText}` });
+  }
   const gaps = intervals(scheduled);
   const median = gaps.length ? gaps.slice().sort((a, b) => a - b)[Math.floor(gaps.length / 2)] : null;
   const regular = median != null && gaps.every(gap => Math.abs(gap - median) <= Math.max(1, median * REGULARITY_INTERVAL_TOLERANCE));
-  if (!regular) return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', busesPerHour: null, intervalMinutes: null, wording: `${dayText}: ${scheduled.length} scheduled journeys/day (irregular)` });
+  if (!regular) {
+    const valueText = `${scheduled.length} scheduled journeys/day (irregular)`;
+    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'irregular', noService: false, busesPerHour: null, intervalMinutes: null, valueText, wording: `${dayText}: ${valueText}` });
+  }
   const frequency = calculateScheduledFrequency(scheduled, { startMinute: scheduled[0], endMinute: scheduled.at(-1) + median, label });
-  return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', busesPerHour: frequency.busesPerHour, intervalMinutes: median, wording: `${dayText}: Approx. ${Number((60 / median).toFixed(1))} buses/hour (every ${median} mins)` });
+  const valueText = `Approx. ${Number((60 / median).toFixed(1))} buses/hour (every ${median} mins)`;
+  return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'regular-frequency', noService: false, busesPerHour: frequency.busesPerHour, intervalMinutes: median, valueText, wording: `${dayText}: ${valueText}` });
+}
+
+function frequencyEquivalenceKey(result) {
+  return JSON.stringify([
+    result?.basis ?? null,
+    result?.classification ?? null,
+    result?.departureCount ?? null,
+    result?.busesPerHour ?? null,
+    result?.intervalMinutes ?? null,
+    result?.noService === true
+  ]);
+}
+
+export function formatTypicalFrequency(frequencyByDay = {}) {
+  const lines = [];
+  let start = 0;
+  while (start < DAY_ORDER.length) {
+    let end = start;
+    while (end + 1 < DAY_ORDER.length && frequencyEquivalenceKey(frequencyByDay[DAY_ORDER[end]]) === frequencyEquivalenceKey(frequencyByDay[DAY_ORDER[end + 1]])) end += 1;
+    const firstDay = DAY_ORDER[start];
+    const lastDay = DAY_ORDER[end];
+    const label = start === end ? dayShortLabel(firstDay) : `${dayShortLabel(firstDay)}-${dayShortLabel(lastDay)}`;
+    const result = frequencyByDay[firstDay];
+    lines.push(`${label}: ${result?.valueText || 'Frequency unavailable'}`);
+    start = end + 1;
+  }
+  return lines;
+}
+
+function qualificationAppliesToFinalRow(note, departuresByDay = {}) {
+  const representedDays = DAY_ORDER.filter(day => numeric(departuresByDay[day] ?? []).length);
+  if (/limited service|no more than three scheduled journeys/i.test(note)) {
+    return representedDays.length > 0 && representedDays.every(day => numeric(departuresByDay[day] ?? []).length <= 3);
+  }
+  if (/weekday-only service/i.test(note)) {
+    return representedDays.length > 0 && !representedDays.some(day => day === 'saturday' || day === 'sunday');
+  }
+  return true;
 }
 
 function representativeDay(departuresByDay = {}) { return REPRESENTATIVE_DAY_ORDER.find(day => numeric(departuresByDay[day] ?? []).length) || null; }

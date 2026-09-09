@@ -1,5 +1,15 @@
 # ATLAS version and build record
 
+## BUS-QA-03 Alpha.12 candidate
+
+| Version | `2.0.0-alpha.12` |
+|---|---|
+| Visible build | `ATLAS-2.0.0-alpha.12-20260909` |
+| Branch | `codex/atlas-bus-qa-03-london-runtime-integrity` |
+| Status | Local Technical Director review candidate; not published |
+
+Alpha.12 restores bounded sequential London timetable orchestration, retains explicit TfL/BODS/TNDS authority and fallback provenance across the London boundary, protects timetable chronology and physical journey identities, consolidates equivalent nearby-stop service rows with auditable stop context, uses honest minute-headway/range wording, and adds the confirmed-site radius map circle plus optional detailed evidence view. The default London radius is 400 metres and the non-London default remains 700 metres.
+
 ## BUS-QA-02 Alpha.11 candidate
 
 | Field | Value |

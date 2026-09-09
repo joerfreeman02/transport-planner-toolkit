@@ -259,7 +259,10 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const relevantStops = Object.keys(service.stopSchedules ?? {}).filter(id => selectedIds.has(id));
     if (!relevantStops.length) continue;
     const stopDirections = unique(relevantStops.map(id => selectedStopDirectionKey(selectedStopsById.get(id))).filter(Boolean)).sort().join(',');
-    const identity = [service.routeNumber, service.operator, directionGroupKey(service), service.origin, service.destination, stopDirections].map(value => text(value).toLowerCase()).join('|');
+    const directionKey = directionGroupKey(service);
+    const explicitDirectionFamily = /^gtfs:/.test(directionKey);
+    const terminiKey = explicitDirectionFamily ? '' : `${service.origin}|${service.destination}`;
+    const identity = [service.routeNumber, service.operator, directionKey, terminiKey, stopDirections].map(value => text(value).toLowerCase()).join('|');
     if (!groups.has(identity)) groups.set(identity, []);
     groups.get(identity).push({ ...service, relevantStops });
   }

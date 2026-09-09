@@ -27,4 +27,4 @@ await import('./bus-qa-03-integrity.test.mjs');
 await import('./legacy-isolation-guard.test.mjs');
 await import('./legacy-isolation.test.mjs');
 await import('./review-environment.test.mjs');
-console.log('ATLAS Alpha.11 deterministic suite passed.');
+console.log('ATLAS Alpha.12 deterministic suite passed.');

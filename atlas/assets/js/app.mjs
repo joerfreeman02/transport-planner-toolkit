@@ -1,5 +1,6 @@
 import { createSiteSelector } from '../../../src/atlas/application/site-selector.mjs';
 import { SITE_LOCATION_METHODS } from '../../../src/atlas/domain/site.mjs';
+import { isGreaterLondonPoint } from '../../../src/atlas/domain/geography.mjs';
 import { createJsonCache } from '../../../src/atlas/infrastructure/cache.mjs';
 import { createNominatimGeocodingAdapter } from '../../../src/atlas/adapters/nominatim-geocoding-adapter.mjs';
 import { createTflBusStopAdapter } from '../../../src/atlas/adapters/tfl-bus-stop-adapter.mjs';
@@ -14,7 +15,7 @@ import { buildControlledBusWording, buildServicePresentation, formatServiceOrigi
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
-const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha8' });
+const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha12' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tfl = createTflBusStopAdapter({ cache });
 const preparedBusData = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url), tndsBaseUrl: new URL('../../data/bus-tnds/', import.meta.url) });
@@ -35,6 +36,7 @@ const METHOD_LABELS = Object.freeze({
 let confirmedSite = null;
 let map = null;
 let assessmentMarker = null;
+let radiusCircle = null;
 let busStopMarkers = [];
 let routeLayers = [];
 let currentBusResult = null;
@@ -42,6 +44,8 @@ let lastAssessmentMode = 'full';
 let selectedStopIds = new Set();
 let selectedServiceIds = new Set();
 let selectionInitialised = false;
+let detailedEvidenceVisible = false;
+let radiusTouched = false;
 
 function stopKey(stop) { return String(stop?.id || stop?.sourceId || ''); }
 function serviceKey(service) { return String(service?.id || `${service?.routeNumber}|${service?.operator}|${service?.origin}|${service?.destination}`); }
@@ -145,11 +149,14 @@ function assessmentMethod(site) {
 function clearBusEvidence(message = 'Confirm the assessment point before checking nearby bus stops.') {
   const hadEvidence = !$('evidencePanel').hidden;
   confirmedSite = null;
+  radiusTouched = false;
+  detailedEvidenceVisible = false;
   currentBusResult = null;
   busStopMarkers.forEach(marker => map?.removeLayer(marker));
   busStopMarkers = [];
   routeLayers.forEach(layer => map?.removeLayer(layer));
   routeLayers = [];
+  if (radiusCircle) { map?.removeLayer(radiusCircle); radiusCircle = null; }
   $('findStops').disabled = true;
   $('findNearestStops').disabled = true;
   $('refreshStops').disabled = true;
@@ -161,6 +168,29 @@ function clearBusEvidence(message = 'Confirm the assessment point before checkin
   $('clearRoutes').hidden = true;
   selectedStopIds = new Set(); selectedServiceIds = new Set(); selectionInitialised = false;
   setCallout($('stopStatus'), hadEvidence ? 'The assessment point changed, so the earlier bus results were cleared. Confirm the new point before checking again.' : message, hadEvidence ? 'warning' : 'neutral');
+}
+
+function selectedRadius() {
+  const value = Number($('radius').value);
+  return Number.isFinite(value) ? Math.max(100, Math.min(2000, value)) : 700;
+}
+
+function syncRadiusCircle() {
+  if (!confirmedSite || !map || !window.L) return;
+  const radius = selectedRadius();
+  if (!radiusCircle) {
+    radiusCircle = window.L.circle([confirmedSite.latitude, confirmedSite.longitude], {
+      radius,
+      color: '#146b63',
+      weight: 2,
+      fillColor: '#44bba4',
+      fillOpacity: 0.12,
+      interactive: false
+    }).addTo(map);
+  } else {
+    radiusCircle.setLatLng([confirmedSite.latitude, confirmedSite.longitude]);
+    radiusCircle.setRadius(radius);
+  }
 }
 
 function googleMapsUrl(stop) {
@@ -235,6 +265,8 @@ function renderBusStopMarkers(stops) {
 function clearSelection() {
   selector.reset();
   confirmedSite = null;
+  radiusTouched = false;
+  detailedEvidenceVisible = false;
   if (assessmentMarker) {
     map.removeLayer(assessmentMarker);
     assessmentMarker = null;
@@ -384,9 +416,13 @@ function renderAssessment(result) {
   const panel = $('evidencePanel');
   const rows = $('evidenceRows');
   const serviceRows = $('serviceRows');
+  const detailPanel = $('serviceDetailPanel');
+  const detailRows = $('serviceDetailRows');
+  const detailToggle = $('toggleDetailedEvidence');
   panel.hidden = false;
   rows.replaceChildren();
   serviceRows.replaceChildren();
+  if (detailRows) detailRows.replaceChildren();
   for (const stop of result.stops) {
     const row = document.createElement('tr');
     const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedStopIds.has(stopKey(stop)); include.setAttribute('aria-label', `Include ${stop.name}`);
@@ -436,6 +472,25 @@ function renderAssessment(result) {
   if (!result.serviceSummaries.length) {
     const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 7; cell.textContent = 'No matched timetable summary is available. Review Sources and checks before using the stop information.'; row.append(cell); serviceRows.append(row);
   }
+  if (detailPanel && detailRows) {
+    detailPanel.hidden = !detailedEvidenceVisible;
+    if (detailToggle) detailToggle.textContent = detailedEvidenceVisible ? 'Hide detailed evidence' : 'Show detailed evidence';
+    if (detailedEvidenceVisible) {
+      for (const service of result.services ?? []) {
+        const article = document.createElement('article');
+        article.className = 'service-detail';
+        const heading = document.createElement('strong');
+        heading.textContent = `${service.routeNumber || 'Route not supplied'} · ${service.origin || 'Origin not supplied'} – ${service.destination || 'Destination not supplied'}`;
+        const detail = document.createElement('p');
+        const stopIds = Object.keys(service.stopSchedules ?? {}).join(', ') || 'no selected StopPoint';
+        const pattern = service.source?.patternVariantId || service.source?.patternId || service.source?.intervalId || service.id || 'pattern identity not supplied';
+        detail.textContent = `Pattern: ${pattern} · Stops: ${stopIds} · Source: ${service.timetableSource || service.source?.provider || 'timetable source'}`;
+        article.append(heading, detail);
+        detailRows.append(article);
+      }
+      if (!(result.services ?? []).length) detailRows.textContent = 'No detailed timetable records were returned for this assessment.';
+    }
+  }
   renderBusStopMarkers(result.stops);
   $('assessmentWording').textContent = buildControlledBusWording(result.serviceSummaries.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => selectedStopIds.has(String(id)))), { nearestGroupName: result.nearestGroup?.name ?? null });
   const stopProvenance = result.provenance.stops ?? {};
@@ -468,6 +523,7 @@ function renderAssessment(result) {
     `Timetable source reference: ${timetableProvenance.endpoint || 'not supplied'}`,
     `Prepared dataset time: ${timetableProvenance.dataPreparedAt || stopProvenance.dataPreparedAt || 'not supplied'}`,
     `Assessment mode: ${result.assessmentMode || 'full'}`,
+    `Discovery radius: ${result.provenance.stops?.radiusMetres || selectedRadius()} metres`,
     `Nearest stop-group method: ${result.nearestGroup?.basis || 'not applicable'}`,
     `Representative timetable dates: ${JSON.stringify(timetableProvenance.representativeDates || {})}`,
     `Source stop IDs: ${result.stops.map(stop => stop.id).join(', ')}`,
@@ -519,13 +575,15 @@ function enterCoordinates(event) {
 function confirmAssessmentPoint() {
   try {
     confirmedSite = selector.confirm();
+    if (!radiusTouched) $('radius').value = isGreaterLondonPoint(confirmedSite) ? '400' : '700';
     renderConfirmedSite(confirmedSite);
+    syncRadiusCircle();
     $('confirmAssessmentPoint').disabled = true;
     $('findStops').disabled = false;
     $('findNearestStops').disabled = false;
     $('refreshStops').disabled = false;
     setCallout($('confirmationStatus'), `${assessmentMethod(confirmedSite)}. The assessment point is confirmed.`, 'success');
-    setCallout($('stopStatus'), 'Ready to check nearby bus stops from the confirmed assessment point.', 'neutral');
+    setCallout($('stopStatus'), `Ready to check nearby bus stops. The ${selectedRadius()} m assessment radius is shown on the map.`, 'neutral');
   } catch {
     setCallout($('confirmationStatus'), 'Select a valid assessment point before confirming.', 'error');
   }
@@ -604,6 +662,7 @@ $('chooseOnMap').addEventListener('click', () => {
 });
 $('coordinatesForm').addEventListener('submit', enterCoordinates);
 $('confirmAssessmentPoint').addEventListener('click', confirmAssessmentPoint);
+$('radius').addEventListener('input', () => { radiusTouched = true; syncRadiusCircle(); });
 $('findNearestStops').addEventListener('click', () => loadStops(false, 'nearest'));
 $('findStops').addEventListener('click', () => loadStops(false, 'full'));
 $('refreshStops').addEventListener('click', () => loadStops(true, lastAssessmentMode));
@@ -612,6 +671,7 @@ $('clearRoutes').addEventListener('click', clearRouteLines);
 $('recommendedSelection').addEventListener('click', () => { selectionInitialised = false; renderAssessment(currentBusResult); });
 $('selectAllRows').addEventListener('click', () => { selectedStopIds = new Set(currentBusResult?.stops.map(stopKey) ?? []); selectedServiceIds = new Set(currentBusResult?.serviceSummaries.map(serviceKey) ?? []); selectionInitialised = true; renderAssessment(currentBusResult); });
 $('clearAllRows').addEventListener('click', () => { selectedStopIds = new Set(); selectedServiceIds = new Set(); selectionInitialised = true; renderAssessment(currentBusResult); });
+$('toggleDetailedEvidence').addEventListener('click', () => { detailedEvidenceVisible = !detailedEvidenceVisible; renderAssessment(currentBusResult); });
 $('refreshDataStatus').addEventListener('click', refreshDataStatus);
 const localMaintenance = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
 const updateButton = $('updateBusData');

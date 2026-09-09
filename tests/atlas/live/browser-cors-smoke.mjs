@@ -6,7 +6,7 @@ const { chromium } = require('playwright');
 const root = process.env.ATLAS_REVIEW_ROOT || 'http://127.0.0.1:8769/';
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({
-  userAgent: 'ATLAS/2.0.0-alpha.11 browser live verification',
+  userAgent: 'ATLAS/2.0.0-alpha.12 browser live verification',
   viewport: { width: 1440, height: 1000 }
 });
 const page = await context.newPage();

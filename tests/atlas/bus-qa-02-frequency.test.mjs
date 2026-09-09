@@ -91,13 +91,14 @@ assert.equal(multiStop[0].frequencyByDay.monday.intervalMinutes, 10);
 const html = fs.readFileSync(new URL('../../atlas/index.html', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../../atlas/assets/css/atlas-shell.css', import.meta.url), 'utf8');
 assert.deepEqual((html.match(/<th>/g) ?? []).slice(-7).length, 7);
-for (const [className, width] of [['col-include', '4%'], ['col-route', '6%'], ['col-operator', '15%'], ['col-origin', '21%'], ['col-principal', '26%'], ['col-frequency', '12%'], ['col-operating-period', '16%']]) assert.match(css, new RegExp(`\\.${className} \\{ width: ${width.replace('%', '\\%')}; \\}`));
+for (const [className, width] of [['col-include', '4%'], ['col-route', '6%'], ['col-operator', '13%'], ['col-origin', '20%'], ['col-principal', '23%'], ['col-frequency', '18%'], ['col-operating-period', '16%']]) assert.match(css, new RegExp(`\\.${className} \\{ width: ${width.replace('%', '\\%')}; \\}`));
 assert.match(css, /input\[type="checkbox"\].*width: 17px/);
 
 const word = buildBusWordTables({ ok: true, stops: [], serviceSummaries: [varied] });
 assert.deepEqual(word[1].headers, ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period']);
 assert.equal(word[1].headers.length, 6);
 assert.equal(word[1].rows[0][4], varied.typicalFrequencyLines.join('\n'));
+assert.deepEqual(word[1].widths, [7, 14, 22, 25, 17, 15]);
 assert.match(word[1].rows[0][2], /\(Southbound\)$/);
 
 console.log('PASS BUS-QA-02 full-week frequency grouping, TfL safety, representative-stop authority, presentation contracts and limited-service provenance tests.');

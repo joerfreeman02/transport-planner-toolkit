@@ -43,7 +43,7 @@ test('nearest mode sends the complete nearest logical stop group to timetable pr
   assert.equal(result.ok, true);
   assert.equal(result.assessmentMode, 'nearest');
   assert.deepEqual(result.stops.map(s => s.id), ['A', 'B']);
-  assert.deepEqual(serviceCalls, [['A', 'B', 'C']]);
+  assert.deepEqual(serviceCalls, [['A', 'B']]);
   assert.deepEqual(result.serviceSummaries.map(s => s.routeNumber), ['251', '279']);
   assert.equal(result.nearestGroup.name, 'Bus Station');
 });

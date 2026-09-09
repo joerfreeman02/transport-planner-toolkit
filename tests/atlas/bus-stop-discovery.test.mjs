@@ -42,5 +42,19 @@ await test('outside-London point can retain returned TfL StopPoint authority alo
   assert.equal(result.provenance.crossBoundaryTfL, true);
   assert.match(result.warnings.join(' '), /outside the Greater London boundary/);
 });
+await test('cross-boundary merge uses physical StopPoint identity without authority duplication', async () => {
+  const discovery = createBusStopDiscovery({
+    tflAdapter: { id: 'tfl', nearbyStops: async () => ({ ...success('TfL'), data: [{ id: 'SHARED', name: 'Shared Stop', latitude: 51.685, longitude: -0.034, distanceMetres: 30, routes: ['279'], timetableAuthority: 'TfL' }] }) },
+    naptanAdapter: { id: 'naptan', nearbyStops: async () => ({ ...success('NaPTAN'), data: [{ id: 'SHARED', name: 'Shared Stop', latitude: 51.6851, longitude: -0.0341, distanceMetres: 40, routes: ['217'], timetableAuthority: 'NaPTAN' }] }) },
+    londonCoverage: () => false,
+    crossBoundaryTfL: true
+  });
+  const result = await discovery.nearbyStops({ latitude: 51.685, longitude: -0.034 });
+  assert.equal(result.data.length, 1);
+  assert.deepEqual(result.data[0].sourceAuthorities, ['NaPTAN', 'TfL']);
+  assert.deepEqual(result.data[0].timetableAuthorities, ['NaPTAN', 'TfL']);
+  assert.deepEqual(result.data[0].routes, ['217', '279']);
+  assert.equal(result.data[0].timetableAuthority, 'TfL');
+});
 
 console.log(`${passed} bus discovery tests passed.`);

@@ -5,6 +5,7 @@ import { createAuthoritativeBusTimetableAdapter } from '../../src/atlas/adapters
 import { createPreparedBusDataAdapter } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { buildServiceSummaries, calculateOperatingPeriods, formatOperatingPeriod } from '../../src/atlas/domain/bus-service-assessment.mjs';
 import { createJsonCache, createMemoryStorage } from '../../src/atlas/infrastructure/cache.mjs';
+import { createTflRequestScheduler } from '../../src/atlas/adapters/tfl-request-scheduler.mjs';
 
 const fixture = JSON.parse(fs.readFileSync(new URL('./fixtures/tfl-timetable.json', import.meta.url), 'utf8'));
 const routeFixture = JSON.parse(fs.readFileSync(new URL('./fixtures/tfl-line-route.json', import.meta.url), 'utf8'));
@@ -236,8 +237,18 @@ const budgetAuthority = createAuthoritativeBusTimetableAdapter({ tflAdapter: bud
 const tooManyStops = Array.from({ length: 21 }, (_, index) => ({ id: `490TEST${String(index).padStart(3, '0')}`, routes: [`R${index}`] }));
 const budgetResult = await budgetAuthority.servicesForStops(tooManyStops, { site: { latitude: 51.418, longitude: -0.082 } });
 assert.equal(budgetResult.ok, true, 'dense London discovery must produce a controlled result rather than a raw request-budget failure');
-assert.equal(budgetResult.provenance.detailedRequests, 20, 'the first deterministic request stage is bounded');
-assert.ok(budgetCalls.length > 0, 'the bounded candidate stage must be given a chance to produce authoritative evidence');
+assert.equal(budgetResult.provenance.detailedRequests, 21, 'all 21 detailed pairs are processed');
+assert.equal(budgetResult.provenance.unprocessedRequests, 0);
+assert.equal(budgetResult.provenance.totalTfLRequests, 22, '21 timetable requests plus one batched metadata request are counted');
+assert.equal(budgetCalls.length, 22, 'the complete 21-pair assessment makes every controlled outbound request');
+
+let fakeNow = 0;
+const sleeps = [];
+const scheduler = createTflRequestScheduler({ now: () => fakeNow, sleep: async milliseconds => { sleeps.push(milliseconds); fakeNow += milliseconds; } });
+for (let index = 0; index < 46; index += 1) await scheduler.schedule('timetable', async () => ({ ok: true }));
+assert.equal(sleeps.length, 1, 'the rolling scheduler waits only when the 45-request window is exhausted');
+assert.ok(sleeps[0] >= 60000);
+assert.equal(scheduler.snapshot().requestsInWindow, 1);
 
 let busyTimetable = 0, busyRoute = 0;
 const busyRouteUrls = [];
@@ -256,6 +267,16 @@ assert.match(busyRouteUrls[0], /\/Line\/322,323\/Route\?serviceTypes=Regular&ser
 assert.equal(busyResult.provenance.timetableRequests, 12);
 assert.equal(busyResult.provenance.routeMetadataRequests, 1);
 assert.equal(busyResult.provenance.totalTfLRequests, 13);
+
+const cachedStore = cache();
+const primeScheduler = createTflRequestScheduler({ now: () => 0, sleep: async () => {} });
+const primeCachedAdapter = createTflBusTimetableAdapter({ cache: cachedStore, requestScheduler: primeScheduler, fetchImpl: async url => String(url).includes('/Route') ? response(routeFixture) : response(withOperator) });
+await primeCachedAdapter.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });
+const hitScheduler = createTflRequestScheduler({ now: () => 0, sleep: async () => { throw new Error('cache hit must not sleep'); } });
+const cachedAdapter = createTflBusTimetableAdapter({ cache: cachedStore, requestScheduler: hitScheduler, fetchImpl: async () => { throw new Error('cache hit must not fetch'); } });
+const cachedResult = await cachedAdapter.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });
+assert.equal(cachedResult.cache.status, 'hit');
+assert.equal(hitScheduler.snapshot().requestsInWindow, 0, 'cache hits do not consume the rolling TfL request budget');
 
 console.log('PASS TfL interval linkage, full-route identity, cross-source validation, fallback and outside-London composition tests.');
 console.log('PASS deterministic request counts: Crystal Palace mid-route 1 timetable + 1 metadata = 2; opposite direction 1 + 1 = 2 with a fresh assessment; busy 12 + 1 batched metadata = 13.');

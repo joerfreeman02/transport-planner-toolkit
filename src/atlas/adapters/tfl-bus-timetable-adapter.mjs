@@ -2,6 +2,7 @@ import { createEvidence } from '../domain/evidence.mjs';
 import { derivePrincipalLocations } from '../domain/bus-service-assessment.mjs';
 import { requestJson } from '../infrastructure/http-client.mjs';
 import { runCachedSourceQuery, sourceFailure, sourceSuccess } from './source-adapter.mjs';
+import { createTflRequestScheduler } from './tfl-request-scheduler.mjs';
 
 const SOURCE = 'Transport for London Unified API';
 const ATTRIBUTION = 'Scheduled timetable data provided by Transport for London';
@@ -200,7 +201,7 @@ function validResponse(data) {
   return Boolean(data && text(data.lineId ?? data.lineName) && (Array.isArray(data.stations) || Array.isArray(data.timetable?.routes) || Array.isArray(data.routes)));
 }
 
-export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cache, clock = () => new Date(), timeoutMs = 12000, baseUrl = 'https://api.tfl.gov.uk' } = {}) {
+export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cache, clock = () => new Date(), timeoutMs = 12000, baseUrl = 'https://api.tfl.gov.uk', requestScheduler = createTflRequestScheduler() } = {}) {
   const metadataInflight = new Map();
   async function routeMetadataForLines(lineIds, { forceRefresh = false } = {}) {
     const lines = [...new Set((lineIds ?? []).map(text).filter(Boolean))].sort();
@@ -213,7 +214,7 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
       endpointUrl.searchParams.append('serviceTypes', 'Regular');
       endpointUrl.searchParams.append('serviceTypes', 'Night');
       const endpoint = endpointUrl.toString();
-      const response = await requestJson({ url: endpoint, fetchImpl, timeoutMs });
+      const response = await requestScheduler.schedule('route-metadata', () => requestJson({ url: endpoint, fetchImpl, timeoutMs }));
       const source = { ...provenance, endpoint, retrievedAt: clock().toISOString(), httpStatus: response.status ?? null, requestCount: 1, lineIds: lines };
       if (!response.ok) return sourceFailure({ code: response.code, message: `TfL route metadata could not be checked: ${response.message}`, status: response.status, provenance: source });
       if (!Array.isArray(response.data)) return sourceFailure({ code: 'invalid_response', message: 'TfL returned route metadata that ATLAS could not safely interpret.', provenance: source });
@@ -230,7 +231,7 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
     const metadataResult = routeMetadata ?? await routeMetadataForLines([line], { forceRefresh });
     const endpoint = new URL(`/Line/${encodeURIComponent(line)}/Timetable/${encodeURIComponent(stop)}`, baseUrl).toString();
     return runCachedSourceQuery({ cache, cacheKey: `tfl-timetable:${line}:${stop}`, freshForMs: 5 * 60 * 1000, forceRefresh, load: async () => {
-      const response = await requestJson({ url: endpoint, fetchImpl, timeoutMs });
+      const response = await requestScheduler.schedule('timetable', () => requestJson({ url: endpoint, fetchImpl, timeoutMs }));
       const source = { ...provenance, endpoint, retrievedAt: clock().toISOString(), httpStatus: response.status ?? null };
       if (!response.ok) return sourceFailure({ code: response.code, message: `TfL scheduled timetable could not be checked: ${response.message}`, status: response.status, provenance: source });
       if (!validResponse(response.data)) return sourceFailure({ code: 'invalid_response', message: 'TfL returned a scheduled timetable response that ATLAS could not safely interpret.', provenance: source });

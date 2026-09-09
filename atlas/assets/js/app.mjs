@@ -19,9 +19,8 @@ const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha12
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tfl = createTflBusStopAdapter({ cache });
 const preparedBusData = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url), tndsBaseUrl: new URL('../../data/bus-tnds/', import.meta.url) });
-const preparedBodsOnly = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url) });
 const tflTimetable = createTflBusTimetableAdapter({ cache });
-const authoritativeTimetable = createAuthoritativeBusTimetableAdapter({ tflAdapter: tflTimetable, nationalAdapter: preparedBusData, londonSupplementAdapter: preparedBodsOnly });
+const authoritativeTimetable = createAuthoritativeBusTimetableAdapter({ tflAdapter: tflTimetable, nationalAdapter: preparedBusData, londonSupplementAdapter: preparedBusData });
 const accessRouting = createOsrmAccessRoutingAdapter();
 const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: preparedBusData, crossBoundaryTfL: true });
 const busAssessment = createBusAssessment({ stopDiscovery: busStops, timetableData: authoritativeTimetable, accessRouting });
@@ -589,7 +588,7 @@ function confirmAssessmentPoint() {
   }
 }
 
-async function loadStops(forceRefresh, mode = lastAssessmentMode) {
+async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = false } = {}) {
   lastAssessmentMode = mode === 'nearest' ? 'nearest' : 'full';
   const action = lastAssessmentMode === 'nearest' ? 'nearest bus stop group' : 'full Bus assessment';
   setCallout($('stopStatus'), forceRefresh ? `Checking the ${action} again…` : `Building the ${action}…`, 'neutral');
@@ -597,7 +596,26 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode) {
   $('findNearestStops').disabled = true;
   $('refreshStops').disabled = true;
   $('exportBusWord').disabled = true;
+  $('assessmentScope').hidden = true;
   try {
+    if (lastAssessmentMode === 'full' && !skipScope) {
+      const scope = await busAssessment.inspectScope(confirmedSite, { radius: $('radius').value, forceRefresh });
+      if (!scope.ok) {
+        setCallout($('stopStatus'), `${plannerFailure('bus', scope)}`, 'error');
+        return;
+      }
+      const { stopCount, routeCount, pairCount } = scope.scope;
+      const scopeBox = $('assessmentScope');
+      scopeBox.textContent = `Selected radius: ${selectedRadius()} m · ${stopCount} stop${stopCount === 1 ? '' : 's'} · ${routeCount} distinct route${routeCount === 1 ? '' : 's'} · ${pairCount} detailed route × StopPoint pair${pairCount === 1 ? '' : 's'}.`;
+      scopeBox.hidden = false;
+      if (pairCount > 45) {
+        scopeBox.append(' This full assessment exceeds the one-window safe request threshold. Reduce the radius, use nearest/recommended assessment, or continue the full staged assessment. ');
+        const nearest = document.createElement('button'); nearest.type = 'button'; nearest.className = 'secondary compact'; nearest.textContent = 'Use nearest assessment'; nearest.addEventListener('click', () => loadStops(false, 'nearest'));
+        const continueButton = document.createElement('button'); continueButton.type = 'button'; continueButton.className = 'primary compact'; continueButton.textContent = 'Continue full staged assessment'; continueButton.addEventListener('click', () => loadStops(forceRefresh, 'full', { skipScope: true }));
+        scopeBox.append(nearest, continueButton);
+        return;
+      }
+    }
     const result = await busAssessment.assess(confirmedSite, { radius: $('radius').value, forceRefresh, mode: lastAssessmentMode });
     if (!result.ok) {
       $('evidencePanel').hidden = true;

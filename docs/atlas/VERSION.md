@@ -1,5 +1,18 @@
 # ATLAS version and build record
 
+## BUS-QA-02 Alpha.11 candidate
+
+| Field | Value |
+|---|---|
+| Product line | ATLAS 2.0 |
+| Version | `2.0.0-alpha.11` |
+| Visible build | `ATLAS-2.0.0-alpha.11-20260909` |
+| Base tree | `82e8dab921d1c3fb0d5345fdfaece272ffa67dce` (verified deployed Alpha.10 main tree) |
+| Branch | `codex/atlas-bus-qa-02-full-week-frequency` |
+| Status | Candidate; Technical Director re-review required |
+
+This bounded post-deployment correction replaces the single representative-day planner frequency with independently evidenced Monday-Sunday results and deterministic adjacent-day compression. It keeps the Alpha.10 representative-stop, TfL period-type, BODS/TNDS, selected-stop direction, browser/Word table and BUS-MAINT-02 protections. Service qualifications are filtered after final row aggregation so component limited-service notes cannot contradict the planner-facing consolidated row. Alpha.11 is used because the planner-facing behaviour changes after Alpha.10 deployment.
+
 ## BUS-QA-01 Alpha.10 candidate
 
 | Field | Value |

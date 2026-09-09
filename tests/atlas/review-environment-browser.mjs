@@ -41,7 +41,7 @@ await page.route('https://api.tfl.gov.uk/**', route => route.fulfill({ status: 2
 try {
   await page.goto(review.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   assert.equal(page.url(), review.url);
-  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.8/);
+  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.11/);
   assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--atlas-blue').trim()), '#002060');
   for (const section of ['Report Builder', 'Modules', 'Projects', 'About']) {
     await page.getByRole('button', { name: section }).click();

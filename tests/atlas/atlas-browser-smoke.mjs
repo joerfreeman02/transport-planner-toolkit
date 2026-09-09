@@ -30,7 +30,7 @@ await page.route('https://api.tfl.gov.uk/**', route => {
 
 try {
   await page.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.6/);
+  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.11/);
   await page.getByRole('button', { name: 'Report Builder' }).click();
   assert.equal(await page.getByRole('heading', { name: 'Report Builder', exact: true }).isVisible(), true);
   await page.getByRole('button', { name: 'About' }).click();

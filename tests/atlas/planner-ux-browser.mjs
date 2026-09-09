@@ -25,6 +25,7 @@ page.on('requestfailed', request => failedRequests.push({ url: request.url(), er
 await mockMapTiles(page);
 await mockAccessRouting(page);
 await mockPreparedBusTimetables(page);
+await page.route('**/atlas/data/status/manifest.json', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ successfulRefreshAt: '2026-09-04T08:00:00.000Z', sources: { naptan: { outcome: 'CHECKED_NO_CHANGE' }, bods: { outcome: 'CHECKED_NO_CHANGE' }, tnds: { outcome: 'CHECKED_NO_CHANGE', regionsChecked: [] }, tfl: { outcome: 'LIVE' } } }) }));
 await page.route('https://nominatim.openstreetmap.org/**', route => {
   geocodeRequests += 1;
   const query = new URL(route.request().url()).searchParams.get('q');
@@ -90,7 +91,7 @@ try {
 
   await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await page.waitForFunction(() => /Complete - checked/.test(document.getElementById('stopStatus')?.textContent || ''), null, { timeout: 20000 });
-  assert.equal(tflRequests, requestsAfterFirstAssessment, 'A repeated check should use still-current information without another source request.');
+  assert.equal(tflRequests, requestsAfterFirstAssessment + 5, 'A repeated check retries the five failed TfL timetable requests rather than caching source failures.');
   assert.match(await page.locator('#stopStatus').innerText(), /Complete - checked/);
   assert.doesNotMatch(await page.locator('#stopStatus').innerText(), /cache/i);
 
@@ -117,10 +118,12 @@ try {
   nonLondonPage.on('pageerror', error => nonLondonErrors.push(error.message));
   await mockMapTiles(nonLondonPage);
   await mockAccessRouting(nonLondonPage);
+  await mockPreparedBusTimetables(nonLondonPage);
+  await nonLondonPage.route('https://api.tfl.gov.uk/**', route => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify([]) }));
   await nonLondonPage.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await nonLondonPage.getByText('Enter coordinates instead', { exact: true }).click();
-  await nonLondonPage.getByLabel('Latitude').fill('51.686');
-  await nonLondonPage.getByLabel('Longitude').fill('-0.034');
+  await nonLondonPage.getByLabel('Latitude').fill('51.6857829');
+  await nonLondonPage.getByLabel('Longitude').fill('-0.0330001');
   await nonLondonPage.getByRole('button', { name: 'Use these coordinates' }).click();
   await nonLondonPage.getByRole('button', { name: 'Confirm assessment point' }).click();
   await nonLondonPage.getByRole('button', { name: 'Build full Bus assessment' }).click();

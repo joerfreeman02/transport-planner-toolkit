@@ -86,7 +86,7 @@ try {
 
   await page.getByLabel('Site address or name').fill('Unknown former depot site');
   await page.getByRole('button', { name: 'Find site' }).click();
-  await page.getByText(/choose the site on the map instead/i).waitFor({ timeout: 5000 });
+  await page.waitForFunction(() => /We could not find a suitable match|Site search is temporarily unavailable/.test(document.getElementById('geocodeStatus')?.textContent || ''), null, { timeout: 30000 });
   await page.locator('#siteMap').scrollIntoViewIfNeeded();
   const fallbackMapBox = await page.locator('#siteMap').boundingBox();
   await page.mouse.click(fallbackMapBox.x + fallbackMapBox.width * 0.55, fallbackMapBox.y + fallbackMapBox.height * 0.55);

@@ -21,7 +21,8 @@ export async function mockAccessRouting(page, { fail = false } = {}) {
 export async function mockPreparedBusTimetables(page, { serviceResolver = null } = {}) {
   const generatedAt = '2026-09-04T08:00:00.000Z';
   const manifest = {
-    schema: 'atlas-prepared-bus-data-v1', generatedAt, refreshAfterDays: 8, serviceShardKeyLength: 5,
+    schema: 'atlas-prepared-bus-data-v1', generatedAt, refreshAfterDays: 8, gridSize: 0.1, serviceShardKeyLength: 5,
+    stopShards: { g516_m1: 'stops/g516_m1.json' },
     sources: { naptan: { url: 'https://naptan.api.dft.gov.uk/', downloadedAt: generatedAt, sha256: 'fixture-naptan' }, bods: { url: 'https://data.bus-data.dft.gov.uk/timetable/download/', sha256: 'fixture-bods', regions: [{ region: 'london' }] } },
     serviceShards: { '490TE': ['services/490TE-london.json.gz'] }, representativeDates: { monday: '2026-09-07', tuesday: '2026-09-08', wednesday: '2026-09-09', thursday: '2026-09-10', friday: '2026-09-11', saturday: '2026-09-12', sunday: '2026-09-13' }
   };
@@ -35,6 +36,7 @@ export async function mockPreparedBusTimetables(page, { serviceResolver = null }
     ]
   };
   await page.route('**/atlas/data/bus/manifest.json', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(manifest) }));
+  await page.route('**/atlas/data/bus/stops/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ schema: 'atlas-prepared-bus-data-v1', stops: [{ id: '490TEST001', name: 'Waltham Cross Bus Station', indicator: 'A', direction: 'N', latitude: 51.6858, longitude: -0.0330, routes: ['322'] }] }) }));
   await page.route('**/atlas/data/bus/services/**', route => {
     const resolved = typeof serviceResolver === 'function' ? serviceResolver(route.request(), services) : services;
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(resolved) });

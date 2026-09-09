@@ -105,8 +105,8 @@ try {
   await chooseFirstCandidateAndConfirm(expansionPage);
   await expansionPage.getByRole('button', { name: 'Find nearest bus stop(s)' }).click();
   await expansionPage.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
-  assert.ok(expansionStopRequests >= 2, 'nearest assessment retries stop discovery after automatic radius expansion');
-  assert.match(await expansionPage.locator('#diagnostics').textContent(), /2000/);
+  assert.equal(expansionStopRequests, 1, 'nearest assessment retains the nearest group after unresolved timetable evidence instead of expanding to a farther group');
+  assert.doesNotMatch(await expansionPage.locator('#diagnostics').textContent(), /2000/);
   await expansionPage.locator('#radius').fill('550');
   assert.equal(await expansionPage.locator('#stopStatus').innerText(), 'The assessment radius changed. Build the Bus assessment again to update the evidence.');
   assert.equal(await expansionPage.locator('#evidencePanel').isHidden(), true);

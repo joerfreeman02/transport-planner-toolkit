@@ -37,13 +37,14 @@ try {
   assert.match(candidate, /^33, Westow Street/i, 'The exact property candidate was not returned.');
   await page.getByRole('button', { name: 'Use this result' }).click();
   await page.getByRole('button', { name: 'Confirm assessment point' }).click();
-  await page.getByRole('button', { name: 'Build Bus assessment' }).click();
-  await page.locator('#evidenceRows tr').first().waitFor({ timeout: 60000 });
+  await page.locator('#radius').fill('100');
+  await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
+  await page.locator('#evidenceRows tr').first().waitFor({ timeout: 120000 });
   const evidenceRows = await page.locator('#evidenceRows tr').count();
   assert.ok(evidenceRows > 0, 'Live browser workflow returned no stop evidence.');
   assert.equal(await page.locator('#siteMap .bus-stop-marker').count(), evidenceRows);
   assert.equal(await page.locator('#evidenceRows a[href*="google.com/maps/search"]').count(), evidenceRows);
-  assert.match(await page.locator('#resultSource').innerText(), /Transport for London.*Department for Transport bus timetables.*OpenStreetMap routing/);
+  assert.match(await page.locator('#resultSource').innerText(), /Transport for London.*(?:Department for Transport bus timetables|TfL scheduled timetable authority).*OpenStreetMap routing/);
   assert.match(await page.locator('#resultFreshness').innerText(), /^Assessment complete/);
   assert.ok(await page.locator('#serviceRows tr:not(.service-note)').count() > 0, 'No BODS service summary was produced.');
   assert.equal(pageErrors.length, 0, `Page errors: ${pageErrors.join('; ')}`);

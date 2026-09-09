@@ -20,6 +20,37 @@ function hasServiceForStops(services, stops) {
   return (services ?? []).some(service => Object.entries(service.stopSchedules ?? {}).some(([id, schedule]) => selectedIds.has(id) && hasScheduledEvidence(schedule)));
 }
 
+function routeAuthorities(stop, route) {
+  const explicit = stop?.routeAuthorities && typeof stop.routeAuthorities === 'object' ? stop.routeAuthorities[route] : null;
+  if (Array.isArray(explicit)) return explicit.map(value => String(value).trim().toLowerCase());
+  if (explicit) return [String(explicit).trim().toLowerCase()];
+  if (stop?.routeAuthorities && typeof stop.routeAuthorities === 'object') return [];
+  return (stop?.timetableAuthorities ?? [stop?.timetableAuthority]).map(value => String(value ?? '').trim().toLowerCase()).filter(Boolean);
+}
+
+function requiresNationalEvidence(stop) {
+  if (stop?.routeAuthorities && typeof stop.routeAuthorities === 'object') {
+    return Object.keys(stop.routeAuthorities).some(route => routeAuthorities(stop, route).some(authority => authority !== 'tfl'));
+  }
+  return routeAuthorities(stop, '').some(authority => authority !== 'tfl') || !routeAuthorities(stop, '').length;
+}
+
+function nationalEvidenceUnavailableForStop(stop, provenance = {}) {
+  if (provenance.nationalSourceAvailable !== false) return false;
+  const unresolvedRoutes = new Set((provenance.nationalUnresolvedRoutes ?? []).map(route => String(route)));
+  if (stop?.routeAuthorities && typeof stop.routeAuthorities === 'object') {
+    return Object.keys(stop.routeAuthorities).some(route => unresolvedRoutes.has(String(route)) && routeAuthorities(stop, route).some(authority => authority !== 'tfl'));
+  }
+  return requiresNationalEvidence(stop);
+}
+
+function timetableConclusion(result, selection) {
+  const explicit = result?.timetableConclusion || result?.provenance?.timetableConclusion;
+  if (explicit === 'MATCHED' || explicit === 'NO_CURRENT_MATCH' || explicit === 'UNRESOLVED') return explicit;
+  if (!result?.ok) return 'UNRESOLVED';
+  return hasServiceForStops(result.data, selection.stops) ? 'MATCHED' : 'NO_CURRENT_MATCH';
+}
+
 function sourceLabel(service) {
   const source = String(service?.timetableSource || service?.source?.provider || '').trim();
   if (/fallback/i.test(source)) return /TNDS/i.test(source) ? 'TNDS fallback' : 'BODS fallback';
@@ -43,12 +74,15 @@ function buildStopTimetableEvidence(stop, services, servicesResult) {
   if (!servicesResult?.ok) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable' });
   const matched = (services ?? []).filter(service => hasScheduledEvidence(service.stopSchedules?.[stopKey(stop)] || {}));
   const labels = [...new Set(matched.map(sourceLabel))];
+  const nationalIncomplete = nationalEvidenceUnavailableForStop(stop, servicesResult.provenance ?? {});
   if (labels.length) {
+    if (nationalIncomplete) return Object.freeze({ status: 'PARTIAL', label: `Matched · ${labels.join(' + ')} · national timetable source unavailable for required route coverage`, sources: labels });
     const status = labels.some(label => /fallback/i.test(label)) ? 'FALLBACK' : labels.some(label => /supplementary/i.test(label)) ? 'SUPPLEMENTED' : 'MATCHED';
     return Object.freeze({ status, label: `Matched · ${labels.join(' + ')}`, sources: labels });
   }
   const checked = checkedSourceLabels(servicesResult.provenance);
   if (Number(servicesResult.provenance?.failedRequests || 0) > 0 || servicesResult.provenance?.unavailable === true) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable', sources: checked });
+  if (nationalIncomplete) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · required national evidence could not be checked', sources: checked });
   return Object.freeze({ status: 'NO_CURRENT_MATCH', label: `No current match · ${checked.join('/') || 'timetable sources'} checked`, sources: checked });
 }
 
@@ -84,8 +118,18 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
       if (!selection.ok) return { selectedStops: [], services: [], servicesResult: lastResult, nearestGroup: null, warnings };
       const result = await timetableData.servicesForStops(selection.stops, options);
       lastResult = result;
-      if (result.ok && hasServiceForStops(result.data, selection.stops)) {
+      const conclusion = timetableConclusion(result, selection);
+      if (conclusion === 'MATCHED') {
         return { selectedStops: selection.stops, services: result.data, servicesResult: result, nearestGroup: Object.freeze({ name: selection.groupName, anchorStopId: selection.anchor.id, anchorWalkingDistanceMetres: selection.anchor.walking.distanceMetres, basis: `${selection.basis} Detailed timetable evidence was requested only for this candidate group.` }), warnings };
+      }
+      if (conclusion === 'UNRESOLVED') {
+        return {
+          selectedStops: selection.stops,
+          services: result.ok ? (result.data ?? []) : [],
+          servicesResult: result,
+          nearestGroup: Object.freeze({ name: selection.groupName, anchorStopId: selection.anchor.id, anchorWalkingDistanceMetres: selection.anchor.walking.distanceMetres, conclusion, basis: `${selection.basis} The nearest candidate was retained because timetable evidence was unresolved; a farther group was not substituted.` }),
+          warnings: [...new Set([...(warnings ?? []), 'The nearest candidate group was retained because timetable evidence was unavailable or unresolved; ATLAS did not substitute a farther group.'])]
+        };
       }
       const selectedIds = new Set(selection.stops.map(stopKey));
       remaining.splice(0, remaining.length, ...remaining.filter(stop => !selectedIds.has(stopKey(stop))));
@@ -100,7 +144,24 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     let prepared = await prepareStops(site, radius, forceRefresh, discovery);
     if (!prepared.stopsResult.ok) return Object.freeze({ ok: false, stage: 'stops', code: prepared.stopsResult.code, message: prepared.stopsResult.message, warnings: prepared.stopsResult.warnings ?? [], stopsResult: prepared.stopsResult, servicesResult: null });
     let enrichedDiscoveredStops = prepared.enriched;
-    if (!enrichedDiscoveredStops.length) return Object.freeze({ ok: true, status: 'complete', assessmentMode, discoveredStopCount: 0, scope: { stopCount: 0, routeCount: 0, pairCount: 0 }, stops: [], services: [], serviceSummaries: [], wording: 'No authoritative bus stops were found within the selected discovery radius.', warnings: prepared.stopsResult.warnings, provenance: { stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres } } });
+    if (!enrichedDiscoveredStops.length) {
+      const stopCoverageComplete = prepared.stopsResult.provenance?.stopCoverageComplete !== false;
+      return Object.freeze({
+        ok: true,
+        status: stopCoverageComplete ? 'complete' : 'partial',
+        assessmentMode,
+        discoveredStopCount: 0,
+        scope: { stopCount: 0, routeCount: 0, pairCount: 0 },
+        stops: [],
+        services: [],
+        serviceSummaries: [],
+        wording: stopCoverageComplete
+          ? 'No authoritative bus stops were found within the selected discovery radius.'
+          : 'No bus stops were returned, but required stop-source coverage was incomplete; ATLAS could not make an authoritative zero-stop conclusion.',
+        warnings: [...new Set([...(prepared.stopsResult.warnings ?? []), ...(!stopCoverageComplete ? ['Required stop-source coverage was incomplete; zero returned stops do not establish authoritative zero bus stops.'] : [])])],
+        provenance: { stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres } }
+      });
+    }
 
     const commonWarnings = [
       ...(prepared.stopsResult.warnings ?? []),
@@ -141,9 +202,10 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     });
     const warnings = [...new Set([...(assessmentWarnings ?? commonWarnings), ...(servicesResult?.warnings ?? []), ...collectServiceWarnings(services), ...(!servicesResult?.ok ? ['Timetable information is unavailable. Stop and routed-access results are still shown.'] : []), ...(!prepared.walkingResult?.ok ? ['Walking routes could not be checked. Please try again.'] : []), ...(!prepared.cyclingResult?.ok ? ['Cycling routes could not be checked. Please try again.'] : [])])];
     const routingComplete = selectedStops.every(stop => stop.walking.status === 'routed' && stop.cycling.status === 'routed');
+    const stopCoverageComplete = prepared.stopsResult.provenance?.stopCoverageComplete !== false;
     const nationalEvidenceComplete = servicesResult?.provenance?.nationalSourceAvailable !== false && !(servicesResult?.provenance?.nationalUnresolvedRoutes?.length);
     const timetablesComplete = Boolean(servicesResult?.ok) && nationalEvidenceComplete && Number(servicesResult?.provenance?.unprocessedRequests || 0) === 0 && Number(servicesResult?.provenance?.unresolvedRequests || 0) === 0;
-    const status = timetablesComplete && serviceSummaries.length && routingComplete ? 'complete' : 'partial';
+    const status = stopCoverageComplete && timetablesComplete && serviceSummaries.length && routingComplete ? 'complete' : 'partial';
     const selectedIds = new Set(selectedStops.map(stopKey));
     const routes = new Set(enrichedDiscoveredStops.flatMap(stop => stop.routes ?? []));
     return Object.freeze({ ok: true, status, assessmentMode, discoveredStopCount: enrichedDiscoveredStops.length, scope: { stopCount: enrichedDiscoveredStops.length, routeCount: routes.size, pairCount: routePairs(enrichedDiscoveredStops).size }, nearestGroup, stops: Object.freeze(selectedStops), services: Object.freeze(services), serviceSummaries: Object.freeze(serviceSummaries), wording: buildControlledBusWording(serviceSummaries, { nearestGroupName: nearestGroup?.name ?? null }), warnings: Object.freeze(warnings), provenance: Object.freeze({ stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres }, timetables: servicesResult?.provenance ?? {}, walking: prepared.walkingResult?.provenance ?? {}, cycling: prepared.cyclingResult?.provenance ?? {} }), evidence: Object.freeze((prepared.stopsResult.evidence ?? []).filter(item => assessmentMode === 'full' || selectedIds.has(item?.subject?.id))) });

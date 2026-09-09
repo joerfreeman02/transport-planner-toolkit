@@ -226,7 +226,7 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
 
   async function servicesForStop({ lineId, stopPointId, forceRefresh = false, routeMetadata = null } = {}) {
     const line = text(lineId), stop = text(stopPointId);
-    const provenance = { source: SOURCE, authoritativeFor: 'scheduled London bus timetables', endpoint: `${baseUrl}/Line/{id}/Timetable/{fromStopPointId}`, anonymousRequest: true, apiKeyEmbedded: false };
+    const provenance = { source: SOURCE, authoritativeFor: 'scheduled London bus timetables', endpoint: `${baseUrl}/Line/{id}/Timetable/{fromStopPointId}`, anonymousRequest: true, apiKeyEmbedded: false, timetableConclusion: 'UNRESOLVED' };
     if (!line || !stop) return sourceFailure({ code: 'invalid_request', message: 'A TfL line and StopPoint identity are required.', provenance });
     const metadataResult = routeMetadata ?? await routeMetadataForLines([line], { forceRefresh });
     const endpoint = new URL(`/Line/${encodeURIComponent(line)}/Timetable/${encodeURIComponent(stop)}`, baseUrl).toString();
@@ -240,7 +240,7 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
       const warnings = parsed.services.length ? parsed.warnings : [...parsed.warnings, 'TfL returned scheduled timetable data without a deterministically resolved route pattern. No route or zero-service conclusion has been assumed.'];
       const evidence = parsed.services.map(service => createEvidence({ subject: { entityType: 'bus-service', id: service.id, name: service.routeNumber }, evidenceType: 'bus.timetable.scheduled', value: service, source: { name: SOURCE, authoritative: true, recordIdentifier: service.id, endpoint, attribution: ATTRIBUTION }, retrievedAt: source.retrievedAt, calculationMethodology: 'TfL scheduled timetable journeys were associated only with their matching StationInterval pattern. TfL line-route metadata establishes complete route identity where deterministic; no arrival predictions were used.', validationStatus: 'validated', confidenceStatus: 'authoritative', freshness: { status: 'live-current', assessedAt: source.retrievedAt }, cache: { status: 'miss' } }));
       const routeMetadataRequests = routeMetadata ? 0 : metadataResult.cache?.status === 'hit' ? 0 : 1;
-      return sourceSuccess({ data: parsed.services, evidence, warnings, provenance: { ...source, departureStopId, resultCount: parsed.services.length, serviceDiscovery: 'scheduled-timetable', timetableRequests: 1, routeMetadataRequests, realtimeArrivalsUsed: false } });
+      return sourceSuccess({ data: parsed.services, evidence, warnings, provenance: { ...source, departureStopId, resultCount: parsed.services.length, serviceDiscovery: 'scheduled-timetable', timetableRequests: 1, routeMetadataRequests, realtimeArrivalsUsed: false, timetableConclusion: parsed.services.length ? 'MATCHED' : 'UNRESOLVED' } });
     }});
   }
   return Object.freeze({ id: 'tfl-bus-timetable-v1', servicesForStop, routeMetadataForLines });

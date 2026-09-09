@@ -35,6 +35,23 @@ function mergeRouteAuthorities(...stops) {
     .map(([route, authorities]) => [route, [...authorities].sort()]));
 }
 
+function unavailableSourceResult(source, error = null) {
+  const label = source === 'TfL' ? 'TfL StopPoint' : 'NaPTAN';
+  return {
+    ok: false,
+    code: 'unavailable_source',
+    message: `${label} bus-stop discovery was unavailable.`,
+    data: null,
+    evidence: [],
+    warnings: [`${label} bus-stop discovery was unavailable; stop coverage is incomplete.`],
+    provenance: { source: label, unavailable: true, technicalErrorType: error ? String(error?.name || 'source_rejected') : null }
+  };
+}
+
+function settledSource(settled, source) {
+  return settled.status === 'fulfilled' ? (settled.value ?? unavailableSourceResult(source)) : unavailableSourceResult(source, settled.reason);
+}
+
 export function createBusStopDiscovery({ tflAdapter, naptanAdapter, londonCoverage = isGreaterLondonPoint, crossBoundaryTfL = false } = {}) {
   if (!tflAdapter?.nearbyStops || !naptanAdapter?.nearbyStops) throw new Error('TfL and NaPTAN bus-stop adapters are required.');
 
@@ -47,8 +64,10 @@ export function createBusStopDiscovery({ tflAdapter, naptanAdapter, londonCovera
         Promise.resolve(result),
         tflAdapter.nearbyStops(site, options)
       ]);
-      const national = nationalResult.status === 'fulfilled' ? nationalResult.value : null;
-      const tfl = tflResult.status === 'fulfilled' ? tflResult.value : null;
+      const national = settledSource(nationalResult, 'NaPTAN');
+      const tfl = settledSource(tflResult, 'TfL');
+      const nationalAvailable = Boolean(national?.ok);
+      const tflAvailable = Boolean(tfl?.ok);
       const usable = [national, tfl].filter(candidate => candidate?.ok);
       if (usable.length) {
         const combined = usable.flatMap(candidate => candidate.data ?? []);
@@ -90,10 +109,16 @@ export function createBusStopDiscovery({ tflAdapter, naptanAdapter, londonCovera
         const data = [...mergedStops.values()].sort((a, b) => Number(a.distanceMetres) - Number(b.distanceMetres) || String(a.id).localeCompare(String(b.id)));
         result = {
           ok: true,
-          status: 'complete',
+          status: nationalAvailable && tflAvailable ? 'complete' : 'partial',
           data,
           evidence: usable.flatMap(candidate => candidate.evidence ?? []),
-          warnings: [...new Set(usable.flatMap(candidate => candidate.warnings ?? [])), ...(tfl?.ok ? ['TfL StopPoint records were checked at this confirmed point outside the Greater London boundary; TfL timetable authority is limited to the returned StopPoint records.'] : ['TfL StopPoint records were unavailable; national stop and timetable evidence remains the only checked source.'])],
+          warnings: [...new Set([
+            ...[national, tfl].flatMap(candidate => candidate.warnings ?? []),
+            ...(nationalAvailable && tflAvailable ? [] : ['Cross-boundary stop coverage is incomplete because one required stop source was unavailable.']),
+            ...(tflAvailable ? ['TfL StopPoint records were checked at this confirmed point outside the Greater London boundary; TfL timetable authority is limited to the returned StopPoint records.'] : []),
+            ...(!tflAvailable ? ['TfL StopPoint records were unavailable; cross-boundary TfL stop coverage could not be checked.'] : []),
+            ...(!nationalAvailable ? ['NaPTAN stop records were unavailable; national stop coverage could not be checked.'] : [])
+          ])],
           provenance: {
             source: 'NaPTAN with source-aware TfL cross-boundary check',
             retrievedAt: national?.provenance?.retrievedAt || tfl?.provenance?.retrievedAt || null,
@@ -101,7 +126,30 @@ export function createBusStopDiscovery({ tflAdapter, naptanAdapter, londonCovera
             providerAdapter: 'prepared-naptan-bus-stop-v1 + tfl-bus-stop-v1',
             national: national?.provenance ?? null,
             tfl: tfl?.provenance ?? null,
-            crossBoundaryTfL: Boolean(tfl?.ok)
+            crossBoundaryTfL: tflAvailable,
+            crossBoundaryTfLAttempted: true,
+            nationalStopSourceAvailable: nationalAvailable,
+            tflStopSourceAvailable: tflAvailable,
+            stopCoverageComplete: nationalAvailable && tflAvailable
+          }
+        };
+      } else {
+        return {
+          ok: false,
+          code: national.code || tfl.code || 'unavailable_source',
+          message: 'Required bus-stop sources could not be checked. Stop coverage is unavailable.',
+          data: null,
+          evidence: [],
+          warnings: [...new Set([...(national.warnings ?? []), ...(tfl.warnings ?? []), 'Required national and TfL stop sources were unavailable; no authoritative zero-stop conclusion can be made.'])],
+          provenance: {
+            source: 'NaPTAN with source-aware TfL cross-boundary check',
+            national: national.provenance ?? null,
+            tfl: tfl.provenance ?? null,
+            crossBoundaryTfL: false,
+            crossBoundaryTfLAttempted: true,
+            nationalStopSourceAvailable: false,
+            tflStopSourceAvailable: false,
+            stopCoverageComplete: false
           }
         };
       }
@@ -112,7 +160,10 @@ export function createBusStopDiscovery({ tflAdapter, naptanAdapter, londonCovera
       provenance: Object.freeze({
         ...result.provenance,
         providerSelectedBy: 'Confirmed assessment point checked against the official Greater London boundary',
-        providerAdapter: result.provenance.providerAdapter || provider.id
+        providerAdapter: result.provenance.providerAdapter || provider.id,
+        nationalStopSourceAvailable: result.provenance.nationalStopSourceAvailable ?? (insideLondon ? null : Boolean(result.ok)),
+        tflStopSourceAvailable: result.provenance.tflStopSourceAvailable ?? (insideLondon ? Boolean(result.ok) : null),
+        stopCoverageComplete: result.provenance.stopCoverageComplete ?? Boolean(result.ok)
       })
     });
   }

@@ -9,7 +9,7 @@ const fallbackWarning = 'TfL scheduled timetable information was unavailable, so
 const partialWarning = 'TfL scheduled timetable information could not be checked for one or more services. ATLAS retained available authoritative results and used matching national timetable evidence where available. Review the affected service evidence before formal use.';
 const incompleteWarning = 'TfL scheduled timetable information could not be checked for one or more services, and no defensible national fallback was available. ATLAS did not assume zero service; review the incomplete evidence before formal use.';
 const unprocessedWarning = 'Some detailed route/StopPoint timetable requests were not processed within the explicitly bounded assessment scope. The assessment is partial; unprocessed services were not treated as zero service.';
-const crossBoundaryWarning = 'TfL timetable authority was used only for returned TfL StopPoint records outside the Greater London boundary; national evidence remains supplementary or fallback evidence for other selected stops.';
+const crossBoundaryWarning = 'TfL timetable authority was used only for returned TfL StopPoint records outside the Greater London boundary; national-authority routes remain national-primary, while national evidence may supplement or explicitly fall back for TfL records.';
 const nationalUnavailableWarning = 'National BODS/TNDS timetable evidence was unavailable for one or more selected national-authority routes. ATLAS retained available TfL evidence but did not assume zero national service.';
 
 function isTfLStop(stop) { return normal(stop?.timetableAuthority) === 'tfl' || (stop?.timetableAuthorities ?? []).some(authority => normal(authority) === 'tfl'); }
@@ -106,8 +106,8 @@ function nationalRoutesForStop(stop) {
   return isTfLStop(stop) ? [] : (stop?.routes ?? []).map(text).filter(Boolean);
 }
 
-function nationalServiceCoveredByTfL(service, tflServices) {
-  const stopIds = scheduledStopIds(service);
+function nationalServiceCoveredByTfL(service, tflServices, selectedStopIds) {
+  const stopIds = scheduledStopIds(service).filter(stopId => selectedStopIds.has(stopId));
   const matches = (tflServices ?? []).filter(tfl => sameServiceIdentity(tfl, service));
   return matches.length > 0 && stopIds.length > 0 && stopIds.every(stopId => matches.some(tfl => hasScheduledServiceAt(tfl, new Set([stopId]))));
 }
@@ -136,16 +136,18 @@ function supplement(tfl, bods) {
   return { service, matched: true, conflict };
 }
 
-function fallbackService(service, request) {
+function fallbackService(service, request, reason = 'failure') {
   const provider = isTnds(service) ? 'TNDS' : 'BODS';
-  return { ...service, timetableSource: `${provider} fallback after TfL failure`, source: { ...(service.source ?? {}), provider, fallbackFor: 'TfL scheduled timetable', requestedLineId: request.lineId, requestedStopPointId: request.stopPointId } };
+  const fallbackReason = reason === 'unresolved' ? 'TfL unresolved timetable result' : 'TfL scheduled timetable failure';
+  const sourceLabel = reason === 'unresolved' ? 'TfL unresolved' : 'TfL failure';
+  return { ...service, timetableSource: `${provider} fallback after ${sourceLabel}`, source: { ...(service.source ?? {}), provider, fallbackFor: fallbackReason, requestedLineId: request.lineId, requestedStopPointId: request.stopPointId } };
 }
 
 export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAdapter, londonSupplementAdapter = nationalAdapter, londonCoverage = isGreaterLondonPoint, requestLimit = 20 } = {}) {
   if (!tflAdapter?.servicesForStop || !nationalAdapter?.servicesForStops || !londonSupplementAdapter?.servicesForStops) throw new Error('TfL, national and London supplementary timetable adapters are required.');
 
   async function servicesForStops(stops, options = {}) {
-    if (!stops?.length) return sourceSuccess({ data: [], warnings: [], provenance: { source: 'TfL scheduled timetable authority', authority: 'TfL', requestCount: 0, processedRequests: 0, unprocessedRequests: 0 } });
+    if (!stops?.length) return sourceSuccess({ data: [], warnings: [], provenance: { source: 'TfL scheduled timetable authority', authority: 'TfL', requestCount: 0, processedRequests: 0, unprocessedRequests: 0, timetableConclusion: 'NO_CURRENT_MATCH' } });
     const site = options.site ?? stops[0];
     const insideLondon = londonCoverage(site);
     const tflStops = insideLondon ? stops : stops.filter(isTfLStop);
@@ -177,12 +179,17 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     const successful = resultEntries.filter(entry => entry.result.ok);
     const failed = resultEntries.filter(entry => !entry.result.ok);
     const services = successful.flatMap(entry => entry.result.data ?? []);
-    const fallbackServices = failed.flatMap(({ result, request }) => {
-      if (result.ok || !request) return [];
+    const selectedStopIds = new Set(stops.map(stopKey));
+    const fallbackServices = resultEntries.flatMap(({ result, request }) => {
+      const unresolved = Boolean(result?.ok) && result?.provenance?.timetableConclusion === 'UNRESOLVED';
+      if ((!unresolved && result.ok) || !request) return [];
       const fallback = matchNationalRequest(request.lineId, request.stopPointId, nationalServices);
-      return fallback ? [fallbackService(fallback, request)] : [];
+      return fallback ? [fallbackService(fallback, request, unresolved ? 'unresolved' : 'failure')] : [];
     });
-    const unresolvedFailure = failed.some(({ request }) => !matchNationalRequest(request?.lineId, request?.stopPointId, nationalServices));
+    const unresolvedFailure = resultEntries.some(({ result, request }) => {
+      const unresolved = !result?.ok || result?.provenance?.timetableConclusion === 'UNRESOLVED';
+      return unresolved && !matchNationalRequest(request?.lineId, request?.stopPointId, nationalServices);
+    });
     let conflicts = 0;
     const composed = services.map(service => { const result = supplement(service, bods); if (result.conflict) conflicts += 1; return result.service; });
     composed.push(...fallbackServices);
@@ -191,7 +198,7 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       const fallbackIds = new Set(fallbackServices.map(service => text(service.id)));
       composed.push(...nationalServices.filter(service => hasScheduledServiceAt(service, nationalOnlyStopIds)
         && !fallbackIds.has(text(service.id))
-        && !nationalServiceCoveredByTfL(service, services)));
+        && !nationalServiceCoveredByTfL(service, services, selectedStopIds)));
     }
     if (conflicts) warnings.push(conflictWarning);
     if (failed.length && (fallbackServices.length || unresolvedFailure)) warnings.push(partialWarning);
@@ -212,7 +219,8 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       nationalUnresolvedRoutes,
       realtimeArrivalsUsed: false, anonymousRequest: true, apiKeyEmbedded: false
     };
-    if (!composed.length) return sourceFailure({ code: results[0]?.code || (!nationalSourceAvailable ? national?.code : null) || 'unavailable_source', message: 'TfL scheduled timetable information could not be checked. No London zero-service conclusion has been assumed.', warnings, provenance });
+    provenance.timetableConclusion = composed.length ? 'MATCHED' : (unresolvedFailure ? 'UNRESOLVED' : 'NO_CURRENT_MATCH');
+    if (!composed.length && provenance.timetableConclusion === 'UNRESOLVED') return sourceFailure({ code: results[0]?.code || (!nationalSourceAvailable ? national?.code : null) || 'unavailable_source', message: 'TfL scheduled timetable information could not be checked. No London zero-service conclusion has been assumed.', warnings, provenance });
     return sourceSuccess({ data: composed, warnings, provenance });
   }
   return Object.freeze({ id: 'authoritative-bus-timetable-v1', servicesForStops });

@@ -30,6 +30,7 @@ export async function mockPreparedBusTimetables(page, { serviceResolver = null }
     schema: 'atlas-prepared-bus-data-v1', services: [
       { id: 'fixture:322:outbound', routeNumber: '322', operator: 'London General', origin: 'Crystal Palace', destination: 'Clapham Common', direction: 'Clapham Common', principalLocations: ['West Norwood', 'Brixton'], stopSchedules: { '490TEST001': weekdays }, validFrom: '2026-09-04', validTo: '2027-01-01' },
       { id: 'fixture:450:outbound', routeNumber: '450', operator: 'Arriva London', origin: 'Lower Sydenham', destination: 'West Croydon', direction: 'West Croydon', principalLocations: ['Crystal Palace', 'Thornton Heath'], stopSchedules: { '490TEST001': weekdays }, validFrom: '2026-09-04', validTo: '2027-01-01' },
+      { id: 'fixture:3:outbound', routeNumber: '3', operator: 'Arriva London', origin: 'Crystal Palace', destination: 'Oxford Circus', direction: 'Oxford Circus', principalLocations: ['Brixton'], stopSchedules: { '490TEST002': weekdays }, validFrom: '2026-09-04', validTo: '2027-01-01' },
       { id: 'fixture:N3:night', routeNumber: 'N3', operator: 'Transport UK London Bus', origin: 'Oxford Circus', destination: 'Bromley North', direction: 'Bromley North', principalLocations: ['Brixton', 'Crystal Palace'], stopSchedules: { '490TEST002': { ...weekdays, monday: [1380, 1470], tuesday: [1380, 1470], wednesday: [1380, 1470], thursday: [1380, 1470], friday: [1380, 1470] } }, validFrom: '2026-09-04', validTo: '2027-01-01' }
     ]
   };

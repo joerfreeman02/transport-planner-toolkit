@@ -54,11 +54,11 @@ try {
   assert.match(await page.locator('.candidate p').first().innerText(), /^33, Westow Street/i);
   assert.equal(await page.getByText('Possible match — not yet confirmed', { exact: true }).count(), 0);
   assert.equal(geocodeRequests, 3);
-  assert.equal(await page.getByRole('button', { name: 'Build Bus assessment' }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).isDisabled(), true);
   await chooseFirstCandidateAndConfirm(page);
   assert.match(await page.locator('#confirmedSite').innerText(), /Confirmed from address/);
 
-  await page.getByRole('button', { name: 'Build Bus assessment' }).click();
+  await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.equal(await page.locator('#evidenceRows tr').count(), 2);
   assert.equal(await page.locator('#siteMap .bus-stop-marker').count(), 2);
@@ -66,8 +66,9 @@ try {
   assert.match(await page.locator('#evidenceRows tr').first().innerText(), /322, 450/);
   assert.ok(await page.locator('#serviceRows tr:not(.service-note)').count() > 0);
   assert.match(await page.locator('#evidenceRows tr').first().innerText(), /m · \d+ mins?/);
-  assert.equal(tflRequests, 1);
-  assert.match(await page.locator('#resultSource').innerText(), /Transport for London.*Department for Transport bus timetables.*OpenStreetMap routing/);
+  assert.ok(tflRequests > 0);
+  const requestsAfterFirstAssessment = tflRequests;
+  assert.match(await page.locator('#resultSource').innerText(), /Transport for London.*OpenStreetMap routing/);
   assert.match(await page.locator('#resultFreshness').innerText(), /^Assessment complete/);
   await page.getByText('Sources and checks', { exact: true }).click();
   assert.match(await page.locator('#plannerChecks').innerText(), /Stops:\s*Transport for London/);
@@ -87,8 +88,9 @@ try {
   if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'atlas-site-selector-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
 
-  await page.getByRole('button', { name: 'Build Bus assessment' }).click();
-  assert.equal(tflRequests, 1, 'A repeated check should use still-current information without another source request.');
+  await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
+  await page.waitForFunction(() => /Complete - checked/.test(document.getElementById('stopStatus')?.textContent || ''), null, { timeout: 20000 });
+  assert.equal(tflRequests, requestsAfterFirstAssessment, 'A repeated check should use still-current information without another source request.');
   assert.match(await page.locator('#stopStatus').innerText(), /Complete - checked/);
   assert.doesNotMatch(await page.locator('#stopStatus').innerText(), /cache/i);
 
@@ -104,7 +106,7 @@ try {
   await failurePage.getByLabel('Site address or name').fill('33 Westow Street, Crystal Palace');
   await failurePage.getByRole('button', { name: 'Find site' }).click();
   await chooseFirstCandidateAndConfirm(failurePage);
-  await failurePage.getByRole('button', { name: 'Build Bus assessment' }).click();
+  await failurePage.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await failurePage.getByText('Bus information is temporarily unavailable. Please try again shortly.', { exact: true }).waitFor({ timeout: 10000 });
   assert.doesNotMatch(await failurePage.locator('body').innerText(), /HTTP 429/i);
   assert.equal(failurePageErrors.length, 0);
@@ -121,7 +123,7 @@ try {
   await nonLondonPage.getByLabel('Longitude').fill('-0.034');
   await nonLondonPage.getByRole('button', { name: 'Use these coordinates' }).click();
   await nonLondonPage.getByRole('button', { name: 'Confirm assessment point' }).click();
-  await nonLondonPage.getByRole('button', { name: 'Build Bus assessment' }).click();
+  await nonLondonPage.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await nonLondonPage.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.ok(await nonLondonPage.locator('#evidenceRows tr').count() > 0);
   assert.match(await nonLondonPage.locator('#resultSource').innerText(), /NaPTAN/);

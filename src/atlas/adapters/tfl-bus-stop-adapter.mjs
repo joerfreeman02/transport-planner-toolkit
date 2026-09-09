@@ -84,6 +84,7 @@ export function createTflBusStopAdapter({
           sourceId: id,
           timetableAuthority: 'TfL',
           routes,
+          routeAuthorities: Object.fromEntries(routes.map(route => [route, ['TfL']])),
           distanceMetres: distance
         });
       }

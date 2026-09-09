@@ -139,7 +139,10 @@ export function createPreparedBusDataAdapter({
     for (const response of responses) for (const rawStop of response.data?.stops ?? []) {
       const stop = Array.isArray(rawStop) ? Object.fromEntries(fields.map((field, position) => [field, rawStop[position]])) : rawStop;
       const distance = distanceMetres(site, stop);
-      if (distance <= numericRadius && !deduplicated.has(stop.id)) deduplicated.set(stop.id, { ...stop, sourceId: stop.id, timetableAuthority: 'NaPTAN', distanceMetres: distance, routes: [...new Set(stop.routes ?? [])] });
+      if (distance <= numericRadius && !deduplicated.has(stop.id)) {
+        const routes = [...new Set(stop.routes ?? [])];
+        deduplicated.set(stop.id, { ...stop, sourceId: stop.id, timetableAuthority: 'NaPTAN', distanceMetres: distance, routes, routeAuthorities: Object.fromEntries(routes.map(route => [String(route), ['NaPTAN']])) });
+      }
     }
     const stops = [...deduplicated.values()].sort((a, b) => a.distanceMetres - b.distanceMetres || a.id.localeCompare(b.id));
     const checkedAt = clock().toISOString();

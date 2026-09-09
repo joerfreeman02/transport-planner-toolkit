@@ -1,5 +1,39 @@
 import { isGreaterLondonPoint } from '../domain/geography.mjs';
 
+function normaliseRouteAuthorities(stop, authority = '') {
+  const result = new Map();
+  const explicit = stop?.routeAuthorities && typeof stop.routeAuthorities === 'object' ? stop.routeAuthorities : {};
+  for (const [route, authorities] of Object.entries(explicit)) {
+    const key = String(route).trim();
+    if (!key) continue;
+    const values = Array.isArray(authorities) ? authorities : [authorities];
+    result.set(key, new Set(values.map(value => String(value).trim()).filter(Boolean)));
+  }
+  const fallback = String(authority || stop?.timetableAuthority || '').trim();
+  if (fallback) for (const route of stop?.routes ?? []) {
+    const key = String(route).trim();
+    if (!key) continue;
+    if (!result.has(key)) result.set(key, new Set());
+    result.get(key).add(fallback);
+  }
+  return Object.fromEntries([...result.entries()]
+    .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true }))
+    .map(([route, authorities]) => [route, [...authorities].sort()]));
+}
+
+function mergeRouteAuthorities(...stops) {
+  const merged = new Map();
+  for (const stop of stops) {
+    for (const [route, authorities] of Object.entries(normaliseRouteAuthorities(stop))) {
+      if (!merged.has(route)) merged.set(route, new Set());
+      for (const authority of authorities) merged.get(route).add(authority);
+    }
+  }
+  return Object.fromEntries([...merged.entries()]
+    .sort(([left], [right]) => left.localeCompare(right, undefined, { numeric: true }))
+    .map(([route, authorities]) => [route, [...authorities].sort()]));
+}
+
 export function createBusStopDiscovery({ tflAdapter, naptanAdapter, londonCoverage = isGreaterLondonPoint, crossBoundaryTfL = false } = {}) {
   if (!tflAdapter?.nearbyStops || !naptanAdapter?.nearbyStops) throw new Error('TfL and NaPTAN bus-stop adapters are required.');
 
@@ -29,7 +63,8 @@ export function createBusStopDiscovery({ tflAdapter, naptanAdapter, londonCovera
               sourceId: stop.sourceId || id,
               sourceAuthorities: authority ? [authority] : [],
               timetableAuthorities: authority ? [authority] : [],
-              routes: [...new Set(stop.routes ?? [])]
+              routes: [...new Set(stop.routes ?? [])],
+              routeAuthorities: normaliseRouteAuthorities(stop, authority)
             });
             continue;
           }
@@ -47,7 +82,8 @@ export function createBusStopDiscovery({ tflAdapter, naptanAdapter, londonCovera
             sourceAuthorities: authorities,
             timetableAuthorities,
             timetableAuthority: prefersTfL ? 'TfL' : (timetableAuthorities[0] || existing.timetableAuthority || null),
-            routes: [...new Set([...(existing.routes ?? []), ...(stop.routes ?? [])])].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }))
+            routes: [...new Set([...(existing.routes ?? []), ...(stop.routes ?? [])])].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true })),
+            routeAuthorities: mergeRouteAuthorities(existing, stop)
           });
         }
         const data = [...mergedStops.values()].sort((a, b) => Number(a.distanceMetres) - Number(b.distanceMetres) || String(a.id).localeCompare(String(b.id)));

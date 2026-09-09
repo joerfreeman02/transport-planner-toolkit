@@ -93,6 +93,16 @@ const scopeFull = await scopeAssessment.assess({ latitude: 51.685, longitude: -0
 assert.equal(scopeFull.status, 'complete');
 assert.equal(scopeRoutingCalls, 2, 'the real assessment makes exactly one walking and one cycling routing call');
 
+let discoveryCalls = 0;
+const reusableScopeAssessment = createBusAssessment({
+  stopDiscovery: { nearbyStops: async () => { discoveryCalls += 1; return { ok: true, data: [scopeStop], evidence: [], warnings: [], provenance: {} }; } },
+  timetableData: { servicesForStops: async () => ({ ok: true, data: [{ id: 'reuse-service', routeNumber: '10', operator: 'Reuse operator', origin: 'Reuse origin', destination: 'Reuse terminus', direction: 'Reuse terminus', stopSchedules: { 'SCOPE-STOP': schedule({ monday: [420] }) } }], warnings: [], provenance: {} }) },
+  accessRouting: { matrix: routed }
+});
+const reusableScope = await reusableScopeAssessment.inspectScope({ latitude: 51.685, longitude: -0.033 }, { radius: 700, forceRefresh: true });
+await reusableScopeAssessment.assess({ latitude: 51.685, longitude: -0.033 }, { radius: 700, forceRefresh: true, mode: 'full', discovery: reusableScope.discovery });
+assert.equal(discoveryCalls, 1, 'a force-refresh full assessment reuses the already discovered StopPoint scope');
+
 const expandedRadiusCalls = [];
 let expandedTimetableCalls = 0;
 const expandedStop = { id: 'EXPANDED-STOP', name: 'Expanded stop', latitude: 51.685, longitude: -0.033, routes: ['10'], walkingDistance: 120 };
@@ -151,8 +161,8 @@ const mixedAuthority = createAuthoritativeBusTimetableAdapter({
   londonCoverage: () => false
 });
 const mixedResult = await mixedAuthority.servicesForStops([
-  { id: 'MIX-TFL', timetableAuthority: 'TfL', routes: ['279'] },
-  { id: 'MIX-NATIONAL', timetableAuthority: 'NaPTAN', routes: ['X'] }
+  { id: 'MIX-TFL', timetableAuthority: 'TfL', routes: ['279'], routeAuthorities: { '279': ['TfL'] } },
+  { id: 'MIX-NATIONAL', timetableAuthority: 'NaPTAN', routes: ['X'], routeAuthorities: { X: ['NaPTAN'] } }
 ], { site: { latitude: 51.7, longitude: -0.1 } });
 assert.deepEqual(mixedNationalStopIds, ['MIX-NATIONAL'], 'mixed outside-London composition requests national evidence for national-only stops');
 assert.equal(mixedResult.ok, true);
@@ -167,11 +177,65 @@ const dualAuthority = createAuthoritativeBusTimetableAdapter({
   nationalAdapter: { servicesForStops: async selected => { dualNationalStopIds = selected.map(stop => stop.id); return { ok: true, data: [dualNationalService], warnings: [], provenance: { source: 'BODS' } }; } },
   londonCoverage: () => false
 });
-const dualResult = await dualAuthority.servicesForStops([{ id: 'DUAL-STOP', timetableAuthority: 'TfL', timetableAuthorities: ['NaPTAN', 'TfL'], routes: ['10'] }], { site: { latitude: 51.7, longitude: -0.1 } });
+const dualResult = await dualAuthority.servicesForStops([{ id: 'DUAL-STOP', timetableAuthority: 'TfL', timetableAuthorities: ['NaPTAN', 'TfL'], routes: ['10'], routeAuthorities: { '10': ['NaPTAN', 'TfL'] } }], { site: { latitude: 51.7, longitude: -0.1 } });
 assert.deepEqual(dualNationalStopIds, ['DUAL-STOP'], 'dual-authority physical stops remain in the national evidence scope');
 assert.equal(dualResult.ok, true);
 assert.equal(dualResult.data[0].timetableSource, 'BODS fallback after TfL failure');
 assert.equal(dualResult.data[0].source.provider, 'BODS');
+
+let dualRouteRequests = [];
+const dualRouteAuthority = createAuthoritativeBusTimetableAdapter({
+  tflAdapter: { servicesForStop: async ({ lineId, stopPointId }) => { dualRouteRequests.push(`${lineId}|${stopPointId}`); return { ok: true, data: [{ id: `tfl-${lineId}`, routeNumber: lineId, operator: 'TfL operator', origin: 'Dual origin', destination: 'Dual terminus', direction: 'Dual terminus', timetableSource: 'TfL', stopSchedules: { [stopPointId]: schedule({ monday: [420] }) } }], warnings: [], provenance: {} }; } },
+  nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [{ id: 'bods-X', routeNumber: 'X', operator: 'National operator', origin: 'National origin', destination: 'National terminus', direction: 'National terminus', timetableSource: 'BODS', stopSchedules: { 'DUAL-ROUTES': schedule({ monday: [450] }) } }], warnings: [], provenance: { source: 'BODS' } }) },
+  londonCoverage: () => false
+});
+const dualRouteResult = await dualRouteAuthority.servicesForStops([{
+  id: 'DUAL-ROUTES',
+  timetableAuthority: 'TfL',
+  timetableAuthorities: ['NaPTAN', 'TfL'],
+  routes: ['279', 'X'],
+  routeAuthorities: { '279': ['NaPTAN', 'TfL'], X: ['NaPTAN'] }
+}], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.deepEqual(dualRouteRequests, ['279|DUAL-ROUTES'], 'cross-boundary TfL requests are restricted to TfL-authoritative routes on a dual-authority stop');
+assert.equal(dualRouteResult.data.some(service => service.routeNumber === 'X' && service.timetableSource === 'BODS'), true, 'a national-only route on a dual stop remains national-primary');
+
+const unavailableNational = createAuthoritativeBusTimetableAdapter({
+  tflAdapter: { servicesForStop: async ({ lineId, stopPointId }) => ({ ok: true, data: [{ id: `tfl-${lineId}`, routeNumber: lineId, operator: 'TfL operator', origin: 'TfL origin', destination: 'TfL terminus', direction: 'TfL terminus', timetableSource: 'TfL', stopSchedules: { [stopPointId]: schedule({ monday: [420] }) } }], warnings: [], provenance: {} }) },
+  nationalAdapter: { servicesForStops: async () => ({ ok: false, code: 'offline', message: 'national unavailable', warnings: ['National fixture unavailable'], provenance: { source: 'BODS/TNDS' } }) },
+  londonCoverage: () => false
+});
+const unavailableResult = await unavailableNational.servicesForStops([
+  { id: 'UNAVAILABLE-TFL', timetableAuthority: 'TfL', routes: ['279'], routeAuthorities: { '279': ['TfL'] } },
+  { id: 'UNAVAILABLE-NATIONAL', timetableAuthority: 'NaPTAN', routes: ['X'], routeAuthorities: { X: ['NaPTAN'] } }
+], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.equal(unavailableResult.ok, true, 'available TfL evidence is retained when the required national source is unavailable');
+assert.equal(unavailableResult.provenance.nationalSourceAvailable, false);
+assert.deepEqual(unavailableResult.provenance.nationalUnresolvedRoutes, ['X']);
+assert.match(unavailableResult.warnings.join(' '), /national.*unavailable/i);
+
+const nationalRetained = createAuthoritativeBusTimetableAdapter({
+  tflAdapter: { servicesForStop: async () => ({ ok: false, code: 'offline', warnings: [], provenance: {} }) },
+  nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [{ id: 'bods-national-only', routeNumber: 'X', operator: 'National operator', origin: 'National origin', destination: 'National terminus', direction: 'National terminus', timetableSource: 'BODS', stopSchedules: { 'NATIONAL-ONLY': schedule({ monday: [450] }) } }], warnings: [], provenance: { source: 'BODS' } }) },
+  londonCoverage: () => false
+});
+const nationalRetainedResult = await nationalRetained.servicesForStops([
+  { id: 'FAILED-TFL', timetableAuthority: 'TfL', routes: ['279'], routeAuthorities: { '279': ['TfL'] } },
+  { id: 'NATIONAL-ONLY', timetableAuthority: 'NaPTAN', routes: ['X'], routeAuthorities: { X: ['NaPTAN'] } }
+], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.equal(nationalRetainedResult.ok, true);
+assert.equal(nationalRetainedResult.data.some(service => service.routeNumber === 'X'), true, 'ordinary national services remain visible when every TfL request fails');
+assert.match(nationalRetainedResult.warnings.join(' '), /could not be checked/i);
+
+const duplicateStop = { id: 'DUPLICATE-STOP', timetableAuthority: 'TfL', timetableAuthorities: ['NaPTAN', 'TfL'], routes: ['10'], routeAuthorities: { '10': ['NaPTAN', 'TfL'] } };
+const makeDuplicateAuthority = operator => createAuthoritativeBusTimetableAdapter({
+  tflAdapter: { servicesForStop: async ({ stopPointId }) => ({ ok: true, data: [{ id: 'tfl-duplicate', routeNumber: '10', operator: 'Shared operator', origin: 'Origin', destination: 'Terminus', direction: 'Terminus', timetableSource: 'TfL', stopSchedules: { [stopPointId]: schedule({ monday: [420] }) } }], warnings: [], provenance: {} }) },
+  nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [{ id: `tnds-${operator}`, routeNumber: '10', operator, origin: 'Origin', destination: 'Terminus', direction: 'Terminus', timetableSource: 'TNDS', source: { provider: 'TNDS' }, stopSchedules: { 'DUPLICATE-STOP': schedule({ monday: [450] }) } }], warnings: [], provenance: { source: 'TNDS' } }) },
+  londonCoverage: () => false
+});
+const sameOperatorResult = await makeDuplicateAuthority('Shared operator').servicesForStops([duplicateStop], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.equal(sameOperatorResult.data.filter(service => service.routeNumber === '10').length, 1, 'same route, termini and operator are de-duplicated across sources');
+const differentOperatorResult = await makeDuplicateAuthority('Different operator').servicesForStops([duplicateStop], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.equal(differentOperatorResult.data.filter(service => service.routeNumber === '10').length, 2, 'materially different operators remain distinct across sources');
 
 let sharedNow = 0;
 const sharedSleeps = [];

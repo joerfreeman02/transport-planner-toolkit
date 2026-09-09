@@ -18,7 +18,7 @@ export async function mockAccessRouting(page, { fail = false } = {}) {
   });
 }
 
-export async function mockPreparedBusTimetables(page) {
+export async function mockPreparedBusTimetables(page, { serviceResolver = null } = {}) {
   const generatedAt = '2026-09-04T08:00:00.000Z';
   const manifest = {
     schema: 'atlas-prepared-bus-data-v1', generatedAt, refreshAfterDays: 8, serviceShardKeyLength: 5,
@@ -34,7 +34,10 @@ export async function mockPreparedBusTimetables(page) {
     ]
   };
   await page.route('**/atlas/data/bus/manifest.json', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(manifest) }));
-  await page.route('**/atlas/data/bus/services/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(services) }));
+  await page.route('**/atlas/data/bus/services/**', route => {
+    const resolved = typeof serviceResolver === 'function' ? serviceResolver(route.request(), services) : services;
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(resolved) });
+  });
 }
 
 export async function chooseFirstCandidateAndConfirm(page) {

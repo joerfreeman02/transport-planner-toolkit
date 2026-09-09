@@ -171,6 +171,27 @@ function clearBusEvidence(message = 'Confirm the assessment point before checkin
   setCallout($('stopStatus'), hadEvidence ? 'The assessment point changed, so the earlier bus results were cleared. Confirm the new point before checking again.' : message, hadEvidence ? 'warning' : 'neutral');
 }
 
+function clearStaleBusAssessment() {
+  if (!currentBusResult) return;
+  currentBusResult = null;
+  detailedEvidenceVisible = false;
+  busStopMarkers.forEach(marker => map?.removeLayer(marker));
+  busStopMarkers = [];
+  routeLayers.forEach(layer => map?.removeLayer(layer));
+  routeLayers = [];
+  $('exportBusWord').disabled = true;
+  $('evidencePanel').hidden = true;
+  $('assessmentScope').hidden = true;
+  $('evidenceRows').replaceChildren();
+  $('serviceRows').replaceChildren();
+  $('assessmentWording').textContent = '';
+  $('clearRoutes').hidden = true;
+  selectedStopIds = new Set();
+  selectedServiceIds = new Set();
+  selectionInitialised = false;
+  setCallout($('stopStatus'), 'The assessment radius changed. Build the Bus assessment again to update the evidence.', 'warning');
+}
+
 function selectedRadius() {
   const value = Number($('radius').value);
   return Number.isFinite(value) ? Math.max(100, Math.min(2000, value)) : 700;
@@ -600,6 +621,7 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
   $('exportBusWord').disabled = true;
   $('assessmentScope').hidden = true;
   try {
+    let discovery = null;
     if (lastAssessmentMode === 'full' && !skipScope) {
       const scope = await busAssessment.inspectScope(confirmedSite, { radius: $('radius').value, forceRefresh });
       if (!scope.ok) {
@@ -607,6 +629,7 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
         return;
       }
       const { stopCount, routeCount, pairCount } = scope.scope;
+      discovery = scope.discovery ?? null;
       const scopeBox = $('assessmentScope');
       scopeBox.textContent = `Selected radius: ${selectedRadius()} m · ${stopCount} stop${stopCount === 1 ? '' : 's'} · ${routeCount} distinct route${routeCount === 1 ? '' : 's'} · ${pairCount} detailed route × StopPoint pair${pairCount === 1 ? '' : 's'}.`;
       scopeBox.hidden = false;
@@ -618,7 +641,7 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
         return;
       }
     }
-    const result = await busAssessment.assess(confirmedSite, { radius: $('radius').value, forceRefresh, mode: lastAssessmentMode });
+    const result = await busAssessment.assess(confirmedSite, { radius: $('radius').value, forceRefresh, mode: lastAssessmentMode, discovery });
     if (!result.ok) {
       $('evidencePanel').hidden = true;
       currentBusResult = null;
@@ -683,7 +706,7 @@ $('chooseOnMap').addEventListener('click', () => {
 });
 $('coordinatesForm').addEventListener('submit', enterCoordinates);
 $('confirmAssessmentPoint').addEventListener('click', confirmAssessmentPoint);
-$('radius').addEventListener('input', () => { radiusTouched = true; syncRadiusCircle(); });
+$('radius').addEventListener('input', () => { radiusTouched = true; clearStaleBusAssessment(); syncRadiusCircle(); });
 $('findNearestStops').addEventListener('click', () => loadStops(false, 'nearest'));
 $('findStops').addEventListener('click', () => loadStops(false, 'full'));
 $('refreshStops').addEventListener('click', () => loadStops(true, lastAssessmentMode));

@@ -5,8 +5,9 @@ import {
   groupStopsForPresentation,
   selectNearestStopGroup
 } from '../domain/bus-service-assessment.mjs';
+import { DEFAULT_TFL_REQUEST_LIMIT } from '../adapters/tfl-request-scheduler.mjs';
 
-export const TFL_REQUEST_WINDOW_LIMIT = 45;
+export const TFL_REQUEST_WINDOW_LIMIT = DEFAULT_TFL_REQUEST_LIMIT;
 export const TFL_ASSESSMENT_FIXED_REQUESTS = 2;
 export const TFL_SAFE_DETAILED_PAIR_LIMIT = TFL_REQUEST_WINDOW_LIMIT - TFL_ASSESSMENT_FIXED_REQUESTS;
 
@@ -54,15 +55,16 @@ function buildStopTimetableEvidence(stop, services, servicesResult) {
 export function createBusAssessment({ stopDiscovery, timetableData, accessRouting } = {}) {
   if (!stopDiscovery?.nearbyStops || !timetableData?.servicesForStops || !accessRouting?.matrix) throw new Error('Stop discovery, timetable data and access routing are required.');
 
-  async function discoverStops(site, radius, forceRefresh) {
+  async function discoverStops(site, radius, forceRefresh, cachedDiscovery = null) {
+    if (cachedDiscovery && Number(cachedDiscovery.radiusMetres) === Number(radius) && cachedDiscovery.stopsResult) return cachedDiscovery;
     const stopsResult = await stopDiscovery.nearbyStops(site, { radius, forceRefresh });
-    if (!stopsResult.ok) return { stopsResult, enriched: [] };
+    if (!stopsResult.ok) return { stopsResult, discovered: [], radiusMetres: Number(radius) };
     const discoveredStops = groupStopsForPresentation(stopsResult.data);
-    return { stopsResult, discovered: discoveredStops };
+    return { stopsResult, discovered: discoveredStops, radiusMetres: Number(radius) };
   }
 
-  async function prepareStops(site, radius, forceRefresh) {
-    const discovered = await discoverStops(site, radius, forceRefresh);
+  async function prepareStops(site, radius, forceRefresh, cachedDiscovery = null) {
+    const discovered = await discoverStops(site, radius, forceRefresh, cachedDiscovery);
     if (!discovered.stopsResult.ok) return { stopsResult: discovered.stopsResult, enriched: [] };
     const discoveredStops = discovered.discovered ?? [];
     if (!discoveredStops.length) return { ...discovered, enriched: [] };
@@ -91,11 +93,11 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     return { selectedStops: [], services: [], servicesResult: lastResult, nearestGroup: null, warnings };
   }
 
-  async function assess(site, { radius = 700, forceRefresh = false, mode = 'full' } = {}) {
+  async function assess(site, { radius = 700, forceRefresh = false, mode = 'full', discovery = null } = {}) {
     const assessmentMode = mode === 'nearest' ? 'nearest' : 'full';
     const selectedRadiusMetres = Number(radius);
     let actualDiscoveryRadiusMetres = selectedRadiusMetres;
-    let prepared = await prepareStops(site, radius, forceRefresh);
+    let prepared = await prepareStops(site, radius, forceRefresh, discovery);
     if (!prepared.stopsResult.ok) return Object.freeze({ ok: false, stage: 'stops', code: prepared.stopsResult.code, message: prepared.stopsResult.message, warnings: prepared.stopsResult.warnings ?? [], stopsResult: prepared.stopsResult, servicesResult: null });
     let enrichedDiscoveredStops = prepared.enriched;
     if (!enrichedDiscoveredStops.length) return Object.freeze({ ok: true, status: 'complete', assessmentMode, discoveredStopCount: 0, scope: { stopCount: 0, routeCount: 0, pairCount: 0 }, stops: [], services: [], serviceSummaries: [], wording: 'No authoritative bus stops were found within the selected discovery radius.', warnings: prepared.stopsResult.warnings, provenance: { stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres } } });
@@ -139,7 +141,8 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     });
     const warnings = [...new Set([...(assessmentWarnings ?? commonWarnings), ...(servicesResult?.warnings ?? []), ...collectServiceWarnings(services), ...(!servicesResult?.ok ? ['Timetable information is unavailable. Stop and routed-access results are still shown.'] : []), ...(!prepared.walkingResult?.ok ? ['Walking routes could not be checked. Please try again.'] : []), ...(!prepared.cyclingResult?.ok ? ['Cycling routes could not be checked. Please try again.'] : [])])];
     const routingComplete = selectedStops.every(stop => stop.walking.status === 'routed' && stop.cycling.status === 'routed');
-    const timetablesComplete = Boolean(servicesResult?.ok) && Number(servicesResult?.provenance?.unprocessedRequests || 0) === 0 && Number(servicesResult?.provenance?.unresolvedRequests || 0) === 0;
+    const nationalEvidenceComplete = servicesResult?.provenance?.nationalSourceAvailable !== false && !(servicesResult?.provenance?.nationalUnresolvedRoutes?.length);
+    const timetablesComplete = Boolean(servicesResult?.ok) && nationalEvidenceComplete && Number(servicesResult?.provenance?.unprocessedRequests || 0) === 0 && Number(servicesResult?.provenance?.unresolvedRequests || 0) === 0;
     const status = timetablesComplete && serviceSummaries.length && routingComplete ? 'complete' : 'partial';
     const selectedIds = new Set(selectedStops.map(stopKey));
     const routes = new Set(enrichedDiscoveredStops.flatMap(stop => stop.routes ?? []));
@@ -151,7 +154,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     if (!discovered.stopsResult.ok) return Object.freeze({ ok: false, code: discovered.stopsResult.code, message: discovered.stopsResult.message, warnings: discovered.stopsResult.warnings ?? [] });
     const stops = discovered.discovered ?? [];
     const routes = new Set(stops.flatMap(stop => stop.routes ?? []));
-    return Object.freeze({ ok: true, scope: Object.freeze({ stopCount: stops.length, routeCount: routes.size, pairCount: routePairs(stops).size }), warnings: discovered.stopsResult.warnings ?? [] });
+    return Object.freeze({ ok: true, scope: Object.freeze({ stopCount: stops.length, routeCount: routes.size, pairCount: routePairs(stops).size }), warnings: discovered.stopsResult.warnings ?? [], discovery: Object.freeze(discovered) });
   }
 
   return Object.freeze({ id: 'atlas-bus-assessment-v1', assess, inspectScope });

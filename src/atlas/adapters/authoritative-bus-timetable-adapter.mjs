@@ -61,6 +61,8 @@ function matchNationalRequest(lineId, stopPointId, nationalServices) {
   return candidates.length === 1 ? candidates[0] : null;
 }
 
+function requestIdentity(request) { return request?.lineId && request?.stopPointId ? `${request.lineId}|${request.stopPointId}` : null; }
+
 function matchBods(tfl, bods) {
   const candidates = (bods ?? []).filter(service => normal(service.routeNumber) === normal(tfl.routeNumber) && Object.keys(service.stopSchedules ?? {}).some(id => Object.keys(tfl.stopSchedules ?? {}).includes(id)));
   if (!candidates.length) return null;
@@ -178,6 +180,7 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     const results = resultEntries.map(entry => entry.result);
     const successful = resultEntries.filter(entry => entry.result.ok);
     const failed = resultEntries.filter(entry => !entry.result.ok);
+    const unresolvedObserved = resultEntries.filter(({ result }) => !result?.ok || result?.provenance?.timetableConclusion === 'UNRESOLVED');
     const services = successful.flatMap(entry => entry.result.data ?? []);
     const selectedStopIds = new Set(stops.map(stopKey));
     const fallbackServices = resultEntries.flatMap(({ result, request }) => {
@@ -186,10 +189,8 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       const fallback = matchNationalRequest(request.lineId, request.stopPointId, nationalServices);
       return fallback ? [fallbackService(fallback, request, unresolved ? 'unresolved' : 'failure')] : [];
     });
-    const unresolvedFailure = resultEntries.some(({ result, request }) => {
-      const unresolved = !result?.ok || result?.provenance?.timetableConclusion === 'UNRESOLVED';
-      return unresolved && !matchNationalRequest(request?.lineId, request?.stopPointId, nationalServices);
-    });
+    const unresolvedEntries = unresolvedObserved.filter(({ request }) => !matchNationalRequest(request?.lineId, request?.stopPointId, nationalServices));
+    const unresolvedRequestIdentities = unresolvedEntries.map(({ request }) => requestIdentity(request)).filter(Boolean);
     let conflicts = 0;
     const composed = services.map(service => { const result = supplement(service, bods); if (result.conflict) conflicts += 1; return result.service; });
     composed.push(...fallbackServices);
@@ -201,8 +202,8 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
         && !nationalServiceCoveredByTfL(service, services, selectedStopIds)));
     }
     if (conflicts) warnings.push(conflictWarning);
-    if (failed.length && (fallbackServices.length || unresolvedFailure)) warnings.push(partialWarning);
-    if (unresolvedFailure) warnings.push(incompleteWarning);
+    if (unresolvedObserved.length && (fallbackServices.length || unresolvedEntries.length)) warnings.push(partialWarning);
+    if (unresolvedEntries.length) warnings.push(incompleteWarning);
     if (!nationalSourceAvailable) warnings.push(nationalUnavailableWarning);
     if (fallbackServices.length) warnings.push(fallbackWarning);
     if (unprocessed.length) warnings.push(`Unprocessed timetable scope: ${unprocessed.map(request => `${request.lineId}/${request.stopPointId}`).join(', ')}.`);
@@ -214,12 +215,12 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       processedRequests: processedRequests.length, unprocessedRequests: unprocessed.length, processedRequestIdentities: processedRequests.map(request => `${request.lineId}|${request.stopPointId}`),
       unprocessedRequestIdentities: unprocessed.map(request => `${request.lineId}|${request.stopPointId}`), timetableRequests: results.length,
       routeMetadataRequests, totalTfLRequests: results.length + routeMetadataRequests, successfulRequests: successful.length, failedRequests: failed.length,
-      unresolvedRequests: failed.filter(({ request }) => !matchNationalRequest(request?.lineId, request?.stopPointId, nationalServices)).length,
+      unresolvedRequests: unresolvedRequestIdentities.length, unresolvedRequestIdentities,
       nationalSourceAvailable,
       nationalUnresolvedRoutes,
       realtimeArrivalsUsed: false, anonymousRequest: true, apiKeyEmbedded: false
     };
-    provenance.timetableConclusion = composed.length ? 'MATCHED' : (unresolvedFailure ? 'UNRESOLVED' : 'NO_CURRENT_MATCH');
+    provenance.timetableConclusion = composed.length ? 'MATCHED' : (unresolvedEntries.length ? 'UNRESOLVED' : 'NO_CURRENT_MATCH');
     if (!composed.length && provenance.timetableConclusion === 'UNRESOLVED') return sourceFailure({ code: results[0]?.code || (!nationalSourceAvailable ? national?.code : null) || 'unavailable_source', message: 'TfL scheduled timetable information could not be checked. No London zero-service conclusion has been assumed.', warnings, provenance });
     return sourceSuccess({ data: composed, warnings, provenance });
   }

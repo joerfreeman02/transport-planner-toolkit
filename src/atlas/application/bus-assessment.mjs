@@ -44,6 +44,14 @@ function nationalEvidenceUnavailableForStop(stop, provenance = {}) {
   return requiresNationalEvidence(stop);
 }
 
+function incompleteTimetableIdentitiesForStop(stop, provenance = {}) {
+  const identitySuffix = `|${stopKey(stop)}`;
+  return [...new Set([
+    ...(provenance.unresolvedRequestIdentities ?? []),
+    ...(provenance.unprocessedRequestIdentities ?? [])
+  ].map(String).filter(identity => identity.endsWith(identitySuffix)))];
+}
+
 function timetableConclusion(result, selection) {
   const explicit = result?.timetableConclusion || result?.provenance?.timetableConclusion;
   if (explicit === 'MATCHED' || explicit === 'NO_CURRENT_MATCH' || explicit === 'UNRESOLVED') return explicit;
@@ -71,17 +79,23 @@ function checkedSourceLabels(provenance = {}) {
 }
 
 function buildStopTimetableEvidence(stop, services, servicesResult) {
-  if (!servicesResult?.ok) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable' });
+  const provenance = servicesResult?.provenance ?? {};
+  const incompleteIdentities = incompleteTimetableIdentitiesForStop(stop, provenance);
+  const incompleteCount = incompleteIdentities.length;
+  const incompleteLabel = `timetable evidence unresolved or incomplete for ${incompleteCount} route${incompleteCount === 1 ? '' : 's'}`;
+  if (!servicesResult?.ok) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: incompleteCount ? `Timetable source unavailable · ${incompleteLabel}` : 'Timetable source unavailable' });
   const matched = (services ?? []).filter(service => hasScheduledEvidence(service.stopSchedules?.[stopKey(stop)] || {}));
   const labels = [...new Set(matched.map(sourceLabel))];
-  const nationalIncomplete = nationalEvidenceUnavailableForStop(stop, servicesResult.provenance ?? {});
+  const nationalIncomplete = nationalEvidenceUnavailableForStop(stop, provenance);
   if (labels.length) {
     if (nationalIncomplete) return Object.freeze({ status: 'PARTIAL', label: `Matched · ${labels.join(' + ')} · national timetable source unavailable for required route coverage`, sources: labels });
+    if (incompleteCount) return Object.freeze({ status: 'PARTIAL', label: `Matched · ${labels.join(' + ')} · ${incompleteLabel}`, sources: labels });
     const status = labels.some(label => /fallback/i.test(label)) ? 'FALLBACK' : labels.some(label => /supplementary/i.test(label)) ? 'SUPPLEMENTED' : 'MATCHED';
     return Object.freeze({ status, label: `Matched · ${labels.join(' + ')}`, sources: labels });
   }
-  const checked = checkedSourceLabels(servicesResult.provenance);
-  if (Number(servicesResult.provenance?.failedRequests || 0) > 0 || servicesResult.provenance?.unavailable === true) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable', sources: checked });
+  const checked = checkedSourceLabels(provenance);
+  if (incompleteCount) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: `Timetable source unavailable · ${incompleteLabel}`, sources: checked });
+  if (Number(provenance.failedRequests || 0) > 0 || provenance.unavailable === true) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable', sources: checked });
   if (nationalIncomplete) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · required national evidence could not be checked', sources: checked });
   return Object.freeze({ status: 'NO_CURRENT_MATCH', label: `No current match · ${checked.join('/') || 'timetable sources'} checked`, sources: checked });
 }

@@ -7,6 +7,19 @@ const schedule = departures => ({ monday: departures, tuesday: [], wednesday: []
 const sourceSuccess = (source, data = [], provenance = {}) => ({ ok: true, data, evidence: [], warnings: [], provenance: { source, ...provenance } });
 const sourceFailure = (source, warning = `${source} unavailable`) => ({ ok: false, code: 'offline', data: null, evidence: [], warnings: [warning], provenance: { source, unavailable: true } });
 const routed = async (_site, stops) => ({ ok: true, routes: stops.map(stop => ({ status: 'routed', distanceMetres: Number(stop.walking?.distanceMetres) || 100, durationSeconds: 60 })), warnings: [], provenance: {} });
+function makeAlpha12Assessment(stops, tflResults, nationalServices = []) {
+  const authority = createAuthoritativeBusTimetableAdapter({
+    tflAdapter: { servicesForStop: async ({ lineId }) => tflResults[lineId] ?? sourceSuccess('TfL', [], { timetableConclusion: 'NO_CURRENT_MATCH' }) },
+    nationalAdapter: { servicesForStops: async () => sourceSuccess('BODS', nationalServices) },
+    londonSupplementAdapter: { servicesForStops: async () => sourceSuccess('BODS', nationalServices) },
+    londonCoverage: () => true
+  });
+  return createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => sourceSuccess('TfL', stops, { stopCoverageComplete: true }) },
+    timetableData: authority,
+    accessRouting: { matrix: routed }
+  });
+}
 
 const nationalStop = { id: 'NATIONAL-STOP', name: 'National stop', routes: ['X'], timetableAuthority: 'NaPTAN', routeAuthorities: { X: ['NaPTAN'] } };
 const tflStop = { id: 'TFL-STOP', name: 'TfL stop', routes: ['279'], timetableAuthority: 'TfL', routeAuthorities: { '279': ['TfL'] } };
@@ -113,6 +126,81 @@ const dualEvidenceAssessment = createBusAssessment({
 });
 const dualEvidence = await dualEvidenceAssessment.assess({ latitude: 51.7, longitude: -0.1 });
 assert.equal(dualEvidence.stops[0].timetableEvidenceStatus, 'PARTIAL');
+
+const mixedSameStop = makeAlpha12Assessment([
+  { id: 'STOP-A', name: 'Mixed stop', latitude: 51.7, longitude: -0.1, routes: ['279', 'N279'], timetableAuthority: 'TfL' }
+], {
+  '279': sourceSuccess('TfL', [{ id: 'tfl-279', routeNumber: '279', timetableSource: 'TfL', stopSchedules: { 'STOP-A': schedule([420]) } }], { timetableConclusion: 'MATCHED' }),
+  N279: sourceSuccess('TfL', [], { timetableConclusion: 'UNRESOLVED' })
+});
+const mixedSameStopResult = await mixedSameStop.assess({ latitude: 51.7, longitude: -0.1 });
+assert.equal(mixedSameStopResult.ok, true);
+assert.equal(mixedSameStopResult.provenance.timetables.timetableConclusion, 'MATCHED');
+assert.equal(mixedSameStopResult.provenance.timetables.unresolvedRequests, 1);
+assert.deepEqual(mixedSameStopResult.provenance.timetables.unresolvedRequestIdentities, ['N279|STOP-A']);
+assert.equal(mixedSameStopResult.status, 'partial');
+assert.equal(mixedSameStopResult.stops[0].timetableEvidenceStatus, 'PARTIAL');
+assert.match(mixedSameStopResult.stops[0].timetableEvidence, /unresolved/i);
+assert.match(mixedSameStopResult.warnings.join(' '), /incomplete evidence/i);
+
+const mixedSeparateStops = makeAlpha12Assessment([
+  { id: 'STOP-A', name: 'Matched stop', latitude: 51.7, longitude: -0.1, routes: ['279'], timetableAuthority: 'TfL' },
+  { id: 'STOP-B', name: 'Unresolved stop', latitude: 51.701, longitude: -0.1, routes: ['N279'], timetableAuthority: 'TfL' }
+], {
+  '279': sourceSuccess('TfL', [{ id: 'tfl-279', routeNumber: '279', timetableSource: 'TfL', stopSchedules: { 'STOP-A': schedule([420]) } }], { timetableConclusion: 'MATCHED' }),
+  N279: sourceSuccess('TfL', [], { timetableConclusion: 'UNRESOLVED' })
+});
+const mixedSeparateResult = await mixedSeparateStops.assess({ latitude: 51.7, longitude: -0.1 });
+assert.equal(mixedSeparateResult.status, 'partial');
+assert.equal(mixedSeparateResult.stops.find(stop => stop.id === 'STOP-A').timetableEvidenceStatus, 'MATCHED');
+assert.equal(mixedSeparateResult.stops.find(stop => stop.id === 'STOP-B').timetableEvidenceStatus, 'SOURCE_UNAVAILABLE');
+assert.match(mixedSeparateResult.stops.find(stop => stop.id === 'STOP-B').timetableEvidence, /unresolved/i);
+
+const unprocessedStopAssessment = createBusAssessment({
+  stopDiscovery: { nearbyStops: async () => sourceSuccess('TfL', [
+    { id: 'STOP-A', name: 'Processed stop', latitude: 51.7, longitude: -0.1, routes: ['279'], timetableAuthority: 'TfL' },
+    { id: 'STOP-B', name: 'Unprocessed stop', latitude: 51.701, longitude: -0.1, routes: ['N279'], timetableAuthority: 'TfL' }
+  ], { stopCoverageComplete: true }) },
+  timetableData: { servicesForStops: async () => sourceSuccess('TfL', [{ id: 'tfl-279', routeNumber: '279', timetableSource: 'TfL', stopSchedules: { 'STOP-A': schedule([420]) } }], { processedRequests: 1, unprocessedRequests: 1, unprocessedRequestIdentities: ['N279|STOP-B'], timetableConclusion: 'MATCHED' }) },
+  accessRouting: { matrix: routed }
+});
+const unprocessedResult = await unprocessedStopAssessment.assess({ latitude: 51.7, longitude: -0.1 });
+assert.equal(unprocessedResult.status, 'partial');
+assert.equal(unprocessedResult.stops.find(stop => stop.id === 'STOP-A').timetableEvidenceStatus, 'MATCHED');
+assert.equal(unprocessedResult.stops.find(stop => stop.id === 'STOP-B').timetableEvidenceStatus, 'SOURCE_UNAVAILABLE');
+assert.match(unprocessedResult.stops.find(stop => stop.id === 'STOP-B').timetableEvidence, /incomplete/i);
+
+const fallbackService = { id: 'bods-n279', routeNumber: 'N279', operator: 'National operator', origin: 'Origin', destination: 'Terminus', direction: 'Terminus', timetableSource: 'BODS', stopSchedules: { 'STOP-A': schedule([450]) } };
+const unresolvedWithFallback = makeAlpha12Assessment([
+  { id: 'STOP-A', name: 'Fallback stop', latitude: 51.7, longitude: -0.1, routes: ['N279'], timetableAuthority: 'TfL' }
+], { N279: sourceSuccess('TfL', [], { timetableConclusion: 'UNRESOLVED' }) }, [fallbackService]);
+const fallbackResult = await unresolvedWithFallback.assess({ latitude: 51.7, longitude: -0.1 });
+assert.equal(fallbackResult.provenance.timetables.unresolvedRequests, 0);
+assert.equal(fallbackResult.provenance.timetables.unresolvedRequestIdentities.length, 0);
+assert.equal(fallbackResult.services[0].timetableSource, 'BODS fallback after TfL unresolved');
+assert.equal(fallbackResult.stops[0].timetableEvidenceStatus, 'FALLBACK');
+
+const hardFailureMixed = makeAlpha12Assessment([
+  { id: 'STOP-A', name: 'Hard failure stop', latitude: 51.7, longitude: -0.1, routes: ['279', 'N279'], timetableAuthority: 'TfL' }
+], {
+  '279': sourceSuccess('TfL', [{ id: 'tfl-279', routeNumber: '279', timetableSource: 'TfL', stopSchedules: { 'STOP-A': schedule([420]) } }], { timetableConclusion: 'MATCHED' }),
+  N279: sourceFailure('TfL', 'TfL N279 request failed')
+});
+const hardFailureResult = await hardFailureMixed.assess({ latitude: 51.7, longitude: -0.1 });
+assert.equal(hardFailureResult.ok, true);
+assert.equal(hardFailureResult.status, 'partial');
+assert.equal(hardFailureResult.provenance.timetables.unresolvedRequests, 1);
+assert.deepEqual(hardFailureResult.provenance.timetables.unresolvedRequestIdentities, ['N279|STOP-A']);
+assert.equal(hardFailureResult.stops[0].timetableEvidenceStatus, 'PARTIAL');
+
+const provenNoMatch = makeAlpha12Assessment([
+  { id: 'STOP-A', name: 'No-match stop', latitude: 51.7, longitude: -0.1, routes: ['279'], timetableAuthority: 'TfL' }
+], { '279': sourceSuccess('TfL', [], { timetableConclusion: 'NO_CURRENT_MATCH' }) });
+const provenNoMatchResult = await provenNoMatch.assess({ latitude: 51.7, longitude: -0.1 });
+assert.equal(provenNoMatchResult.ok, true);
+assert.equal(provenNoMatchResult.provenance.timetables.timetableConclusion, 'NO_CURRENT_MATCH');
+assert.equal(provenNoMatchResult.provenance.timetables.unresolvedRequests, 0);
+assert.equal(provenNoMatchResult.stops[0].timetableEvidenceStatus, 'NO_CURRENT_MATCH');
 
 const nearestStops = [
   { id: 'NEAREST-A', name: 'Nearest A', latitude: 51.7, longitude: -0.1, routes: ['10'], walking: { status: 'routed', distanceMetres: 50 } },

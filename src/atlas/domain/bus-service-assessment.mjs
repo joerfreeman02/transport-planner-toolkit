@@ -31,17 +31,7 @@ function normaliseSchedule(schedule = {}, warnings = []) {
   const output = {};
   for (const day of DAY_ORDER) {
     const values = numeric(schedule?.[day] ?? []).filter(value => value >= 0 && value <= 2880);
-    const seenModulo = new Map();
-    output[day] = values.filter(value => {
-      const modulo = value % 1440;
-      if (seenModulo.has(modulo)) {
-        const previous = seenModulo.get(modulo);
-        if (Math.abs(value - previous) === 1440) warnings.push(`Repeated ${modulo} minute schedule evidence was de-duplicated on ${day}.`);
-        return false;
-      }
-      seenModulo.set(modulo, value);
-      return true;
-    });
+    output[day] = [...new Set(values)];
     if (values.length !== numeric(schedule?.[day] ?? []).length) warnings.push(`Invalid or out-of-range schedule evidence was excluded on ${day}.`);
   }
   return output;
@@ -260,8 +250,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
     if (!relevantStops.length) continue;
     const stopDirections = unique(relevantStops.map(id => selectedStopDirectionKey(selectedStopsById.get(id))).filter(Boolean)).sort().join(',');
     const directionKey = directionGroupKey(service);
-    const explicitDirectionFamily = /^gtfs:/.test(directionKey);
-    const terminiKey = explicitDirectionFamily ? '' : `${service.origin}|${service.destination}`;
+    const terminiKey = `${service.origin}|${service.destination}`;
     const identity = [service.routeNumber, service.operator, directionKey, terminiKey, stopDirections].map(value => text(value).toLowerCase()).join('|');
     if (!groups.has(identity)) groups.set(identity, []);
     groups.get(identity).push({ ...service, relevantStops });
@@ -269,7 +258,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
   const summaries = [...groups.values()].map(records => {
     const stopIds = unique(records.flatMap(record => record.relevantStops));
     const first = representativeRecord(records, stopIds);
-    const identity = [first.routeNumber, first.operator, directionGroupKey(first)].map(value => text(value).toLowerCase()).join('|');
+    const identity = [first.routeNumber, first.operator, directionGroupKey(first), first.origin, first.destination].map(value => text(value).toLowerCase()).join('|');
     const frequencyStop = representativeStop(stops, records);
     const frequencyBasisStopId = text(frequencyStop?.id || frequencyStop?.sourceId) || stopIds[0] || null;
     const departuresByDay = mergeDepartures(records, frequencyBasisStopId ? [frequencyBasisStopId] : stopIds);
@@ -296,7 +285,12 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const servedAtStops = unique(assessedStops.map(stopLabel)).sort((a, b) => a.localeCompare(b));
     const frequencyStopLabel = stopLabel(frequencyStop) || 'selected stop';
     const companionStops = servedAtStops.filter(label => label !== frequencyStopLabel);
-    const stopContext = companionStops.length ? `Assessed at: ${frequencyStopLabel} (Stops ${companionStops.join(', ')})` : null;
+    const commonNames = unique(assessedStops.map(stop => text(stop?.name)));
+    const stopContext = companionStops.length
+      ? (commonNames.length === 1
+        ? `Served at: ${commonNames[0]} (Stops ${assessedStops.map(stop => text(stop?.indicator || stop?.id || stop?.sourceId)).filter(Boolean).join(', ')})`
+        : `Served at: ${frequencyStopLabel} (Stops ${companionStops.join(', ')})`)
+      : null;
     const integrityWarnings = unique(records.flatMap(record => record.scheduleIntegrityWarnings ?? []));
     if (integrityWarnings.length) notes.push(`Schedule integrity note: ${integrityWarnings.join(' ')}`);
     return Object.freeze({

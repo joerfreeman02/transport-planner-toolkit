@@ -141,7 +141,15 @@ export function createPreparedBusDataAdapter({
       const distance = distanceMetres(site, stop);
       if (distance <= numericRadius && !deduplicated.has(stop.id)) {
         const routes = [...new Set(stop.routes ?? [])];
-        deduplicated.set(stop.id, { ...stop, sourceId: stop.id, timetableAuthority: 'NaPTAN', distanceMetres: distance, routes, routeAuthorities: Object.fromEntries(routes.map(route => [String(route), ['NaPTAN']])) });
+        deduplicated.set(stop.id, {
+          ...stop,
+          sourceId: stop.id,
+          timetableAuthority: 'NaPTAN',
+          distanceMetres: distance,
+          routes,
+          routeAuthorities: Object.fromEntries(routes.map(route => [String(route), ['BODS']])),
+          routeDiscoverySource: 'BODS'
+        });
       }
     }
     const stops = [...deduplicated.values()].sort((a, b) => a.distanceMetres - b.distanceMetres || a.id.localeCompare(b.id));
@@ -159,7 +167,7 @@ export function createPreparedBusDataAdapter({
       validationStatus: 'validated', confidenceStatus: 'authoritative', warnings,
       freshness: { status: warnings.length ? 'stale' : 'live-current', assessedAt: checkedAt }, cache: { status: 'not-used' }
     }));
-    return sourceSuccess({ data: stops, evidence, warnings, provenance: { ...provenance, endpoint: index.sources.naptan.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, datasetVersion: index.sources.naptan.sha256, resultCount: stops.length, providerAdapter: 'prepared-naptan-bus-stop-v1', anonymousRequest: true, apiKeyEmbedded: false } });
+    return sourceSuccess({ data: stops, evidence, warnings, provenance: { ...provenance, endpoint: index.sources.naptan.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, datasetVersion: index.sources.naptan.sha256, routeDiscoverySource: 'BODS', resultCount: stops.length, providerAdapter: 'prepared-naptan-bus-stop-v1', anonymousRequest: true, apiKeyEmbedded: false } });
   }
 
   async function servicesForStops(stops, { forceRefresh = false } = {}) {

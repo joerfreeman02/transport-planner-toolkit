@@ -41,6 +41,8 @@ let radiusCircle = null;
 let busStopMarkers = [];
 let routeLayers = [];
 let currentBusResult = null;
+let pendingScopeDiscovery = null;
+let pendingScopeContext = null;
 let lastAssessmentMode = 'full';
 let selectedStopIds = new Set();
 let selectedServiceIds = new Set();
@@ -153,6 +155,8 @@ function clearBusEvidence(message = 'Confirm the assessment point before checkin
   radiusTouched = false;
   detailedEvidenceVisible = false;
   currentBusResult = null;
+  pendingScopeDiscovery = null;
+  pendingScopeContext = null;
   busStopMarkers.forEach(marker => map?.removeLayer(marker));
   busStopMarkers = [];
   routeLayers.forEach(layer => map?.removeLayer(layer));
@@ -172,8 +176,11 @@ function clearBusEvidence(message = 'Confirm the assessment point before checkin
 }
 
 function clearStaleBusAssessment() {
-  if (!currentBusResult) return;
+  const scopeVisible = !$('assessmentScope').hidden;
+  if (!currentBusResult && !scopeVisible && !pendingScopeDiscovery) return;
   currentBusResult = null;
+  pendingScopeDiscovery = null;
+  pendingScopeContext = null;
   detailedEvidenceVisible = false;
   busStopMarkers.forEach(marker => map?.removeLayer(marker));
   busStopMarkers = [];
@@ -181,6 +188,7 @@ function clearStaleBusAssessment() {
   routeLayers = [];
   $('exportBusWord').disabled = true;
   $('evidencePanel').hidden = true;
+  $('assessmentScope').replaceChildren();
   $('assessmentScope').hidden = true;
   $('evidenceRows').replaceChildren();
   $('serviceRows').replaceChildren();
@@ -611,8 +619,12 @@ function confirmAssessmentPoint() {
   }
 }
 
-async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = false } = {}) {
+async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = false, discoveryOverride = null } = {}) {
   lastAssessmentMode = mode === 'nearest' ? 'nearest' : 'full';
+  if (!skipScope || lastAssessmentMode !== 'full') {
+    pendingScopeDiscovery = null;
+    pendingScopeContext = null;
+  }
   const action = lastAssessmentMode === 'nearest' ? 'nearest bus stop group' : 'full Bus assessment';
   setCallout($('stopStatus'), forceRefresh ? `Checking the ${action} again…` : `Building the ${action}…`, 'neutral');
   $('findStops').disabled = true;
@@ -621,10 +633,12 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
   $('exportBusWord').disabled = true;
   $('assessmentScope').hidden = true;
   try {
-    let discovery = null;
+    let discovery = discoveryOverride;
     if (lastAssessmentMode === 'full' && !skipScope) {
       const scope = await busAssessment.inspectScope(confirmedSite, { radius: $('radius').value, forceRefresh });
       if (!scope.ok) {
+        pendingScopeDiscovery = null;
+        pendingScopeContext = null;
         setCallout($('stopStatus'), `${plannerFailure('bus', scope)}`, 'error');
         return;
       }
@@ -634,9 +648,16 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
       scopeBox.textContent = `Selected radius: ${selectedRadius()} m · ${stopCount} stop${stopCount === 1 ? '' : 's'} · ${routeCount} distinct route${routeCount === 1 ? '' : 's'} · ${pairCount} detailed route × StopPoint pair${pairCount === 1 ? '' : 's'}.`;
       scopeBox.hidden = false;
       if (pairCount > TFL_SAFE_DETAILED_PAIR_LIMIT) {
+        pendingScopeDiscovery = discovery;
+        pendingScopeContext = { site: confirmedSite, radius: Number($('radius').value) };
         scopeBox.append(' This assessment may require staged TfL requests. Reduce the radius, use nearest/recommended assessment, or continue the full staged assessment. ');
         const nearest = document.createElement('button'); nearest.type = 'button'; nearest.className = 'secondary compact'; nearest.textContent = 'Use nearest assessment'; nearest.addEventListener('click', () => loadStops(false, 'nearest'));
-        const continueButton = document.createElement('button'); continueButton.type = 'button'; continueButton.className = 'primary compact'; continueButton.textContent = 'Continue full staged assessment'; continueButton.addEventListener('click', () => loadStops(forceRefresh, 'full', { skipScope: true }));
+        const continueButton = document.createElement('button'); continueButton.type = 'button'; continueButton.className = 'primary compact'; continueButton.textContent = 'Continue full staged assessment'; continueButton.addEventListener('click', () => {
+          const reusableDiscovery = pendingScopeContext?.site === confirmedSite && Number(pendingScopeContext.radius) === Number($('radius').value) ? pendingScopeDiscovery : null;
+          pendingScopeDiscovery = null;
+          pendingScopeContext = null;
+          loadStops(forceRefresh, 'full', { skipScope: true, discoveryOverride: reusableDiscovery });
+        });
         scopeBox.append(nearest, continueButton);
         return;
       }

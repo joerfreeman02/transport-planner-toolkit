@@ -9,8 +9,9 @@ function normaliseRouteAuthorities(stop, authority = '') {
     const values = Array.isArray(authorities) ? authorities : [authorities];
     result.set(key, new Set(values.map(value => String(value).trim()).filter(Boolean)));
   }
+  const hasExplicitRouteAuthorities = Object.prototype.hasOwnProperty.call(stop ?? {}, 'routeAuthorities');
   const fallback = String(authority || stop?.timetableAuthority || '').trim();
-  if (fallback) for (const route of stop?.routes ?? []) {
+  if (!hasExplicitRouteAuthorities && fallback) for (const route of stop?.routes ?? []) {
     const key = String(route).trim();
     if (!key) continue;
     if (!result.has(key)) result.set(key, new Set());

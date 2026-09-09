@@ -162,13 +162,23 @@ const mixedAuthority = createAuthoritativeBusTimetableAdapter({
 });
 const mixedResult = await mixedAuthority.servicesForStops([
   { id: 'MIX-TFL', timetableAuthority: 'TfL', routes: ['279'], routeAuthorities: { '279': ['TfL'] } },
-  { id: 'MIX-NATIONAL', timetableAuthority: 'NaPTAN', routes: ['X'], routeAuthorities: { X: ['NaPTAN'] } }
+  { id: 'MIX-NATIONAL', timetableAuthority: 'NaPTAN', routes: ['279', 'X'], routeAuthorities: { '279': ['BODS'], X: ['BODS'] } }
 ], { site: { latitude: 51.7, longitude: -0.1 } });
 assert.deepEqual(mixedNationalStopIds, ['MIX-NATIONAL'], 'mixed outside-London composition requests national evidence for national-only stops');
 assert.equal(mixedResult.ok, true);
-assert.equal(mixedResult.data.filter(service => service.routeNumber === '279').length, 1, 'a TfL service is not duplicated through the national path');
-assert.equal(mixedResult.data.find(service => service.routeNumber === '279').timetableSource, 'TfL');
+assert.equal(mixedResult.data.filter(service => service.routeNumber === '279').length, 2, 'a matching national service at another selected stop is retained');
+assert.equal(mixedResult.data.find(service => service.id === 'tfl:279').timetableSource, 'TfL');
+assert.deepEqual(Object.keys(mixedResult.data.find(service => service.id === 'tfl:279').stopSchedules), ['MIX-TFL']);
+assert.equal(mixedResult.data.find(service => service.id === 'bods-279').timetableSource, 'BODS');
+assert.deepEqual(Object.keys(mixedResult.data.find(service => service.id === 'bods-279').stopSchedules), ['MIX-NATIONAL']);
 assert.equal(mixedResult.data.find(service => service.routeNumber === 'X').timetableSource, 'BODS');
+const crossStopSummaries = buildServiceSummaries([
+  { id: 'MIX-TFL', name: 'Stop A', walking: { status: 'routed', distanceMetres: 100 } },
+  { id: 'MIX-NATIONAL', name: 'Stop B', walking: { status: 'routed', distanceMetres: 130 } }
+], mixedResult.data.filter(service => service.routeNumber === '279'));
+assert.equal(crossStopSummaries.length, 1, 'same cross-stop service family remains one planner-facing summary');
+assert.deepEqual(crossStopSummaries[0].assessedStops, ['MIX-TFL', 'MIX-NATIONAL']);
+assert.deepEqual(crossStopSummaries[0].departuresByDay.monday, [420], 'cross-stop presentation uses the representative stop without summing departures');
 
 let dualNationalStopIds;
 const dualNationalService = { id: 'bods-dual-10', routeNumber: '10', operator: 'National operator', origin: 'Dual Origin', destination: 'Dual Terminus', direction: 'Dual Terminus', timetableSource: 'BODS', source: { provider: 'BODS' }, stopSchedules: { 'DUAL-STOP': schedule({ monday: [510] }) } };
@@ -212,6 +222,15 @@ assert.equal(unavailableResult.ok, true, 'available TfL evidence is retained whe
 assert.equal(unavailableResult.provenance.nationalSourceAvailable, false);
 assert.deepEqual(unavailableResult.provenance.nationalUnresolvedRoutes, ['X']);
 assert.match(unavailableResult.warnings.join(' '), /national.*unavailable/i);
+const unavailableTfLOnlyDual = await unavailableNational.servicesForStops([{
+  id: 'UNAVAILABLE-DUAL-TFL-ONLY',
+  timetableAuthority: 'TfL',
+  timetableAuthorities: ['NaPTAN', 'TfL'],
+  routes: ['279'],
+  routeAuthorities: { '279': ['TfL'] }
+}], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.equal(unavailableTfLOnlyDual.provenance.nationalSourceAvailable, false);
+assert.deepEqual(unavailableTfLOnlyDual.provenance.nationalUnresolvedRoutes, [], 'TfL-only route provenance is not mislabelled as a known national route');
 
 const nationalRetained = createAuthoritativeBusTimetableAdapter({
   tflAdapter: { servicesForStop: async () => ({ ok: false, code: 'offline', warnings: [], provenance: {} }) },

@@ -64,7 +64,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
       serviceSummaries: [],
       wording: 'No authoritative bus stops were found within the selected discovery radius.',
       warnings: stopsResult.warnings,
-      provenance: { stops: stopsResult.provenance }
+      provenance: { stops: { ...stopsResult.provenance, radiusMetres: Number(radius) } }
     });
 
     const [walkingResult, cyclingResult] = await Promise.all([
@@ -114,7 +114,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
           serviceSummaries: Object.freeze([]),
           wording: buildControlledBusWording([]),
           warnings: Object.freeze(warnings),
-          provenance: Object.freeze({ stops: stopsResult.provenance, timetables: servicesResult.provenance, walking: walkingResult.provenance, cycling: cyclingResult.provenance }),
+          provenance: Object.freeze({ stops: { ...stopsResult.provenance, radiusMetres: Number(radius) }, timetables: servicesResult.provenance, walking: walkingResult.provenance, cycling: cyclingResult.provenance }),
           evidence: Object.freeze(stopsResult.evidence ?? [])
         });
       }
@@ -175,7 +175,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
       wording: buildControlledBusWording(serviceSummaries, { nearestGroupName: nearestGroup?.name ?? null }),
       warnings: Object.freeze(warnings),
       provenance: Object.freeze({
-        stops: stopsResult.provenance,
+        stops: { ...stopsResult.provenance, radiusMetres: Number(radius) },
         timetables: servicesResult.provenance,
         walking: walkingResult.provenance,
         cycling: cyclingResult.provenance

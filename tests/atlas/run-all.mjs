@@ -23,6 +23,7 @@ await import('./tnds-transxchange.test.mjs');
 await import('./tnds-preparation-multiservice.test.mjs');
 await import('./bus-qa-01-acceptance.test.mjs');
 await import('./bus-qa-02-frequency.test.mjs');
+await import('./bus-qa-03-integrity.test.mjs');
 await import('./legacy-isolation-guard.test.mjs');
 await import('./legacy-isolation.test.mjs');
 await import('./review-environment.test.mjs');

@@ -37,7 +37,7 @@ assert.deepEqual(result.data[0].stopSchedules['490TEST003'].monday, [350, 370, 4
 assert.ok(result.data[0].principalLocations.includes('West Norwood Bus Station'));
 assert.deepEqual(result.data[0].frequencyEvidence, [{ periodType: 'FrequencyMinutes', day: 'monday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'tuesday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'wednesday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'thursday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'friday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }]);
 const [frequencySummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], result.data);
-assert.match(frequencySummary.typicalFrequencyText, /Mon-Fri: Approx\. 6 buses\/hour \(every 10 mins\)/);
+assert.match(frequencySummary.typicalFrequencyText, /Mon-Fri: Every 10 mins/);
 assert.equal(frequencySummary.typicalFrequency.basis, 'frequency-band');
 assert.equal(frequencySummary.typicalFrequency.departureCount, 4, 'exact known TfL journeys remain auditable');
 assert.deepEqual(frequencySummary.departuresByDay.wednesday, [350, 370, 400, 1400], 'frequency-band evidence must not fabricate TfL departures');
@@ -105,7 +105,8 @@ distinctStopPeriods.timetable.routes[0].schedules[0].periods.push({ type: 'Frequ
 const distinctTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => response(String(url).includes('/Route') ? routeFixture : distinctStopPeriods) });
 const distinctResult = await distinctTfl.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });
 const [distinctSummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], distinctResult.data);
-assert.notEqual(distinctSummary.typicalFrequency.basis, 'frequency-band', 'different same-stop bands remain variable rather than being collapsed');
+assert.equal(distinctSummary.typicalFrequency.basis, 'frequency-band');
+assert.equal(distinctSummary.typicalFrequency.valueText, 'Every 5–10 mins', 'different same-stop bands remain an honest range rather than being collapsed');
 assert.equal(timetableCalls, 1);
 assert.equal(routeCalls, 1);
 await tfl.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });

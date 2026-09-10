@@ -75,6 +75,16 @@ test('empty timetable records do not become planner-facing services', () => {
   assert.deepEqual(summaries, []);
 });
 
+test('frequency interval maths uses N minus 1 elapsed gaps', () => {
+  const two = calculateScheduledFrequency([600, 660], { startMinute: 600, endMinute: 720 });
+  assert.equal(two.departureCount, 2);
+  assert.equal(two.intervalMinutes, 60);
+  assert.equal(two.busesPerHour, 1);
+  const three = calculateScheduledFrequency([600, 630, 660], { startMinute: 600, endMinute: 720 });
+  assert.equal(three.intervalMinutes, 30);
+  assert.equal(three.busesPerHour, 2);
+});
+
 test('controlled wording uses only supplied routes and principal locations', () => {
   const wording = buildControlledBusWording([{ routeNumber: '10', principalLocations: ['Hospital'] }, { routeNumber: '20', principalLocations: ['Town Centre'] }]);
   assert.match(wording, /bus routes 10, 20/);

@@ -5,7 +5,8 @@ export function createTflRequestScheduler({
   limit = DEFAULT_TFL_REQUEST_LIMIT,
   windowMs = WINDOW_MS,
   now = () => Date.now(),
-  sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))
+  sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)),
+  onEvent = null
 } = {}) {
   const requestTimes = [];
   const numericLimit = Math.max(1, Number(limit) || DEFAULT_TFL_REQUEST_LIMIT);
@@ -14,7 +15,13 @@ export function createTflRequestScheduler({
     while (requestTimes.length && current - requestTimes[0] >= windowMs) requestTimes.shift();
   }
 
-  async function schedule(label, operation) {
+  function emit(event) {
+    if (typeof onEvent !== 'function') return;
+    try { onEvent(Object.freeze({ ...event, snapshot: snapshot() })); } catch { /* observers must never alter request behaviour */ }
+  }
+
+  async function schedule(label, operation, { progress = {} } = {}) {
+    const hasProgressObserver = progress && Object.keys(progress).length > 0;
     for (;;) {
       const current = Number(now());
       prune(current);
@@ -24,7 +31,9 @@ export function createTflRequestScheduler({
         return { ...result, requestLabel: label };
       }
       const waitFor = Math.max(1, windowMs - (current - requestTimes[0]));
+      if (hasProgressObserver) emit({ ...progress, phase: progress.phase || 'checking-timetables', waiting: true, waitMilliseconds: waitFor, requestLabel: label });
       await sleep(waitFor);
+      if (hasProgressObserver) emit({ ...progress, phase: progress.phase || 'checking-timetables', waiting: false, requestLabel: label });
     }
   }
 

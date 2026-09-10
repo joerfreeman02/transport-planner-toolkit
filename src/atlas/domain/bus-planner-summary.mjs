@@ -32,7 +32,11 @@ function explicitDirectionMarker(service) {
   return '';
 }
 
-function explicitPattern(service) { return unique(service?.routePatternStopIds ?? []); }
+function sourceDirectionMarker(value) {
+  return /^(?:inbound|outbound|northbound|southbound|eastbound|westbound|clockwise|anticlockwise|north|south|east|west)$/i.test(text(value));
+}
+
+function explicitPattern(service) { return (service?.routePatternStopIds ?? []).map(text).filter(Boolean); }
 
 function strictSubsequence(shorter, longer) {
   if (!shorter.length || shorter.length > longer.length) return false;
@@ -125,14 +129,19 @@ function semanticDepartureKey(entry) {
 
 function deduplicateDepartureEntries(entries) {
   const bySemantic = new Map();
+  const byStrongIdentity = new Set();
   const output = [];
-  const ordered = entries.slice().sort((first, second) => DAY_ORDER.indexOf(first.day) - DAY_ORDER.indexOf(second.day) || first.minute - second.minute || semanticDepartureKey(first).localeCompare(semanticDepartureKey(second)));
+  const ordered = entries.slice().sort((first, second) => DAY_ORDER.indexOf(first.day) - DAY_ORDER.indexOf(second.day) || first.minute - second.minute || (departureIdentity(first) ? 0 : 1) - (departureIdentity(second) ? 0 : 1) || semanticDepartureKey(first).localeCompare(semanticDepartureKey(second)));
   for (const entry of ordered) {
     const semantic = semanticDepartureKey(entry);
     const existing = bySemantic.get(semantic) ?? [];
     const identity = departureIdentity(entry);
-    const duplicate = identity ? existing.some(item => departureIdentity(item) === identity || !departureIdentity(item)) : existing.length > 0;
+    const strongKey = identity ? [entry.routeNumber, identity, entry.stopPointId, entry.day, entry.minute].map(normal).join('|') : null;
+    const duplicate = strongKey
+      ? byStrongIdentity.has(strongKey)
+      : existing.length > 0;
     if (duplicate) continue;
+    if (strongKey) byStrongIdentity.add(strongKey);
     existing.push(entry);
     bySemantic.set(semantic, existing);
     output.push(entry);
@@ -155,7 +164,8 @@ function canonicalCount(service, representativeId) {
 }
 
 function compareMain(first, second, representativeId) {
-  return canonicalCount(second, representativeId) - canonicalCount(first, representativeId)
+  return Number(resolvedPlannerDestination(second)) - Number(resolvedPlannerDestination(first))
+    || canonicalCount(second, representativeId) - canonicalCount(first, representativeId)
     || (second.routePatternExtent ?? explicitPattern(second).length) - (first.routePatternExtent ?? explicitPattern(first).length)
     || (second.principalLocations?.length ?? 0) - (first.principalLocations?.length ?? 0)
     || (second.recordActivity ?? 0) - (first.recordActivity ?? 0)
@@ -173,13 +183,15 @@ function plannerDirection(service) {
 }
 
 function directionPatternText(service) {
-  const origin = text(service?.origin);
   const destination = text(service?.destination);
   const direction = plannerDirection(service);
   if (service?.circular) return `Circular service${direction ? ` (${direction})` : ''}`;
-  const target = destination || (direction && !/^(?:inbound|outbound|northbound|southbound|eastbound|westbound)$/i.test(direction) ? direction : 'destination not supplied');
-  if (!target || /^destination not supplied$/i.test(target)) return direction ? `Towards ${direction}` : 'Direction not supplied';
-  return origin && normal(origin) !== normal(target) ? `Towards ${target} (${origin})` : `Towards ${target}`;
+  const locality = text(service?.destinationLocality || service?.destinationLocalityName || service?.destinationQualifier);
+  const target = destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination)
+    ? destination
+    : direction && !sourceDirectionMarker(direction) ? direction : '';
+  if (!target || sourceDirectionMarker(target)) return 'Destination not resolved';
+  return locality && normal(locality) !== normal(target) ? `Towards ${target} (${locality})` : `Towards ${target}`;
 }
 
 function servedAtText(representative) {
@@ -195,7 +207,7 @@ function materialServiceNote(note) {
   const value = text(note);
   if (!value) return null;
   if (/^Includes scheduled short workings or route variants/i.test(value)) return null;
-  if (/^(?:Schedule integrity note:|TfL supplied|ATLAS retained|source (?:evidence|processing)|representative stop.*(?:evidence|frequency)|(?:frequency|operating[- ]period).*evidence|timetable evidence.*(?:derived|retained))/i.test(value)) return null;
+  if (/^(?:Schedule integrity note:|TfL supplied|ATLAS retained|source (?:evidence|processing)|representative stop.*(?:evidence|frequency)|(?:frequency|operating[- ]period).*evidence|timetable evidence.*(?:derived|retained)|full tfl route origin|the timetable did not supply|tfl route metadata|the scheduled evidence is retained|limited service:\s*no more than three scheduled journeys)/i.test(value)) return null;
   return value;
 }
 
@@ -203,14 +215,32 @@ function noteAppliesToCanonicalPopulation(note, schedules) {
   const representedDays = DAY_ORDER.filter(day => (schedules[day] ?? []).length);
   if (/limited service|no more than three scheduled journeys/i.test(note)) return representedDays.length > 0 && representedDays.every(day => (schedules[day] ?? []).length <= 3);
   if (/weekday-only service/i.test(note)) return representedDays.length > 0 && !representedDays.some(day => day === 'saturday' || day === 'sunday');
+  if (/school\s*days?/i.test(note) && representedDays.some(day => day === 'saturday' || day === 'sunday')) return false;
   return true;
 }
 
 function variantNote(component) {
   const endpoints = unique(component.map(service => text(service.origin) + ' → ' + text(service.destination)));
-  const patterns = new Set(component.flatMap(explicitPattern));
-  const hasVariant = component.length > 1 && (endpoints.length > 1 || patterns.size > 1 || component.some(service => Number(service.patternVariantCount) > 1));
+  const patterns = unique(component.map(service => explicitPattern(service).map(text).join('>')).filter(Boolean));
+  const journeyIdentitySets = component.map(service => new Set(DAY_ORDER.flatMap(day => (service.departureEvidenceByDay?.[day] ?? []).map(item => departureIdentity(item)).filter(Boolean))));
+  const sharedJourneyIdentity = journeyIdentitySets.length > 1 && journeyIdentitySets.every(set => set.size) && [...journeyIdentitySets[0]].some(identity => journeyIdentitySets.every(set => set.has(identity)));
+  const hasVariant = component.length > 1 && ((endpoints.length > 1 && !sharedJourneyIdentity) || patterns.length > 1 || component.some(service => Number(service.patternVariantCount) > 1));
   return hasVariant ? 'Additional timetable variants and short workings operate; some journeys serve different destinations and operate at different times.' : null;
+}
+
+function resolvedPlannerDestination(service) {
+  const destination = text(service?.destination);
+  const direction = plannerDirection(service);
+  return Boolean(destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination) && !sourceDirectionMarker(destination))
+    || Boolean(direction && !sourceDirectionMarker(direction));
+}
+
+export function plannerSourceWarning(service) {
+  const route = text(service?.routeNumber) || 'Unknown route';
+  const warnings = [];
+  if (!resolvedPlannerDestination(service)) warnings.push(`Route ${route} — one timetable pattern could not be assigned a complete route identity. The scheduled evidence is retained under Detailed Evidence and is not presented as a separate planner service.`);
+  if (!text(service?.operator) || /not supplied/i.test(text(service?.operator))) warnings.push(`Route ${route} — operator identity was not deterministically supplied for one timetable pattern. The source evidence is retained under Detailed Evidence.`);
+  return warnings;
 }
 
 function principalText(main) {
@@ -226,7 +256,7 @@ function buildPlannerRow(component, stops, componentIndex) {
   const calculationEvidence = canonical.eligible.length <= 1 || canonical.eligible.every(service => (service.frequencyEvidence ?? []).some(item => !item.stopPointId || text(item.stopPointId) === representative.id)) ? evidence : [];
   const periods = calculateOperatingPeriods(canonical.schedules);
   const frequencyByDay = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, calculateTypicalServiceFrequency(canonical.schedules[day], { day, frequencyEvidence: calculationEvidence })])));
-  const notes = unique(component.flatMap(service => text(service.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean))).filter(note => noteAppliesToCanonicalPopulation(note, canonical.schedules));
+    const notes = unique(component.flatMap(service => text(service.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean))).filter(note => noteAppliesToCanonicalPopulation(note, canonical.schedules));
   if (main.circular) notes.push('Circular service pattern; the displayed origin and destination are the timetable pattern endpoints.');
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
   const principalLocations = unique(main.principalLocations ?? []);
@@ -267,7 +297,8 @@ function buildPlannerRow(component, stops, componentIndex) {
     presentation: Object.freeze({ principalLocationsText: principalText(main), rank: 0 }),
     rawServiceSummaries: Object.freeze(component),
     sourceSelection: canonical.eligible.length ? 'representative-stop scheduled evidence' : 'representative-stop summary fallback',
-    routeVariantNote: variantNote(component)
+    routeVariantNote: variantNote(component),
+    sourceWarnings: Object.freeze(unique(component.flatMap(service => service.sourceWarnings ?? [])))
   };
   return Object.freeze(row);
 }
@@ -280,16 +311,23 @@ function attachRouteNotes(rows) {
 
 export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = []) {
   const grouped = new Map();
-  for (const service of serviceSummaries ?? []) {
+  const sourceRecords = serviceSummaries ?? [];
+  for (const service of sourceRecords) {
+    const duplicateOperatorRecord = (!text(service.operator) || /not supplied/i.test(text(service.operator)))
+      && sourceRecords.some(candidate => candidate !== service && text(candidate.routeNumber) === text(service.routeNumber) && text(candidate.operator) && !/not supplied/i.test(text(candidate.operator)) && compatibleDirection(candidate, service));
+    if (duplicateOperatorRecord) continue;
     const key = routeGroupKey(service);
     if (!grouped.has(key)) grouped.set(key, []);
     const groups = grouped.get(key);
-    const existing = groups.find(component => component.some(member => compatibleDirection(member, service)));
+    const existing = groups.find(component => component.every(member => compatibleDirection(member, service)));
     if (existing) existing.push(service);
     else groups.push([service]);
   }
   const rows = [];
-  for (const components of grouped.values()) components.forEach((component, index) => rows.push(buildPlannerRow(component, stops, index)));
+  for (const components of grouped.values()) components.forEach((component, index) => {
+    const row = buildPlannerRow(component, stops, index);
+    if (resolvedPlannerDestination(row)) rows.push(row);
+  });
   const sorted = rows.sort((first, second) => text(first.routeNumber).localeCompare(text(second.routeNumber), undefined, { numeric: true })
     || text(first.operator).localeCompare(text(second.operator))
     || text(first.directionPatternText).localeCompare(text(second.directionPatternText))

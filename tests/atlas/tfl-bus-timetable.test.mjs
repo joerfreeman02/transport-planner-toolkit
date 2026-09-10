@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { createTflBusTimetableAdapter } from '../../src/atlas/adapters/tfl-bus-timetable-adapter.mjs';
+import { createTflBusTimetableAdapter, parseTflPeriodCalendar } from '../../src/atlas/adapters/tfl-bus-timetable-adapter.mjs';
 import { createAuthoritativeBusTimetableAdapter } from '../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
 import { createPreparedBusDataAdapter } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { buildServiceSummaries, calculateOperatingPeriods, formatOperatingPeriod } from '../../src/atlas/domain/bus-service-assessment.mjs';
@@ -17,6 +17,52 @@ const httpFailure = status => ({ ok: false, status, headers: new Headers(), json
 const cache = () => createJsonCache({ storage: createMemoryStorage(), namespace: 'tfl-test' });
 const withOperator = { ...fixture, timetable: { ...fixture.timetable, routes: fixture.timetable.routes.map(route => ({ ...route, operator: 'London General' })) } };
 const inboundFixture = { ...withOperator, direction: 'inbound', timetable: { ...withOperator.timetable, departureStopId: '490TEST004', routes: [{ ...withOperator.timetable.routes[0], stationIntervals: [{ intervals: [{ stopId: '490TEST004', timeToArrival: 0 }, { stopId: '490TEST006', timeToArrival: 8 }, { stopId: '490TEST003', timeToArrival: 12 }, { stopId: '490TEST001', timeToArrival: 20 }] }] }] } };
+
+assert.deepEqual(parseTflPeriodCalendar('Schooldays').days, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+assert.equal(parseTflPeriodCalendar('Schooldays').schoolDayOnly, true);
+assert.deepEqual(parseTflPeriodCalendar('School days').days, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+assert.deepEqual(parseTflPeriodCalendar('Monday to Friday, school days').days, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+assert.deepEqual(parseTflPeriodCalendar('Mon-Fri Schooldays').days, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+assert.equal(parseTflPeriodCalendar('Monday-Friday non-schooldays').schoolDayOnly, false);
+assert.equal(parseTflPeriodCalendar('Monday-Friday non-schooldays').nonSchoolDayOnly, true);
+assert.deepEqual(parseTflPeriodCalendar('Unknown custom timetable period').days, [], 'unknown TfL calendar labels never become all seven days');
+
+const routeMetadata657 = { ok: true, data: [{ id: '657', routeSections: [
+  { id: '657-out', direction: 'outbound', originationName: "Salisbury Hall Sainsbury's", destinationName: "Bancroft's School" },
+  { id: '657-in', direction: 'inbound', originationName: "Bancroft's School", destinationName: "Salisbury Hall Sainsbury's" }
+] }] };
+const stops657 = [
+  { id: 'GROVE-P', name: 'Grove Road', indicator: 'P' },
+  { id: 'MAPLETON-HA', name: 'Mapleton Road', indicator: 'HA' },
+  { id: 'GROVE-N', name: 'Grove Road', indicator: 'N' },
+  { id: '657-END', name: "Bancroft's School" },
+  { id: '657-ORIGIN', name: "Salisbury Hall Sainsbury's" }
+];
+const service657Fixture = ({ stopId, direction, patternId, destination, time, adjacentTime, adjacentId }) => ({
+  lineId: '657', lineName: '657', direction,
+  stations: stops657,
+  timetable: { departureStopId: stopId, routes: [{ stationIntervals: [{ id: patternId, intervals: [
+    { stopId, timeToArrival: 0 }, { stopId: adjacentId, timeToArrival: 2 }, { stopId: destination === "Bancroft's School" ? '657-END' : '657-ORIGIN', timeToArrival: 40 }
+  ] }], schedules: [{ name: 'Schooldays', knownJourneys: [{ intervalId: patternId, vehicleJourneyId: `657-${direction}-morning`, stopTimes: [
+    { stopId, departureTime: { hour: Math.floor(time / 60), minute: time % 60 } },
+    { stopId: adjacentId, departureTime: { hour: Math.floor(adjacentTime / 60), minute: adjacentTime % 60 } }
+  ] }] }] }] }
+});
+const fixture657P = service657Fixture({ stopId: 'GROVE-P', direction: 'outbound', patternId: '657-out', destination: "Bancroft's School", time: 476, adjacentTime: 478, adjacentId: 'MAPLETON-HA' });
+const fixture657N = service657Fixture({ stopId: 'GROVE-N', direction: 'inbound', patternId: '657-in', destination: "Salisbury Hall Sainsbury's", time: 982, adjacentTime: 984, adjacentId: '657-ORIGIN' });
+const tfl657 = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => response(String(url).includes('GROVE-N') ? fixture657N : fixture657P) });
+const groveP = await tfl657.servicesForStop({ lineId: '657', stopPointId: 'GROVE-P', routeMetadata: routeMetadata657 });
+assert.deepEqual(groveP.data[0].stopSchedules['GROVE-P'].monday, [476], 'Grove Road Stop P uses its own 07:56 timetable time');
+assert.notDeepEqual(groveP.data[0].stopSchedules['GROVE-P'].monday, [478], 'Mapleton Road 07:58 cannot leak into Grove Road Stop P');
+assert.equal(groveP.data[0].departureEvidenceByDay.monday[0].stopPointId, 'GROVE-P');
+assert.equal(groveP.data[0].departureEvidenceByDay.monday[0].journeyIdentity, '657-outbound-morning');
+const grovePSummary = buildServiceSummaries([{ id: 'GROVE-P', name: 'Grove Road', indicator: 'P' }], groveP.data)[0];
+assert.match(grovePSummary.typicalFrequencyText, /Mon-Fri: 1 journey\/day/);
+assert.match(grovePSummary.operatingPeriodLines.join(' '), /Mon-Fri: Departs approx\. 07:56/);
+assert.match(grovePSummary.serviceNote, /School days only/);
+const groveN = await tfl657.servicesForStop({ lineId: '657', stopPointId: 'GROVE-N', routeMetadata: routeMetadata657 });
+assert.deepEqual(groveN.data[0].stopSchedules['GROVE-N'].monday, [982], 'Grove Road Stop N keeps its own 16:22 timetable time');
+assert.match(buildServiceSummaries([{ id: 'GROVE-N', name: 'Grove Road', indicator: 'N' }], groveN.data)[0].operatingPeriodLines.join(' '), /Mon-Fri: Departs approx\. 16:22/);
 
 let timetableCalls = 0, routeCalls = 0;
 const tfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => {
@@ -239,7 +285,11 @@ const budgetTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: asyn
   const payload = structuredClone(withOperator);
   payload.lineId = decodeURIComponent(match?.[1] ?? payload.lineId);
   payload.lineName = payload.lineId;
-  payload.timetable.departureStopId = decodeURIComponent(match?.[2] ?? payload.timetable.departureStopId);
+  const requestedStop = decodeURIComponent(match?.[2] ?? payload.timetable.departureStopId);
+  payload.timetable.departureStopId = requestedStop;
+  payload.timetable.routes[0].stationIntervals[0].intervals[0].stopId = requestedStop;
+  payload.stations[0] = { ...payload.stations[0], id: requestedStop, name: requestedStop };
+  payload.stops[0] = { ...payload.stops[0], id: requestedStop, name: requestedStop };
   return response(payload);
 } });
 const budgetAuthority = createAuthoritativeBusTimetableAdapter({ tflAdapter: budgetTfl, nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS' } }) }, requestLimit: 20 });
@@ -268,7 +318,11 @@ const busyTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async 
   const payload = structuredClone(withOperator);
   payload.lineId = decodeURIComponent(match?.[1] ?? payload.lineId);
   payload.lineName = payload.lineId;
-  payload.timetable.departureStopId = decodeURIComponent(match?.[2] ?? payload.timetable.departureStopId);
+  const requestedStop = decodeURIComponent(match?.[2] ?? payload.timetable.departureStopId);
+  payload.timetable.departureStopId = requestedStop;
+  payload.timetable.routes[0].stationIntervals[0].intervals[0].stopId = requestedStop;
+  payload.stations[0] = { ...payload.stations[0], id: requestedStop, name: requestedStop };
+  payload.stops[0] = { ...payload.stops[0], id: requestedStop, name: requestedStop };
   return response(payload);
 } });
 const busyAuthority = createAuthoritativeBusTimetableAdapter({ tflAdapter: busyTfl, nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS' } }) } });

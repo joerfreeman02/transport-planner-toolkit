@@ -5,7 +5,10 @@ const html = fs.readFileSync(new URL('../../atlas/index.html', import.meta.url),
 const app = fs.readFileSync(new URL('../../atlas/assets/js/app.mjs', import.meta.url), 'utf8');
 assert.match(html, /2\.0\.0-alpha\.13/);
 assert.match(html, /ATLAS-2\.0\.0-alpha\.13-20260910/);
-for (const id of ['dataStatusMessage', 'preparedDataDate', 'naptanDataState', 'bodsDataState', 'tndsDataDate', 'tflDataState', 'updateBusData', 'refreshDataStatus', 'recommendedSelection', 'selectAllRows', 'clearAllRows', 'toggleDetailedEvidence', 'serviceDetailPanel', 'assessmentScope', 'radius', 'taskStatus', 'taskStatusMessage', 'serviceSummaryMethodology']) assert.match(html, new RegExp(`id="${id}"`));
+for (const id of ['dataStatusMessage', 'preparedDataDate', 'naptanDataState', 'bodsDataState', 'tndsDataDate', 'tflDataState', 'updateBusData', 'refreshDataStatus', 'recommendedSelection', 'selectAllRows', 'clearAllRows', 'toggleDetailedEvidence', 'serviceDetailPanel', 'assessmentScope', 'radius', 'taskStatus', 'taskStatusMessage', 'taskStatusProgress', 'taskStatusProgressText', 'serviceSummaryMethodology']) assert.match(html, new RegExp(`id="${id}"`));
+assert.match(html, /<progress id="taskStatusProgress"/);
+assert.match(app, /progressElement:\s*\$\('taskStatusProgress'\)/);
+assert.match(app, /countElement:\s*\$\('taskStatusProgressText'\)/);
 assert.match(html, /<th>Include<\/th>/);
 assert.match(html, /<th>Timetable evidence<\/th>/);
 assert.match(html, /<th>Typical frequency<\/th>/);

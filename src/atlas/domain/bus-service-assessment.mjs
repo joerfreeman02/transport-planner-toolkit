@@ -11,7 +11,14 @@ const GENERIC_QUALIFICATION_PATTERNS = Object.freeze([
   /date-specific exceptions/i,
   /scheduled variants? (?:are )?retained/i,
   /scheduled route patterns serve/i,
-  /weekday-only service in the prepared representative week/i
+  /weekday-only service in the prepared representative week/i,
+  /full tfl route origin and destination were not deterministically established/i,
+  /timetable did not supply a reliable operator name/i,
+  /tfl route metadata (?:did not establish|could not be checked)/i,
+  /without intervalid linkage/i,
+  /frequency ranges?/i,
+  /representative stop/i,
+  /source (?:evidence|processing)|processing|provenance/i
 ]);
 
 function text(value) { return String(value ?? '').trim(); }
@@ -122,15 +129,18 @@ export function calculateScheduledFrequency(departures, { startMinute, endMinute
   const end = Number(endMinute);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new Error('A valid representative assessment period is required.');
   const scheduled = ordered(departures).filter(value => value >= start && value < end);
-  const hours = (end - start) / 60;
-  const busesPerHour = scheduled.length / hours;
-  const intervalMinutes = busesPerHour > 0 ? 60 / busesPerHour : null;
+  const elapsedMinutes = scheduled.length > 1 ? scheduled.at(-1) - scheduled[0] : 0;
+  const intervalMinutes = elapsedMinutes > 0 ? elapsedMinutes / (scheduled.length - 1) : null;
+  const busesPerHour = intervalMinutes ? 60 / intervalMinutes : null;
+  const busLabel = scheduled.length === 1 ? 'bus' : 'buses';
   return Object.freeze({
     period: Object.freeze({ startMinute: start, endMinute: end, label: text(label) }),
     departureCount: scheduled.length,
-    busesPerHour: Number(busesPerHour.toFixed(2)),
+    busesPerHour: busesPerHour == null ? null : Number(busesPerHour.toFixed(2)),
     intervalMinutes: intervalMinutes == null ? null : Math.round(intervalMinutes),
-    wording: scheduled.length ? `${Number(busesPerHour.toFixed(1))} buses per hour${intervalMinutes ? ` (approximately every ${Math.round(intervalMinutes)} minutes)` : ''}` : 'No scheduled buses during the defined assessment period'
+    wording: scheduled.length > 1
+      ? `${Number(busesPerHour.toFixed(1))} ${busLabel} per hour (approximately every ${Math.round(intervalMinutes)} minutes)`
+      : scheduled.length === 1 ? '1 scheduled bus during the defined assessment period' : 'No scheduled buses during the defined assessment period'
   });
 }
 
@@ -178,17 +188,20 @@ function departureEvidenceForRecords(records, stopId) {
     const explicitJourney = sourceJourneyIdentity(record);
     const pattern = patternIdentity(record);
     for (const day of DAY_ORDER) {
-      for (const minute of numeric(schedule[day] ?? [])) evidence[day].push({
-        minute,
+      const sourceEntries = Array.isArray(record.departureEvidenceByDay?.[day])
+        ? record.departureEvidenceByDay[day]
+        : ordered(schedule[day] ?? []).map(minute => ({ minute }));
+      for (const sourceEntry of sourceEntries) evidence[day].push({
+        minute: Number(sourceEntry?.minute ?? sourceEntry?.departureMinute ?? sourceEntry?.time),
         stopPointId: stopId,
-        journeyIdentity: explicitJourney || null,
-        sourceRecordId: text(record.id) || null,
-        provider: provider || null,
-        patternIdentity: pattern || null,
-        routeNumber: text(record.routeNumber) || null,
-        direction: text(record.direction || record.destination || record.origin) || null,
-        origin: text(record.origin) || null,
-        destination: text(record.destination) || null
+        journeyIdentity: text(sourceEntry?.journeyIdentity) || explicitJourney || null,
+        sourceRecordId: text(sourceEntry?.sourceRecordId) || text(record.id) || null,
+        provider: text(sourceEntry?.provider) || provider || null,
+        patternIdentity: text(sourceEntry?.patternIdentity) || pattern || null,
+        routeNumber: text(sourceEntry?.routeNumber) || text(record.routeNumber) || null,
+        direction: text(sourceEntry?.direction) || text(record.direction || record.destination || record.origin) || null,
+        origin: text(sourceEntry?.origin) || text(record.origin) || null,
+        destination: text(sourceEntry?.destination) || text(record.destination) || null
       });
     }
   }
@@ -199,11 +212,17 @@ function materialQualification(note) {
   return note && !GENERIC_QUALIFICATION_PATTERNS.some(pattern => pattern.test(note));
 }
 
+function sourceDiagnostic(note) {
+  const value = text(note);
+  return Boolean(value && /full tfl route origin|timetable did not supply|tfl route metadata|could not be safely mapped|without intervalid linkage|frequency ranges?|representative stop.*(?:evidence|frequency)|source (?:evidence|processing)|processing|provenance|schedule integrity note/i.test(value));
+}
+
 export function collectServiceWarnings(serviceRecords = []) {
   const qualifications = unique(serviceRecords.flatMap(record => record.qualifications ?? []));
-  const warnings = [];
+  const warnings = unique(serviceRecords.flatMap(record => record.sourceWarnings ?? []));
   if (qualifications.some(note => /date-specific exceptions/i.test(note))) warnings.push('Some timetables contain date-specific changes. Check the assessment date before formal use.');
   if (serviceRecords.some(record => (record.scheduleIntegrityWarnings ?? []).length)) warnings.push('One or more timetable records contained duplicate or invalid chronology evidence; the affected values were retained only after deterministic integrity checks.');
+  warnings.push(...qualifications.filter(sourceDiagnostic));
   return warnings;
 }
 
@@ -302,14 +321,14 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const typicalFrequency = frequencyRepresentativeDay
       ? frequencyByDay[frequencyRepresentativeDay]
       : Object.freeze({ day: null, dayLabel: null, departureCount: 0, basis: 'unavailable', classification: 'unavailable', noService: true, busesPerHour: null, intervalMinutes: null, valueText: 'Frequency unavailable', wording: 'Frequency unavailable' });
-    const notes = unique(records.flatMap(record => record.qualifications ?? []))
+    const sourceWarnings = unique(records.flatMap(record => [...(record.sourceWarnings ?? []), ...(record.qualifications ?? [])].filter(sourceDiagnostic)));
+    const notes = unique(records.flatMap(record => [...(record.serviceNotes ?? []), ...(record.qualifications ?? [])]))
       .filter(materialQualification)
       .filter(note => qualificationAppliesToFinalRow(note, departuresByDay));
     const endpointPatterns = unique(records.map(record => `${text(record.origin)} → ${text(record.destination)}`));
     if (endpointPatterns.length > 1) notes.push('Includes scheduled short workings or route variants in this direction; the main origin/destination shown is the most extensive pattern in the source timetable.');
     if (records.some(record => record.circular)) notes.push('Circular service pattern; the displayed origin and destination are the timetable pattern endpoints.');
     if (!DAY_ORDER.some(day => periods[day])) notes.push('No scheduled departures are available for the prepared representative week.');
-    if (!text(first.operator) || /not supplied/i.test(text(first.operator))) notes.push('The timetable did not supply a reliable operator name.');
     const principalLocations = unique(records.flatMap(record => record.principalLocations ?? []));
     const assessedStops = stopIds.map(id => selectedStopsById.get(id)).filter(Boolean);
     const stopLabel = stop => [text(stop?.name), text(stop?.indicator)].filter(Boolean).join(' — ') || text(stop?.id || stop?.sourceId);
@@ -353,6 +372,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
       frequencyEvidenceSource: unique(records.map(record => record.timetableSource || record.source?.provider)).join(' + ') || null,
       frequencyRepresentativeDay,
       frequencyEvidence: Object.freeze(frequencyEvidence),
+      sourceWarnings: Object.freeze(sourceWarnings),
       serviceNote: unique(notes).join(' '),
       stopIds,
       sourceRecordIds: unique(records.map(record => record.id)),
@@ -583,10 +603,11 @@ export function calculateTypicalServiceFrequency(departures, { day, label = '', 
   }
   if (!regular) {
     const operatingMinutes = scheduled.at(-1) - scheduled[0];
-    const busesPerHour = operatingMinutes > 0 ? scheduled.length / (operatingMinutes / 60) : null;
-    const roundedRate = busesPerHour == null ? null : (busesPerHour >= 10 ? Math.round(busesPerHour) : Number(busesPerHour.toFixed(1)));
-    const valueText = roundedRate == null ? `${scheduled.length} scheduled journeys/day (irregular)` : `Approx. ${roundedRate} buses/hour (irregular)`;
-    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'irregular', presentationMode: 'rate', noService: false, busesPerHour: roundedRate, intervalMinutes: null, intervalRange: null, valueText, wording: `${dayText}: ${valueText}` });
+    const intervalMinutes = operatingMinutes > 0 ? operatingMinutes / (scheduled.length - 1) : null;
+    const busesPerHour = intervalMinutes ? 60 / intervalMinutes : null;
+    const roundedInterval = intervalMinutes == null ? null : Math.max(5, Math.round(intervalMinutes / 5) * 5);
+    const valueText = roundedInterval == null ? `${scheduled.length} scheduled journeys/day (irregular)` : `Approx. every ${roundedInterval} mins (irregular)`;
+    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'irregular', presentationMode: 'headway', noService: false, busesPerHour: busesPerHour == null ? null : Number(busesPerHour.toFixed(2)), intervalMinutes: roundedInterval, averageIntervalMinutes: intervalMinutes, intervalRange: null, valueText, wording: `${dayText}: ${valueText}` });
   }
   const roundedMedian = Math.round(robustMedian);
   const frequency = calculateScheduledFrequency(scheduled, { startMinute: scheduled[0], endMinute: scheduled.at(-1) + roundedMedian, label });
@@ -630,6 +651,7 @@ function qualificationAppliesToFinalRow(note, departuresByDay = {}) {
   if (/weekday-only service/i.test(note)) {
     return representedDays.length > 0 && !representedDays.some(day => day === 'saturday' || day === 'sunday');
   }
+  if (/school\s*days?/i.test(note) && representedDays.some(day => day === 'saturday' || day === 'sunday')) return false;
   return true;
 }
 

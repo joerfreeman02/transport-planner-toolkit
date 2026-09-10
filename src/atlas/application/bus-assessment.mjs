@@ -5,7 +5,7 @@ import {
   groupStopsForPresentation,
   selectNearestStopGroup
 } from '../domain/bus-service-assessment.mjs';
-import { buildPlannerBusServiceSummaries } from '../domain/bus-planner-summary.mjs';
+import { buildPlannerBusServiceSummaries, plannerSourceWarning } from '../domain/bus-planner-summary.mjs';
 import { DEFAULT_TFL_REQUEST_LIMIT } from '../adapters/tfl-request-scheduler.mjs';
 import { deriveTimetableConclusion, hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
 import { buildStopTimetableSourcePresentation } from '../domain/bus-source-presentation.mjs';
@@ -161,7 +161,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
       const selection = selectNearestStopGroup(remaining);
       if (!selection.ok) return { selectedStops: [], services: [], servicesResult: lastResult, nearestGroup: null, warnings };
       onProgress({ phase: 'checking-timetables' });
-      const result = await timetableData.servicesForStops(selection.stops, options);
+      const result = await timetableData.servicesForStops(selection.stops, { ...options, onProgress });
       lastResult = result;
       const conclusion = timetableConclusion(result, selection);
       if (conclusion === 'MATCHED') {
@@ -189,13 +189,13 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     onProgress({ phase: 'finding-stops' });
     let prepared = await prepareStops(site, radius, forceRefresh, discovery, onProgress);
     if (!prepared.stopsResult.ok) {
-      onProgress({ phase: 'complete', detail: 'Assessment unavailable' });
+      onProgress({ phase: 'unavailable', detail: 'The required stop evidence could not be checked.' });
       return Object.freeze({ ok: false, stage: 'stops', code: prepared.stopsResult.code, message: prepared.stopsResult.message, warnings: prepared.stopsResult.warnings ?? [], stopsResult: prepared.stopsResult, servicesResult: null });
     }
     let enrichedDiscoveredStops = prepared.enriched;
     if (!enrichedDiscoveredStops.length) {
       const stopCoverageComplete = prepared.stopsResult.provenance?.stopCoverageComplete !== false;
-      onProgress({ phase: 'complete' });
+      onProgress({ phase: stopCoverageComplete ? 'complete' : 'partial', detail: stopCoverageComplete ? 'Complete' : 'Partial — review evidence' });
       return Object.freeze({
         ok: true,
         status: stopCoverageComplete ? 'complete' : 'partial',
@@ -242,20 +242,21 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
       nearestGroup = nearest.nearestGroup;
     } else {
       onProgress({ phase: 'checking-timetables' });
-      servicesResult = await timetableData.servicesForStops(enrichedDiscoveredStops, { forceRefresh, site });
+      servicesResult = await timetableData.servicesForStops(enrichedDiscoveredStops, { forceRefresh, site, onProgress });
       services = servicesResult.ok ? servicesResult.data : [];
     }
     onProgress({ phase: 'reconciling-evidence' });
     const serviceSummaries = buildServiceSummaries(selectedStops, services);
     onProgress({ phase: 'preparing-assessment' });
     const plannerServiceSummaries = buildPlannerBusServiceSummaries(serviceSummaries, selectedStops);
+    const plannerSourceWarnings = [...new Set(serviceSummaries.flatMap(service => [...(service.sourceWarnings ?? []), ...plannerSourceWarning(service)]))];
     const routesByStop = new Map(selectedStops.map(stop => [stopKey(stop), new Set()]));
     for (const service of services) for (const [id, schedule] of Object.entries(service.stopSchedules ?? {})) if (routesByStop.has(id) && service.routeNumber && hasScheduledEvidence(schedule)) routesByStop.get(id).add(String(service.routeNumber));
     selectedStops = selectedStops.map(stop => {
       const timetableEvidence = buildStopTimetableEvidence(stop, services, servicesResult);
       return Object.freeze({ ...stop, routes: [...new Set([...(stop.routes ?? []), ...(routesByStop.get(stopKey(stop)) ?? new Set())])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })), timetableMatch: (routesByStop.get(stopKey(stop))?.size ?? 0) > 0, timetableEvidence: timetableEvidence.label, timetableEvidenceStatus: timetableEvidence.status, timetableEvidenceSources: timetableEvidence.sources ?? [] });
     });
-    const warnings = [...new Set([...(assessmentWarnings ?? commonWarnings), ...(servicesResult?.warnings ?? []), ...collectServiceWarnings(services), ...(!servicesResult?.ok ? ['Timetable information is unavailable. Stop and routed-access results are still shown.'] : []), ...(!prepared.walkingResult?.ok ? ['Walking routes could not be checked. Please try again.'] : []), ...(!prepared.cyclingResult?.ok ? ['Cycling routes could not be checked. Please try again.'] : [])])];
+    const warnings = [...new Set([...(assessmentWarnings ?? commonWarnings), ...(servicesResult?.warnings ?? []), ...collectServiceWarnings(services), ...plannerSourceWarnings, ...(!servicesResult?.ok ? ['Timetable information is unavailable. Stop and routed-access results are still shown.'] : []), ...(!prepared.walkingResult?.ok ? ['Walking routes could not be checked. Please try again.'] : []), ...(!prepared.cyclingResult?.ok ? ['Cycling routes could not be checked. Please try again.'] : [])])];
     const routingComplete = selectedStops.every(stop => stop.walking.status === 'routed' && stop.cycling.status === 'routed');
     const stopCoverageComplete = prepared.stopsResult.provenance?.stopCoverageComplete !== false;
     const nationalEvidenceComplete = servicesResult?.provenance?.nationalSourceAvailable !== false && !(servicesResult?.provenance?.nationalUnresolvedRoutes?.length);
@@ -267,7 +268,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     const status = stopCoverageComplete && timetablesComplete && serviceSummaries.length && routingComplete ? 'complete' : 'partial';
     const selectedIds = new Set(selectedStops.map(stopKey));
     const routes = new Set(enrichedDiscoveredStops.flatMap(stop => stop.routes ?? []));
-    onProgress({ phase: 'complete' });
+    onProgress({ phase: status === 'complete' ? 'complete' : 'partial', detail: status === 'complete' ? 'Complete' : 'Partial — review evidence' });
     return Object.freeze({ ok: true, status, assessmentMode, discoveredStopCount: enrichedDiscoveredStops.length, scope: { stopCount: enrichedDiscoveredStops.length, routeCount: routes.size, pairCount: routePairs(enrichedDiscoveredStops).size }, nearestGroup, stops: Object.freeze(selectedStops), services: Object.freeze(services), serviceSummaries: Object.freeze(serviceSummaries), plannerServiceSummaries: Object.freeze(plannerServiceSummaries), wording: buildControlledBusWording(plannerServiceSummaries, { nearestGroupName: nearestGroup?.name ?? null }), warnings: Object.freeze(warnings), provenance: Object.freeze({ stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres }, timetables: servicesResult?.provenance ?? {}, walking: prepared.walkingResult?.provenance ?? {}, cycling: prepared.cyclingResult?.provenance ?? {} }), evidence: Object.freeze((prepared.stopsResult.evidence ?? []).filter(item => assessmentMode === 'full' || selectedIds.has(item?.subject?.id))) });
   }
 

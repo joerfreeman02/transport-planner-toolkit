@@ -141,7 +141,11 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .task-status { display: flex; justify-content: space-between; gap: 18px; align-items: center; margin-top: 16px; padding: 12px 14px; border: 1px solid #b8d5d0; border-radius: 9px; background: #f2faf8; }
 .task-status h3 { margin: 2px 0 0; color: var(--atlas-blue); font-size: .98rem; }
 .task-status > p { margin: 0; color: var(--atlas-ink); font-weight: 750; text-align: right; }
+.task-progress { display: flex; align-items: center; gap: 8px; min-width: 190px; }
+.task-progress progress { width: 160px; height: 12px; accent-color: var(--atlas-teal); }
+.task-progress span { color: var(--atlas-muted); font-size: .82rem; font-weight: 700; white-space: nowrap; }
 .task-status[data-phase="complete"] { border-color: #9ccbb2; background: #f1faf5; }
+.task-status[data-phase="partial"], .task-status[data-phase="unavailable"] { border-color: #d8b67c; background: #fff8eb; }
 
 .evidence-panel { padding: 27px 30px 32px; }
 .evidence-heading { display: flex; justify-content: space-between; gap: 20px; align-items: start; }

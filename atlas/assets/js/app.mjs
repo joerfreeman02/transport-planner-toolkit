@@ -19,9 +19,10 @@ import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation } from 
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
+const taskStatus = createAtlasTaskStatus({ messageElement: $('taskStatusMessage'), regionElement: $('taskStatus'), progressElement: $('taskStatusProgress'), countElement: $('taskStatusProgressText') });
 const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha13' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
-const tflRequestScheduler = createTflRequestScheduler();
+const tflRequestScheduler = createTflRequestScheduler({ onEvent: event => taskStatus.update(event) });
 const tfl = createTflBusStopAdapter({ cache, requestScheduler: tflRequestScheduler });
 const preparedBusData = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url), tndsBaseUrl: new URL('../../data/bus-tnds/', import.meta.url) });
 const tflTimetable = createTflBusTimetableAdapter({ cache, requestScheduler: tflRequestScheduler });
@@ -52,7 +53,6 @@ let selectedServiceIds = new Set();
 let selectionInitialised = false;
 let detailedEvidenceVisible = false;
 let radiusTouched = false;
-const taskStatus = createAtlasTaskStatus({ messageElement: $('taskStatusMessage'), regionElement: $('taskStatus') });
 
 function stopKey(stop) { return String(stop?.id || stop?.sourceId || ''); }
 function serviceKey(service) { return String(service?.id || `${service?.routeNumber}|${service?.operator}|${service?.origin}|${service?.destination}`); }
@@ -663,6 +663,7 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
       if (!scope.ok) {
         pendingScopeDiscovery = null;
         pendingScopeContext = null;
+        taskStatus.update({ phase: 'unavailable', detail: 'The required stop evidence could not be checked.' });
         setCallout($('stopStatus'), `${plannerFailure('bus', scope)}`, 'error');
         return;
       }
@@ -702,6 +703,9 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
     const modeText = result.assessmentMode === 'nearest' ? `Nearest stop group "${result.nearestGroup?.name || 'selected group'}"` : `${result.stops.length} nearby stop${result.stops.length === 1 ? '' : 's'}`;
     const message = result.status === 'complete' ? `${modeText} assessed. Complete - checked ${checked}.` : `${modeText} assessed. Part of the assessment is unavailable; review the points to note.`;
     setCallout($('stopStatus'), message, result.status === 'complete' && !result.warnings.length ? 'success' : 'warning');
+  } catch {
+    taskStatus.update({ phase: 'unavailable', detail: 'The assessment could not be completed.' });
+    setCallout($('stopStatus'), 'The assessment could not be completed. No successful-looking result has been shown.', 'error');
   } finally {
     $('findStops').disabled = !confirmedSite;
     $('findNearestStops').disabled = !confirmedSite;

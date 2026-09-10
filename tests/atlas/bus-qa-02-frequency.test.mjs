@@ -41,7 +41,7 @@ assert.deepEqual(formatTypicalFrequency(Object.fromEntries(days.map(day => [day,
 const route13 = summaryFor(schedule({ monday: weekdayIrregular, tuesday: weekdayIrregular, wednesday: weekdayIrregular, thursday: weekdayIrregular, friday: weekdayIrregular, saturday: [420, 540, 660], sunday: [] }), {
   qualifications: ['Limited service: no more than three scheduled journeys on any represented day.']
 });
-assert.match(route13.typicalFrequencyLines[0], /Mon-Fri: Approx\. [0-9.]+ buses\/hour \(irregular\)/);
+assert.match(route13.typicalFrequencyLines[0], /Mon-Fri: Approx\. every \d+ mins \(irregular\)/);
 assert.equal(route13.typicalFrequencyLines[2], 'Sun: No scheduled service');
 assert.doesNotMatch(route13.serviceNote, /no more than three scheduled journeys on any represented day/i);
 
@@ -53,7 +53,7 @@ assert.deepEqual(route13b.typicalFrequencyLines, ['Mon-Fri: 1 journey/day', 'Sat
 
 const regularity = calculateTypicalServiceFrequency(weekdayIrregular, { day: 'wednesday' });
 assert.equal(regularity.classification, 'irregular');
-assert.match(regularity.wording, /Approx\. [0-9.]+ buses\/hour \(irregular\)/);
+assert.match(regularity.wording, /Approx\. every \d+ mins \(irregular\)/);
 const regular = calculateTypicalServiceFrequency(weekdayRegular, { day: 'monday' });
 assert.equal(regular.classification, 'regular-frequency');
 assert.equal(regular.intervalMinutes, 15);

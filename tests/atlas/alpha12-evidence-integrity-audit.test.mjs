@@ -18,6 +18,7 @@ const sourceFailure = (source = 'TfL') => ({ ok: false, code: 'offline', data: n
 const stop = (id, route, authority = 'TfL', extra = {}) => ({ id, name: id, routes: [route], timetableAuthority: authority, routeAuthorities: { [route]: [authority] }, ...extra });
 const national = ({ id = 'bods-Q', routeNumber = 'Q', timetableSource = 'BODS', stops = { A: [450] }, operator = 'Shared operator' } = {}) => ({ id, routeNumber, operator, origin: 'Origin', destination: 'Terminus', direction: 'Terminus', timetableSource, stopSchedules: Object.fromEntries(Object.entries(stops).map(([id, departures]) => [id, schedule(departures)])) });
 const tfl = ({ id = 'tfl-Q', routeNumber = 'Q', stopId = 'A', departures = [420], operator = 'Shared operator' } = {}) => ({ id, routeNumber, operator, origin: 'Origin', destination: 'Terminus', direction: 'Terminus', timetableSource: 'TfL', stopSchedules: { [stopId]: schedule(departures) } });
+const routed = async (_site, selected) => ({ ok: true, routes: selected.map(() => ({ status: 'routed', distanceMetres: 100, durationSeconds: 60 })), warnings: [], provenance: {} });
 
 function createAuthority({ results = {}, nationalServices = [], nationalProvenance = { source: 'BODS' }, london = true }) {
   const nationalResult = () => sourceSuccess('BODS', nationalServices, nationalProvenance);
@@ -181,6 +182,102 @@ const noCurrent = await createAuthority({ results: { 'Q|A': sourceSuccess('TfL',
 assert.equal(noCurrent.ok, true);
 assert.equal(noCurrent.provenance.timetableConclusion, 'NO_CURRENT_MATCH');
 assert.deepEqual(noCurrent.provenance.unresolvedRequestIdentities, []);
+
+let outsideNationalCalls = 0;
+let outsideTfLMode = 'MATCHED';
+const outsideTfLOnlyAuthority = createAuthoritativeBusTimetableAdapter({
+  tflAdapter: {
+    servicesForStop: async ({ lineId, stopPointId }) => outsideTfLMode === 'MATCHED'
+      ? sourceSuccess('TfL', [tfl({ id: `tfl-${lineId}-${stopPointId}`, routeNumber: lineId, stopId: stopPointId, departures: [420] })], { timetableConclusion: 'MATCHED' })
+      : sourceSuccess('TfL', [], { timetableConclusion: outsideTfLMode })
+  },
+  nationalAdapter: { servicesForStops: async () => { outsideNationalCalls += 1; throw new Error('national adapter must not be called for TfL-only scope'); } },
+  londonSupplementAdapter: { servicesForStops: async () => { outsideNationalCalls += 1; throw new Error('London supplementary adapter must not be called for outside-London TfL-only scope'); } },
+  londonCoverage: () => false
+});
+const outsideTfLOnlyStop = stop('TFL-A', '279', 'TfL');
+const outsideMatched = await outsideTfLOnlyAuthority.servicesForStops([outsideTfLOnlyStop], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.equal(outsideMatched.ok, true);
+assert.equal(outsideMatched.provenance.timetableConclusion, 'MATCHED');
+assert.equal(outsideMatched.provenance.nationalSourceAvailable, true);
+assert.equal(outsideMatched.provenance.nationalEvidenceRequired, false);
+assert.equal(outsideNationalCalls, 0, 'outside-London TfL-only scope must not call a national adapter');
+
+outsideTfLMode = 'NO_CURRENT_MATCH';
+const outsideNoCurrent = await outsideTfLOnlyAuthority.servicesForStops([outsideTfLOnlyStop], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.equal(outsideNoCurrent.ok, true);
+assert.equal(outsideNoCurrent.provenance.timetableConclusion, 'NO_CURRENT_MATCH');
+assert.equal(outsideNationalCalls, 0);
+
+outsideTfLMode = 'UNRESOLVED';
+const outsideUnresolved = await outsideTfLOnlyAuthority.servicesForStops([outsideTfLOnlyStop], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.equal(outsideUnresolved.ok, false);
+assert.equal(outsideUnresolved.provenance.timetableConclusion, 'UNRESOLVED');
+assert.equal(outsideNationalCalls, 0);
+
+const outsideNearest = createBusAssessment({
+  stopDiscovery: { nearbyStops: async () => sourceSuccess('TfL', [
+    { ...outsideTfLOnlyStop, name: 'Nearest TfL stop', latitude: 51.7, longitude: -0.1 },
+    { ...stop('TFL-FARTHER', '279', 'TfL'), name: 'Farther TfL stop', latitude: 51.71, longitude: -0.1 }
+  ], { stopCoverageComplete: true }) },
+  timetableData: { servicesForStops: async selected => outsideTfLOnlyAuthority.servicesForStops(selected, { site: { latitude: 51.7, longitude: -0.1 } }) },
+  accessRouting: { matrix: routed }
+});
+const outsideNearestResult = await outsideNearest.assess({ latitude: 51.7, longitude: -0.1 }, { mode: 'nearest' });
+assert.equal(outsideNearestResult.nearestGroup.anchorStopId, 'TFL-A');
+assert.equal(outsideNearestResult.status, 'partial');
+assert.equal(outsideNationalCalls, 0);
+
+const quarantineWithTfLNoMatch = createAuthority({
+  london: false,
+  results: { '279|STOP-A': sourceSuccess('TfL', [], { timetableConclusion: 'NO_CURRENT_MATCH' }) },
+  nationalProvenance: { source: 'BODS; TNDS', unresolvedRequestIdentities: ['Q|STOP-B'], timetableConclusion: 'UNRESOLVED' }
+});
+const quarantineNoMatchResult = await quarantineWithTfLNoMatch.servicesForStops([stop('STOP-A', '279', 'TfL'), stop('STOP-B', 'Q', 'NaPTAN')], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.equal(quarantineNoMatchResult.ok, false);
+assert.equal(quarantineNoMatchResult.provenance.timetableConclusion, 'UNRESOLVED');
+assert.deepEqual(quarantineNoMatchResult.provenance.nationalUnresolvedRequestIdentities, ['Q|STOP-B']);
+assert.deepEqual(quarantineNoMatchResult.provenance.noCurrentRequestIdentities, ['279|STOP-A']);
+const quarantineNoMatchAssessment = await assessWith([stop('STOP-A', '279', 'TfL'), stop('STOP-B', 'Q', 'NaPTAN')], quarantineWithTfLNoMatch);
+assert.equal(quarantineNoMatchAssessment.status, 'partial');
+assert.equal(quarantineNoMatchAssessment.stops.find(item => item.id === 'STOP-A').timetableEvidenceStatus, 'NO_CURRENT_MATCH');
+assert.equal(quarantineNoMatchAssessment.stops.find(item => item.id === 'STOP-B').timetableEvidenceStatus, 'SOURCE_UNAVAILABLE');
+
+const unavailableNationalWithTfLNoMatch = createAuthoritativeBusTimetableAdapter({
+  tflAdapter: { servicesForStop: async () => sourceSuccess('TfL', [], { timetableConclusion: 'NO_CURRENT_MATCH' }) },
+  nationalAdapter: { servicesForStops: async () => sourceFailure('BODS') },
+  londonSupplementAdapter: { servicesForStops: async () => sourceFailure('BODS') },
+  londonCoverage: () => false
+});
+const unavailableNationalNoMatch = await unavailableNationalWithTfLNoMatch.servicesForStops([stop('STOP-A', '279', 'TfL'), stop('STOP-B', 'Q', 'NaPTAN')], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.equal(unavailableNationalNoMatch.ok, false);
+assert.equal(unavailableNationalNoMatch.provenance.timetableConclusion, 'UNRESOLVED');
+assert.equal(unavailableNationalNoMatch.provenance.nationalSourceAvailable, false);
+
+outsideTfLMode = 'NO_CURRENT_MATCH';
+const unprocessedNoMatch = await outsideTfLOnlyAuthority.servicesForStops([stop('STOP-A', '279', 'TfL'), stop('STOP-B', 'Q', 'TfL')], { site: { latitude: 51.7, longitude: -0.1 }, maxRequests: 1 });
+assert.equal(unprocessedNoMatch.ok, false);
+assert.equal(unprocessedNoMatch.provenance.timetableConclusion, 'UNRESOLVED');
+assert.deepEqual(unprocessedNoMatch.provenance.unprocessedRequestIdentities, ['Q|STOP-B']);
+
+const pureNationalNoCurrent = await createAuthority({ london: false, nationalServices: [], nationalProvenance: { source: 'BODS', timetableConclusion: 'NO_CURRENT_MATCH' } }).servicesForStops([stop('NATIONAL-NONE', 'Q', 'NaPTAN')], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.equal(pureNationalNoCurrent.ok, true);
+assert.equal(pureNationalNoCurrent.provenance.timetableConclusion, 'NO_CURRENT_MATCH');
+
+const matchedWithUnresolved = await createAuthority({
+  results: {
+    'Q|STOP-A': sourceSuccess('TfL', [tfl({ routeNumber: 'Q', stopId: 'STOP-A', departures: [420] })], { timetableConclusion: 'MATCHED' }),
+    'R|STOP-B': sourceSuccess('TfL', [], { timetableConclusion: 'UNRESOLVED' })
+  },
+  nationalServices: []
+}).servicesForStops([stop('STOP-A', 'Q'), stop('STOP-B', 'R')], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.equal(matchedWithUnresolved.ok, true);
+assert.equal(matchedWithUnresolved.provenance.timetableConclusion, 'MATCHED');
+assert.deepEqual(matchedWithUnresolved.provenance.unresolvedRequestIdentities, ['R|STOP-B']);
+const matchedWithUnresolvedAssessment = await assessWith([stop('STOP-A', 'Q'), stop('STOP-B', 'R')], { servicesForStops: async () => matchedWithUnresolved });
+assert.equal(matchedWithUnresolvedAssessment.status, 'partial');
+assert.equal(matchedWithUnresolvedAssessment.stops.find(item => item.id === 'STOP-A').timetableEvidenceStatus, 'MATCHED');
+assert.equal(matchedWithUnresolvedAssessment.stops.find(item => item.id === 'STOP-B').timetableEvidenceStatus, 'SOURCE_UNAVAILABLE');
 
 const perRequestNoCurrent = await assessWith([stop('A', 'Q'), stop('B', 'R')], {
   servicesForStops: async () => sourceSuccess('TfL', [tfl({ id: 'tfl-R-B', routeNumber: 'R', stopId: 'B', departures: [480] })], {

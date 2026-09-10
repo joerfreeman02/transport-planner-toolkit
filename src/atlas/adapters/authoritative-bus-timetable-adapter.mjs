@@ -1,5 +1,5 @@
 import { isGreaterLondonPoint } from '../domain/geography.mjs';
-import { hasScheduledEvidenceAt, scheduledStopIds, scopedScheduledService } from '../domain/scheduled-evidence.mjs';
+import { deriveTimetableConclusion, hasScheduledEvidenceAt, scheduledStopIds, scopedScheduledService } from '../domain/scheduled-evidence.mjs';
 import { sourceFailure, sourceSuccess } from './source-adapter.mjs';
 
 const text = value => String(value ?? '').trim();
@@ -148,7 +148,19 @@ function scopeNationalResult(result, stops) {
     ...(result.provenance?.nationalUnresolvedRequestIdentities ?? [])
   ])].map(String);
   const explicit = result.timetableConclusion || result.provenance?.timetableConclusion;
-  const timetableConclusion = data.length ? 'MATCHED' : (unresolvedRequestIdentities.length || explicit !== 'NO_CURRENT_MATCH' ? 'UNRESOLVED' : 'NO_CURRENT_MATCH');
+  const timetableConclusion = deriveTimetableConclusion({
+    hasScheduledService: data.length > 0,
+    explicitNoCurrentMatch: explicit === 'NO_CURRENT_MATCH',
+    unresolvedRequestIdentities,
+    unprocessedRequestIdentities: result.provenance?.unprocessedRequestIdentities ?? [],
+    unprocessedRequests: result.provenance?.unprocessedRequests,
+    nationalSourceAvailable: result.provenance?.nationalSourceAvailable,
+    nationalUnresolvedRoutes: result.provenance?.nationalUnresolvedRoutes ?? [],
+    failedRequests: result.provenance?.failedRequests,
+    unavailable: result.provenance?.unavailable === true,
+    semanticUnresolved: explicit === 'UNRESOLVED',
+    quarantine: Boolean(result.provenance?.quarantine || result.provenance?.quarantinedRequestIdentities?.length)
+  });
   return sourceSuccess({
     ...result,
     data,
@@ -177,7 +189,10 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     const tflStops = insideLondon ? stops : stops.filter(isTfLStop);
     if (!insideLondon && !tflStops.length) return scopeNationalResult(await nationalAdapter.servicesForStops(stops, options), stops);
     const nationalStops = insideLondon ? stops : stops.filter(stop => !isTfLStop(stop) || isDualAuthorityStop(stop));
-    const national = await (insideLondon ? londonSupplementAdapter : (nationalStops.length ? nationalAdapter : { ok: true, data: [], warnings: [], provenance: { source: 'National timetable authority', requestCount: 0 } })).servicesForStops(nationalStops.length ? nationalStops : stops, options);
+    const nationalEvidenceRequired = !insideLondon && nationalStops.length > 0;
+    const national = nationalEvidenceRequired || insideLondon
+      ? await (insideLondon ? londonSupplementAdapter : nationalAdapter).servicesForStops(nationalStops.length ? nationalStops : stops, options)
+      : sourceSuccess({ data: [], warnings: [], provenance: { source: 'National timetable authority not required for the selected TfL-only scope', authority: 'not-required', nationalEvidenceRequired: false, nationalSourceAvailable: true, timetableConclusion: 'NO_CURRENT_MATCH' } });
     const nationalServices = national.ok ? national.data ?? [] : [];
     const bods = nationalServices.filter(isBods);
     const requests = stagedRequests(tflStops, { insideLondon });
@@ -185,7 +200,7 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     const maximumRequests = Number.isInteger(Number(options.maxRequests)) && Number(options.maxRequests) >= 0 ? Number(options.maxRequests) : requests.length;
     const processedRequests = requests.slice(0, maximumRequests);
     const unprocessed = requests.slice(maximumRequests);
-    const nationalRequired = !insideLondon && nationalStops.length > 0;
+    const nationalRequired = nationalEvidenceRequired;
     const nationalSourceAvailable = !nationalRequired || Boolean(national.ok);
     const nationalUnresolvedRoutes = nationalSourceAvailable ? [] : [...new Set(nationalStops.flatMap(nationalRoutesForStop))].sort((left, right) => left.localeCompare(right, 'en-GB', { numeric: true }));
     const warnings = [...new Set([...(national.warnings ?? []), ...(insideLondon ? [] : [crossBoundaryWarning]), ...(nationalSourceAvailable ? [] : [nationalUnavailableWarning]), ...(unprocessed.length ? [unprocessedWarning] : [])])];
@@ -261,7 +276,30 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       nationalUnresolvedRoutes,
       realtimeArrivalsUsed: false, anonymousRequest: true, apiKeyEmbedded: false
     };
-    provenance.timetableConclusion = composed.length ? 'MATCHED' : (unresolvedEntries.length ? 'UNRESOLVED' : 'NO_CURRENT_MATCH');
+    const nationalConclusion = national.timetableConclusion || national.provenance?.timetableConclusion;
+    const tflNoCurrent = requests.length === noCurrentRequestIdentities.length
+      && noCurrentRequestIdentities.length > 0
+      && unresolvedObserved.length === 0
+      && failed.length === 0
+      && unprocessed.length === 0;
+    const nationalNoCurrent = !nationalRequired
+      || (national.ok && nationalConclusion === 'NO_CURRENT_MATCH' && rawNationalUnresolvedRequestIdentities.length === 0);
+    provenance.nationalEvidenceRequired = nationalRequired;
+    provenance.nationalEvidenceNotRequired = !nationalRequired;
+    provenance.nationalTimetableConclusion = nationalConclusion || null;
+    provenance.timetableConclusion = deriveTimetableConclusion({
+      hasScheduledService: composed.length > 0,
+      explicitNoCurrentMatch: tflNoCurrent && nationalNoCurrent,
+      unresolvedRequestIdentities,
+      unprocessedRequestIdentities: provenance.unprocessedRequestIdentities,
+      unprocessedRequests: unprocessed.length,
+      nationalSourceAvailable,
+      nationalUnresolvedRoutes,
+      failedRequests: failed.length,
+      unavailable: failed.length > 0 || !nationalSourceAvailable,
+      semanticUnresolved: unresolvedEntries.length > 0 || nationalConclusion === 'UNRESOLVED',
+      quarantine: Boolean(national.provenance?.quarantine || national.provenance?.quarantinedRequestIdentities?.length)
+    });
     if (!composed.length && provenance.timetableConclusion === 'UNRESOLVED') {
       const candidateCode = results[0]?.code || (!nationalSourceAvailable ? national?.code : null);
       const code = ['timeout', 'http_failure', 'invalid_response', 'unavailable_source', 'invalid_request', 'coverage_not_implemented'].includes(candidateCode) ? candidateCode : 'unavailable_source';

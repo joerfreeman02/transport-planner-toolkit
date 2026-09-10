@@ -6,7 +6,7 @@ import {
   selectNearestStopGroup
 } from '../domain/bus-service-assessment.mjs';
 import { DEFAULT_TFL_REQUEST_LIMIT } from '../adapters/tfl-request-scheduler.mjs';
-import { hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
+import { deriveTimetableConclusion, hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
 
 export const TFL_REQUEST_WINDOW_LIMIT = DEFAULT_TFL_REQUEST_LIMIT;
 export const TFL_ASSESSMENT_FIXED_REQUESTS = 2;
@@ -36,10 +36,11 @@ function requiresNationalEvidence(stop) {
 }
 
 function nationalEvidenceUnavailableForStop(stop, provenance = {}) {
-  if (provenance.nationalSourceAvailable !== false) return false;
   const unresolvedRoutes = new Set((provenance.nationalUnresolvedRoutes ?? []).map(route => String(route)));
+  const nationalUnavailable = provenance.nationalSourceAvailable === false;
+  if (!nationalUnavailable && !unresolvedRoutes.size) return false;
   if (stop?.routeAuthorities && typeof stop.routeAuthorities === 'object') {
-    return Object.keys(stop.routeAuthorities).some(route => unresolvedRoutes.has(String(route)) && routeAuthorities(stop, route).some(authority => authority !== 'tfl'));
+    return Object.keys(stop.routeAuthorities).some(route => (unresolvedRoutes.has(String(route)) || nationalUnavailable) && routeAuthorities(stop, route).some(authority => authority !== 'tfl'));
   }
   return requiresNationalEvidence(stop);
 }
@@ -49,7 +50,8 @@ function incompleteTimetableIdentitiesForStop(stop, provenance = {}) {
   return [...new Set([
     ...(provenance.unresolvedRequestIdentities ?? []),
     ...(provenance.nationalUnresolvedRequestIdentities ?? []),
-    ...(provenance.unprocessedRequestIdentities ?? [])
+    ...(provenance.unprocessedRequestIdentities ?? []),
+    ...(provenance.quarantinedRequestIdentities ?? [])
   ].map(String).filter(identity => identity.endsWith(identitySuffix)))];
 }
 
@@ -60,10 +62,23 @@ function hasNoCurrentTimetableConclusionForStop(stop, provenance = {}) {
 
 function timetableConclusion(result, selection) {
   const explicit = result?.timetableConclusion || result?.provenance?.timetableConclusion;
-  if (!result?.ok) return 'UNRESOLVED';
-  if (explicit === 'NO_CURRENT_MATCH') return 'NO_CURRENT_MATCH';
-  if (explicit === 'UNRESOLVED') return 'UNRESOLVED';
-  return hasServiceForStops(result.data, selection.stops) ? 'MATCHED' : 'UNRESOLVED';
+  const provenance = result?.provenance ?? {};
+  return deriveTimetableConclusion({
+    hasScheduledService: hasServiceForStops(result?.data, selection.stops),
+    explicitNoCurrentMatch: explicit === 'NO_CURRENT_MATCH',
+    unresolvedRequestIdentities: [
+      ...(provenance.unresolvedRequestIdentities ?? []),
+      ...(provenance.nationalUnresolvedRequestIdentities ?? [])
+    ],
+    unprocessedRequestIdentities: provenance.unprocessedRequestIdentities ?? [],
+    unprocessedRequests: provenance.unprocessedRequests,
+    nationalSourceAvailable: provenance.nationalSourceAvailable,
+    nationalUnresolvedRoutes: provenance.nationalUnresolvedRoutes ?? [],
+    failedRequests: provenance.failedRequests,
+    unavailable: !result?.ok || provenance.unavailable === true,
+    semanticUnresolved: explicit === 'UNRESOLVED',
+    quarantine: Boolean(provenance.quarantine || provenance.quarantinedRequestIdentities?.length)
+  });
 }
 
 function sourceLabel(service) {
@@ -90,7 +105,6 @@ function buildStopTimetableEvidence(stop, services, servicesResult) {
   const incompleteIdentities = incompleteTimetableIdentitiesForStop(stop, provenance);
   const incompleteCount = incompleteIdentities.length;
   const incompleteLabel = `timetable evidence unresolved or incomplete for ${incompleteCount} route${incompleteCount === 1 ? '' : 's'}`;
-  if (!servicesResult?.ok) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: incompleteCount ? `Timetable source unavailable · ${incompleteLabel}` : 'Timetable source unavailable' });
   const matched = (services ?? []).filter(service => hasScheduledEvidence(service.stopSchedules?.[stopKey(stop)] || {}));
   const labels = [...new Set(matched.map(sourceLabel))];
   const nationalIncomplete = nationalEvidenceUnavailableForStop(stop, provenance);
@@ -102,8 +116,14 @@ function buildStopTimetableEvidence(stop, services, servicesResult) {
   }
   const checked = checkedSourceLabels(provenance);
   if (incompleteCount) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: `Timetable source unavailable · ${incompleteLabel}`, sources: checked });
+  if (!servicesResult?.ok && Number(provenance.failedRequests || 0) === 0 && provenance.unavailable !== true && hasNoCurrentTimetableConclusionForStop(stop, provenance)) {
+    return Object.freeze({ status: 'NO_CURRENT_MATCH', label: `No current match · ${checked.join('/') || 'timetable sources'} checked`, sources: checked });
+  }
+  if (!servicesResult?.ok) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable', sources: checked });
+  if (Number(provenance.unprocessedRequests || 0) > 0) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · timetable request scope was incomplete', sources: checked });
   if (Number(provenance.failedRequests || 0) > 0 || provenance.unavailable === true) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable', sources: checked });
   if (nationalIncomplete) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · required national evidence could not be checked', sources: checked });
+  if ((provenance.timetableConclusion || servicesResult?.timetableConclusion) === 'UNRESOLVED') return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · evidence remained unresolved', sources: checked });
   if ((provenance.timetableConclusion || servicesResult?.timetableConclusion) === 'NO_CURRENT_MATCH' || hasNoCurrentTimetableConclusionForStop(stop, provenance)) {
     return Object.freeze({ status: 'NO_CURRENT_MATCH', label: `No current match · ${checked.join('/') || 'timetable sources'} checked`, sources: checked });
   }

@@ -29,3 +29,39 @@ export function scopedScheduledService(service = {}, stopPointIds = []) {
     .filter(([stopPointId, schedule]) => allowed.has(stopPointId) && hasScheduledEvidence(schedule)));
   return { ...service, stopSchedules };
 }
+
+/**
+ * Derive the only defensible conclusion for a selected timetable scope.
+ * Actual evidence wins; without it, any completeness blocker prevents a
+ * zero-service conclusion. Callers may assert NO_CURRENT_MATCH only after
+ * every relevant evidence path has explicitly and successfully done so.
+ */
+export function deriveTimetableConclusion({
+  hasScheduledService = false,
+  explicitNoCurrentMatch = false,
+  unresolvedRequestIdentities = [],
+  unprocessedRequestIdentities = [],
+  unprocessedRequests = 0,
+  nationalSourceAvailable = true,
+  nationalUnresolvedRoutes = [],
+  failedRequests = 0,
+  unavailable = false,
+  semanticUnresolved = false,
+  quarantine = false
+} = {}) {
+  if (hasScheduledService) return 'MATCHED';
+  const unresolved = Array.isArray(unresolvedRequestIdentities) ? unresolvedRequestIdentities : [];
+  const unprocessed = Array.isArray(unprocessedRequestIdentities) ? unprocessedRequestIdentities : [];
+  const unresolvedRoutes = Array.isArray(nationalUnresolvedRoutes) ? nationalUnresolvedRoutes : [];
+  const blocked = unavailable
+    || semanticUnresolved
+    || quarantine
+    || Number(failedRequests) > 0
+    || Number(unprocessedRequests) > 0
+    || nationalSourceAvailable === false
+    || unresolved.length > 0
+    || unprocessed.length > 0
+    || unresolvedRoutes.length > 0;
+  if (blocked) return 'UNRESOLVED';
+  return explicitNoCurrentMatch ? 'NO_CURRENT_MATCH' : 'UNRESOLVED';
+}

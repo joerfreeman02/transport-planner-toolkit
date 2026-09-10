@@ -26,6 +26,15 @@ assert.deepEqual(parseTflPeriodCalendar('Mon-Fri Schooldays').days, ['monday', '
 assert.equal(parseTflPeriodCalendar('Monday-Friday non-schooldays').schoolDayOnly, false);
 assert.equal(parseTflPeriodCalendar('Monday-Friday non-schooldays').nonSchoolDayOnly, true);
 assert.deepEqual(parseTflPeriodCalendar('Unknown custom timetable period').days, [], 'unknown TfL calendar labels never become all seven days');
+assert.deepEqual(parseTflPeriodCalendar('Mon-Thu').days, ['monday', 'tuesday', 'wednesday', 'thursday']);
+assert.deepEqual(parseTflPeriodCalendar('Tuesday, Wednesday & Thursday').days, ['tuesday', 'wednesday', 'thursday']);
+assert.deepEqual(parseTflPeriodCalendar('Sat/Sun').days, ['saturday', 'sunday']);
+assert.deepEqual(parseTflPeriodCalendar('Mon-Sun').days, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
+assert.deepEqual(parseTflPeriodCalendar('Sunday Night/Monday Morning').days, ['sunday']);
+assert.deepEqual(parseTflPeriodCalendar('Friday Night/Saturday Morning').days, ['friday']);
+assert.deepEqual(parseTflPeriodCalendar('Saturday Night/Sunday Morning').days, ['saturday']);
+assert.deepEqual(parseTflPeriodCalendar('Mo-Th Nights/Tu-Fr Morning').days, ['monday', 'tuesday', 'wednesday', 'thursday']);
+assert.equal(parseTflPeriodCalendar('').calendarResolved, false);
 
 const routeMetadata657 = { ok: true, data: [{ id: '657', routeSections: [
   { id: '657-out', direction: 'outbound', originationName: "Salisbury Hall Sainsbury's", destinationName: "Bancroft's School" },

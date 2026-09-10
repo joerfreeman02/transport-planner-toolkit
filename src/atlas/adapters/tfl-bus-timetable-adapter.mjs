@@ -3,6 +3,7 @@ import { derivePrincipalLocations } from '../domain/bus-service-assessment.mjs';
 import { requestJson } from '../infrastructure/http-client.mjs';
 import { runCachedSourceQuery, sourceFailure, sourceSuccess } from './source-adapter.mjs';
 import { createTflRequestScheduler } from './tfl-request-scheduler.mjs';
+import { calendarQualificationNotes, createServiceCalendarEvidence } from '../domain/service-calendar.mjs';
 
 const SOURCE = 'Transport for London Unified API';
 const ATTRIBUTION = 'Scheduled timetable data provided by Transport for London';
@@ -14,23 +15,72 @@ const emptySchedule = () => Object.fromEntries(DAYS.map(day => [day, []]));
 
 const WEEKDAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
 
-function periodCalendar(name) {
-  const raw = text(name);
+const DAY_ALIASES = Object.freeze({
+  monday: 'monday', mon: 'monday', tuesday: 'tuesday', tue: 'tuesday', tues: 'tuesday',
+  wednesday: 'wednesday', wed: 'wednesday', thursday: 'thursday', thu: 'thursday', thur: 'thursday', thurs: 'thursday',
+  friday: 'friday', fri: 'friday', saturday: 'saturday', sat: 'saturday', sunday: 'sunday', sun: 'sunday'
+});
+
+function daysFromTokens(value) {
+  const matches = normal(value).split(/\s+/).map(token => DAY_ALIASES[token]).filter(Boolean);
+  return [...new Set(matches)];
+}
+
+function expandedDayRange(raw) {
+  if (!/(?:-|–|\bto\b)/i.test(raw)) return [];
+  const endpoints = daysFromTokens(raw);
+  if (endpoints.length !== 2) return [];
+  const firstIndex = DAYS.indexOf(endpoints[0]), lastIndex = DAYS.indexOf(endpoints[1]);
+  if (firstIndex < 0 || lastIndex < firstIndex) return [];
+  return DAYS.slice(firstIndex, lastIndex + 1);
+}
+
+function calendarInput(input) {
+  if (Array.isArray(input)) return { raw: input.join(', '), days: daysFromTokens(input.join(' ')), structured: true };
+  if (input && typeof input === 'object') {
+    const raw = text(input.name ?? input.label ?? input.period ?? input.sourceCalendarLabel);
+    const structuredDays = input.daysOfWeek ?? input.days ?? input.operatingDays ?? input.daysOfOperation;
+    return { raw, days: Array.isArray(structuredDays) ? daysFromTokens(structuredDays.join(' ')) : [], structured: Boolean(structuredDays) };
+  }
+  return { raw: text(input), days: [], structured: false };
+}
+
+function periodCalendar(input) {
+  const { raw, days: structuredDays, structured } = calendarInput(input);
   const value = normal(raw);
-  if (!raw) return Object.freeze({ rawLabel: null, days: DAYS, resolved: true, schoolDayOnly: false, nonSchoolDayOnly: false });
-  const nonSchoolDayOnly = /\bnon\s*school\s*days?\b|\bschool\s*holidays?\b/.test(value);
-  const schoolDayOnly = !nonSchoolDayOnly && /\bschool\s*days?\b/.test(value);
-  let days = null;
-  if (/monday.*friday|mon.*fri|weekdays?/.test(value)) days = WEEKDAYS;
-  else if (/monday.*saturday|mon.*sat/.test(value)) days = Object.freeze([...WEEKDAYS, 'saturday']);
-  else if (/saturday.*(?:and|&)\s*sunday|weekends?/.test(value)) days = Object.freeze(['saturday', 'sunday']);
-  else if (/\bdaily\b|every\s*day/.test(value)) days = DAYS;
-  else if (/\bsaturday\b/.test(value) && !/\bsunday\b/.test(value)) days = Object.freeze(['saturday']);
-  else if (/\bsunday\b/.test(value) && !/\bsaturday\b/.test(value)) days = Object.freeze(['sunday']);
-  else if (/^monday$/.test(value)) days = Object.freeze(['monday']);
+  const nonSchoolDayOnly = /\bnon\s*school\s*days?\b|\bschool\s*holidays?\b|\bholidays?\s*only\b/.test(value);
+  const schoolDayOnly = !nonSchoolDayOnly && /\bschool\s*days?\b|\bschooldays?\b/.test(value);
+  const termTimeOnly = /\bterm\s*[- ]?time\b|\bterm\s*[- ]?only\b/.test(value);
+  const holidayOnly = /\bholiday(?:s)?\s*only\b|\bschool\s*holidays?\b/.test(value);
+  let days = expandedDayRange(raw);
+  if (!days.length) days = structuredDays.length ? structuredDays : null;
+  const nightLabel = value.replace(/\s+/g, ' ');
+  if (/^sunday\s+night\s*\/?\s*monday\s+morning$/.test(nightLabel)) days = ['sunday'];
+  else if (/^friday\s+night\s*\/?\s*saturday\s+morning$/.test(nightLabel)) days = ['friday'];
+  else if (/^saturday\s+night\s*\/?\s*sunday\s+morning$/.test(nightLabel)) days = ['saturday'];
+  else if (/^mo(?:n)?\s+th(?:u)?\s+nights?\s+tu(?:e)?\s+fr(?:i)?\s+morning$/.test(nightLabel)) days = ['monday', 'tuesday', 'wednesday', 'thursday'];
+  else if (/monday\s+(?:to\s+)?sunday|mon\s+(?:to\s+)?sun|mondaytosunday/.test(value)) days = DAYS;
+  else if (/monday\s+(?:to\s+)?saturday|mon\s+(?:to\s+)?sat|mondaytosaturday/.test(value)) days = [...WEEKDAYS, 'saturday'];
+  else if (/monday\s+(?:to\s+)?friday|mon\s+(?:to\s+)?fri|weekdays?/.test(value)) days = WEEKDAYS;
+  else if (/saturday\s+(?:and\s+)?sunday|sat\s+(?:and\s+)?sun|weekends?/.test(value)) days = ['saturday', 'sunday'];
+  else if (/\bdaily\b|every\s*day|mon\s*[- ]?sun/.test(value)) days = DAYS;
   else if (/^night$/.test(value)) days = DAYS;
-  else if (schoolDayOnly || nonSchoolDayOnly) days = WEEKDAYS;
-  return Object.freeze({ rawLabel: raw, days: days ?? Object.freeze([]), resolved: Boolean(days), schoolDayOnly, nonSchoolDayOnly });
+  else if (days == null) {
+    const explicit = daysFromTokens(value);
+    if (explicit.length) days = explicit;
+  }
+  if (!days?.length && (schoolDayOnly || termTimeOnly || nonSchoolDayOnly || holidayOnly)) days = WEEKDAYS;
+  return createServiceCalendarEvidence({
+    daysOfWeek: days ?? [],
+    calendarResolved: Boolean(days?.length),
+    schoolDayOnly,
+    termTimeOnly,
+    nonSchoolDayOnly,
+    holidayOnly,
+    sourceCalendarLabel: raw || null,
+    qualificationMetadata: { structuredInput: structured },
+    provenance: { provider: 'TfL', authority: 'Transport for London Unified API' }
+  });
 }
 
 export function periodDays(name) {
@@ -125,7 +175,7 @@ function scheduleForPattern(route, pattern, stopPointId, responseDepartureStopId
   let chronologyIncomplete = false;
   for (const schedule of schedules) {
     hasPeriods ||= Array.isArray(schedule?.periods) && schedule.periods.length > 0;
-    const calendar = periodCalendar(schedule?.name ?? schedule?.period ?? schedule?.days);
+    const calendar = periodCalendar(schedule);
     calendarEvidence.push(calendar);
     const journeys = Array.isArray(schedule?.knownJourneys) ? schedule.knownJourneys : [];
     const firstJourney = schedule?.firstJourney && belongsToPattern(schedule.firstJourney, pattern, pattern.count) ? schedule.firstJourney : null;
@@ -258,7 +308,7 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         frequencyBasisStopId: stopPointId,
         source: { provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId, routeMetadata: identity ? 'matched' : 'incomplete' },
         timetableSource: 'TfL',
-        serviceNotes: timing.calendarEvidence.filter(calendar => calendar.schoolDayOnly).length ? ['School days only.'] : [],
+        serviceNotes: calendarQualificationNotes(timing.calendarEvidence),
         sourceWarnings: timing.calendarEvidence.filter(calendar => !calendar.resolved).map(calendar => `TfL timetable period "${calendar.rawLabel}" could not be safely mapped to operating days; no unverified days were fabricated.`),
         qualifications: [
           ...(hasPeriods ? ['TfL supplied operating-period/frequency evidence; ATLAS retained only exact scheduled journeys and first/last journey boundaries, without synthesising departures from frequency ranges.'] : []),

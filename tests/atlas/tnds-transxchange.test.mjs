@@ -1,9 +1,29 @@
 import assert from 'node:assert/strict';
-import { parseTndsTransXchange, parseTndsTransXchangeServices } from '../../src/atlas/adapters/tnds-transxchange-adapter.mjs';
+import { parseTndsOperatingProfile, parseTndsTransXchange, parseTndsTransXchangeServices } from '../../src/atlas/adapters/tnds-transxchange-adapter.mjs';
 import { mergeBusTimetableSources } from '../../src/atlas/domain/bus-timetable-merge.mjs';
 const xml = `<TransXChange SchemaVersion="2.5"><Operators><Operator id="OP1"><OperatorCode>OP1</OperatorCode><TradingName>Example</TradingName></Operator></Operators><Services><Service><ServiceCode>S1</ServiceCode><LineName>231</LineName><OperatingPeriod><StartDate>2026-08-31</StartDate><EndDate>2027-07-31</EndDate></OperatingPeriod><StandardService><Origin>A</Origin><Destination>B</Destination></StandardService><OperatingProfile><MondayToFriday>true</MondayToFriday></OperatingProfile></Service></Services><StopPoints><AnnotatedStopPointRef><StopPointRef>021013518</StopPointRef><CommonName>Woodside Road</CommonName></AnnotatedStopPointRef></StopPoints><VehicleJourneys><VehicleJourney><VehicleJourneyCode>V1</VehicleJourneyCode><JourneyPatternRef>JP1</JourneyPatternRef><DepartureTime>25:10:00</DepartureTime><OperatingProfile><MondayToFriday>true</MondayToFriday></OperatingProfile></VehicleJourney></VehicleJourneys><JourneyPatterns><JourneyPattern id="JP1"><Direction>outbound</Direction><DestinationDisplay>B</DestinationDisplay></JourneyPattern></JourneyPatterns></TransXChange>`;
 const parsed = parseTndsTransXchange(xml, { region: 'SE', sourceArchive: 'TNDS-SE-v2.5.zip' });
 assert.equal(parsed.routeNumber, '231'); assert.equal(parsed.operator, 'Example'); assert.equal(parsed.validFrom, '2026-08-31'); assert.equal(parsed.stopSchedules['021013518'].monday[0], 1510); assert.equal(parsed.source.schemaVersion, '2.5');
+assert.deepEqual(parsed.calendarEvidence[0].daysOfWeek, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+assert.equal(parsed.serviceNotes.length, 0, 'ordinary weekday service does not acquire a school-day qualification');
+const schoolProfile = parseTndsOperatingProfile('<OperatingProfile><ServicedOrganisationDayType>Schooldays</ServicedOrganisationDayType><DaysOfOperation>Monday, Tuesday, Wednesday, Thursday, Friday</DaysOfOperation></OperatingProfile>');
+assert.deepEqual(schoolProfile.daysOfWeek, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+assert.equal(schoolProfile.schoolDayOnly, true);
+assert.equal(schoolProfile.daysOfWeek.includes('saturday'), false, 'school profile does not fabricate weekend operation');
+assert.match(parseTndsOperatingProfile('<OperatingProfile><ServicedOrganisationDayType>TermTime</ServicedOrganisationDayType><MondayToFriday>true</MondayToFriday></OperatingProfile>').sourceCalendarLabel, /TermTime/);
+const precedenceXml = xml
+  .replace('<StandardService><Origin>A</Origin><Destination>B</Destination></StandardService><OperatingProfile><MondayToFriday>true</MondayToFriday>', '<StandardService><Origin>A</Origin><Destination>B</Destination></StandardService><OperatingProfile><MondayToFriday>true</MondayToFriday>')
+  .replace('<JourneyPattern id="JP1">', '<JourneyPattern id="JP1"><OperatingProfile><Saturday>true</Saturday></OperatingProfile>')
+  .replace('<OperatingProfile><MondayToFriday>true</MondayToFriday></OperatingProfile></VehicleJourney>', '<OperatingProfile><Sunday>true</Sunday></OperatingProfile></VehicleJourney>');
+const precedence = parseTndsTransXchange(precedenceXml, { region: 'SE', sourceArchive: 'precedence.xml' });
+assert.deepEqual(precedence.calendarEvidence[0].daysOfWeek, ['sunday'], 'VehicleJourney OperatingProfile overrides JourneyPattern and Service profiles');
+assert.deepEqual(precedence.stopSchedules['021013518'].saturday, []);
+assert.deepEqual(precedence.stopSchedules['021013518'].sunday, [1510]);
+const unsupportedXml = xml.replace(/<OperatingProfile><MondayToFriday>true<\/MondayToFriday><\/OperatingProfile>/g, '<OperatingProfile><SpecialDaysOperation><SpecialDay>Tuesday</SpecialDay></SpecialDaysOperation></OperatingProfile>');
+const unsupported = parseTndsTransXchange(unsupportedXml, { region: 'SE', sourceArchive: 'unsupported.xml' });
+assert.equal(unsupported.calendarEvidence[0].resolutionStatus, 'unresolved');
+assert.match(unsupported.sourceWarnings.join(' '), /unsupported complex operating profile/);
+assert.deepEqual(unsupported.stopSchedules['021013518'].monday, [], 'unsupported complex profiles never become fabricated weekday evidence');
 const bods = [{ routeNumber: '999', operator: 'Other', direction: 'outbound', origin: 'X', destination: 'Y', stopSchedules: { '021013518': {} } }];
 assert.equal(mergeBusTimetableSources({ bods, tnds: [parsed] }).length, 2);
 assert.equal(mergeBusTimetableSources({ bods: [{ routeNumber: '231', operator: 'Example', direction: 'outbound', origin: 'A', destination: 'B', stopSchedules: parsed.stopSchedules }], tnds: [parsed] }).length, 1);

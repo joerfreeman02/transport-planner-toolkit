@@ -32,7 +32,7 @@ assert.equal(main.servedAtText, 'Waltham Cross Bus Station — G · 82 m');
 assert.deepEqual(main.departuresByDay.monday, [360, 360, 420, 480, 540, 600, 660], 'same representative-stop schedules are consolidated without cross-stop addition while a destination-distinguished short working remains represented');
 assert.deepEqual(main.typicalFrequencyLines, ['Mon-Fri: Every ~60 mins', 'Sat: 2 journeys/day', 'Sun: 1 journey/day']);
 assert.match(main.operatingPeriodLines.join(' '), /Sun: Departs approx\. 10:00/);
-assert.match(main.serviceNote, /School-day-only service/);
+assert.doesNotMatch(main.serviceNote, /School days only\./, 'a school-day qualification is not shown alongside retained weekend departures');
 assert.doesNotMatch(main.serviceNote, /Includes scheduled short workings/);
 assert.equal(main.directionPatternText, 'Towards Chingford');
 assert.equal(planner.filter(row => row.routeNumber === '657').length, 3);
@@ -47,14 +47,15 @@ assert.equal(formatAtlasTaskStatus({ phase: 'routing-stops', completed: 2, total
 assert.equal(formatAtlasTaskStatus({ phase: 'checking-timetables', completed: 12, total: 31 }), 'Step 3 of 5 · Checking timetables — 12 of 31');
 assert.match(formatAtlasTaskStatus({ phase: 'checking-timetables', waiting: true }), /Waiting briefly/);
 assert.equal(formatAtlasTaskStatus({ phase: 'complete' }), 'Complete');
-assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: 'one source was unavailable' }), 'Partial — review evidence — one source was unavailable');
+assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: 'one source was unavailable' }), 'Assessment finished — one source was unavailable');
 assert.equal(formatAtlasTaskStatus({ phase: 'unavailable' }), 'Assessment unavailable');
 
 const statusMessage = { textContent: '' };
 const statusRegion = { dataset: {}, attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } };
 const statusProgress = { hidden: false, max: 0, value: 0, dataset: {}, attributes: {}, setAttribute(name, value) { this.attributes[name] = value; }, removeAttribute(name) { delete this.attributes[name]; } };
 const statusCount = { textContent: '' };
-const taskStatus = createAtlasTaskStatus({ messageElement: statusMessage, regionElement: statusRegion, progressElement: statusProgress, countElement: statusCount });
+const statusStages = Array.from({ length: 5 }, () => ({ dataset: {}, attributes: {}, setAttribute(name, value) { this.attributes[name] = value; }, removeAttribute(name) { delete this.attributes[name]; } }));
+const taskStatus = createAtlasTaskStatus({ messageElement: statusMessage, regionElement: statusRegion, progressElement: statusProgress, countElement: statusCount, stageElements: statusStages });
 taskStatus.update({ phase: 'checking-timetables', completed: 12, total: 31 });
 assert.equal(statusMessage.textContent, 'Step 3 of 5 · Checking timetables — 12 of 31');
 assert.equal(statusProgress.hidden, false);
@@ -63,9 +64,11 @@ assert.equal(statusProgress.value, 12);
 assert.equal(statusProgress.dataset.progressMode, 'determinate');
 assert.equal(statusCount.textContent, '12 of 31');
 assert.equal(statusRegion.attributes['aria-busy'], 'true');
+assert.deepEqual(statusStages.map(stage => stage.dataset.state), ['complete', 'complete', 'active', 'upcoming', 'upcoming']);
 taskStatus.update({ phase: 'partial', detail: 'one timetable request failed' });
 assert.equal(statusProgress.hidden, true);
 assert.equal(statusRegion.attributes['aria-busy'], 'false');
+assert.deepEqual(statusStages.map(stage => stage.dataset.state), ['complete', 'complete', 'complete', 'complete', 'complete']);
 
 const evidence = (minutes, prefix, extra = {}) => minutes.map((minute, index) => ({ minute, journeyIdentity: `${prefix}-${index}`, ...extra }));
 const plannerRecord = ({ routeNumber = '279', destination = 'Theobalds Grove', direction = 'outbound', pattern = ['A', 'B', 'C'], departures = [], ids = 'journey', serviceNote = '', ...extra } = {}) => ({
@@ -104,7 +107,7 @@ assert.match(route279[0].operatingPeriodLines[0], /Approx\. 05:00–01:00 \(next
 assert.equal(route279[0].servedAtStopId, 'A');
 assert.equal(route279[0].frequencyBasisStopId, 'A');
 assert.equal(route279[0].canonicalDeparturePopulation.monday.every(item => item.stopPointId === 'A'), true);
-assert.equal(route279[0].routeGroupNote, 'Additional timetable variants and short workings operate; some journeys serve different destinations and operate at different times.');
+assert.equal(route279[0].routeGroupNote, 'Route 279 — main timetable pattern shown above. Additional variants and short workings operate; some journeys use different destinations or times.');
 assert.equal(route279[0].directionPatternText, 'Towards Theobalds Grove');
 
 const sameTime = buildPlannerBusServiceSummaries([
@@ -126,6 +129,11 @@ const distinctPhysicalJourneys = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: 'P2', pattern: ['A', 'B'], departures: [420], ids: 'physical-2' })
 ], coherentStops)[0];
 assert.equal(distinctPhysicalJourneys.departuresByDay.monday.length, 2, 'distinct physical journeys at one minute remain separate');
+const providerIdentityCollision = buildPlannerBusServiceSummaries([
+  plannerRecord({ routeNumber: 'PN', destination: 'One Terminal', ids: 'shared-id', departures: [420], timetableSource: 'BODS' }),
+  plannerRecord({ routeNumber: 'PN', destination: 'Two Terminal', ids: 'shared-id', departures: [420], timetableSource: 'TNDS' })
+], coherentStops)[0];
+assert.equal(providerIdentityCollision.departuresByDay.monday.length, 2, 'source-local journey IDs do not collide across providers when route semantics differ');
 
 const mondayJourney = plannerRecord({ routeNumber: 'D', departures: [], ids: 'day-journey' });
 const tuesdayJourney = plannerRecord({ routeNumber: 'D', departures: [], ids: 'day-journey' });
@@ -147,7 +155,7 @@ const route13 = buildPlannerBusServiceSummaries([
 ], coherentStops)[0];
 assert.equal(route13.departuresByDay.monday.length, 21);
 assert.doesNotMatch(route13.serviceNote, /Limited service|no more than three/i, 'limited-service notes are recalculated after consolidation');
-assert.equal(route13.routeGroupNote, 'Additional timetable variants and short workings operate; some journeys serve different destinations and operate at different times.');
+assert.equal(route13.routeGroupNote, 'Route 13 — main timetable pattern shown above. Additional variants and short workings operate; some journeys use different destinations or times.');
 assert.equal(route13.directionPatternText, 'Towards North Weald');
 
 const mixedPatternEvidence = buildPlannerBusServiceSummaries([
@@ -191,6 +199,14 @@ const circularRows = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: 'C', destination: 'Town Centre', direction: 'Anticlockwise', pattern: ['C', 'B', 'A'], departures: [420], ids: 'anticlockwise', circular: true })
 ], coherentStops);
 assert.equal(circularRows.length, 2, 'circular directions remain distinct where timetable evidence distinguishes them');
+const namedCircular = buildPlannerBusServiceSummaries([plannerRecord({ routeNumber: '230', destination: 'Lyons Community Centre', direction: 'Southeastbound', circular: true, pattern: ['A', 'B', 'A'], departures: [420], ids: 'named-circular', routePatternStops: [{ id: 'A', name: 'Lyons Community Centre' }, { id: 'B', name: 'Caddington Woods' }, { id: 'A', name: 'Lyons Community Centre' }] })], coherentStops)[0];
+assert.equal(namedCircular.directionPatternText, 'Circular — Lyons Community Centre via Caddington Woods (Southeastbound)');
+const sharedRouteCharacteristics = buildPlannerBusServiceSummaries([
+  plannerRecord({ routeNumber: '46', direction: 'outbound', directionFamily: 'outbound', destination: 'North Terminal', serviceNote: 'School days only.' }),
+  plannerRecord({ routeNumber: '46', direction: 'inbound', directionFamily: 'inbound', origin: 'North Terminal', destination: 'South Terminal', pattern: ['C', 'B', 'A'], serviceNote: 'School days only.' })
+], coherentStops);
+assert.equal(sharedRouteCharacteristics.filter(row => row.routeGroupNote === 'School days only.').length, 1, 'shared route characteristics are emitted once after the route group');
+assert.equal(sharedRouteCharacteristics.filter(row => row.serviceNote.includes('School days')).length, 0);
 
 const single = buildPlannerBusServiceSummaries([plannerRecord({ routeNumber: '657', departures: [982], ids: '657-single' })], coherentStops)[0];
 assert.equal(single.typicalFrequencyLines[0], 'Mon-Fri: 1 journey/day');
@@ -204,7 +220,9 @@ assert.equal(builtSummary.departureEvidenceByDay.monday[0].minute, 678, 'raw sum
 const wordRows = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [route279[0]], serviceSummaries: [] })[1].rows;
 assert.equal(wordRows[0][2], route279[0].directionPatternText, 'Word consumes the same direction model as Browser');
 assert.equal(wordRows[0][5], route279[0].typicalFrequencyText, 'Word consumes the same frequency model as Browser');
-assert.equal(wordRows.filter(row => !Array.isArray(row) && row.text === 'Service note: Additional timetable variants and short workings operate; some journeys serve different destinations and operate at different times.').length, 1, 'route-level variant note is emitted once');
+assert.equal(wordRows.filter(row => !Array.isArray(row) && row.text === 'Service note: Route 279 — main timetable pattern shown above. Additional variants and short workings operate; some journeys use different destinations or times.').length, 1, 'route-level variant note is emitted once');
+const reviewWordRows = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [], serviceSummaries: [], reviewItems: [{ route: '279', stop: 'A', source: 'TfL', message: 'Review this timetable evidence.' }] })[1].rows;
+assert.equal(reviewWordRows.some(row => !Array.isArray(row) && row.text === 'Evidence items to review: Route 279 · Stop A · TfL: Review this timetable evidence.'), true, 'Word carries the same scoped review item naming as Browser');
 
 const variable = calculateTypicalServiceFrequency([300, 310, 320, 330, 340, 350, 365, 380], { day: 'monday' });
 assert.equal(variable.classification, 'variable-frequency');

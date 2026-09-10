@@ -58,6 +58,11 @@ const regular = calculateTypicalServiceFrequency(weekdayRegular, { day: 'monday'
 assert.equal(regular.classification, 'regular-frequency');
 assert.equal(regular.intervalMinutes, 15);
 assert.match(regular.wording, /Every ~15 mins/);
+assert.equal(calculateTypicalServiceFrequency([0, 10, 20, 30, 40], { day: 'monday' }).valueText, 'Every ~10 mins', 'five regular departures use their central headway rather than a limited-service label');
+assert.match(calculateTypicalServiceFrequency([0, 8, 18, 28, 39, 51], { day: 'monday' }).valueText, /Every ~10 mins|Typically every ~10 mins/);
+const inactiveGaps = calculateTypicalServiceFrequency([0, 10, 20, 30, 330, 340, 350, 660, 670], { day: 'monday' });
+assert.equal(inactiveGaps.valueText, 'Every ~10 mins', 'all inactive gaps above the deterministic threshold are excluded, not only the largest one');
+assert.match(calculateTypicalServiceFrequency([360, 370, 380, 390, 690, 700], { day: 'monday' }).valueText, /Every ~10 mins|Typically every ~10 mins/);
 assert.equal(calculateTypicalServiceFrequency([], { day: 'sunday' }).wording, 'Sunday: No scheduled service');
 
 const tflSafe = calculateTypicalServiceFrequency([350, 370, 400, 1400], { day: 'monday', frequencyEvidence: [{ periodType: 'FrequencyMinutes', day: 'monday', lowestFrequency: 10, highestFrequency: 10 }] });

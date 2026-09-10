@@ -19,7 +19,7 @@ import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation } from 
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
-const taskStatus = createAtlasTaskStatus({ messageElement: $('taskStatusMessage'), regionElement: $('taskStatus'), progressElement: $('taskStatusProgress'), countElement: $('taskStatusProgressText') });
+const taskStatus = createAtlasTaskStatus({ messageElement: $('taskStatusMessage'), regionElement: $('taskStatus'), progressElement: $('taskStatusProgress'), countElement: $('taskStatusProgressText'), stageElements: [...document.querySelectorAll('[data-task-stage]')] });
 const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha13' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tflRequestScheduler = createTflRequestScheduler({ onEvent: event => taskStatus.update(event) });
@@ -443,6 +443,11 @@ function appendCell(row, label, value, secondary = '') {
   return cell;
 }
 
+function reviewItemText(item) {
+  const scope = [item.route && 'Route ' + item.route, item.stop && 'Stop ' + item.stop, item.source].filter(Boolean).join(' · ');
+  return scope ? scope + ': ' + item.message : item.message;
+}
+
 function renderAssessment(result) {
   currentBusResult = result;
   const presentedServices = Array.isArray(result.plannerServiceSummaries)
@@ -556,10 +561,11 @@ function renderAssessment(result) {
   const timetableLabel = timetablePresentation.label;
   $('resultSource').textContent = `${stopSource}; ${timetableLabel}; OpenStreetMap routing`;
   $('resultChecked').textContent = checked;
-  $('resultFreshness').textContent = result.status === 'complete' ? 'Assessment complete' : 'Partial assessment - review points to note';
+  const reviewItems = result.reviewItems ?? [];
+  $('resultFreshness').textContent = result.status === 'complete' ? 'Assessment complete' : 'Assessment finished — ' + reviewItems.length + ' evidence item' + (reviewItems.length === 1 ? '' : 's') + ' need review';
   const plannerChecks = $('plannerChecks');
   plannerChecks.replaceChildren();
-  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', result.status === 'complete' ? 'Complete for the information shown' : 'Partial - use the points to note below']]) {
+  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', result.status === 'complete' ? 'Complete for the information shown' : 'Assessment finished — ' + reviewItems.length + ' evidence item' + (reviewItems.length === 1 ? '' : 's') + ' need review']]) {
     const line = document.createElement('p'); const label = document.createElement('strong'); label.textContent = `${labelText}: `; line.append(label, value); plannerChecks.append(line);
   }
   const plannerWarnings = [...new Set(result.warnings.map(plannerStopWarning).filter(Boolean))];
@@ -567,6 +573,12 @@ function renderAssessment(result) {
     const heading = document.createElement('strong'); heading.textContent = 'Points to note';
     const list = document.createElement('ul');
     plannerWarnings.forEach(warning => { const item = document.createElement('li'); item.textContent = warning; list.append(item); });
+    plannerChecks.append(heading, list);
+  }
+  if (reviewItems.length) {
+    const heading = document.createElement('strong'); heading.textContent = 'Evidence items to review';
+    const list = document.createElement('ul');
+    reviewItems.forEach(item => { const line = document.createElement('li'); line.textContent = reviewItemText(item); list.append(line); });
     plannerChecks.append(heading, list);
   }
   const diagnostics = $('diagnostics');
@@ -701,7 +713,8 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
     syncRadiusCircle(result.provenance.stops?.actualDiscoveryRadiusMetres ?? result.provenance.stops?.radiusMetres ?? selectedRadius());
     const checked = formatTime(result.provenance.stops?.retrievedAt || result.provenance.timetables?.retrievedAt);
     const modeText = result.assessmentMode === 'nearest' ? `Nearest stop group "${result.nearestGroup?.name || 'selected group'}"` : `${result.stops.length} nearby stop${result.stops.length === 1 ? '' : 's'}`;
-    const message = result.status === 'complete' ? `${modeText} assessed. Complete - checked ${checked}.` : `${modeText} assessed. Part of the assessment is unavailable; review the points to note.`;
+    const reviewCount = result.reviewItems?.length ?? 0;
+    const message = result.status === 'complete' ? `${modeText} assessed. Complete - checked ${checked}.` : `${modeText} assessed. Assessment finished — ${reviewCount} evidence item${reviewCount === 1 ? '' : 's'} need review.`;
     setCallout($('stopStatus'), message, result.status === 'complete' && !result.warnings.length ? 'success' : 'warning');
   } catch {
     taskStatus.update({ phase: 'unavailable', detail: 'The assessment could not be completed.' });

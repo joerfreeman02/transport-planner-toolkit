@@ -14,6 +14,11 @@ function principalLocationsText(service) {
   return text(service?.principalLocationsText || service?.presentation?.principalLocationsText);
 }
 
+function reviewItemText(item) {
+  const scope = [item.route && `Route ${item.route}`, item.stop && `Stop ${item.stop}`, item.source].filter(Boolean).join(' · ');
+  return scope ? `${scope}: ${item.message}` : item.message;
+}
+
 export function buildBusWordTables(result) {
   if (!result?.ok) throw new Error('A completed Bus assessment is required for Word export.');
   const stopRows = (result.stops ?? []).map(stop => [
@@ -50,6 +55,7 @@ export function buildBusWordTables(result) {
     const next = services[index + 1];
     if (hasPlannerSummary && service.routeGroupNote && (!next || next.routeGroupKey !== service.routeGroupKey)) serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeGroupNote}` });
   });
+  if (Array.isArray(result.reviewItems) && result.reviewItems.length) serviceRows.push({ kind: 'summary', text: `Evidence items to review: ${result.reviewItems.map(reviewItemText).join(' | ')}` });
   if (hasPlannerSummary) serviceRows.push({ kind: 'summary', text: PLANNER_METHODOLOGY_NOTE });
 
   return [

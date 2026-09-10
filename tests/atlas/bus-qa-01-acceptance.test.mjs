@@ -65,7 +65,7 @@ assert.equal(unavailableResult.stops[0].timetableEvidence, 'Timetable source una
 const wordTables = buildBusWordTables(result);
 assert.deepEqual(wordTables[0].headers, ['Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop']);
 assert.deepEqual(wordTables[1].headers, ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']);
-assert.match(wordTables[1].rows[0][2], /Southbound — Rural Origin to Town Terminal/);
+assert.equal(wordTables[1].rows[0][2], 'Towards Town Terminal (Rural Origin)');
 assert.match(wordTables[1].rows[0][3], /Assessment Stop — S/);
 assert.doesNotMatch(wordTables[0].headers.join(' '), /Timetable evidence|Include/);
 console.log('PASS BUS-QA-01 TNDS/BODS principal-location parity, representative-stop frequency, source status and Word exclusion regressions.');

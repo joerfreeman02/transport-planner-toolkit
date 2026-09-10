@@ -27,7 +27,7 @@ export function buildBusWordTables(result) {
   const hasPlannerSummary = Array.isArray(result.plannerServiceSummaries);
   const services = hasPlannerSummary ? result.plannerServiceSummaries : buildServicePresentation(result.serviceSummaries ?? []);
   const serviceRows = [];
-  for (const service of services) {
+  services.forEach((service, index) => {
     serviceRows.push(hasPlannerSummary
       ? [
         service.routeNumber,
@@ -47,7 +47,9 @@ export function buildBusWordTables(result) {
         (service.operatingPeriodLines ?? []).join('\n')
       ]);
     if (service.serviceNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.serviceNote}` });
-  }
+    const next = services[index + 1];
+    if (hasPlannerSummary && service.routeGroupNote && (!next || next.routeGroupKey !== service.routeGroupKey)) serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeGroupNote}` });
+  });
   if (hasPlannerSummary) serviceRows.push({ kind: 'summary', text: PLANNER_METHODOLOGY_NOTE });
 
   return [

@@ -41,7 +41,7 @@ assert.deepEqual(formatTypicalFrequency(Object.fromEntries(days.map(day => [day,
 const route13 = summaryFor(schedule({ monday: weekdayIrregular, tuesday: weekdayIrregular, wednesday: weekdayIrregular, thursday: weekdayIrregular, friday: weekdayIrregular, saturday: [420, 540, 660], sunday: [] }), {
   qualifications: ['Limited service: no more than three scheduled journeys on any represented day.']
 });
-assert.match(route13.typicalFrequencyLines[0], /Mon-Fri: 22 scheduled journeys\/day \(irregular\)/);
+assert.match(route13.typicalFrequencyLines[0], /Mon-Fri: Approx\. [0-9.]+ buses\/hour \(irregular\)/);
 assert.equal(route13.typicalFrequencyLines[2], 'Sun: No scheduled service');
 assert.doesNotMatch(route13.serviceNote, /no more than three scheduled journeys on any represented day/i);
 
@@ -53,7 +53,7 @@ assert.deepEqual(route13b.typicalFrequencyLines, ['Mon-Fri: 1 journey/day', 'Sat
 
 const regularity = calculateTypicalServiceFrequency(weekdayIrregular, { day: 'wednesday' });
 assert.equal(regularity.classification, 'irregular');
-assert.match(regularity.wording, /22 scheduled journeys\/day \(irregular\)/);
+assert.match(regularity.wording, /Approx\. [0-9.]+ buses\/hour \(irregular\)/);
 const regular = calculateTypicalServiceFrequency(weekdayRegular, { day: 'monday' });
 assert.equal(regular.classification, 'regular-frequency');
 assert.equal(regular.intervalMinutes, 15);
@@ -64,7 +64,7 @@ const tflSafe = calculateTypicalServiceFrequency([350, 370, 400, 1400], { day: '
 assert.equal(tflSafe.basis, 'frequency-band');
 assert.equal(tflSafe.intervalMinutes, 10);
 assert.equal(tflSafe.departureCount, 4);
-assert.equal(tflSafe.valueText, 'Every 10 mins');
+assert.equal(tflSafe.valueText, 'Every ~10 mins');
 for (const periodType of ['FrequencyHours', 'Unknown', 'Normal']) {
   const result = calculateTypicalServiceFrequency(weekdayRegular, { day: 'monday', frequencyEvidence: [{ periodType, day: 'monday', lowestFrequency: 2, highestFrequency: 2 }] });
   assert.notEqual(result.basis, 'frequency-band', `${periodType} must not become minute headway evidence`);
@@ -73,10 +73,10 @@ const distinctBands = calculateTypicalServiceFrequency(weekdayRegular, { day: 'm
   { periodType: 'FrequencyMinutes', day: 'monday', fromMinute: 360, toMinute: 480, lowestFrequency: 10, highestFrequency: 10 },
   { periodType: 'FrequencyMinutes', day: 'monday', fromMinute: 480, toMinute: 600, lowestFrequency: 15, highestFrequency: 15 }
 ] });
-assert.equal(distinctBands.basis, 'frequency-band');
-assert.equal(distinctBands.valueText, 'Every 10–15 mins');
+assert.equal(distinctBands.basis, 'frequency-band-range');
+assert.equal(distinctBands.valueText, 'Typically every ~10–15 mins');
 const rangedBand = calculateTypicalServiceFrequency([420, 435], { day: 'monday', frequencyEvidence: [{ periodType: 'FrequencyMinutes', day: 'monday', lowestFrequency: 3, highestFrequency: 5 }] });
-assert.equal(rangedBand.valueText, 'Every 3–5 mins');
+assert.equal(rangedBand.valueText, 'Typically every ~3–5 mins');
 
 const multiStop = buildServiceSummaries([
   { id: 'A', walking: { status: 'routed', distanceMetres: 100 } },

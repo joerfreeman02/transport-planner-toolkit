@@ -1,5 +1,6 @@
 import {
   DAY_ORDER,
+  LIMITED_SERVICE_JOURNEY_THRESHOLD,
   calculateOperatingPeriods,
   calculateTypicalServiceFrequency,
   formatOperatingPeriod,
@@ -7,14 +8,13 @@ import {
   formatServiceOriginDestination
 } from './bus-service-assessment.mjs';
 
-export const PLANNER_METHODOLOGY_NOTE = 'Typical frequencies and operating periods are derived from scheduled departures at the representative stop. Additional timetable variants may operate; detailed source evidence is available under Show detailed evidence.';
+export const PLANNER_METHODOLOGY_NOTE = 'Typical frequencies and operating periods are derived from one de-duplicated scheduled-departure population at the representative stop. Additional timetable variants may operate; detailed source evidence is available under Show detailed evidence.';
 
 function text(value) { return String(value ?? '').trim(); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
 function unique(values) { return [...new Set((values ?? []).map(text).filter(Boolean))]; }
 function numeric(values) { return unique(values).map(Number).filter(Number.isFinite).sort((a, b) => a - b); }
 function stopId(stop) { return text(stop?.id || stop?.sourceId); }
-function scheduleCount(schedule = {}) { return DAY_ORDER.reduce((total, day) => total + numeric(schedule?.[day] ?? []).length, 0); }
 function emptySchedule() { return Object.fromEntries(DAY_ORDER.map(day => [day, []])); }
 
 function directionKey(service) {
@@ -32,9 +32,7 @@ function explicitDirectionMarker(service) {
   return '';
 }
 
-function explicitPattern(service) {
-  return unique(service?.routePatternStopIds ?? []);
-}
+function explicitPattern(service) { return unique(service?.routePatternStopIds ?? []); }
 
 function strictSubsequence(shorter, longer) {
   if (!shorter.length || shorter.length > longer.length) return false;
@@ -66,86 +64,106 @@ function compatibleDirection(first, second) {
   return normal(first?.origin) === normal(second?.origin) && normal(first?.destination) === normal(second?.destination);
 }
 
-function groupKey(service) {
-  return [
-    normal(service?.routeNumber),
-    normal(service?.operator),
-    service?.circular ? 'circular' : 'linear'
-  ].join('|');
+function routeGroupKey(service) {
+  return [normal(service?.routeNumber), normal(service?.operator), service?.circular ? 'circular' : 'linear'].join('|');
 }
 
 function candidateStopIds(component) {
-  return unique(component.flatMap(service => [
-    service.frequencyBasisStopId,
-    ...(service.stopIds ?? []),
-    ...(service.assessedStops ?? [])
-  ]));
+  return unique(component.flatMap(service => [service.frequencyBasisStopId, ...(service.stopIds ?? []), ...(service.assessedStops ?? [])]));
 }
 
 function stopRank(stop) {
   const walking = stop?.walking?.status === 'routed' ? Number(stop.walking.distanceMetres) : Number.POSITIVE_INFINITY;
   const distance = Number(stop?.distanceMetres);
-  return [
-    Number.isFinite(walking) ? 0 : 1,
-    Number.isFinite(walking) ? walking : Number.POSITIVE_INFINITY,
-    Number.isFinite(distance) ? 0 : 1,
-    Number.isFinite(distance) ? distance : Number.POSITIVE_INFINITY,
-    stopId(stop)
-  ];
+  return [Number.isFinite(walking) ? 0 : 1, Number.isFinite(walking) ? walking : Number.POSITIVE_INFINITY, Number.isFinite(distance) ? 0 : 1, Number.isFinite(distance) ? distance : Number.POSITIVE_INFINITY, stopId(stop)];
 }
 
 function compareStopRank(first, second) {
   const left = stopRank(first);
   const right = stopRank(second);
-  for (let index = 0; index < left.length - 1; index += 1) {
-    if (left[index] !== right[index]) return left[index] - right[index];
-  }
+  for (let index = 0; index < left.length - 1; index += 1) if (left[index] !== right[index]) return left[index] - right[index];
   return left.at(-1).localeCompare(right.at(-1));
 }
 
 function selectRepresentativeStop(component, stops) {
   const byId = new Map((stops ?? []).map(stop => [stopId(stop), stop]).filter(([id]) => id));
-  const candidates = candidateStopIds(component).map(id => byId.get(id)).filter(Boolean);
+  const ids = candidateStopIds(component);
+  const candidates = ids.map(id => byId.get(id)).filter(Boolean);
   const stop = [...candidates].sort(compareStopRank)[0] ?? null;
-  const fallbackId = candidateStopIds(component)[0] || null;
-  return {
-    stop,
-    id: stopId(stop) || fallbackId,
-    name: text(stop?.name) || text(component.find(service => service.frequencyBasisStopId === fallbackId)?.frequencyBasisStopName) || null
-  };
+  const fallbackId = ids[0] || null;
+  return { stop, id: stopId(stop) || fallbackId, name: text(stop?.name) || text(component.find(service => service.frequencyBasisStopId === fallbackId)?.frequencyBasisStopName) || null };
 }
 
-function scheduleAtRepresentative(service, representativeId) {
-  if (!representativeId) return 0;
+function serviceAtRepresentative(service, representativeId) {
+  if (!representativeId) return false;
   const basis = text(service?.frequencyBasisStopId);
-  if (basis && basis !== representativeId) return 0;
-  if (!basis && !(service?.stopIds ?? []).map(text).includes(representativeId)) return 0;
-  return scheduleCount(service.departuresByDay);
+  if (basis) return basis === representativeId;
+  return (service?.stopIds ?? []).map(text).includes(representativeId);
+}
+
+function departureIdentity(item) {
+  return text(item?.journeyIdentity || item?.journeyId || item?.sourceJourneyId || item?.vehicleJourneyCode || item?.tripId || item?.vehicleJourneyId || item?.journeyCode);
+}
+
+function serviceDepartureEntries(service, representativeId) {
+  if (!serviceAtRepresentative(service, representativeId)) return [];
+  const evidence = service?.departureEvidenceByDay;
+  const hasEvidence = evidence && DAY_ORDER.some(day => Array.isArray(evidence[day]));
+  return DAY_ORDER.flatMap(day => {
+    const entries = hasEvidence ? (evidence[day] ?? []) : (service?.departuresByDay?.[day] ?? []);
+    return entries.map(item => {
+      const minute = Number(item?.minute ?? item?.departureMinute ?? item?.time ?? item);
+      if (!Number.isFinite(minute)) return null;
+      return { day, minute, stopPointId: representativeId, journeyIdentity: departureIdentity(item) || null, provider: text(item?.provider || service?.timetableSource || service?.source?.provider) || null, sourceRecordId: text(item?.sourceRecordId || service?.id) || null, routeNumber: text(item?.routeNumber || service?.routeNumber), direction: text(item?.direction || service?.direction || service?.destination || service?.origin), origin: text(item?.origin || service?.origin), destination: text(item?.destination || service?.destination) };
+    }).filter(Boolean);
+  });
+}
+
+function semanticDepartureKey(entry) {
+  return [entry.routeNumber, entry.direction, entry.origin, entry.destination, entry.stopPointId, entry.day, entry.minute].map(normal).join('|');
+}
+
+function deduplicateDepartureEntries(entries) {
+  const bySemantic = new Map();
+  const output = [];
+  const ordered = entries.slice().sort((first, second) => DAY_ORDER.indexOf(first.day) - DAY_ORDER.indexOf(second.day) || first.minute - second.minute || semanticDepartureKey(first).localeCompare(semanticDepartureKey(second)));
+  for (const entry of ordered) {
+    const semantic = semanticDepartureKey(entry);
+    const existing = bySemantic.get(semantic) ?? [];
+    const identity = departureIdentity(entry);
+    const duplicate = identity ? existing.some(item => departureIdentity(item) === identity || !departureIdentity(item)) : existing.length > 0;
+    if (duplicate) continue;
+    existing.push(entry);
+    bySemantic.set(semantic, existing);
+    output.push(entry);
+  }
+  return output;
+}
+
+function canonicalDeparturePopulation(component, representativeId, main) {
+  const eligible = component.filter(service => serviceAtRepresentative(service, representativeId));
+  const records = eligible.length ? eligible : (main ? [main] : []);
+  const entries = deduplicateDepartureEntries(records.flatMap(service => serviceDepartureEntries(service, representativeId)));
+  const schedules = emptySchedule();
+  for (const entry of entries) schedules[entry.day].push(entry.minute);
+  for (const day of DAY_ORDER) schedules[day].sort((first, second) => first - second);
+  return { entries, schedules, eligible };
+}
+
+function canonicalCount(service, representativeId) {
+  return deduplicateDepartureEntries(serviceDepartureEntries(service, representativeId)).length;
 }
 
 function compareMain(first, second, representativeId) {
-  return scheduleAtRepresentative(second, representativeId) - scheduleAtRepresentative(first, representativeId)
+  return canonicalCount(second, representativeId) - canonicalCount(first, representativeId)
     || (second.routePatternExtent ?? explicitPattern(second).length) - (first.routePatternExtent ?? explicitPattern(first).length)
     || (second.principalLocations?.length ?? 0) - (first.principalLocations?.length ?? 0)
     || (second.recordActivity ?? 0) - (first.recordActivity ?? 0)
     || (text(first.origin) + '|' + text(first.destination) + '|' + text(first.id)).localeCompare(text(second.origin) + '|' + text(second.destination) + '|' + text(second.id));
 }
 
-function mergeSchedules(component, representativeId, main) {
-  const eligible = component.filter(service => text(service.frequencyBasisStopId) === representativeId
-    || (!text(service.frequencyBasisStopId) && (service.stopIds ?? []).map(text).includes(representativeId)));
-  const records = eligible.length ? eligible : [main];
-  const merged = emptySchedule();
-  for (const service of records) {
-    for (const day of DAY_ORDER) merged[day].push(...numeric(service.departuresByDay?.[day] ?? []));
-  }
-  for (const day of DAY_ORDER) merged[day] = numeric(merged[day]);
-  return { schedules: merged, eligible };
-}
-
 function frequencyEvidence(component, representativeId) {
-  return component.flatMap(service => (service.frequencyEvidence ?? [])
-    .filter(item => !item.stopPointId || text(item.stopPointId) === representativeId));
+  return component.flatMap(service => (service.frequencyEvidence ?? []).filter(item => !item.stopPointId || text(item.stopPointId) === representativeId));
 }
 
 function plannerDirection(service) {
@@ -155,11 +173,13 @@ function plannerDirection(service) {
 }
 
 function directionPatternText(service) {
-  const origin = text(service?.origin) || 'Origin not supplied';
-  const destination = text(service?.destination) || 'Destination not supplied';
+  const origin = text(service?.origin);
+  const destination = text(service?.destination);
   const direction = plannerDirection(service);
-  const route = service?.circular ? origin + ' loop' : origin + ' to ' + destination;
-  return direction ? direction + ' — ' + route : route;
+  if (service?.circular) return `Circular service${direction ? ` (${direction})` : ''}`;
+  const target = destination || (direction && !/^(?:inbound|outbound|northbound|southbound|eastbound|westbound)$/i.test(direction) ? direction : 'destination not supplied');
+  if (!target || /^destination not supplied$/i.test(target)) return direction ? `Towards ${direction}` : 'Direction not supplied';
+  return origin && normal(origin) !== normal(target) ? `Towards ${target} (${origin})` : `Towards ${target}`;
 }
 
 function servedAtText(representative) {
@@ -179,16 +199,18 @@ function materialServiceNote(note) {
   return value;
 }
 
+function noteAppliesToCanonicalPopulation(note, schedules) {
+  const representedDays = DAY_ORDER.filter(day => (schedules[day] ?? []).length);
+  if (/limited service|no more than three scheduled journeys/i.test(note)) return representedDays.length > 0 && representedDays.every(day => (schedules[day] ?? []).length <= 3);
+  if (/weekday-only service/i.test(note)) return representedDays.length > 0 && !representedDays.some(day => day === 'saturday' || day === 'sunday');
+  return true;
+}
+
 function variantNote(component) {
   const endpoints = unique(component.map(service => text(service.origin) + ' → ' + text(service.destination)));
   const patterns = new Set(component.flatMap(explicitPattern));
-  const hasVariant = component.length > 1 && (
-    endpoints.length > 1
-    || patterns.size > 1
-    || component.some(service => Number(service.patternVariantCount) > 1)
-  );
-  if (!hasVariant) return null;
-  return 'Additional timetable variants and short workings operate; some journeys serve different destinations and operate at different times.';
+  const hasVariant = component.length > 1 && (endpoints.length > 1 || patterns.size > 1 || component.some(service => Number(service.patternVariantCount) > 1));
+  return hasVariant ? 'Additional timetable variants and short workings operate; some journeys serve different destinations and operate at different times.' : null;
 }
 
 function principalText(main) {
@@ -199,22 +221,17 @@ function principalText(main) {
 function buildPlannerRow(component, stops, componentIndex) {
   const representative = selectRepresentativeStop(component, stops);
   const main = [...component].sort((first, second) => compareMain(first, second, representative.id))[0];
-  const merged = mergeSchedules(component, representative.id, main);
-  const evidence = frequencyEvidence(merged.eligible.length ? merged.eligible : [main], representative.id);
-  const periods = calculateOperatingPeriods(merged.schedules);
-  const frequencyByDay = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [
-    day,
-    calculateTypicalServiceFrequency(merged.schedules[day], { day, frequencyEvidence: evidence })
-  ])));
-  const notes = unique(component.flatMap(service => text(service.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean)));
+  const canonical = canonicalDeparturePopulation(component, representative.id, main);
+  const evidence = frequencyEvidence(canonical.eligible.length ? canonical.eligible : [main], representative.id);
+  const calculationEvidence = canonical.eligible.length <= 1 || canonical.eligible.every(service => (service.frequencyEvidence ?? []).some(item => !item.stopPointId || text(item.stopPointId) === representative.id)) ? evidence : [];
+  const periods = calculateOperatingPeriods(canonical.schedules);
+  const frequencyByDay = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, calculateTypicalServiceFrequency(canonical.schedules[day], { day, frequencyEvidence: calculationEvidence })])));
+  const notes = unique(component.flatMap(service => text(service.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean))).filter(note => noteAppliesToCanonicalPopulation(note, canonical.schedules));
   if (main.circular) notes.push('Circular service pattern; the displayed origin and destination are the timetable pattern endpoints.');
-  const extraVariantNote = variantNote(component);
-  if (extraVariantNote) notes.push(extraVariantNote);
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
   const principalLocations = unique(main.principalLocations ?? []);
-  const id = 'planner:' + normal(main.routeNumber) + '|' + normal(main.operator) + '|' + directionKey(main) + '|' + (componentIndex + 1);
-  return Object.freeze({
-    id,
+  const row = {
+    id: 'planner:' + normal(main.routeNumber) + '|' + normal(main.operator) + '|' + directionKey(main) + '|' + (componentIndex + 1),
     routeNumber: text(main.routeNumber) || 'Not supplied',
     operator: text(main.operator) || 'Operator not supplied in the timetable',
     origin: text(main.origin) || 'Origin not supplied',
@@ -236,9 +253,11 @@ function buildPlannerRow(component, stops, componentIndex) {
     frequencyByDay,
     operatingPeriods: periods,
     operatingPeriodLines: Object.freeze(formatOperatingPeriod(periods)),
-    departuresByDay: Object.freeze(merged.schedules),
+    departuresByDay: Object.freeze(canonical.schedules),
+    canonicalDeparturePopulation: Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, Object.freeze(canonical.entries.filter(entry => entry.day === day))]))),
     frequencyEvidence: Object.freeze(evidence),
     serviceNote: unique(notes).join(' '),
+    routeGroupKey: routeGroupKey(main),
     stopIds: Object.freeze(representative.id ? [representative.id] : unique(component.flatMap(service => service.stopIds ?? []))),
     sourceRecordIds: Object.freeze(ids),
     variantCount: component.length,
@@ -247,14 +266,22 @@ function buildPlannerRow(component, stops, componentIndex) {
     recordActivity: Math.max(0, ...component.map(service => Number(service.recordActivity) || 0)),
     presentation: Object.freeze({ principalLocationsText: principalText(main), rank: 0 }),
     rawServiceSummaries: Object.freeze(component),
-    sourceSelection: merged.eligible.length ? 'representative-stop scheduled evidence' : 'representative-stop summary fallback'
-  });
+    sourceSelection: canonical.eligible.length ? 'representative-stop scheduled evidence' : 'representative-stop summary fallback',
+    routeVariantNote: variantNote(component)
+  };
+  return Object.freeze(row);
+}
+
+function attachRouteNotes(rows) {
+  const notes = new Map();
+  for (const row of rows) if (row.routeVariantNote && !notes.has(row.routeGroupKey)) notes.set(row.routeGroupKey, row.routeVariantNote);
+  return rows.map(row => Object.freeze({ ...row, routeGroupNote: notes.get(row.routeGroupKey) || null }));
 }
 
 export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = []) {
   const grouped = new Map();
   for (const service of serviceSummaries ?? []) {
-    const key = groupKey(service);
+    const key = routeGroupKey(service);
     if (!grouped.has(key)) grouped.set(key, []);
     const groups = grouped.get(key);
     const existing = groups.find(component => component.some(member => compatibleDirection(member, service)));
@@ -262,13 +289,12 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
     else groups.push([service]);
   }
   const rows = [];
-  for (const components of grouped.values()) {
-    components.forEach((component, index) => rows.push(buildPlannerRow(component, stops, index)));
-  }
-  return rows.sort((first, second) => text(first.routeNumber).localeCompare(text(second.routeNumber), undefined, { numeric: true })
+  for (const components of grouped.values()) components.forEach((component, index) => rows.push(buildPlannerRow(component, stops, index)));
+  const sorted = rows.sort((first, second) => text(first.routeNumber).localeCompare(text(second.routeNumber), undefined, { numeric: true })
     || text(first.operator).localeCompare(text(second.operator))
     || text(first.directionPatternText).localeCompare(text(second.directionPatternText))
     || text(first.id).localeCompare(text(second.id)));
+  return attachRouteNotes(sorted);
 }
 
 export const buildPlannerBusServiceSummary = buildPlannerBusServiceSummaries;

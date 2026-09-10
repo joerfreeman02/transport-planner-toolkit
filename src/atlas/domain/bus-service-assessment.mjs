@@ -4,7 +4,7 @@ const DAY_ORDER = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', '
 const DAY_LABELS = Object.freeze({ monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday' });
 const DAY_SHORT_LABELS = Object.freeze({ monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' });
 const REPRESENTATIVE_DAY_ORDER = Object.freeze(['wednesday', 'tuesday', 'thursday', 'monday', 'friday', 'saturday', 'sunday']);
-const LIMITED_SERVICE_JOURNEY_THRESHOLD = 5;
+export const LIMITED_SERVICE_JOURNEY_THRESHOLD = 5;
 const REGULARITY_INTERVAL_TOLERANCE = 0.25;
 const HUB_PATTERN = /\b(?:bus|coach)\s+(?:station|interchange)\b|\btransport\s+interchange\b/i;
 const GENERIC_QUALIFICATION_PATTERNS = Object.freeze([
@@ -17,6 +17,7 @@ const GENERIC_QUALIFICATION_PATTERNS = Object.freeze([
 function text(value) { return String(value ?? '').trim(); }
 function unique(values) { return [...new Set(values.map(text).filter(Boolean))]; }
 function numeric(values) { return unique(values).map(Number).filter(Number.isFinite).sort((a, b) => a - b); }
+function ordered(values) { return (values ?? []).map(Number).filter(Number.isFinite).sort((a, b) => a - b); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
 
 function sourceJourneyIdentity(record) {
@@ -77,7 +78,7 @@ export function formatClock(totalMinutes) {
 export function calculateOperatingPeriods(departuresByDay = {}) {
   const periods = {};
   for (const day of DAY_ORDER) {
-    const values = numeric(departuresByDay[day] ?? []);
+    const values = ordered(departuresByDay[day] ?? []);
     periods[day] = values.length ? Object.freeze({
       firstMinute: values[0],
       lastMinute: values.at(-1),
@@ -120,7 +121,7 @@ export function calculateScheduledFrequency(departures, { startMinute, endMinute
   const start = Number(startMinute);
   const end = Number(endMinute);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new Error('A valid representative assessment period is required.');
-  const scheduled = numeric(departures).filter(value => value >= start && value < end);
+  const scheduled = ordered(departures).filter(value => value >= start && value < end);
   const hours = (end - start) / 60;
   const busesPerHour = scheduled.length / hours;
   const intervalMinutes = busesPerHour > 0 ? 60 / busesPerHour : null;
@@ -166,6 +167,32 @@ function mergeDepartures(records, stopIds) {
   }
   for (const day of DAY_ORDER) merged[day] = numeric(merged[day]);
   return merged;
+}
+
+function departureEvidenceForRecords(records, stopId) {
+  const evidence = Object.fromEntries(DAY_ORDER.map(day => [day, []]));
+  for (const record of records ?? []) {
+    const schedule = record.stopSchedules?.[stopId];
+    if (!schedule) continue;
+    const provider = text(record.timetableSource || record.source?.provider);
+    const explicitJourney = sourceJourneyIdentity(record);
+    const pattern = patternIdentity(record);
+    for (const day of DAY_ORDER) {
+      for (const minute of numeric(schedule[day] ?? [])) evidence[day].push({
+        minute,
+        stopPointId: stopId,
+        journeyIdentity: explicitJourney || null,
+        sourceRecordId: text(record.id) || null,
+        provider: provider || null,
+        patternIdentity: pattern || null,
+        routeNumber: text(record.routeNumber) || null,
+        direction: text(record.direction || record.destination || record.origin) || null,
+        origin: text(record.origin) || null,
+        destination: text(record.destination) || null
+      });
+    }
+  }
+  return Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, Object.freeze(evidence[day])])))
 }
 
 function materialQualification(note) {
@@ -330,6 +357,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
       stopIds,
       sourceRecordIds: unique(records.map(record => record.id)),
       departuresByDay,
+      departureEvidenceByDay: departureEvidenceForRecords(records, frequencyBasisStopId),
       validity: Object.freeze({ from: unique(records.map(record => record.validFrom)).sort()[0] || null, to: unique(records.map(record => record.validTo)).sort().at(-1) || null })
     });
   });
@@ -479,8 +507,8 @@ function dayLabel(day) { return DAY_LABELS[day] || text(day); }
 function dayShortLabel(day) { return DAY_SHORT_LABELS[day] || text(day); }
 
 function intervals(values) {
-  const ordered = numeric(values);
-  return ordered.slice(1).map((value, index) => value - ordered[index]).filter(value => value > 0);
+  const valuesInOrder = ordered(values);
+  return valuesInOrder.slice(1).map((value, index) => value - valuesInOrder[index]).filter(value => value > 0);
 }
 
 function deterministicFrequencyBand(evidence, day) {
@@ -498,9 +526,11 @@ function deterministicFrequencyBand(evidence, day) {
       && (!Number.isFinite(item.fromMinute) || !Number.isFinite(item.toMinute) || item.toMinute > item.fromMinute));
   const uniqueBands = [...new Map(bands.map(item => [JSON.stringify(item), item])).values()];
   if (!uniqueBands.length) return null;
+  const exact = uniqueBands.every(item => item.lowestFrequency === item.highestFrequency);
   const lowestFrequency = Math.min(...uniqueBands.map(item => item.lowestFrequency));
   const highestFrequency = Math.max(...uniqueBands.map(item => item.highestFrequency));
-  return { ...uniqueBands[0], lowestFrequency, highestFrequency, bandCount: uniqueBands.length };
+  const sameExactFrequency = exact && uniqueBands.every(item => item.lowestFrequency === uniqueBands[0].lowestFrequency);
+  return { ...uniqueBands[0], lowestFrequency, highestFrequency, bandCount: uniqueBands.length, exact: sameExactFrequency };
 }
 
 export function formatServiceOriginDestination(service, separator = ' - ') {
@@ -513,17 +543,21 @@ export function formatServiceOriginDestination(service, separator = ' - ') {
 
 /** Shared planner-facing frequency rule; no synthetic departures are created. */
 export function calculateTypicalServiceFrequency(departures, { day, label = '', frequencyEvidence = [] } = {}) {
-  const scheduled = numeric(departures);
+  const scheduled = ordered(departures);
   const band = deterministicFrequencyBand(frequencyEvidence, day);
   const dayText = dayLabel(day);
-  if (band) {
+  if (band?.exact && scheduled.length) {
     const busesPerHour = 60 / ((band.lowestFrequency + band.highestFrequency) / 2);
-    const valueText = band.lowestFrequency === band.highestFrequency
-      ? `Every ${band.lowestFrequency} mins`
-      : `Every ${band.lowestFrequency}–${band.highestFrequency} mins`;
+    const valueText = `Every ~${band.lowestFrequency} mins`;
     return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'frequency-band', classification: 'regular-frequency', noService: false, busesPerHour: Number(busesPerHour.toFixed(2)), intervalMinutes: band.lowestFrequency === band.highestFrequency ? band.lowestFrequency : null, intervalRange: Object.freeze([band.lowestFrequency, band.highestFrequency]), valueText, wording: `${dayText}: ${valueText}` });
   }
   if (!scheduled.length) return Object.freeze({ day, dayLabel: dayText, departureCount: 0, basis: 'scheduled', classification: 'no-service', noService: true, busesPerHour: null, intervalMinutes: null, valueText: 'No scheduled service', wording: `${dayText}: No scheduled service` });
+  if (band) {
+    const low = Math.round(band.lowestFrequency);
+    const high = Math.round(band.highestFrequency);
+    const valueText = low === high ? `Every ~${low} mins` : `Typically every ~${low}–${high} mins`;
+    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'frequency-band-range', classification: low === high ? 'regular-frequency' : 'variable-frequency', noService: false, busesPerHour: Number((60 / ((low + high) / 2)).toFixed(2)), intervalMinutes: low === high ? low : null, intervalRange: Object.freeze([low, high]), valueText, wording: `${dayText}: ${valueText}` });
+  }
   if (scheduled.length <= LIMITED_SERVICE_JOURNEY_THRESHOLD) {
     const valueText = `${scheduled.length} journey${scheduled.length === 1 ? '' : 's'}/day`;
     return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'journeys-per-day', noService: false, busesPerHour: null, intervalMinutes: null, valueText, wording: `${dayText}: ${valueText}` });
@@ -533,12 +567,28 @@ export function calculateTypicalServiceFrequency(departures, { day, label = '', 
   const median = orderedGaps.length
     ? (orderedGaps.length % 2 ? orderedGaps[Math.floor(orderedGaps.length / 2)] : (orderedGaps[orderedGaps.length / 2 - 1] + orderedGaps[orderedGaps.length / 2]) / 2)
     : null;
-  const regular = median != null && gaps.every(gap => Math.abs(gap - median) <= Math.max(1, median * REGULARITY_INTERVAL_TOLERANCE));
-  if (!regular) {
-    const valueText = `${scheduled.length} scheduled journeys/day (irregular)`;
-    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'irregular', noService: false, busesPerHour: null, intervalMinutes: null, valueText, wording: `${dayText}: ${valueText}` });
+  const robustGaps = median != null && gaps.length >= 3
+    ? gaps.filter((gap, index) => !(gap === Math.max(...gaps) && gap > Math.max(180, median * 3) && index === gaps.indexOf(Math.max(...gaps))))
+    : gaps;
+  const robustOrdered = robustGaps.slice().sort((a, b) => a - b);
+  const robustMedian = robustOrdered.length
+    ? (robustOrdered.length % 2 ? robustOrdered[Math.floor(robustOrdered.length / 2)] : (robustOrdered[robustOrdered.length / 2 - 1] + robustOrdered[robustOrdered.length / 2]) / 2)
+    : median;
+  const regular = robustMedian != null && robustGaps.length > 0 && robustGaps.every(gap => Math.abs(gap - robustMedian) <= Math.max(1, robustMedian * REGULARITY_INTERVAL_TOLERANCE));
+  const rangeLow = robustOrdered[0] == null ? null : Math.max(1, Math.round(robustOrdered[0] / 5) * 5);
+  const rangeHigh = robustOrdered.at(-1) == null ? null : Math.max(rangeLow ?? 1, Math.round(robustOrdered.at(-1) / 5) * 5);
+  if (!regular && rangeLow != null && rangeHigh <= Math.max(30, (robustMedian ?? rangeHigh) * 2)) {
+    const valueText = rangeLow === rangeHigh ? `Typically every ~${rangeLow} mins` : `Typically every ~${rangeLow}–${rangeHigh} mins`;
+    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'variable-frequency', noService: false, busesPerHour: null, intervalMinutes: rangeLow === rangeHigh ? rangeLow : null, intervalRange: Object.freeze([rangeLow, rangeHigh]), valueText, wording: `${dayText}: ${valueText}` });
   }
-  const roundedMedian = Math.round(median);
+  if (!regular) {
+    const operatingMinutes = scheduled.at(-1) - scheduled[0];
+    const busesPerHour = operatingMinutes > 0 ? scheduled.length / (operatingMinutes / 60) : null;
+    const roundedRate = busesPerHour == null ? null : (busesPerHour >= 10 ? Math.round(busesPerHour) : Number(busesPerHour.toFixed(1)));
+    const valueText = roundedRate == null ? `${scheduled.length} scheduled journeys/day (irregular)` : `Approx. ${roundedRate} buses/hour (irregular)`;
+    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'irregular', presentationMode: 'rate', noService: false, busesPerHour: roundedRate, intervalMinutes: null, intervalRange: null, valueText, wording: `${dayText}: ${valueText}` });
+  }
+  const roundedMedian = Math.round(robustMedian);
   const frequency = calculateScheduledFrequency(scheduled, { startMinute: scheduled[0], endMinute: scheduled.at(-1) + roundedMedian, label });
   const valueText = `Every ~${roundedMedian} mins`;
   return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'regular-frequency', noService: false, busesPerHour: frequency.busesPerHour, intervalMinutes: roundedMedian, valueText, wording: `${dayText}: ${valueText}` });

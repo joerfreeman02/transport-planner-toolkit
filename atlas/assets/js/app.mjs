@@ -489,7 +489,7 @@ function renderAssessment(result) {
   if (!result.stops.length) {
     const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 7; cell.textContent = 'No authoritative bus stops were found within the selected discovery radius.'; row.append(cell); rows.append(row);
   }
-  for (const service of presentedServices) {
+  presentedServices.forEach((service, index) => {
     const row = document.createElement('tr');
     const supported = service.stopIds?.some(id => selectedStopIds.has(String(id)));
     const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedServiceIds.has(serviceKey(service)) && supported; include.disabled = !supported; include.setAttribute('aria-label', `Include route ${service.routeNumber}`);
@@ -513,7 +513,14 @@ function renderAssessment(result) {
       const label = document.createElement('strong'); label.textContent = 'Service note: ';
       noteCell.append(label, service.serviceNote); noteRow.append(noteCell); serviceRows.append(noteRow);
     }
-  }
+    const next = presentedServices[index + 1];
+    if (service.routeGroupNote && (!next || next.routeGroupKey !== service.routeGroupKey)) {
+      const noteRow = document.createElement('tr'); noteRow.className = 'service-note route-group-note';
+      const noteCell = document.createElement('td'); noteCell.colSpan = 8;
+      const label = document.createElement('strong'); label.textContent = 'Service note: ';
+      noteCell.append(label, service.routeGroupNote); noteRow.append(noteCell); serviceRows.append(noteRow);
+    }
+  });
   if (!presentedServices.length) {
     const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 8; cell.textContent = 'No matched timetable summary is available. Review Sources and checks before using the stop information.'; row.append(cell); serviceRows.append(row);
   }

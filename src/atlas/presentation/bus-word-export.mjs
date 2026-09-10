@@ -47,7 +47,7 @@ export function buildBusWordTables(result) {
       caption: 'Table 3.3 - Bus Service Summary',
       headers: ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period'],
       rows: serviceRows,
-      widths: [7, 16, 23, 27, 12, 15]
+      widths: [7, 14, 22, 25, 17, 15]
     }
   ];
 }

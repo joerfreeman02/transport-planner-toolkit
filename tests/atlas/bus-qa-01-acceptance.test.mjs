@@ -26,9 +26,9 @@ const limited = {
 const summaries = buildServiceSummaries(stops, [bods]);
 assert.equal(summaries[0].frequencyBasisStopId, 'A');
 assert.equal(summaries[0].stopDirection, 'Southbound');
-assert.equal(formatServiceOriginDestination(summaries[0]), 'Rural Origin - Town Terminal (Southbound)');
+assert.equal(formatServiceOriginDestination(summaries[0]), 'Rural Origin - Town Terminal (Southbound); Served at: Assessment Stop — S (Stops Fallback Stop, Nearby Stop — N)');
 assert.equal(summaries[0].typicalFrequency.departureCount, 6, 'three selected stops must not triple-count one physical journey');
-assert.match(summaries[0].typicalFrequencyText, /Approx\. 4 buses\/hour/);
+assert.match(summaries[0].typicalFrequencyText, /Every ~15 mins/);
 assert.match(summaries[0].operatingPeriodLines.join(' '), /Approx\. 07:00–08:15/);
 
 const limitedSummary = buildServiceSummaries(stops, [limited])[0];
@@ -52,7 +52,7 @@ const assessment = createBusAssessment({
 const result = await assessment.assess({ latitude: 51.7, longitude: -0.1 });
 assert.equal(result.stops.find(stop => stop.id === 'A').timetableEvidence, 'Matched · BODS');
 assert.equal(result.stops.find(stop => stop.id === 'B').timetableEvidence, 'Matched · BODS + TNDS');
-assert.match(result.stops.find(stop => stop.id === 'D').timetableEvidence, /No current match · BODS\/TNDS checked/);
+assert.equal(result.stops.find(stop => stop.id === 'D').timetableEvidence, 'Timetable source unavailable · no scheduled evidence was established');
 
 const unavailable = createBusAssessment({
   stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stops[0]], warnings: [], provenance: { source: 'NaPTAN' } }) },
@@ -65,6 +65,6 @@ assert.equal(unavailableResult.stops[0].timetableEvidence, 'Timetable source una
 const wordTables = buildBusWordTables(result);
 assert.deepEqual(wordTables[0].headers, ['Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop']);
 assert.deepEqual(wordTables[1].headers, ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period']);
-assert.match(wordTables[1].rows[0][2], /\(Southbound\)$/);
+assert.match(wordTables[1].rows[0][2], /\(Southbound\); Served at:/);
 assert.doesNotMatch(wordTables[0].headers.join(' '), /Timetable evidence|Include/);
 console.log('PASS BUS-QA-01 TNDS/BODS principal-location parity, representative-stop frequency, source status and Word exclusion regressions.');

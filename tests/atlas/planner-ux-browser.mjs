@@ -9,6 +9,8 @@ const { chromium } = require('playwright');
 const root = process.env.ATLAS_REVIEW_ROOT || 'http://127.0.0.1:8769/';
 const geocode = JSON.parse(fs.readFileSync(new URL('./fixtures/nominatim-candidate.json', import.meta.url), 'utf8'));
 const stops = JSON.parse(fs.readFileSync(new URL('./fixtures/tfl-nearby-stops.json', import.meta.url), 'utf8'));
+const tflRoute = JSON.parse(fs.readFileSync(new URL('./fixtures/tfl-line-route.json', import.meta.url), 'utf8'));
+const tflTimetable = JSON.parse(fs.readFileSync(new URL('./fixtures/tfl-timetable.json', import.meta.url), 'utf8'));
 const screenshotDir = process.env.ATLAS_UX_SCREENSHOT_DIR || '';
 if (screenshotDir) fs.mkdirSync(screenshotDir, { recursive: true });
 const browser = await chromium.launch({ headless: true });
@@ -25,6 +27,7 @@ page.on('requestfailed', request => failedRequests.push({ url: request.url(), er
 await mockMapTiles(page);
 await mockAccessRouting(page);
 await mockPreparedBusTimetables(page);
+await page.route('**/atlas/data/status/manifest.json', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ successfulRefreshAt: '2026-09-04T08:00:00.000Z', sources: { naptan: { outcome: 'CHECKED_NO_CHANGE' }, bods: { outcome: 'CHECKED_NO_CHANGE' }, tnds: { outcome: 'CHECKED_NO_CHANGE', regionsChecked: [] }, tfl: { outcome: 'LIVE' } } }) }));
 await page.route('https://nominatim.openstreetmap.org/**', route => {
   geocodeRequests += 1;
   const query = new URL(route.request().url()).searchParams.get('q');
@@ -37,7 +40,7 @@ await page.route('https://api.tfl.gov.uk/**', route => {
 
 try {
   await page.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.11/);
+  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.12/);
   for (const section of ['Report Builder', 'Modules', 'Projects', 'About']) {
     await page.getByRole('button', { name: section }).click();
     assert.equal(await page.getByRole('heading', { name: section === 'About' ? 'ATLAS — Automated Transport & Location Assessment System' : section, exact: true }).isVisible(), true);
@@ -54,11 +57,11 @@ try {
   assert.match(await page.locator('.candidate p').first().innerText(), /^33, Westow Street/i);
   assert.equal(await page.getByText('Possible match — not yet confirmed', { exact: true }).count(), 0);
   assert.equal(geocodeRequests, 3);
-  assert.equal(await page.getByRole('button', { name: 'Build Bus assessment' }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).isDisabled(), true);
   await chooseFirstCandidateAndConfirm(page);
   assert.match(await page.locator('#confirmedSite').innerText(), /Confirmed from address/);
 
-  await page.getByRole('button', { name: 'Build Bus assessment' }).click();
+  await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.equal(await page.locator('#evidenceRows tr').count(), 2);
   assert.equal(await page.locator('#siteMap .bus-stop-marker').count(), 2);
@@ -66,8 +69,9 @@ try {
   assert.match(await page.locator('#evidenceRows tr').first().innerText(), /322, 450/);
   assert.ok(await page.locator('#serviceRows tr:not(.service-note)').count() > 0);
   assert.match(await page.locator('#evidenceRows tr').first().innerText(), /m · \d+ mins?/);
-  assert.equal(tflRequests, 1);
-  assert.match(await page.locator('#resultSource').innerText(), /Transport for London.*Department for Transport bus timetables.*OpenStreetMap routing/);
+  assert.ok(tflRequests > 0);
+  const requestsAfterFirstAssessment = tflRequests;
+  assert.match(await page.locator('#resultSource').innerText(), /Transport for London.*OpenStreetMap routing/);
   assert.match(await page.locator('#resultFreshness').innerText(), /^Assessment complete/);
   await page.getByText('Sources and checks', { exact: true }).click();
   assert.match(await page.locator('#plannerChecks').innerText(), /Stops:\s*Transport for London/);
@@ -87,8 +91,9 @@ try {
   if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'atlas-site-selector-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
 
-  await page.getByRole('button', { name: 'Build Bus assessment' }).click();
-  assert.equal(tflRequests, 1, 'A repeated check should use still-current information without another source request.');
+  await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
+  await page.waitForFunction(() => /Complete - checked/.test(document.getElementById('stopStatus')?.textContent || ''), null, { timeout: 20000 });
+  assert.equal(tflRequests, requestsAfterFirstAssessment + 5, 'A repeated check retries the five failed TfL timetable requests rather than caching source failures.');
   assert.match(await page.locator('#stopStatus').innerText(), /Complete - checked/);
   assert.doesNotMatch(await page.locator('#stopStatus').innerText(), /cache/i);
 
@@ -104,7 +109,7 @@ try {
   await failurePage.getByLabel('Site address or name').fill('33 Westow Street, Crystal Palace');
   await failurePage.getByRole('button', { name: 'Find site' }).click();
   await chooseFirstCandidateAndConfirm(failurePage);
-  await failurePage.getByRole('button', { name: 'Build Bus assessment' }).click();
+  await failurePage.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await failurePage.getByText('Bus information is temporarily unavailable. Please try again shortly.', { exact: true }).waitFor({ timeout: 10000 });
   assert.doesNotMatch(await failurePage.locator('body').innerText(), /HTTP 429/i);
   assert.equal(failurePageErrors.length, 0);
@@ -115,16 +120,42 @@ try {
   nonLondonPage.on('pageerror', error => nonLondonErrors.push(error.message));
   await mockMapTiles(nonLondonPage);
   await mockAccessRouting(nonLondonPage);
+  await mockPreparedBusTimetables(nonLondonPage);
+  const outsideStops = { stopPoints: [{ ...stops.stopPoints[0], lines: [{ id: '322', name: '322' }] }] };
+  await nonLondonPage.route('https://api.tfl.gov.uk/**', route => {
+    const url = route.request().url();
+    if (url.includes('/StopPoint')) return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(outsideStops) });
+    if (url.includes('/Route')) return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(tflRoute) });
+    const match = url.match(/\/Line\/([^/]+)\/Timetable\/([^/?]+)/);
+    const lineId = decodeURIComponent(match?.[1] || '322');
+    const stopId = decodeURIComponent(match?.[2] || '490TEST001');
+    const payload = structuredClone(tflTimetable);
+    payload.lineId = lineId;
+    payload.lineName = lineId;
+    payload.timetable.departureStopId = stopId;
+    payload.timetable.routes[0].stationIntervals[0].intervals[0].stopId = stopId;
+    payload.stations[0].id = stopId;
+    payload.stops[0].id = stopId;
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(payload) });
+  });
   await nonLondonPage.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await nonLondonPage.getByText('Enter coordinates instead', { exact: true }).click();
-  await nonLondonPage.getByLabel('Latitude').fill('51.686');
-  await nonLondonPage.getByLabel('Longitude').fill('-0.034');
+  await nonLondonPage.getByLabel('Latitude').fill('51.7000000');
+  await nonLondonPage.getByLabel('Longitude').fill('-0.1000000');
   await nonLondonPage.getByRole('button', { name: 'Use these coordinates' }).click();
   await nonLondonPage.getByRole('button', { name: 'Confirm assessment point' }).click();
-  await nonLondonPage.getByRole('button', { name: 'Build Bus assessment' }).click();
+  await nonLondonPage.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await nonLondonPage.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.ok(await nonLondonPage.locator('#evidenceRows tr').count() > 0);
-  assert.match(await nonLondonPage.locator('#resultSource').innerText(), /NaPTAN/);
+  const outsideResultSource = await nonLondonPage.locator('#resultSource').innerText();
+  assert.match(outsideResultSource, /Department for Transport NaPTAN \+ Transport for London StopPoint/);
+  assert.match(outsideResultSource, /Transport for London scheduled timetables/);
+  assert.doesNotMatch(outsideResultSource, /Department for Transport bus timetables|BODS|TNDS/);
+  await nonLondonPage.getByText('Sources and checks', { exact: true }).click();
+  const outsideChecks = await nonLondonPage.locator('#plannerChecks').innerText();
+  assert.match(outsideChecks, /Stops:\s*Department for Transport NaPTAN \+ Transport for London StopPoint/);
+  assert.match(outsideChecks, /Timetables:\s*Transport for London scheduled timetables/);
+  assert.doesNotMatch(outsideChecks, /Department for Transport bus timetables|BODS|TNDS/);
   assert.ok(await nonLondonPage.locator('#serviceRows tr:not(.service-note)').count() > 0);
   assert.equal(nonLondonErrors.length, 0);
   await nonLondonPage.close();

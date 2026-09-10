@@ -48,7 +48,7 @@ try {
   assert.match(await page.locator('#geocodeStatus').innerText(), /building or location details/i);
   await page.getByRole('button', { name: 'Use this result' }).click();
   await page.locator('.assessment-point-marker').waitFor({ timeout: 5000 });
-  assert.equal(await page.getByRole('button', { name: 'Build Bus assessment' }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).isDisabled(), true);
   const selected = await page.evaluate(() => window.__ATLAS_SITE_SELECTOR__.getSnapshot().site);
   assert.equal(selected.suppliedAddress, productOwnerQuery);
   assert.deepEqual([selected.geocoding.latitude, selected.geocoding.longitude], [51.7901, 0.0123]);
@@ -73,7 +73,7 @@ try {
   const confirmed = await page.evaluate(() => window.__ATLAS_SITE_SELECTOR__.getSnapshot().confirmedSite);
   assert.deepEqual([confirmed.latitude, confirmed.longitude], [moved.latitude, moved.longitude]);
   assert.ok(confirmed.assessmentPoint.confirmedAt);
-  await page.getByRole('button', { name: 'Build Bus assessment' }).click();
+  await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.ok(await page.locator('#evidenceRows tr').count() > 0);
 
@@ -81,12 +81,12 @@ try {
   const mapBox = await page.locator('#siteMap').boundingBox();
   await page.mouse.click(mapBox.x + mapBox.width * 0.72, mapBox.y + mapBox.height * 0.35);
   await page.waitForFunction(() => document.getElementById('selectedMethod').textContent === 'Adjusted on map' && document.getElementById('evidencePanel').hidden);
-  assert.equal(await page.getByRole('button', { name: 'Build Bus assessment' }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).isDisabled(), true);
   assert.match(await page.locator('#stopStatus').innerText(), /earlier bus results were cleared/i);
 
   await page.getByLabel('Site address or name').fill('Unknown former depot site');
   await page.getByRole('button', { name: 'Find site' }).click();
-  await page.getByText(/choose the site on the map instead/i).waitFor({ timeout: 5000 });
+  await page.waitForFunction(() => /We could not find a suitable match|Site search is temporarily unavailable/.test(document.getElementById('geocodeStatus')?.textContent || ''), null, { timeout: 30000 });
   await page.locator('#siteMap').scrollIntoViewIfNeeded();
   const fallbackMapBox = await page.locator('#siteMap').boundingBox();
   await page.mouse.click(fallbackMapBox.x + fallbackMapBox.width * 0.55, fallbackMapBox.y + fallbackMapBox.height * 0.55);

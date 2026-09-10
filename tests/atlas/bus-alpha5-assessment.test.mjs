@@ -43,7 +43,7 @@ test('nearest mode sends the complete nearest logical stop group to timetable pr
   assert.equal(result.ok, true);
   assert.equal(result.assessmentMode, 'nearest');
   assert.deepEqual(result.stops.map(s => s.id), ['A', 'B']);
-  assert.deepEqual(serviceCalls, [['A', 'B', 'C']]);
+  assert.deepEqual(serviceCalls, [['A', 'B']]);
   assert.deepEqual(result.serviceSummaries.map(s => s.routeNumber), ['251', '279']);
   assert.equal(result.nearestGroup.name, 'Bus Station');
 });
@@ -52,13 +52,16 @@ test('nearest mode returns a partial result when no service is found within 2km'
   const stop = { id: 'UNSERVED', name: 'Pipers Lane', locality: 'Example', latitude: site.latitude, longitude: site.longitude, routes: [] };
   const assessment = createBusAssessment({
     stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { source: 'prepared' } }) },
-    timetableData: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS' } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS', timetableConclusion: 'NO_CURRENT_MATCH' } }) },
     accessRouting: { matrix: async () => ({ ok: true, warnings: [], provenance: { source: 'OSRM' }, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 80 }] }) }
   });
   const result = await assessment.assess(site, { mode: 'nearest', radius: 500 });
   assert.equal(result.ok, true);
   assert.equal(result.status, 'partial');
-  assert.match(result.warnings.join(' '), /within the controlled 2,000 metre nearest-search limit/);
+  assert.match(result.warnings.join(' '), /Nearest search expanded from 500 m to 2,000 m because no matched scheduled service was established in the initial radius\./);
+  assert.equal(result.provenance.stops.selectedRadiusMetres, 500);
+  assert.equal(result.provenance.stops.actualDiscoveryRadiusMetres, 2000);
+  assert.equal(result.provenance.stops.radiusMetres, 2000);
   assert.equal(result.nearestGroup, null);
 });
 

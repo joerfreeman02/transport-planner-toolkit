@@ -105,7 +105,7 @@ test('material school-service note remains visible', () => {
 });
 
 
-test('short workings with the same GTFS direction collapse to one planner-facing row', () => {
+test('short workings with the same GTFS direction remain distinct when termini differ', () => {
   const weekdays = { monday: [360, 420], tuesday: [360, 420], wednesday: [360, 420], thursday: [360, 420], friday: [360, 420], saturday: [480], sunday: [] };
   const records = [
     {
@@ -143,10 +143,11 @@ test('short workings with the same GTFS direction collapse to one planner-facing
     }
   ];
   const summaries = buildServiceSummaries([stop()], records);
-  assert.equal(summaries.length, 2);
+  assert.equal(summaries.length, 3);
   const outbound = summaries.find(summary => summary.destination === 'Smiths Lane');
   assert.ok(outbound);
-  assert.match(outbound.serviceNote, /short workings or route variants/i);
+  assert.ok(summaries.some(summary => summary.destination === 'Bus Station'));
+  assert.ok(summaries.some(summary => summary.destination === 'Princesfield Rd'));
 });
 
 test('nearest controlled wording identifies the selected group', () => {

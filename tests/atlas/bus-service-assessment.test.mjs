@@ -70,12 +70,9 @@ test('circular, school-day and limited qualifications remain visible', () => {
   assert.match(summary.serviceNote, /Circular service pattern/);
 });
 
-test('missing operator and incomplete timetable fields are not fabricated', () => {
-  const [summary] = buildServiceSummaries([{ id: 'A' }], [{ id: 'incomplete', routeNumber: '5', operator: '', origin: '', destination: '', principalLocations: [], qualifications: [], stopSchedules: { A: {} } }]);
-  assert.equal(summary.operator, 'Operator not supplied in the timetable');
-  assert.equal(summary.origin, 'Origin not supplied');
-  assert.match(summary.serviceNote, /No scheduled departures/);
-  assert.match(summary.serviceNote, /did not supply a reliable operator/);
+test('empty timetable records do not become planner-facing services', () => {
+  const summaries = buildServiceSummaries([{ id: 'A' }], [{ id: 'incomplete', routeNumber: '5', operator: '', origin: '', destination: '', principalLocations: [], qualifications: [], stopSchedules: { A: {} } }]);
+  assert.deepEqual(summaries, []);
 });
 
 test('controlled wording uses only supplied routes and principal locations', () => {

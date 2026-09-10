@@ -4,6 +4,7 @@ import { requestJson } from '../infrastructure/http-client.mjs';
 import { distanceMetres } from './tfl-bus-stop-adapter.mjs';
 import { sourceFailure, sourceSuccess } from './source-adapter.mjs';
 import { mergeBusTimetableSources } from '../domain/bus-timetable-merge.mjs';
+import { hasScheduledEvidenceAt, scheduledStopIds, scopedScheduledService } from '../domain/scheduled-evidence.mjs';
 
 const STOP_SOURCE = 'Department for Transport NaPTAN';
 const TIMETABLE_SOURCE = 'Department for Transport Bus Open Data Service';
@@ -33,8 +34,8 @@ function sourceTimestamp(value) { const text = String(value ?? '').trim(); retur
 
 const SERVICE_DAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 
-// BODS and TNDS are deliberately allowed to be sparse at the source boundary.
-// The assessment/presentation layers, however, consume one deterministic shape.
+// Source records are normalised to one deterministic shape. A StopPoint key
+// without a real departure remains metadata, not scheduled evidence.
 export function normalisePreparedService(service = {}) {
   const rawSchedules = service.stopSchedules && typeof service.stopSchedules === 'object' ? service.stopSchedules : {};
   const stopSchedules = Object.fromEntries(Object.entries(rawSchedules).map(([stopId, schedule]) => [
@@ -139,7 +140,18 @@ export function createPreparedBusDataAdapter({
     for (const response of responses) for (const rawStop of response.data?.stops ?? []) {
       const stop = Array.isArray(rawStop) ? Object.fromEntries(fields.map((field, position) => [field, rawStop[position]])) : rawStop;
       const distance = distanceMetres(site, stop);
-      if (distance <= numericRadius && !deduplicated.has(stop.id)) deduplicated.set(stop.id, { ...stop, sourceId: stop.id, distanceMetres: distance, routes: [...new Set(stop.routes ?? [])] });
+      if (distance <= numericRadius && !deduplicated.has(stop.id)) {
+        const routes = [...new Set(stop.routes ?? [])];
+        deduplicated.set(stop.id, {
+          ...stop,
+          sourceId: stop.id,
+          timetableAuthority: 'NaPTAN',
+          distanceMetres: distance,
+          routes,
+          routeAuthorities: Object.fromEntries(routes.map(route => [String(route), ['BODS']])),
+          routeDiscoverySource: 'BODS'
+        });
+      }
     }
     const stops = [...deduplicated.values()].sort((a, b) => a.distanceMetres - b.distanceMetres || a.id.localeCompare(b.id));
     const checkedAt = clock().toISOString();
@@ -156,7 +168,7 @@ export function createPreparedBusDataAdapter({
       validationStatus: 'validated', confidenceStatus: 'authoritative', warnings,
       freshness: { status: warnings.length ? 'stale' : 'live-current', assessedAt: checkedAt }, cache: { status: 'not-used' }
     }));
-    return sourceSuccess({ data: stops, evidence, warnings, provenance: { ...provenance, endpoint: index.sources.naptan.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, datasetVersion: index.sources.naptan.sha256, resultCount: stops.length, providerAdapter: 'prepared-naptan-bus-stop-v1', anonymousRequest: true, apiKeyEmbedded: false } });
+    return sourceSuccess({ data: stops, evidence, warnings, provenance: { ...provenance, endpoint: index.sources.naptan.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, datasetVersion: index.sources.naptan.sha256, routeDiscoverySource: 'BODS', resultCount: stops.length, providerAdapter: 'prepared-naptan-bus-stop-v1', anonymousRequest: true, apiKeyEmbedded: false } });
   }
 
   async function servicesForStops(stops, { forceRefresh = false } = {}) {
@@ -190,14 +202,16 @@ export function createPreparedBusDataAdapter({
     const services = new Map();
     for (const response of responses) for (const rawService of response.data?.services ?? []) {
       const service = normalisePreparedService(rawService);
-      if (!Object.keys(service.stopSchedules ?? {}).some(id => stopIds.has(id))) continue;
+      const scoped = scopedScheduledService(service, stopIds);
+      if (!scheduledStopIds(scoped).length) continue;
       const existing = services.get(service.id);
-      if (!existing) services.set(service.id, structuredClone(service));
-      else Object.assign(existing.stopSchedules, service.stopSchedules);
+      if (!existing) services.set(service.id, structuredClone(scoped));
+      else Object.assign(existing.stopSchedules, scoped.stopSchedules);
     }
     let mergedServices = [...services.values()];
     let tndsProvenance = null;
     const tndsWarnings = new Set();
+    const quarantinedRequestIdentities = new Set();
     if (tndsBaseUrl) {
       const tndsManifest = await requestJson({ url: resolveUrl(tndsBaseUrl, 'manifest.json'), fetchImpl, timeoutMs });
       if (!tndsManifest.ok || tndsManifest.data?.schema !== 'atlas-prepared-bus-tnds-v1') return sourceFailure({ code: 'unavailable_source', message: 'Supplementary bus timetable information could not be safely checked. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveUrl(tndsBaseUrl, 'manifest.json') }, warnings: ['Prepared supplementary timetable coverage is unavailable or malformed.'] });
@@ -223,21 +237,34 @@ export function createPreparedBusDataAdapter({
       if (responses.some(row => !row.ok)) return sourceFailure({ code: 'unavailable_source', message: 'Supplementary bus timetable information could not be safely checked. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveUrl(tndsBaseUrl, 'manifest.json') }, warnings: ['One or more prepared supplementary timetable shards could not be loaded.'] });
       if (!legacy && responses.some(row => !Array.isArray(row.data?.services) || row.data?.schema !== 'atlas-prepared-bus-tnds-v1')) return sourceFailure({ code: 'invalid_response', message: 'Supplementary bus timetable information could not be safely interpreted. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveUrl(tndsBaseUrl, 'manifest.json') }, warnings: ['One or more prepared supplementary timetable shards were malformed.'] });
       if (hasShards && responses.some(row => !row.data?.stopPrefix)) return sourceFailure({ code: 'invalid_response', message: 'Supplementary bus timetable information could not be safely interpreted. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveUrl(tndsBaseUrl, 'manifest.json') }, warnings: ['One or more prepared supplementary timetable shards were missing their stop-prefix identity.'] });
-      const tndsRows = (legacy ? responses.map(row => row.data) : responses.flatMap(row => row.data.services)).map(service => normalisePreparedService(service)).filter(service => {
-          const scheduledAtStop = Object.keys(service.stopSchedules || {}).some(id => stopIds.has(id));
-          const affectedAtStop = (service.tndsQuarantine?.affectedStopIds || []).some(id => stopIds.has(id));
-          if (affectedAtStop) tndsWarnings.add(TNDS_QUARANTINE_WARNING);
-          return scheduledAtStop && !service.tndsQuarantine?.serviceQuarantined;
-        });
+      const tndsRows = (legacy ? responses.map(row => row.data) : responses.flatMap(row => row.data.services)).map(service => normalisePreparedService(service)).map(service => {
+          const scoped = scopedScheduledService(service, stopIds);
+          const affectedAtStop = (service.tndsQuarantine?.affectedStopIds || []).filter(id => stopIds.has(id));
+          if (affectedAtStop.length) {
+            tndsWarnings.add(TNDS_QUARANTINE_WARNING);
+            for (const stopId of affectedAtStop) if (service.routeNumber) quarantinedRequestIdentities.add(`${service.routeNumber}|${stopId}`);
+          }
+          return scoped;
+        }).filter(service => scheduledStopIds(service).length && !service.tndsQuarantine?.serviceQuarantined);
         mergedServices = mergeBusTimetableSources({ bods: mergedServices, tnds: tndsRows });
-        tndsProvenance = { source: 'Traveline National Dataset supplementary data', dataPreparedAt: manifest.generatedAt, regions: manifest.regions, serving: legacy ? 'bounded-legacy-manifest' : 'stop-prefix-shards', shardRequests: [...new Set(shardPaths)].length };
+        const unresolvedRequestIdentities = [...quarantinedRequestIdentities].filter(identity => {
+          const [routeNumber, stopId] = identity.split('|');
+          return !mergedServices.some(service => String(service.routeNumber ?? '').trim().toLowerCase() === routeNumber.trim().toLowerCase()
+            && hasScheduledEvidenceAt(service, stopId)
+            && (!service.tndsQuarantine?.affectedStopIds?.includes(stopId) || !/^tnds:/i.test(String(service.id ?? ''))));
+        }).sort();
+        tndsProvenance = { source: 'Traveline National Dataset supplementary data', dataPreparedAt: manifest.generatedAt, regions: manifest.regions, serving: legacy ? 'bounded-legacy-manifest' : 'stop-prefix-shards', shardRequests: [...new Set(shardPaths)].length, unresolvedRequestIdentities };
     }
     const checkedAt = clock().toISOString();
     const warnings = [...snapshotWarnings(index), ...tndsWarnings];
-    if (!services.size) warnings.push('No current BODS timetable records matched the selected authoritative stop identifiers.');
+    if (!mergedServices.some(service => scheduledStopIds(service).length)) warnings.push('No current BODS timetable records matched the selected authoritative stop identifiers.');
+    const unresolvedRequestIdentities = [...new Set(tndsProvenance?.unresolvedRequestIdentities ?? [])].sort();
+    const timetableConclusion = mergedServices.some(service => scheduledStopIds(service).length)
+      ? 'MATCHED'
+      : unresolvedRequestIdentities.length ? 'UNRESOLVED' : 'NO_CURRENT_MATCH';
     return sourceSuccess({
       data: mergedServices, evidence: [], warnings,
-      provenance: { source: tndsProvenance ? `${TIMETABLE_SOURCE}; ${tndsProvenance.source}` : TIMETABLE_SOURCE, endpoint: index.sources.bods.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, tndsPreparedAt: tndsProvenance?.dataPreparedAt || null, tndsServing: tndsProvenance?.serving || null, tndsShardRequests: tndsProvenance?.shardRequests ?? null, datasetVersion: index.sources.bods.sha256, regions: index.sources.bods.regions, representativeDates: index.representativeDates, anonymousRequest: true, apiKeyEmbedded: false, attribution: TIMETABLE_ATTRIBUTION }
+      provenance: { source: tndsProvenance ? `${TIMETABLE_SOURCE}; ${tndsProvenance.source}` : TIMETABLE_SOURCE, endpoint: index.sources.bods.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, tndsPreparedAt: tndsProvenance?.dataPreparedAt || null, tndsServing: tndsProvenance?.serving || null, tndsShardRequests: tndsProvenance?.shardRequests ?? null, datasetVersion: index.sources.bods.sha256, regions: index.sources.bods.regions, representativeDates: index.representativeDates, anonymousRequest: true, apiKeyEmbedded: false, attribution: TIMETABLE_ATTRIBUTION, unresolvedRequestIdentities, nationalUnresolvedRequestIdentities: unresolvedRequestIdentities, timetableConclusion }
     });
   }
 

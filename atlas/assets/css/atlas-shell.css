@@ -167,15 +167,20 @@ button.compact { padding: 7px 10px; font-size: .78rem; }
 .bus-service-summary { min-width: 1250px; table-layout: fixed; }
 .bus-service-summary .col-include { width: 4%; }
 .bus-service-summary .col-route { width: 6%; }
-.bus-service-summary .col-operator { width: 15%; }
-.bus-service-summary .col-origin { width: 21%; }
-.bus-service-summary .col-principal { width: 26%; }
-.bus-service-summary .col-frequency { width: 12%; }
+.bus-service-summary .col-operator { width: 13%; }
+.bus-service-summary .col-origin { width: 20%; }
+.bus-service-summary .col-principal { width: 23%; }
+.bus-service-summary .col-frequency { width: 18%; }
 .bus-service-summary .col-operating-period { width: 16%; }
 .bus-stop-summary input[type="checkbox"], .bus-service-summary input[type="checkbox"] { width: 17px; height: 17px; margin: 0; }
 .period-lines { margin: 0; padding: 0; list-style: none; }
 .period-lines li + li { margin-top: 3px; }
 .bus-service-summary .period-lines { font-size: .92em; }
+.service-detail-panel { margin-top: 16px; padding: 14px 16px; border: 1px solid var(--atlas-line); border-radius: 9px; background: #f8fafc; }
+.service-detail-panel h5 { margin: 0 0 6px; font-size: 1rem; }
+.service-detail { padding: 9px 0; border-top: 1px solid var(--atlas-line); }
+.service-detail:first-child { border-top: 0; }
+.service-detail p { margin: 4px 0 0; color: var(--atlas-muted); font-size: .9em; }
 .service-note td { border-top: 0; background: #fff8e8; color: #614200; padding-top: 8px; padding-bottom: 9px; }
 .assessment-wording { margin-top: 24px; padding: 16px 18px; border-left: 4px solid var(--atlas-lime); background: #f4f8fd; }
 .assessment-wording p:last-child { margin: 8px 0 0; color: var(--atlas-ink); }

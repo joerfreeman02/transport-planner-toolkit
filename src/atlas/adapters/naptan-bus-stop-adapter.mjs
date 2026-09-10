@@ -58,7 +58,9 @@ export function parseNaptanStops(csv, site, radius) {
       longitude,
       stopType,
       sourceId: id,
+      timetableAuthority: 'NaPTAN',
       routes: [],
+      routeAuthorities: {},
       distanceMetres: distance
     });
   }

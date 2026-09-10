@@ -2,6 +2,7 @@ import { createEvidence } from '../domain/evidence.mjs';
 import { isConfirmedSite } from '../domain/site.mjs';
 import { requestJson } from '../infrastructure/http-client.mjs';
 import { runCachedSourceQuery, sourceFailure, sourceSuccess } from './source-adapter.mjs';
+import { createTflRequestScheduler } from './tfl-request-scheduler.mjs';
 
 const SOURCE_NAME = 'Transport for London Unified API';
 const ATTRIBUTION = 'Data provided by Transport for London';
@@ -22,7 +23,8 @@ export function createTflBusStopAdapter({
   cache,
   clock = () => new Date(),
   timeoutMs = 12000,
-  baseUrl = 'https://api.tfl.gov.uk'
+  baseUrl = 'https://api.tfl.gov.uk',
+  requestScheduler = createTflRequestScheduler()
 } = {}) {
   async function nearbyStops(site, { radius = 700, forceRefresh = false } = {}) {
     const provenance = { source: SOURCE_NAME, authoritativeFor: 'TfL stop-point records', endpoint: `${baseUrl}/StopPoint`, retrievedAt: null };
@@ -43,7 +45,7 @@ export function createTflBusStopAdapter({
     const cacheKey = `tfl-stops:${site.latitude.toFixed(6)}:${site.longitude.toFixed(6)}:${Math.round(numericRadius)}`;
 
     return runCachedSourceQuery({ cache, cacheKey, freshForMs: 5 * 60 * 1000, forceRefresh, load: async () => {
-      const response = await requestJson({ url: endpoint, fetchImpl, timeoutMs });
+      const response = await requestScheduler.schedule('stop-point-discovery', () => requestJson({ url: endpoint, fetchImpl, timeoutMs }));
       if (!response.ok) return sourceFailure({ code: response.code, message: response.message, status: response.status, provenance: { ...provenance, endpoint } });
       if (!response.data || !Array.isArray(response.data.stopPoints)) return sourceFailure({ code: 'invalid_response', message: 'TfL response did not contain a stopPoints array.', provenance: { ...provenance, endpoint } });
 
@@ -80,7 +82,9 @@ export function createTflBusStopAdapter({
           longitude,
           stopType: String(raw.stopType ?? '').trim() || null,
           sourceId: id,
+          timetableAuthority: 'TfL',
           routes,
+          routeAuthorities: Object.fromEntries(routes.map(route => [route, ['TfL']])),
           distanceMetres: distance
         });
       }

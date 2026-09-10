@@ -1,5 +1,6 @@
 import { createSiteSelector } from '../../../src/atlas/application/site-selector.mjs';
 import { SITE_LOCATION_METHODS } from '../../../src/atlas/domain/site.mjs';
+import { isGreaterLondonPoint } from '../../../src/atlas/domain/geography.mjs';
 import { createJsonCache } from '../../../src/atlas/infrastructure/cache.mjs';
 import { createNominatimGeocodingAdapter } from '../../../src/atlas/adapters/nominatim-geocoding-adapter.mjs';
 import { createTflBusStopAdapter } from '../../../src/atlas/adapters/tfl-bus-stop-adapter.mjs';
@@ -7,22 +8,24 @@ import { createPreparedBusDataAdapter } from '../../../src/atlas/adapters/prepar
 import { createTflBusTimetableAdapter } from '../../../src/atlas/adapters/tfl-bus-timetable-adapter.mjs';
 import { createAuthoritativeBusTimetableAdapter } from '../../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
 import { createOsrmAccessRoutingAdapter } from '../../../src/atlas/adapters/osrm-access-routing-adapter.mjs';
+import { createTflRequestScheduler } from '../../../src/atlas/adapters/tfl-request-scheduler.mjs';
 import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-discovery.mjs';
-import { createBusAssessment } from '../../../src/atlas/application/bus-assessment.mjs';
+import { createBusAssessment, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/atlas/application/bus-assessment.mjs';
 import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
 import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
-const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha8' });
+const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha12' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
-const tfl = createTflBusStopAdapter({ cache });
+const tflRequestScheduler = createTflRequestScheduler();
+const tfl = createTflBusStopAdapter({ cache, requestScheduler: tflRequestScheduler });
 const preparedBusData = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url), tndsBaseUrl: new URL('../../data/bus-tnds/', import.meta.url) });
-const preparedBodsOnly = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url) });
-const tflTimetable = createTflBusTimetableAdapter({ cache });
-const authoritativeTimetable = createAuthoritativeBusTimetableAdapter({ tflAdapter: tflTimetable, nationalAdapter: preparedBusData, londonSupplementAdapter: preparedBodsOnly });
+const tflTimetable = createTflBusTimetableAdapter({ cache, requestScheduler: tflRequestScheduler });
+const authoritativeTimetable = createAuthoritativeBusTimetableAdapter({ tflAdapter: tflTimetable, nationalAdapter: preparedBusData, londonSupplementAdapter: preparedBusData });
 const accessRouting = createOsrmAccessRoutingAdapter();
-const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: preparedBusData });
+const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: preparedBusData, crossBoundaryTfL: true });
 const busAssessment = createBusAssessment({ stopDiscovery: busStops, timetableData: authoritativeTimetable, accessRouting });
 const selector = createSiteSelector();
 const views = ['report-builder', 'modules', 'projects', 'about'];
@@ -35,13 +38,18 @@ const METHOD_LABELS = Object.freeze({
 let confirmedSite = null;
 let map = null;
 let assessmentMarker = null;
+let radiusCircle = null;
 let busStopMarkers = [];
 let routeLayers = [];
 let currentBusResult = null;
+let pendingScopeDiscovery = null;
+let pendingScopeContext = null;
 let lastAssessmentMode = 'full';
 let selectedStopIds = new Set();
 let selectedServiceIds = new Set();
 let selectionInitialised = false;
+let detailedEvidenceVisible = false;
+let radiusTouched = false;
 
 function stopKey(stop) { return String(stop?.id || stop?.sourceId || ''); }
 function serviceKey(service) { return String(service?.id || `${service?.routeNumber}|${service?.operator}|${service?.origin}|${service?.destination}`); }
@@ -134,7 +142,7 @@ function plannerStopWarning(warning) {
 }
 
 function providerLabel(result) {
-  return /naptan|prepared-national/i.test(result?.provenance?.providerAdapter || '') ? 'Department for Transport NaPTAN' : 'Transport for London';
+  return buildStopDiscoverySourceLabel(result?.provenance);
 }
 
 function assessmentMethod(site) {
@@ -145,11 +153,16 @@ function assessmentMethod(site) {
 function clearBusEvidence(message = 'Confirm the assessment point before checking nearby bus stops.') {
   const hadEvidence = !$('evidencePanel').hidden;
   confirmedSite = null;
+  radiusTouched = false;
+  detailedEvidenceVisible = false;
   currentBusResult = null;
+  pendingScopeDiscovery = null;
+  pendingScopeContext = null;
   busStopMarkers.forEach(marker => map?.removeLayer(marker));
   busStopMarkers = [];
   routeLayers.forEach(layer => map?.removeLayer(layer));
   routeLayers = [];
+  if (radiusCircle) { map?.removeLayer(radiusCircle); radiusCircle = null; }
   $('findStops').disabled = true;
   $('findNearestStops').disabled = true;
   $('refreshStops').disabled = true;
@@ -161,6 +174,54 @@ function clearBusEvidence(message = 'Confirm the assessment point before checkin
   $('clearRoutes').hidden = true;
   selectedStopIds = new Set(); selectedServiceIds = new Set(); selectionInitialised = false;
   setCallout($('stopStatus'), hadEvidence ? 'The assessment point changed, so the earlier bus results were cleared. Confirm the new point before checking again.' : message, hadEvidence ? 'warning' : 'neutral');
+}
+
+function clearStaleBusAssessment() {
+  const scopeVisible = !$('assessmentScope').hidden;
+  if (!currentBusResult && !scopeVisible && !pendingScopeDiscovery) return;
+  currentBusResult = null;
+  pendingScopeDiscovery = null;
+  pendingScopeContext = null;
+  detailedEvidenceVisible = false;
+  busStopMarkers.forEach(marker => map?.removeLayer(marker));
+  busStopMarkers = [];
+  routeLayers.forEach(layer => map?.removeLayer(layer));
+  routeLayers = [];
+  $('exportBusWord').disabled = true;
+  $('evidencePanel').hidden = true;
+  $('assessmentScope').replaceChildren();
+  $('assessmentScope').hidden = true;
+  $('evidenceRows').replaceChildren();
+  $('serviceRows').replaceChildren();
+  $('assessmentWording').textContent = '';
+  $('clearRoutes').hidden = true;
+  selectedStopIds = new Set();
+  selectedServiceIds = new Set();
+  selectionInitialised = false;
+  setCallout($('stopStatus'), 'The assessment radius changed. Build the Bus assessment again to update the evidence.', 'warning');
+}
+
+function selectedRadius() {
+  const value = Number($('radius').value);
+  return Number.isFinite(value) ? Math.max(100, Math.min(2000, value)) : 700;
+}
+
+function syncRadiusCircle(radiusOverride = null) {
+  if (!confirmedSite || !map || !window.L) return;
+  const radius = Number.isFinite(Number(radiusOverride)) ? Number(radiusOverride) : selectedRadius();
+  if (!radiusCircle) {
+    radiusCircle = window.L.circle([confirmedSite.latitude, confirmedSite.longitude], {
+      radius,
+      color: '#146b63',
+      weight: 2,
+      fillColor: '#44bba4',
+      fillOpacity: 0.12,
+      interactive: false
+    }).addTo(map);
+  } else {
+    radiusCircle.setLatLng([confirmedSite.latitude, confirmedSite.longitude]);
+    radiusCircle.setRadius(radius);
+  }
 }
 
 function googleMapsUrl(stop) {
@@ -235,6 +296,8 @@ function renderBusStopMarkers(stops) {
 function clearSelection() {
   selector.reset();
   confirmedSite = null;
+  radiusTouched = false;
+  detailedEvidenceVisible = false;
   if (assessmentMarker) {
     map.removeLayer(assessmentMarker);
     assessmentMarker = null;
@@ -384,9 +447,13 @@ function renderAssessment(result) {
   const panel = $('evidencePanel');
   const rows = $('evidenceRows');
   const serviceRows = $('serviceRows');
+  const detailPanel = $('serviceDetailPanel');
+  const detailRows = $('serviceDetailRows');
+  const detailToggle = $('toggleDetailedEvidence');
   panel.hidden = false;
   rows.replaceChildren();
   serviceRows.replaceChildren();
+  if (detailRows) detailRows.replaceChildren();
   for (const stop of result.stops) {
     const row = document.createElement('tr');
     const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedStopIds.has(stopKey(stop)); include.setAttribute('aria-label', `Include ${stop.name}`);
@@ -436,6 +503,25 @@ function renderAssessment(result) {
   if (!result.serviceSummaries.length) {
     const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 7; cell.textContent = 'No matched timetable summary is available. Review Sources and checks before using the stop information.'; row.append(cell); serviceRows.append(row);
   }
+  if (detailPanel && detailRows) {
+    detailPanel.hidden = !detailedEvidenceVisible;
+    if (detailToggle) detailToggle.textContent = detailedEvidenceVisible ? 'Hide detailed evidence' : 'Show detailed evidence';
+    if (detailedEvidenceVisible) {
+      for (const service of result.services ?? []) {
+        const article = document.createElement('article');
+        article.className = 'service-detail';
+        const heading = document.createElement('strong');
+        heading.textContent = `${service.routeNumber || 'Route not supplied'} · ${service.origin || 'Origin not supplied'} – ${service.destination || 'Destination not supplied'}`;
+        const detail = document.createElement('p');
+        const stopIds = Object.keys(service.stopSchedules ?? {}).join(', ') || 'no selected StopPoint';
+        const pattern = service.source?.patternVariantId || service.source?.patternId || service.source?.intervalId || service.id || 'pattern identity not supplied';
+        detail.textContent = `Pattern: ${pattern} · Stops: ${stopIds} · Source: ${service.timetableSource || service.source?.provider || 'timetable source'}`;
+        article.append(heading, detail);
+        detailRows.append(article);
+      }
+      if (!(result.services ?? []).length) detailRows.textContent = 'No detailed timetable records were returned for this assessment.';
+    }
+  }
   renderBusStopMarkers(result.stops);
   $('assessmentWording').textContent = buildControlledBusWording(result.serviceSummaries.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => selectedStopIds.has(String(id)))), { nearestGroupName: result.nearestGroup?.name ?? null });
   const stopProvenance = result.provenance.stops ?? {};
@@ -445,13 +531,14 @@ function renderAssessment(result) {
   $('evidenceSummary').textContent = result.assessmentMode === 'nearest'
     ? `Nearest stop group: ${result.nearestGroup?.name || 'selected group'} · ${result.stops.length} stop record${result.stops.length === 1 ? '' : 's'} · ${result.serviceSummaries.length} directional service summar${result.serviceSummaries.length === 1 ? 'y' : 'ies'}`
     : `${result.stops.length} stop${result.stops.length === 1 ? '' : 's'} · ${result.serviceSummaries.length} directional service summar${result.serviceSummaries.length === 1 ? 'y' : 'ies'}`;
-  const timetableLabel = /TfL scheduled/i.test(timetableProvenance.source || '') ? 'TfL scheduled timetable authority' : 'Department for Transport bus timetables';
+  const timetablePresentation = buildTimetableSourcePresentation(timetableProvenance, result.services ?? []);
+  const timetableLabel = timetablePresentation.label;
   $('resultSource').textContent = `${stopSource}; ${timetableLabel}; OpenStreetMap routing`;
   $('resultChecked').textContent = checked;
   $('resultFreshness').textContent = result.status === 'complete' ? 'Assessment complete' : 'Partial assessment - review points to note';
   const plannerChecks = $('plannerChecks');
   plannerChecks.replaceChildren();
-  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableProvenance.source || 'Department for Transport Bus Open Data Service'], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', result.status === 'complete' ? 'Complete for the information shown' : 'Partial - use the points to note below']]) {
+  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', result.status === 'complete' ? 'Complete for the information shown' : 'Partial - use the points to note below']]) {
     const line = document.createElement('p'); const label = document.createElement('strong'); label.textContent = `${labelText}: `; line.append(label, value); plannerChecks.append(line);
   }
   const plannerWarnings = [...new Set(result.warnings.map(plannerStopWarning).filter(Boolean))];
@@ -468,6 +555,7 @@ function renderAssessment(result) {
     `Timetable source reference: ${timetableProvenance.endpoint || 'not supplied'}`,
     `Prepared dataset time: ${timetableProvenance.dataPreparedAt || stopProvenance.dataPreparedAt || 'not supplied'}`,
     `Assessment mode: ${result.assessmentMode || 'full'}`,
+    `Discovery radius: ${result.provenance.stops?.actualDiscoveryRadiusMetres || result.provenance.stops?.radiusMetres || selectedRadius()} metres`,
     `Nearest stop-group method: ${result.nearestGroup?.basis || 'not applicable'}`,
     `Representative timetable dates: ${JSON.stringify(timetableProvenance.representativeDates || {})}`,
     `Source stop IDs: ${result.stops.map(stop => stop.id).join(', ')}`,
@@ -519,28 +607,64 @@ function enterCoordinates(event) {
 function confirmAssessmentPoint() {
   try {
     confirmedSite = selector.confirm();
+    if (!radiusTouched) $('radius').value = isGreaterLondonPoint(confirmedSite) ? '400' : '700';
     renderConfirmedSite(confirmedSite);
+    syncRadiusCircle();
     $('confirmAssessmentPoint').disabled = true;
     $('findStops').disabled = false;
     $('findNearestStops').disabled = false;
     $('refreshStops').disabled = false;
     setCallout($('confirmationStatus'), `${assessmentMethod(confirmedSite)}. The assessment point is confirmed.`, 'success');
-    setCallout($('stopStatus'), 'Ready to check nearby bus stops from the confirmed assessment point.', 'neutral');
+    setCallout($('stopStatus'), `Ready to check nearby bus stops. The ${selectedRadius()} m assessment radius is shown on the map.`, 'neutral');
   } catch {
     setCallout($('confirmationStatus'), 'Select a valid assessment point before confirming.', 'error');
   }
 }
 
-async function loadStops(forceRefresh, mode = lastAssessmentMode) {
+async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = false, discoveryOverride = null } = {}) {
   lastAssessmentMode = mode === 'nearest' ? 'nearest' : 'full';
+  if (!skipScope || lastAssessmentMode !== 'full') {
+    pendingScopeDiscovery = null;
+    pendingScopeContext = null;
+  }
   const action = lastAssessmentMode === 'nearest' ? 'nearest bus stop group' : 'full Bus assessment';
   setCallout($('stopStatus'), forceRefresh ? `Checking the ${action} again…` : `Building the ${action}…`, 'neutral');
   $('findStops').disabled = true;
   $('findNearestStops').disabled = true;
   $('refreshStops').disabled = true;
   $('exportBusWord').disabled = true;
+  $('assessmentScope').hidden = true;
   try {
-    const result = await busAssessment.assess(confirmedSite, { radius: $('radius').value, forceRefresh, mode: lastAssessmentMode });
+    let discovery = discoveryOverride;
+    if (lastAssessmentMode === 'full' && !skipScope) {
+      const scope = await busAssessment.inspectScope(confirmedSite, { radius: $('radius').value, forceRefresh });
+      if (!scope.ok) {
+        pendingScopeDiscovery = null;
+        pendingScopeContext = null;
+        setCallout($('stopStatus'), `${plannerFailure('bus', scope)}`, 'error');
+        return;
+      }
+      const { stopCount, routeCount, pairCount } = scope.scope;
+      discovery = scope.discovery ?? null;
+      const scopeBox = $('assessmentScope');
+      scopeBox.textContent = `Selected radius: ${selectedRadius()} m · ${stopCount} stop${stopCount === 1 ? '' : 's'} · ${routeCount} distinct route${routeCount === 1 ? '' : 's'} · ${pairCount} detailed route × StopPoint pair${pairCount === 1 ? '' : 's'}.`;
+      scopeBox.hidden = false;
+      if (pairCount > TFL_SAFE_DETAILED_PAIR_LIMIT) {
+        pendingScopeDiscovery = discovery;
+        pendingScopeContext = { site: confirmedSite, radius: Number($('radius').value) };
+        scopeBox.append(' This assessment may require staged TfL requests. Reduce the radius, use nearest/recommended assessment, or continue the full staged assessment. ');
+        const nearest = document.createElement('button'); nearest.type = 'button'; nearest.className = 'secondary compact'; nearest.textContent = 'Use nearest assessment'; nearest.addEventListener('click', () => loadStops(false, 'nearest'));
+        const continueButton = document.createElement('button'); continueButton.type = 'button'; continueButton.className = 'primary compact'; continueButton.textContent = 'Continue full staged assessment'; continueButton.addEventListener('click', () => {
+          const reusableDiscovery = pendingScopeContext?.site === confirmedSite && Number(pendingScopeContext.radius) === Number($('radius').value) ? pendingScopeDiscovery : null;
+          pendingScopeDiscovery = null;
+          pendingScopeContext = null;
+          loadStops(forceRefresh, 'full', { skipScope: true, discoveryOverride: reusableDiscovery });
+        });
+        scopeBox.append(nearest, continueButton);
+        return;
+      }
+    }
+    const result = await busAssessment.assess(confirmedSite, { radius: $('radius').value, forceRefresh, mode: lastAssessmentMode, discovery });
     if (!result.ok) {
       $('evidencePanel').hidden = true;
       currentBusResult = null;
@@ -551,6 +675,7 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode) {
       return;
     }
     renderAssessment(result);
+    syncRadiusCircle(result.provenance.stops?.actualDiscoveryRadiusMetres ?? result.provenance.stops?.radiusMetres ?? selectedRadius());
     const checked = formatTime(result.provenance.stops?.retrievedAt || result.provenance.timetables?.retrievedAt);
     const modeText = result.assessmentMode === 'nearest' ? `Nearest stop group "${result.nearestGroup?.name || 'selected group'}"` : `${result.stops.length} nearby stop${result.stops.length === 1 ? '' : 's'}`;
     const message = result.status === 'complete' ? `${modeText} assessed. Complete - checked ${checked}.` : `${modeText} assessed. Part of the assessment is unavailable; review the points to note.`;
@@ -604,6 +729,7 @@ $('chooseOnMap').addEventListener('click', () => {
 });
 $('coordinatesForm').addEventListener('submit', enterCoordinates);
 $('confirmAssessmentPoint').addEventListener('click', confirmAssessmentPoint);
+$('radius').addEventListener('input', () => { radiusTouched = true; clearStaleBusAssessment(); syncRadiusCircle(); });
 $('findNearestStops').addEventListener('click', () => loadStops(false, 'nearest'));
 $('findStops').addEventListener('click', () => loadStops(false, 'full'));
 $('refreshStops').addEventListener('click', () => loadStops(true, lastAssessmentMode));
@@ -612,6 +738,7 @@ $('clearRoutes').addEventListener('click', clearRouteLines);
 $('recommendedSelection').addEventListener('click', () => { selectionInitialised = false; renderAssessment(currentBusResult); });
 $('selectAllRows').addEventListener('click', () => { selectedStopIds = new Set(currentBusResult?.stops.map(stopKey) ?? []); selectedServiceIds = new Set(currentBusResult?.serviceSummaries.map(serviceKey) ?? []); selectionInitialised = true; renderAssessment(currentBusResult); });
 $('clearAllRows').addEventListener('click', () => { selectedStopIds = new Set(); selectedServiceIds = new Set(); selectionInitialised = true; renderAssessment(currentBusResult); });
+$('toggleDetailedEvidence').addEventListener('click', () => { detailedEvidenceVisible = !detailedEvidenceVisible; renderAssessment(currentBusResult); });
 $('refreshDataStatus').addEventListener('click', refreshDataStatus);
 const localMaintenance = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
 const updateButton = $('updateBusData');

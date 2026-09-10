@@ -5,6 +5,7 @@ import { createAuthoritativeBusTimetableAdapter } from '../../src/atlas/adapters
 import { createPreparedBusDataAdapter } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { buildServiceSummaries, calculateOperatingPeriods, formatOperatingPeriod } from '../../src/atlas/domain/bus-service-assessment.mjs';
 import { createJsonCache, createMemoryStorage } from '../../src/atlas/infrastructure/cache.mjs';
+import { createTflRequestScheduler } from '../../src/atlas/adapters/tfl-request-scheduler.mjs';
 
 const fixture = JSON.parse(fs.readFileSync(new URL('./fixtures/tfl-timetable.json', import.meta.url), 'utf8'));
 const routeFixture = JSON.parse(fs.readFileSync(new URL('./fixtures/tfl-line-route.json', import.meta.url), 'utf8'));
@@ -37,7 +38,7 @@ assert.deepEqual(result.data[0].stopSchedules['490TEST003'].monday, [350, 370, 4
 assert.ok(result.data[0].principalLocations.includes('West Norwood Bus Station'));
 assert.deepEqual(result.data[0].frequencyEvidence, [{ periodType: 'FrequencyMinutes', day: 'monday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'tuesday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'wednesday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'thursday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }, { periodType: 'FrequencyMinutes', day: 'friday', fromMinute: 360, toMinute: 540, lowestFrequency: 10, highestFrequency: 10, stopPointId: '490TEST003', source: 'TfL' }]);
 const [frequencySummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], result.data);
-assert.match(frequencySummary.typicalFrequencyText, /Mon-Fri: Approx\. 6 buses\/hour \(every 10 mins\)/);
+assert.match(frequencySummary.typicalFrequencyText, /Mon-Fri: Every 10 mins/);
 assert.equal(frequencySummary.typicalFrequency.basis, 'frequency-band');
 assert.equal(frequencySummary.typicalFrequency.departureCount, 4, 'exact known TfL journeys remain auditable');
 assert.deepEqual(frequencySummary.departuresByDay.wednesday, [350, 370, 400, 1400], 'frequency-band evidence must not fabricate TfL departures');
@@ -105,7 +106,8 @@ distinctStopPeriods.timetable.routes[0].schedules[0].periods.push({ type: 'Frequ
 const distinctTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => response(String(url).includes('/Route') ? routeFixture : distinctStopPeriods) });
 const distinctResult = await distinctTfl.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });
 const [distinctSummary] = buildServiceSummaries([{ id: '490TEST003', walking: { status: 'routed', distanceMetres: 100 } }], distinctResult.data);
-assert.notEqual(distinctSummary.typicalFrequency.basis, 'frequency-band', 'different same-stop bands remain variable rather than being collapsed');
+assert.equal(distinctSummary.typicalFrequency.basis, 'frequency-band');
+assert.equal(distinctSummary.typicalFrequency.valueText, 'Every 5–10 mins', 'different same-stop bands remain an honest range rather than being collapsed');
 assert.equal(timetableCalls, 1);
 assert.equal(routeCalls, 1);
 await tfl.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });
@@ -230,19 +232,44 @@ assert.equal(unresolved.data.length, 1);
 assert.equal(unresolved.warnings.filter(warning => /no defensible national fallback/.test(warning)).length, 1);
 
 const budgetCalls = [];
-const budgetTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => { budgetCalls.push(url); return response(String(url).includes('/Route') ? routeFixture : withOperator); } });
+const budgetTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => {
+  budgetCalls.push(url);
+  if (String(url).includes('/Route')) return response(routeFixture);
+  const match = String(url).match(/\/Line\/([^/]+)\/Timetable\/([^/?]+)/);
+  const payload = structuredClone(withOperator);
+  payload.lineId = decodeURIComponent(match?.[1] ?? payload.lineId);
+  payload.lineName = payload.lineId;
+  payload.timetable.departureStopId = decodeURIComponent(match?.[2] ?? payload.timetable.departureStopId);
+  return response(payload);
+} });
 const budgetAuthority = createAuthoritativeBusTimetableAdapter({ tflAdapter: budgetTfl, nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS' } }) }, requestLimit: 20 });
 const tooManyStops = Array.from({ length: 21 }, (_, index) => ({ id: `490TEST${String(index).padStart(3, '0')}`, routes: [`R${index}`] }));
 const budgetResult = await budgetAuthority.servicesForStops(tooManyStops, { site: { latitude: 51.418, longitude: -0.082 } });
-assert.equal(budgetResult.ok, false);
-assert.equal(budgetCalls.length, 0, 'request-budget rejection must happen before any TfL HTTP request');
+assert.equal(budgetResult.ok, true, 'dense London discovery must produce a controlled result rather than a raw request-budget failure');
+assert.equal(budgetResult.provenance.detailedRequests, 21, 'all 21 detailed pairs are processed');
+assert.equal(budgetResult.provenance.unprocessedRequests, 0);
+assert.equal(budgetResult.provenance.totalTfLRequests, 22, '21 timetable requests plus one batched metadata request are counted');
+assert.equal(budgetCalls.length, 22, 'the complete 21-pair assessment makes every controlled outbound request');
+
+let fakeNow = 0;
+const sleeps = [];
+const scheduler = createTflRequestScheduler({ now: () => fakeNow, sleep: async milliseconds => { sleeps.push(milliseconds); fakeNow += milliseconds; } });
+for (let index = 0; index < 46; index += 1) await scheduler.schedule('timetable', async () => ({ ok: true }));
+assert.equal(sleeps.length, 1, 'the rolling scheduler waits only when the 45-request window is exhausted');
+assert.ok(sleeps[0] >= 60000);
+assert.equal(scheduler.snapshot().requestsInWindow, 1);
 
 let busyTimetable = 0, busyRoute = 0;
 const busyRouteUrls = [];
 const busyTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => {
   if (String(url).includes('/Route')) { busyRoute += 1; busyRouteUrls.push(String(url)); return response(routeFixture); }
   busyTimetable += 1;
-  return response(withOperator);
+  const match = String(url).match(/\/Line\/([^/]+)\/Timetable\/([^/?]+)/);
+  const payload = structuredClone(withOperator);
+  payload.lineId = decodeURIComponent(match?.[1] ?? payload.lineId);
+  payload.lineName = payload.lineId;
+  payload.timetable.departureStopId = decodeURIComponent(match?.[2] ?? payload.timetable.departureStopId);
+  return response(payload);
 } });
 const busyAuthority = createAuthoritativeBusTimetableAdapter({ tflAdapter: busyTfl, nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS' } }) } });
 const busyStops = Array.from({ length: 6 }, (_, index) => ({ id: `BUSY${index}`, routes: ['322', '323'] }));
@@ -254,6 +281,16 @@ assert.match(busyRouteUrls[0], /\/Line\/322,323\/Route\?serviceTypes=Regular&ser
 assert.equal(busyResult.provenance.timetableRequests, 12);
 assert.equal(busyResult.provenance.routeMetadataRequests, 1);
 assert.equal(busyResult.provenance.totalTfLRequests, 13);
+
+const cachedStore = cache();
+const primeScheduler = createTflRequestScheduler({ now: () => 0, sleep: async () => {} });
+const primeCachedAdapter = createTflBusTimetableAdapter({ cache: cachedStore, requestScheduler: primeScheduler, fetchImpl: async url => String(url).includes('/Route') ? response(routeFixture) : response(withOperator) });
+await primeCachedAdapter.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });
+const hitScheduler = createTflRequestScheduler({ now: () => 0, sleep: async () => { throw new Error('cache hit must not sleep'); } });
+const cachedAdapter = createTflBusTimetableAdapter({ cache: cachedStore, requestScheduler: hitScheduler, fetchImpl: async () => { throw new Error('cache hit must not fetch'); } });
+const cachedResult = await cachedAdapter.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });
+assert.equal(cachedResult.cache.status, 'hit');
+assert.equal(hitScheduler.snapshot().requestsInWindow, 0, 'cache hits do not consume the rolling TfL request budget');
 
 console.log('PASS TfL interval linkage, full-route identity, cross-source validation, fallback and outside-London composition tests.');
 console.log('PASS deterministic request counts: Crystal Palace mid-route 1 timetable + 1 metadata = 2; opposite direction 1 + 1 = 2 with a fresh assessment; busy 12 + 1 batched metadata = 13.');

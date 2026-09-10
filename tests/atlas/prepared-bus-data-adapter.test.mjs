@@ -48,6 +48,10 @@ test('prepared NaPTAN lookup returns authoritative nearby records with the sourc
   assert.equal(result.data[0].id, '2100A');
   assert.equal(result.evidence[0].source.name, 'Department for Transport NaPTAN');
   assert.equal(result.evidence[0].source.datasetTimestamp, stop.modifiedAt);
+  assert.deepEqual(result.data[0].routeAuthorities, { '10': ['BODS'] });
+  assert.equal(result.data[0].timetableAuthority, 'NaPTAN');
+  assert.equal(result.data[0].routeDiscoverySource, 'BODS');
+  assert.equal(result.provenance.routeDiscoverySource, 'BODS');
   assert.match(result.evidence[0].calculationMethodology, /Straight-line discovery distance/);
 });
 

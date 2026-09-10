@@ -1,3 +1,5 @@
+import { hasScheduledEvidence } from './scheduled-evidence.mjs';
+
 const DAY_ORDER = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 const DAY_LABELS = Object.freeze({ monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday' });
 const DAY_SHORT_LABELS = Object.freeze({ monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' });
@@ -16,6 +18,54 @@ function text(value) { return String(value ?? '').trim(); }
 function unique(values) { return [...new Set(values.map(text).filter(Boolean))]; }
 function numeric(values) { return unique(values).map(Number).filter(Number.isFinite).sort((a, b) => a - b); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
+
+function sourceJourneyIdentity(record) {
+  const source = record?.source ?? {};
+  return text(source.vehicleJourneyCode || source.vehicleJourneyId || source.tripId || source.journeyId || source.journeyCode);
+}
+
+function patternIdentity(record) {
+  const source = record?.source ?? {};
+  return text(source.patternVariantId || source.patternId || source.intervalId || record?.patternId);
+}
+
+function normaliseSchedule(schedule = {}, warnings = []) {
+  const output = {};
+  for (const day of DAY_ORDER) {
+    const values = numeric(schedule?.[day] ?? []).filter(value => value >= 0 && value <= 2880);
+    output[day] = [...new Set(values)];
+    if (values.length !== numeric(schedule?.[day] ?? []).length) warnings.push(`Invalid or out-of-range schedule evidence was excluded on ${day}.`);
+  }
+  return output;
+}
+
+function mergeRecordSchedules(first, second) {
+  const stopSchedules = { ...(first.stopSchedules ?? {}) };
+  for (const [stopId, schedule] of Object.entries(second.stopSchedules ?? {})) {
+    const existing = stopSchedules[stopId] ?? {};
+    stopSchedules[stopId] = Object.fromEntries(DAY_ORDER.map(day => [day, numeric([...(existing[day] ?? []), ...(schedule?.[day] ?? [])])]));
+  }
+  return { ...first, stopSchedules, scheduleIntegrityWarnings: unique([...(first.scheduleIntegrityWarnings ?? []), ...(second.scheduleIntegrityWarnings ?? [])]) };
+}
+
+function deduplicateServiceRecords(records = []) {
+  const byIdentity = new Map();
+  for (const raw of records) {
+    const scheduleWarnings = [];
+    const record = {
+      ...raw,
+      stopSchedules: Object.fromEntries(Object.entries(raw.stopSchedules ?? {}).map(([stopId, schedule]) => [stopId, normaliseSchedule(schedule, scheduleWarnings)])),
+      scheduleIntegrityWarnings: unique([...(raw.scheduleIntegrityWarnings ?? []), ...scheduleWarnings])
+    };
+    const explicitIdentity = sourceJourneyIdentity(record);
+    const identity = explicitIdentity
+      ? ['journey', record.timetableSource || record.source?.provider, record.routeNumber, patternIdentity(record), explicitIdentity].map(normal).join('|')
+      : ['record', record.id, record.timetableSource || record.source?.provider, record.routeNumber, patternIdentity(record), JSON.stringify(record.routePatternStopIds ?? [])].map(normal).join('|');
+    const existing = byIdentity.get(identity);
+    byIdentity.set(identity, existing ? mergeRecordSchedules(existing, record) : record);
+  }
+  return [...byIdentity.values()];
+}
 
 export function formatClock(totalMinutes) {
   if (!Number.isFinite(Number(totalMinutes))) return null;
@@ -125,6 +175,7 @@ export function collectServiceWarnings(serviceRecords = []) {
   const qualifications = unique(serviceRecords.flatMap(record => record.qualifications ?? []));
   const warnings = [];
   if (qualifications.some(note => /date-specific exceptions/i.test(note))) warnings.push('Some timetables contain date-specific changes. Check the assessment date before formal use.');
+  if (serviceRecords.some(record => (record.scheduleIntegrityWarnings ?? []).length)) warnings.push('One or more timetable records contained duplicate or invalid chronology evidence; the affected values were retained only after deterministic integrity checks.');
   return warnings;
 }
 
@@ -162,10 +213,9 @@ function selectedStopDirectionKey(stop) {
 function representativeStop(stops, records) {
   const supporting = (stops ?? []).filter(stop => records.some(record => {
     const schedule = record.stopSchedules?.[text(stop.id || stop.sourceId)];
-    return schedule && Object.values(schedule).some(day => Array.isArray(day) && day.length);
+    return hasScheduledEvidence(schedule);
   }));
-  const fallback = supporting.length ? supporting : (stops ?? []).filter(stop => records.some(record => Object.prototype.hasOwnProperty.call(record.stopSchedules ?? {}, text(stop.id || stop.sourceId))));
-  return [...fallback].sort((a, b) => {
+  return [...supporting].sort((a, b) => {
     const walkingA = a.walking?.status === 'routed' ? Number(a.walking.distanceMetres) : Number.POSITIVE_INFINITY;
     const walkingB = b.walking?.status === 'routed' ? Number(b.walking.distanceMetres) : Number.POSITIVE_INFINITY;
     const validWalkingA = Number.isFinite(walkingA), validWalkingB = Number.isFinite(walkingB);
@@ -192,21 +242,26 @@ function representativeRecord(records, stopIds) {
 }
 
 export function buildServiceSummaries(stops, serviceRecords) {
+  const preparedRecords = deduplicateServiceRecords(serviceRecords);
   const selectedIds = new Set((stops ?? []).map(stop => text(stop.id || stop.sourceId)).filter(Boolean));
   const selectedStopsById = new Map((stops ?? []).map(stop => [text(stop.id || stop.sourceId), stop]));
   const groups = new Map();
-  for (const service of serviceRecords ?? []) {
-    const relevantStops = Object.keys(service.stopSchedules ?? {}).filter(id => selectedIds.has(id));
+  for (const service of preparedRecords) {
+    const relevantStops = Object.entries(service.stopSchedules ?? {})
+      .filter(([id, schedule]) => selectedIds.has(id) && hasScheduledEvidence(schedule))
+      .map(([id]) => id);
     if (!relevantStops.length) continue;
     const stopDirections = unique(relevantStops.map(id => selectedStopDirectionKey(selectedStopsById.get(id))).filter(Boolean)).sort().join(',');
-    const identity = [service.routeNumber, service.operator, directionGroupKey(service), stopDirections].map(value => text(value).toLowerCase()).join('|');
+    const directionKey = directionGroupKey(service);
+    const terminiKey = `${service.origin}|${service.destination}`;
+    const identity = [service.routeNumber, service.operator, directionKey, terminiKey, stopDirections].map(value => text(value).toLowerCase()).join('|');
     if (!groups.has(identity)) groups.set(identity, []);
     groups.get(identity).push({ ...service, relevantStops });
   }
   const summaries = [...groups.values()].map(records => {
     const stopIds = unique(records.flatMap(record => record.relevantStops));
     const first = representativeRecord(records, stopIds);
-    const identity = [first.routeNumber, first.operator, directionGroupKey(first)].map(value => text(value).toLowerCase()).join('|');
+    const identity = [first.routeNumber, first.operator, directionGroupKey(first), first.origin, first.destination].map(value => text(value).toLowerCase()).join('|');
     const frequencyStop = representativeStop(stops, records);
     const frequencyBasisStopId = text(frequencyStop?.id || frequencyStop?.sourceId) || stopIds[0] || null;
     const departuresByDay = mergeDepartures(records, frequencyBasisStopId ? [frequencyBasisStopId] : stopIds);
@@ -228,6 +283,19 @@ export function buildServiceSummaries(stops, serviceRecords) {
     if (!DAY_ORDER.some(day => periods[day])) notes.push('No scheduled departures are available for the prepared representative week.');
     if (!text(first.operator) || /not supplied/i.test(text(first.operator))) notes.push('The timetable did not supply a reliable operator name.');
     const principalLocations = unique(records.flatMap(record => record.principalLocations ?? []));
+    const assessedStops = stopIds.map(id => selectedStopsById.get(id)).filter(Boolean);
+    const stopLabel = stop => [text(stop?.name), text(stop?.indicator)].filter(Boolean).join(' — ') || text(stop?.id || stop?.sourceId);
+    const servedAtStops = unique(assessedStops.map(stopLabel)).sort((a, b) => a.localeCompare(b));
+    const frequencyStopLabel = stopLabel(frequencyStop) || 'selected stop';
+    const companionStops = servedAtStops.filter(label => label !== frequencyStopLabel);
+    const commonNames = unique(assessedStops.map(stop => text(stop?.name)));
+    const stopContext = companionStops.length
+      ? (commonNames.length === 1
+        ? `Served at: ${commonNames[0]} (Stops ${assessedStops.map(stop => text(stop?.indicator || stop?.id || stop?.sourceId)).filter(Boolean).join(', ')})`
+        : `Served at: ${frequencyStopLabel} (Stops ${companionStops.join(', ')})`)
+      : null;
+    const integrityWarnings = unique(records.flatMap(record => record.scheduleIntegrityWarnings ?? []));
+    if (integrityWarnings.length) notes.push(`Schedule integrity note: ${integrityWarnings.join(' ')}`);
     return Object.freeze({
       id: identity,
       routeNumber: text(first.routeNumber) || 'Not supplied',
@@ -251,6 +319,9 @@ export function buildServiceSummaries(stops, serviceRecords) {
       typicalFrequencyText: formatTypicalFrequency(frequencyByDay).join('\n'),
       frequencyBasisStopId,
       frequencyBasisStopName: text(frequencyStop?.name) || null,
+      servedAtStops: Object.freeze(servedAtStops),
+      assessedStops: Object.freeze(assessedStops.map(stop => text(stop.id || stop.sourceId))),
+      stopContext,
       frequencyEvidenceSource: unique(records.map(record => record.timetableSource || record.source?.provider)).join(' + ') || null,
       frequencyRepresentativeDay,
       serviceNote: unique(notes).join(' '),
@@ -421,17 +492,21 @@ function deterministicFrequencyBand(evidence, day) {
     }))
     .filter(item => item.periodType === 'FrequencyMinutes'
       && Number.isFinite(item.lowestFrequency) && item.lowestFrequency > 0
-      && item.lowestFrequency === item.highestFrequency
+      && Number.isFinite(item.highestFrequency) && item.highestFrequency >= item.lowestFrequency
       && (!Number.isFinite(item.fromMinute) || !Number.isFinite(item.toMinute) || item.toMinute > item.fromMinute));
   const uniqueBands = [...new Map(bands.map(item => [JSON.stringify(item), item])).values()];
-  return uniqueBands.length === 1 ? uniqueBands[0] : null;
+  if (!uniqueBands.length) return null;
+  const lowestFrequency = Math.min(...uniqueBands.map(item => item.lowestFrequency));
+  const highestFrequency = Math.max(...uniqueBands.map(item => item.highestFrequency));
+  return { ...uniqueBands[0], lowestFrequency, highestFrequency, bandCount: uniqueBands.length };
 }
 
 export function formatServiceOriginDestination(service, separator = ' - ') {
   const origin = text(service?.origin) || 'Origin not supplied';
   const destination = text(service?.destination) || 'Destination not supplied';
   const base = `${origin}${separator}${destination}${service?.circular && service?.direction ? ` (${service.direction})` : ''}`;
-  return service?.stopDirection ? `${base} (${service.stopDirection})` : base;
+  const directed = service?.stopDirection ? `${base} (${service.stopDirection})` : base;
+  return service?.stopContext ? `${directed}; ${service.stopContext}` : directed;
 }
 
 /** Shared planner-facing frequency rule; no synthetic departures are created. */
@@ -440,9 +515,11 @@ export function calculateTypicalServiceFrequency(departures, { day, label = '', 
   const band = deterministicFrequencyBand(frequencyEvidence, day);
   const dayText = dayLabel(day);
   if (band) {
-    const busesPerHour = 60 / band.lowestFrequency;
-    const valueText = `Approx. ${Number(busesPerHour.toFixed(1))} buses/hour (every ${band.lowestFrequency} mins)`;
-    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'frequency-band', classification: 'regular-frequency', noService: false, busesPerHour: Number(busesPerHour.toFixed(2)), intervalMinutes: band.lowestFrequency, valueText, wording: `${dayText}: ${valueText}` });
+    const busesPerHour = 60 / ((band.lowestFrequency + band.highestFrequency) / 2);
+    const valueText = band.lowestFrequency === band.highestFrequency
+      ? `Every ${band.lowestFrequency} mins`
+      : `Every ${band.lowestFrequency}–${band.highestFrequency} mins`;
+    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'frequency-band', classification: 'regular-frequency', noService: false, busesPerHour: Number(busesPerHour.toFixed(2)), intervalMinutes: band.lowestFrequency === band.highestFrequency ? band.lowestFrequency : null, intervalRange: Object.freeze([band.lowestFrequency, band.highestFrequency]), valueText, wording: `${dayText}: ${valueText}` });
   }
   if (!scheduled.length) return Object.freeze({ day, dayLabel: dayText, departureCount: 0, basis: 'scheduled', classification: 'no-service', noService: true, busesPerHour: null, intervalMinutes: null, valueText: 'No scheduled service', wording: `${dayText}: No scheduled service` });
   if (scheduled.length <= LIMITED_SERVICE_JOURNEY_THRESHOLD) {
@@ -457,11 +534,12 @@ export function calculateTypicalServiceFrequency(departures, { day, label = '', 
     return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'irregular', noService: false, busesPerHour: null, intervalMinutes: null, valueText, wording: `${dayText}: ${valueText}` });
   }
   const frequency = calculateScheduledFrequency(scheduled, { startMinute: scheduled[0], endMinute: scheduled.at(-1) + median, label });
-  const valueText = `Approx. ${Number((60 / median).toFixed(1))} buses/hour (every ${median} mins)`;
+  const valueText = `Every ~${median} mins`;
   return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'regular-frequency', noService: false, busesPerHour: frequency.busesPerHour, intervalMinutes: median, valueText, wording: `${dayText}: ${valueText}` });
 }
 
 function frequencyEquivalenceKey(result) {
+  if (result?.basis === 'frequency-band') return JSON.stringify([result.basis, result.valueText, result.noService === true]);
   return JSON.stringify([
     result?.basis ?? null,
     result?.classification ?? null,

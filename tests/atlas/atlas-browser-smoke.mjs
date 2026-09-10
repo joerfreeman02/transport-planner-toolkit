@@ -30,7 +30,7 @@ await page.route('https://api.tfl.gov.uk/**', route => {
 
 try {
   await page.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.12/);
+  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.13/);
   await page.getByRole('button', { name: 'Report Builder' }).click();
   assert.equal(await page.getByRole('heading', { name: 'Report Builder', exact: true }).isVisible(), true);
   await page.getByRole('button', { name: 'About' }).click();
@@ -47,6 +47,7 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).isDisabled(), true);
   await chooseFirstCandidateAndConfirm(page);
   assert.match(await page.locator('#confirmedSite').innerText(), /Confirmed from address/);
+  assert.equal(await page.evaluate(() => window.__ATLAS_BUS_UI__.hasRadiusCircle()), true);
   await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.equal(await page.locator('#evidenceRows tr').count(), 2);
@@ -54,6 +55,9 @@ try {
   assert.equal(await page.locator('#evidenceRows a[href*="google.com/maps/search"]').count(), 2);
   assert.match(await page.locator('#evidenceRows tr').first().innerText(), /322, 450/);
   assert.ok(await page.locator('#serviceRows tr:not(.service-note)').count() > 0);
+  assert.equal(await page.locator('.bus-service-summary thead th').count(), 8);
+  assert.match(await page.locator('.bus-service-summary').innerText(), /Served at/);
+  assert.equal(await page.locator('#taskStatusMessage').innerText(), 'Complete');
   assert.match(await page.locator('#evidenceRows tr').first().innerText(), /m · \d+ mins?/);
   assert.ok(tflRequests > 0);
   const requestsAfterFirstAssessment = tflRequests;

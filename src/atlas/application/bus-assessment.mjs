@@ -5,6 +5,7 @@ import {
   groupStopsForPresentation,
   selectNearestStopGroup
 } from '../domain/bus-service-assessment.mjs';
+import { buildPlannerBusServiceSummaries } from '../domain/bus-planner-summary.mjs';
 import { DEFAULT_TFL_REQUEST_LIMIT } from '../adapters/tfl-request-scheduler.mjs';
 import { deriveTimetableConclusion, hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
 import { buildStopTimetableSourcePresentation } from '../domain/bus-source-presentation.mjs';
@@ -138,25 +139,28 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     return { stopsResult, discovered: discoveredStops, radiusMetres: Number(radius) };
   }
 
-  async function prepareStops(site, radius, forceRefresh, cachedDiscovery = null) {
+  async function prepareStops(site, radius, forceRefresh, cachedDiscovery = null, onProgress = () => {}) {
     const discovered = await discoverStops(site, radius, forceRefresh, cachedDiscovery);
     if (!discovered.stopsResult.ok) return { stopsResult: discovered.stopsResult, enriched: [] };
     const discoveredStops = discovered.discovered ?? [];
     if (!discoveredStops.length) return { ...discovered, enriched: [] };
+    onProgress({ phase: 'routing-stops', completed: 0, total: discoveredStops.length, detail: discoveredStops.length + ' stops' });
     const [walkingResult, cyclingResult] = await Promise.all([
       accessRouting.matrix(site, discoveredStops, 'walk'),
       accessRouting.matrix(site, discoveredStops, 'cycle')
     ]);
     const enriched = discoveredStops.map((stop, index) => Object.freeze({ ...stop, walking: routingFor(walkingResult, index), cycling: routingFor(cyclingResult, index) }));
+    onProgress({ phase: 'routing-stops', completed: enriched.length, total: discoveredStops.length });
     return { ...discovered, enriched, walkingResult, cyclingResult };
   }
 
-  async function nearestTimetable(enrichedStops, options, warnings) {
+  async function nearestTimetable(enrichedStops, options, warnings, onProgress = () => {}) {
     const remaining = [...enrichedStops];
     let lastResult = null;
     while (remaining.length) {
       const selection = selectNearestStopGroup(remaining);
       if (!selection.ok) return { selectedStops: [], services: [], servicesResult: lastResult, nearestGroup: null, warnings };
+      onProgress({ phase: 'checking-timetables' });
       const result = await timetableData.servicesForStops(selection.stops, options);
       lastResult = result;
       const conclusion = timetableConclusion(result, selection);
@@ -178,15 +182,20 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     return { selectedStops: [], services: [], servicesResult: lastResult, nearestGroup: null, warnings };
   }
 
-  async function assess(site, { radius = 700, forceRefresh = false, mode = 'full', discovery = null } = {}) {
+  async function assess(site, { radius = 700, forceRefresh = false, mode = 'full', discovery = null, onProgress = () => {} } = {}) {
     const assessmentMode = mode === 'nearest' ? 'nearest' : 'full';
     const selectedRadiusMetres = Number(radius);
     let actualDiscoveryRadiusMetres = selectedRadiusMetres;
-    let prepared = await prepareStops(site, radius, forceRefresh, discovery);
-    if (!prepared.stopsResult.ok) return Object.freeze({ ok: false, stage: 'stops', code: prepared.stopsResult.code, message: prepared.stopsResult.message, warnings: prepared.stopsResult.warnings ?? [], stopsResult: prepared.stopsResult, servicesResult: null });
+    onProgress({ phase: 'finding-stops' });
+    let prepared = await prepareStops(site, radius, forceRefresh, discovery, onProgress);
+    if (!prepared.stopsResult.ok) {
+      onProgress({ phase: 'complete', detail: 'Assessment unavailable' });
+      return Object.freeze({ ok: false, stage: 'stops', code: prepared.stopsResult.code, message: prepared.stopsResult.message, warnings: prepared.stopsResult.warnings ?? [], stopsResult: prepared.stopsResult, servicesResult: null });
+    }
     let enrichedDiscoveredStops = prepared.enriched;
     if (!enrichedDiscoveredStops.length) {
       const stopCoverageComplete = prepared.stopsResult.provenance?.stopCoverageComplete !== false;
+      onProgress({ phase: 'complete' });
       return Object.freeze({
         ok: true,
         status: stopCoverageComplete ? 'complete' : 'partial',
@@ -196,6 +205,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
         stops: [],
         services: [],
         serviceSummaries: [],
+        plannerServiceSummaries: [],
         wording: stopCoverageComplete
           ? 'No authoritative bus stops were found within the selected discovery radius.'
           : 'No bus stops were returned, but required stop-source coverage was incomplete; ATLAS could not make an authoritative zero-stop conclusion.',
@@ -215,9 +225,9 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     let services = [];
     let assessmentWarnings = commonWarnings;
     if (assessmentMode === 'nearest') {
-      let nearest = await nearestTimetable(enrichedDiscoveredStops, { forceRefresh, site }, commonWarnings);
+      let nearest = await nearestTimetable(enrichedDiscoveredStops, { forceRefresh, site }, commonWarnings, onProgress);
       if (!nearest.selectedStops.length && Number(radius) < 2000) {
-        const expanded = await prepareStops(site, 2000, forceRefresh);
+        const expanded = await prepareStops(site, 2000, forceRefresh, null, onProgress);
         if (expanded.stopsResult.ok) {
           prepared = expanded;
           actualDiscoveryRadiusMetres = 2000;
@@ -231,10 +241,14 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
       services = nearest.services;
       nearestGroup = nearest.nearestGroup;
     } else {
+      onProgress({ phase: 'checking-timetables' });
       servicesResult = await timetableData.servicesForStops(enrichedDiscoveredStops, { forceRefresh, site });
       services = servicesResult.ok ? servicesResult.data : [];
     }
+    onProgress({ phase: 'reconciling-evidence' });
     const serviceSummaries = buildServiceSummaries(selectedStops, services);
+    onProgress({ phase: 'preparing-assessment' });
+    const plannerServiceSummaries = buildPlannerBusServiceSummaries(serviceSummaries, selectedStops);
     const routesByStop = new Map(selectedStops.map(stop => [stopKey(stop), new Set()]));
     for (const service of services) for (const [id, schedule] of Object.entries(service.stopSchedules ?? {})) if (routesByStop.has(id) && service.routeNumber && hasScheduledEvidence(schedule)) routesByStop.get(id).add(String(service.routeNumber));
     selectedStops = selectedStops.map(stop => {
@@ -253,7 +267,8 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     const status = stopCoverageComplete && timetablesComplete && serviceSummaries.length && routingComplete ? 'complete' : 'partial';
     const selectedIds = new Set(selectedStops.map(stopKey));
     const routes = new Set(enrichedDiscoveredStops.flatMap(stop => stop.routes ?? []));
-    return Object.freeze({ ok: true, status, assessmentMode, discoveredStopCount: enrichedDiscoveredStops.length, scope: { stopCount: enrichedDiscoveredStops.length, routeCount: routes.size, pairCount: routePairs(enrichedDiscoveredStops).size }, nearestGroup, stops: Object.freeze(selectedStops), services: Object.freeze(services), serviceSummaries: Object.freeze(serviceSummaries), wording: buildControlledBusWording(serviceSummaries, { nearestGroupName: nearestGroup?.name ?? null }), warnings: Object.freeze(warnings), provenance: Object.freeze({ stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres }, timetables: servicesResult?.provenance ?? {}, walking: prepared.walkingResult?.provenance ?? {}, cycling: prepared.cyclingResult?.provenance ?? {} }), evidence: Object.freeze((prepared.stopsResult.evidence ?? []).filter(item => assessmentMode === 'full' || selectedIds.has(item?.subject?.id))) });
+    onProgress({ phase: 'complete' });
+    return Object.freeze({ ok: true, status, assessmentMode, discoveredStopCount: enrichedDiscoveredStops.length, scope: { stopCount: enrichedDiscoveredStops.length, routeCount: routes.size, pairCount: routePairs(enrichedDiscoveredStops).size }, nearestGroup, stops: Object.freeze(selectedStops), services: Object.freeze(services), serviceSummaries: Object.freeze(serviceSummaries), plannerServiceSummaries: Object.freeze(plannerServiceSummaries), wording: buildControlledBusWording(plannerServiceSummaries, { nearestGroupName: nearestGroup?.name ?? null }), warnings: Object.freeze(warnings), provenance: Object.freeze({ stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres }, timetables: servicesResult?.provenance ?? {}, walking: prepared.walkingResult?.provenance ?? {}, cycling: prepared.cyclingResult?.provenance ?? {} }), evidence: Object.freeze((prepared.stopsResult.evidence ?? []).filter(item => assessmentMode === 'full' || selectedIds.has(item?.subject?.id))) });
   }
 
   async function inspectScope(site, { radius = 700, forceRefresh = false } = {}) {

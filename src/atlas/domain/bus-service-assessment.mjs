@@ -97,6 +97,7 @@ function samePeriod(a, b) {
 
 function periodText(period) {
   if (!period) return 'No scheduled service';
+  if (period.departureCount === 1) return `Departs approx. ${period.first}`;
   return `Approx. ${period.first}–${period.last}${period.overnight ? ' (next day)' : ''}`;
 }
 
@@ -324,6 +325,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
       stopContext,
       frequencyEvidenceSource: unique(records.map(record => record.timetableSource || record.source?.provider)).join(' + ') || null,
       frequencyRepresentativeDay,
+      frequencyEvidence: Object.freeze(frequencyEvidence),
       serviceNote: unique(notes).join(' '),
       stopIds,
       sourceRecordIds: unique(records.map(record => record.id)),
@@ -527,15 +529,19 @@ export function calculateTypicalServiceFrequency(departures, { day, label = '', 
     return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'journeys-per-day', noService: false, busesPerHour: null, intervalMinutes: null, valueText, wording: `${dayText}: ${valueText}` });
   }
   const gaps = intervals(scheduled);
-  const median = gaps.length ? gaps.slice().sort((a, b) => a - b)[Math.floor(gaps.length / 2)] : null;
+  const orderedGaps = gaps.slice().sort((a, b) => a - b);
+  const median = orderedGaps.length
+    ? (orderedGaps.length % 2 ? orderedGaps[Math.floor(orderedGaps.length / 2)] : (orderedGaps[orderedGaps.length / 2 - 1] + orderedGaps[orderedGaps.length / 2]) / 2)
+    : null;
   const regular = median != null && gaps.every(gap => Math.abs(gap - median) <= Math.max(1, median * REGULARITY_INTERVAL_TOLERANCE));
   if (!regular) {
     const valueText = `${scheduled.length} scheduled journeys/day (irregular)`;
     return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'irregular', noService: false, busesPerHour: null, intervalMinutes: null, valueText, wording: `${dayText}: ${valueText}` });
   }
-  const frequency = calculateScheduledFrequency(scheduled, { startMinute: scheduled[0], endMinute: scheduled.at(-1) + median, label });
-  const valueText = `Every ~${median} mins`;
-  return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'regular-frequency', noService: false, busesPerHour: frequency.busesPerHour, intervalMinutes: median, valueText, wording: `${dayText}: ${valueText}` });
+  const roundedMedian = Math.round(median);
+  const frequency = calculateScheduledFrequency(scheduled, { startMinute: scheduled[0], endMinute: scheduled.at(-1) + roundedMedian, label });
+  const valueText = `Every ~${roundedMedian} mins`;
+  return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'regular-frequency', noService: false, busesPerHour: frequency.busesPerHour, intervalMinutes: roundedMedian, valueText, wording: `${dayText}: ${valueText}` });
 }
 
 function frequencyEquivalenceKey(result) {

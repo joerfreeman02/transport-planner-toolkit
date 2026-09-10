@@ -1,5 +1,15 @@
 # ATLAS version and build record
 
+## BUS-QA-04 Alpha.13 candidate
+
+| Version | `2.0.0-alpha.13` |
+|---|---|
+| Visible build | `ATLAS-2.0.0-alpha.13-20260910` |
+| Branch | `codex/atlas-bus-alpha13-planner-summary` |
+| Status | Local implementation candidate; Technical Director review required |
+
+Alpha.13 adds a planner-facing summary over the validated Alpha.12 evidence engine. It presents one concise row per route direction and main service pattern, uses scheduled departures at the deterministic representative stop for frequency and operating-period wording, preserves detailed raw timetable evidence, and exposes the served stop explicitly. It also adds a reusable task-status component with truthful scheduler-wait wording and keeps the selected radius visible on the map from site selection through assessment. Alpha.12 updater and evidence-source architecture remain unchanged.
+
 ## BUS-QA-03 Alpha.12 candidate
 
 | Version | `2.0.0-alpha.12` |

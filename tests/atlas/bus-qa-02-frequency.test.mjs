@@ -90,8 +90,8 @@ assert.equal(multiStop[0].frequencyByDay.monday.intervalMinutes, 10);
 
 const html = fs.readFileSync(new URL('../../atlas/index.html', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../../atlas/assets/css/atlas-shell.css', import.meta.url), 'utf8');
-assert.deepEqual((html.match(/<th>/g) ?? []).slice(-7).length, 7);
-for (const [className, width] of [['col-include', '4%'], ['col-route', '6%'], ['col-operator', '13%'], ['col-origin', '20%'], ['col-principal', '23%'], ['col-frequency', '18%'], ['col-operating-period', '16%']]) assert.match(css, new RegExp(`\\.${className} \\{ width: ${width.replace('%', '\\%')}; \\}`));
+assert.deepEqual((html.match(/<th>/g) ?? []).slice(-8).length, 8);
+for (const [className, width] of [['col-include', '4%'], ['col-route', '6%'], ['col-operator', '13%'], ['col-direction', '21%'], ['col-served-at', '16%'], ['col-principal', '16%'], ['col-frequency', '12%'], ['col-operating-period', '12%']]) assert.ok(css.includes('.' + className + ' { width: ' + width + '; }'), className);
 assert.match(css, /input\[type="checkbox"\].*width: 17px/);
 
 const word = buildBusWordTables({ ok: true, stops: [], serviceSummaries: [varied] });

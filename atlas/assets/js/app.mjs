@@ -13,6 +13,7 @@ import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-
 import { createBusAssessment, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/atlas/application/bus-assessment.mjs';
 import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
 import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
@@ -141,7 +142,7 @@ function plannerStopWarning(warning) {
 }
 
 function providerLabel(result) {
-  return /naptan|prepared-national/i.test(result?.provenance?.providerAdapter || '') ? 'Department for Transport NaPTAN' : 'Transport for London';
+  return buildStopDiscoverySourceLabel(result?.provenance);
 }
 
 function assessmentMethod(site) {
@@ -530,13 +531,14 @@ function renderAssessment(result) {
   $('evidenceSummary').textContent = result.assessmentMode === 'nearest'
     ? `Nearest stop group: ${result.nearestGroup?.name || 'selected group'} · ${result.stops.length} stop record${result.stops.length === 1 ? '' : 's'} · ${result.serviceSummaries.length} directional service summar${result.serviceSummaries.length === 1 ? 'y' : 'ies'}`
     : `${result.stops.length} stop${result.stops.length === 1 ? '' : 's'} · ${result.serviceSummaries.length} directional service summar${result.serviceSummaries.length === 1 ? 'y' : 'ies'}`;
-  const timetableLabel = /TfL scheduled/i.test(timetableProvenance.source || '') ? 'TfL scheduled timetable authority' : 'Department for Transport bus timetables';
+  const timetablePresentation = buildTimetableSourcePresentation(timetableProvenance, result.services ?? []);
+  const timetableLabel = timetablePresentation.label;
   $('resultSource').textContent = `${stopSource}; ${timetableLabel}; OpenStreetMap routing`;
   $('resultChecked').textContent = checked;
   $('resultFreshness').textContent = result.status === 'complete' ? 'Assessment complete' : 'Partial assessment - review points to note';
   const plannerChecks = $('plannerChecks');
   plannerChecks.replaceChildren();
-  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableProvenance.source || 'Department for Transport Bus Open Data Service'], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', result.status === 'complete' ? 'Complete for the information shown' : 'Partial - use the points to note below']]) {
+  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', result.status === 'complete' ? 'Complete for the information shown' : 'Partial - use the points to note below']]) {
     const line = document.createElement('p'); const label = document.createElement('strong'); label.textContent = `${labelText}: `; line.append(label, value); plannerChecks.append(line);
   }
   const plannerWarnings = [...new Set(result.warnings.map(plannerStopWarning).filter(Boolean))];

@@ -201,6 +201,9 @@ assert.equal(outsideMatched.ok, true);
 assert.equal(outsideMatched.provenance.timetableConclusion, 'MATCHED');
 assert.equal(outsideMatched.provenance.nationalSourceAvailable, true);
 assert.equal(outsideMatched.provenance.nationalEvidenceRequired, false);
+assert.equal(outsideMatched.provenance.nationalEvidenceNotRequired, true);
+assert.equal(outsideMatched.provenance.nationalTimetableAttempted, false);
+assert.equal(outsideMatched.provenance.tflTimetableAttempted, true);
 assert.equal(outsideNationalCalls, 0, 'outside-London TfL-only scope must not call a national adapter');
 
 outsideTfLMode = 'NO_CURRENT_MATCH';

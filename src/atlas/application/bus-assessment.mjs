@@ -7,6 +7,7 @@ import {
 } from '../domain/bus-service-assessment.mjs';
 import { DEFAULT_TFL_REQUEST_LIMIT } from '../adapters/tfl-request-scheduler.mjs';
 import { deriveTimetableConclusion, hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
+import { buildStopTimetableSourcePresentation } from '../domain/bus-source-presentation.mjs';
 
 export const TFL_REQUEST_WINDOW_LIMIT = DEFAULT_TFL_REQUEST_LIMIT;
 export const TFL_ASSESSMENT_FIXED_REQUESTS = 2;
@@ -91,13 +92,8 @@ function sourceLabel(service) {
   return source || 'timetable source';
 }
 
-function checkedSourceLabels(provenance = {}) {
-  const source = String(provenance.source || '');
-  return [...new Set([
-    /TfL/i.test(source) ? 'TfL' : null,
-    /Bus Open Data|BODS/i.test(source) ? 'BODS' : null,
-    /Traveline|TNDS/i.test(source) ? 'TNDS' : null
-  ].filter(Boolean))];
+function checkedSourceLabels(stop, provenance = {}, services = []) {
+  return buildStopTimetableSourcePresentation(stop, provenance, services).checked;
 }
 
 function buildStopTimetableEvidence(stop, services, servicesResult) {
@@ -114,7 +110,8 @@ function buildStopTimetableEvidence(stop, services, servicesResult) {
     const status = labels.some(label => /fallback/i.test(label)) ? 'FALLBACK' : labels.some(label => /supplementary/i.test(label)) ? 'SUPPLEMENTED' : 'MATCHED';
     return Object.freeze({ status, label: `Matched · ${labels.join(' + ')}`, sources: labels });
   }
-  const checked = checkedSourceLabels(provenance);
+  const sourcePresentation = buildStopTimetableSourcePresentation(stop, provenance, services);
+  const checked = sourcePresentation.checked;
   if (incompleteCount) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: `Timetable source unavailable · ${incompleteLabel}`, sources: checked });
   if (!servicesResult?.ok && Number(provenance.failedRequests || 0) === 0 && provenance.unavailable !== true && hasNoCurrentTimetableConclusionForStop(stop, provenance)) {
     return Object.freeze({ status: 'NO_CURRENT_MATCH', label: `No current match · ${checked.join('/') || 'timetable sources'} checked`, sources: checked });
@@ -124,7 +121,7 @@ function buildStopTimetableEvidence(stop, services, servicesResult) {
   if (Number(provenance.failedRequests || 0) > 0 || provenance.unavailable === true) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable', sources: checked });
   if (nationalIncomplete) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · required national evidence could not be checked', sources: checked });
   if ((provenance.timetableConclusion || servicesResult?.timetableConclusion) === 'UNRESOLVED') return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · evidence remained unresolved', sources: checked });
-  if ((provenance.timetableConclusion || servicesResult?.timetableConclusion) === 'NO_CURRENT_MATCH' || hasNoCurrentTimetableConclusionForStop(stop, provenance)) {
+  if (((provenance.timetableConclusion || servicesResult?.timetableConclusion) === 'NO_CURRENT_MATCH' && checked.length) || hasNoCurrentTimetableConclusionForStop(stop, provenance)) {
     return Object.freeze({ status: 'NO_CURRENT_MATCH', label: `No current match · ${checked.join('/') || 'timetable sources'} checked`, sources: checked });
   }
   return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · no scheduled evidence was established', sources: checked });

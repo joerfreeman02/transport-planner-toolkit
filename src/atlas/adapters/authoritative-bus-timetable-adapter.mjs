@@ -1,5 +1,6 @@
 import { isGreaterLondonPoint } from '../domain/geography.mjs';
 import { deriveTimetableConclusion, hasScheduledEvidenceAt, scheduledStopIds, scopedScheduledService } from '../domain/scheduled-evidence.mjs';
+import { timetableProviderLabelsFromText } from '../domain/bus-source-presentation.mjs';
 import { sourceFailure, sourceSuccess } from './source-adapter.mjs';
 
 const text = value => String(value ?? '').trim();
@@ -164,7 +165,20 @@ function scopeNationalResult(result, stops) {
   return sourceSuccess({
     ...result,
     data,
-    provenance: { ...(result.provenance ?? {}), unresolvedRequestIdentities, nationalUnresolvedRequestIdentities: unresolvedRequestIdentities, timetableConclusion }
+    provenance: {
+      ...(result.provenance ?? {}),
+      unresolvedRequestIdentities,
+      nationalUnresolvedRequestIdentities: unresolvedRequestIdentities,
+      timetableConclusion,
+      tflTimetableAttempted: false,
+      nationalTimetableAttempted: true,
+      nationalSupplementaryAttempted: false,
+      nationalEvidenceRequired: true,
+      nationalEvidenceNotRequired: false,
+      nationalTimetableStopIds: [...selectedStopIds],
+      tflTimetableRequestIdentities: [],
+      nationalTimetableProviders: timetableProviderLabelsFromText(result.provenance?.source)
+    }
   });
 }
 
@@ -183,7 +197,7 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
   if (!tflAdapter?.servicesForStop || !nationalAdapter?.servicesForStops || !londonSupplementAdapter?.servicesForStops) throw new Error('TfL, national and London supplementary timetable adapters are required.');
 
   async function servicesForStops(stops, options = {}) {
-    if (!stops?.length) return sourceSuccess({ data: [], warnings: [], provenance: { source: 'TfL scheduled timetable authority', authority: 'TfL', requestCount: 0, processedRequests: 0, unprocessedRequests: 0, timetableConclusion: 'NO_CURRENT_MATCH' } });
+    if (!stops?.length) return sourceSuccess({ data: [], warnings: [], provenance: { source: 'TfL scheduled timetable authority', authority: 'TfL', requestCount: 0, processedRequests: 0, unprocessedRequests: 0, timetableConclusion: 'NO_CURRENT_MATCH', tflTimetableAttempted: false, nationalTimetableAttempted: false, nationalSupplementaryAttempted: false, nationalEvidenceRequired: false, nationalEvidenceNotRequired: true, nationalTimetableStopIds: [], tflTimetableRequestIdentities: [], nationalTimetableProviders: [] } });
     const site = options.site ?? stops[0];
     const insideLondon = londonCoverage(site);
     const tflStops = insideLondon ? stops : stops.filter(isTfLStop);
@@ -192,7 +206,7 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     const nationalEvidenceRequired = !insideLondon && nationalStops.length > 0;
     const national = nationalEvidenceRequired || insideLondon
       ? await (insideLondon ? londonSupplementAdapter : nationalAdapter).servicesForStops(nationalStops.length ? nationalStops : stops, options)
-      : sourceSuccess({ data: [], warnings: [], provenance: { source: 'National timetable authority not required for the selected TfL-only scope', authority: 'not-required', nationalEvidenceRequired: false, nationalSourceAvailable: true, timetableConclusion: 'NO_CURRENT_MATCH' } });
+      : sourceSuccess({ data: [], warnings: [], provenance: { source: 'National timetable authority not required for the selected TfL-only scope', authority: 'not-required', nationalEvidenceRequired: false, nationalEvidenceNotRequired: true, nationalSourceAvailable: true, timetableConclusion: 'NO_CURRENT_MATCH', tflTimetableAttempted: false, nationalTimetableAttempted: false, nationalSupplementaryAttempted: false, nationalTimetableStopIds: [], nationalTimetableProviders: [] } });
     const nationalServices = national.ok ? national.data ?? [] : [];
     const bods = nationalServices.filter(isBods);
     const requests = stagedRequests(tflStops, { insideLondon });
@@ -274,6 +288,12 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       nationalUnresolvedRequestIdentities,
       nationalSourceAvailable,
       nationalUnresolvedRoutes,
+      tflTimetableAttempted: processedRequests.length > 0,
+      nationalTimetableAttempted: nationalRequired,
+      nationalSupplementaryAttempted: insideLondon,
+      nationalTimetableStopIds: nationalStops.map(stopKey),
+      tflTimetableRequestIdentities: processedRequests.map(request => requestIdentity(request)),
+      nationalTimetableProviders: timetableProviderLabelsFromText(national.provenance?.source),
       realtimeArrivalsUsed: false, anonymousRequest: true, apiKeyEmbedded: false
     };
     const nationalConclusion = national.timetableConclusion || national.provenance?.timetableConclusion;

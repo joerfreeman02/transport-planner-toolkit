@@ -1,11 +1,14 @@
 import fs from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
 import path from 'node:path';
-import { gzipSync } from 'node:zlib';
+import { pipeline } from 'node:stream/promises';
+import { createGzip } from 'node:zlib';
 import { parseTndsTransXchangeServices } from '../../src/atlas/adapters/tnds-transxchange-adapter.mjs';
 import { hasScheduledEvidence } from '../../src/atlas/domain/scheduled-evidence.mjs';
 
 export const TNDS_REGIONS = Object.freeze(['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y']);
 export const TNDS_SERVICE_SHARD_KEY_LENGTH = 5;
+export const TNDS_XML_MAX_BYTES = 64 * 1024 * 1024;
 
 async function walk(root) {
   const result = [];
@@ -25,7 +28,40 @@ function regionFrom(file) {
   return match ? match[1].toUpperCase() : null;
 }
 
-export async function prepareTnds({ input, output, preparedAt = new Date().toISOString() }) {
+async function materializeShardRegion({ sourceFile, outputFile, shardKey, region, entries, stats }) {
+  const temporaryOutput = `${outputFile}.part`;
+  await fs.rm(temporaryOutput, { force: true });
+  const sortedEntries = [...entries].sort((left, right) => left.id.localeCompare(right.id));
+  const header = JSON.stringify({ schema: 'atlas-prepared-bus-tnds-v1', region: region.toUpperCase(), stopPrefix: shardKey });
+  async function* chunks() {
+    const source = await fs.open(sourceFile, 'r');
+    try {
+      yield Buffer.from(`${header.slice(0, -1)},"services":[`);
+      for (const [index, entry] of sortedEntries.entries()) {
+        const buffer = Buffer.allocUnsafe(entry.byteLength);
+        const { bytesRead } = await source.read(buffer, 0, entry.byteLength, entry.offset);
+        if (bytesRead !== entry.byteLength || buffer[entry.byteLength - 1] !== 0x0a) {
+          throw new Error(`TNDS shard ${shardKey}/${region} contained an incomplete indexed record for ${entry.id}.`);
+        }
+        if (index) yield Buffer.from(',');
+        yield buffer.subarray(0, -1);
+        stats.maxBufferedRecordBytes = Math.max(stats.maxBufferedRecordBytes, entry.byteLength);
+      }
+      yield Buffer.from(']}\n');
+    } finally {
+      await source.close();
+    }
+  }
+  try {
+    await pipeline(chunks(), createGzip(), createWriteStream(temporaryOutput, { flags: 'wx' }));
+    await fs.rename(temporaryOutput, outputFile);
+  } catch (error) {
+    await fs.rm(temporaryOutput, { force: true });
+    throw new Error(`TNDS shard ${shardKey}/${region} materialisation failed: ${error.message}`);
+  }
+}
+
+export async function prepareTnds({ input, output, preparedAt = new Date().toISOString(), maxXmlBytes = TNDS_XML_MAX_BYTES }) {
   const files = await walk(input);
   const filesByRegion = new Map();
   for (const file of files) {
@@ -40,9 +76,12 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
   const parsedFileCounts = {};
   const ignoredRegistrationFileCounts = {};
   const shardFiles = new Map();
+  const shardRegionFiles = new Map();
   const serviceIds = new Set();
   const registeredPaths = new Set();
   const work = path.join(output, '.tnds-shards-work');
+  const materialization = { sourceBytes: 0, recordCount: 0, maxRecordBytes: 0, maxBufferedRecordBytes: 0, shardRegionCount: 0 };
+  const xmlByteLimit = Number.isInteger(maxXmlBytes) && maxXmlBytes > 0 ? maxXmlBytes : TNDS_XML_MAX_BYTES;
   let quarantinedPatterns = 0;
   let quarantinedServices = 0;
   await fs.rm(output, { recursive: true, force: true });
@@ -56,8 +95,10 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
     let regionQuarantinedPatterns = 0;
     let regionQuarantinedServices = 0;
     for (const file of regionFiles) {
-      const xml = await fs.readFile(file, 'utf8');
       try {
+        const xmlSize = (await fs.stat(file)).size;
+        if (xmlSize > xmlByteLimit) throw new Error(`XML input is ${xmlSize} bytes; exceeds the bounded ${xmlByteLimit}-byte limit; no data was dropped.`);
+        const xml = await fs.readFile(file, 'utf8');
         const parsed = parseTndsTransXchangeServices(xml, { region, sourceArchive: path.basename(file), preparedAt });
         if (parsed.length) parsedFiles += 1;
         if (parsed.length > 1) console.log(`TNDS ${path.basename(file)}: prepared ${parsed.length} Service records.`);
@@ -83,11 +124,20 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
               patterns: service.tndsQuarantine.patterns.filter(pattern => pattern.affectedStopIds.some(stopId => stopId.startsWith(shardKey))).map(pattern => ({ ...pattern, affectedStopIds: pattern.affectedStopIds.filter(stopId => stopId.startsWith(shardKey)) }))
             } : null;
             const record = { ...service, stopSchedules: scheduled, tndsQuarantine: quarantine?.affectedStopIds.length ? quarantine : null };
-            if (!shardFiles.has(shardKey)) shardFiles.set(shardKey, { file: path.join(work, `${shardKey}.jsonl`), identities: new Set() });
+            if (!shardFiles.has(shardKey)) shardFiles.set(shardKey, { identities: new Set() });
             const shard = shardFiles.get(shardKey);
             if (shard.identities.has(record.id)) throw new Error(`TNDS prepared service ${record.id} was duplicated in shard ${shardKey}.`);
             shard.identities.add(record.id);
-            await fs.appendFile(shard.file, `${JSON.stringify(record)}\n`);
+            const shardRegionKey = `${shardKey}\u0000${region}`;
+            if (!shardRegionFiles.has(shardRegionKey)) shardRegionFiles.set(shardRegionKey, { file: path.join(work, `${shardKey}-${region}.jsonl`), entries: [], bytes: 0 });
+            const shardRegion = shardRegionFiles.get(shardRegionKey);
+            const serialized = Buffer.from(`${JSON.stringify(record)}\n`);
+            shardRegion.entries.push({ id: record.id, offset: shardRegion.bytes, byteLength: serialized.byteLength });
+            shardRegion.bytes += serialized.byteLength;
+            materialization.sourceBytes += serialized.byteLength;
+            materialization.recordCount += 1;
+            materialization.maxRecordBytes = Math.max(materialization.maxRecordBytes, serialized.byteLength);
+            await fs.appendFile(shardRegion.file, serialized);
           }
         }
       } catch (error) {
@@ -111,24 +161,15 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
   if (!serviceIds.size) throw new Error('TNDS preparation produced no services.');
   const regionServiceCounts = Object.fromEntries([...regionServiceIds.entries()].map(([region, ids]) => [region, ids.size]));
   const serviceShards = {};
-  for (const shardKey of [...shardFiles.keys()].sort()) {
-    const byRegion = new Map();
-    const lines = (await fs.readFile(shardFiles.get(shardKey).file, 'utf8')).trim().split('\n').filter(Boolean);
-    for (const line of lines) {
-      const service = JSON.parse(line);
-      const region = service.source.region.toLowerCase();
-      if (!byRegion.has(region)) byRegion.set(region, []);
-      byRegion.get(region).push(service);
-    }
-    for (const [region, records] of byRegion) {
-      const relative = `services/${shardKey}-${region}.json.gz`;
-      if (registeredPaths.has(relative) || await fs.access(path.join(output, relative)).then(() => true, () => false)) throw new Error(`TNDS prepared output collision ${relative}.`);
-      registeredPaths.add(relative);
-      const payload = { schema: 'atlas-prepared-bus-tnds-v1', region: region.toUpperCase(), stopPrefix: shardKey, services: records.sort((left, right) => left.id.localeCompare(right.id)) };
-      await fs.writeFile(path.join(output, relative), gzipSync(`${JSON.stringify(payload)}\n`), { flag: 'wx' });
-      if (!serviceShards[shardKey]) serviceShards[shardKey] = [];
-      serviceShards[shardKey].push(relative);
-    }
+  for (const [shardRegionKey, shardRegion] of [...shardRegionFiles.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+    const [shardKey, region] = shardRegionKey.split('\u0000');
+    const relative = `services/${shardKey}-${region.toLowerCase()}.json.gz`;
+    if (registeredPaths.has(relative) || await fs.access(path.join(output, relative)).then(() => true, () => false)) throw new Error(`TNDS prepared output collision ${relative}.`);
+    registeredPaths.add(relative);
+    await materializeShardRegion({ sourceFile: shardRegion.file, outputFile: path.join(output, relative), shardKey, region, entries: shardRegion.entries, stats: materialization });
+    materialization.shardRegionCount += 1;
+    if (!serviceShards[shardKey]) serviceShards[shardKey] = [];
+    serviceShards[shardKey].push(relative);
   }
   await fs.rm(work, { recursive: true, force: true });
   await fs.writeFile(path.join(output, 'manifest.json'), `${JSON.stringify({
@@ -147,7 +188,7 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
     serviceShardKeyLength: TNDS_SERVICE_SHARD_KEY_LENGTH,
     serviceShards
   })}\n`);
-  return { services: serviceIds.size, shards: Object.values(serviceShards).flat().length, expectedRegions: [...TNDS_REGIONS], regions: processedRegions, regionServiceCounts, sourceFileCounts, parsedFileCounts, ignoredRegistrationFileCounts, quarantinedPatterns, quarantinedServices };
+  return { services: serviceIds.size, shards: Object.values(serviceShards).flat().length, expectedRegions: [...TNDS_REGIONS], regions: processedRegions, regionServiceCounts, sourceFileCounts, parsedFileCounts, ignoredRegistrationFileCounts, quarantinedPatterns, quarantinedServices, materialization };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

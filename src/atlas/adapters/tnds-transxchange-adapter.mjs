@@ -3,6 +3,21 @@ import { hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
 import { calendarProfilesMutuallyExclusive, calendarQualificationNotes, createServiceCalendarEvidence } from '../domain/service-calendar.mjs';
 
 const DAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
+const DAY_GROUPS = Object.freeze({
+  MondayToSunday: DAYS,
+  MondayToSaturday: DAYS.slice(0, 6),
+  MondayToFriday: DAYS.slice(0, 5),
+  Weekend: DAYS.slice(5)
+});
+const NEGATED_DAY_GROUPS = Object.freeze({
+  NotMonday: ['monday'],
+  NotTuesday: ['tuesday'],
+  NotWednesday: ['wednesday'],
+  NotThursday: ['thursday'],
+  NotFriday: ['friday'],
+  NotSaturday: ['saturday'],
+  NotSunday: ['sunday']
+});
 
 function text(value) { return String(value ?? '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').trim(); }
 function first(source, tag, fallback = '') {
@@ -17,17 +32,37 @@ function seconds(value) { const match = text(value).match(/^P(?:(\d+)D)?T(?:(\d+
 const DAY_ALIASES = Object.freeze({ monday: 'monday', mon: 'monday', tuesday: 'tuesday', tue: 'tuesday', tues: 'tuesday', wednesday: 'wednesday', wed: 'wednesday', thursday: 'thursday', thu: 'thursday', thur: 'thursday', thurs: 'thursday', friday: 'friday', fri: 'friday', saturday: 'saturday', sat: 'saturday', sunday: 'sunday', sun: 'sunday' });
 function dayTokens(value) { return [...new Set(normaliseCalendarText(value).split(/\s+/).map(token => DAY_ALIASES[token]).filter(Boolean))]; }
 function normaliseCalendarText(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
-function enabledTag(block, tag) { return new RegExp(`<${tag}(?:\\s[^>]*)?>\\s*(?:true|1|yes)\\s*</${tag}>`, 'i').test(block); }
+function tagMatches(block, tag) {
+  const pattern = new RegExp(`<${tag}\\b(?:[^>]*)>([\\s\\S]*?)</${tag}\\s*>|<${tag}\\b[^>]*/>`, 'gi');
+  return [...String(block ?? '').matchAll(pattern)].map(match => ({ value: match[1] ?? '', selfClosing: !match[1] && /\/>\s*$/.test(match[0]) }));
+}
+function enabledTag(block, tag) {
+  return tagMatches(block, tag).some(match => {
+    const value = text(match.value);
+    return match.selfClosing || !value || /^(?:true|1|yes)$/i.test(value);
+  });
+}
+function enabledDescriptiveTag(block, tag) {
+  return tagMatches(block, tag).some(match => {
+    const value = text(match.value);
+    return match.selfClosing || !value || (!/^(?:false|0|no)$/i.test(value) && Boolean(value));
+  });
+}
 function firstTagValue(block, tag) { return first(blocks(block, tag)[0] || '', tag); }
 
 function parseOperatingProfile(block, { sourceLabel = null, precedence = null } = {}) {
   const raw = text(block);
   const value = normaliseCalendarText(raw);
   const days = new Set();
-  if (enabledTag(block, 'MondayToSunday') || /monday to sunday/.test(value)) DAYS.forEach(day => days.add(day));
-  if (enabledTag(block, 'MondayToSaturday') || /monday to saturday/.test(value)) DAYS.slice(0, 6).forEach(day => days.add(day));
-  if (enabledTag(block, 'MondayToFriday') || /monday to friday|weekdays?/.test(value)) DAYS.slice(0, 5).forEach(day => days.add(day));
+  for (const [tag, group] of Object.entries(DAY_GROUPS)) if (enabledTag(block, tag)) group.forEach(day => days.add(day));
+  if (/monday to sunday/.test(value)) DAYS.forEach(day => days.add(day));
+  if (/monday to saturday/.test(value)) DAYS.slice(0, 6).forEach(day => days.add(day));
+  if (/monday to friday|weekdays?/.test(value)) DAYS.slice(0, 5).forEach(day => days.add(day));
   for (const day of DAYS) if (enabledTag(block, day)) days.add(day);
+  for (const [tag, excluded] of Object.entries(NEGATED_DAY_GROUPS)) if (enabledTag(block, tag)) {
+    DAYS.forEach(day => days.add(day));
+    excluded.forEach(day => days.delete(day));
+  }
   for (const field of ['DaysOfOperation', 'OperatingDays', 'DaysOfWeek']) {
     for (const day of dayTokens(firstTagValue(block, field))) days.add(day);
   }
@@ -37,12 +72,14 @@ function parseOperatingProfile(block, { sourceLabel = null, precedence = null } 
   }
   for (const day of nonOperationDays) days.delete(day);
   const dayType = firstTagValue(block, 'ServicedOrganisationDayType') || firstTagValue(block, 'DayType') || firstTagValue(block, 'ServiceDayType');
-  const qualificationRefs = ['TermTime', 'TermTimeOnly', 'TermTimeOperation', 'SchoolDays', 'SchoolDaysOnly', 'HolidayOnly', 'SchoolHoliday'].flatMap(tag => firstTagValue(block, tag)).join(' ');
-  const semantics = [normaliseCalendarText(dayType), normaliseCalendarText(qualificationRefs), value].filter(Boolean).join(' ');
+  const qualificationTags = ['TermTime', 'TermTimeOnly', 'TermTimeOperation', 'SchoolDays', 'SchoolDaysOnly', 'HolidayOnly', 'HolidaysOnly', 'SchoolHoliday'];
+  const qualificationRefs = qualificationTags.filter(tag => enabledDescriptiveTag(block, tag)).join(' ');
+  const rawText = normaliseCalendarText(raw.replace(/<[^>]+>/g, ' '));
+  const semantics = [normaliseCalendarText(dayType), normaliseCalendarText(qualificationRefs), rawText].filter(Boolean).join(' ');
   const schoolDayOnly = /school\s*days?|schooldays?|school\s*term/.test(semantics) && !/non\s*school|nonschool|holiday/.test(semantics);
   const termTimeOnly = /term\s*time|termtime|term\s*only|termonly/.test(semantics);
   const nonSchoolDayOnly = /non\s*school|nonschool|school\s*holiday|schoolholiday|holiday\s*only|holidayonly/.test(semantics);
-  const holidayOnly = /holiday\s*only|holidayonly|school\s*holiday|schoolholiday/.test(semantics);
+  const holidayOnly = /holiday\s*only|holidayonly|holidaysonly|school\s*holiday|schoolholiday/.test(semantics);
   const specialFields = ['SpecialDaysOperation', 'BankHolidaysOperation', 'OperatingProfileSpecialDay'].filter(field => blocks(block, field).length || new RegExp(`<${field}(?:\\s[^>]*)?\\s*/>`, 'i').test(block));
   const dateExceptions = [...blocks(block, 'SpecialDay').map(value => text(value.replace(/<[^>]+>/g, ''))), ...blocks(block, 'DateException').map(value => text(value.replace(/<[^>]+>/g, '')))].filter(Boolean);
   const complex = Boolean(specialFields.length) && !days.size;

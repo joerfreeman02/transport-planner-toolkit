@@ -7,7 +7,7 @@ import gzip
 import json
 from pathlib import Path
 
-from refresh_bus_data import RefreshError, TNDS_REGIONS, candidate_metrics
+from refresh_bus_data import RefreshError, TNDS_REGIONS, candidate_metrics, validate_tnds_region_coverage
 
 KNOWN_TNDS_QUARANTINE_REASONS = {"incomplete_runtime_sequence", "missing_timing_links"}
 
@@ -66,18 +66,19 @@ def validate(site: Path) -> dict:
         raise RefreshError("Candidate NaPTAN/BODS manifest schema is invalid")
     if tnds_manifest.get("schema") != "atlas-prepared-bus-tnds-v1":
         raise RefreshError("Candidate TNDS manifest schema is invalid")
-    if "services" in tnds_manifest or tnds_manifest.get("serviceShardKeyLength") != 5:
+    if "services" in tnds_manifest:
+        raise RefreshError("Candidate TNDS manifest contains obsolete inline services; expected five-character stop-prefix service shards")
+    if tnds_manifest.get("serviceShardKeyLength") != 5:
         raise RefreshError("Candidate TNDS manifest must use five-character stop-prefix service shards")
     service_shards = tnds_manifest.get("serviceShards")
     if not isinstance(service_shards, dict) or not service_shards:
         raise RefreshError("Candidate TNDS serviceShards are missing or malformed")
+    validate_tnds_region_coverage(tnds_manifest)
     metrics = candidate_metrics(site)
     if metrics["naptanStopCount"] < 1000 or metrics["bodsServiceCount"] < 1000:
         raise RefreshError("Candidate is below the expected national stop/service scale")
     if metrics["bodsRegionCount"] < 8:
         raise RefreshError("Candidate BODS regional coverage is incomplete")
-    if set(tnds_manifest.get("regions", [])) != set(TNDS_REGIONS):
-        raise RefreshError("Candidate TNDS regional coverage is incomplete")
     stop_ids = set()
     for relative in bus_manifest.get("stopShards", {}).values():
         payload = read_json(bus / relative)

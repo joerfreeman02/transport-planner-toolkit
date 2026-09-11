@@ -178,9 +178,9 @@ class RefreshTests(unittest.TestCase):
         (bus / 'services.json.gz').write_bytes(b'candidate')
         (tnds / 'service.json').write_text('{}')
         (bus / 'manifest.json').write_text(json.dumps({'stopShards': {'x': 'stops.json.gz'}, 'serviceShards': {'x': ['services.json.gz']}, 'sources': {'naptan': {'stopCount': 100}, 'bods': {'regions': [{'serviceCount': 100}]}}}))
-        (tnds.parent / 'manifest.json').write_text(json.dumps({'regions': list(TNDS_REGIONS), 'serviceCount': 1, 'serviceShardKeyLength': 5, 'serviceShards': {'x': ['services/service.json']}}))
+        (tnds.parent / 'manifest.json').write_text(json.dumps({'regions': list(TNDS_REGIONS), 'regionServiceCounts': {region: 1 for region in TNDS_REGIONS}, 'serviceCount': 8, 'serviceShardKeyLength': 5, 'serviceShards': {'x': ['services/service.json']}}))
         counts = validate_candidate(site)
-        self.assertEqual(counts['tndsServiceCount'], 1)
+        self.assertEqual(counts['tndsServiceCount'], 8)
 
     def _write_candidate(self, naptan=100, services=100, regions=2):
         site = self.root
@@ -193,7 +193,7 @@ class RefreshTests(unittest.TestCase):
         (tnds / 'service.json').write_text('{}')
         bods_regions = [{'serviceCount': services // regions} for _ in range(regions)]
         (bus / 'manifest.json').write_text(json.dumps({'stopShards': {'x': 'stops.json.gz'}, 'serviceShards': {'x': ['services.json.gz']}, 'sources': {'naptan': {'stopCount': naptan}, 'bods': {'regions': bods_regions}}}))
-        (tnds.parent / 'manifest.json').write_text(json.dumps({'regions': list(TNDS_REGIONS), 'serviceCount': 1, 'serviceShardKeyLength': 5, 'serviceShards': {'x': ['services/service.json']}}))
+        (tnds.parent / 'manifest.json').write_text(json.dumps({'regions': list(TNDS_REGIONS), 'regionServiceCounts': {region: 1 for region in TNDS_REGIONS}, 'serviceCount': 8, 'serviceShardKeyLength': 5, 'serviceShards': {'x': ['services/service.json']}}))
 
     def test_modest_change_passes_and_severe_naptan_collapse_fails(self):
         self._write_candidate(naptan=90, services=90)
@@ -209,6 +209,52 @@ class RefreshTests(unittest.TestCase):
         self._write_candidate(naptan=100, services=100, regions=1)
         with self.assertRaisesRegex(RefreshError, 'BODS region count'):
             validate_candidate(self.root, {'naptanStopCount': 100, 'bodsServiceCount': 100, 'bodsRegionCount': 2})
+
+    def test_tnds_region_coverage_failure_identifies_expected_and_received_regions(self):
+        self._write_candidate(naptan=100, services=100)
+        manifest = self.root / 'atlas/data/bus-tnds/manifest.json'
+        payload = json.loads(manifest.read_text())
+        payload['regions'] = ['EM', 'NE', 'SE']
+        manifest.write_text(json.dumps(payload))
+        with self.assertRaisesRegex(RefreshError, r'expected EA, EM, NE, NW, SE, SW, WM, Y; received EM, NE, SE'):
+            validate_candidate(self.root)
+
+    def _set_tnds_coverage(self, counts, regions=None):
+        manifest = self.root / 'atlas/data/bus-tnds/manifest.json'
+        if not manifest.exists():
+            self._write_candidate()
+        payload = json.loads(manifest.read_text())
+        payload['regionServiceCounts'] = counts
+        payload['serviceCount'] = sum(counts.values())
+        if regions is not None:
+            payload['regions'] = regions
+        manifest.write_text(json.dumps(payload))
+
+    def test_tnds_regional_retained_coverage_healthy(self):
+        counts = {region: 100 for region in TNDS_REGIONS}
+        self._set_tnds_coverage(counts)
+        self.assertEqual(validate_candidate(self.root)['tndsServiceCount'], 800)
+
+    def test_tnds_zero_retained_region_fails_even_above_national_collapse_threshold(self):
+        counts = {region: 100 for region in TNDS_REGIONS}
+        counts['SE'] = 0
+        self._set_tnds_coverage(counts)
+        with self.assertRaisesRegex(RefreshError, 'retained no services for region SE'):
+            validate_candidate(self.root, {'tndsServiceCount': 1000})
+
+    def test_tnds_missing_region_count_fails(self):
+        counts = {region: 100 for region in TNDS_REGIONS}
+        del counts['NW']
+        self._set_tnds_coverage(counts)
+        with self.assertRaisesRegex(RefreshError, 'regionServiceCounts missing region NW'):
+            validate_candidate(self.root)
+
+    def test_tnds_malformed_region_count_fails(self):
+        counts = {region: 100 for region in TNDS_REGIONS}
+        counts['EA'] = -1
+        self._set_tnds_coverage(counts)
+        with self.assertRaisesRegex(RefreshError, 'regionServiceCounts for region EA is malformed'):
+            validate_candidate(self.root)
 
     def test_source_status_states_and_initial_baseline(self):
         self.assertEqual(source_outcome('hash-a', None), ('UPDATED', 'INITIAL AUTOMATED BASELINE'))

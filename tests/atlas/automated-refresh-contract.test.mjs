@@ -14,7 +14,7 @@ const tndsPreparation = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/pr
 const freshness = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/refresh-freshness.mjs'), 'utf8');
 
 assert.equal(release.version, '2.0.0-alpha.13');
-assert.equal(release.build, 'ATLAS-2.0.0-alpha.13-20260910');
+assert.equal(release.build, 'ATLAS-2.0.0-alpha.13-20260911');
 assert.match(html, new RegExp(release.version.replaceAll('.', '\\.') ));
 assert.match(html, new RegExp(release.build.replaceAll('.', '\\.') ));
 assert.match(html, /id="updateBusData"[^>]*hidden/);

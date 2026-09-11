@@ -9,7 +9,7 @@ import {
 } from './bus-service-assessment.mjs';
 import { calendarProfileLabel, calendarProfilesMutuallyExclusive } from './service-calendar.mjs';
 
-export const PLANNER_METHODOLOGY_NOTE = 'Typical frequencies and operating periods are derived from one de-duplicated scheduled-departure population at the representative stop. Additional timetable variants may operate; detailed source evidence is available under Show detailed evidence.';
+export const PLANNER_METHODOLOGY_NOTE = 'Typical frequencies and operating periods are derived from one de-duplicated scheduled-departure population at the representative stop. Additional timetable variants may operate. Detailed source evidence is retained within the ATLAS assessment workspace.';
 
 function text(value) { return String(value ?? '').trim(); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }

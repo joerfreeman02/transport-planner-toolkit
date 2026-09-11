@@ -23,6 +23,7 @@ assert.match(app, /This assessment may require staged TfL requests/);
 assert.match(app, /createTflRequestScheduler/);
 assert.match(app, /requestScheduler: tflRequestScheduler/);
 assert.match(app, /detailedEvidenceVisible/);
+assert.match(app, /Show detailed evidence/);
 assert.match(app, /The assessment radius changed\. Build the Bus assessment again to update the evidence\./);
 assert.match(app, /pendingScopeDiscovery/);
 assert.match(app, /discoveryOverride/);

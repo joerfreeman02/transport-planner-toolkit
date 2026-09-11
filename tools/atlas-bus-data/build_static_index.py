@@ -48,6 +48,45 @@ def clean(value: object) -> str:
     return str(value or "").strip()
 
 
+GENERIC_ENDPOINT_NAMES = frozenset({
+    "airport",
+    "bus station",
+    "city centre",
+    "coach station",
+    "high street",
+    "hospital",
+    "interchange",
+    "rail station",
+    "railway station",
+    "shopping centre",
+    "station",
+    "town centre",
+})
+
+
+def circular_identity(calls: list[dict]) -> bool:
+    """Classify a loop only from authoritative endpoint identity or strong fallback evidence."""
+    if not calls:
+        return False
+    first, last = calls[0], calls[-1]
+    first_id = clean(first.get("stop_id"))
+    last_id = clean(last.get("stop_id"))
+    if first_id or last_id:
+        return bool(first_id and last_id and first_id == last_id)
+    first_name = clean(first.get("name"))
+    last_name = clean(last.get("name"))
+    first_locality = clean(first.get("locality"))
+    last_locality = clean(last.get("locality"))
+    normal_name = first_name.casefold()
+    return bool(
+        first_name
+        and normal_name == last_name.casefold()
+        and normal_name not in GENERIC_ENDPOINT_NAMES
+        and first_locality
+        and first_locality.casefold() == last_locality.casefold()
+    )
+
+
 def compact_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = (json.dumps(value, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
@@ -324,7 +363,7 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
     agency = clean(agencies.get(clean(route.get("agency_id")))) or "Operator not supplied in the timetable"
     first_name = clean(calls[0].get("name"))
     last_name = clean(calls[-1].get("name"))
-    circular = clean(calls[0].get("stop_id")) == clean(calls[-1].get("stop_id")) or first_name.lower() == last_name.lower()
+    circular = circular_identity(calls)
     record = services.get(service_id)
     if not record:
         record = {
@@ -333,6 +372,8 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             "operator": agency,
             "origin": first_name,
             "destination": last_name,
+            "originStopPointId": clean(calls[0].get("stop_id")) or None,
+            "destinationStopPointId": clean(calls[-1].get("stop_id")) or None,
             "direction": clean(trip.get("trip_headsign")) or (f"towards {last_name}" if last_name else ""),
             "circular": circular,
             "principalLocations": principal_locations(calls),

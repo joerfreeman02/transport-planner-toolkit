@@ -7,6 +7,7 @@ import {
   formatTypicalFrequency,
   formatServiceOriginDestination
 } from './bus-service-assessment.mjs';
+import { calendarProfileLabel, calendarProfilesMutuallyExclusive } from './service-calendar.mjs';
 
 export const PLANNER_METHODOLOGY_NOTE = 'Typical frequencies and operating periods are derived from one de-duplicated scheduled-departure population at the representative stop. Additional timetable variants may operate; detailed source evidence is available under Show detailed evidence.';
 
@@ -64,6 +65,7 @@ function provenPatternRelationship(first, second) {
 }
 
 function compatibleDirection(first, second) {
+  if (calendarProfilesMutuallyExclusive(first, second)) return false;
   const leftMarker = explicitDirectionMarker(first);
   const rightMarker = explicitDirectionMarker(second);
   if (leftMarker && rightMarker) return leftMarker === rightMarker && provenPatternRelationship(first, second);
@@ -130,7 +132,7 @@ function serviceDepartureEntries(service, representativeId) {
 }
 
 function semanticDepartureKey(entry) {
-  return [entry.routeNumber, entry.direction, entry.origin, entry.destination, entry.stopPointId, entry.day, entry.minute].map(normal).join('|');
+  return [entry.routeNumber, entry.direction, entry.origin, entry.destination, entry.stopPointId, entry.day, entry.minute, entry.calendarProfileId].map(normal).join('|');
 }
 
 function deduplicateDepartureEntries(entries) {
@@ -142,7 +144,7 @@ function deduplicateDepartureEntries(entries) {
     const semantic = semanticDepartureKey(entry);
     const existing = bySemantic.get(semantic) ?? [];
     const identity = departureIdentity(entry);
-    const strongKey = identity ? [entry.routeNumber, identity, entry.stopPointId, entry.day, entry.minute].map(normal).join('|') : null;
+    const strongKey = identity ? [entry.routeNumber, identity, entry.stopPointId, entry.day, entry.minute, entry.calendarProfileId].map(normal).join('|') : null;
     const provider = normal(entry.provider) || 'provider-unspecified';
     const identityEntries = strongKey ? (byStrongIdentity.get(strongKey) ?? []) : [];
     const duplicate = strongKey
@@ -227,6 +229,7 @@ function servedAtText(representative) {
 function materialServiceNote(note) {
   const value = text(note);
   if (!value) return null;
+  if (/school[- ]?days?.*non[- ]school|non[- ]school.*school[- ]?days?/i.test(value)) return 'Timetable varies between school and non-school days.';
   if (/non[- ]school|school holidays?/i.test(value)) return 'Non-school days only.';
   if (/school[- ]?days?(?:[- ]only)?|schooldays?/i.test(value)) return 'School days only.';
   if (/term[- ]time|term[- ]only/i.test(value)) return 'Term-time service.';
@@ -240,7 +243,7 @@ function noteAppliesToCanonicalPopulation(note, schedules) {
   const representedDays = DAY_ORDER.filter(day => (schedules[day] ?? []).length);
   if (/limited service|no more than three scheduled journeys/i.test(note)) return representedDays.length > 0 && representedDays.every(day => (schedules[day] ?? []).length <= 3);
   if (/weekday-only service/i.test(note)) return representedDays.length > 0 && !representedDays.some(day => day === 'saturday' || day === 'sunday');
-  if (/school\s*days?/i.test(note) && representedDays.some(day => day === 'saturday' || day === 'sunday')) return false;
+  if (!/non[- ]school/i.test(note) && /school\s*days?/i.test(note) && representedDays.some(day => day === 'saturday' || day === 'sunday')) return false;
   return true;
 }
 
@@ -273,6 +276,11 @@ function principalText(main) {
   return locations.length ? locations.join(', ') : 'See route origin / destination';
 }
 
+function profileLines(lines, profileLabel) {
+  if (!profileLabel) return lines;
+  return lines.map(line => line.replace(/^([^:]+):\s*/, `$1 (${profileLabel}): `));
+}
+
 function buildPlannerRow(component, stops, componentIndex) {
   const representative = selectRepresentativeStop(component, stops);
   const main = [...component].sort((first, second) => compareMain(first, second, representative.id))[0];
@@ -281,6 +289,8 @@ function buildPlannerRow(component, stops, componentIndex) {
   const calculationEvidence = canonical.eligible.length <= 1 || canonical.eligible.every(service => (service.frequencyEvidence ?? []).some(item => !item.stopPointId || text(item.stopPointId) === representative.id)) ? evidence : [];
   const periods = calculateOperatingPeriods(canonical.schedules);
   const frequencyByDay = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, calculateTypicalServiceFrequency(canonical.schedules[day], { day, frequencyEvidence: calculationEvidence })])));
+  const calendarProfileId = unique(component.map(service => text(service.calendarProfileId || service.source?.calendarProfileId))).find(Boolean) || null;
+  const calendarProfile = calendarProfileLabel(calendarProfileId);
     const notes = unique(component.flatMap(service => text(service.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean))).filter(note => noteAppliesToCanonicalPopulation(note, canonical.schedules));
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
   const principalLocations = unique(main.principalLocations ?? []);
@@ -293,6 +303,8 @@ function buildPlannerRow(component, stops, componentIndex) {
     direction: text(main.direction),
     stopDirection: text(main.stopDirection) || null,
     circular: Boolean(main.circular),
+    calendarProfileId,
+    calendarProfileLabel: calendarProfile,
     directionFamily: directionKey(main),
     directionPatternText: directionPatternText(main),
     servedAtStopId: representative.id,
@@ -302,11 +314,11 @@ function buildPlannerRow(component, stops, componentIndex) {
     principalLocations: Object.freeze(principalLocations),
     principalLocationsText: principalText(main),
     typicalFrequency: frequencyByDay[DAY_ORDER.find(day => !frequencyByDay[day].noService) ?? 'monday'],
-    typicalFrequencyLines: Object.freeze(formatTypicalFrequency(frequencyByDay)),
-    typicalFrequencyText: formatTypicalFrequency(frequencyByDay).join('\n'),
+    typicalFrequencyLines: Object.freeze(profileLines(formatTypicalFrequency(frequencyByDay), calendarProfile)),
+    typicalFrequencyText: profileLines(formatTypicalFrequency(frequencyByDay), calendarProfile).join('\n'),
     frequencyByDay,
     operatingPeriods: periods,
-    operatingPeriodLines: Object.freeze(formatOperatingPeriod(periods)),
+    operatingPeriodLines: Object.freeze(profileLines(formatOperatingPeriod(periods), calendarProfile)),
     departuresByDay: Object.freeze(canonical.schedules),
     canonicalDeparturePopulation: Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, Object.freeze(canonical.entries.filter(entry => entry.day === day))]))),
     frequencyEvidence: Object.freeze(evidence),

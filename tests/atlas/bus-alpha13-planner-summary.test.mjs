@@ -48,6 +48,8 @@ assert.equal(formatAtlasTaskStatus({ phase: 'checking-timetables', completed: 12
 assert.match(formatAtlasTaskStatus({ phase: 'checking-timetables', waiting: true }), /Waiting briefly/);
 assert.equal(formatAtlasTaskStatus({ phase: 'complete' }), 'Complete');
 assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: 'one source was unavailable' }), 'Assessment finished — one source was unavailable');
+assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '1 evidence item needs review' }), 'Assessment finished — 1 evidence item needs review');
+assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '2 evidence items need review' }), 'Assessment finished — 2 evidence items need review');
 assert.equal(formatAtlasTaskStatus({ phase: 'unavailable' }), 'Assessment unavailable');
 
 const statusMessage = { textContent: '' };

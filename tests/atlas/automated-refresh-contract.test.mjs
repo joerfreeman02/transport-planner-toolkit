@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const html = fs.readFileSync(path.join(root, 'atlas/index.html'), 'utf8');
+const release = JSON.parse(fs.readFileSync(path.join(root, 'atlas/config/atlas-release.json'), 'utf8'));
 const app = fs.readFileSync(path.join(root, 'atlas/assets/js/app.mjs'), 'utf8');
 const workflow = fs.readFileSync(path.join(root, '.github/workflows/atlas-bus-data-refresh.yml'), 'utf8');
 const refresh = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/refresh_bus_data.py'), 'utf8');
@@ -12,8 +13,10 @@ const builder = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/build_stat
 const tndsPreparation = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/prepare_tnds.mjs'), 'utf8');
 const freshness = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/refresh-freshness.mjs'), 'utf8');
 
-assert.match(html, /2\.0\.0-alpha\.13/);
-assert.match(html, /ATLAS-2\.0\.0-alpha\.13-20260910/);
+assert.equal(release.version, '2.0.0-alpha.13');
+assert.equal(release.build, 'ATLAS-2.0.0-alpha.13-20260910');
+assert.match(html, new RegExp(release.version.replaceAll('.', '\\.') ));
+assert.match(html, new RegExp(release.build.replaceAll('.', '\\.') ));
 assert.match(html, /id="updateBusData"[^>]*hidden/);
 assert.match(app, /localMaintenance/);
 assert.match(app, /Bus data updates automatically/);
@@ -38,9 +41,10 @@ assert.match(refresh, /TNDS_PASSWORD/);
 assert.match(refresh, /set\(TNDS_REGIONS\)/);
 assert.match(refresh, /atlas-bus-refresh-staging/);
 assert.match(refresh, /previous_root/);
+assert.match(refresh, /site\s*\/\s*"atlas"\s*\/\s*"config"\s*\/\s*"atlas-release\.json"/);
+assert.doesNotMatch(refresh, /2\.0\.0-alpha\.7|ATLAS-2\.0\.0-alpha\.7-20260907/);
 assert.match(tndsPreparation, /serviceShards/);
 assert.match(refresh, /INITIAL AUTOMATED BASELINE/);
-assert.match(refresh, /2\.0\.0-alpha\.7/);
 assert.match(refresh, /timetable\/download\/gtfs-file\//);
 assert.match(refresh, /east_anglia.*east_midlands.*london.*north_east.*north_west.*south_east.*south_west.*west_midlands.*yorkshire/s);
 assert.match(builder, /timetable\/download\/gtfs-file\//);

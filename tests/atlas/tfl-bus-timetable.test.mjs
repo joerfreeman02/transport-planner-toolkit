@@ -4,6 +4,7 @@ import { createTflBusTimetableAdapter, parseTflPeriodCalendar } from '../../src/
 import { createAuthoritativeBusTimetableAdapter } from '../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
 import { createPreparedBusDataAdapter } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { buildServiceSummaries, calculateOperatingPeriods, formatOperatingPeriod } from '../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildPlannerBusServiceSummaries } from '../../src/atlas/domain/bus-planner-summary.mjs';
 import { createJsonCache, createMemoryStorage } from '../../src/atlas/infrastructure/cache.mjs';
 import { createTflRequestScheduler } from '../../src/atlas/adapters/tfl-request-scheduler.mjs';
 
@@ -35,6 +36,30 @@ assert.deepEqual(parseTflPeriodCalendar('Friday Night/Saturday Morning').days, [
 assert.deepEqual(parseTflPeriodCalendar('Saturday Night/Sunday Morning').days, ['saturday']);
 assert.deepEqual(parseTflPeriodCalendar('Mo-Th Nights/Tu-Fr Morning').days, ['monday', 'tuesday', 'wednesday', 'thursday']);
 assert.equal(parseTflPeriodCalendar('').calendarResolved, false);
+
+const mixedCalendarFixture = {
+  lineId: 'MIX', lineName: 'MIX', direction: 'outbound',
+  stations: [{ id: 'MIX-STOP', name: 'Mixed stop' }, { id: 'MIX-END', name: 'Mixed terminus' }],
+  timetable: {
+    departureStopId: 'MIX-STOP',
+    routes: [{ stationIntervals: [{ id: 'mix-pattern', intervals: [{ stopId: 'MIX-STOP', timeToArrival: 0 }, { stopId: 'MIX-END', timeToArrival: 10 }] }], schedules: [
+      { name: 'Schooldays', knownJourneys: [{ vehicleJourneyId: 'mix-school', intervalId: 'mix-pattern', departureTime: { hour: 7, minute: 0 } }] },
+      { name: 'Non-Schooldays', knownJourneys: [{ vehicleJourneyId: 'mix-nonschool', intervalId: 'mix-pattern', departureTime: { hour: 7, minute: 30 } }] }
+    ] }]
+  }
+};
+const mixedCalendarMetadata = { ok: true, data: [{ id: 'MIX', routeSections: [{ direction: 'outbound', originationName: 'Mixed origin', destinationName: 'Mixed terminus' }] }] };
+const mixedCalendarTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async () => response(mixedCalendarFixture) });
+const mixedCalendarResult = await mixedCalendarTfl.servicesForStop({ lineId: 'MIX', stopPointId: 'MIX-STOP', routeMetadata: mixedCalendarMetadata });
+assert.equal(mixedCalendarResult.data.length, 2, 'mutually exclusive TfL calendar profiles remain separate records');
+assert.deepEqual(mixedCalendarResult.data.map(service => service.calendarProfileId).sort(), ['non-school-day', 'school-day']);
+assert.deepEqual(mixedCalendarResult.data.map(service => service.stopSchedules['MIX-STOP'].monday).sort((a, b) => a[0] - b[0]), [[420], [450]], 'TfL school and non-school schedules are not unioned');
+const mixedCalendarSummaries = buildServiceSummaries([{ id: 'MIX-STOP', name: 'Mixed stop', walking: { status: 'routed', distanceMetres: 100 } }], mixedCalendarResult.data);
+const mixedCalendarPlanner = buildPlannerBusServiceSummaries(mixedCalendarSummaries, [{ id: 'MIX-STOP', name: 'Mixed stop', walking: { status: 'routed', distanceMetres: 100 } }]);
+assert.equal(mixedCalendarPlanner.length, 2, 'planner keeps mutually exclusive TfL calendar populations separate');
+assert.ok(mixedCalendarPlanner.every(row => row.typicalFrequencyText.includes('(')), 'planner labels split calendar populations');
+assert.ok(mixedCalendarPlanner.some(row => row.typicalFrequencyText.includes('(school days)')));
+assert.ok(mixedCalendarPlanner.some(row => row.typicalFrequencyText.includes('(non-school days)')));
 
 const routeMetadata657 = { ok: true, data: [{ id: '657', routeSections: [
   { id: '657-out', direction: 'outbound', originationName: "Salisbury Hall Sainsbury's", destinationName: "Bancroft's School" },

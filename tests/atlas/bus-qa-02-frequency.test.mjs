@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { buildServiceSummaries, calculateTypicalServiceFrequency, formatTypicalFrequency } from '../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildPlannerBusServiceSummaries } from '../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
 
 const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -118,6 +119,29 @@ const holidayOnly = summaryFor(schedule({ saturday: [420], sunday: [420] }), {
   calendarEvidence: [{ nonSchoolDayOnly: true, holidayOnly: true }]
 });
 assert.match(holidayOnly.serviceNote, /Non-school days only\./);
+
+const schoolOnly = summaryFor(schedule({ monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420] }), {
+  calendarEvidence: [{ schoolDayOnly: true, calendarResolved: true, daysOfWeek: days.slice(0, 5) }]
+});
+assert.equal(schoolOnly.serviceNote, 'School days only.');
+const nonSchoolOnly = summaryFor(schedule({ saturday: [420], sunday: [450] }), {
+  calendarEvidence: [{ nonSchoolDayOnly: true, calendarResolved: true, daysOfWeek: ['saturday', 'sunday'] }]
+});
+assert.equal(nonSchoolOnly.serviceNote, 'Non-school days only.');
+const nonSchoolPlanner = buildPlannerBusServiceSummaries([nonSchoolOnly], [{ id: 'A', name: 'Assessment stop', walking: { status: 'routed', distanceMetres: 100 } }])[0];
+assert.equal(nonSchoolPlanner.serviceNote, 'Non-school days only.', 'non-school qualification remains visible for a weekend-only row');
+const ordinary = summaryFor(schedule({ monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420] }), {
+  calendarEvidence: [{ calendarResolved: true, daysOfWeek: days.slice(0, 5) }]
+});
+assert.equal(ordinary.serviceNote, '', 'ordinary weekday evidence has no school or non-school qualification');
+const mixedQualification = summaryFor(schedule({ monday: [420], saturday: [450] }), {
+  calendarEvidence: [
+    { schoolDayOnly: true, calendarResolved: true, daysOfWeek: days.slice(0, 5) },
+    { nonSchoolDayOnly: true, calendarResolved: true, daysOfWeek: ['saturday', 'sunday'] }
+  ]
+});
+assert.equal(mixedQualification.serviceNote, 'Timetable varies between school and non-school days.');
+assert.doesNotMatch(mixedQualification.serviceNote, /School days only|Non-school days only/);
 
 const html = fs.readFileSync(new URL('../../atlas/index.html', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../../atlas/assets/css/atlas-shell.css', import.meta.url), 'utf8');

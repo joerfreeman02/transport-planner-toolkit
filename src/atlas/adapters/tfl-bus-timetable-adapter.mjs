@@ -3,7 +3,7 @@ import { derivePrincipalLocations } from '../domain/bus-service-assessment.mjs';
 import { requestJson } from '../infrastructure/http-client.mjs';
 import { runCachedSourceQuery, sourceFailure, sourceSuccess } from './source-adapter.mjs';
 import { createTflRequestScheduler } from './tfl-request-scheduler.mjs';
-import { calendarQualificationNotes, createServiceCalendarEvidence } from '../domain/service-calendar.mjs';
+import { calendarProfilesMutuallyExclusive, calendarQualificationNotes, createServiceCalendarEvidence } from '../domain/service-calendar.mjs';
 
 const SOURCE = 'Transport for London Unified API';
 const ATTRIBUTION = 'Scheduled timetable data provided by Transport for London';
@@ -168,6 +168,7 @@ function scheduleForPattern(route, pattern, stopPointId, responseDepartureStopId
   const departureEvidence = Object.fromEntries(DAYS.map(day => [day, []]));
   const frequencyEvidence = [];
   const calendarEvidence = [];
+  const profileBuckets = new Map();
   const schedules = Array.isArray(route?.schedules) ? route.schedules : [];
   let ambiguous = false;
   let evidence = false;
@@ -177,6 +178,17 @@ function scheduleForPattern(route, pattern, stopPointId, responseDepartureStopId
     hasPeriods ||= Array.isArray(schedule?.periods) && schedule.periods.length > 0;
     const calendar = periodCalendar(schedule);
     calendarEvidence.push(calendar);
+    const profileId = calendar.calendarProfileId;
+    if (!profileBuckets.has(profileId)) profileBuckets.set(profileId, {
+      calendarProfileId: profileId,
+      schedule: emptySchedule(),
+      departureEvidence: Object.fromEntries(DAYS.map(day => [day, []])),
+      frequencyEvidence: [],
+      calendarEvidence: [],
+      evidence: false
+    });
+    const profileBucket = profileBuckets.get(profileId);
+    profileBucket.calendarEvidence.push(calendar);
     const journeys = Array.isArray(schedule?.knownJourneys) ? schedule.knownJourneys : [];
     const firstJourney = schedule?.firstJourney && belongsToPattern(schedule.firstJourney, pattern, pattern.count) ? schedule.firstJourney : null;
     const lastJourney = schedule?.lastJourney && belongsToPattern(schedule.lastJourney, pattern, pattern.count) ? schedule.lastJourney : null;
@@ -193,14 +205,19 @@ function scheduleForPattern(route, pattern, stopPointId, responseDepartureStopId
     if (departures.length) evidence = true;
     for (const day of calendar.days) {
       result[day].push(...departures);
-      departureEvidence[day].push(...departureEntries.map((entry, index) => ({
+      const entries = departureEntries.map((entry, index) => ({
         minute: departures[index],
         stopPointId,
         journeyIdentity: journeyIdentity(entry.journey) || null,
         sourceRecordId: null,
         provider: 'TfL',
-        patternIdentity: pattern.sourceId || null
-      })));
+        patternIdentity: pattern.sourceId || null,
+        calendarProfileId: profileId
+      }));
+      departureEvidence[day].push(...entries);
+      profileBucket.schedule[day].push(...departures);
+      profileBucket.departureEvidence[day].push(...entries);
+      profileBucket.evidence ||= departures.length > 0;
     }
     for (const period of Array.isArray(schedule?.periods) ? schedule.periods : []) {
       const lowestFrequency = Number(period?.frequency?.lowestFrequency);
@@ -209,7 +226,8 @@ function scheduleForPattern(route, pattern, stopPointId, responseDepartureStopId
       const toMinute = minutes(period?.toTime);
       const periodType = text(period?.type) || 'Unknown';
       if (!Number.isFinite(lowestFrequency) || !Number.isFinite(highestFrequency)) continue;
-      for (const day of calendar.days) frequencyEvidence.push({
+      for (const day of calendar.days) {
+        const entry = {
         periodType,
         day,
         fromMinute,
@@ -217,15 +235,31 @@ function scheduleForPattern(route, pattern, stopPointId, responseDepartureStopId
         lowestFrequency,
         highestFrequency,
         stopPointId,
-        source: 'TfL'
-      });
+        source: 'TfL',
+        calendarProfileId: profileId
+        };
+        frequencyEvidence.push(entry);
+        profileBucket.frequencyEvidence.push(entry);
+      }
     }
   }
   for (const day of DAYS) {
     result[day] = result[day].map(Number).filter(Number.isFinite).sort((a, b) => a - b);
     departureEvidence[day].sort((a, b) => a.minute - b.minute || text(a.journeyIdentity).localeCompare(text(b.journeyIdentity)));
   }
-  return { schedule: result, departureEvidence, frequencyEvidence, calendarEvidence, evidence, ambiguous, hasPeriods, chronologyIncomplete };
+  const buckets = [...profileBuckets.values()].map(bucket => {
+    for (const day of DAYS) {
+      bucket.schedule[day] = [...new Set(bucket.schedule[day].map(Number).filter(Number.isFinite))].sort((a, b) => a - b);
+      bucket.departureEvidence[day].sort((a, b) => a.minute - b.minute || text(a.journeyIdentity).localeCompare(text(b.journeyIdentity)));
+    }
+    return bucket;
+  });
+  const splitByCalendarProfile = buckets.length > 1
+    && buckets.some((bucket, index) => buckets.slice(index + 1).some(other => calendarProfilesMutuallyExclusive(bucket.calendarEvidence[0], other.calendarEvidence[0])));
+  const profiles = splitByCalendarProfile
+    ? buckets.filter(bucket => bucket.evidence)
+    : [{ calendarProfileId: buckets.length === 1 ? buckets[0].calendarProfileId : null, schedule: result, departureEvidence, frequencyEvidence: frequencyEvidence.map(({ calendarProfileId, ...entry }) => entry), calendarEvidence, evidence }];
+  return { schedule: result, departureEvidence, frequencyEvidence, calendarEvidence, profiles, splitByCalendarProfile, evidence, ambiguous, hasPeriods, chronologyIncomplete };
 }
 
 function sectionsFromMetadata(data, lineId) {
@@ -291,8 +325,9 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         ? 'TfL route metadata did not establish one complete route identity for this timetable pattern. ATLAS retained the scheduled pattern without inventing full origin or destination.'
         : 'TfL route metadata could not be checked. ATLAS retained the scheduled pattern without inventing full origin or destination.');
       const hasPeriods = timing.hasPeriods;
-      services.push({
-        id: `tfl:${lineId}:${normal(direction)}:${normal(pattern.id || `pattern-${index + 1}`)}`,
+      const profileTimings = timing.profiles ?? [{ calendarProfileId: null, schedule: timing.schedule, departureEvidence: timing.departureEvidence, frequencyEvidence: timing.frequencyEvidence, calendarEvidence: timing.calendarEvidence, evidence: timing.evidence }];
+      for (const profileTiming of profileTimings) services.push({
+        id: `tfl:${lineId}:${normal(direction)}:${normal(pattern.id || `pattern-${index + 1}`)}${timing.splitByCalendarProfile ? `:calendar:${normal(profileTiming.calendarProfileId)}` : ''}`,
         routeNumber: lineName || lineId,
         operator: text(route?.operator ?? response?.operator),
         origin: identity?.origin ?? '',
@@ -301,15 +336,16 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         principalLocations: derivePrincipalLocations(pattern.stations),
         routePatternStopIds: pattern.stations.map(station => station.id),
         operatingPeriodEvidence: hasPeriods,
-        stopSchedules: { [stopPointId]: timing.schedule },
-        departureEvidenceByDay: timing.departureEvidence,
-        frequencyEvidence: timing.frequencyEvidence,
-        calendarEvidence: timing.calendarEvidence,
+        stopSchedules: { [stopPointId]: profileTiming.schedule },
+        departureEvidenceByDay: profileTiming.departureEvidence,
+        frequencyEvidence: profileTiming.frequencyEvidence,
+        calendarEvidence: profileTiming.calendarEvidence,
+        calendarProfileId: profileTiming.calendarProfileId,
         frequencyBasisStopId: stopPointId,
-        source: { provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId, routeMetadata: identity ? 'matched' : 'incomplete' },
+        source: { provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId, calendarProfileId: profileTiming.calendarProfileId, routeMetadata: identity ? 'matched' : 'incomplete' },
         timetableSource: 'TfL',
-        serviceNotes: calendarQualificationNotes(timing.calendarEvidence),
-        sourceWarnings: timing.calendarEvidence.filter(calendar => !calendar.resolved).map(calendar => `TfL timetable period "${calendar.rawLabel}" could not be safely mapped to operating days; no unverified days were fabricated.`),
+        serviceNotes: calendarQualificationNotes(profileTiming.calendarEvidence),
+        sourceWarnings: profileTiming.calendarEvidence.filter(calendar => !calendar.resolved).map(calendar => `TfL timetable period "${calendar.rawLabel}" could not be safely mapped to operating days; no unverified days were fabricated.`),
         qualifications: [
           ...(hasPeriods ? ['TfL supplied operating-period/frequency evidence; ATLAS retained only exact scheduled journeys and first/last journey boundaries, without synthesising departures from frequency ranges.'] : []),
           ...(!identity ? ['Full TfL route origin and destination were not deterministically established for this selected-stop timetable pattern.'] : [])

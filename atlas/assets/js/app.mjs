@@ -448,6 +448,10 @@ function reviewItemText(item) {
   return scope ? scope + ': ' + item.message : item.message;
 }
 
+function evidenceReviewText(count) {
+  return `${count} evidence item${count === 1 ? '' : 's'} ${count === 1 ? 'needs' : 'need'} review`;
+}
+
 function renderAssessment(result) {
   currentBusResult = result;
   const presentedServices = Array.isArray(result.plannerServiceSummaries)
@@ -562,10 +566,10 @@ function renderAssessment(result) {
   $('resultSource').textContent = `${stopSource}; ${timetableLabel}; OpenStreetMap routing`;
   $('resultChecked').textContent = checked;
   const reviewItems = result.reviewItems ?? [];
-  $('resultFreshness').textContent = result.status === 'complete' ? 'Assessment complete' : 'Assessment finished — ' + reviewItems.length + ' evidence item' + (reviewItems.length === 1 ? '' : 's') + ' need review';
+  $('resultFreshness').textContent = result.status === 'complete' ? 'Assessment complete' : 'Assessment finished — ' + evidenceReviewText(reviewItems.length);
   const plannerChecks = $('plannerChecks');
   plannerChecks.replaceChildren();
-  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', result.status === 'complete' ? 'Complete for the information shown' : 'Assessment finished — ' + reviewItems.length + ' evidence item' + (reviewItems.length === 1 ? '' : 's') + ' need review']]) {
+  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', result.status === 'complete' ? 'Complete for the information shown' : 'Assessment finished — ' + evidenceReviewText(reviewItems.length)]]) {
     const line = document.createElement('p'); const label = document.createElement('strong'); label.textContent = `${labelText}: `; line.append(label, value); plannerChecks.append(line);
   }
   const plannerWarnings = [...new Set(result.warnings.map(plannerStopWarning).filter(Boolean))];
@@ -714,7 +718,7 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
     const checked = formatTime(result.provenance.stops?.retrievedAt || result.provenance.timetables?.retrievedAt);
     const modeText = result.assessmentMode === 'nearest' ? `Nearest stop group "${result.nearestGroup?.name || 'selected group'}"` : `${result.stops.length} nearby stop${result.stops.length === 1 ? '' : 's'}`;
     const reviewCount = result.reviewItems?.length ?? 0;
-    const message = result.status === 'complete' ? `${modeText} assessed. Complete - checked ${checked}.` : `${modeText} assessed. Assessment finished — ${reviewCount} evidence item${reviewCount === 1 ? '' : 's'} need review.`;
+    const message = result.status === 'complete' ? `${modeText} assessed. Complete - checked ${checked}.` : `${modeText} assessed. Assessment finished — ${evidenceReviewText(reviewCount)}.`;
     setCallout($('stopStatus'), message, result.status === 'complete' && !result.warnings.length ? 'success' : 'warning');
   } catch {
     taskStatus.update({ phase: 'unavailable', detail: 'The assessment could not be completed.' });

@@ -1,5 +1,5 @@
 import { hasScheduledEvidence } from './scheduled-evidence.mjs';
-import { calendarQualificationNotes } from './service-calendar.mjs';
+import { calendarProfileLabel, calendarQualificationNotes } from './service-calendar.mjs';
 
 const DAY_ORDER = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 const DAY_LABELS = Object.freeze({ monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday' });
@@ -58,6 +58,7 @@ function mergeRecordSchedules(first, second) {
   return {
     ...first,
     stopSchedules,
+    calendarProfileId: first.calendarProfileId || second.calendarProfileId || null,
     calendarEvidence: [...new Map(calendarEvidence.map(item => [JSON.stringify(item), item])).values()],
     serviceNotes: unique([...(first.serviceNotes ?? []), ...(second.serviceNotes ?? [])]),
     sourceWarnings: unique([...(first.sourceWarnings ?? []), ...(second.sourceWarnings ?? [])]),
@@ -76,8 +77,8 @@ function deduplicateServiceRecords(records = []) {
     };
     const explicitIdentity = sourceJourneyIdentity(record);
     const identity = explicitIdentity
-      ? ['journey', record.timetableSource || record.source?.provider, record.routeNumber, patternIdentity(record), explicitIdentity].map(normal).join('|')
-      : ['record', record.id, record.timetableSource || record.source?.provider, record.routeNumber, patternIdentity(record), JSON.stringify(record.routePatternStopIds ?? [])].map(normal).join('|');
+      ? ['journey', record.timetableSource || record.source?.provider, record.routeNumber, patternIdentity(record), record.calendarProfileId || record.source?.calendarProfileId, explicitIdentity].map(normal).join('|')
+      : ['record', record.id, record.timetableSource || record.source?.provider, record.routeNumber, patternIdentity(record), record.calendarProfileId || record.source?.calendarProfileId, JSON.stringify(record.routePatternStopIds ?? [])].map(normal).join('|');
     const existing = byIdentity.get(identity);
     byIdentity.set(identity, existing ? mergeRecordSchedules(existing, record) : record);
   }
@@ -210,7 +211,8 @@ function departureEvidenceForRecords(records, stopId) {
         routeNumber: text(sourceEntry?.routeNumber) || text(record.routeNumber) || null,
         direction: text(sourceEntry?.direction) || text(record.direction || record.destination || record.origin) || null,
         origin: text(sourceEntry?.origin) || text(record.origin) || null,
-        destination: text(sourceEntry?.destination) || text(record.destination) || null
+        destination: text(sourceEntry?.destination) || text(record.destination) || null,
+        calendarProfileId: text(sourceEntry?.calendarProfileId) || text(record.calendarProfileId || record.source?.calendarProfileId) || null
       });
     }
   }
@@ -224,6 +226,7 @@ function materialQualification(note) {
 function plannerQualificationNote(note) {
   const value = text(note);
   if (!value) return null;
+  if (/school[- ]?days?.*non[- ]school|non[- ]school.*school[- ]?days?/i.test(value)) return 'Timetable varies between school and non-school days.';
   if (/non[- ]school|school holidays?/i.test(value)) return 'Non-school days only.';
   if (/school[- ]?days?(?:[- ]only)?|schooldays?/i.test(value)) return 'School days only.';
   if (/term[- ]time|term[- ]only/i.test(value)) return 'Term-time service.';
@@ -320,7 +323,8 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const stopDirections = unique(relevantStops.map(id => selectedStopDirectionKey(selectedStopsById.get(id))).filter(Boolean)).sort().join(',');
     const directionKey = directionGroupKey(service);
     const terminiKey = `${service.origin}|${service.destination}`;
-    const identity = [service.routeNumber, service.operator, directionKey, terminiKey, stopDirections].map(value => text(value).toLowerCase()).join('|');
+    const calendarProfileId = text(service.calendarProfileId || service.source?.calendarProfileId);
+    const identity = [service.routeNumber, service.operator, directionKey, terminiKey, stopDirections, calendarProfileId].map(value => text(value).toLowerCase()).join('|');
     if (!groups.has(identity)) groups.set(identity, []);
     groups.get(identity).push({ ...service, relevantStops });
   }
@@ -375,6 +379,8 @@ export function buildServiceSummaries(stops, serviceRecords) {
       stopDirection: serviceStopDirection(frequencyStop),
       stopDirectionEvidenceId: frequencyBasisStopId,
       circular: records.some(record => record.circular),
+      calendarProfileId: text(first.calendarProfileId || first.source?.calendarProfileId) || null,
+      calendarProfileLabel: calendarProfileLabel(first.calendarProfileId || first.source?.calendarProfileId),
       principalLocations,
       routePatternStops: Object.freeze([...(first.routePatternStops ?? [])]),
       calendarEvidence: Object.freeze(calendarEvidence),

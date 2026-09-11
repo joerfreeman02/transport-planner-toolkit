@@ -170,7 +170,7 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
 
 function partialDetail(reviewItems) {
   const count = reviewItems.length;
-  return `${count} evidence item${count === 1 ? '' : 's'} need review`;
+  return `${count} evidence item${count === 1 ? '' : 's'} ${count === 1 ? 'needs' : 'need'} review`;
 }
 
 export function createBusAssessment({ stopDiscovery, timetableData, accessRouting } = {}) {

@@ -1,4 +1,5 @@
 import { buildServicePresentation, formatServiceOriginDestination } from '../domain/bus-service-assessment.mjs';
+import { PLANNER_METHODOLOGY_NOTE } from '../domain/bus-planner-summary.mjs';
 
 function text(value) { return String(value ?? '').trim(); }
 
@@ -10,7 +11,12 @@ function accessText(route) {
 }
 
 function principalLocationsText(service) {
-  return text(service?.presentation?.principalLocationsText);
+  return text(service?.principalLocationsText || service?.presentation?.principalLocationsText);
+}
+
+function reviewItemText(item) {
+  const scope = [item.route && `Route ${item.route}`, item.stop && `Stop ${item.stop}`, item.source].filter(Boolean).join(' · ');
+  return scope ? `${scope}: ${item.message}` : item.message;
 }
 
 export function buildBusWordTables(result) {
@@ -23,18 +29,34 @@ export function buildBusWordTables(result) {
     stop.routes?.length ? stop.routes.join(', ') : 'Timetable route match unavailable'
   ]);
 
+  const hasPlannerSummary = Array.isArray(result.plannerServiceSummaries);
+  const services = hasPlannerSummary ? result.plannerServiceSummaries : buildServicePresentation(result.serviceSummaries ?? []);
   const serviceRows = [];
-  for (const service of buildServicePresentation(result.serviceSummaries ?? [])) {
-    serviceRows.push([
-      service.routeNumber,
-      service.operator,
-      formatServiceOriginDestination(service, ' – '),
-      principalLocationsText(service),
-      service.typicalFrequencyText || 'Frequency unavailable',
-      (service.operatingPeriodLines ?? []).join('\n')
-    ]);
+  services.forEach((service, index) => {
+    serviceRows.push(hasPlannerSummary
+      ? [
+        service.routeNumber,
+        service.operator,
+        service.directionPatternText || formatServiceOriginDestination(service, ' – '),
+        service.servedAtText || 'Representative stop not supplied',
+        principalLocationsText(service),
+        service.typicalFrequencyText || 'Frequency unavailable',
+        (service.operatingPeriodLines ?? []).join('\n')
+      ]
+      : [
+        service.routeNumber,
+        service.operator,
+        formatServiceOriginDestination(service, ' – '),
+        principalLocationsText(service),
+        service.typicalFrequencyText || 'Frequency unavailable',
+        (service.operatingPeriodLines ?? []).join('\n')
+      ]);
     if (service.serviceNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.serviceNote}` });
-  }
+    const next = services[index + 1];
+    if (hasPlannerSummary && service.routeGroupNote && (!next || next.routeGroupKey !== service.routeGroupKey)) serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeGroupNote}` });
+  });
+  if (Array.isArray(result.reviewItems) && result.reviewItems.length) serviceRows.push({ kind: 'summary', text: `Evidence items to review: ${result.reviewItems.map(reviewItemText).join(' | ')}` });
+  if (hasPlannerSummary) serviceRows.push({ kind: 'summary', text: PLANNER_METHODOLOGY_NOTE });
 
   return [
     {
@@ -45,9 +67,11 @@ export function buildBusWordTables(result) {
     },
     {
       caption: 'Table 3.3 - Bus Service Summary',
-      headers: ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period'],
+      headers: hasPlannerSummary
+        ? ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']
+        : ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period'],
       rows: serviceRows,
-      widths: [7, 14, 22, 25, 17, 15]
+      widths: hasPlannerSummary ? [7, 13, 20, 16, 18, 12, 14] : [7, 14, 22, 25, 17, 15]
     }
   ];
 }

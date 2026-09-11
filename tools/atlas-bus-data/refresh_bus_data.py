@@ -37,6 +37,19 @@ class RefreshError(RuntimeError):
     pass
 
 
+def load_release_metadata(site: Path) -> dict[str, str]:
+    metadata_path = site / "atlas" / "config" / "atlas-release.json"
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        version = str(metadata["version"])
+        build = str(metadata["build"])
+    except (OSError, KeyError, TypeError, ValueError) as error:
+        raise RefreshError(f"ATLAS release metadata is missing or invalid: {metadata_path}") from error
+    if not re.fullmatch(r"\d+\.\d+\.\d+-alpha\.\d+", version) or not re.fullmatch(rf"ATLAS-{re.escape(version)}-\d{{8}}", build):
+        raise RefreshError(f"ATLAS release metadata has invalid version/build identity: {metadata_path}")
+    return {"version": version, "build": build}
+
+
 def now_utc() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -343,7 +356,8 @@ def run(args: argparse.Namespace) -> dict:
         }
         for source, note in (("naptan", naptan_note), ("bods", bods_note), ("tnds", tnds_note)):
             if note: sources[source]["note"] = note
-        status = {"schema": "atlas-bus-refresh-status-v1", "status": "validated", "successfulRefreshAt": started, "version": "2.0.0-alpha.7", "build": "ATLAS-2.0.0-alpha.7-20260907", "repositoryCommit": os.environ.get("GITHUB_SHA"), "workflowRun": os.environ.get("GITHUB_RUN_ID"), "sources": sources, "preparedCounts": counts, "validation": "passed", "sanityThresholds": {"collapseMinimum": 0.5, "description": "Existing meaningful baselines must retain at least 50% of stop/service counts; BODS region count may not decrease."}}
+        release = load_release_metadata(site)
+        status = {"schema": "atlas-bus-refresh-status-v1", "status": "validated", "successfulRefreshAt": started, "version": release["version"], "build": release["build"], "repositoryCommit": os.environ.get("GITHUB_SHA"), "workflowRun": os.environ.get("GITHUB_RUN_ID"), "sources": sources, "preparedCounts": counts, "validation": "passed", "sanityThresholds": {"collapseMinimum": 0.5, "description": "Existing meaningful baselines must retain at least 50% of stop/service counts; BODS region count may not decrease."}}
         status_path = site / "atlas" / "data" / "status" / "manifest.json"
         status_path.parent.mkdir(parents=True, exist_ok=True)
         status_path.write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")

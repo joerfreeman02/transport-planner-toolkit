@@ -1,5 +1,6 @@
 import { derivePrincipalLocations } from '../domain/bus-service-assessment.mjs';
 import { hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
+import { calendarProfilesMutuallyExclusive, calendarQualificationNotes, createServiceCalendarEvidence } from '../domain/service-calendar.mjs';
 
 const DAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 
@@ -13,14 +14,61 @@ function blocks(source, tag) { return [...String(source ?? '').matchAll(new RegE
 function attr(source, name) { return (String(source ?? '').match(new RegExp(`\\b${name}="([^"]+)"`, 'i')) || [])[1] || ''; }
 function minutes(value) { const match = text(value).match(/^(\d{1,3}):(\d{2})(?::(\d{2}))?/); return match ? Number(match[1]) * 60 + Number(match[2]) + Math.round(Number(match[3] || 0) / 60) : null; }
 function seconds(value) { const match = text(value).match(/^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/i); return match ? Number(match[1] || 0) * 86400 + Number(match[2] || 0) * 3600 + Number(match[3] || 0) * 60 + Number(match[4] || 0) : null; }
-function dayNames(block) {
-  const lower = text(block).toLowerCase();
-  if (/mondaytosunday|monday.to.sunday/.test(lower)) return [...DAYS];
-  if (/mondaytosaturday|monday.to.saturday/.test(lower)) return DAYS.slice(0, 6);
-  if (/mondaytofriday|monday.to.friday/.test(lower)) return DAYS.slice(0, 5);
-  if (/weekend/.test(lower)) return DAYS.slice(5);
-  return DAYS.filter(day => new RegExp(`<${day}>|\\b${day}\\b`, 'i').test(block));
+const DAY_ALIASES = Object.freeze({ monday: 'monday', mon: 'monday', tuesday: 'tuesday', tue: 'tuesday', tues: 'tuesday', wednesday: 'wednesday', wed: 'wednesday', thursday: 'thursday', thu: 'thursday', thur: 'thursday', thurs: 'thursday', friday: 'friday', fri: 'friday', saturday: 'saturday', sat: 'saturday', sunday: 'sunday', sun: 'sunday' });
+function dayTokens(value) { return [...new Set(normaliseCalendarText(value).split(/\s+/).map(token => DAY_ALIASES[token]).filter(Boolean))]; }
+function normaliseCalendarText(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
+function enabledTag(block, tag) { return new RegExp(`<${tag}(?:\\s[^>]*)?>\\s*(?:true|1|yes)\\s*</${tag}>`, 'i').test(block); }
+function firstTagValue(block, tag) { return first(blocks(block, tag)[0] || '', tag); }
+
+function parseOperatingProfile(block, { sourceLabel = null, precedence = null } = {}) {
+  const raw = text(block);
+  const value = normaliseCalendarText(raw);
+  const days = new Set();
+  if (enabledTag(block, 'MondayToSunday') || /monday to sunday/.test(value)) DAYS.forEach(day => days.add(day));
+  if (enabledTag(block, 'MondayToSaturday') || /monday to saturday/.test(value)) DAYS.slice(0, 6).forEach(day => days.add(day));
+  if (enabledTag(block, 'MondayToFriday') || /monday to friday|weekdays?/.test(value)) DAYS.slice(0, 5).forEach(day => days.add(day));
+  for (const day of DAYS) if (enabledTag(block, day)) days.add(day);
+  for (const field of ['DaysOfOperation', 'OperatingDays', 'DaysOfWeek']) {
+    for (const day of dayTokens(firstTagValue(block, field))) days.add(day);
+  }
+  const nonOperationDays = new Set();
+  for (const field of ['DaysOfNonOperation', 'NonOperatingDays']) {
+    for (const day of dayTokens(firstTagValue(block, field))) nonOperationDays.add(day);
+  }
+  for (const day of nonOperationDays) days.delete(day);
+  const dayType = firstTagValue(block, 'ServicedOrganisationDayType') || firstTagValue(block, 'DayType') || firstTagValue(block, 'ServiceDayType');
+  const qualificationRefs = ['TermTime', 'TermTimeOnly', 'TermTimeOperation', 'SchoolDays', 'SchoolDaysOnly', 'HolidayOnly', 'SchoolHoliday'].flatMap(tag => firstTagValue(block, tag)).join(' ');
+  const semantics = [normaliseCalendarText(dayType), normaliseCalendarText(qualificationRefs), value].filter(Boolean).join(' ');
+  const schoolDayOnly = /school\s*days?|schooldays?|school\s*term/.test(semantics) && !/non\s*school|nonschool|holiday/.test(semantics);
+  const termTimeOnly = /term\s*time|termtime|term\s*only|termonly/.test(semantics);
+  const nonSchoolDayOnly = /non\s*school|nonschool|school\s*holiday|schoolholiday|holiday\s*only|holidayonly/.test(semantics);
+  const holidayOnly = /holiday\s*only|holidayonly|school\s*holiday|schoolholiday/.test(semantics);
+  const specialFields = ['SpecialDaysOperation', 'BankHolidaysOperation', 'OperatingProfileSpecialDay'].filter(field => blocks(block, field).length || new RegExp(`<${field}(?:\\s[^>]*)?\\s*/>`, 'i').test(block));
+  const dateExceptions = [...blocks(block, 'SpecialDay').map(value => text(value.replace(/<[^>]+>/g, ''))), ...blocks(block, 'DateException').map(value => text(value.replace(/<[^>]+>/g, '')))].filter(Boolean);
+  const complex = Boolean(specialFields.length) && !days.size;
+  const resolved = days.size > 0 && !complex;
+  const warning = complex
+    ? `TNDS ${sourceLabel || 'service'} has an unsupported complex operating profile (${specialFields.join(', ')}); operating days remain unresolved and no timetable days were fabricated.`
+    : specialFields.length
+      ? `TNDS ${sourceLabel || 'service'} includes special-day operating metadata (${specialFields.join(', ')}); regular-day evidence was retained, but special dates require review.`
+      : null;
+  return createServiceCalendarEvidence({
+    daysOfWeek: DAYS.filter(day => days.has(day)),
+    calendarResolved: resolved,
+    schoolDayOnly,
+    termTimeOnly,
+    nonSchoolDayOnly,
+    holidayOnly,
+    sourceCalendarLabel: dayType || sourceLabel || (raw ? value : null),
+    dateExceptions,
+    qualificationMetadata: { precedence, specialFields, nonOperationDays: [...nonOperationDays] },
+    provenance: { provider: 'TNDS', authority: 'Traveline National Dataset', sourceField: sourceLabel || null },
+    resolutionStatus: resolved ? (specialFields.length ? 'partial' : 'resolved') : 'unresolved',
+    warnings: warning ? [warning] : []
+  });
 }
+
+export const parseTndsOperatingProfile = parseOperatingProfile;
 function refs(block, tag) { return all(block, tag).flatMap(value => value.split(/\s+/).filter(Boolean)); }
 function patternRefs(block) { return [...refs(block, 'JourneyPatternRef'), ...refs(block, 'JourneyPatternRefs')]; }
 
@@ -49,11 +97,11 @@ function patternProfile(pattern, sections) {
   const offsets = new Map(stopIds.length ? [[stopIds[0], 0]] : []);
   let elapsed = 0;
   for (const link of links) {
-    if (link.runTime == null) return { direction: first(pattern, 'Direction'), destination: first(pattern, 'DestinationDisplay'), stopIds: [...new Set(stopIds)], offsets: new Map(), status: 'quarantine', reasonCode: 'incomplete_runtime_sequence' };
+    if (link.runTime == null) return { direction: first(pattern, 'Direction'), destination: first(pattern, 'DestinationDisplay'), stopIds: [...new Set(stopIds)], offsets: new Map(), status: 'quarantine', reasonCode: 'incomplete_runtime_sequence', operatingProfile: blocks(pattern, 'OperatingProfile')[0] || '' };
     elapsed += link.runTime + link.waitTime;
     offsets.set(link.to, elapsed);
   }
-  return { direction: first(pattern, 'Direction'), origin: first(pattern, 'Origin'), destination: first(pattern, 'DestinationDisplay'), stopIds, offsets, status: links.length ? 'valid' : 'no_timing_links' };
+  return { direction: first(pattern, 'Direction'), origin: first(pattern, 'Origin'), destination: first(pattern, 'DestinationDisplay'), stopIds, offsets, status: links.length ? 'valid' : 'no_timing_links', operatingProfile: blocks(pattern, 'OperatingProfile')[0] || '' };
 }
 
 function patternCalls(profile, stops) {
@@ -101,20 +149,31 @@ function parseService({ source, serviceBlock, serviceBlocks, patternById, journe
     const profile = patternById.get(patternId);
     if (!profile) return null;
     const calls = profile.status === 'valid' ? patternCalls(profile, stops) : [];
-    return { patternId, status: profile.status, reasonCode: profile.reasonCode || null, direction: text(profile.direction), origin: text(profile.origin), destination: text(profile.destination), routePatternStopIds: [...profile.stopIds], calls, principalLocations: calls.length ? derivePrincipalLocations(calls) : [] };
+    return { patternId, status: profile.status, reasonCode: profile.reasonCode || null, direction: text(profile.direction), origin: text(profile.origin), destination: text(profile.destination), routePatternStopIds: [...profile.stopIds], routePatternStops: calls.map(call => ({ id: call.id, name: call.name })).filter(call => call.id || call.name), calls, principalLocations: calls.length ? derivePrincipalLocations(calls) : [], operatingProfile: profile.operatingProfile || '' };
   }).filter(Boolean);
   const validVariants = patternVariants.filter(variant => variant.status === 'valid');
   const serviceOrigin = first(serviceBlock, 'Origin') || first(serviceBlock, 'StandardService');
   const serviceDestination = first(serviceBlock, 'Destination');
+  const serviceOperatingProfile = blocks(serviceBlock, 'OperatingProfile')[0] || '';
   const baseId = `tnds:${region || 'unknown'}:${sourceArchive || 'xml'}:${serviceCode || 'service'}`;
   const quarantine = quarantinePatterns.length ? { serviceQuarantined: !serviceStopIds.size, affectedStopIds: [...quarantineStopIds], patterns: quarantinePatterns } : null;
   const recordVariants = validVariants.length ? validVariants : (patternVariants.length === 1 ? patternVariants : []);
-  const createRecord = variant => {
+  const profileForJourney = (journey, variant) => {
+    const pattern = patternById.get(variant.patternId) || {};
+    const profileSource = blocks(journey, 'OperatingProfile')[0]
+      || pattern.operatingProfile
+      || serviceOperatingProfile;
+    return parseOperatingProfile(profileSource, { sourceLabel: firstTagValue(profileSource, 'ServicedOrganisationDayType') || variant.patternId, precedence: blocks(journey, 'OperatingProfile').length ? 'VehicleJourney' : pattern.operatingProfile ? 'JourneyPattern' : 'Service' });
+  };
+  const createRecord = (variant, selectedJourneys = null, calendarProfileId = null, splitByCalendarProfile = false) => {
     const profile = patternById.get(variant.patternId) || {};
     const patternStopIds = variant.status === 'valid' && variant.routePatternStopIds.length ? variant.routePatternStopIds : serviceStops.map(stop => stop.id);
     const patternStops = stops.filter(stop => patternStopIds.includes(stop.id));
     const stopSchedules = Object.fromEntries(patternStops.map(stop => [stop.id, Object.fromEntries(DAYS.map(day => [day, []]))]));
-    const patternJourneys = assignedJourneys.filter(journey => {
+    const departureEvidenceByDay = Object.fromEntries(DAYS.map(day => [day, []]));
+    const calendarEvidence = [];
+    const calendarWarnings = [];
+    const patternJourneys = selectedJourneys ?? assignedJourneys.filter(journey => {
       const journeyPatternRef = first(journey, 'JourneyPatternRef');
       if (journeyPatternRef) return journeyPatternRef === variant.patternId;
       return recordVariants.length === 1;
@@ -122,15 +181,24 @@ function parseService({ source, serviceBlock, serviceBlocks, patternById, journe
     for (const journey of patternJourneys) {
       const departure = minutes(first(journey, 'DepartureTime'));
       if (departure == null || variant.status === 'quarantine') continue;
-      const operatingProfile = blocks(journey, 'OperatingProfile')[0] || blocks(serviceBlock, 'OperatingProfile')[0] || '';
-      for (const day of dayNames(operatingProfile)) for (const stopId of patternStopIds) if (stopSchedules[stopId]) stopSchedules[stopId][day].push(departure + Math.round((profile.offsets?.get(stopId) ?? 0) / 60));
+      const calendar = profileForJourney(journey, variant);
+      calendarEvidence.push(calendar);
+      calendarWarnings.push(...calendar.warnings);
+      const journeyIdentity = first(journey, 'VehicleJourneyCode') || first(journey, 'VehicleJourneyId') || first(journey, 'VehicleJourneyRef') || null;
+      for (const day of calendar.daysOfWeek) {
+        for (const stopId of patternStopIds) if (stopSchedules[stopId]) {
+          const minute = departure + Math.round((profile.offsets?.get(stopId) ?? 0) / 60);
+          stopSchedules[stopId][day].push(minute);
+          departureEvidenceByDay[day].push({ minute, stopPointId: stopId, journeyIdentity, sourceRecordId: baseId, provider: 'TNDS', patternIdentity: variant.patternId, calendarProfileId: calendar.calendarProfileId });
+        }
+      }
     }
     for (const schedule of Object.values(stopSchedules)) for (const day of DAYS) schedule[day] = [...new Set(schedule[day])].sort((a, b) => a - b);
     const calls = variant.calls ?? [];
     const origin = variant.origin || (recordVariants.length === 1 ? serviceOrigin : calls[0]?.name || '');
     const destination = variant.destination || (recordVariants.length === 1 ? serviceDestination : calls.at(-1)?.name || '');
     return Object.freeze({
-      id: recordVariants.length > 1 ? `${baseId}:pattern:${variant.patternId}` : baseId,
+      id: `${recordVariants.length > 1 ? `${baseId}:pattern:${variant.patternId}` : baseId}${splitByCalendarProfile ? `:calendar:${calendarProfileId}` : ''}`,
       routeNumber: text(first(serviceBlock, 'LineName') || first(serviceBlock, 'Line') || first(serviceBlock, 'PrivateCode')),
       operator: text(operator.name) || 'Operator not supplied',
       origin,
@@ -138,20 +206,50 @@ function parseService({ source, serviceBlock, serviceBlocks, patternById, journe
       direction: text(variant.direction),
       principalLocations: [...variant.principalLocations],
       routePatternStopIds: [...variant.routePatternStopIds],
+      routePatternStops: [...(variant.routePatternStops ?? [])],
       patternVariants: [variant],
       description: first(serviceBlock, 'Description'),
       validFrom: first(blocks(serviceBlock, 'OperatingPeriod')[0] || blocks(source, 'OperatingPeriod')[0] || '', 'StartDate') || null,
       validTo: first(blocks(serviceBlock, 'OperatingPeriod')[0] || blocks(source, 'OperatingPeriod')[0] || '', 'EndDate') || null,
       stopSchedules,
+      departureEvidenceByDay: Object.freeze(Object.fromEntries(DAYS.map(day => [day, Object.freeze(departureEvidenceByDay[day])] ))),
+      calendarProfileId,
+      calendarEvidence: Object.freeze([...new Map(calendarEvidence.map(item => [JSON.stringify(item), item])).values()]),
+      serviceNotes: Object.freeze(calendarQualificationNotes(calendarEvidence)),
+      sourceWarnings: Object.freeze([...new Set(calendarWarnings)]),
       stops: patternStops,
       tndsQuarantine: quarantine,
-      source: { type: 'TNDS', region, archive: sourceArchive, serviceCode, operatorCode: operator.code || operator.id, schemaVersion: '2.5', preparedAt, patternIds: [variant.patternId], patternVariantCount: patternVariants.length, patternVariantId: variant.patternId }
+      source: { type: 'TNDS', provider: 'TNDS', region, archive: sourceArchive, serviceCode, operatorCode: operator.code || operator.id, schemaVersion: '2.5', preparedAt, patternIds: [variant.patternId], patternVariantCount: patternVariants.length, patternVariantId: variant.patternId, calendarProfileId, operatingProfilePrecedence: 'VehicleJourney > JourneyPattern > Service' }
     });
   };
   if (recordVariants.length) {
-    const records = recordVariants.map(createRecord);
+    const records = recordVariants.flatMap(variant => {
+      const patternJourneys = assignedJourneys.filter(journey => {
+        const journeyPatternRef = first(journey, 'JourneyPatternRef');
+        if (journeyPatternRef) return journeyPatternRef === variant.patternId;
+        return recordVariants.length === 1;
+      });
+      const profileGroups = new Map();
+      for (const journey of patternJourneys) {
+        const profile = profileForJourney(journey, variant);
+        const group = profileGroups.get(profile.calendarProfileId) || { profileId: profile.calendarProfileId, journeys: [], profiles: [] };
+        group.journeys.push(journey);
+        group.profiles.push(profile);
+        profileGroups.set(profile.calendarProfileId, group);
+      }
+      const groups = [...profileGroups.values()];
+      const splitByCalendarProfile = groups.length > 1
+        && groups.some((group, index) => groups.slice(index + 1).some(other => calendarProfilesMutuallyExclusive(group.profiles[0], other.profiles[0])));
+      const selectedGroups = splitByCalendarProfile
+        ? groups
+        : [{ profileId: groups.length === 1 ? groups[0].profileId : null, journeys: patternJourneys }];
+      return selectedGroups.map(group => createRecord(variant, group.journeys, splitByCalendarProfile ? group.profileId : (groups.length === 1 ? group.profileId : null), splitByCalendarProfile));
+    });
     const scheduledRecords = records.filter(record => Object.values(record.stopSchedules ?? {}).some(hasScheduledEvidence));
-    if (scheduledRecords.length || !quarantine) return scheduledRecords;
+    const unresolvedCalendar = records.some(record => (record.calendarEvidence ?? []).some(calendar => calendar.resolutionStatus === 'unresolved'));
+    if (scheduledRecords.length) return scheduledRecords;
+    if (quarantine || unresolvedCalendar) return [records[0]];
+    return [];
     return [records[0]];
   }
   if (quarantine) {

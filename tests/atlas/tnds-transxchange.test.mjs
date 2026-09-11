@@ -1,9 +1,77 @@
 import assert from 'node:assert/strict';
-import { parseTndsTransXchange, parseTndsTransXchangeServices } from '../../src/atlas/adapters/tnds-transxchange-adapter.mjs';
+import { parseTndsOperatingProfile, parseTndsTransXchange, parseTndsTransXchangeServices } from '../../src/atlas/adapters/tnds-transxchange-adapter.mjs';
 import { mergeBusTimetableSources } from '../../src/atlas/domain/bus-timetable-merge.mjs';
+import { buildServiceSummaries } from '../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildPlannerBusServiceSummaries } from '../../src/atlas/domain/bus-planner-summary.mjs';
 const xml = `<TransXChange SchemaVersion="2.5"><Operators><Operator id="OP1"><OperatorCode>OP1</OperatorCode><TradingName>Example</TradingName></Operator></Operators><Services><Service><ServiceCode>S1</ServiceCode><LineName>231</LineName><OperatingPeriod><StartDate>2026-08-31</StartDate><EndDate>2027-07-31</EndDate></OperatingPeriod><StandardService><Origin>A</Origin><Destination>B</Destination></StandardService><OperatingProfile><MondayToFriday>true</MondayToFriday></OperatingProfile></Service></Services><StopPoints><AnnotatedStopPointRef><StopPointRef>021013518</StopPointRef><CommonName>Woodside Road</CommonName></AnnotatedStopPointRef></StopPoints><VehicleJourneys><VehicleJourney><VehicleJourneyCode>V1</VehicleJourneyCode><JourneyPatternRef>JP1</JourneyPatternRef><DepartureTime>25:10:00</DepartureTime><OperatingProfile><MondayToFriday>true</MondayToFriday></OperatingProfile></VehicleJourney></VehicleJourneys><JourneyPatterns><JourneyPattern id="JP1"><Direction>outbound</Direction><DestinationDisplay>B</DestinationDisplay></JourneyPattern></JourneyPatterns></TransXChange>`;
 const parsed = parseTndsTransXchange(xml, { region: 'SE', sourceArchive: 'TNDS-SE-v2.5.zip' });
 assert.equal(parsed.routeNumber, '231'); assert.equal(parsed.operator, 'Example'); assert.equal(parsed.validFrom, '2026-08-31'); assert.equal(parsed.stopSchedules['021013518'].monday[0], 1510); assert.equal(parsed.source.schemaVersion, '2.5');
+assert.deepEqual(parsed.calendarEvidence[0].daysOfWeek, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+assert.equal(parsed.serviceNotes.length, 0, 'ordinary weekday service does not acquire a school-day qualification');
+const schoolProfile = parseTndsOperatingProfile('<OperatingProfile><ServicedOrganisationDayType>Schooldays</ServicedOrganisationDayType><DaysOfOperation>Monday, Tuesday, Wednesday, Thursday, Friday</DaysOfOperation></OperatingProfile>');
+assert.deepEqual(schoolProfile.daysOfWeek, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+assert.equal(schoolProfile.schoolDayOnly, true);
+assert.equal(schoolProfile.daysOfWeek.includes('saturday'), false, 'school profile does not fabricate weekend operation');
+assert.match(parseTndsOperatingProfile('<OperatingProfile><ServicedOrganisationDayType>TermTime</ServicedOrganisationDayType><MondayToFriday>true</MondayToFriday></OperatingProfile>').sourceCalendarLabel, /TermTime/);
+const precedenceXml = xml
+  .replace('<StandardService><Origin>A</Origin><Destination>B</Destination></StandardService><OperatingProfile><MondayToFriday>true</MondayToFriday>', '<StandardService><Origin>A</Origin><Destination>B</Destination></StandardService><OperatingProfile><MondayToFriday>true</MondayToFriday>')
+  .replace('<JourneyPattern id="JP1">', '<JourneyPattern id="JP1"><OperatingProfile><Saturday>true</Saturday></OperatingProfile>')
+  .replace('<OperatingProfile><MondayToFriday>true</MondayToFriday></OperatingProfile></VehicleJourney>', '<OperatingProfile><Sunday>true</Sunday></OperatingProfile></VehicleJourney>');
+const precedence = parseTndsTransXchange(precedenceXml, { region: 'SE', sourceArchive: 'precedence.xml' });
+assert.deepEqual(precedence.calendarEvidence[0].daysOfWeek, ['sunday'], 'VehicleJourney OperatingProfile overrides JourneyPattern and Service profiles');
+assert.deepEqual(precedence.stopSchedules['021013518'].saturday, []);
+assert.deepEqual(precedence.stopSchedules['021013518'].sunday, [1510]);
+
+const mixedCalendarXml = `<TransXChange SchemaVersion="2.5"><Operators><Operator id="OP-MIX"><OperatorCode>OP-MIX</OperatorCode><TradingName>Mixed Operator</TradingName></Operator></Operators><Services><Service><ServiceCode>MIX</ServiceCode><LineName>MIX</LineName><RegisteredOperatorRef>OP-MIX</RegisteredOperatorRef><StandardService><Origin>Mixed origin</Origin><Destination>Mixed terminus</Destination><JourneyPatternRef>JP-MIX</JourneyPatternRef></StandardService></Service></Services><StopPoints><AnnotatedStopPointRef><StopPointRef>MIX-STOP</StopPointRef><CommonName>Mixed stop</CommonName></AnnotatedStopPointRef><AnnotatedStopPointRef><StopPointRef>MIX-END</StopPointRef><CommonName>Mixed terminus</CommonName></AnnotatedStopPointRef></StopPoints><JourneyPatternSections><JourneyPatternSection id="JPS-MIX"><JourneyPatternTimingLink><From><StopPointRef>MIX-STOP</StopPointRef></From><To><StopPointRef>MIX-END</StopPointRef></To><RunTime>PT10M</RunTime></JourneyPatternTimingLink></JourneyPatternSection></JourneyPatternSections><JourneyPatterns><JourneyPattern id="JP-MIX"><Direction>outbound</Direction><DestinationDisplay>Mixed terminus</DestinationDisplay><JourneyPatternSectionRefs>JPS-MIX</JourneyPatternSectionRefs></JourneyPattern></JourneyPatterns><VehicleJourneys><VehicleJourney><VehicleJourneyCode>MIX-SCHOOL</VehicleJourneyCode><JourneyPatternRef>JP-MIX</JourneyPatternRef><DepartureTime>07:00:00</DepartureTime><OperatingProfile><ServicedOrganisationDayType>Schooldays</ServicedOrganisationDayType><MondayToFriday>true</MondayToFriday></OperatingProfile></VehicleJourney><VehicleJourney><VehicleJourneyCode>MIX-NONSCHOOL</VehicleJourneyCode><JourneyPatternRef>JP-MIX</JourneyPatternRef><DepartureTime>07:30:00</DepartureTime><OperatingProfile><ServicedOrganisationDayType>Non-Schooldays</ServicedOrganisationDayType><MondayToFriday>true</MondayToFriday></OperatingProfile></VehicleJourney></VehicleJourneys></TransXChange>`;
+const mixedCalendarTnds = parseTndsTransXchangeServices(mixedCalendarXml, { region: 'SE', sourceArchive: 'mixed-calendar.xml' });
+assert.equal(mixedCalendarTnds.length, 2, 'mutually exclusive TNDS calendar profiles remain separate records');
+assert.deepEqual(mixedCalendarTnds.map(service => service.calendarProfileId).sort(), ['non-school-day', 'school-day']);
+assert.deepEqual(mixedCalendarTnds.map(service => service.stopSchedules['MIX-STOP'].monday).sort((a, b) => a[0] - b[0]), [[420], [450]], 'TNDS school and non-school schedules are not unioned');
+assert.ok(mixedCalendarTnds.every(service => service.departureEvidenceByDay.monday[0].calendarProfileId === service.calendarProfileId));
+
+const stopEvidenceXml = journeys => `<TransXChange SchemaVersion="2.5"><Operators><Operator id="OP-EVIDENCE"><OperatorCode>OP-EVIDENCE</OperatorCode><TradingName>Evidence Operator</TradingName></Operator></Operators><Services><Service><ServiceCode>EVIDENCE</ServiceCode><LineName>EVIDENCE</LineName><RegisteredOperatorRef>OP-EVIDENCE</RegisteredOperatorRef><StandardService><Origin>Stop A origin</Origin><Destination>Stop C terminus</Destination><JourneyPatternRef>JP-EVIDENCE</JourneyPatternRef></StandardService></Service></Services><StopPoints><AnnotatedStopPointRef><StopPointRef>STOP-A</StopPointRef><CommonName>Stop A</CommonName></AnnotatedStopPointRef><AnnotatedStopPointRef><StopPointRef>STOP-B</StopPointRef><CommonName>Stop B</CommonName></AnnotatedStopPointRef><AnnotatedStopPointRef><StopPointRef>STOP-C</StopPointRef><CommonName>Stop C</CommonName></AnnotatedStopPointRef></StopPoints><JourneyPatternSections><JourneyPatternSection id="JPS-EVIDENCE"><JourneyPatternTimingLink><From><StopPointRef>STOP-A</StopPointRef></From><To><StopPointRef>STOP-B</StopPointRef></To><RunTime>PT5M</RunTime></JourneyPatternTimingLink><JourneyPatternTimingLink><From><StopPointRef>STOP-B</StopPointRef></From><To><StopPointRef>STOP-C</StopPointRef></To><RunTime>PT7M</RunTime></JourneyPatternTimingLink></JourneyPatternSection></JourneyPatternSections><JourneyPatterns><JourneyPattern id="JP-EVIDENCE"><Direction>outbound</Direction><DestinationDisplay>Stop C terminus</DestinationDisplay><JourneyPatternSectionRefs>JPS-EVIDENCE</JourneyPatternSectionRefs></JourneyPattern></JourneyPatterns><VehicleJourneys>${journeys}</VehicleJourneys></TransXChange>`;
+const vehicleJourney = (code, departureTime) => `<VehicleJourney><VehicleJourneyCode>${code}</VehicleJourneyCode><JourneyPatternRef>JP-EVIDENCE</JourneyPatternRef><DepartureTime>${departureTime}</DepartureTime><OperatingProfile><MondayToFriday>true</MondayToFriday></OperatingProfile></VehicleJourney>`;
+const evidenceStop = { id: 'STOP-B', name: 'Stop B', walking: { status: 'routed', distanceMetres: 80 } };
+const oneJourneyTnds = parseTndsTransXchange(stopEvidenceXml(vehicleJourney('EVIDENCE-1', '08:00:00')), { region: 'SE', sourceArchive: 'stop-evidence-one.xml' });
+assert.deepEqual(oneJourneyTnds.departureEvidenceByDay.monday.map(item => [item.stopPointId, item.minute, item.journeyIdentity]), [['STOP-A', 480, 'EVIDENCE-1'], ['STOP-B', 485, 'EVIDENCE-1'], ['STOP-C', 492, 'EVIDENCE-1']], 'raw TNDS evidence retains every physical stop time');
+const oneJourneySummary = buildServiceSummaries([evidenceStop], [oneJourneyTnds])[0];
+const oneJourneyPlanner = buildPlannerBusServiceSummaries([oneJourneySummary], [evidenceStop])[0];
+assert.deepEqual(oneJourneySummary.departuresByDay.monday, [485], 'TNDS representative Stop B keeps only its exact departure');
+assert.deepEqual(oneJourneySummary.departureEvidenceByDay.monday.map(item => [item.stopPointId, item.minute]), [['STOP-B', 485]]);
+assert.equal(oneJourneySummary.typicalFrequencyLines[0], 'Mon-Fri: 1 journey/day');
+assert.equal(oneJourneySummary.operatingPeriodLines[0], 'Mon-Fri: Departs approx. 08:05');
+assert.deepEqual(oneJourneyPlanner.departuresByDay.monday, [485]);
+assert.equal(oneJourneyPlanner.typicalFrequencyLines[0], 'Mon-Fri: 1 journey/day');
+assert.equal(oneJourneyPlanner.operatingPeriodLines[0], 'Mon-Fri: Departs approx. 08:05');
+const twoJourneyTnds = parseTndsTransXchange(stopEvidenceXml(vehicleJourney('EVIDENCE-1', '08:00:00') + vehicleJourney('EVIDENCE-2', '08:30:00')), { region: 'SE', sourceArchive: 'stop-evidence-two.xml' });
+assert.deepEqual(twoJourneyTnds.departureEvidenceByDay.monday.map(item => [item.stopPointId, item.minute, item.journeyIdentity]), [['STOP-A', 480, 'EVIDENCE-1'], ['STOP-B', 485, 'EVIDENCE-1'], ['STOP-C', 492, 'EVIDENCE-1'], ['STOP-A', 510, 'EVIDENCE-2'], ['STOP-B', 515, 'EVIDENCE-2'], ['STOP-C', 522, 'EVIDENCE-2']], 'two physical TNDS journeys retain each stop identity');
+const twoJourneySummary = buildServiceSummaries([evidenceStop], [twoJourneyTnds])[0];
+const twoJourneyPlanner = buildPlannerBusServiceSummaries([twoJourneySummary], [evidenceStop])[0];
+assert.deepEqual(twoJourneySummary.departuresByDay.monday, [485, 515], 'TNDS representative Stop B excludes A and C times for both journeys');
+assert.ok(twoJourneySummary.departureEvidenceByDay.monday.every(item => item.stopPointId === 'STOP-B'));
+assert.equal(twoJourneySummary.typicalFrequencyLines[0], 'Mon-Fri: 2 journeys/day');
+assert.equal(twoJourneySummary.operatingPeriodLines[0], 'Mon-Fri: Approx. 08:05–08:35');
+assert.deepEqual(twoJourneyPlanner.departuresByDay.monday, [485, 515]);
+
+const mergedStops = [{ id: 'MERGED-A', name: 'Merged A', walking: { status: 'routed', distanceMetres: 140 } }, { id: 'MERGED-B', name: 'Merged B', walking: { status: 'routed', distanceMetres: 80 } }];
+const mergedRecords = [
+  { id: 'merged-record', routeNumber: 'M', operator: 'Merged Operator', origin: 'Origin', destination: 'Destination', direction: 'outbound', routePatternStopIds: ['MERGED-A', 'MERGED-B'], calendarProfileId: 'school-day', source: { provider: 'TNDS', patternVariantId: 'MERGED', calendarProfileId: 'school-day' }, calendarEvidence: [{ calendarProfileId: 'school-day', schoolDayOnly: true, calendarResolved: true, daysOfWeek: ['monday'] }], stopSchedules: { 'MERGED-A': { monday: [480], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] } }, departureEvidenceByDay: { monday: [{ minute: 480, stopPointId: 'MERGED-A', journeyIdentity: 'MERGED-1', provider: 'TNDS', patternIdentity: 'MERGED', calendarProfileId: 'school-day' }] } },
+  { id: 'merged-record', routeNumber: 'M', operator: 'Merged Operator', origin: 'Origin', destination: 'Destination', direction: 'outbound', routePatternStopIds: ['MERGED-A', 'MERGED-B'], calendarProfileId: 'school-day', source: { provider: 'TNDS', patternVariantId: 'MERGED', calendarProfileId: 'school-day' }, calendarEvidence: [{ calendarProfileId: 'school-day', schoolDayOnly: true, calendarResolved: true, daysOfWeek: ['monday'] }], stopSchedules: { 'MERGED-B': { monday: [485], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] } }, departureEvidenceByDay: { monday: [{ minute: 485, stopPointId: 'MERGED-B', journeyIdentity: 'MERGED-1', provider: 'TNDS', patternIdentity: 'MERGED', calendarProfileId: 'school-day' }] } }
+];
+const mergedAtA = buildServiceSummaries([mergedStops[0]], mergedRecords)[0];
+const mergedAtB = buildServiceSummaries([mergedStops[1]], mergedRecords)[0];
+assert.deepEqual(mergedAtA.departuresByDay.monday, [480], 'merged equivalent records retain Stop A evidence');
+assert.deepEqual(mergedAtB.departuresByDay.monday, [485], 'merged equivalent records retain Stop B evidence');
+assert.equal(mergedAtA.departureEvidenceByDay.monday[0].stopPointId, 'MERGED-A');
+assert.equal(mergedAtB.departureEvidenceByDay.monday[0].stopPointId, 'MERGED-B');
+assert.equal(mergedAtB.departureEvidenceByDay.monday[0].calendarProfileId, 'school-day');
+const mergedPlanner = buildPlannerBusServiceSummaries([mergedAtB], [mergedStops[1]])[0];
+assert.deepEqual(mergedPlanner.canonicalDeparturePopulation.monday.map(item => [item.stopPointId, item.minute, item.calendarProfileId]), [['MERGED-B', 485, 'school-day']], 'planner canonical evidence preserves merged Stop B and calendar provenance');
+const unsupportedXml = xml.replace(/<OperatingProfile><MondayToFriday>true<\/MondayToFriday><\/OperatingProfile>/g, '<OperatingProfile><SpecialDaysOperation><SpecialDay>Tuesday</SpecialDay></SpecialDaysOperation></OperatingProfile>');
+const unsupported = parseTndsTransXchange(unsupportedXml, { region: 'SE', sourceArchive: 'unsupported.xml' });
+assert.equal(unsupported.calendarEvidence[0].resolutionStatus, 'unresolved');
+assert.match(unsupported.sourceWarnings.join(' '), /unsupported complex operating profile/);
+assert.deepEqual(unsupported.stopSchedules['021013518'].monday, [], 'unsupported complex profiles never become fabricated weekday evidence');
 const bods = [{ routeNumber: '999', operator: 'Other', direction: 'outbound', origin: 'X', destination: 'Y', stopSchedules: { '021013518': {} } }];
 assert.equal(mergeBusTimetableSources({ bods, tnds: [parsed] }).length, 2);
 assert.equal(mergeBusTimetableSources({ bods: [{ routeNumber: '231', operator: 'Example', direction: 'outbound', origin: 'A', destination: 'B', stopSchedules: parsed.stopSchedules }], tnds: [parsed] }).length, 1);

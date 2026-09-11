@@ -40,6 +40,17 @@ const filtered = buildBusWordTables({ ...result, stops: [result.stops[1]], servi
 assert.equal(filtered[0].rows.length, 1);
 assert.equal(filtered[0].rows[0][1], 'Stop T (Westbound)');
 assert.equal(filtered[1].rows.length, 0);
+const plannerWord = buildBusWordTables({
+  ok: true,
+  stops: [],
+  plannerServiceSummaries: [{
+    routeNumber: '310', operator: 'Arriva', directionPatternText: 'Towards Waltham Cross', servedAtText: 'Hertford Bus Station',
+    principalLocationsText: 'Hoddesdon', typicalFrequencyText: 'Mon-Fri: 2 journeys/day', operatingPeriodLines: ['Mon-Fri: Approx. 08:00–18:00']
+  }]
+});
+const plannerWordNotes = plannerWord[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
+assert.match(plannerWordNotes, /Detailed source evidence is retained within the ATLAS assessment workspace/);
+assert.doesNotMatch(plannerWordNotes, /Show detailed evidence/);
 console.log('PASS Word export respects planner-selected stop and service rows.');
 console.log('PASS Alpha.5 Plaistow Word export contract.');
 

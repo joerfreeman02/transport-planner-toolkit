@@ -66,13 +66,23 @@ test('circular services with the same endpoints retain opposite directions', () 
 
 test('circular, school-day and limited qualifications remain visible', () => {
   const [summary] = buildServiceSummaries([{ id: 'A' }], [{ id: 'school-loop', routeNumber: 'S1', operator: 'School Bus', origin: 'School', destination: 'School', direction: 'Clockwise', circular: true, principalLocations: [], qualifications: ['School-day-only service.'], stopSchedules: { A: { monday: [480], tuesday: [480], wednesday: [480], thursday: [480], friday: [480], saturday: [], sunday: [] } } }]);
-  assert.match(summary.serviceNote, /School-day-only/);
-  assert.match(summary.serviceNote, /Circular service pattern/);
+  assert.match(summary.serviceNote, /School days only\./);
+  assert.match(summary.serviceNote, /Circular service\./);
 });
 
 test('empty timetable records do not become planner-facing services', () => {
   const summaries = buildServiceSummaries([{ id: 'A' }], [{ id: 'incomplete', routeNumber: '5', operator: '', origin: '', destination: '', principalLocations: [], qualifications: [], stopSchedules: { A: {} } }]);
   assert.deepEqual(summaries, []);
+});
+
+test('frequency interval maths uses N minus 1 elapsed gaps', () => {
+  const two = calculateScheduledFrequency([600, 660], { startMinute: 600, endMinute: 720 });
+  assert.equal(two.departureCount, 2);
+  assert.equal(two.intervalMinutes, 60);
+  assert.equal(two.busesPerHour, 1);
+  const three = calculateScheduledFrequency([600, 630, 660], { startMinute: 600, endMinute: 720 });
+  assert.equal(three.intervalMinutes, 30);
+  assert.equal(three.busesPerHour, 2);
 });
 
 test('controlled wording uses only supplied routes and principal locations', () => {

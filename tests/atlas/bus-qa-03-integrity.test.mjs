@@ -122,6 +122,25 @@ assert.equal(expandedResult.provenance.stops.radiusMetres, 400);
 assert.match(expandedResult.warnings.join(' '), /nearest candidate group was retained/i);
 assert.equal(expandedResult.serviceSummaries.length, 0);
 
+const noMatchExpansionCalls = [];
+const noMatchProgress = [];
+let noMatchTimetableCalls = 0;
+const noMatchExpansion = createBusAssessment({
+  stopDiscovery: { nearbyStops: async (_site, { radius }) => { noMatchExpansionCalls.push(Number(radius)); return { ok: true, data: [{ ...expandedStop, id: 'EXPANSION-NO-MATCH' }], evidence: [], warnings: [], provenance: { radiusMetres: Number(radius) } }; } },
+  timetableData: { servicesForStops: async (selected, { onProgress } = {}) => { noMatchTimetableCalls += 1; onProgress?.({ phase: 'checking-timetables', completed: 0, total: selected.length }); const result = noMatchTimetableCalls === 1
+    ? { ok: true, data: [], timetableConclusion: 'NO_CURRENT_MATCH', warnings: [], provenance: { timetableConclusion: 'NO_CURRENT_MATCH' } }
+    : { ok: true, data: [{ id: 'expanded-match', routeNumber: '10', operator: 'Expanded operator', origin: 'Expanded origin', destination: 'Expanded terminus', direction: 'Expanded terminus', stopSchedules: { [selected[0].id]: schedule({ monday: [540] }) } }], warnings: [], provenance: {} }; onProgress?.({ phase: 'checking-timetables', completed: selected.length, total: selected.length }); return result; } },
+  accessRouting: { matrix: routed }
+});
+const noMatchResult = await noMatchExpansion.assess({ latitude: 51.685, longitude: -0.033 }, { mode: 'nearest', radius: 400, onProgress: progress => noMatchProgress.push(progress) });
+assert.deepEqual(noMatchExpansionCalls, [400, 2000], 'nearest mode expands only after an explicit no-current-match conclusion');
+assert.equal(noMatchResult.provenance.stops.actualDiscoveryRadiusMetres, 2000);
+assert.ok(noMatchProgress.some(progress => progress.phase === 'routing-stops' && progress.total === 1));
+assert.ok(noMatchProgress.some(progress => progress.phase === 'checking-timetables'));
+assert.equal(noMatchTimetableCalls, 2, 'nearest expansion makes exactly one additional timetable request');
+assert.ok(noMatchProgress.filter(progress => progress.phase === 'checking-timetables' && progress.completed === 0).length >= 2, 'expanded nearest forwards the initial checking-timetables progress event');
+assert.ok(noMatchProgress.filter(progress => progress.phase === 'checking-timetables' && progress.completed === 1 && progress.total === 1).length >= 2, 'expanded nearest forwards the completed checking-timetables progress event');
+
 let clock = 0;
 const sleeps = [];
 const scheduler = createTflRequestScheduler({ now: () => clock, sleep: async milliseconds => { sleeps.push(milliseconds); clock += milliseconds; } });
@@ -135,8 +154,13 @@ const partialAssessment = createBusAssessment({
   timetableData: { servicesForStops: async () => ({ ok: true, data: [{ id: 'partial', routeNumber: '10', operator: 'Example', origin: 'A', destination: 'B', direction: 'B', stopSchedules: { PARTIAL: schedule({ monday: [420] }) } }], warnings: [], provenance: { processedRequests: 1, unprocessedRequests: 1, unresolvedRequests: 0 } }) },
   accessRouting: { matrix: routed }
 });
-const partialResult = await partialAssessment.assess({ latitude: 51.685, longitude: -0.033 });
+const partialProgress = [];
+const partialResult = await partialAssessment.assess({ latitude: 51.685, longitude: -0.033 }, { onProgress: progress => partialProgress.push(progress) });
 assert.equal(partialResult.status, 'partial', 'unprocessed timetable scope cannot be reported as complete');
+assert.ok(partialResult.reviewItems.length >= 1, 'partial result carries structured actionable review items');
+assert.equal(partialResult.reviewItems[0].source, 'timetable source');
+assert.match(partialResult.reviewItems[0].message, /processed assessment scope/i);
+assert.ok(partialProgress.some(progress => progress.phase === 'partial' && progress.detail === '1 evidence item needs review'), 'partial detail owns only the evidence count while the phase owns the completion label');
 
 const tndsStop = { id: '021013518', routes: ['231'] };
 const tndsService = { id: 'tnds:231:pattern-1', routeNumber: '231', operator: 'TNDS operator', origin: 'Pipers Lane', destination: 'Bedford', direction: 'Bedford', source: { type: 'TNDS', patternVariantId: 'pattern-1' }, stopSchedules: { [tndsStop.id]: schedule({ monday: [510] }) } };

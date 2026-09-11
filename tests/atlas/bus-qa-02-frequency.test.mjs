@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { buildServiceSummaries, calculateTypicalServiceFrequency, formatTypicalFrequency } from '../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildPlannerBusServiceSummaries } from '../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
 
 const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -41,7 +42,7 @@ assert.deepEqual(formatTypicalFrequency(Object.fromEntries(days.map(day => [day,
 const route13 = summaryFor(schedule({ monday: weekdayIrregular, tuesday: weekdayIrregular, wednesday: weekdayIrregular, thursday: weekdayIrregular, friday: weekdayIrregular, saturday: [420, 540, 660], sunday: [] }), {
   qualifications: ['Limited service: no more than three scheduled journeys on any represented day.']
 });
-assert.match(route13.typicalFrequencyLines[0], /Mon-Fri: 22 scheduled journeys\/day \(irregular\)/);
+assert.match(route13.typicalFrequencyLines[0], /Mon-Fri: Approx\. every \d+ mins \(irregular\)/);
 assert.equal(route13.typicalFrequencyLines[2], 'Sun: No scheduled service');
 assert.doesNotMatch(route13.serviceNote, /no more than three scheduled journeys on any represented day/i);
 
@@ -53,18 +54,35 @@ assert.deepEqual(route13b.typicalFrequencyLines, ['Mon-Fri: 1 journey/day', 'Sat
 
 const regularity = calculateTypicalServiceFrequency(weekdayIrregular, { day: 'wednesday' });
 assert.equal(regularity.classification, 'irregular');
-assert.match(regularity.wording, /22 scheduled journeys\/day \(irregular\)/);
+assert.match(regularity.wording, /Approx\. every \d+ mins \(irregular\)/);
 const regular = calculateTypicalServiceFrequency(weekdayRegular, { day: 'monday' });
 assert.equal(regular.classification, 'regular-frequency');
 assert.equal(regular.intervalMinutes, 15);
 assert.match(regular.wording, /Every ~15 mins/);
+assert.equal(calculateTypicalServiceFrequency([0, 10, 20, 30, 40], { day: 'monday' }).valueText, 'Every ~10 mins', 'five regular departures use their central headway rather than a limited-service label');
+assert.match(calculateTypicalServiceFrequency([0, 8, 18, 28, 39, 51], { day: 'monday' }).valueText, /Every ~10 mins|Typically every ~10 mins/);
+const inactiveGaps = calculateTypicalServiceFrequency([0, 10, 20, 30, 330, 340, 350, 660, 670], { day: 'monday' });
+assert.equal(inactiveGaps.valueText, 'Every ~10 mins', 'all inactive gaps above the deterministic threshold are excluded, not only the largest one');
+assert.match(calculateTypicalServiceFrequency([360, 370, 380, 390, 690, 700], { day: 'monday' }).valueText, /Every ~10 mins|Typically every ~10 mins/);
+const inactiveIrregular = calculateTypicalServiceFrequency([0, 10, 20, 30, 90, 100, 110, 120], { day: 'monday' });
+assert.equal(inactiveIrregular.classification, 'irregular');
+assert.equal(inactiveIrregular.valueText, 'Approx. every 10 mins (irregular)', 'irregular fallback uses the robust active-service headway rather than the full operating span');
+assert.equal(inactiveIrregular.averageIntervalMinutes, 10);
+const lateActive = calculateTypicalServiceFrequency([300, 310, 320, 330, 340, 400, 1500, 1510], { day: 'monday' });
+assert.equal(lateActive.valueText, 'Approx. every 10 mins (irregular)', 'a late next-day departure remains in the operating period without diluting active frequency');
+const groupedSemanticFrequency = formatTypicalFrequency({
+  monday: inactiveIrregular,
+  tuesday: calculateTypicalServiceFrequency([0, 10, 20, 30, 100, 110, 120, 130], { day: 'tuesday' }),
+  wednesday: calculateTypicalServiceFrequency([], { day: 'wednesday' })
+});
+assert.deepEqual(groupedSemanticFrequency.slice(0, 2), ['Mon-Tue: Approx. every 10 mins (irregular)', 'Wed: No scheduled service'], 'day grouping uses displayed planner meaning rather than hidden raw rate diagnostics');
 assert.equal(calculateTypicalServiceFrequency([], { day: 'sunday' }).wording, 'Sunday: No scheduled service');
 
 const tflSafe = calculateTypicalServiceFrequency([350, 370, 400, 1400], { day: 'monday', frequencyEvidence: [{ periodType: 'FrequencyMinutes', day: 'monday', lowestFrequency: 10, highestFrequency: 10 }] });
 assert.equal(tflSafe.basis, 'frequency-band');
 assert.equal(tflSafe.intervalMinutes, 10);
 assert.equal(tflSafe.departureCount, 4);
-assert.equal(tflSafe.valueText, 'Every 10 mins');
+assert.equal(tflSafe.valueText, 'Every ~10 mins');
 for (const periodType of ['FrequencyHours', 'Unknown', 'Normal']) {
   const result = calculateTypicalServiceFrequency(weekdayRegular, { day: 'monday', frequencyEvidence: [{ periodType, day: 'monday', lowestFrequency: 2, highestFrequency: 2 }] });
   assert.notEqual(result.basis, 'frequency-band', `${periodType} must not become minute headway evidence`);
@@ -73,10 +91,10 @@ const distinctBands = calculateTypicalServiceFrequency(weekdayRegular, { day: 'm
   { periodType: 'FrequencyMinutes', day: 'monday', fromMinute: 360, toMinute: 480, lowestFrequency: 10, highestFrequency: 10 },
   { periodType: 'FrequencyMinutes', day: 'monday', fromMinute: 480, toMinute: 600, lowestFrequency: 15, highestFrequency: 15 }
 ] });
-assert.equal(distinctBands.basis, 'frequency-band');
-assert.equal(distinctBands.valueText, 'Every 10–15 mins');
+assert.equal(distinctBands.basis, 'frequency-band-range');
+assert.equal(distinctBands.valueText, 'Typically every ~10–15 mins');
 const rangedBand = calculateTypicalServiceFrequency([420, 435], { day: 'monday', frequencyEvidence: [{ periodType: 'FrequencyMinutes', day: 'monday', lowestFrequency: 3, highestFrequency: 5 }] });
-assert.equal(rangedBand.valueText, 'Every 3–5 mins');
+assert.equal(rangedBand.valueText, 'Typically every ~3–5 mins');
 
 const multiStop = buildServiceSummaries([
   { id: 'A', walking: { status: 'routed', distanceMetres: 100 } },
@@ -88,10 +106,47 @@ const multiStop = buildServiceSummaries([
 assert.equal(multiStop[0].frequencyBasisStopId, 'A');
 assert.equal(multiStop[0].frequencyByDay.monday.intervalMinutes, 10);
 
+const schoolAndTerm = summaryFor(schedule({ monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420] }), {
+  calendarEvidence: [{ schoolDayOnly: true, termTimeOnly: true }]
+});
+assert.match(schoolAndTerm.serviceNote, /School days only\./);
+assert.doesNotMatch(schoolAndTerm.serviceNote, /Term-time service\./, 'school-day evidence takes precedence over the less-specific term-time note');
+const termOnly = summaryFor(schedule({ monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420] }), {
+  calendarEvidence: [{ termTimeOnly: true }]
+});
+assert.match(termOnly.serviceNote, /^Term-time service\.$/);
+const holidayOnly = summaryFor(schedule({ saturday: [420], sunday: [420] }), {
+  calendarEvidence: [{ nonSchoolDayOnly: true, holidayOnly: true }]
+});
+assert.match(holidayOnly.serviceNote, /Non-school days only\./);
+
+const schoolOnly = summaryFor(schedule({ monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420] }), {
+  calendarEvidence: [{ schoolDayOnly: true, calendarResolved: true, daysOfWeek: days.slice(0, 5) }]
+});
+assert.equal(schoolOnly.serviceNote, 'School days only.');
+const nonSchoolOnly = summaryFor(schedule({ saturday: [420], sunday: [450] }), {
+  calendarEvidence: [{ nonSchoolDayOnly: true, calendarResolved: true, daysOfWeek: ['saturday', 'sunday'] }]
+});
+assert.equal(nonSchoolOnly.serviceNote, 'Non-school days only.');
+const nonSchoolPlanner = buildPlannerBusServiceSummaries([nonSchoolOnly], [{ id: 'A', name: 'Assessment stop', walking: { status: 'routed', distanceMetres: 100 } }])[0];
+assert.equal(nonSchoolPlanner.serviceNote, 'Non-school days only.', 'non-school qualification remains visible for a weekend-only row');
+const ordinary = summaryFor(schedule({ monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420] }), {
+  calendarEvidence: [{ calendarResolved: true, daysOfWeek: days.slice(0, 5) }]
+});
+assert.equal(ordinary.serviceNote, '', 'ordinary weekday evidence has no school or non-school qualification');
+const mixedQualification = summaryFor(schedule({ monday: [420], saturday: [450] }), {
+  calendarEvidence: [
+    { schoolDayOnly: true, calendarResolved: true, daysOfWeek: days.slice(0, 5) },
+    { nonSchoolDayOnly: true, calendarResolved: true, daysOfWeek: ['saturday', 'sunday'] }
+  ]
+});
+assert.equal(mixedQualification.serviceNote, 'Timetable varies between school and non-school days.');
+assert.doesNotMatch(mixedQualification.serviceNote, /School days only|Non-school days only/);
+
 const html = fs.readFileSync(new URL('../../atlas/index.html', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../../atlas/assets/css/atlas-shell.css', import.meta.url), 'utf8');
-assert.deepEqual((html.match(/<th>/g) ?? []).slice(-7).length, 7);
-for (const [className, width] of [['col-include', '4%'], ['col-route', '6%'], ['col-operator', '13%'], ['col-origin', '20%'], ['col-principal', '23%'], ['col-frequency', '18%'], ['col-operating-period', '16%']]) assert.match(css, new RegExp(`\\.${className} \\{ width: ${width.replace('%', '\\%')}; \\}`));
+assert.deepEqual((html.match(/<th>/g) ?? []).slice(-8).length, 8);
+for (const [className, width] of [['col-include', '4%'], ['col-route', '6%'], ['col-operator', '13%'], ['col-direction', '21%'], ['col-served-at', '16%'], ['col-principal', '16%'], ['col-frequency', '12%'], ['col-operating-period', '12%']]) assert.ok(css.includes('.' + className + ' { width: ' + width + '; }'), className);
 assert.match(css, /input\[type="checkbox"\].*width: 17px/);
 
 const word = buildBusWordTables({ ok: true, stops: [], serviceSummaries: [varied] });

@@ -1,23 +1,59 @@
 import { hasScheduledEvidence } from './scheduled-evidence.mjs';
+import { calendarProfileLabel, calendarQualificationNotes } from './service-calendar.mjs';
 
 const DAY_ORDER = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 const DAY_LABELS = Object.freeze({ monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday' });
 const DAY_SHORT_LABELS = Object.freeze({ monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' });
 const REPRESENTATIVE_DAY_ORDER = Object.freeze(['wednesday', 'tuesday', 'thursday', 'monday', 'friday', 'saturday', 'sunday']);
-const LIMITED_SERVICE_JOURNEY_THRESHOLD = 5;
+export const LIMITED_SERVICE_JOURNEY_THRESHOLD = 4;
 const REGULARITY_INTERVAL_TOLERANCE = 0.25;
 const HUB_PATTERN = /\b(?:bus|coach)\s+(?:station|interchange)\b|\btransport\s+interchange\b/i;
 const GENERIC_QUALIFICATION_PATTERNS = Object.freeze([
   /date-specific exceptions/i,
   /scheduled variants? (?:are )?retained/i,
   /scheduled route patterns serve/i,
-  /weekday-only service in the prepared representative week/i
+  /weekday-only service in the prepared representative week/i,
+  /full tfl route origin and destination were not deterministically established/i,
+  /timetable did not supply a reliable operator name/i,
+  /tfl route metadata (?:did not establish|could not be checked)/i,
+  /without intervalid linkage/i,
+  /frequency ranges?/i,
+  /representative stop/i,
+  /source (?:evidence|processing)|processing|provenance/i
 ]);
 
 function text(value) { return String(value ?? '').trim(); }
 function unique(values) { return [...new Set(values.map(text).filter(Boolean))]; }
 function numeric(values) { return unique(values).map(Number).filter(Number.isFinite).sort((a, b) => a - b); }
+function ordered(values) { return (values ?? []).map(Number).filter(Number.isFinite).sort((a, b) => a - b); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
+
+function departureEvidenceKey(entry) {
+  return [
+    text(entry?.stopPointId),
+    Number(entry?.minute ?? entry?.departureMinute ?? entry?.time),
+    text(entry?.journeyIdentity),
+    text(entry?.provider),
+    text(entry?.patternIdentity),
+    text(entry?.calendarProfileId)
+  ].map(normal).join('|');
+}
+
+function mergeDepartureEvidence(first, second) {
+  const hasEvidence = Boolean((first && typeof first === 'object') || (second && typeof second === 'object'));
+  if (!hasEvidence) return undefined;
+  return Object.fromEntries(DAY_ORDER.map(day => {
+    const entries = [...(Array.isArray(first?.[day]) ? first[day] : []), ...(Array.isArray(second?.[day]) ? second[day] : [])]
+      .filter(entry => Number.isFinite(Number(entry?.minute ?? entry?.departureMinute ?? entry?.time)));
+    const seen = new Set();
+    return [day, entries.filter(entry => {
+      const key = departureEvidenceKey(entry);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })];
+  }));
+}
 
 function sourceJourneyIdentity(record) {
   const source = record?.source ?? {};
@@ -45,7 +81,17 @@ function mergeRecordSchedules(first, second) {
     const existing = stopSchedules[stopId] ?? {};
     stopSchedules[stopId] = Object.fromEntries(DAY_ORDER.map(day => [day, numeric([...(existing[day] ?? []), ...(schedule?.[day] ?? [])])]));
   }
-  return { ...first, stopSchedules, scheduleIntegrityWarnings: unique([...(first.scheduleIntegrityWarnings ?? []), ...(second.scheduleIntegrityWarnings ?? [])]) };
+  const calendarEvidence = [...(first.calendarEvidence ?? []), ...(second.calendarEvidence ?? [])];
+  return {
+    ...first,
+    stopSchedules,
+    departureEvidenceByDay: mergeDepartureEvidence(first.departureEvidenceByDay, second.departureEvidenceByDay),
+    calendarProfileId: first.calendarProfileId || second.calendarProfileId || null,
+    calendarEvidence: [...new Map(calendarEvidence.map(item => [JSON.stringify(item), item])).values()],
+    serviceNotes: unique([...(first.serviceNotes ?? []), ...(second.serviceNotes ?? [])]),
+    sourceWarnings: unique([...(first.sourceWarnings ?? []), ...(second.sourceWarnings ?? [])]),
+    scheduleIntegrityWarnings: unique([...(first.scheduleIntegrityWarnings ?? []), ...(second.scheduleIntegrityWarnings ?? [])])
+  };
 }
 
 function deduplicateServiceRecords(records = []) {
@@ -59,8 +105,8 @@ function deduplicateServiceRecords(records = []) {
     };
     const explicitIdentity = sourceJourneyIdentity(record);
     const identity = explicitIdentity
-      ? ['journey', record.timetableSource || record.source?.provider, record.routeNumber, patternIdentity(record), explicitIdentity].map(normal).join('|')
-      : ['record', record.id, record.timetableSource || record.source?.provider, record.routeNumber, patternIdentity(record), JSON.stringify(record.routePatternStopIds ?? [])].map(normal).join('|');
+      ? ['journey', record.timetableSource || record.source?.provider, record.routeNumber, patternIdentity(record), record.calendarProfileId || record.source?.calendarProfileId, explicitIdentity].map(normal).join('|')
+      : ['record', record.id, record.timetableSource || record.source?.provider, record.routeNumber, patternIdentity(record), record.calendarProfileId || record.source?.calendarProfileId, JSON.stringify(record.routePatternStopIds ?? [])].map(normal).join('|');
     const existing = byIdentity.get(identity);
     byIdentity.set(identity, existing ? mergeRecordSchedules(existing, record) : record);
   }
@@ -77,7 +123,7 @@ export function formatClock(totalMinutes) {
 export function calculateOperatingPeriods(departuresByDay = {}) {
   const periods = {};
   for (const day of DAY_ORDER) {
-    const values = numeric(departuresByDay[day] ?? []);
+    const values = ordered(departuresByDay[day] ?? []);
     periods[day] = values.length ? Object.freeze({
       firstMinute: values[0],
       lastMinute: values.at(-1),
@@ -97,6 +143,7 @@ function samePeriod(a, b) {
 
 function periodText(period) {
   if (!period) return 'No scheduled service';
+  if (period.departureCount === 1) return `Departs approx. ${period.first}`;
   return `Approx. ${period.first}–${period.last}${period.overnight ? ' (next day)' : ''}`;
 }
 
@@ -119,16 +166,19 @@ export function calculateScheduledFrequency(departures, { startMinute, endMinute
   const start = Number(startMinute);
   const end = Number(endMinute);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) throw new Error('A valid representative assessment period is required.');
-  const scheduled = numeric(departures).filter(value => value >= start && value < end);
-  const hours = (end - start) / 60;
-  const busesPerHour = scheduled.length / hours;
-  const intervalMinutes = busesPerHour > 0 ? 60 / busesPerHour : null;
+  const scheduled = ordered(departures).filter(value => value >= start && value < end);
+  const elapsedMinutes = scheduled.length > 1 ? scheduled.at(-1) - scheduled[0] : 0;
+  const intervalMinutes = elapsedMinutes > 0 ? elapsedMinutes / (scheduled.length - 1) : null;
+  const busesPerHour = intervalMinutes ? 60 / intervalMinutes : null;
+  const busLabel = scheduled.length === 1 ? 'bus' : 'buses';
   return Object.freeze({
     period: Object.freeze({ startMinute: start, endMinute: end, label: text(label) }),
     departureCount: scheduled.length,
-    busesPerHour: Number(busesPerHour.toFixed(2)),
+    busesPerHour: busesPerHour == null ? null : Number(busesPerHour.toFixed(2)),
     intervalMinutes: intervalMinutes == null ? null : Math.round(intervalMinutes),
-    wording: scheduled.length ? `${Number(busesPerHour.toFixed(1))} buses per hour${intervalMinutes ? ` (approximately every ${Math.round(intervalMinutes)} minutes)` : ''}` : 'No scheduled buses during the defined assessment period'
+    wording: scheduled.length > 1
+      ? `${Number(busesPerHour.toFixed(1))} ${busLabel} per hour (approximately every ${Math.round(intervalMinutes)} minutes)`
+      : scheduled.length === 1 ? '1 scheduled bus during the defined assessment period' : 'No scheduled buses during the defined assessment period'
   });
 }
 
@@ -167,15 +217,66 @@ function mergeDepartures(records, stopIds) {
   return merged;
 }
 
+function departureEvidenceForRecords(records, stopId) {
+  const evidence = Object.fromEntries(DAY_ORDER.map(day => [day, []]));
+  for (const record of records ?? []) {
+    const schedule = record.stopSchedules?.[stopId];
+    if (!schedule) continue;
+    const provider = text(record.timetableSource || record.source?.provider);
+    const explicitJourney = sourceJourneyIdentity(record);
+    const pattern = patternIdentity(record);
+    for (const day of DAY_ORDER) {
+      const explicitEntries = Array.isArray(record.departureEvidenceByDay?.[day]) ? record.departureEvidenceByDay[day] : null;
+      const scopedEntries = explicitEntries && explicitEntries.some(item => text(item?.stopPointId))
+        ? explicitEntries.filter(item => text(item?.stopPointId) === stopId)
+        : explicitEntries;
+      const sourceEntries = scopedEntries?.length
+        ? scopedEntries
+        : ordered(schedule[day] ?? []).map(minute => ({ minute }));
+      for (const sourceEntry of sourceEntries) evidence[day].push({
+        minute: Number(sourceEntry?.minute ?? sourceEntry?.departureMinute ?? sourceEntry?.time),
+        stopPointId: text(sourceEntry?.stopPointId) || stopId,
+        journeyIdentity: text(sourceEntry?.journeyIdentity) || explicitJourney || null,
+        sourceRecordId: text(sourceEntry?.sourceRecordId) || text(record.id) || null,
+        provider: text(sourceEntry?.provider) || provider || null,
+        patternIdentity: text(sourceEntry?.patternIdentity) || pattern || null,
+        routeNumber: text(sourceEntry?.routeNumber) || text(record.routeNumber) || null,
+        direction: text(sourceEntry?.direction) || text(record.direction || record.destination || record.origin) || null,
+        origin: text(sourceEntry?.origin) || text(record.origin) || null,
+        destination: text(sourceEntry?.destination) || text(record.destination) || null,
+        calendarProfileId: text(sourceEntry?.calendarProfileId) || text(record.calendarProfileId || record.source?.calendarProfileId) || null
+      });
+    }
+  }
+  return Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, Object.freeze(evidence[day])])))
+}
+
 function materialQualification(note) {
   return note && !GENERIC_QUALIFICATION_PATTERNS.some(pattern => pattern.test(note));
 }
 
+function plannerQualificationNote(note) {
+  const value = text(note);
+  if (!value) return null;
+  if (/school[- ]?days?.*non[- ]school|non[- ]school.*school[- ]?days?/i.test(value)) return 'Timetable varies between school and non-school days.';
+  if (/non[- ]school|school holidays?/i.test(value)) return 'Non-school days only.';
+  if (/school[- ]?days?(?:[- ]only)?|schooldays?/i.test(value)) return 'School days only.';
+  if (/term[- ]time|term[- ]only/i.test(value)) return 'Term-time service.';
+  if (/circular service/i.test(value)) return 'Circular service.';
+  return materialQualification(value) ? value : null;
+}
+
+function sourceDiagnostic(note) {
+  const value = text(note);
+  return Boolean(value && /full tfl route origin|timetable did not supply|tfl route metadata|could not be safely mapped|without intervalid linkage|frequency ranges?|representative stop.*(?:evidence|frequency)|source (?:evidence|processing)|processing|provenance|schedule integrity note/i.test(value));
+}
+
 export function collectServiceWarnings(serviceRecords = []) {
   const qualifications = unique(serviceRecords.flatMap(record => record.qualifications ?? []));
-  const warnings = [];
+  const warnings = unique(serviceRecords.flatMap(record => record.sourceWarnings ?? []));
   if (qualifications.some(note => /date-specific exceptions/i.test(note))) warnings.push('Some timetables contain date-specific changes. Check the assessment date before formal use.');
   if (serviceRecords.some(record => (record.scheduleIntegrityWarnings ?? []).length)) warnings.push('One or more timetable records contained duplicate or invalid chronology evidence; the affected values were retained only after deterministic integrity checks.');
+  warnings.push(...qualifications.filter(sourceDiagnostic));
   return warnings;
 }
 
@@ -254,7 +355,8 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const stopDirections = unique(relevantStops.map(id => selectedStopDirectionKey(selectedStopsById.get(id))).filter(Boolean)).sort().join(',');
     const directionKey = directionGroupKey(service);
     const terminiKey = `${service.origin}|${service.destination}`;
-    const identity = [service.routeNumber, service.operator, directionKey, terminiKey, stopDirections].map(value => text(value).toLowerCase()).join('|');
+    const calendarProfileId = text(service.calendarProfileId || service.source?.calendarProfileId);
+    const identity = [service.routeNumber, service.operator, directionKey, terminiKey, stopDirections, calendarProfileId].map(value => text(value).toLowerCase()).join('|');
     if (!groups.has(identity)) groups.set(identity, []);
     groups.get(identity).push({ ...service, relevantStops });
   }
@@ -274,14 +376,17 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const typicalFrequency = frequencyRepresentativeDay
       ? frequencyByDay[frequencyRepresentativeDay]
       : Object.freeze({ day: null, dayLabel: null, departureCount: 0, basis: 'unavailable', classification: 'unavailable', noService: true, busesPerHour: null, intervalMinutes: null, valueText: 'Frequency unavailable', wording: 'Frequency unavailable' });
-    const notes = unique(records.flatMap(record => record.qualifications ?? []))
-      .filter(materialQualification)
+    const sourceWarnings = unique(records.flatMap(record => [...(record.sourceWarnings ?? []), ...(record.qualifications ?? [])].filter(sourceDiagnostic)));
+    const calendarEvidence = records.flatMap(record => record.calendarEvidence ?? record.operatingCalendarEvidence ?? []);
+    const notes = unique([
+      ...calendarQualificationNotes(calendarEvidence),
+      ...records.flatMap(record => [...(record.serviceNotes ?? []), ...(record.qualifications ?? [])].map(plannerQualificationNote))
+    ])
       .filter(note => qualificationAppliesToFinalRow(note, departuresByDay));
     const endpointPatterns = unique(records.map(record => `${text(record.origin)} → ${text(record.destination)}`));
     if (endpointPatterns.length > 1) notes.push('Includes scheduled short workings or route variants in this direction; the main origin/destination shown is the most extensive pattern in the source timetable.');
-    if (records.some(record => record.circular)) notes.push('Circular service pattern; the displayed origin and destination are the timetable pattern endpoints.');
+    if (records.some(record => record.circular)) notes.push('Circular service.');
     if (!DAY_ORDER.some(day => periods[day])) notes.push('No scheduled departures are available for the prepared representative week.');
-    if (!text(first.operator) || /not supplied/i.test(text(first.operator))) notes.push('The timetable did not supply a reliable operator name.');
     const principalLocations = unique(records.flatMap(record => record.principalLocations ?? []));
     const assessedStops = stopIds.map(id => selectedStopsById.get(id)).filter(Boolean);
     const stopLabel = stop => [text(stop?.name), text(stop?.indicator)].filter(Boolean).join(' — ') || text(stop?.id || stop?.sourceId);
@@ -306,7 +411,11 @@ export function buildServiceSummaries(stops, serviceRecords) {
       stopDirection: serviceStopDirection(frequencyStop),
       stopDirectionEvidenceId: frequencyBasisStopId,
       circular: records.some(record => record.circular),
+      calendarProfileId: text(first.calendarProfileId || first.source?.calendarProfileId) || null,
+      calendarProfileLabel: calendarProfileLabel(first.calendarProfileId || first.source?.calendarProfileId),
       principalLocations,
+      routePatternStops: Object.freeze([...(first.routePatternStops ?? [])]),
+      calendarEvidence: Object.freeze(calendarEvidence),
       directionFamily: directionGroupKey(first),
       routePatternStopIds: Object.freeze([...(first.routePatternStopIds ?? [])]),
       routePatternExtent: Math.max(0, ...records.map(record => Array.isArray(record.routePatternStopIds) ? record.routePatternStopIds.length : 0)),
@@ -324,10 +433,13 @@ export function buildServiceSummaries(stops, serviceRecords) {
       stopContext,
       frequencyEvidenceSource: unique(records.map(record => record.timetableSource || record.source?.provider)).join(' + ') || null,
       frequencyRepresentativeDay,
+      frequencyEvidence: Object.freeze(frequencyEvidence),
+      sourceWarnings: Object.freeze(sourceWarnings),
       serviceNote: unique(notes).join(' '),
       stopIds,
       sourceRecordIds: unique(records.map(record => record.id)),
       departuresByDay,
+      departureEvidenceByDay: departureEvidenceForRecords(records, frequencyBasisStopId),
       validity: Object.freeze({ from: unique(records.map(record => record.validFrom)).sort()[0] || null, to: unique(records.map(record => record.validTo)).sort().at(-1) || null })
     });
   });
@@ -477,8 +589,17 @@ function dayLabel(day) { return DAY_LABELS[day] || text(day); }
 function dayShortLabel(day) { return DAY_SHORT_LABELS[day] || text(day); }
 
 function intervals(values) {
-  const ordered = numeric(values);
-  return ordered.slice(1).map((value, index) => value - ordered[index]).filter(value => value > 0);
+  const valuesInOrder = ordered(values);
+  return valuesInOrder.slice(1).map((value, index) => value - valuesInOrder[index]).filter(value => value > 0);
+}
+
+function quantile(values, fraction) {
+  const orderedValues = values.slice().sort((a, b) => a - b);
+  if (!orderedValues.length) return null;
+  const position = (orderedValues.length - 1) * fraction;
+  const lower = Math.floor(position), upper = Math.ceil(position);
+  if (lower === upper) return orderedValues[lower];
+  return orderedValues[lower] + (orderedValues[upper] - orderedValues[lower]) * (position - lower);
 }
 
 function deterministicFrequencyBand(evidence, day) {
@@ -496,9 +617,11 @@ function deterministicFrequencyBand(evidence, day) {
       && (!Number.isFinite(item.fromMinute) || !Number.isFinite(item.toMinute) || item.toMinute > item.fromMinute));
   const uniqueBands = [...new Map(bands.map(item => [JSON.stringify(item), item])).values()];
   if (!uniqueBands.length) return null;
+  const exact = uniqueBands.every(item => item.lowestFrequency === item.highestFrequency);
   const lowestFrequency = Math.min(...uniqueBands.map(item => item.lowestFrequency));
   const highestFrequency = Math.max(...uniqueBands.map(item => item.highestFrequency));
-  return { ...uniqueBands[0], lowestFrequency, highestFrequency, bandCount: uniqueBands.length };
+  const sameExactFrequency = exact && uniqueBands.every(item => item.lowestFrequency === uniqueBands[0].lowestFrequency);
+  return { ...uniqueBands[0], lowestFrequency, highestFrequency, bandCount: uniqueBands.length, exact: sameExactFrequency };
 }
 
 export function formatServiceOriginDestination(service, separator = ' - ') {
@@ -511,41 +634,66 @@ export function formatServiceOriginDestination(service, separator = ' - ') {
 
 /** Shared planner-facing frequency rule; no synthetic departures are created. */
 export function calculateTypicalServiceFrequency(departures, { day, label = '', frequencyEvidence = [] } = {}) {
-  const scheduled = numeric(departures);
+  const scheduled = ordered(departures);
   const band = deterministicFrequencyBand(frequencyEvidence, day);
   const dayText = dayLabel(day);
-  if (band) {
+  if (band?.exact && scheduled.length) {
     const busesPerHour = 60 / ((band.lowestFrequency + band.highestFrequency) / 2);
-    const valueText = band.lowestFrequency === band.highestFrequency
-      ? `Every ${band.lowestFrequency} mins`
-      : `Every ${band.lowestFrequency}–${band.highestFrequency} mins`;
+    const valueText = `Every ~${band.lowestFrequency} mins`;
     return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'frequency-band', classification: 'regular-frequency', noService: false, busesPerHour: Number(busesPerHour.toFixed(2)), intervalMinutes: band.lowestFrequency === band.highestFrequency ? band.lowestFrequency : null, intervalRange: Object.freeze([band.lowestFrequency, band.highestFrequency]), valueText, wording: `${dayText}: ${valueText}` });
   }
   if (!scheduled.length) return Object.freeze({ day, dayLabel: dayText, departureCount: 0, basis: 'scheduled', classification: 'no-service', noService: true, busesPerHour: null, intervalMinutes: null, valueText: 'No scheduled service', wording: `${dayText}: No scheduled service` });
+  if (band) {
+    const low = Math.round(band.lowestFrequency);
+    const high = Math.round(band.highestFrequency);
+    const valueText = low === high ? `Every ~${low} mins` : `Typically every ~${low}–${high} mins`;
+    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'frequency-band-range', classification: low === high ? 'regular-frequency' : 'variable-frequency', noService: false, busesPerHour: Number((60 / ((low + high) / 2)).toFixed(2)), intervalMinutes: low === high ? low : null, intervalRange: Object.freeze([low, high]), valueText, wording: `${dayText}: ${valueText}` });
+  }
   if (scheduled.length <= LIMITED_SERVICE_JOURNEY_THRESHOLD) {
     const valueText = `${scheduled.length} journey${scheduled.length === 1 ? '' : 's'}/day`;
     return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'journeys-per-day', noService: false, busesPerHour: null, intervalMinutes: null, valueText, wording: `${dayText}: ${valueText}` });
   }
   const gaps = intervals(scheduled);
-  const median = gaps.length ? gaps.slice().sort((a, b) => a - b)[Math.floor(gaps.length / 2)] : null;
-  const regular = median != null && gaps.every(gap => Math.abs(gap - median) <= Math.max(1, median * REGULARITY_INTERVAL_TOLERANCE));
-  if (!regular) {
-    const valueText = `${scheduled.length} scheduled journeys/day (irregular)`;
-    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'irregular', noService: false, busesPerHour: null, intervalMinutes: null, valueText, wording: `${dayText}: ${valueText}` });
+  const orderedGaps = gaps.slice().sort((a, b) => a - b);
+  const median = orderedGaps.length
+    ? (orderedGaps.length % 2 ? orderedGaps[Math.floor(orderedGaps.length / 2)] : (orderedGaps[orderedGaps.length / 2 - 1] + orderedGaps[orderedGaps.length / 2]) / 2)
+    : null;
+  const inactiveGapThreshold = median == null ? Number.POSITIVE_INFINITY : Math.max(180, median * 3);
+  const filteredGaps = median != null && gaps.length >= 3
+    ? gaps.filter(gap => gap <= inactiveGapThreshold)
+    : gaps;
+  const robustGaps = filteredGaps.length ? filteredGaps : gaps;
+  const robustOrdered = robustGaps.slice().sort((a, b) => a - b);
+  const robustMedian = robustOrdered.length
+    ? (robustOrdered.length % 2 ? robustOrdered[Math.floor(robustOrdered.length / 2)] : (robustOrdered[robustOrdered.length / 2 - 1] + robustOrdered[robustOrdered.length / 2]) / 2)
+    : median;
+  const regular = robustMedian != null && robustGaps.length > 0 && robustGaps.every(gap => Math.abs(gap - robustMedian) <= Math.max(1, robustMedian * REGULARITY_INTERVAL_TOLERANCE));
+  const centralLow = quantile(robustGaps, 0.25);
+  const centralHigh = quantile(robustGaps, 0.75);
+  const rangeLow = centralLow == null ? null : Math.max(5, Math.round(centralLow / 5) * 5);
+  const rangeHigh = centralHigh == null ? null : Math.max(rangeLow ?? 5, Math.round(centralHigh / 5) * 5);
+  const hasMaterialActiveGap = robustMedian != null && robustGaps.some(gap => gap >= Math.max(60, robustMedian * 5));
+  if (!regular && !hasMaterialActiveGap && rangeLow != null && rangeHigh <= Math.max(30, (robustMedian ?? rangeHigh) * 2)) {
+    const valueText = rangeLow === rangeHigh ? `Typically every ~${rangeLow} mins` : `Typically every ~${rangeLow}–${rangeHigh} mins`;
+    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'variable-frequency', noService: false, busesPerHour: null, intervalMinutes: rangeLow === rangeHigh ? rangeLow : null, intervalRange: Object.freeze([rangeLow, rangeHigh]), valueText, wording: `${dayText}: ${valueText}` });
   }
-  const frequency = calculateScheduledFrequency(scheduled, { startMinute: scheduled[0], endMinute: scheduled.at(-1) + median, label });
-  const valueText = `Every ~${median} mins`;
-  return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'regular-frequency', noService: false, busesPerHour: frequency.busesPerHour, intervalMinutes: median, valueText, wording: `${dayText}: ${valueText}` });
+  if (!regular) {
+    const intervalMinutes = robustMedian;
+    const busesPerHour = intervalMinutes ? 60 / intervalMinutes : null;
+    const roundedInterval = intervalMinutes == null ? null : Math.max(5, Math.round(intervalMinutes / 5) * 5);
+    const valueText = roundedInterval == null ? `${scheduled.length} scheduled journeys/day (irregular)` : `Approx. every ${roundedInterval} mins (irregular)`;
+    return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'irregular', presentationMode: 'headway', noService: false, busesPerHour: busesPerHour == null ? null : Number(busesPerHour.toFixed(2)), intervalMinutes: roundedInterval, averageIntervalMinutes: intervalMinutes, intervalRange: null, valueText, wording: `${dayText}: ${valueText}` });
+  }
+  const roundedMedian = Math.round(robustMedian);
+  const frequency = calculateScheduledFrequency(scheduled, { startMinute: scheduled[0], endMinute: scheduled.at(-1) + roundedMedian, label });
+  const valueText = `Every ~${roundedMedian} mins`;
+  return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'regular-frequency', noService: false, busesPerHour: frequency.busesPerHour, intervalMinutes: roundedMedian, valueText, wording: `${dayText}: ${valueText}` });
 }
 
 function frequencyEquivalenceKey(result) {
-  if (result?.basis === 'frequency-band') return JSON.stringify([result.basis, result.valueText, result.noService === true]);
   return JSON.stringify([
-    result?.basis ?? null,
     result?.classification ?? null,
-    result?.departureCount ?? null,
-    result?.busesPerHour ?? null,
-    result?.intervalMinutes ?? null,
+    result?.valueText ?? null,
     result?.noService === true
   ]);
 }
@@ -574,6 +722,7 @@ function qualificationAppliesToFinalRow(note, departuresByDay = {}) {
   if (/weekday-only service/i.test(note)) {
     return representedDays.length > 0 && !representedDays.some(day => day === 'saturday' || day === 'sunday');
   }
+  if (!/non[- ]school/i.test(note) && /school\s*days?/i.test(note) && representedDays.some(day => day === 'saturday' || day === 'sunday')) return false;
   return true;
 }
 

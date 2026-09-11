@@ -214,17 +214,23 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     const maximumRequests = Number.isInteger(Number(options.maxRequests)) && Number(options.maxRequests) >= 0 ? Number(options.maxRequests) : requests.length;
     const processedRequests = requests.slice(0, maximumRequests);
     const unprocessed = requests.slice(maximumRequests);
+    const onProgress = typeof options.onProgress === 'function' ? options.onProgress : () => {};
+    onProgress({ phase: 'checking-timetables', completed: 0, total: processedRequests.length, detail: `${processedRequests.length} timetable requests` });
     const nationalRequired = nationalEvidenceRequired;
     const nationalSourceAvailable = !nationalRequired || Boolean(national.ok);
     const nationalUnresolvedRoutes = nationalSourceAvailable ? [] : [...new Set(nationalStops.flatMap(nationalRoutesForStop))].sort((left, right) => left.localeCompare(right, 'en-GB', { numeric: true }));
     const warnings = [...new Set([...(national.warnings ?? []), ...(insideLondon ? [] : [crossBoundaryWarning]), ...(nationalSourceAvailable ? [] : [nationalUnavailableWarning]), ...(unprocessed.length ? [unprocessedWarning] : [])])];
     const routeMetadata = tflAdapter.routeMetadataForLines && processedRequests.length
-      ? await tflAdapter.routeMetadataForLines([...new Set(processedRequests.map(request => request.lineId))], { forceRefresh: options.forceRefresh })
+      ? await tflAdapter.routeMetadataForLines([...new Set(processedRequests.map(request => request.lineId))], { forceRefresh: options.forceRefresh, progress: { phase: 'checking-timetables', completed: 0, total: processedRequests.length } })
       : null;
     const stageResults = [];
     for (const [stageIndex, stage] of chunks(processedRequests, stageSize).entries()) {
       const results = [];
-      for (const request of stage) results.push(await tflAdapter.servicesForStop({ lineId: request.lineId, stopPointId: request.stopPointId, forceRefresh: options.forceRefresh, routeMetadata }));
+      for (const request of stage) {
+        const completed = stageResults.flatMap(item => item.results).length + results.length;
+        results.push(await tflAdapter.servicesForStop({ lineId: request.lineId, stopPointId: request.stopPointId, forceRefresh: options.forceRefresh, routeMetadata, progress: { phase: 'checking-timetables', completed, total: processedRequests.length } }));
+        onProgress({ phase: 'checking-timetables', completed: completed + 1, total: processedRequests.length });
+      }
       stageResults.push({ stageIndex, stage, results, routeMetadata });
     }
     const resultEntries = stageResults.flatMap(stage => stage.results.map((result, index) => ({ result, request: stage.stage[index] })));

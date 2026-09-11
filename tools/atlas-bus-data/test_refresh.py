@@ -210,6 +210,15 @@ class RefreshTests(unittest.TestCase):
         with self.assertRaisesRegex(RefreshError, 'BODS region count'):
             validate_candidate(self.root, {'naptanStopCount': 100, 'bodsServiceCount': 100, 'bodsRegionCount': 2})
 
+    def test_tnds_region_coverage_failure_identifies_expected_and_received_regions(self):
+        self._write_candidate(naptan=100, services=100)
+        manifest = self.root / 'atlas/data/bus-tnds/manifest.json'
+        payload = json.loads(manifest.read_text())
+        payload['regions'] = ['EM', 'NE', 'SE']
+        manifest.write_text(json.dumps(payload))
+        with self.assertRaisesRegex(RefreshError, r'expected EA, EM, NE, NW, SE, SW, WM, Y; received EM, NE, SE'):
+            validate_candidate(self.root)
+
     def test_source_status_states_and_initial_baseline(self):
         self.assertEqual(source_outcome('hash-a', None), ('UPDATED', 'INITIAL AUTOMATED BASELINE'))
         self.assertEqual(source_outcome('hash-a', {'sourceHash': 'hash-a'}), ('CHECKED_NO_CHANGE', None))

@@ -255,8 +255,15 @@ def candidate_metrics(site: Path) -> dict:
     if not bus.get("stopShards") or not bus.get("serviceShards"):
         raise RefreshError("Prepared NaPTAN/BODS candidate is empty")
     tnds_shards = tnds.get("serviceShards")
-    if set(tnds.get("regions", [])) != set(TNDS_REGIONS) or not isinstance(tnds_shards, dict) or tnds.get("services"):
-        raise RefreshError("Prepared TNDS candidate does not contain the required stop-prefix shard architecture")
+    if "services" in tnds:
+        raise RefreshError("Prepared TNDS candidate contains obsolete inline services; expected stop-prefix service shards")
+    if not isinstance(tnds_shards, dict) or not tnds_shards:
+        raise RefreshError("Prepared TNDS candidate serviceShards are missing or malformed")
+    received_regions = sorted({str(region).upper() for region in tnds.get("regions", []) if str(region).strip()})
+    if set(received_regions) != set(TNDS_REGIONS):
+        expected = ", ".join(TNDS_REGIONS)
+        received = ", ".join(received_regions) or "none"
+        raise RefreshError(f"Prepared TNDS candidate region coverage incomplete: expected {expected}; received {received}")
     tnds_paths = [item for values in tnds_shards.values() for item in values] if all(isinstance(values, list) for values in tnds_shards.values()) else []
     if not tnds_paths or not isinstance(tnds.get("serviceShardKeyLength"), int) or tnds["serviceShardKeyLength"] < 1:
         raise RefreshError("Prepared TNDS candidate does not contain valid stop-prefix shards")
@@ -264,7 +271,18 @@ def candidate_metrics(site: Path) -> dict:
         if not (site / "atlas" / "data" / ("bus-tnds" if relative in tnds_paths else "bus") / relative).is_file():
             raise RefreshError(f"Prepared candidate references a missing file: {relative}")
     bods_regions = bus.get("sources", {}).get("bods", {}).get("regions", [])
-    return {"naptanStopCount": bus.get("sources", {}).get("naptan", {}).get("stopCount", 0), "bodsRegionCount": len(bods_regions), "bodsServiceCount": sum(int(region.get("serviceCount", 0) or 0) for region in bods_regions), "tndsRegionCount": len(tnds.get("regions", [])), "tndsServiceCount": int(tnds.get("serviceCount", 0) or 0)}
+    return {
+        "naptanStopCount": bus.get("sources", {}).get("naptan", {}).get("stopCount", 0),
+        "bodsRegionCount": len(bods_regions),
+        "bodsServiceCount": sum(int(region.get("serviceCount", 0) or 0) for region in bods_regions),
+        "tndsRegionCount": len(received_regions),
+        "tndsProcessedRegions": received_regions,
+        "tndsRegionServiceCounts": tnds.get("regionServiceCounts", {}),
+        "tndsSourceFileCounts": tnds.get("sourceFileCounts", {}),
+        "tndsParsedFileCounts": tnds.get("parsedFileCounts", {}),
+        "tndsIgnoredRegistrationFileCounts": tnds.get("ignoredRegistrationFileCounts", {}),
+        "tndsServiceCount": int(tnds.get("serviceCount", 0) or 0),
+    }
 
 
 def validate_candidate(site: Path, baseline: dict | None = None) -> dict:
@@ -279,7 +297,9 @@ def validate_candidate(site: Path, baseline: dict | None = None) -> dict:
     if previous_regions and metrics["bodsRegionCount"] < previous_regions:
         raise RefreshError(f"Candidate BODS region count collapsed from {previous_regions} to {metrics['bodsRegionCount']}")
     if metrics["tndsRegionCount"] != len(TNDS_REGIONS):
-        raise RefreshError("Prepared TNDS candidate does not contain all eight England regions")
+        expected = ", ".join(TNDS_REGIONS)
+        received = ", ".join(metrics.get("tndsProcessedRegions", [])) or "none"
+        raise RefreshError(f"Prepared TNDS candidate region coverage incomplete: expected {expected}; received {received}")
     return metrics
 
 
@@ -351,7 +371,7 @@ def run(args: argparse.Namespace) -> dict:
         sources = {
             "naptan": {"identity": NAPTAN_URL, "checkedAt": started, "httpStatus": naptan_source["httpStatus"], "contentType": naptan_source["contentType"], "sourceHash": naptan_hash, "outcome": naptan_outcome, "preparedCount": counts["naptanStopCount"]},
             "bods": {"identity": bods["identity"], "checkedAt": started, "sourceHash": bods["sourceHash"], "outcome": bods_outcome, "regionsChecked": bods["regions"], "preparedCount": {"regions": counts["bodsRegionCount"], "services": counts["bodsServiceCount"]}},
-            "tnds": {"identity": tnds["identity"], "checkedAt": started, "sourceHash": tnds["sourceHash"], "regionHashes": tnds["regionHashes"], "regionsChecked": tnds["regions"], "outcome": tnds_outcome, "preparedCount": counts["tndsServiceCount"], "transport": "legacy FTP; credentials supplied only to the runner"},
+            "tnds": {"identity": tnds["identity"], "checkedAt": started, "sourceHash": tnds["sourceHash"], "regionHashes": tnds["regionHashes"], "regionsChecked": tnds["regions"], "outcome": tnds_outcome, "preparedCount": counts["tndsServiceCount"], "processedRegions": counts["tndsProcessedRegions"], "regionServiceCounts": counts["tndsRegionServiceCounts"], "sourceFileCounts": counts["tndsSourceFileCounts"], "parsedFileCounts": counts["tndsParsedFileCounts"], "ignoredRegistrationFileCounts": counts["tndsIgnoredRegistrationFileCounts"], "transport": "legacy FTP; credentials supplied only to the runner"},
             "tfl": {"outcome": "LIVE", "description": "Live source — checked when a London assessment is run"}
         }
         for source, note in (("naptan", naptan_note), ("bods", bods_note), ("tnds", tnds_note)):

@@ -27,7 +27,18 @@ function regionFrom(file) {
 
 export async function prepareTnds({ input, output, preparedAt = new Date().toISOString() }) {
   const files = await walk(input);
-  const regions = new Set();
+  const filesByRegion = new Map();
+  for (const file of files) {
+    const region = regionFrom(file);
+    if (!region) continue;
+    if (!filesByRegion.has(region)) filesByRegion.set(region, []);
+    filesByRegion.get(region).push(file);
+  }
+  const processedRegions = [];
+  const regionServiceIds = new Map();
+  const sourceFileCounts = {};
+  const parsedFileCounts = {};
+  const ignoredRegistrationFileCounts = {};
   const shardFiles = new Map();
   const serviceIds = new Set();
   const registeredPaths = new Set();
@@ -37,51 +48,68 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
   await fs.rm(output, { recursive: true, force: true });
   await fs.mkdir(path.join(output, 'services'), { recursive: true });
   await fs.mkdir(work, { recursive: true });
-  for (const file of files) {
-    const region = regionFrom(file);
-    if (!region) continue;
-    const xml = await fs.readFile(file, 'utf8');
-    try {
-      const parsed = parseTndsTransXchangeServices(xml, { region, sourceArchive: path.basename(file), preparedAt });
-      if (parsed.length > 1) console.log(`TNDS ${path.basename(file)}: prepared ${parsed.length} Service records.`);
-      for (const service of parsed) {
-        const hasSchedules = Object.values(service.stopSchedules ?? {}).some(hasScheduledEvidence);
-        const quarantine = service.tndsQuarantine;
-        if (!hasSchedules && !quarantine?.affectedStopIds?.length) continue;
-        if (quarantine) {
-          quarantinedPatterns += quarantine.patterns.length;
-          if (quarantine.serviceQuarantined) quarantinedServices += 1;
-          console.log(`TNDS ${path.basename(file)}: quarantined ${quarantine.patterns.length} pattern(s) for service ${service.source.serviceCode || service.id}.`);
+  for (const region of [...filesByRegion.keys()].sort()) {
+    const regionFiles = filesByRegion.get(region);
+    const retainedServiceIds = new Set();
+    let parsedFiles = 0;
+    let ignoredRegistrationFiles = 0;
+    let regionQuarantinedPatterns = 0;
+    let regionQuarantinedServices = 0;
+    for (const file of regionFiles) {
+      const xml = await fs.readFile(file, 'utf8');
+      try {
+        const parsed = parseTndsTransXchangeServices(xml, { region, sourceArchive: path.basename(file), preparedAt });
+        if (parsed.length) parsedFiles += 1;
+        if (parsed.length > 1) console.log(`TNDS ${path.basename(file)}: prepared ${parsed.length} Service records.`);
+        for (const service of parsed) {
+          const hasSchedules = Object.values(service.stopSchedules ?? {}).some(hasScheduledEvidence);
+          const quarantine = service.tndsQuarantine;
+          if (!hasSchedules && !quarantine?.affectedStopIds?.length) continue;
+          if (quarantine) {
+            regionQuarantinedPatterns += quarantine.patterns.length;
+            regionQuarantinedServices += quarantine.serviceQuarantined ? 1 : 0;
+            console.log(`TNDS ${path.basename(file)}: quarantined ${quarantine.patterns.length} pattern(s) for service ${service.source.serviceCode || service.id}.`);
+          }
+          retainedServiceIds.add(service.id);
+          serviceIds.add(service.id);
+          const ids = [...Object.keys(service.stopSchedules || {}), ...(service.tndsQuarantine?.affectedStopIds || [])];
+          const shardKeys = [...new Set(ids.map(id => String(id).slice(0, TNDS_SERVICE_SHARD_KEY_LENGTH)).filter(Boolean))];
+          if (!shardKeys.length) throw new Error(`TNDS service ${service.source.serviceCode || service.id} has no shardable StopPoint IDs.`);
+          for (const shardKey of shardKeys) {
+            const scheduled = Object.fromEntries(Object.entries(service.stopSchedules || {}).filter(([stopId]) => stopId.startsWith(shardKey)));
+            const quarantine = service.tndsQuarantine ? {
+              ...service.tndsQuarantine,
+              affectedStopIds: service.tndsQuarantine.affectedStopIds.filter(stopId => stopId.startsWith(shardKey)),
+              patterns: service.tndsQuarantine.patterns.filter(pattern => pattern.affectedStopIds.some(stopId => stopId.startsWith(shardKey))).map(pattern => ({ ...pattern, affectedStopIds: pattern.affectedStopIds.filter(stopId => stopId.startsWith(shardKey)) }))
+            } : null;
+            const record = { ...service, stopSchedules: scheduled, tndsQuarantine: quarantine?.affectedStopIds.length ? quarantine : null };
+            if (!shardFiles.has(shardKey)) shardFiles.set(shardKey, { file: path.join(work, `${shardKey}.jsonl`), identities: new Set() });
+            const shard = shardFiles.get(shardKey);
+            if (shard.identities.has(record.id)) throw new Error(`TNDS prepared service ${record.id} was duplicated in shard ${shardKey}.`);
+            shard.identities.add(record.id);
+            await fs.appendFile(shard.file, `${JSON.stringify(record)}\n`);
+          }
         }
-        regions.add(region);
-        serviceIds.add(service.id);
-        const ids = [...Object.keys(service.stopSchedules || {}), ...(service.tndsQuarantine?.affectedStopIds || [])];
-        const shardKeys = [...new Set(ids.map(id => String(id).slice(0, TNDS_SERVICE_SHARD_KEY_LENGTH)).filter(Boolean))];
-        if (!shardKeys.length) throw new Error(`TNDS service ${service.source.serviceCode || service.id} has no shardable StopPoint IDs.`);
-        for (const shardKey of shardKeys) {
-          const scheduled = Object.fromEntries(Object.entries(service.stopSchedules || {}).filter(([stopId]) => stopId.startsWith(shardKey)));
-          const quarantine = service.tndsQuarantine ? {
-            ...service.tndsQuarantine,
-            affectedStopIds: service.tndsQuarantine.affectedStopIds.filter(stopId => stopId.startsWith(shardKey)),
-            patterns: service.tndsQuarantine.patterns.filter(pattern => pattern.affectedStopIds.some(stopId => stopId.startsWith(shardKey))).map(pattern => ({ ...pattern, affectedStopIds: pattern.affectedStopIds.filter(stopId => stopId.startsWith(shardKey)) }))
-          } : null;
-          const record = { ...service, stopSchedules: scheduled, tndsQuarantine: quarantine?.affectedStopIds.length ? quarantine : null };
-          if (!shardFiles.has(shardKey)) shardFiles.set(shardKey, { file: path.join(work, `${shardKey}.jsonl`), identities: new Set() });
-          const shard = shardFiles.get(shardKey);
-          if (shard.identities.has(record.id)) throw new Error(`TNDS prepared service ${record.id} was duplicated in shard ${shardKey}.`);
-          shard.identities.add(record.id);
-          await fs.appendFile(shard.file, `${JSON.stringify(record)}\n`);
+      } catch (error) {
+        if (error.message === 'TNDS XML contains no Service record.') {
+          ignoredRegistrationFiles += 1;
+          console.log(`TNDS ${path.basename(file)}: no Service record; ignored as non-timetable registration data.`);
+          continue;
         }
+        throw new Error(`TNDS parser rejected ${path.basename(file)}: ${error.message}`);
       }
-    } catch (error) {
-      if (error.message === 'TNDS XML contains no Service record.') {
-        console.log(`TNDS ${path.basename(file)}: no Service record; ignored as non-timetable registration data.`);
-        continue;
-      }
-      throw new Error(`TNDS parser rejected ${path.basename(file)}: ${error.message}`);
     }
+    processedRegions.push(region);
+    regionServiceIds.set(region, retainedServiceIds);
+    sourceFileCounts[region] = regionFiles.length;
+    parsedFileCounts[region] = parsedFiles;
+    ignoredRegistrationFileCounts[region] = ignoredRegistrationFiles;
+    quarantinedPatterns += regionQuarantinedPatterns;
+    quarantinedServices += regionQuarantinedServices;
+    console.log(`TNDS ${region}: processed ${regionFiles.length} XML file(s); parsed ${parsedFiles}; retained ${retainedServiceIds.size} service(s); ignored ${ignoredRegistrationFiles} registration file(s); quarantined ${regionQuarantinedPatterns} pattern(s)/${regionQuarantinedServices} service(s).`);
   }
   if (!serviceIds.size) throw new Error('TNDS preparation produced no services.');
+  const regionServiceCounts = Object.fromEntries([...regionServiceIds.entries()].map(([region, ids]) => [region, ids.size]));
   const serviceShards = {};
   for (const shardKey of [...shardFiles.keys()].sort()) {
     const byRegion = new Map();
@@ -107,12 +135,19 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
     schema: 'atlas-prepared-bus-tnds-v1',
     generatedAt: preparedAt,
     source: 'Traveline National Dataset v2.5',
-    regions: [...regions].sort(),
+    expectedRegions: [...TNDS_REGIONS],
+    regions: processedRegions,
+    regionServiceCounts,
+    sourceFileCounts,
+    parsedFileCounts,
+    ignoredRegistrationFileCounts,
+    quarantinedPatternCount: quarantinedPatterns,
+    quarantinedServiceCount: quarantinedServices,
     serviceCount: serviceIds.size,
     serviceShardKeyLength: TNDS_SERVICE_SHARD_KEY_LENGTH,
     serviceShards
   })}\n`);
-  return { services: serviceIds.size, shards: Object.values(serviceShards).flat().length, regions: [...regions].sort(), quarantinedPatterns, quarantinedServices };
+  return { services: serviceIds.size, shards: Object.values(serviceShards).flat().length, expectedRegions: [...TNDS_REGIONS], regions: processedRegions, regionServiceCounts, sourceFileCounts, parsedFileCounts, ignoredRegistrationFileCounts, quarantinedPatterns, quarantinedServices };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

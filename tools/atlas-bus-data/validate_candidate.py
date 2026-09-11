@@ -66,7 +66,9 @@ def validate(site: Path) -> dict:
         raise RefreshError("Candidate NaPTAN/BODS manifest schema is invalid")
     if tnds_manifest.get("schema") != "atlas-prepared-bus-tnds-v1":
         raise RefreshError("Candidate TNDS manifest schema is invalid")
-    if "services" in tnds_manifest or tnds_manifest.get("serviceShardKeyLength") != 5:
+    if "services" in tnds_manifest:
+        raise RefreshError("Candidate TNDS manifest contains obsolete inline services; expected five-character stop-prefix service shards")
+    if tnds_manifest.get("serviceShardKeyLength") != 5:
         raise RefreshError("Candidate TNDS manifest must use five-character stop-prefix service shards")
     service_shards = tnds_manifest.get("serviceShards")
     if not isinstance(service_shards, dict) or not service_shards:
@@ -77,7 +79,9 @@ def validate(site: Path) -> dict:
     if metrics["bodsRegionCount"] < 8:
         raise RefreshError("Candidate BODS regional coverage is incomplete")
     if set(tnds_manifest.get("regions", [])) != set(TNDS_REGIONS):
-        raise RefreshError("Candidate TNDS regional coverage is incomplete")
+        expected = ", ".join(TNDS_REGIONS)
+        received = ", ".join(sorted({str(region).upper() for region in tnds_manifest.get("regions", [])})) or "none"
+        raise RefreshError(f"Candidate TNDS region coverage is incomplete: expected {expected}; received {received}")
     stop_ids = set()
     for relative in bus_manifest.get("stopShards", {}).values():
         payload = read_json(bus / relative)

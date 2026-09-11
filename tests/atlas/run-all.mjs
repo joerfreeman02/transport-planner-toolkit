@@ -23,6 +23,8 @@ await import('./bus-ui-contract.test.mjs');
 await import('./playwright-launch.test.mjs');
 await import('./tnds-transxchange.test.mjs');
 await import('./tnds-preparation-multiservice.test.mjs');
+await import('./tnds-operating-profile-standard.test.mjs');
+await import('./tnds-preparation-coverage.test.mjs');
 await import('./bus-qa-01-acceptance.test.mjs');
 await import('./bus-qa-02-frequency.test.mjs');
 await import('./bus-qa-03-integrity.test.mjs');

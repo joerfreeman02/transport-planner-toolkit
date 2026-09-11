@@ -45,7 +45,7 @@ export function calendarQualificationNotes(calendarEvidence = []) {
   const evidence = Array.isArray(calendarEvidence) ? calendarEvidence : [calendarEvidence];
   const notes = [];
   if (evidence.some(item => item?.schoolDayOnly)) notes.push('School days only.');
-  if (evidence.some(item => item?.termTimeOnly)) notes.push('Term-time service.');
+  else if (evidence.some(item => item?.termTimeOnly)) notes.push('Term-time service.');
   if (evidence.some(item => item?.nonSchoolDayOnly || item?.holidayOnly)) notes.push('Non-school days only.');
   return [...new Set(notes)];
 }

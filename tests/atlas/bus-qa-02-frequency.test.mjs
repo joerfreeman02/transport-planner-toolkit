@@ -63,6 +63,18 @@ assert.match(calculateTypicalServiceFrequency([0, 8, 18, 28, 39, 51], { day: 'mo
 const inactiveGaps = calculateTypicalServiceFrequency([0, 10, 20, 30, 330, 340, 350, 660, 670], { day: 'monday' });
 assert.equal(inactiveGaps.valueText, 'Every ~10 mins', 'all inactive gaps above the deterministic threshold are excluded, not only the largest one');
 assert.match(calculateTypicalServiceFrequency([360, 370, 380, 390, 690, 700], { day: 'monday' }).valueText, /Every ~10 mins|Typically every ~10 mins/);
+const inactiveIrregular = calculateTypicalServiceFrequency([0, 10, 20, 30, 90, 100, 110, 120], { day: 'monday' });
+assert.equal(inactiveIrregular.classification, 'irregular');
+assert.equal(inactiveIrregular.valueText, 'Approx. every 10 mins (irregular)', 'irregular fallback uses the robust active-service headway rather than the full operating span');
+assert.equal(inactiveIrregular.averageIntervalMinutes, 10);
+const lateActive = calculateTypicalServiceFrequency([300, 310, 320, 330, 340, 400, 1500, 1510], { day: 'monday' });
+assert.equal(lateActive.valueText, 'Approx. every 10 mins (irregular)', 'a late next-day departure remains in the operating period without diluting active frequency');
+const groupedSemanticFrequency = formatTypicalFrequency({
+  monday: inactiveIrregular,
+  tuesday: calculateTypicalServiceFrequency([0, 10, 20, 30, 100, 110, 120, 130], { day: 'tuesday' }),
+  wednesday: calculateTypicalServiceFrequency([], { day: 'wednesday' })
+});
+assert.deepEqual(groupedSemanticFrequency.slice(0, 2), ['Mon-Tue: Approx. every 10 mins (irregular)', 'Wed: No scheduled service'], 'day grouping uses displayed planner meaning rather than hidden raw rate diagnostics');
 assert.equal(calculateTypicalServiceFrequency([], { day: 'sunday' }).wording, 'Sunday: No scheduled service');
 
 const tflSafe = calculateTypicalServiceFrequency([350, 370, 400, 1400], { day: 'monday', frequencyEvidence: [{ periodType: 'FrequencyMinutes', day: 'monday', lowestFrequency: 10, highestFrequency: 10 }] });
@@ -92,6 +104,20 @@ const multiStop = buildServiceSummaries([
 ], stopSchedules: { A: schedule({ monday: weekdayRegular, tuesday: weekdayRegular, wednesday: weekdayRegular, thursday: weekdayRegular, friday: weekdayRegular }), B: schedule({ monday: weekdayRegular, tuesday: weekdayRegular, wednesday: weekdayRegular, thursday: weekdayRegular, friday: weekdayRegular }) } }]);
 assert.equal(multiStop[0].frequencyBasisStopId, 'A');
 assert.equal(multiStop[0].frequencyByDay.monday.intervalMinutes, 10);
+
+const schoolAndTerm = summaryFor(schedule({ monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420] }), {
+  calendarEvidence: [{ schoolDayOnly: true, termTimeOnly: true }]
+});
+assert.match(schoolAndTerm.serviceNote, /School days only\./);
+assert.doesNotMatch(schoolAndTerm.serviceNote, /Term-time service\./, 'school-day evidence takes precedence over the less-specific term-time note');
+const termOnly = summaryFor(schedule({ monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420] }), {
+  calendarEvidence: [{ termTimeOnly: true }]
+});
+assert.match(termOnly.serviceNote, /^Term-time service\.$/);
+const holidayOnly = summaryFor(schedule({ saturday: [420], sunday: [420] }), {
+  calendarEvidence: [{ nonSchoolDayOnly: true, holidayOnly: true }]
+});
+assert.match(holidayOnly.serviceNote, /Non-school days only\./);
 
 const html = fs.readFileSync(new URL('../../atlas/index.html', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../../atlas/assets/css/atlas-shell.css', import.meta.url), 'utf8');

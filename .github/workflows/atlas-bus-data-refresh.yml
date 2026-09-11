@@ -2,8 +2,16 @@ name: ATLAS Bus data refresh
 
 on:
   workflow_dispatch:
+    inputs:
+      force_refresh:
+        description: 'Bypass the weekly freshness guard and run the complete validated refresh.'
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: '17 6 * * 5'
+    - cron: '47 7 * * 5'
+    - cron: '23 12 * * 5'
 
 permissions:
   contents: read
@@ -13,8 +21,59 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  main-guard:
+    name: Require production main ref
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse non-main refresh
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::ATLAS Bus refresh is permitted only from refs/heads/main; refusing to build or deploy $GITHUB_REF."
+          exit 1
+
+  freshness:
+    name: Check weekly Bus refresh freshness
+    needs: main-guard
+    runs-on: ubuntu-latest
+    outputs:
+      refresh_required: ${{ steps.decision.outputs.refresh_required }}
+      reason: ${{ steps.decision.outputs.reason }}
+      message: ${{ steps.decision.outputs.message }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Obtain deployed Bus and status manifests
+        shell: bash
+        run: |
+          rm -rf last-known-good
+          mkdir -p last-known-good/atlas/data/{status,bus,bus-tnds}
+          base='https://joerfreeman02.github.io/transport-planner-toolkit/atlas/data'
+          for item in status/manifest.json bus/manifest.json bus-tnds/manifest.json; do
+            curl --fail --silent --show-error --location --header 'Cache-Control: no-cache' "$base/$item" -o "last-known-good/atlas/data/$item" || rm -f "last-known-good/atlas/data/$item"
+          done
+      - name: Decide whether a full refresh is required
+        id: decision
+        env:
+          FORCE_REFRESH: ${{ github.event_name == 'workflow_dispatch' && inputs.force_refresh || false }}
+        shell: bash
+        run: |
+          node tools/atlas-bus-data/refresh-freshness.mjs \
+            --status last-known-good/atlas/data/status/manifest.json \
+            --bus last-known-good/atlas/data/bus/manifest.json \
+            --tnds last-known-good/atlas/data/bus-tnds/manifest.json \
+            --force-refresh "$FORCE_REFRESH" \
+            --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Record freshness decision
+        run: echo "${{ steps.decision.outputs.message }}"
+
   build-validate:
     name: Build and validate Bus candidate
+    needs: [main-guard, freshness]
+    if: needs.freshness.outputs.refresh_required == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 75
     permissions:
@@ -74,8 +133,8 @@ jobs:
 
   deploy:
     name: Deploy validated Pages artifact
-    needs: build-validate
-    if: needs.build-validate.result == 'success'
+    needs: [main-guard, freshness, build-validate]
+    if: needs.freshness.outputs.refresh_required == 'true' && needs.build-validate.result == 'success' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -85,3 +144,12 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
+
+  freshness-no-op:
+    name: Confirm already-fresh Bus data
+    needs: [main-guard, freshness, build-validate]
+    if: always() && needs.main-guard.result == 'success' && needs.freshness.outputs.refresh_required == 'false' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Complete without a duplicate refresh
+        run: echo "${{ needs.freshness.outputs.message }}"

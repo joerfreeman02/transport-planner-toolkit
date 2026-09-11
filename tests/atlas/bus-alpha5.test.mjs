@@ -101,7 +101,8 @@ test('material school-service note remains visible', () => {
     qualifications: ['School-day or term-time service identified in the source timetable; check the assessment date before formal use.']
   }];
   const [summary] = buildServiceSummaries([stop()], records);
-  assert.match(summary.serviceNote, /School days only\. Term-time service\./i);
+  assert.match(summary.serviceNote, /School days only\./i);
+  assert.doesNotMatch(summary.serviceNote, /Term-time service\./i);
 });
 
 

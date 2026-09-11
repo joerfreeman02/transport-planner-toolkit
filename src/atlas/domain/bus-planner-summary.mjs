@@ -227,10 +227,9 @@ function servedAtText(representative) {
 function materialServiceNote(note) {
   const value = text(note);
   if (!value) return null;
-  if (/school[- ]?days?.*term[- ]?time|term[- ]?time.*school[- ]?days?/i.test(value)) return 'School days only. Term-time service.';
+  if (/non[- ]school|school holidays?/i.test(value)) return 'Non-school days only.';
   if (/school[- ]?days?(?:[- ]only)?|schooldays?/i.test(value)) return 'School days only.';
   if (/term[- ]time|term[- ]only/i.test(value)) return 'Term-time service.';
-  if (/non[- ]school|school holidays?/i.test(value)) return 'Non-school days only.';
   if (/circular service/i.test(value)) return 'Circular service.';
   if (/^Includes scheduled short workings or route variants/i.test(value)) return null;
   if (/^(?:Schedule integrity note:|TfL supplied|ATLAS retained|source (?:evidence|processing)|representative stop.*(?:evidence|frequency)|(?:frequency|operating[- ]period).*evidence|timetable evidence.*(?:derived|retained)|full tfl route origin|the timetable did not supply|tfl route metadata|the scheduled evidence is retained|limited service:\s*no more than three scheduled journeys)/i.test(value)) return null;

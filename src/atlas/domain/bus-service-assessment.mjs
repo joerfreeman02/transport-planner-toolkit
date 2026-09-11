@@ -224,10 +224,9 @@ function materialQualification(note) {
 function plannerQualificationNote(note) {
   const value = text(note);
   if (!value) return null;
-  if (/school[- ]?days?.*term[- ]?time|term[- ]?time.*school[- ]?days?/i.test(value)) return 'School days only. Term-time service.';
+  if (/non[- ]school|school holidays?/i.test(value)) return 'Non-school days only.';
   if (/school[- ]?days?(?:[- ]only)?|schooldays?/i.test(value)) return 'School days only.';
   if (/term[- ]time|term[- ]only/i.test(value)) return 'Term-time service.';
-  if (/non[- ]school|school holidays?/i.test(value)) return 'Non-school days only.';
   if (/circular service/i.test(value)) return 'Circular service.';
   return materialQualification(value) ? value : null;
 }
@@ -641,8 +640,7 @@ export function calculateTypicalServiceFrequency(departures, { day, label = '', 
     return Object.freeze({ day, dayLabel: dayText, departureCount: scheduled.length, basis: 'scheduled', classification: 'variable-frequency', noService: false, busesPerHour: null, intervalMinutes: rangeLow === rangeHigh ? rangeLow : null, intervalRange: Object.freeze([rangeLow, rangeHigh]), valueText, wording: `${dayText}: ${valueText}` });
   }
   if (!regular) {
-    const operatingMinutes = scheduled.at(-1) - scheduled[0];
-    const intervalMinutes = operatingMinutes > 0 ? operatingMinutes / (scheduled.length - 1) : null;
+    const intervalMinutes = robustMedian;
     const busesPerHour = intervalMinutes ? 60 / intervalMinutes : null;
     const roundedInterval = intervalMinutes == null ? null : Math.max(5, Math.round(intervalMinutes / 5) * 5);
     const valueText = roundedInterval == null ? `${scheduled.length} scheduled journeys/day (irregular)` : `Approx. every ${roundedInterval} mins (irregular)`;
@@ -655,13 +653,9 @@ export function calculateTypicalServiceFrequency(departures, { day, label = '', 
 }
 
 function frequencyEquivalenceKey(result) {
-  if (result?.basis === 'frequency-band') return JSON.stringify([result.basis, result.valueText, result.noService === true]);
   return JSON.stringify([
-    result?.basis ?? null,
     result?.classification ?? null,
-    result?.departureCount ?? null,
-    result?.busesPerHour ?? null,
-    result?.intervalMinutes ?? null,
+    result?.valueText ?? null,
     result?.noService === true
   ]);
 }
@@ -690,7 +684,7 @@ function qualificationAppliesToFinalRow(note, departuresByDay = {}) {
   if (/weekday-only service/i.test(note)) {
     return representedDays.length > 0 && !representedDays.some(day => day === 'saturday' || day === 'sunday');
   }
-  if (/school\s*days?/i.test(note) && representedDays.some(day => day === 'saturday' || day === 'sunday')) return false;
+  if (!/non[- ]school/i.test(note) && /school\s*days?/i.test(note) && representedDays.some(day => day === 'saturday' || day === 'sunday')) return false;
   return true;
 }
 

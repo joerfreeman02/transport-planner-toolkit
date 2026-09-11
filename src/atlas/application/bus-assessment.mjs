@@ -170,7 +170,7 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
 
 function partialDetail(reviewItems) {
   const count = reviewItems.length;
-  return `Assessment finished — ${count} evidence item${count === 1 ? '' : 's'} need review`;
+  return `${count} evidence item${count === 1 ? '' : 's'} need review`;
 }
 
 export function createBusAssessment({ stopDiscovery, timetableData, accessRouting } = {}) {
@@ -279,7 +279,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
           prepared = expanded;
           actualDiscoveryRadiusMetres = 2000;
           enrichedDiscoveredStops = expanded.enriched;
-          nearest = await nearestTimetable(expanded.enriched, { forceRefresh, site }, [...commonWarnings, `Nearest search expanded from ${selectedRadiusMetres} m to 2,000 m because no matched scheduled service was established in the initial radius.`]);
+          nearest = await nearestTimetable(expanded.enriched, { forceRefresh, site }, [...commonWarnings, `Nearest search expanded from ${selectedRadiusMetres} m to 2,000 m because no matched scheduled service was established in the initial radius.`], onProgress);
         }
       }
       assessmentWarnings = nearest.warnings;

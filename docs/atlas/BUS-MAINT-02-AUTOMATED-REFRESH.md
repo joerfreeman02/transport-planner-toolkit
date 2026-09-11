@@ -1,5 +1,45 @@
 # BUS-MAINT-02 — Automated Bus refresh
 
+## Alpha.13 production-scale TNDS failure and scale hardening
+
+The single authorized production refresh `34606248773` on 2026-09-11 acquired
+all nine BODS feeds and completed all eight TNDS transfers, processing 11,996
+XML files and retaining 229,917 services. It failed before candidate
+validation at `tools/atlas-bus-data/prepare_tnds.mjs:116` while executing a
+whole-file UTF-8 `fs.readFile()` of a large intermediate TNDS JSONL shard.
+The subsequent `.trim().split('\\n')` attempted to materialise the complete
+shard as one JavaScript string and raised `RangeError: Invalid string length`.
+This was a materialisation-boundary failure, not an FTP, parser, coverage or
+source-authentication failure; no candidate or Pages deployment was written.
+
+The bounded hotfix keeps the existing document-level TransXChange parser and
+all service, StopPoint, calendar, provenance, quarantine, fallback and
+ordering semantics. It writes one deterministic JSONL work file per
+stop-prefix/region, retains only scalar service-id/byte-offset indexes for
+ordering and duplicate detection, reads one indexed record at a time, and
+streams the final JSON array through gzip with backpressure. It therefore
+removes the whole-shard read, region-record aggregation and giant
+`JSON.stringify`/`gzipSync` payload. Individual XML reads remain bounded by an
+explicit 64 MiB limit and fail with an actionable error rather than silently
+truncating or dropping data.
+
+The adjacent-path audit covered whole-file XML reads, giant shard reads,
+monolithic JSON serialization, large joins and concatenations, pre-shard
+all-region/all-service aggregation, concurrent raw-content retention,
+archive/XML materialisation, oversized individual inputs and diagnostic
+strings. The only confirmed production defect was the large-shard
+materialisation boundary; the other cases are sequential, path/index-only or
+now explicitly bounded and fail-safe.
+
+Regression coverage includes direct parser/output equivalence, an ordinary
+fixture, a generated 1,800-record stress path using the production preparation
+entry point, a one-record buffering assertion, and an oversized-XML explicit
+failure case. The release metadata remains unchanged at Alpha.13. If release
+policy requires publishing this post-deployment correction separately, the
+recommended identity for Technical Director approval is
+`2.0.0-alpha.14` / `ATLAS-2.0.0-alpha.14-20260911`; it is not changed by this
+hotfix.
+
 Alpha.7 builds an isolated GitHub Pages candidate every Friday at 06:17 UTC or on `workflow_dispatch`. The runner acquires the official NaPTAN CSV, the DfT BODS regional GTFS ZIP endpoints under `https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/{region}/`, and all eight accepted England TNDS v2.5 regions (`EA`, `EM`, `NE`, `NW`, `SE`, `SW`, `WM`, `Y`). TNDS uses the existing legacy FTP source; the runner receives only `TNDS_USERNAME` and `TNDS_PASSWORD` as Actions secrets and the credentials are never written to manifests or Pages files.
 
 TNDS directory discovery remains a single authenticated listing session, but each regional archive transfer uses its own authenticated FTP session. Each region is attempted at most three times with modest bounded backoff. Archives are written to a temporary `.part` file, validated as non-empty, promoted only after transfer completion, and then safely extracted. A failed region names the region, archive, attempt and failure category; no partial archive is accepted, and any failed region fails the complete candidate so Pages deployment cannot proceed with incomplete TNDS coverage.

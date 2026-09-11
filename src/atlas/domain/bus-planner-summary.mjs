@@ -122,11 +122,15 @@ function serviceDepartureEntries(service, representativeId) {
   const evidence = service?.departureEvidenceByDay;
   const hasEvidence = evidence && DAY_ORDER.some(day => Array.isArray(evidence[day]));
   return DAY_ORDER.flatMap(day => {
-    const entries = hasEvidence ? (evidence[day] ?? []) : (service?.departuresByDay?.[day] ?? []);
+    const explicitEntries = hasEvidence && Array.isArray(evidence[day]) ? evidence[day] : null;
+    const scopedEntries = explicitEntries && explicitEntries.some(item => text(item?.stopPointId))
+      ? explicitEntries.filter(item => text(item?.stopPointId) === representativeId)
+      : explicitEntries;
+    const entries = scopedEntries?.length ? scopedEntries : (service?.departuresByDay?.[day] ?? []);
     return entries.map(item => {
       const minute = Number(item?.minute ?? item?.departureMinute ?? item?.time ?? item);
       if (!Number.isFinite(minute)) return null;
-      return { day, minute, stopPointId: representativeId, journeyIdentity: departureIdentity(item) || null, provider: text(item?.provider || service?.timetableSource || service?.source?.provider) || null, sourceRecordId: text(item?.sourceRecordId || service?.id) || null, routeNumber: text(item?.routeNumber || service?.routeNumber), direction: text(item?.direction || service?.direction || service?.destination || service?.origin), origin: text(item?.origin || service?.origin), destination: text(item?.destination || service?.destination) };
+      return { day, minute, stopPointId: text(item?.stopPointId) || representativeId, journeyIdentity: departureIdentity(item) || null, provider: text(item?.provider || service?.timetableSource || service?.source?.provider) || null, sourceRecordId: text(item?.sourceRecordId || service?.id) || null, routeNumber: text(item?.routeNumber || service?.routeNumber), direction: text(item?.direction || service?.direction || service?.destination || service?.origin), origin: text(item?.origin || service?.origin), destination: text(item?.destination || service?.destination), calendarProfileId: text(item?.calendarProfileId || service?.calendarProfileId || service?.source?.calendarProfileId) || null };
     }).filter(Boolean);
   });
 }

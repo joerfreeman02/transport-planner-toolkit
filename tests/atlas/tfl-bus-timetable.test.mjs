@@ -61,6 +61,33 @@ assert.ok(mixedCalendarPlanner.every(row => row.typicalFrequencyText.includes('(
 assert.ok(mixedCalendarPlanner.some(row => row.typicalFrequencyText.includes('(school days)')));
 assert.ok(mixedCalendarPlanner.some(row => row.typicalFrequencyText.includes('(non-school days)')));
 
+const multiStopTflPayload = requestedStop => ({
+  lineId: 'MSTOP', lineName: 'MSTOP', direction: 'outbound', stations: [{ id: 'MSTOP-A', name: 'MSTOP A' }, { id: 'MSTOP-B', name: 'MSTOP B' }, { id: 'MSTOP-C', name: 'MSTOP C' }],
+  timetable: {
+    departureStopId: requestedStop,
+    routes: [{ stationIntervals: [{ id: 'mstop-pattern', intervals: [{ stopId: 'MSTOP-A', timeToArrival: 0 }, { stopId: 'MSTOP-B', timeToArrival: 5 }, { stopId: 'MSTOP-C', timeToArrival: 12 }] }], schedules: [{ name: 'Monday to Friday', knownJourneys: [{ vehicleJourneyId: 'MSTOP-1', intervalId: 'mstop-pattern', stopTimes: [{ stopId: 'MSTOP-A', departureTime: { hour: 8, minute: 0 } }, { stopId: 'MSTOP-B', departureTime: { hour: 8, minute: 5 } }, { stopId: 'MSTOP-C', departureTime: { hour: 8, minute: 12 } }] }] }] }]
+  }
+});
+const multiStopTflMetadata = { ok: true, data: [{ id: 'MSTOP', routeSections: [{ direction: 'outbound', originationName: 'MSTOP origin', destinationName: 'MSTOP C' }] }] };
+const multiStopRepresentativeTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => response(multiStopTflPayload(String(url).includes('MSTOP-B') ? 'MSTOP-B' : 'MSTOP-A')) });
+const multiStopAResult = await multiStopRepresentativeTfl.servicesForStop({ lineId: 'MSTOP', stopPointId: 'MSTOP-A', routeMetadata: multiStopTflMetadata });
+const multiStopBResult = await multiStopRepresentativeTfl.servicesForStop({ lineId: 'MSTOP', stopPointId: 'MSTOP-B', routeMetadata: multiStopTflMetadata });
+const multiStopStops = [{ id: 'MSTOP-A', name: 'MSTOP A', walking: { status: 'routed', distanceMetres: 140 } }, { id: 'MSTOP-B', name: 'MSTOP B', walking: { status: 'routed', distanceMetres: 80 } }];
+const representativeMultiStopSummary = buildServiceSummaries(multiStopStops, [...multiStopAResult.data, ...multiStopBResult.data])[0];
+const representativeMultiStopPlanner = buildPlannerBusServiceSummaries([representativeMultiStopSummary], multiStopStops)[0];
+assert.deepEqual(representativeMultiStopSummary.departuresByDay.monday, [485], 'TfL representative Stop B uses only the exact Stop B departure');
+assert.deepEqual(representativeMultiStopSummary.departureEvidenceByDay.monday.map(item => [item.stopPointId, item.minute, item.calendarProfileId]), [['MSTOP-B', 485, 'ordinary']]);
+assert.equal(representativeMultiStopSummary.typicalFrequencyLines[0], 'Mon-Fri: 1 journey/day');
+assert.equal(representativeMultiStopSummary.operatingPeriodLines[0], 'Mon-Fri: Departs approx. 08:05');
+assert.deepEqual(representativeMultiStopPlanner.canonicalDeparturePopulation.monday.map(item => [item.stopPointId, item.minute, item.calendarProfileId]), [['MSTOP-B', 485, 'ordinary']], 'TfL evidence remains stop- and calendar-profile-scoped through planner consolidation');
+
+const unresolvedTflFixture = { lineId: 'UNRES', lineName: 'UNRES', direction: 'outbound', stations: [{ id: 'UNRES-STOP', name: 'Unresolved stop' }, { id: 'UNRES-END', name: 'Unresolved terminus' }], timetable: { departureStopId: 'UNRES-STOP', routes: [{ stationIntervals: [{ id: 'unresolved-pattern', intervals: [{ stopId: 'UNRES-STOP', timeToArrival: 0 }, { stopId: 'UNRES-END', timeToArrival: 10 }] }], schedules: [{ name: 'Example custom period', knownJourneys: [{ vehicleJourneyId: 'UNRES-1', intervalId: 'unresolved-pattern', departureTime: { hour: 8, minute: 0 } }] }] }] } };
+const unresolvedTflMetadata = { ok: true, data: [{ id: 'UNRES', routeSections: [{ direction: 'outbound', originationName: 'Unresolved origin', destinationName: 'Unresolved terminus' }] }] };
+const unresolvedTflAdapter = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async () => response(unresolvedTflFixture) });
+const unresolvedTflResult = await unresolvedTflAdapter.servicesForStop({ lineId: 'UNRES', stopPointId: 'UNRES-STOP', routeMetadata: unresolvedTflMetadata });
+assert.match(unresolvedTflResult.warnings.join(' '), /Example custom period/, 'unresolved TfL diagnostics name the source calendar label');
+assert.doesNotMatch(unresolvedTflResult.warnings.join(' '), /undefined/, 'unresolved TfL diagnostics never expose an undefined calendar label');
+
 const routeMetadata657 = { ok: true, data: [{ id: '657', routeSections: [
   { id: '657-out', direction: 'outbound', originationName: "Salisbury Hall Sainsbury's", destinationName: "Bancroft's School" },
   { id: '657-in', direction: 'inbound', originationName: "Bancroft's School", destinationName: "Salisbury Hall Sainsbury's" }

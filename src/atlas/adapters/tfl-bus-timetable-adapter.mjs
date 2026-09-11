@@ -310,7 +310,7 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         continue;
       }
       const timing = scheduleForPattern(route, pattern, stopPointId, responseDepartureStopId);
-      for (const calendar of timing.calendarEvidence.filter(item => !item.resolved)) warnings.push(`TfL timetable period "${calendar.rawLabel}" could not be safely mapped to operating days; no unverified days were fabricated.`);
+      for (const calendar of timing.calendarEvidence.filter(item => !item.resolved)) warnings.push(`TfL timetable period "${calendar.sourceCalendarLabel}" could not be safely mapped to operating days; no unverified days were fabricated.`);
       if (timing.ambiguous) {
         warnings.push('TfL returned competing timetable interval patterns without intervalId linkage for one or more journeys. The ambiguous pattern has not been guessed.');
         continue;
@@ -345,7 +345,7 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         source: { provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId, calendarProfileId: profileTiming.calendarProfileId, routeMetadata: identity ? 'matched' : 'incomplete' },
         timetableSource: 'TfL',
         serviceNotes: calendarQualificationNotes(profileTiming.calendarEvidence),
-        sourceWarnings: profileTiming.calendarEvidence.filter(calendar => !calendar.resolved).map(calendar => `TfL timetable period "${calendar.rawLabel}" could not be safely mapped to operating days; no unverified days were fabricated.`),
+        sourceWarnings: profileTiming.calendarEvidence.filter(calendar => !calendar.resolved).map(calendar => `TfL timetable period "${calendar.sourceCalendarLabel}" could not be safely mapped to operating days; no unverified days were fabricated.`),
         qualifications: [
           ...(hasPeriods ? ['TfL supplied operating-period/frequency evidence; ATLAS retained only exact scheduled journeys and first/last journey boundaries, without synthesising departures from frequency ranges.'] : []),
           ...(!identity ? ['Full TfL route origin and destination were not deterministically established for this selected-stop timetable pattern.'] : [])

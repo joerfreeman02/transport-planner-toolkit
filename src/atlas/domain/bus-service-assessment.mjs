@@ -28,6 +28,33 @@ function numeric(values) { return unique(values).map(Number).filter(Number.isFin
 function ordered(values) { return (values ?? []).map(Number).filter(Number.isFinite).sort((a, b) => a - b); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
 
+function departureEvidenceKey(entry) {
+  return [
+    text(entry?.stopPointId),
+    Number(entry?.minute ?? entry?.departureMinute ?? entry?.time),
+    text(entry?.journeyIdentity),
+    text(entry?.provider),
+    text(entry?.patternIdentity),
+    text(entry?.calendarProfileId)
+  ].map(normal).join('|');
+}
+
+function mergeDepartureEvidence(first, second) {
+  const hasEvidence = Boolean((first && typeof first === 'object') || (second && typeof second === 'object'));
+  if (!hasEvidence) return undefined;
+  return Object.fromEntries(DAY_ORDER.map(day => {
+    const entries = [...(Array.isArray(first?.[day]) ? first[day] : []), ...(Array.isArray(second?.[day]) ? second[day] : [])]
+      .filter(entry => Number.isFinite(Number(entry?.minute ?? entry?.departureMinute ?? entry?.time)));
+    const seen = new Set();
+    return [day, entries.filter(entry => {
+      const key = departureEvidenceKey(entry);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })];
+  }));
+}
+
 function sourceJourneyIdentity(record) {
   const source = record?.source ?? {};
   return text(source.vehicleJourneyCode || source.vehicleJourneyId || source.tripId || source.journeyId || source.journeyCode);
@@ -58,6 +85,7 @@ function mergeRecordSchedules(first, second) {
   return {
     ...first,
     stopSchedules,
+    departureEvidenceByDay: mergeDepartureEvidence(first.departureEvidenceByDay, second.departureEvidenceByDay),
     calendarProfileId: first.calendarProfileId || second.calendarProfileId || null,
     calendarEvidence: [...new Map(calendarEvidence.map(item => [JSON.stringify(item), item])).values()],
     serviceNotes: unique([...(first.serviceNotes ?? []), ...(second.serviceNotes ?? [])]),
@@ -198,12 +226,16 @@ function departureEvidenceForRecords(records, stopId) {
     const explicitJourney = sourceJourneyIdentity(record);
     const pattern = patternIdentity(record);
     for (const day of DAY_ORDER) {
-      const sourceEntries = Array.isArray(record.departureEvidenceByDay?.[day])
-        ? record.departureEvidenceByDay[day]
+      const explicitEntries = Array.isArray(record.departureEvidenceByDay?.[day]) ? record.departureEvidenceByDay[day] : null;
+      const scopedEntries = explicitEntries && explicitEntries.some(item => text(item?.stopPointId))
+        ? explicitEntries.filter(item => text(item?.stopPointId) === stopId)
+        : explicitEntries;
+      const sourceEntries = scopedEntries?.length
+        ? scopedEntries
         : ordered(schedule[day] ?? []).map(minute => ({ minute }));
       for (const sourceEntry of sourceEntries) evidence[day].push({
         minute: Number(sourceEntry?.minute ?? sourceEntry?.departureMinute ?? sourceEntry?.time),
-        stopPointId: stopId,
+        stopPointId: text(sourceEntry?.stopPointId) || stopId,
         journeyIdentity: text(sourceEntry?.journeyIdentity) || explicitJourney || null,
         sourceRecordId: text(sourceEntry?.sourceRecordId) || text(record.id) || null,
         provider: text(sourceEntry?.provider) || provider || null,

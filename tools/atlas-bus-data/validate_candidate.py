@@ -7,7 +7,7 @@ import gzip
 import json
 from pathlib import Path
 
-from refresh_bus_data import RefreshError, TNDS_REGIONS, candidate_metrics
+from refresh_bus_data import RefreshError, TNDS_REGIONS, candidate_metrics, validate_tnds_region_coverage
 
 KNOWN_TNDS_QUARANTINE_REASONS = {"incomplete_runtime_sequence", "missing_timing_links"}
 
@@ -73,15 +73,12 @@ def validate(site: Path) -> dict:
     service_shards = tnds_manifest.get("serviceShards")
     if not isinstance(service_shards, dict) or not service_shards:
         raise RefreshError("Candidate TNDS serviceShards are missing or malformed")
+    validate_tnds_region_coverage(tnds_manifest)
     metrics = candidate_metrics(site)
     if metrics["naptanStopCount"] < 1000 or metrics["bodsServiceCount"] < 1000:
         raise RefreshError("Candidate is below the expected national stop/service scale")
     if metrics["bodsRegionCount"] < 8:
         raise RefreshError("Candidate BODS regional coverage is incomplete")
-    if set(tnds_manifest.get("regions", [])) != set(TNDS_REGIONS):
-        expected = ", ".join(TNDS_REGIONS)
-        received = ", ".join(sorted({str(region).upper() for region in tnds_manifest.get("regions", [])})) or "none"
-        raise RefreshError(f"Candidate TNDS region coverage is incomplete: expected {expected}; received {received}")
     stop_ids = set()
     for relative in bus_manifest.get("stopShards", {}).values():
         payload = read_json(bus / relative)

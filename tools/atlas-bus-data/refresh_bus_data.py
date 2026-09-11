@@ -244,6 +244,43 @@ def acquire_tnds(
     return staging / "tnds-xml", {"identity": f"ftp://{TNDS_HOST}{TNDS_PATH}", "regions": list(TNDS_REGIONS), "regionHashes": hashes, "regionBytes": sizes, "sourceHash": aggregate}
 
 
+def validate_tnds_region_coverage(tnds_manifest: dict) -> tuple[list[str], dict[str, int]]:
+    processed_regions = sorted({str(region).strip().upper() for region in tnds_manifest.get("regions", []) if str(region).strip()})
+    if set(processed_regions) != set(TNDS_REGIONS):
+        expected = ", ".join(TNDS_REGIONS)
+        received = ", ".join(processed_regions) or "none"
+        raise RefreshError(f"Prepared TNDS candidate region coverage incomplete: expected {expected}; received {received}")
+
+    raw_counts = tnds_manifest.get("regionServiceCounts")
+    if not isinstance(raw_counts, dict):
+        raise RefreshError("Prepared TNDS candidate regionServiceCounts are missing or malformed")
+    region_counts: dict[str, int] = {}
+    for raw_region, count in raw_counts.items():
+        region = str(raw_region).strip().upper()
+        if region in region_counts:
+            raise RefreshError(f"Prepared TNDS candidate regionServiceCounts contains duplicate region {region}")
+        region_counts[region] = count
+    for region in TNDS_REGIONS:
+        if region not in region_counts:
+            raise RefreshError(f"Prepared TNDS candidate regionServiceCounts missing region {region}")
+        count = region_counts[region]
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            raise RefreshError(f"Prepared TNDS candidate regionServiceCounts for region {region} is malformed")
+        if count == 0:
+            raise RefreshError(f"Prepared TNDS candidate retained no services for region {region}.")
+
+    service_count = tnds_manifest.get("serviceCount")
+    if isinstance(service_count, bool) or not isinstance(service_count, int) or service_count < 0:
+        raise RefreshError("Prepared TNDS candidate serviceCount is missing or malformed")
+    expected_service_count = sum(region_counts[region] for region in TNDS_REGIONS)
+    if expected_service_count != service_count:
+        raise RefreshError(
+            f"Prepared TNDS candidate regionServiceCounts total {expected_service_count} "
+            f"does not match serviceCount {service_count}"
+        )
+    return processed_regions, {region: region_counts[region] for region in TNDS_REGIONS}
+
+
 def candidate_metrics(site: Path) -> dict:
     bus_manifest_path = site / "atlas" / "data" / "bus" / "manifest.json"
     tnds_manifest_path = site / "atlas" / "data" / "bus-tnds" / "manifest.json"
@@ -259,11 +296,7 @@ def candidate_metrics(site: Path) -> dict:
         raise RefreshError("Prepared TNDS candidate contains obsolete inline services; expected stop-prefix service shards")
     if not isinstance(tnds_shards, dict) or not tnds_shards:
         raise RefreshError("Prepared TNDS candidate serviceShards are missing or malformed")
-    received_regions = sorted({str(region).upper() for region in tnds.get("regions", []) if str(region).strip()})
-    if set(received_regions) != set(TNDS_REGIONS):
-        expected = ", ".join(TNDS_REGIONS)
-        received = ", ".join(received_regions) or "none"
-        raise RefreshError(f"Prepared TNDS candidate region coverage incomplete: expected {expected}; received {received}")
+    received_regions, region_service_counts = validate_tnds_region_coverage(tnds)
     tnds_paths = [item for values in tnds_shards.values() for item in values] if all(isinstance(values, list) for values in tnds_shards.values()) else []
     if not tnds_paths or not isinstance(tnds.get("serviceShardKeyLength"), int) or tnds["serviceShardKeyLength"] < 1:
         raise RefreshError("Prepared TNDS candidate does not contain valid stop-prefix shards")
@@ -277,11 +310,11 @@ def candidate_metrics(site: Path) -> dict:
         "bodsServiceCount": sum(int(region.get("serviceCount", 0) or 0) for region in bods_regions),
         "tndsRegionCount": len(received_regions),
         "tndsProcessedRegions": received_regions,
-        "tndsRegionServiceCounts": tnds.get("regionServiceCounts", {}),
+        "tndsRegionServiceCounts": region_service_counts,
         "tndsSourceFileCounts": tnds.get("sourceFileCounts", {}),
         "tndsParsedFileCounts": tnds.get("parsedFileCounts", {}),
         "tndsIgnoredRegistrationFileCounts": tnds.get("ignoredRegistrationFileCounts", {}),
-        "tndsServiceCount": int(tnds.get("serviceCount", 0) or 0),
+        "tndsServiceCount": tnds["serviceCount"],
     }
 
 
@@ -296,10 +329,6 @@ def validate_candidate(site: Path, baseline: dict | None = None) -> dict:
     previous_regions = int(baseline.get("bodsRegionCount", 0) or 0)
     if previous_regions and metrics["bodsRegionCount"] < previous_regions:
         raise RefreshError(f"Candidate BODS region count collapsed from {previous_regions} to {metrics['bodsRegionCount']}")
-    if metrics["tndsRegionCount"] != len(TNDS_REGIONS):
-        expected = ", ".join(TNDS_REGIONS)
-        received = ", ".join(metrics.get("tndsProcessedRegions", [])) or "none"
-        raise RefreshError(f"Prepared TNDS candidate region coverage incomplete: expected {expected}; received {received}")
     return metrics
 
 

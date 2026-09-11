@@ -29,7 +29,7 @@ class CandidateValidatorTests(unittest.TestCase):
             name = f'services/{index}-{region.lower()}.json'
             (self.root / 'atlas/data/bus-tnds' / name).write_text(json.dumps({'schema': 'atlas-prepared-bus-tnds-v1', 'stopPrefix': 'STOP-', 'services': [{'id': f'tnds:{region}:fixture:1', 'stopSchedules': {'STOP-1': {'monday': [600]}}, 'source': {'region': region, 'serviceCode': f'fixture-{region}'}}]}))
             tnds_paths.append(name)
-        (self.root / 'atlas/data/bus-tnds/manifest.json').write_text(json.dumps({'schema': 'atlas-prepared-bus-tnds-v1', 'regions': list(TNDS_REGIONS), 'serviceCount': len(TNDS_REGIONS), 'serviceShardKeyLength': 5, 'serviceShards': {'STOP-': tnds_paths}}))
+        (self.root / 'atlas/data/bus-tnds/manifest.json').write_text(json.dumps({'schema': 'atlas-prepared-bus-tnds-v1', 'regions': list(TNDS_REGIONS), 'regionServiceCounts': {region: 1 for region in TNDS_REGIONS}, 'serviceCount': len(TNDS_REGIONS), 'serviceShardKeyLength': 5, 'serviceShards': {'STOP-': tnds_paths}}))
 
     def tearDown(self):
         shutil.rmtree(self.root, ignore_errors=True)
@@ -88,6 +88,46 @@ class CandidateValidatorTests(unittest.TestCase):
     def test_raw_public_source_file_fails(self):
         (self.root / 'atlas/data/bus/raw.zip').write_bytes(b'not public data')
         with self.assertRaisesRegex(RefreshError, '(?i)raw source'):
+            validate(self.root)
+
+    def _set_tnds_coverage(self, counts, regions=None):
+        manifest = self.root / 'atlas/data/bus-tnds/manifest.json'
+        payload = json.loads(manifest.read_text())
+        payload['regionServiceCounts'] = counts
+        payload['serviceCount'] = sum(value for value in counts.values() if isinstance(value, int) and not isinstance(value, bool))
+        if regions is not None:
+            payload['regions'] = regions
+        manifest.write_text(json.dumps(payload))
+
+    def test_regional_retained_coverage_healthy(self):
+        counts = {region: 100 for region in TNDS_REGIONS}
+        self._set_tnds_coverage(counts)
+        self.assertEqual(validate(self.root)['tndsServiceCount'], 800)
+
+    def test_zero_retained_region_fails_even_above_national_collapse_threshold(self):
+        counts = {region: 100 for region in TNDS_REGIONS}
+        counts['SE'] = 0
+        self._set_tnds_coverage(counts)
+        with self.assertRaisesRegex(RefreshError, 'retained no services for region SE'):
+            validate(self.root)
+
+    def test_missing_region_count_fails(self):
+        counts = {region: 100 for region in TNDS_REGIONS}
+        del counts['NW']
+        self._set_tnds_coverage(counts)
+        with self.assertRaisesRegex(RefreshError, 'regionServiceCounts missing region NW'):
+            validate(self.root)
+
+    def test_malformed_region_count_fails(self):
+        counts = {region: 100 for region in TNDS_REGIONS}
+        counts['EA'] = 'invalid'
+        self._set_tnds_coverage(counts)
+        with self.assertRaisesRegex(RefreshError, 'regionServiceCounts for region EA is malformed'):
+            validate(self.root)
+
+    def test_processed_region_shape_fails_with_region_coverage_message(self):
+        self._set_tnds_coverage({region: 100 for region in TNDS_REGIONS}, ['EM', 'NE', 'SE'])
+        with self.assertRaisesRegex(RefreshError, r'expected EA, EM, NE, NW, SE, SW, WM, Y; received EM, NE, SE'):
             validate(self.root)
 
 

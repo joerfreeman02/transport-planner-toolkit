@@ -49,7 +49,7 @@ const plannerWord = buildBusWordTables({
   }]
 });
 const plannerWordNotes = plannerWord[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
-assert.match(plannerWordNotes, /Detailed source evidence is retained within the ATLAS assessment workspace/);
+assert.match(plannerWordNotes, /Additional source evidence remains available in the ATLAS assessment workspace/);
 assert.doesNotMatch(plannerWordNotes, /Show detailed evidence/);
 console.log('PASS Word export respects planner-selected stop and service rows.');
 console.log('PASS Alpha.5 Plaistow Word export contract.');

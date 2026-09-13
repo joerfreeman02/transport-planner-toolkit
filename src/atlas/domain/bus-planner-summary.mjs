@@ -9,7 +9,7 @@ import {
 } from './bus-service-assessment.mjs';
 import { calendarProfileLabel, calendarProfilesMutuallyExclusive } from './service-calendar.mjs';
 
-export const PLANNER_METHODOLOGY_NOTE = 'Typical frequencies and operating periods are derived from one de-duplicated scheduled-departure population at the representative stop. Additional timetable variants may operate. Detailed source evidence is retained within the ATLAS assessment workspace.';
+export const PLANNER_METHODOLOGY_NOTE = 'Typical frequencies and operating periods are based on the de-duplicated departures at the assessed representative stop. Additional source evidence remains available in the ATLAS assessment workspace.';
 
 function text(value) { return String(value ?? '').trim(); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
@@ -35,6 +35,20 @@ function explicitDirectionMarker(service) {
 
 function sourceDirectionMarker(value) {
   return /^(?:inbound|outbound|northbound|southbound|eastbound|westbound|clockwise|anticlockwise|north|south|east|west)$/i.test(text(value));
+}
+
+function operatorTokens(value) {
+  return new Set(normal(value).split(' ').filter(token => token && !['and', 'the', 'bus', 'buses', 'company', 'co', 'ltd', 'limited', 'travel', 'transport'].includes(token)));
+}
+
+function operatorFamilyCompatible(first, second) {
+  const left = normal(first?.operator);
+  const right = normal(second?.operator);
+  if (!left || !right) return true;
+  if (left === right) return true;
+  const leftTokens = operatorTokens(left), rightTokens = operatorTokens(right);
+  const subset = (small, large) => small.size > 0 && [...small].every(token => large.has(token));
+  return subset(leftTokens, rightTokens) || subset(rightTokens, leftTokens);
 }
 
 function explicitPattern(service) { return (service?.routePatternStopIds ?? []).map(text).filter(Boolean); }
@@ -64,20 +78,30 @@ function provenPatternRelationship(first, second) {
   return strictSubsequence(left, right) || strictSubsequence(right, left);
 }
 
+function patternCorridorRelationship(first, second) {
+  const left = explicitPattern(first);
+  const right = explicitPattern(second);
+  if (!left.length || !right.length) return true;
+  if (provenPatternRelationship(first, second)) return true;
+  const shared = new Set(left.filter(value => right.includes(value)));
+  return shared.size >= Math.min(2, left.length, right.length);
+}
+
 function compatibleDirection(first, second) {
   if (calendarProfilesMutuallyExclusive(first, second)) return false;
+  if (!operatorFamilyCompatible(first, second)) return false;
   const leftMarker = explicitDirectionMarker(first);
   const rightMarker = explicitDirectionMarker(second);
-  if (leftMarker && rightMarker) return leftMarker === rightMarker && provenPatternRelationship(first, second);
+  if (leftMarker && rightMarker) return leftMarker === rightMarker && patternCorridorRelationship(first, second);
   const leftPattern = explicitPattern(first);
   const rightPattern = explicitPattern(second);
-  if (leftPattern.length && rightPattern.length) return provenPatternRelationship(first, second);
+  if (leftPattern.length && rightPattern.length) return patternCorridorRelationship(first, second);
   if (directionKey(first) === directionKey(second)) return true;
   return normal(first?.origin) === normal(second?.origin) && normal(first?.destination) === normal(second?.destination);
 }
 
 function routeGroupKey(service) {
-  return [normal(service?.routeNumber), normal(service?.operator), service?.circular ? 'circular' : 'linear'].join('|');
+  return [normal(service?.routeNumber), service?.circular ? 'circular' : 'linear'].join('|');
 }
 
 function candidateStopIds(component) {
@@ -239,6 +263,7 @@ function materialServiceNote(note) {
   if (/term[- ]time|term[- ]only/i.test(value)) return 'Term-time service.';
   if (/circular service/i.test(value)) return 'Circular service.';
   if (/^Includes scheduled short workings or route variants/i.test(value)) return null;
+  if (/^\d+ scheduled variants are retained/i.test(value)) return null;
   if (/^(?:Schedule integrity note:|TfL supplied|ATLAS retained|source (?:evidence|processing)|representative stop.*(?:evidence|frequency)|(?:frequency|operating[- ]period).*evidence|timetable evidence.*(?:derived|retained)|full tfl route origin|the timetable did not supply|tfl route metadata|the scheduled evidence is retained|limited service:\s*no more than three scheduled journeys)/i.test(value)) return null;
   return value;
 }
@@ -251,13 +276,38 @@ function noteAppliesToCanonicalPopulation(note, schedules) {
   return true;
 }
 
-function variantNote(component) {
+function plannerDestination(service) {
+  const destination = text(service?.destination);
+  return destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination) && !sourceDirectionMarker(destination)
+    ? destination
+    : '';
+}
+
+function destinationNames(values) {
+  const names = unique(values).filter(Boolean);
+  const normalised = names.map(name => ({ name, key: normal(name), words: normal(name).split(' ').filter(Boolean) }));
+  return normalised
+    .filter(candidate => !normalised.some(other => other !== candidate && other.words.length > candidate.words.length && other.key.includes(candidate.key)))
+    .map(candidate => candidate.name)
+    .slice(0, 4);
+}
+
+function alternateDestinations(component, main) {
+  const mainDestination = normal(plannerDestination(main));
+  return destinationNames(component.map(plannerDestination).filter(value => normal(value) !== mainDestination));
+}
+
+function variantNote(component, main) {
   const endpoints = unique(component.map(service => text(service.origin) + ' → ' + text(service.destination)));
   const patterns = unique(component.map(service => explicitPattern(service).map(text).join('>')).filter(Boolean));
   const journeyIdentitySets = component.map(service => new Set(DAY_ORDER.flatMap(day => (service.departureEvidenceByDay?.[day] ?? []).map(item => departureIdentity(item)).filter(Boolean))));
   const sharedJourneyIdentity = journeyIdentitySets.length > 1 && journeyIdentitySets.every(set => set.size) && [...journeyIdentitySets[0]].some(identity => journeyIdentitySets.every(set => set.has(identity)));
+  const alternatives = alternateDestinations(component, main);
   const hasVariant = component.length > 1 && ((endpoints.length > 1 && !sharedJourneyIdentity) || patterns.length > 1 || component.some(service => Number(service.patternVariantCount) > 1));
-  return hasVariant ? 'Additional timetable variants and short workings operate; some journeys serve different destinations and operate at different times.' : null;
+  if (!hasVariant) return null;
+  if (alternatives.length === 1) return `Additional variants and short workings operate, including journeys towards ${alternatives[0]}.`;
+  if (alternatives.length > 1) return `Additional variants and short workings operate, including journeys towards ${alternatives.slice(0, -1).join(', ')} and ${alternatives.at(-1)}.`;
+  return 'Additional short workings and timetable variants operate.';
 }
 
 function resolvedPlannerDestination(service) {
@@ -293,9 +343,10 @@ function buildPlannerRow(component, stops, componentIndex) {
   const calculationEvidence = canonical.eligible.length <= 1 || canonical.eligible.every(service => (service.frequencyEvidence ?? []).some(item => !item.stopPointId || text(item.stopPointId) === representative.id)) ? evidence : [];
   const periods = calculateOperatingPeriods(canonical.schedules);
   const frequencyByDay = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, calculateTypicalServiceFrequency(canonical.schedules[day], { day, frequencyEvidence: calculationEvidence })])));
-  const calendarProfileId = unique(component.map(service => text(service.calendarProfileId || service.source?.calendarProfileId))).find(Boolean) || null;
+  const calendarProfiles = unique(component.map(service => text(service.calendarProfileId || service.source?.calendarProfileId)));
+  const calendarProfileId = calendarProfiles.length === 1 ? calendarProfiles[0] : null;
   const calendarProfile = calendarProfileLabel(calendarProfileId);
-    const notes = unique(component.flatMap(service => text(service.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean))).filter(note => noteAppliesToCanonicalPopulation(note, canonical.schedules));
+  const notes = unique(component.flatMap(service => text(service.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean))).filter(note => noteAppliesToCanonicalPopulation(note, canonical.schedules));
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
   const principalLocations = unique(main.principalLocations ?? []);
   const row = {
@@ -338,7 +389,8 @@ function buildPlannerRow(component, stops, componentIndex) {
     presentation: Object.freeze({ principalLocationsText: principalText(main), rank: 0 }),
     rawServiceSummaries: Object.freeze(component),
     sourceSelection: canonical.eligible.length ? 'representative-stop scheduled evidence' : 'representative-stop summary fallback',
-    routeVariantNote: variantNote(component),
+    routeVariantNote: variantNote(component, main),
+    alternateDestinationNames: Object.freeze(alternateDestinations(component, main)),
     sourceWarnings: Object.freeze(unique(component.flatMap(service => service.sourceWarnings ?? [])))
   };
   return Object.freeze(row);
@@ -356,9 +408,12 @@ function attachRouteNotes(rows) {
     const hasVariant = group.some(({ row }) => row.routeVariantNote);
     const routeNotes = [...shared];
     if (hasVariant) {
-      const route = text(group[0].row.routeNumber) || 'Not supplied';
-      const patternLabel = group.length > 1 ? 'main directional timetable patterns' : 'main timetable pattern';
-      routeNotes.push(`Route ${route} — ${patternLabel} shown above. Additional variants and short workings operate; some journeys use different destinations or times.`);
+      const headlineDestinations = new Set(group.map(({ row }) => normal(plannerDestination(row))));
+      const alternatives = destinationNames(group.flatMap(({ row }) => row.alternateDestinationNames ?? [])
+        .filter(destination => !headlineDestinations.has(normal(destination))));
+      if (alternatives.length === 1) routeNotes.push(`Additional variants and short workings operate, including journeys towards ${alternatives[0]}.`);
+      else if (alternatives.length > 1) routeNotes.push(`Additional variants and short workings operate, including journeys towards ${alternatives.slice(0, -1).join(', ')} and ${alternatives.at(-1)}.`);
+      else routeNotes.push('Additional short workings and timetable variants operate.');
     }
     group.forEach(({ row, index }, position) => {
       const remainingNotes = notesFor(row).filter(note => !shared.includes(note));

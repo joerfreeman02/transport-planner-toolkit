@@ -816,12 +816,12 @@ export function selectNearestStopGroup(stops, { maximumSeparationMetres = 350 } 
 
 export function buildControlledBusWording(serviceSummaries, { nearestGroupName = null } = {}) {
   const services = serviceSummaries ?? [];
-  if (!services.length) return 'No verified bus-service wording is available for the confirmed assessment point.';
+  if (!services.length) return 'No bus-service summary wording is available for the confirmed assessment point.';
   const routes = unique(services.map(service => service.routeNumber));
   const locations = unique(services.flatMap(service => service.principalLocations)).slice(0, 8);
   const routeWords = routes.length === 1 ? `bus route ${routes[0]}` : `bus routes ${routes.join(', ')}`;
   const nearestLead = nearestGroupName ? `The nearest assessed bus stop group is ${nearestGroupName}. ` : '';
-  return `${nearestLead}The assessed stop${nearestGroupName ? ' group is' : 's are'} served by ${routeWords}${locations.length ? `, providing direct connections along the verified service patterns to ${locations.join(', ')}` : ''}. Timetable periods and any material qualifications are shown in the Bus Service Summary.`;
+  return `${nearestLead}The assessed stop${nearestGroupName ? ' group is' : 's are'} served by ${routeWords}${locations.length ? `, providing direct connections to ${locations.join(', ')}` : ''}. Timetable periods and any material qualifications are shown in the Bus Service Summary.`;
 }
 
 export { DAY_ORDER };

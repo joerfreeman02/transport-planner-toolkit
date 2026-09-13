@@ -1,6 +1,6 @@
 # BUS-1 authoritative bus-assessment architecture
 
-Reviewed: 2026-09-04
+Reviewed: 2026-09-13
 
 ## Source hierarchy and cost position
 
@@ -28,11 +28,13 @@ Candidate discovery uses haversine distance only to decide which authoritative s
 
 Every prepared service retains route number, operator where supplied, direction, origin, destination, calling pattern, principal locations, per-stop scheduled departures for each represented day, validity, source identifiers, circular status and material qualifications. TNDS records with multiple valid JourneyPatterns are prepared as pattern-specific records with ordered stop IDs, calls, schedules, direction and principal locations; opposite directions and short workings therefore cannot mix their timetable evidence. Unresolved TNDS StopPoint identities remain in route sequencing but are not display names or principal locations. Summary grouping also retains distinct selected-stop direction evidence.
 
+The Alpha.13 planner-summary closeout separates raw timetable records, canonical scheduled departures, route-direction/corridor consolidation, headline Table 3.3 rows and route service notes. Ordinary two-way services normally produce one row per principal direction, while genuine circular and one-way services normally produce one row; an additional row is reserved for a genuinely distinct corridor whose consolidation would misrepresent connectivity. Compatible variants are combined at the deterministic representative stop before frequency and operating-period calculation, with canonical journey identities de-duplicated independently of calendar labels and each physical journey partitioned by structured calendar applicability. Calendar variation is therefore shown as profile-qualified frequency and operating-period lines within one route-direction row; unresolved applicability remains visible for review and is never treated as ordinary service. Dominant destinations and operator aliases are selected only from the compatible source evidence; alternate termini and short workings remain concise service-note connectivity information, while original records and provenance remain available in Detailed Evidence.
+
 Operating periods use the earliest and latest scheduled departure at the selected stops for each day. Times beyond 24:00 remain ordered and render as after-midnight clock times, with an overnight note. Missing days say `No scheduled service`; missing timetable evidence is not inferred.
 
 Principal locations come only from the actual calling pattern. The deterministic rule first selects intermediate named stations, interchanges, town/city centres, hospitals, airports, universities and shopping centres; then locality transitions; then quarter/mid/three-quarter calls when needed. Endpoints are not repeated and a maximum of seven locations is used.
 
-The shared Bus presentation decision ranks each route/operator/direction family by verified route-pattern extent, verified principal-location count, scheduled activity and a deterministic textual/id tie-breaker. It retains all legitimate rows, keeps opposite direction families distinct, and adds relational Principal locations wording only where route-pattern or direction evidence proves the relationship. Browser Table 3.3 and Word Table 3.3 consume that same decision; source principal-location arrays are not rewritten.
+The shared Bus presentation decision ranks each compatible route-direction family by route-pattern extent, principal-location count, scheduled activity and a deterministic textual/id tie-breaker. It keeps opposite direction families and genuinely distinct corridors separate, but does not promote every timetable variant to a headline row. Browser Table 3.3 and Word Table 3.3 consume that same decision; source principal-location arrays and detailed evidence are not rewritten.
 
 Empty principal locations are context-sensitive: `Route endpoints only` is reserved for a verified two-stop route pattern. A multi-stop or unknown-extent pattern uses `See route origin / destination`, which does not imply a direct service. Rural locality transitions and representative quarter/mid/three-quarter calling points remain meaningful principal-location evidence when urban landmark keywords are absent.
 

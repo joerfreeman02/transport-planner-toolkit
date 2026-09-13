@@ -30,6 +30,7 @@ await import('./bus-qa-01-acceptance.test.mjs');
 await import('./bus-qa-02-frequency.test.mjs');
 await import('./bus-qa-03-integrity.test.mjs');
 await import('./bus-alpha13-planner-summary.test.mjs');
+await import('./alpha13-calendar-safety.test.mjs');
 await import('./alpha12-source-completeness.test.mjs');
 await import('./alpha12-evidence-integrity-audit.test.mjs');
 await import('./alpha12-source-presentation.test.mjs');

@@ -24,9 +24,12 @@ Circular versus linear is retained as service-family evidence and cannot by itse
 
 The representative stop is selected after compatible route-direction consolidation. Canonical departures are then deduplicated by physical journey identity at that stop, while raw service records, source lineage, provenance and alternate destinations remain available. The planner summary audit reports every route, row count, direction/corridor identity, representative stop, operator family, headline destination and variant count; routes above an expected production count are reported rather than hidden.
 
+The compatibility relation is evaluated as a deterministic graph within each route number and its connected components become planner rows. This permits a legitimate chain of timetable variants to consolidate when each adjacent pair is evidenced, without allowing an ambiguous record to bridge two explicitly opposite directions. Common lineage is supporting evidence only: it cannot merge disjoint patterns or corridors by itself. A closed physical loop may retain circular presentation, while a route family with explicit two-way evidence and an open linear pattern is presented as non-circular; this distinguishes the production-shaped 230 loop from 310.
+
 ## Consequences
 
 - Production-representative replay fixtures are mandatory for 25C, 310, 46 and 230, with 317 inspected as a surrounding control.
+- The 25C replay retains the observed Maple Gate, Maynard Court and Temp Bus Station alternate-destination evidence in concise service notes; the 310 replay includes the Arriva operator alias and nearby-stop frequency-isolation control.
 - The accepted row-count controls are 25C 2, 66 2, 242 2, 310 2, 46 2, 230 1, 231 1, 357 2, 444 2, W16 2 and 657 1.
 - The Alpha.13 manual-acceptance failure is corrected without `rows.slice(0, 2)` or any other hidden truncation.
 - Alpha.13 calendar-safe frequency, operating-period, deduplication, provenance and Browser/Word parity contracts remain in force.

@@ -176,10 +176,27 @@ function provenPatternRelationship(first, second) {
   return strictSubsequence(left, right) || strictSubsequence(right, left);
 }
 
+function longestCommonSubsequenceLength(left, right) {
+  const previous = Array(right.length + 1).fill(0);
+  for (const leftValue of left) {
+    const current = Array(right.length + 1).fill(0);
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      current[rightIndex] = leftValue === right[rightIndex - 1]
+        ? previous[rightIndex - 1] + 1
+        : Math.max(previous[rightIndex], current[rightIndex - 1]);
+    }
+    for (let rightIndex = 0; rightIndex < previous.length; rightIndex += 1) previous[rightIndex] = current[rightIndex];
+  }
+  return previous.at(-1) ?? 0;
+}
+
 function reversePatternRelationship(first, second) {
   const left = explicitPattern(first), right = explicitPattern(second);
-  const sameForwardPattern = left.length === right.length && left.every((value, index) => value === right[index]);
-  return !sameForwardPattern && left.length > 1 && left.length === right.length && left.every((value, index) => value === right.at(-index - 1));
+  if (left.length < 2 || right.length < 2) return false;
+  const forwardRelationship = strictSubsequence(left, right) || strictSubsequence(right, left);
+  if (forwardRelationship) return false;
+  if (closedPhysicalShape(first) || closedPhysicalShape(second)) return false;
+  return longestCommonSubsequenceLength(left, [...right].reverse()) >= 2;
 }
 
 function sharedPatternValues(first, second) {
@@ -302,9 +319,13 @@ function hasTwoWayDirectionEvidence(services) {
 }
 
 function resolveCircularPresentation(component, routeFamilyServices = component) {
+  const relevantServices = (routeFamilyServices ?? []).filter(service => component.includes(service)
+    || component.some(member => operatorFamilyCompatible(member, service)
+      && sameServiceLineage(member, service)
+      && patternCorridorRelationship(member, service)));
   const hasClosedCircularEvidence = component.some(service => Boolean(service?.circular) && closedPhysicalShape(service));
-  const hasOpenLinearEvidence = (routeFamilyServices ?? []).some(service => service?.circular === false && !closedPhysicalShape(service));
-  if (hasTwoWayDirectionEvidence(routeFamilyServices) && hasOpenLinearEvidence) return false;
+  const hasOpenLinearEvidence = relevantServices.some(service => service?.circular === false && !closedPhysicalShape(service));
+  if (hasTwoWayDirectionEvidence(relevantServices) && hasOpenLinearEvidence) return false;
   if (hasClosedCircularEvidence) return true;
   return component.some(service => Boolean(service?.circular));
 }
@@ -474,16 +495,33 @@ function hasCalendarTaxonomyNote(note) {
   return /^(?:School days only\.|Non-school days only\.|Term-time service\.|Timetable varies between school and non-school days\.)$/i.test(text(note));
 }
 
-function canonicalCount(service, representativeId) {
-  return deduplicateDepartureEntries(serviceDepartureEntries(service, representativeId)).length;
+function principalJourneyKeys(service, representativeId) {
+  return new Set(serviceDepartureEntries(service, representativeId).map(entry => physicalDepartureKey(entry) || semanticDepartureKey(entry)));
 }
 
-function compareMain(first, second, representativeId) {
+function principalSupport(service, component, representativeId) {
+  const destination = normal(plannerDestination(service));
+  const destinationServices = component.filter(candidate => normal(plannerDestination(candidate)) === destination);
+  const destinationJourneys = new Set(destinationServices.flatMap(candidate => [...principalJourneyKeys(candidate, representativeId)]));
+  const journeys = principalJourneyKeys(service, representativeId);
+  return {
+    destinationJourneys: destinationJourneys.size,
+    destinationRecords: destinationServices.length,
+    journeys: journeys.size,
+    activity: Number(service.recordActivity) || 0
+  };
+}
+
+function compareMain(first, second, representativeId, component = [first, second]) {
+  const firstSupport = principalSupport(first, component, representativeId);
+  const secondSupport = principalSupport(second, component, representativeId);
   return Number(resolvedPlannerDestination(second)) - Number(resolvedPlannerDestination(first))
-    || canonicalCount(second, representativeId) - canonicalCount(first, representativeId)
+    || secondSupport.destinationJourneys - firstSupport.destinationJourneys
+    || secondSupport.destinationRecords - firstSupport.destinationRecords
+    || secondSupport.journeys - firstSupport.journeys
+    || secondSupport.activity - firstSupport.activity
     || (second.routePatternExtent ?? explicitPattern(second).length) - (first.routePatternExtent ?? explicitPattern(first).length)
     || (second.principalLocations?.length ?? 0) - (first.principalLocations?.length ?? 0)
-    || (second.recordActivity ?? 0) - (first.recordActivity ?? 0)
     || (text(first.origin) + '|' + text(first.destination) + '|' + text(first.id)).localeCompare(text(second.origin) + '|' + text(second.destination) + '|' + text(second.id));
 }
 
@@ -611,7 +649,7 @@ function profileLines(lines, profileLabel) {
 
 function buildPlannerRow(component, stops, componentIndex, routeFamilyServices = component) {
   const representative = selectRepresentativeStop(component, stops);
-  const main = [...component].sort((first, second) => compareMain(first, second, representative.id))[0];
+  const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
   const rowCircular = resolveCircularPresentation(component, routeFamilyServices);
   const canonical = canonicalDeparturePopulation(component, representative.id, main);
   const profileIds = orderedCalendarProfiles([

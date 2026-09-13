@@ -197,11 +197,36 @@ const alpha14ReviewRecords = [
     routeId: '12315124',
     directionId: '0',
     origin: 'Central Start',
+    destination: 'Bus Station',
+    direction: 'Hoddesdon',
+    pattern: ['25C-START', '25C-REP', '25C-MAPLE', '25C-MAYNARD', '25C-TEMP', '25C-BUS'],
+    patternNames: ['Central Start', 'Waltham Cross Bus Station', 'Maple Gate', 'Maynard Court', 'Temp Bus Station', 'Bus Station'],
+    representativeMinutes: [420, 480, 500, 540]
+  }),
+  reviewRecord({
+    id: '25c-bus-variant',
+    routeNumber: '25C',
+    routeId: '12315124',
+    directionId: '0',
+    origin: 'Central Start',
+    destination: 'Bus Station',
+    direction: 'Hoddesdon',
+    pattern: ['25C-START', '25C-REP', '25C-BUS'],
+    patternNames: ['Central Start', 'Waltham Cross Bus Station', 'Bus Station'],
+    representativeMinutes: [510, 570],
+    nearbyMinutes: [900, 960]
+  }),
+  reviewRecord({
+    id: '25c-temp',
+    routeNumber: '25C',
+    routeId: '12315124',
+    directionId: '0',
+    origin: 'Central Start',
     destination: 'Temp Bus Station',
     direction: 'Hoddesdon',
-    pattern: ['25C-START', '25C-REP', '25C-MAPLE', '25C-MAYNARD', '25C-TEMP'],
-    patternNames: ['Central Start', 'Waltham Cross Bus Station', 'Maple Gate', 'Maynard Court', 'Temp Bus Station'],
-    representativeMinutes: [420, 480]
+    pattern: ['25C-START', '25C-REP', '25C-TEMP'],
+    patternNames: ['Central Start', 'Waltham Cross Bus Station', 'Temp Bus Station'],
+    representativeMinutes: [450]
   }),
   reviewRecord({
     id: '25c-maple',
@@ -243,16 +268,20 @@ const alpha14ReviewRecords = [
   // 310 includes the observed Arriva alias, a circular-labelled record and an open linear record.
   reviewRecord({ id: '310-circular-out', routeNumber: '310', routeId: '7650', directionId: '0', operator: 'Arriva (in Herts and Essex)', origin: 'Bus Station', destination: 'Bus Station', direction: 'Hertford', circular: true, pattern: ['310-BUS', '310-REP', '310-BUS'], patternNames: ['Bus Station', 'Waltham Cross Bus Station', 'Bus Station'] }),
   reviewRecord({ id: '310-linear-out', routeNumber: '310', routeId: '7650', directionId: '0', operator: 'Arriva Herts and Essex', origin: 'Ware Railway Station', destination: 'Bus Station', direction: 'Hertford', pattern: ['310-WARE', '310-REP', '310-BUS'], patternNames: ['Ware Railway Station', 'Waltham Cross Bus Station', 'Bus Station'], representativeMinutes: [430], nearbyMinutes: [900, 960] }),
+  reviewRecord({ id: '310-short-out', routeNumber: '310', routeId: '7650', directionId: '0', operator: 'Arriva Herts and Essex', origin: 'Ware Railway Station', destination: 'Bus Station', direction: 'Hertford', pattern: ['310-WARE', '310-REP', '310-PLATFORM', '310-BUS'], patternNames: ['Ware Railway Station', 'Waltham Cross Bus Station', 'Town Centre', 'Bus Station'], representativeMinutes: [440] }),
+  reviewRecord({ id: '310-timetable-variant-out', routeNumber: '310', routeId: '7650', directionId: '0', operator: 'Arriva (in Herts and Essex)', origin: 'Hoddesdon', destination: 'Bus Station', direction: 'Hertford', pattern: ['310-HOD', '310-REP', '310-BUS'], patternNames: ['Hoddesdon', 'Waltham Cross Bus Station', 'Bus Station'], representativeMinutes: [450] }),
   reviewRecord({ id: '310-circular-in', routeNumber: '310', routeId: '7650', directionId: '1', operator: 'Arriva Herts and Essex', origin: 'Bus Station', destination: 'Bus Station', direction: 'Ware', circular: true, pattern: ['310-BUS-IN', '310-REP-IN', '310-BUS-IN'], patternNames: ['Bus Station', 'Waltham Cross Bus Station', 'Bus Station'] }),
 
   // 230 is a genuine Lyons Community Centre loop, with one linear-classified source variant in the same family.
   reviewRecord({ id: '230-circular', routeNumber: '230', routeId: '118723', origin: 'Lyons Community Centre', destination: 'Lyons Community Centre', direction: 'Caddington Woods', circular: true, pattern: ['230-LYONS', '230-CW', '230-LYONS'], patternNames: ['Lyons Community Centre', 'Caddington Woods', 'Lyons Community Centre'] }),
   reviewRecord({ id: '230-linear-variant', routeNumber: '230', routeId: '118723', origin: 'Lyons Community Centre', destination: 'Bus Station', direction: 'Caddington Woods', pattern: ['230-LYONS-LINEAR', '230-CW-LINEAR', '230-BUS'], patternNames: ['Lyons Community Centre', 'Caddington Woods', 'Bus Station'], representativeMinutes: [435] }),
 
-  // 46 is the production-shaped two-direction control with operator aliases and a short-working origin.
-  reviewRecord({ id: '46-main', routeNumber: '46', routeId: '7603', directionId: '0', operator: 'Centrebus', origin: 'Park Square', destination: 'Bridge Street', direction: 'Bridge Street', pattern: ['46-PARK', '46-REP', '46-BRIDGE'], patternNames: ['Park Square', 'Waltham Cross Bus Station', 'Bridge Street'] }),
-  reviewRecord({ id: '46-short', routeNumber: '46', routeId: '7603', directionId: '0', operator: 'Centrebus South', origin: 'Ridgedown', destination: 'Park Square', direction: 'Bridge Street', pattern: ['46-RIDGE', '46-REP', '46-PARK'], patternNames: ['Ridgedown', 'Waltham Cross Bus Station', 'Park Square'], representativeMinutes: [450] }),
-  reviewRecord({ id: '46-return', routeNumber: '46', routeId: '7603', directionId: '1', operator: 'Centrebus', origin: 'Bridge Street', destination: 'Park Square', direction: 'Park Square', pattern: ['46-BRIDGE-RETURN', '46-REP-RETURN', '46-PARK-RETURN'], patternNames: ['Bridge Street', 'Waltham Cross Bus Station', 'Park Square'] }),
+  // 46 replays the hosted four-row failure shape: Centrebus/Centrebus South and
+  // Bridge Street/Hemel Hempstead/Park Square/Luton, Park Square variants.
+  reviewRecord({ id: '46-bridge-street', routeNumber: '46', routeId: '7603', directionId: '0', operator: 'Centrebus', origin: 'Park Square', destination: 'Bridge Street', direction: 'Bridge Street', pattern: ['46-PARK', '46-REP', '46-BRIDGE'], patternNames: ['Park Square', 'Waltham Cross Bus Station', 'Bridge Street'], representativeMinutes: [420, 480, 540] }),
+  reviewRecord({ id: '46-hemel-hempstead', routeNumber: '46', routeId: '7603', directionId: '0', operator: 'Centrebus South', origin: 'Park Square', destination: 'Hemel Hempstead', direction: 'Bridge Street', pattern: ['46-PARK', '46-REP', '46-HEMEL'], patternNames: ['Park Square', 'Waltham Cross Bus Station', 'Hemel Hempstead'], representativeMinutes: [450] }),
+  reviewRecord({ id: '46-park-square', routeNumber: '46', routeId: '7603', directionId: '1', operator: 'Centrebus', origin: 'Bridge Street', destination: 'Park Square', direction: 'Park Square', pattern: ['46-BRIDGE-RETURN', '46-REP-RETURN', '46-PARK-RETURN'], patternNames: ['Bridge Street', 'Waltham Cross Bus Station', 'Park Square'], representativeMinutes: [420, 480, 540] }),
+  reviewRecord({ id: '46-luton-park-square', routeNumber: '46', routeId: '7603', directionId: '1', operator: 'Centrebus South', origin: 'Luton', destination: 'Luton, Park Square', direction: 'Park Square', pattern: ['46-LUTON', '46-REP-RETURN', '46-PARK-RETURN'], patternNames: ['Luton', 'Waltham Cross Bus Station', 'Luton, Park Square'], representativeMinutes: [450] }),
 
   // 317 is an independent production-shaped two-way control.
   reviewRecord({ id: '317-out', routeNumber: '317', routeId: '10984053', directionId: '0', operator: 'Metroline Travel', origin: 'Bus Station', destination: 'Little Park Gardens', direction: 'Little Park Gardens', pattern: ['317-BUS', '317-REP', '317-LPG'], patternNames: ['Bus Station', 'Waltham Cross Bus Station', 'Little Park Gardens'] }),
@@ -269,9 +298,11 @@ const review25c = review25cRows.find(row => row.directionFamily === 'gtfs:0');
 assert.ok(review25c, '25C principal production direction is present');
 assert.ok(review25c.rawServiceSummaries.some(service => service.destination === 'Maple Gate'));
 assert.ok(review25c.rawServiceSummaries.some(service => service.destination === 'Maynard Court'));
-assert.match(review25c.routeGroupNote || '', /Maple Gate/);
-assert.match(review25c.routeGroupNote || '', /Maynard Court/);
-assert.match(review25c.destination, /Temp Bus Station/);
+const review25cRouteNotes = review25cRows.map(row => row.routeGroupNote || '').join(' ');
+assert.match(review25cRouteNotes, /Temp Bus Station/);
+assert.match(review25cRouteNotes, /Maple Gate/);
+assert.match(review25cRouteNotes, /Maynard Court/);
+assert.equal(review25c.destination, 'Bus Station');
 assert.equal(review25c.servedAtStopId, 'REP-A');
 assert.ok(!review25c.departuresByDay.monday.some(minute => [900, 960].includes(minute)), 'nearby-stop departures cannot inflate the representative-stop headline');
 assert.ok(alpha14ReviewRecords.some(service => service.routeNumber === '25C' && service.stopSchedules['REP-B'].monday.some(minute => [900, 960].includes(minute))));
@@ -292,6 +323,16 @@ assert.ok(rows310.every(row => row.circular === false));
 assert.ok(rows310.every(row => !/Circular —/i.test(row.directionPatternText)));
 assert.ok(rows310.some(row => row.rawServiceSummaries.some(service => service.operator === "Arriva (in Herts and Essex)")));
 assert.match(rows310.map(row => row.routeGroupNote || '').join(' '), /short workings|timetable variants/i);
+
+const rows46 = alpha14ReviewRows.filter(row => row.routeNumber === '46');
+assert.equal(rows46.length, 2);
+assert.deepEqual(new Set(rows46.map(row => row.directionFamily)), new Set(['gtfs:0', 'gtfs:1']));
+assert.ok(rows46.every(row => row.rawServiceSummaries.some(service => /Centrebus/.test(service.operator))));
+assert.match(rows46.map(row => row.routeGroupNote || '').join(' '), /Hemel Hempstead/);
+assert.match(rows46.map(row => row.routeGroupNote || '').join(' '), /Luton, Park Square/);
+const word46Notes = wordReview[1].rows.filter(row => !Array.isArray(row) && /Hemel Hempstead|Luton, Park Square/.test(row.text)).map(row => row.text).join(' ');
+assert.match(word46Notes, /Hemel Hempstead/);
+assert.match(word46Notes, /Luton, Park Square/);
 
 const rows230 = alpha14ReviewRows.filter(row => row.routeNumber === '230');
 assert.equal(rows230.length, 1);
@@ -318,5 +359,49 @@ const missingDirectionOpposite = reviewRows([
   reviewRecord({ id: 'missing-direction-reverse', routeNumber: 'MD', routeId: 'missing-direction', directionId: undefined, origin: 'MD End', destination: 'MD Start', direction: '', pattern: ['MD-C', 'MD-B', 'MD-A'], patternNames: ['MD End', 'MD Mid', 'MD Start'] })
 ]);
 assert.equal(missingDirectionOpposite.length, 2, 'reverse pattern/endpoints keep opposite directions separate even without direction markers');
+
+const reverseWorkingCases = [
+  {
+    routeNumber: 'REV-EQ',
+    records: [
+      reviewRecord({ id: 'rev-eq-forward', routeNumber: 'REV-EQ', routeId: 'reverse-lineage', origin: 'Reverse Start', destination: 'Reverse End', direction: '', pattern: ['REV-A', 'REV-B', 'REV-C', 'REV-D'], patternNames: ['Reverse Start', 'Reverse B', 'Reverse C', 'Reverse End'] }),
+      reviewRecord({ id: 'rev-eq-reverse', routeNumber: 'REV-EQ', routeId: 'reverse-lineage', origin: 'Reverse End', destination: 'Reverse Start', direction: '', pattern: ['REV-D', 'REV-C', 'REV-B', 'REV-A'], patternNames: ['Reverse End', 'Reverse C', 'Reverse B', 'Reverse Start'] })
+    ]
+  },
+  {
+    routeNumber: 'REV-UNEQ',
+    records: [
+      reviewRecord({ id: 'rev-uneq-forward', routeNumber: 'REV-UNEQ', routeId: 'reverse-lineage-unequal', origin: 'Unequal Start', destination: 'Unequal End', direction: '', pattern: ['UNEQ-A', 'UNEQ-B', 'UNEQ-C', 'UNEQ-D'], patternNames: ['Unequal Start', 'Unequal B', 'Unequal C', 'Unequal End'] }),
+      reviewRecord({ id: 'rev-uneq-short', routeNumber: 'REV-UNEQ', routeId: 'reverse-lineage-unequal', origin: 'Unequal End', destination: 'Unequal Mid', direction: '', pattern: ['UNEQ-D', 'UNEQ-C', 'UNEQ-B'], patternNames: ['Unequal End', 'Unequal C', 'Unequal Mid'] })
+    ]
+  },
+  {
+    routeNumber: 'REV-PART',
+    records: [
+      reviewRecord({ id: 'rev-part-forward', routeNumber: 'REV-PART', routeId: 'reverse-lineage-partial', origin: 'Partial Start', destination: 'Partial End', direction: '', pattern: ['PART-A', 'PART-B', 'PART-C', 'PART-D', 'PART-E'], patternNames: ['Partial Start', 'Partial B', 'Partial C', 'Partial D', 'Partial End'] }),
+      reviewRecord({ id: 'rev-part-overlap', routeNumber: 'REV-PART', routeId: 'reverse-lineage-partial', origin: 'Partial End', destination: 'Partial Mid', direction: '', pattern: ['PART-E', 'PART-D', 'PART-X'], patternNames: ['Partial End', 'Partial D', 'Partial Mid'] })
+    ]
+  },
+  {
+    routeNumber: 'REV-SAME',
+    records: [
+      reviewRecord({ id: 'rev-same-main', routeNumber: 'REV-SAME', routeId: 'same-direction-lineage', origin: 'Same Start', destination: 'Same End', direction: '', pattern: ['SAME-A', 'SAME-B', 'SAME-C', 'SAME-D'], patternNames: ['Same Start', 'Same B', 'Same C', 'Same End'] }),
+      reviewRecord({ id: 'rev-same-short', routeNumber: 'REV-SAME', routeId: 'same-direction-lineage', origin: 'Same Start', destination: 'Same Mid', direction: '', pattern: ['SAME-A', 'SAME-B', 'SAME-C'], patternNames: ['Same Start', 'Same B', 'Same Mid'] })
+    ]
+  }
+];
+for (const testCase of reverseWorkingCases) {
+  const rowsForCase = reviewRows(testCase.records);
+  assert.equal(rowsForCase.length, testCase.routeNumber === 'REV-SAME' ? 1 : 2, `${testCase.routeNumber}: reverse-orientation safety result`);
+}
+
+const mixedCircularAndLinear = reviewRows([
+  reviewRecord({ id: 'mixed-loop', routeNumber: 'MIXED', routeId: 'mixed-lineage', directionId: '0', origin: 'Loop Hub', destination: 'Loop Hub', direction: 'Loop', circular: true, pattern: ['MIX-LOOP-A', 'MIX-LOOP-REP', 'MIX-LOOP-A'], patternNames: ['Loop Hub', 'Loop Midpoint', 'Loop Hub'] }),
+  reviewRecord({ id: 'mixed-linear-out', routeNumber: 'MIXED', routeId: 'mixed-lineage', directionId: '0', origin: 'Linear Start', destination: 'Linear End', direction: 'Linear', pattern: ['MIX-LINEAR-A', 'MIX-LINEAR-REP', 'MIX-LINEAR-B'], patternNames: ['Linear Start', 'Linear Midpoint', 'Linear End'] }),
+  reviewRecord({ id: 'mixed-linear-in', routeNumber: 'MIXED', routeId: 'mixed-lineage', directionId: '1', origin: 'Linear End', destination: 'Linear Start', direction: 'Linear Return', pattern: ['MIX-LINEAR-B-IN', 'MIX-LINEAR-REP-IN', 'MIX-LINEAR-A-IN'], patternNames: ['Linear End', 'Linear Return Midpoint', 'Linear Start'] })
+]);
+assert.equal(mixedCircularAndLinear.filter(row => row.circular).length, 1, 'closed circular component remains circular beside an independent linear corridor');
+assert.equal(mixedCircularAndLinear.filter(row => !row.circular).length, 2, 'independent linear corridor remains non-circular');
+assert.equal(mixedCircularAndLinear.length, 3, 'mixed circular and linear corridors remain separate components');
 
 console.log('PASS Alpha.14 corrected production replay: 25C provenance/notes, 310/230 circular controls, 317 control, transitive grouping, corridor and frequency safety, and Word parity.');

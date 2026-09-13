@@ -99,7 +99,7 @@ assert.match(route230[0].directionPatternText, /^Circular —/);
 
 const route231 = rowsFor([fixture({ routeNumber: '231', operator: 'Uno', destination: 'Bedford', departures: [678], id: '231-limited', serviceNote: 'Limited service.' })], '231');
 assert.equal(route231.length, 1);
-assert.equal(route231[0].serviceNote, 'Limited service.');
+assert.match(route231[0].serviceNote, /^Limited service\./);
 
 for (const routeNumber of ['357', '444', 'W16']) {
   const rows = rowsFor([
@@ -117,6 +117,6 @@ assert.equal(route657[0].serviceNote, 'School days only.');
 
 const wording = buildControlledBusWording(route25C, { nearestGroupName: 'Representative Stop' });
 assert.doesNotMatch(wording, /verified service|verified destination|verified pattern|verified timetable/i);
-assert.match(wording, /represented service patterns/);
+assert.match(wording, /providing direct connections to/);
 
 console.log('PASS Alpha.13 closeout fixtures: 25C, 66, 242, 310, 46, 230, 231, 357, 444, 657 and W16.');

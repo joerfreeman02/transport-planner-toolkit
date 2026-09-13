@@ -96,7 +96,7 @@ function sourceDirectionMarker(value) {
 }
 
 function operatorTokens(value) {
-  return new Set(normal(value).split(' ').filter(token => token && !['and', 'the', 'bus', 'buses', 'company', 'co', 'ltd', 'limited', 'travel', 'transport'].includes(token)));
+  return new Set(normal(value).split(' ').filter(token => token && !['and', 'the', 'bus', 'buses', 'company', 'co', 'ltd', 'limited', 'travel', 'transport', 'in', 'of'].includes(token)));
 }
 
 function operatorFamilyCompatible(first, second) {
@@ -107,6 +107,47 @@ function operatorFamilyCompatible(first, second) {
   const leftTokens = operatorTokens(left), rightTokens = operatorTokens(right);
   const subset = (small, large) => small.size > 0 && [...small].every(token => large.has(token));
   return subset(leftTokens, rightTokens) || subset(rightTokens, leftTokens);
+}
+
+function serviceLineageIds(service) {
+  return unique([
+    service?.serviceLineageId,
+    ...(service?.sourceRouteIds ?? []),
+    service?.source?.routeId,
+    service?.routeId
+  ]);
+}
+
+function sameServiceLineage(first, second) {
+  const left = new Set(serviceLineageIds(first).map(normal));
+  return serviceLineageIds(second).some(value => left.has(normal(value)));
+}
+
+function validLocation(value) {
+  const valueText = text(value);
+  if (!valueText || /^(?:origin|destination) not supplied|destination not resolved$/i.test(valueText)) return '';
+  return normal(valueText);
+}
+
+function endpointPair(service) {
+  return { origin: validLocation(service?.origin), destination: validLocation(service?.destination) };
+}
+
+function endpointValues(service) {
+  return unique([endpointPair(service).origin, endpointPair(service).destination]);
+}
+
+function endpointRelationship(first, second) {
+  const left = endpointValues(first);
+  const right = new Set(endpointValues(second));
+  return left.length > 0 && left.some(value => right.has(value));
+}
+
+function reverseEndpointRelationship(first, second) {
+  const left = endpointPair(first), right = endpointPair(second);
+  return Boolean(left.origin && left.destination && right.origin && right.destination
+    && left.origin === right.destination && left.destination === right.origin
+    && !(left.origin === right.origin && left.destination === right.destination));
 }
 
 function explicitPattern(service) { return (service?.routePatternStopIds ?? []).map(text).filter(Boolean); }
@@ -129,20 +170,118 @@ function strictSubsequence(shorter, longer) {
 }
 
 function provenPatternRelationship(first, second) {
-  if (Boolean(first?.circular) !== Boolean(second?.circular) && (first?.circular !== undefined || second?.circular !== undefined)) return false;
   const left = explicitPattern(first);
   const right = explicitPattern(second);
-  if (!left.length || !right.length) return true;
+  if (!left.length || !right.length) return false;
   return strictSubsequence(left, right) || strictSubsequence(right, left);
 }
 
+function longestCommonSubsequenceLength(left, right) {
+  const previous = Array(right.length + 1).fill(0);
+  for (const leftValue of left) {
+    const current = Array(right.length + 1).fill(0);
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      current[rightIndex] = leftValue === right[rightIndex - 1]
+        ? previous[rightIndex - 1] + 1
+        : Math.max(previous[rightIndex], current[rightIndex - 1]);
+    }
+    for (let rightIndex = 0; rightIndex < previous.length; rightIndex += 1) previous[rightIndex] = current[rightIndex];
+  }
+  return previous.at(-1) ?? 0;
+}
+
+function reversePatternRelationship(first, second) {
+  const left = explicitPattern(first), right = explicitPattern(second);
+  if (left.length < 2 || right.length < 2) return false;
+  const forwardRelationship = strictSubsequence(left, right) || strictSubsequence(right, left);
+  if (forwardRelationship) return false;
+  if (closedPhysicalShape(first) || closedPhysicalShape(second)) return false;
+  return longestCommonSubsequenceLength(left, [...right].reverse()) >= 2;
+}
+
+function sharedPatternValues(first, second) {
+  const right = new Set(explicitPattern(second));
+  return new Set(explicitPattern(first).filter(value => right.has(value)));
+}
+
+function corridorNames(service) {
+  return unique([...(service?.principalLocations ?? []), ...orderedPatternNames(service)]).map(normal).filter(Boolean);
+}
+
+function sharedCorridorNames(first, second) {
+  const right = new Set(corridorNames(second));
+  return new Set(corridorNames(first).filter(value => right.has(value)));
+}
+
+function sharedStopIds(first, second) {
+  const right = new Set(unique([...(second?.stopIds ?? []), ...(second?.assessedStops ?? [])]));
+  return new Set(unique([...(first?.stopIds ?? []), ...(first?.assessedStops ?? [])]).filter(value => right.has(value)));
+}
+
 function patternCorridorRelationship(first, second) {
-  const left = explicitPattern(first);
-  const right = explicitPattern(second);
-  if (!left.length || !right.length) return true;
+  if (reverseEndpointRelationship(first, second) || reversePatternRelationship(first, second)) return false;
+  const sameLineage = sameServiceLineage(first, second);
+  const sameDirection = directionKey(first) === directionKey(second) && directionKey(first) !== 'direction-not-supplied';
+  const endpointOverlap = endpointRelationship(first, second);
+  const sharedPatterns = sharedPatternValues(first, second);
+  const sharedNames = sharedCorridorNames(first, second);
+  const sharedStops = sharedStopIds(first, second);
   if (provenPatternRelationship(first, second)) return true;
-  const shared = new Set(left.filter(value => right.includes(value)));
-  return shared.size >= Math.min(2, left.length, right.length);
+  if (sharedPatterns.size >= 2) return true;
+  if (sameLineage && sharedNames.size >= 2) return true;
+  if (sameLineage && sameDirection && (endpointOverlap || sharedNames.size > 0 || sharedStops.size >= 2)) return true;
+  if (sameDirection && endpointOverlap && (sameLineage || sharedPatterns.size > 0 || sharedStops.size >= 2)) return true;
+  return false;
+}
+
+function connectedServiceComponents(services) {
+  const compatiblePairs = new Set();
+  for (let left = 0; left < services.length; left += 1) {
+    for (let right = left + 1; right < services.length; right += 1) {
+      if (!compatibleDirection(services[left], services[right])) continue;
+      compatiblePairs.add(`${left}:${right}`);
+    }
+  }
+  const ambiguousMarkerChoice = new Map();
+  for (let index = 0; index < services.length; index += 1) {
+    if (explicitDirectionMarker(services[index])) continue;
+    const connectedMarkers = new Set();
+    for (const pair of compatiblePairs) {
+      const [left, right] = pair.split(':').map(Number);
+      if (left !== index && right !== index) continue;
+      const other = left === index ? right : left;
+      const marker = explicitDirectionMarker(services[other]);
+      if (marker) connectedMarkers.add(marker);
+    }
+    if (connectedMarkers.size > 1) ambiguousMarkerChoice.set(index, [...connectedMarkers][0]);
+  }
+  const components = [];
+  const visited = new Set();
+  for (let start = 0; start < services.length; start += 1) {
+    if (visited.has(start)) continue;
+    const queue = [start];
+    const component = [];
+    visited.add(start);
+    while (queue.length) {
+      const current = queue.shift();
+      component.push(services[current]);
+      for (let candidate = 0; candidate < services.length; candidate += 1) {
+        if (visited.has(candidate) || candidate === current) continue;
+        const pair = current < candidate ? `${current}:${candidate}` : `${candidate}:${current}`;
+        if (!compatiblePairs.has(pair)) continue;
+        const currentChoice = ambiguousMarkerChoice.get(current);
+        const candidateChoice = ambiguousMarkerChoice.get(candidate);
+        const currentMarker = explicitDirectionMarker(services[candidate]);
+        const candidateMarker = explicitDirectionMarker(services[current]);
+        if ((currentChoice && currentMarker && currentChoice !== currentMarker)
+          || (candidateChoice && candidateMarker && candidateChoice !== candidateMarker)) continue;
+        visited.add(candidate);
+        queue.push(candidate);
+      }
+    }
+    components.push(component);
+  }
+  return components;
 }
 
 function compatibleDirection(first, second) {
@@ -153,12 +292,42 @@ function compatibleDirection(first, second) {
   const leftPattern = explicitPattern(first);
   const rightPattern = explicitPattern(second);
   if (leftPattern.length && rightPattern.length) return patternCorridorRelationship(first, second);
-  if (directionKey(first) === directionKey(second)) return true;
-  return normal(first?.origin) === normal(second?.origin) && normal(first?.destination) === normal(second?.destination);
+  if (directionKey(first) === directionKey(second)) return patternCorridorRelationship(first, second);
+  return endpointRelationship(first, second);
 }
 
 function routeGroupKey(service) {
-  return [normal(service?.routeNumber), service?.circular ? 'circular' : 'linear'].join('|');
+  // Circular/linear is a service-family characteristic, not a row identity.
+  // Keep the evidence available on the resulting row while allowing a
+  // circular classification variant to consolidate with its principal
+  // direction when the route/pattern evidence supports that relationship.
+  return normal(service?.routeNumber);
+}
+
+function closedPhysicalShape(service) {
+  const pattern = explicitPattern(service);
+  const names = orderedPatternNames(service).map(normal).filter(Boolean);
+  const endpoints = endpointPair(service);
+  return (pattern.length > 1 && pattern[0] === pattern.at(-1))
+    || (names.length > 1 && names[0] === names.at(-1))
+    || Boolean(endpoints.origin && endpoints.destination && endpoints.origin === endpoints.destination);
+}
+
+function hasTwoWayDirectionEvidence(services) {
+  const markers = unique((services ?? []).map(explicitDirectionMarker).filter(Boolean));
+  return markers.length > 1;
+}
+
+function resolveCircularPresentation(component, routeFamilyServices = component) {
+  const relevantServices = (routeFamilyServices ?? []).filter(service => component.includes(service)
+    || component.some(member => operatorFamilyCompatible(member, service)
+      && sameServiceLineage(member, service)
+      && patternCorridorRelationship(member, service)));
+  const hasClosedCircularEvidence = component.some(service => Boolean(service?.circular) && closedPhysicalShape(service));
+  const hasOpenLinearEvidence = relevantServices.some(service => service?.circular === false && !closedPhysicalShape(service));
+  if (hasTwoWayDirectionEvidence(relevantServices) && hasOpenLinearEvidence) return false;
+  if (hasClosedCircularEvidence) return true;
+  return component.some(service => Boolean(service?.circular));
 }
 
 function candidateStopIds(component) {
@@ -326,16 +495,33 @@ function hasCalendarTaxonomyNote(note) {
   return /^(?:School days only\.|Non-school days only\.|Term-time service\.|Timetable varies between school and non-school days\.)$/i.test(text(note));
 }
 
-function canonicalCount(service, representativeId) {
-  return deduplicateDepartureEntries(serviceDepartureEntries(service, representativeId)).length;
+function principalJourneyKeys(service, representativeId) {
+  return new Set(serviceDepartureEntries(service, representativeId).map(entry => physicalDepartureKey(entry) || semanticDepartureKey(entry)));
 }
 
-function compareMain(first, second, representativeId) {
+function principalSupport(service, component, representativeId) {
+  const destination = normal(plannerDestination(service));
+  const destinationServices = component.filter(candidate => normal(plannerDestination(candidate)) === destination);
+  const destinationJourneys = new Set(destinationServices.flatMap(candidate => [...principalJourneyKeys(candidate, representativeId)]));
+  const journeys = principalJourneyKeys(service, representativeId);
+  return {
+    destinationJourneys: destinationJourneys.size,
+    destinationRecords: destinationServices.length,
+    journeys: journeys.size,
+    activity: Number(service.recordActivity) || 0
+  };
+}
+
+function compareMain(first, second, representativeId, component = [first, second]) {
+  const firstSupport = principalSupport(first, component, representativeId);
+  const secondSupport = principalSupport(second, component, representativeId);
   return Number(resolvedPlannerDestination(second)) - Number(resolvedPlannerDestination(first))
-    || canonicalCount(second, representativeId) - canonicalCount(first, representativeId)
+    || secondSupport.destinationJourneys - firstSupport.destinationJourneys
+    || secondSupport.destinationRecords - firstSupport.destinationRecords
+    || secondSupport.journeys - firstSupport.journeys
+    || secondSupport.activity - firstSupport.activity
     || (second.routePatternExtent ?? explicitPattern(second).length) - (first.routePatternExtent ?? explicitPattern(first).length)
     || (second.principalLocations?.length ?? 0) - (first.principalLocations?.length ?? 0)
-    || (second.recordActivity ?? 0) - (first.recordActivity ?? 0)
     || (text(first.origin) + '|' + text(first.destination) + '|' + text(first.id)).localeCompare(text(second.origin) + '|' + text(second.destination) + '|' + text(second.id));
 }
 
@@ -461,9 +647,10 @@ function profileLines(lines, profileLabel) {
   return lines.map(line => line.replace(/^([^:]+):\s*/, `$1 (${profileLabel}): `));
 }
 
-function buildPlannerRow(component, stops, componentIndex) {
+function buildPlannerRow(component, stops, componentIndex, routeFamilyServices = component) {
   const representative = selectRepresentativeStop(component, stops);
-  const main = [...component].sort((first, second) => compareMain(first, second, representative.id))[0];
+  const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
+  const rowCircular = resolveCircularPresentation(component, routeFamilyServices);
   const canonical = canonicalDeparturePopulation(component, representative.id, main);
   const profileIds = orderedCalendarProfiles([
     ...component.map(calendarProfileFromService),
@@ -517,13 +704,13 @@ function buildPlannerRow(component, stops, componentIndex) {
     destination: text(main.destination) || 'Destination not supplied',
     direction: text(main.direction),
     stopDirection: text(main.stopDirection) || null,
-    circular: Boolean(main.circular),
+    circular: rowCircular,
     calendarProfileId,
     calendarProfileLabel: calendarProfile,
     calendarProfileIds: Object.freeze(profileIds),
     calendarProfileLabels: Object.freeze(profileIds.map(calendarProfileDisplayLabel)),
     directionFamily: directionKey(main),
-    directionPatternText: directionPatternText(main),
+    directionPatternText: directionPatternText({ ...main, circular: rowCircular }),
     servedAtStopId: representative.id,
     servedAtText: servedAtText(representative),
     frequencyBasisStopId: representative.id,
@@ -594,20 +781,20 @@ function attachRouteNotes(rows) {
 export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = []) {
   const grouped = new Map();
   const sourceRecords = serviceSummaries ?? [];
-  for (const service of sourceRecords) {
+  const plannerRecords = sourceRecords.filter(service => {
     const duplicateOperatorRecord = (!text(service.operator) || /not supplied/i.test(text(service.operator)))
       && sourceRecords.some(candidate => candidate !== service && text(candidate.routeNumber) === text(service.routeNumber) && text(candidate.operator) && !/not supplied/i.test(text(candidate.operator)) && compatibleDirection(candidate, service));
-    if (duplicateOperatorRecord) continue;
+    return !duplicateOperatorRecord;
+  });
+  for (const service of plannerRecords) {
     const key = routeGroupKey(service);
     if (!grouped.has(key)) grouped.set(key, []);
-    const groups = grouped.get(key);
-    const existing = groups.find(component => component.every(member => compatibleDirection(member, service)));
-    if (existing) existing.push(service);
-    else groups.push([service]);
+    grouped.get(key).push(service);
   }
   const rows = [];
-  for (const components of grouped.values()) components.forEach((component, index) => {
-    const row = buildPlannerRow(component, stops, index);
+  for (const [routeKey, services] of grouped.entries()) connectedServiceComponents(services).forEach((component, index) => {
+    const routeFamilyServices = plannerRecords.filter(service => routeGroupKey(service) === routeKey);
+    const row = buildPlannerRow(component, stops, index, routeFamilyServices);
     if (resolvedPlannerDestination(row)) rows.push(row);
   });
   const sorted = rows.sort((first, second) => text(first.routeNumber).localeCompare(text(second.routeNumber), undefined, { numeric: true })
@@ -618,4 +805,33 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
 }
 
 export const buildPlannerBusServiceSummary = buildPlannerBusServiceSummaries;
+
+export function buildPlannerSummaryAudit(rows = [], expectedRowCounts = {}) {
+  const routeNumbers = unique([
+    ...Object.keys(expectedRowCounts ?? {}),
+    ...(rows ?? []).map(row => row?.routeNumber)
+  ]).sort((first, second) => first.localeCompare(second, undefined, { numeric: true }));
+  const audit = routeNumbers.map(routeNumber => {
+    const routeRows = (rows ?? []).filter(row => text(row?.routeNumber) === routeNumber);
+    return Object.freeze({
+      routeNumber,
+      rowCount: routeRows.length,
+      expectedRowCount: Number.isFinite(Number(expectedRowCounts?.[routeNumber])) ? Number(expectedRowCounts[routeNumber]) : null,
+      aboveExpected: Number.isFinite(Number(expectedRowCounts?.[routeNumber])) && routeRows.length > Number(expectedRowCounts[routeNumber]),
+      rows: Object.freeze(routeRows.map(row => Object.freeze({
+        directionIdentity: text(row?.directionFamily || row?.direction || row?.stopDirection) || 'direction-not-supplied',
+        corridorIdentity: text(row?.principalLocationsText || row?.directionPatternText) || 'corridor-not-supplied',
+        representativeStop: text(row?.servedAtStopId || row?.frequencyBasisStopId) || null,
+        operatorFamily: normal(row?.operator) || 'operator-not-supplied',
+        headlineDestination: text(row?.destination) || 'destination-not-supplied',
+        variantCount: Number(row?.variantCount) || 0
+      })))
+    });
+  });
+  return Object.freeze({
+    routes: Object.freeze(audit),
+    aboveExpectedRoutes: Object.freeze(audit.filter(route => route.aboveExpected).map(route => route.routeNumber))
+  });
+}
+
 export { directionPatternText, servedAtText, formatServiceOriginDestination };

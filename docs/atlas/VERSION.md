@@ -1,5 +1,15 @@
 # ATLAS version and build record
 
+## BUS-QA-05 Alpha.14 production-representative planner row consolidation
+
+| Version | `2.0.0-alpha.14` |
+|---|---|
+| Visible build | `ATLAS-2.0.0-alpha.14-20260913` |
+| Branch | `codex/atlas-bus-alpha14-production-row-consolidation` |
+| Status | Local implementation candidate; Technical Director review required |
+
+Alpha.14 corrects the Alpha.13 manual-acceptance failure where production-shaped route variants were promoted to extra planner rows. Compatible source evidence now consolidates by route, principal direction and genuine corridor using deterministic connected components; common lineage alone cannot merge disjoint corridors. Circular/linear classification, alternate termini, source pattern/StopPoint variants, operator aliases and calendar profiles remain within the row where the evidence supports the same service family. Genuine closed loops such as 230 remain circular, while the two-way/open 310 family remains non-circular. The representative-stop rule, canonical physical-journey deduplication, calendar-safe frequency, raw provenance and Browser/Word parity are retained. The production-representative audit controls 25C, 66, 242, 310, 46, 230, 231, 357, 444, W16 and 657, with 317 as a two-direction control and 25C alternate destinations retained in route notes.
+
 ## BUS-QA-04 Alpha.13 TNDS production correction candidate
 
 | Version | `2.0.0-alpha.13` |

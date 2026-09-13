@@ -13,8 +13,8 @@ const builder = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/build_stat
 const tndsPreparation = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/prepare_tnds.mjs'), 'utf8');
 const freshness = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/refresh-freshness.mjs'), 'utf8');
 
-assert.equal(release.version, '2.0.0-alpha.13');
-assert.equal(release.build, 'ATLAS-2.0.0-alpha.13-20260911');
+assert.equal(release.version, '2.0.0-alpha.14');
+assert.equal(release.build, 'ATLAS-2.0.0-alpha.14-20260913');
 assert.match(html, new RegExp(release.version.replaceAll('.', '\\.') ));
 assert.match(html, new RegExp(release.build.replaceAll('.', '\\.') ));
 assert.match(html, /id="updateBusData"[^>]*hidden/);

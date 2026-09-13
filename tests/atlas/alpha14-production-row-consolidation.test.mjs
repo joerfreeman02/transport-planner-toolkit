@@ -217,15 +217,15 @@ const alpha14ReviewRecords = [
     nearbyMinutes: [900, 960]
   }),
   reviewRecord({
-    id: '25c-temp',
+    id: '25c-aaa-temp',
     routeNumber: '25C',
     routeId: '12315124',
     directionId: '0',
     origin: 'Central Start',
     destination: 'Temp Bus Station',
     direction: 'Hoddesdon',
-    pattern: ['25C-START', '25C-REP', '25C-TEMP'],
-    patternNames: ['Central Start', 'Waltham Cross Bus Station', 'Temp Bus Station'],
+    pattern: ['25C-START', '25C-REP', '25C-TEMP-MID', '25C-TEMP'],
+    patternNames: ['Central Start', 'Waltham Cross Bus Station', 'Temp Approach', 'Temp Bus Station'],
     representativeMinutes: [450]
   }),
   reviewRecord({
@@ -298,16 +298,15 @@ const review25c = review25cRows.find(row => row.directionFamily === 'gtfs:0');
 assert.ok(review25c, '25C principal production direction is present');
 assert.ok(review25c.rawServiceSummaries.some(service => service.destination === 'Maple Gate'));
 assert.ok(review25c.rawServiceSummaries.some(service => service.destination === 'Maynard Court'));
-const review25cRouteNotes = review25cRows.map(row => row.routeGroupNote || '').join(' ');
-assert.match(review25cRouteNotes, /Temp Bus Station/);
-assert.match(review25cRouteNotes, /Maple Gate/);
-assert.match(review25cRouteNotes, /Maynard Court/);
+const review25cRouteNotes = review25cRows.map(row => row.routeGroupNote || '').filter(Boolean).join(' ');
+assert.equal(review25cRouteNotes, 'Additional variants and short workings operate, including journeys towards Temp Bus Station, Maple Gate and Maynard Court.');
 assert.equal(review25c.destination, 'Bus Station');
 assert.equal(review25c.servedAtStopId, 'REP-A');
 assert.ok(!review25c.departuresByDay.monday.some(minute => [900, 960].includes(minute)), 'nearby-stop departures cannot inflate the representative-stop headline');
 assert.ok(alpha14ReviewRecords.some(service => service.routeNumber === '25C' && service.stopSchedules['REP-B'].monday.some(minute => [900, 960].includes(minute))));
 const wordReview = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: alpha14ReviewRows, serviceSummaries: [] });
-const word25cNotes = wordReview[1].rows.filter(row => !Array.isArray(row) && /Maple Gate|Maynard Court/.test(row.text)).map(row => row.text).join(' ');
+const word25cNotes = wordReview[1].rows.filter(row => !Array.isArray(row) && /Temp Bus Station|Maple Gate|Maynard Court/.test(row.text)).map(row => row.text).join(' ');
+assert.match(word25cNotes, /Temp Bus Station/);
 assert.match(word25cNotes, /Maple Gate/);
 assert.match(word25cNotes, /Maynard Court/);
 assert.equal(wordReview[1].widths.length, 7, 'Word Table 3.3 keeps the seven-column planner contract');
@@ -323,6 +322,11 @@ assert.ok(rows310.every(row => row.circular === false));
 assert.ok(rows310.every(row => !/Circular —/i.test(row.directionPatternText)));
 assert.ok(rows310.some(row => row.rawServiceSummaries.some(service => service.operator === "Arriva (in Herts and Essex)")));
 assert.match(rows310.map(row => row.routeGroupNote || '').join(' '), /short workings|timetable variants/i);
+const rows310Principal = rows310.find(row => row.directionFamily === 'gtfs:0');
+assert.ok(rows310Principal, '310 principal direction is present');
+assert.equal(rows310Principal.servedAtStopId, 'REP-A', '310 selects the intended representative stop');
+assert.ok(!rows310Principal.departuresByDay.monday.some(minute => [900, 960].includes(minute)), '310 nearby-stop departures cannot inflate the representative-stop headline');
+assert.ok(alpha14ReviewRecords.some(service => service.routeNumber === '310' && service.stopSchedules['REP-B'].monday.some(minute => [900, 960].includes(minute))), '310 nearby-stop raw fixture evidence is present');
 
 const rows46 = alpha14ReviewRows.filter(row => row.routeNumber === '46');
 assert.equal(rows46.length, 2);
@@ -359,6 +363,19 @@ const missingDirectionOpposite = reviewRows([
   reviewRecord({ id: 'missing-direction-reverse', routeNumber: 'MD', routeId: 'missing-direction', directionId: undefined, origin: 'MD End', destination: 'MD Start', direction: '', pattern: ['MD-C', 'MD-B', 'MD-A'], patternNames: ['MD End', 'MD Mid', 'MD Start'] })
 ]);
 assert.equal(missingDirectionOpposite.length, 2, 'reverse pattern/endpoints keep opposite directions separate even without direction markers');
+
+const alpha14AmbiguousBridgeRecords = [
+  reviewRecord({ id: 'bridge-a', routeNumber: 'BRIDGE', routeId: 'bridge-lineage', directionId: '0', origin: 'Bridge Start', destination: 'Bridge End', direction: 'inbound', pattern: ['BR-A', 'BR-B', 'BR-C'], patternNames: ['Bridge Start', 'Bridge Mid', 'Bridge End'], representativeMinutes: [420] }),
+  reviewRecord({ id: 'bridge-b', routeNumber: 'BRIDGE', routeId: 'bridge-lineage', directionId: undefined, origin: 'Bridge Start', destination: 'Bridge Variant', direction: '', pattern: ['BR-B'], patternNames: ['Bridge Mid'], representativeMinutes: [430] }),
+  reviewRecord({ id: 'bridge-c', routeNumber: 'BRIDGE', routeId: 'bridge-lineage', directionId: '1', origin: 'Bridge End', destination: 'Bridge Start', direction: 'outbound', pattern: ['BR-C', 'BR-B', 'BR-A'], patternNames: ['Bridge End', 'Bridge Mid', 'Bridge Start'], representativeMinutes: [520] })
+];
+alpha14AmbiguousBridgeRecords[1].principalLocations = ['Bridge Start', 'Bridge Mid', 'Bridge End'];
+const alpha14AmbiguousBridgeRows = reviewRows(alpha14AmbiguousBridgeRecords);
+assert.equal(alpha14AmbiguousBridgeRows.length, 2, 'ambiguous bridge cannot collapse explicit opposite directions');
+assert.equal(alpha14AmbiguousBridgeRows.filter(row => row.rawServiceSummaries.some(service => service.sourceRecordIds?.includes('bridge-b'))).length, 1, 'ambiguous bridge record is assigned to exactly one component');
+for (const minute of [420, 430, 520]) {
+  assert.equal(alpha14AmbiguousBridgeRows.flatMap(row => row.departuresByDay.monday).filter(value => value === minute).length, 1, `ambiguous bridge minute ${minute} remains unique`);
+}
 
 const reverseWorkingCases = [
   {

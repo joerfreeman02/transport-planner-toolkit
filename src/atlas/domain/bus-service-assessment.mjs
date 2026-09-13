@@ -413,6 +413,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
       circular: records.some(record => record.circular),
       calendarProfileId: text(first.calendarProfileId || first.source?.calendarProfileId) || null,
       calendarProfileLabel: calendarProfileLabel(first.calendarProfileId || first.source?.calendarProfileId),
+      sourceRouteIds: Object.freeze(unique(records.map(record => record.source?.routeId || record.routeId))),
       principalLocations,
       routePatternStops: Object.freeze([...(first.routePatternStops ?? [])]),
       calendarEvidence: Object.freeze(calendarEvidence),

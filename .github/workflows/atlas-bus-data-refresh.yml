@@ -43,9 +43,9 @@ jobs:
       message: ${{ steps.decision.outputs.message }}
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22.x'
       - name: Obtain deployed Bus and status manifests
@@ -84,13 +84,13 @@ jobs:
       id-token: write
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.x'
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22.x'
       - name: Prepare isolated Pages site
@@ -127,9 +127,9 @@ jobs:
           test -f pages-site/atlas/data/bus/manifest.json
           test -f pages-site/atlas/data/bus-tnds/manifest.json
       - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Upload validated Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: pages-site
 
@@ -145,7 +145,7 @@ jobs:
       name: github-pages
     steps:
       - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
   freshness-no-op:
     name: Confirm already-fresh Bus data

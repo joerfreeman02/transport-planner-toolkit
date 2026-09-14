@@ -194,12 +194,18 @@ function commonPatternPrefixLength(left, right) {
 }
 
 function comparablePatternValues(first, second) {
-  const leftNames = orderedPatternNames(first).map(normal).filter(Boolean);
-  const rightNames = orderedPatternNames(second).map(normal).filter(Boolean);
   const leftIds = explicitPattern(first).map(normal).filter(Boolean);
   const rightIds = explicitPattern(second).map(normal).filter(Boolean);
+  const leftNames = orderedPatternNames(first).map(normal).filter(Boolean);
+  const rightNames = orderedPatternNames(second).map(normal).filter(Boolean);
+  const sharedIds = new Set(leftIds.filter(id => rightIds.includes(id)));
+  // Provider-local names are a fallback only.  When the two feeds expose a
+  // comparable physical-ID sequence, those IDs are the authoritative
+  // corridor evidence even if the display names differ.
+  if (leftIds.length >= 2 && rightIds.length >= 2
+    && leftIds.length === rightIds.length && sharedIds.size >= 2) return [leftIds, rightIds];
   if (leftNames.length >= 2 && rightNames.length >= 2
-    && leftNames.length === leftIds.length && rightNames.length === rightIds.length) return [leftNames, rightNames];
+    && leftNames.length === rightNames.length) return [leftNames, rightNames];
   return [leftIds, rightIds];
 }
 
@@ -365,10 +371,49 @@ function connectedServiceComponents(services) {
     }
     if (connectedMarkers.size > 1) ambiguousMarkerChoice.set(index, [...connectedMarkers][0]);
   }
+  // A short working or markerless connector that is compatible with two
+  // services which are themselves hard-separated is ambiguous evidence.  It
+  // must remain auditable, but it cannot be allowed to choose a principal
+  // branch based on input order.
+  const ambiguousIndexes = new Set();
+  for (let connector = 0; connector < services.length; connector += 1) {
+    for (let left = 0; left < services.length; left += 1) {
+      if (left === connector) continue;
+      const leftPair = connector < left ? `${connector}:${left}` : `${left}:${connector}`;
+      if (!compatiblePairs.has(leftPair)) continue;
+      for (let right = left + 1; right < services.length; right += 1) {
+        if (right === connector) continue;
+        const rightPair = connector < right ? `${connector}:${right}` : `${right}:${connector}`;
+        const leftMarker = explicitDirectionMarker(services[left]);
+        const rightMarker = explicitDirectionMarker(services[right]);
+        const connectorMarker = explicitDirectionMarker(services[connector]);
+        const leftEndpoints = endpointPair(services[left]);
+        const rightEndpoints = endpointPair(services[right]);
+        const connectorEndpoints = endpointPair(services[connector]);
+        const sharesCommonOrigin = connectorEndpoints.origin
+          && leftEndpoints.origin && rightEndpoints.origin
+          && connectorEndpoints.origin === leftEndpoints.origin
+          && connectorEndpoints.origin === rightEndpoints.origin;
+        const sharesCommonDestination = connectorEndpoints.destination
+          && leftEndpoints.destination && rightEndpoints.destination
+          && connectorEndpoints.destination === leftEndpoints.destination
+          && connectorEndpoints.destination === rightEndpoints.destination;
+        const markerEvidenceIsAmbiguous = !connectorMarker
+          || (leftMarker && rightMarker && connectorMarker === leftMarker && connectorMarker === rightMarker);
+        const connectorIsACommonShortWorking = provenPatternRelationship(services[connector], services[left])
+          && provenPatternRelationship(services[connector], services[right]);
+        if (compatiblePairs.has(rightPair) && hardCorridorSeparation(services[left], services[right])
+          && markerEvidenceIsAmbiguous && (sharesCommonOrigin || sharesCommonDestination)
+          && connectorIsACommonShortWorking) {
+          ambiguousIndexes.add(connector);
+        }
+      }
+    }
+  }
   const components = [];
   const visited = new Set();
   for (let start = 0; start < services.length; start += 1) {
-    if (visited.has(start)) continue;
+    if (visited.has(start) || ambiguousIndexes.has(start)) continue;
     const queue = [start];
     const component = [];
     const componentIndexes = [];
@@ -378,10 +423,16 @@ function connectedServiceComponents(services) {
       component.push(services[current]);
       componentIndexes.push(current);
       for (let candidate = 0; candidate < services.length; candidate += 1) {
-        if (visited.has(candidate) || candidate === current) continue;
+        if (visited.has(candidate) || ambiguousIndexes.has(candidate) || candidate === current) continue;
         const pair = current < candidate ? `${current}:${candidate}` : `${candidate}:${current}`;
         if (!compatiblePairs.has(pair)) continue;
-        if (componentIndexes.some(index => hardCorridorSeparation(services[index], services[candidate]))) continue;
+        // Check all accepted and reserved members before reserving a
+        // candidate; this keeps component formation independent of queue
+        // order when a hard corridor conflict is present.
+        const reservedConflict = [...componentIndexes, ...queue]
+          .some(index => hardCorridorSeparation(services[index], services[candidate]));
+        const queuedContinuation = queue.some(index => provenPatternRelationship(services[index], services[candidate]));
+        if (reservedConflict && !queuedContinuation) continue;
         const currentChoice = ambiguousMarkerChoice.get(current);
         const candidateChoice = ambiguousMarkerChoice.get(candidate);
         const currentMarker = explicitDirectionMarker(services[candidate]);
@@ -392,6 +443,13 @@ function connectedServiceComponents(services) {
         queue.push(candidate);
       }
     }
+    const ambiguousServices = [...ambiguousIndexes]
+      .filter(index => componentIndexes.some(member => compatiblePairs.has(
+        member < index ? `${member}:${index}` : `${index}:${member}`)))
+      .map(index => services[index]);
+    Object.defineProperty(component, 'ambiguousServices', {
+      value: Object.freeze(ambiguousServices), enumerable: false
+    });
     components.push(component);
   }
   return components;
@@ -904,6 +962,7 @@ function buildPlannerServiceGroup(component, stops, main, representative) {
       label: servedStopEvidence.find(stop => stop.id === basisId)?.label || plannerStopLabel(representative.stop, { basis: true })
     }),
     sourceRecordIds: Object.freeze(sourceRecordIds),
+    ambiguousEvidence: Object.freeze([...(component.ambiguousServices ?? [])]),
     services: Object.freeze(component),
     sourceServiceCount: component.length,
     alternateDestinations: Object.freeze(alternateDestinations(component, main)),
@@ -1038,6 +1097,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     recordActivity: Math.max(0, ...component.map(service => Number(service.recordActivity) || 0)),
     presentation: Object.freeze({ principalLocationsText: principalText(main), rank: 0 }),
     rawServiceSummaries: Object.freeze(component),
+    ambiguousServiceSummaries: Object.freeze([...(component.ambiguousServices ?? [])]),
     plannerServiceGroup,
     operatorRawNames: plannerServiceGroup.rawOperatorNames,
     operatorIdentities: plannerServiceGroup.operatorIdentities,

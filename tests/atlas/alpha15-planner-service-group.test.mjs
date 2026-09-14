@@ -223,8 +223,55 @@ const transitiveBridgeRows = buildPlannerBusServiceSummaries([
   })
 ], branchStops);
 assert.equal(transitiveBridgeRows.length, 2, 'a common-trunk short working cannot bridge two genuine branches');
-assert.equal(transitiveBridgeRows.reduce((count, row) => count + row.rawServiceSummaries.length, 0), 3, 'trunk short-working evidence remains retained');
-assert.ok(transitiveBridgeRows.some(row => row.rawServiceSummaries.some(service => service.id === 'transitive-trunk-short')), 'trunk short-working source remains auditable within a branch row');
+assert.equal(transitiveBridgeRows.reduce((count, row) => count + row.rawServiceSummaries.length, 0), 2, 'ambiguous trunk short-working evidence is excluded from principal populations');
+assert.ok(transitiveBridgeRows.some(row => row.ambiguousServiceSummaries.some(service => service.id === 'transitive-trunk-short')), 'ambiguous trunk short-working source remains auditable as retained evidence');
+
+const permutationSignature = rows => rows.map(row => ({
+  destination: row.destination,
+  frequency: row.typicalFrequencyText,
+  operating: row.operatingPeriodLines,
+  principalIds: row.rawServiceSummaries.map(service => service.id).sort()
+})).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+const transitiveServices = transitiveBridgeRows.flatMap(row => [...row.rawServiceSummaries, ...row.ambiguousServiceSummaries]);
+const transitivePermutations = [
+  [0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]
+].map(order => buildPlannerBusServiceSummaries(order.map(index => transitiveServices[index]), branchStops));
+assert.equal(new Set(transitivePermutations.map(rows => JSON.stringify(permutationSignature(rows)))).size, 1, 'all six branch/short-working permutations are order-invariant');
+
+const markerlessBridge = record({ id: 'markerless-ambiguous-bridge', routeNumber: 'MARKERLESS-BRIDGE', routeId: 'markerless-bridge-line', directionId: '', origin: 'Hub', destination: '', direction: '', pattern: ['A', 'COMMON-A', 'COMMON-B'], patternNames: ['Hub', 'Common A', 'Common B'] });
+delete markerlessBridge.directionFamily;
+const markerlessBridgeServices = [
+  record({ id: 'markerless-branch-north', routeNumber: 'MARKERLESS-BRIDGE', routeId: 'markerless-bridge-line', origin: 'Hub', destination: 'North Terminal', direction: 'outbound', pattern: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-TERM'], patternNames: ['Hub', 'Common A', 'Common B', 'North A', 'North Terminal'] }),
+  record({ id: 'markerless-branch-east', routeNumber: 'MARKERLESS-BRIDGE', routeId: 'markerless-bridge-line', origin: 'Hub', destination: 'East Terminal', direction: 'outbound', pattern: ['A', 'COMMON-A', 'COMMON-B', 'EAST-A', 'EAST-TERM'], patternNames: ['Hub', 'Common A', 'Common B', 'East A', 'East Terminal'] }),
+  markerlessBridge
+];
+const markerlessBridgeRows = rows(markerlessBridgeServices);
+assert.equal(markerlessBridgeRows.length, 2, 'ambiguous markerless connector does not create a third principal row');
+assert.ok(markerlessBridgeRows.some(row => row.ambiguousServiceSummaries.some(service => service.id === markerlessBridge.id)), 'ambiguous markerless connector remains retained evidence');
+const markerlessPermutations = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]
+  .map(order => rows(order.map(index => markerlessBridgeServices[index])));
+assert.equal(new Set(markerlessPermutations.map(permutation => JSON.stringify(permutationSignature(permutation)))).size, 1, 'all six markerless bridge permutations remain order-invariant');
+
+const idSameNamesDifferent = rows([
+  record({ id: 'id1-a', routeNumber: 'ID-1', routeId: 'id1', pattern: ['ID-HUB', 'ID-MID', 'ID-TERM'], patternNames: ['Hub', 'High Street', 'Terminal'] }),
+  record({ id: 'id1-b', routeNumber: 'ID-1', routeId: 'id1', pattern: ['ID-HUB', 'ID-MID', 'ID-TERM'], patternNames: ['Hub', 'Main Road', 'Terminus'] })
+]);
+assert.equal(idSameNamesDifferent.length, 1, 'same physical IDs remain one row despite differing names');
+const idDifferentProvidersSameNames = rows([
+  record({ id: 'id2-a', routeNumber: 'ID-2', routeId: 'id2-a', pattern: ['P1-HUB', 'P1-MID', 'P1-TERM'], patternNames: ['Hub', 'High Street', 'Terminal'] }),
+  record({ id: 'id2-b', routeNumber: 'ID-2', routeId: 'id2-b', pattern: ['P2-HUB', 'P2-MID', 'P2-TERM'], patternNames: ['Hub', 'High Street', 'Terminal'] })
+]);
+assert.equal(idDifferentProvidersSameNames.length, 1, 'different provider IDs fall back to equivalent names');
+const idComparableBranch = rows([
+  record({ id: 'id3-north', routeNumber: 'ID-3', routeId: 'id3', pattern: ['ID-HUB', 'ID-COMMON-A', 'ID-COMMON-B', 'ID-NORTH', 'ID-NORTH-TERM'], patternNames: ['Hub', 'Common A', 'Common B', 'North', 'North Terminal'], destination: 'North Terminal' }),
+  record({ id: 'id3-east', routeNumber: 'ID-3', routeId: 'id3', pattern: ['ID-HUB', 'ID-COMMON-A', 'ID-COMMON-B', 'ID-EAST', 'ID-EAST-TERM'], patternNames: ['Hub', 'Common A', 'Common B', 'East', 'East Terminal'], destination: 'East Terminal' })
+]);
+assert.equal(idComparableBranch.length, 2, 'comparable physical IDs preserve a genuine branch');
+const idSameEndpointsDifferentInternal = rows([
+  record({ id: 'id4-north', routeNumber: 'ID-4', routeId: 'id4', pattern: ['ID-HUB', 'ID-NORTH-A', 'ID-NORTH-B', 'ID-TERM'], patternNames: ['Hub', 'North A', 'North B', 'Terminal'], destination: 'Terminal' }),
+  record({ id: 'id4-east', routeNumber: 'ID-4', routeId: 'id4', pattern: ['ID-HUB', 'ID-EAST-A', 'ID-EAST-B', 'ID-TERM'], patternNames: ['Hub', 'East A', 'East B', 'Terminal'], destination: 'Terminal' })
+]);
+assert.equal(idSameEndpointsDifferentInternal.length, 2, 'same endpoint IDs do not collapse distinct internal corridors');
 
 const convergingBranchRows = buildPlannerBusServiceSummaries([
   record({

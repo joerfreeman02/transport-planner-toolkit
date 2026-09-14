@@ -78,4 +78,4 @@ The repository already retains Dependabot configuration and it remains the appro
 
 ## 7. Acceptance status
 
-The deterministic suite, Alpha.16 semantic golden test, DOCX parity checks, review-environment browser test, and all three browser gate scripts pass. Alpha.16 is ready for consultancy acceptance pending the final commit/clean-tree record and any separately authorized branch push. It does not merge or alter `main`.
+The deterministic suite, Alpha.16 semantic golden test, DOCX parity checks, review-environment browser test, and all three browser gate scripts pass. The implementation commit is `fe293c5d63a5c0b64dba512c1ea7934431082833` (tree `d4878f9fdf4283aace1178d1fc3e5ae845921aa7`), and the requested branch is pushed to `origin`. Alpha.16 is ready for consultancy acceptance. It does not merge or alter `main`.

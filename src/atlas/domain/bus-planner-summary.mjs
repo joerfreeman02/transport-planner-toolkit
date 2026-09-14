@@ -193,6 +193,50 @@ function commonPatternPrefixLength(left, right) {
   return length;
 }
 
+function comparablePatternValues(first, second) {
+  const leftNames = orderedPatternNames(first).map(normal).filter(Boolean);
+  const rightNames = orderedPatternNames(second).map(normal).filter(Boolean);
+  const leftIds = explicitPattern(first).map(normal).filter(Boolean);
+  const rightIds = explicitPattern(second).map(normal).filter(Boolean);
+  if (leftNames.length >= 2 && rightNames.length >= 2
+    && leftNames.length === leftIds.length && rightNames.length === rightIds.length) return [leftNames, rightNames];
+  return [leftIds, rightIds];
+}
+
+function disjointValues(left, right) {
+  const rightSet = new Set(right);
+  return left.every(value => !rightSet.has(value));
+}
+
+function materialDivergentTails(left, right, commonLength) {
+  const leftTail = left.slice(commonLength), rightTail = right.slice(commonLength);
+  return leftTail.length >= 2 && rightTail.length >= 2 && disjointValues(leftTail, rightTail);
+}
+
+function materialDivergentHeads(left, right, commonLength) {
+  const leftHead = left.slice(0, left.length - commonLength), rightHead = right.slice(0, right.length - commonLength);
+  return leftHead.length >= 2 && rightHead.length >= 2 && disjointValues(leftHead, rightHead);
+}
+
+function materialDivergentInternalCorridors(left, right) {
+  const leftInternal = left.slice(1, -1), rightInternal = right.slice(1, -1);
+  return leftInternal.length >= 2 && rightInternal.length >= 2 && disjointValues(leftInternal, rightInternal);
+}
+
+function hardCorridorSeparation(first, second) {
+  const [leftPattern, rightPattern] = comparablePatternValues(first, second);
+  if (leftPattern.length < 2 || rightPattern.length < 2) return false;
+  const sharedPrefix = commonPatternPrefixLength(leftPattern, rightPattern);
+  if (sharedPrefix >= 2 && materialDivergentTails(leftPattern, rightPattern, sharedPrefix)) return true;
+  const sharedSuffix = commonPatternPrefixLength([...leftPattern].reverse(), [...rightPattern].reverse());
+  if (sharedSuffix >= 2 && materialDivergentHeads(leftPattern, rightPattern, sharedSuffix)) return true;
+  const leftEndpoints = endpointPair(first), rightEndpoints = endpointPair(second);
+  return leftEndpoints.origin && leftEndpoints.destination
+    && leftEndpoints.origin === rightEndpoints.origin
+    && leftEndpoints.destination === rightEndpoints.destination
+    && materialDivergentInternalCorridors(leftPattern, rightPattern);
+}
+
 function provenPatternRelationship(first, second) {
   const left = explicitPattern(first);
   const right = explicitPattern(second);
@@ -303,6 +347,7 @@ function connectedServiceComponents(services) {
   const compatiblePairs = new Set();
   for (let left = 0; left < services.length; left += 1) {
     for (let right = left + 1; right < services.length; right += 1) {
+      if (hardCorridorSeparation(services[left], services[right])) continue;
       if (!compatibleDirection(services[left], services[right], aliases)) continue;
       compatiblePairs.add(`${left}:${right}`);
     }
@@ -326,14 +371,17 @@ function connectedServiceComponents(services) {
     if (visited.has(start)) continue;
     const queue = [start];
     const component = [];
+    const componentIndexes = [];
     visited.add(start);
     while (queue.length) {
       const current = queue.shift();
       component.push(services[current]);
+      componentIndexes.push(current);
       for (let candidate = 0; candidate < services.length; candidate += 1) {
         if (visited.has(candidate) || candidate === current) continue;
         const pair = current < candidate ? `${current}:${candidate}` : `${candidate}:${current}`;
         if (!compatiblePairs.has(pair)) continue;
+        if (componentIndexes.some(index => hardCorridorSeparation(services[index], services[candidate]))) continue;
         const currentChoice = ambiguousMarkerChoice.get(current);
         const candidateChoice = ambiguousMarkerChoice.get(candidate);
         const currentMarker = explicitDirectionMarker(services[candidate]);
@@ -353,6 +401,7 @@ function compatibleDirection(first, second, aliases = []) {
   // Operator and feed identity are evidence fields, not public direction
   // identity.  The same route-direction can therefore be represented by
   // more than one current operator or prepared feed.
+  if (hardCorridorSeparation(first, second)) return false;
   if (reverseEndpointRelationship(first, second)) return false;
   const leftEndpoints = endpointPair(first), rightEndpoints = endpointPair(second);
   if (leftEndpoints.origin && leftEndpoints.destination && rightEndpoints.origin && rightEndpoints.destination) {

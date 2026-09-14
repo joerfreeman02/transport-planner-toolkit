@@ -148,7 +148,7 @@ assert.equal(independentCorridors.length, 2, 'distinct corridors with common rou
 
 const branchStops = [
   ...stops,
-  ...['COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-B', 'NORTH-TERM', 'EAST-A', 'EAST-B', 'EAST-TERM']
+  ...['COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-B', 'NORTH-C', 'NORTH-TERM', 'EAST-A', 'EAST-B', 'EAST-C', 'EAST-TERM']
     .map(id => ({ id, name: id, distanceMetres: 200, walking: { status: 'routed', distanceMetres: 200 } }))
 ];
 const sharedTrunkBranches = buildPlannerBusServiceSummaries([
@@ -180,6 +180,141 @@ const sharedTrunkBranches = buildPlannerBusServiceSummaries([
   })
 ], branchStops);
 assert.equal(sharedTrunkBranches.length, 2, 'materially divergent same-lineage branches remain separate public rows');
+
+const transitiveBridgeRows = buildPlannerBusServiceSummaries([
+  record({
+    id: 'transitive-north',
+    routeNumber: 'TRANSITIVE-BRANCH',
+    routeId: 'transitive-line',
+    origin: 'Hub',
+    destination: 'North Terminal',
+    direction: 'outbound',
+    stopIds: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-B', 'NORTH-TERM'],
+    basis: 'A',
+    pattern: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-B', 'NORTH-TERM'],
+    principalLocations: ['Hub', 'Common A', 'Common B', 'North A', 'North B', 'North Terminal'],
+    patternNames: ['Hub', 'Common A', 'Common B', 'North A', 'North B', 'North Terminal']
+  }),
+  record({
+    id: 'transitive-east',
+    routeNumber: 'TRANSITIVE-BRANCH',
+    routeId: 'transitive-line',
+    origin: 'Hub',
+    destination: 'East Terminal',
+    direction: 'outbound',
+    stopIds: ['A', 'COMMON-A', 'COMMON-B', 'EAST-A', 'EAST-B', 'EAST-TERM'],
+    basis: 'A',
+    pattern: ['A', 'COMMON-A', 'COMMON-B', 'EAST-A', 'EAST-B', 'EAST-TERM'],
+    principalLocations: ['Hub', 'Common A', 'Common B', 'East A', 'East B', 'East Terminal'],
+    patternNames: ['Hub', 'Common A', 'Common B', 'East A', 'East B', 'East Terminal']
+  }),
+  record({
+    id: 'transitive-trunk-short',
+    routeNumber: 'TRANSITIVE-BRANCH',
+    routeId: 'transitive-line',
+    origin: 'Hub',
+    destination: 'Common B',
+    direction: 'outbound',
+    stopIds: ['A', 'COMMON-A', 'COMMON-B'],
+    basis: 'A',
+    pattern: ['A', 'COMMON-A', 'COMMON-B'],
+    principalLocations: ['Hub', 'Common A', 'Common B'],
+    patternNames: ['Hub', 'Common A', 'Common B']
+  })
+], branchStops);
+assert.equal(transitiveBridgeRows.length, 2, 'a common-trunk short working cannot bridge two genuine branches');
+assert.equal(transitiveBridgeRows.reduce((count, row) => count + row.rawServiceSummaries.length, 0), 3, 'trunk short-working evidence remains retained');
+assert.ok(transitiveBridgeRows.some(row => row.rawServiceSummaries.some(service => service.id === 'transitive-trunk-short')), 'trunk short-working source remains auditable within a branch row');
+
+const convergingBranchRows = buildPlannerBusServiceSummaries([
+  record({
+    id: 'converging-north',
+    routeNumber: 'CONVERGING-BRANCH',
+    routeId: 'converging-line',
+    origin: 'North Terminal',
+    destination: 'Hub',
+    direction: 'inbound',
+    stopIds: ['NORTH-TERM', 'NORTH-B', 'NORTH-A', 'COMMON-B', 'COMMON-A', 'A'],
+    basis: 'A',
+    pattern: ['NORTH-TERM', 'NORTH-B', 'NORTH-A', 'COMMON-B', 'COMMON-A', 'A'],
+    principalLocations: ['North Terminal', 'North B', 'North A', 'Common B', 'Common A', 'Hub'],
+    patternNames: ['North Terminal', 'North B', 'North A', 'Common B', 'Common A', 'Hub']
+  }),
+  record({
+    id: 'converging-east',
+    routeNumber: 'CONVERGING-BRANCH',
+    routeId: 'converging-line',
+    origin: 'East Terminal',
+    destination: 'Hub',
+    direction: 'inbound',
+    stopIds: ['EAST-TERM', 'EAST-B', 'EAST-A', 'COMMON-B', 'COMMON-A', 'A'],
+    basis: 'A',
+    pattern: ['EAST-TERM', 'EAST-B', 'EAST-A', 'COMMON-B', 'COMMON-A', 'A'],
+    principalLocations: ['East Terminal', 'East B', 'East A', 'Common B', 'Common A', 'Hub'],
+    patternNames: ['East Terminal', 'East B', 'East A', 'Common B', 'Common A', 'Hub']
+  })
+], branchStops);
+assert.equal(convergingBranchRows.length, 2, 'converging branches with a common suffix remain separate');
+
+const sameEndpointCorridorRows = buildPlannerBusServiceSummaries([
+  record({
+    id: 'same-endpoint-north',
+    routeNumber: 'SAME-ENDPOINT',
+    routeId: 'same-endpoint-line',
+    origin: 'Hub',
+    destination: 'Terminal',
+    direction: 'outbound',
+    stopIds: ['A', 'NORTH-A', 'NORTH-B', 'NORTH-C', 'NORTH-TERM'],
+    basis: 'A',
+    pattern: ['A', 'NORTH-A', 'NORTH-B', 'NORTH-C', 'NORTH-TERM'],
+    principalLocations: ['Hub', 'North A', 'North B', 'Terminal'],
+    patternNames: ['Hub', 'North A', 'North B', 'North C', 'Terminal']
+  }),
+  record({
+    id: 'same-endpoint-east',
+    routeNumber: 'SAME-ENDPOINT',
+    routeId: 'same-endpoint-line',
+    origin: 'Hub',
+    destination: 'Terminal',
+    direction: 'outbound',
+    stopIds: ['A', 'EAST-A', 'EAST-B', 'EAST-C', 'EAST-TERM'],
+    basis: 'A',
+    pattern: ['A', 'EAST-A', 'EAST-B', 'EAST-C', 'EAST-TERM'],
+    principalLocations: ['Hub', 'East A', 'East B', 'Terminal'],
+    patternNames: ['Hub', 'East A', 'East B', 'East C', 'Terminal']
+  })
+], branchStops);
+assert.equal(sameEndpointCorridorRows.length, 2, 'same endpoints do not collapse materially different corridors');
+
+const sameEndpointShortWorkingRows = buildPlannerBusServiceSummaries([
+  record({
+    id: 'same-endpoint-full',
+    routeNumber: 'SAME-ENDPOINT-CONTROL',
+    routeId: 'same-endpoint-control-line',
+    origin: 'Hub',
+    destination: 'Terminal',
+    direction: 'outbound',
+    stopIds: ['A', 'NORTH-A', 'NORTH-B', 'NORTH-TERM'],
+    basis: 'A',
+    pattern: ['A', 'NORTH-A', 'NORTH-B', 'NORTH-TERM'],
+    principalLocations: ['Hub', 'North A', 'North B', 'Terminal'],
+    patternNames: ['Hub', 'North A', 'North B', 'Terminal']
+  }),
+  record({
+    id: 'same-endpoint-short',
+    routeNumber: 'SAME-ENDPOINT-CONTROL',
+    routeId: 'same-endpoint-control-line',
+    origin: 'Hub',
+    destination: 'Terminal',
+    direction: 'outbound',
+    stopIds: ['A', 'NORTH-A', 'NORTH-TERM'],
+    basis: 'A',
+    pattern: ['A', 'NORTH-A', 'NORTH-TERM'],
+    principalLocations: ['Hub', 'North A', 'Terminal'],
+    patternNames: ['Hub', 'North A', 'Terminal']
+  })
+], branchStops);
+assert.equal(sameEndpointShortWorkingRows.length, 1, 'same-corridor endpoint short working remains one planner row');
 
 const shortWorkingRows = buildPlannerBusServiceSummaries([
   record({ id: 'short-main', routeNumber: 'SHORT-BRANCH', routeId: 'short-line', origin: 'Hub', destination: 'North Terminal', direction: 'outbound', pattern: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-TERM'], patternNames: ['Hub', 'Common A', 'Common B', 'North A', 'North Terminal'] }),

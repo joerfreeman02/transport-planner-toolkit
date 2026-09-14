@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { chooseFirstCandidateAndConfirm, mockAccessRouting, mockMapTiles, mockPreparedBusTimetables } from './browser-test-helpers.mjs';
+import { launchAtlasBrowser } from './playwright-launch.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -13,7 +14,7 @@ const tflRoute = JSON.parse(fs.readFileSync(new URL('./fixtures/tfl-line-route.j
 const tflTimetable = JSON.parse(fs.readFileSync(new URL('./fixtures/tfl-timetable.json', import.meta.url), 'utf8'));
 const screenshotDir = process.env.ATLAS_UX_SCREENSHOT_DIR || '';
 if (screenshotDir) fs.mkdirSync(screenshotDir, { recursive: true });
-const browser = await chromium.launch({ headless: true });
+const browser = await launchAtlasBrowser(chromium, { headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const pageErrors = [];
 const consoleErrors = [];
@@ -40,7 +41,7 @@ await page.route('https://api.tfl.gov.uk/**', route => {
 
 try {
   await page.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.14/);
+  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.15/);
   for (const section of ['Report Builder', 'Modules', 'Projects', 'About']) {
     await page.getByRole('button', { name: section }).click();
     assert.equal(await page.getByRole('heading', { name: section === 'About' ? 'ATLAS — Automated Transport & Location Assessment System' : section, exact: true }).isVisible(), true);

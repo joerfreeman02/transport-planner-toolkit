@@ -1,5 +1,16 @@
 # ATLAS version and build record
 
+## BUS-QA-06 Alpha.15 production-fidelity bus service abstraction
+
+| Version | `2.0.0-alpha.15` |
+|---|---|
+| Visible build | `ATLAS-2.0.0-alpha.15-20260914` |
+| Branch | `codex/atlas-bus-alpha15-production-fidelity` |
+| Starting SHA | `0efdaf4f33b5db5d1e057f43ddfd16d0e15477ba` |
+| Status | Independent clean-clone implementation candidate; Technical Director review required |
+
+Alpha.15 resumes from the deployed Alpha.14 production replay for Waltham Cross. It introduces the auditable `PlannerServiceGroup` abstraction so route-direction rows are formed from public endpoint orientation and genuine corridor evidence rather than operator, feed, registration, pattern or nearby-stop identity. The replay preserves raw service records, operator evidence, alternate termini, all selected served stops and one explicit timetable basis; typical frequency and operating periods use only that basis. Physical-journey duplicates are removed only when their semantic departure agrees, and distinct same-minute journeys remain. Browser Table 3.3 and Word Table 3.3 consume the same planner rows. The network-free fixture records workflow run `34783354786`, artifact `10327455051`, main SHA `0efdaf4f33b5db5d1e057f43ddfd16d0e15477ba` and tree `c7b3dffd4fd7d5dd28dc3daf01b1ef54c44d68c1`.
+
 ## BUS-QA-05 Alpha.14 production-representative planner row consolidation
 
 | Version | `2.0.0-alpha.14` |

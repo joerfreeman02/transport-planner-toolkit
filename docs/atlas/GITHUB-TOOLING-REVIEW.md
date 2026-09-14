@@ -1,6 +1,7 @@
 # GitHub tooling adoption review
 
-Reviewed: 2026-09-04. No repository tool was installed during BUS-1.
+Reviewed: 2026-09-14 for Alpha.15 correction. No new repository tool was
+installed or enabled. Existing Dependabot configuration was left unchanged.
 
 ## Dependabot — retain
 

@@ -26,6 +26,7 @@ function record({
   calendarProfileId = 'ordinary',
   circular = false,
   principalLocations = ['Waltham Cross Bus Station'],
+  patternNames = pattern,
   departureEvidenceByDay
 } = {}) {
   return {
@@ -47,7 +48,7 @@ function record({
     circular,
     principalLocations,
     sourceRecordIds: [id],
-    routePatternStops: pattern.map(name => ({ id: name, name })),
+    routePatternStops: pattern.map((name, index) => ({ id: name, name: patternNames[index] ?? name })),
     timetableSource: 'BODS'
   };
 }
@@ -161,7 +162,8 @@ const sharedTrunkBranches = buildPlannerBusServiceSummaries([
     stopIds: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-B', 'NORTH-TERM'],
     basis: 'A',
     pattern: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-B', 'NORTH-TERM'],
-    principalLocations: ['Hub', 'Common A', 'Common B', 'North A', 'North B', 'North Terminal']
+    principalLocations: ['Hub', 'Common A', 'Common B', 'North A', 'North B', 'North Terminal'],
+    patternNames: ['Hub', 'Common A', 'Common B', 'North A', 'North B', 'North Terminal']
   }),
   record({
     id: 'shared-trunk-east',
@@ -173,14 +175,15 @@ const sharedTrunkBranches = buildPlannerBusServiceSummaries([
     stopIds: ['A', 'COMMON-A', 'COMMON-B', 'EAST-A', 'EAST-B', 'EAST-TERM'],
     basis: 'A',
     pattern: ['A', 'COMMON-A', 'COMMON-B', 'EAST-A', 'EAST-B', 'EAST-TERM'],
-    principalLocations: ['Hub', 'Common A', 'Common B', 'East A', 'East B', 'East Terminal']
+    principalLocations: ['Hub', 'Common A', 'Common B', 'East A', 'East B', 'East Terminal'],
+    patternNames: ['Hub', 'Common A', 'Common B', 'East A', 'East B', 'East Terminal']
   })
 ], branchStops);
 assert.equal(sharedTrunkBranches.length, 2, 'materially divergent same-lineage branches remain separate public rows');
 
 const shortWorkingRows = buildPlannerBusServiceSummaries([
-  record({ id: 'short-main', routeNumber: 'SHORT-BRANCH', routeId: 'short-line', origin: 'Hub', destination: 'North Terminal', direction: 'outbound', pattern: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-TERM'] }),
-  record({ id: 'short-working', routeNumber: 'SHORT-BRANCH', routeId: 'short-line', origin: 'Hub', destination: 'North A', direction: 'outbound', pattern: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A'] })
+  record({ id: 'short-main', routeNumber: 'SHORT-BRANCH', routeId: 'short-line', origin: 'Hub', destination: 'North Terminal', direction: 'outbound', pattern: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-TERM'], patternNames: ['Hub', 'Common A', 'Common B', 'North A', 'North Terminal'] }),
+  record({ id: 'short-working', routeNumber: 'SHORT-BRANCH', routeId: 'short-line', origin: 'Hub', destination: 'North A', direction: 'outbound', pattern: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A'], patternNames: ['Hub', 'Common A', 'Common B', 'North A'] })
 ], stops);
 assert.equal(shortWorkingRows.length, 1, 'an ordered-subsequence short working remains within the principal direction row');
 assert.match(`${shortWorkingRows[0].serviceNote} ${shortWorkingRows[0].routeGroupNote || ''}`, /short workings|variants/i);

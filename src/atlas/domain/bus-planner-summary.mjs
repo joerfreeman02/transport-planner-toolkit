@@ -371,8 +371,8 @@ function compatibleDirection(first, second, aliases = []) {
       const commonPrefixLength = commonPatternPrefixLength(leftPattern, rightPattern);
       const leftTailLength = leftPattern.length - commonPrefixLength;
       const rightTailLength = rightPattern.length - commonPrefixLength;
-      const leftDestinationInRightPattern = orderedPatternNames(second).some(name => normal(name) === rightEndpoints.destination);
-      const rightDestinationInLeftPattern = orderedPatternNames(first).some(name => normal(name) === leftEndpoints.destination);
+      const leftDestinationInRightPattern = orderedPatternNames(second).some(name => normal(name) === leftEndpoints.destination);
+      const rightDestinationInLeftPattern = orderedPatternNames(first).some(name => normal(name) === rightEndpoints.destination);
       const materiallyDivergentBranchPatterns = leftPattern.length >= 2
         && rightPattern.length >= 2
         && commonPrefixLength >= 2

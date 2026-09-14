@@ -1,0 +1,137 @@
+import assert from 'node:assert/strict';
+import { buildPlannerBusServiceSummaries, buildPlannerServiceGroups } from '../../src/atlas/domain/bus-planner-summary.mjs';
+
+const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const stops = [
+  { id: 'A', name: 'Waltham Cross Bus Station', indicator: 'Stop A', distanceMetres: 100, walking: { status: 'routed', distanceMetres: 90 } },
+  { id: 'B', name: 'Waltham Cross Bus Station', indicator: 'Stop B', distanceMetres: 130, walking: { status: 'routed', distanceMetres: 120 } },
+  { id: 'C', name: 'Waltham Cross Bus Station', indicator: 'Stop C', distanceMetres: 160, walking: { status: 'routed', distanceMetres: 150 } }
+];
+
+const week = minutes => Object.fromEntries(DAYS.map(day => [day, [...minutes]]));
+
+function record({
+  id,
+  routeNumber = 'R',
+  operator = 'Example Buses',
+  routeId = `${routeNumber}-line`,
+  directionId = '0',
+  origin = 'Origin',
+  destination = 'Destination',
+  direction = destination,
+  pattern = ['ORIGIN', 'MID', 'DESTINATION'],
+  stopIds = ['A'],
+  basis = stopIds[0],
+  minutes = [420, 480],
+  calendarProfileId = 'ordinary',
+  circular = false,
+  departureEvidenceByDay
+} = {}) {
+  return {
+    id,
+    routeNumber,
+    operator,
+    origin,
+    destination,
+    direction,
+    directionFamily: `gtfs:${directionId}`,
+    sourceRouteIds: [routeId],
+    routePatternStopIds: pattern,
+    stopIds,
+    frequencyBasisStopId: basis,
+    frequencyBasisStopName: stops.find(stop => stop.id === basis)?.name,
+    departuresByDay: week(minutes),
+    departureEvidenceByDay: departureEvidenceByDay ?? Object.fromEntries(DAYS.map(day => [day, minutes.map(minute => ({ minute, stopPointId: basis, journeyIdentity: `${id}:${day}:${minute}`, provider: 'BODS' }))])),
+    calendarProfileId,
+    circular,
+    principalLocations: ['Waltham Cross Bus Station'],
+    sourceRecordIds: [id],
+    routePatternStops: pattern.map(name => ({ id: name, name })),
+    timetableSource: 'BODS'
+  };
+}
+
+const rows = services => buildPlannerBusServiceSummaries(services, stops);
+
+const operatorRows = rows([
+  record({ id: 'operator-a', routeNumber: '46', operator: 'Centrebus', destination: 'North Terminal' }),
+  record({ id: 'operator-b', routeNumber: '46', operator: 'Centrebus South', destination: 'North Terminal' })
+]);
+assert.equal(operatorRows.length, 1, 'operator variants do not create a second public direction');
+assert.deepEqual(operatorRows[0].operatorRawNames, ['Centrebus', 'Centrebus South']);
+assert.match(operatorRows[0].operator, /Centrebus/);
+assert.equal(operatorRows[0].rawServiceSummaries.length, 2, 'operator evidence remains in the planner group');
+
+const variantRows = rows([
+  record({ id: 'variant-main', routeNumber: '25C', routeId: '25c-line', origin: 'Bus Station', destination: 'Main Terminus', direction: 'Main Terminus', pattern: ['START', 'MID', 'MAIN'] }),
+  record({ id: 'variant-short', routeNumber: '25 C', routeId: '25c-line', origin: 'Bus Station', destination: 'Short Terminus', direction: 'Main Terminus', pattern: ['START', 'MID', 'SHORT'], minutes: [450] })
+]);
+assert.equal(variantRows.length, 1, 'route-number formatting and short workings consolidate');
+assert.equal(variantRows[0].variantCount, 2);
+assert.match(`${variantRows[0].serviceNote} ${variantRows[0].routeGroupNote || ''}`, /Additional variants|short workings|timetable variants/i);
+assert.equal(variantRows[0].plannerServiceGroup.sourceServiceCount, 2);
+
+const multiStopRows = rows([record({ id: 'multi-stop', routeNumber: '66', stopIds: ['A', 'B'], basis: 'A' })]);
+assert.equal(multiStopRows[0].frequencyBasisStopId, 'A');
+assert.match(multiStopRows[0].servedAtText, /Stop A .*timetable basis/);
+assert.match(multiStopRows[0].servedAtText, /Stop B/);
+assert.deepEqual(multiStopRows[0].stopIds, ['A', 'B']);
+assert.equal(multiStopRows[0].plannerServiceGroup.timetableBasis.stopId, 'A');
+
+const incompleteNearestRows = rows([record({
+  id: 'basis-far',
+  routeNumber: 'BASIS',
+  stopIds: ['A', 'B'],
+  basis: 'B',
+  departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, [{ minute: 420, stopPointId: 'B', journeyIdentity: `basis-${day}`, provider: 'BODS' }]]))
+})]);
+assert.equal(incompleteNearestRows[0].frequencyBasisStopId, 'B', 'a nearer stop without timetable evidence cannot become the basis');
+assert.deepEqual(incompleteNearestRows[0].stopIds, ['A', 'B'], 'the nearer served stop is still listed');
+
+const physicalEvidence = Object.fromEntries(DAYS.map(day => [day, [
+  { minute: 420, stopPointId: 'A', journeyIdentity: 'physical-1', provider: 'BODS', destination: 'Destination' },
+  { minute: 420, stopPointId: 'A', journeyIdentity: 'physical-1', provider: 'National feed', destination: 'Destination' },
+  { minute: 420, stopPointId: 'A', journeyIdentity: 'physical-2', provider: 'BODS', destination: 'Destination' }
+]]));
+const physicalRows = rows([record({ id: 'physical', routeNumber: 'PHYS', departureEvidenceByDay: physicalEvidence, minutes: [] })]);
+assert.equal(physicalRows[0].canonicalDeparturePopulationAll.monday.length, 2, 'same physical journey copies collapse but distinct physical journeys at the same minute remain');
+
+const calendarRows = rows([
+  record({ id: 'ordinary', routeNumber: 'CAL', calendarProfileId: 'ordinary', minutes: [420] }),
+  record({ id: 'school', routeNumber: 'CAL', calendarProfileId: 'school-day', minutes: [600] })
+]);
+assert.equal(calendarRows.length, 1);
+assert.deepEqual(calendarRows[0].calendarProfileIds, ['ordinary', 'school-day']);
+assert.match(calendarRows[0].typicalFrequencyText, /Ordinary service|School days/);
+
+const route242Groups = buildPlannerServiceGroups([
+  record({ id: 'central-out', routeNumber: '242', operator: 'Central Connect', routeId: 'central', origin: 'Bus Station', destination: 'Potters Bar Railway Station' }),
+  record({ id: 'uno-out', routeNumber: '242', operator: 'Uno', routeId: 'uno', directionId: '1', origin: 'Bus Station', destination: 'Potters Bar Railway Station' }),
+  record({ id: 'uno-in', routeNumber: '242', operator: 'Uno', routeId: 'uno', directionId: '0', origin: 'Potters Bar Railway Station', destination: 'Bus Station', pattern: ['DESTINATION', 'MID', 'ORIGIN'] })
+], stops);
+assert.equal(route242Groups.length, 2, 'operator-specific direction markers cannot split or cross-bridge the public 242 directions');
+assert.deepEqual(route242Groups.map(group => group.operatorNames.slice().sort()), [['Central Connect', 'Uno'], ['Uno']].sort((a, b) => a.join().localeCompare(b.join())));
+
+const circularRows = rows([
+  record({ id: '230-loop', routeNumber: '230', routeId: '230-line', origin: 'Loop Hub', destination: 'Loop Hub', direction: 'Clockwise', pattern: ['LOOP-A', 'LOOP-B', 'LOOP-A'], circular: true }),
+  record({ id: '230-short', routeNumber: '230', routeId: '230-line', origin: 'Loop Hub', destination: 'Bus Station', direction: 'Clockwise', pattern: ['LOOP-A', 'LOOP-B', 'BUS'], circular: false })
+]);
+assert.equal(circularRows.length, 1);
+assert.equal(circularRows[0].circular, true, 'genuine closed-loop evidence is retained');
+
+const independentCorridors = rows([
+  record({ id: 'corridor-a', routeNumber: '230', routeId: 'corridor-a', origin: 'North Interchange', destination: 'North Terminal', pattern: ['N1', 'N2', 'N3'] }),
+  record({ id: 'corridor-b', routeNumber: '230', routeId: 'corridor-b', origin: 'South Interchange', destination: 'South Terminal', pattern: ['S1', 'S2', 'S3'] })
+]);
+assert.equal(independentCorridors.length, 2, 'distinct corridors with common route number remain separate');
+
+const markerlessOpposites = rows([
+  record({ id: 'forward', routeNumber: 'MD', routeId: 'markerless', directionId: undefined, direction: '', origin: 'A Terminal', destination: 'B Terminal', pattern: ['A', 'MID', 'B'] }),
+  record({ id: 'reverse', routeNumber: 'MD', routeId: 'markerless', directionId: undefined, direction: '', origin: 'B Terminal', destination: 'A Terminal', pattern: ['B', 'MID', 'A'] })
+]);
+assert.equal(markerlessOpposites.length, 2, 'reverse endpoint and pattern evidence keeps directions separate without markers');
+
+const unresolved = rows([record({ id: 'unresolved', routeNumber: 'Q', direction: '', destination: 'Destination not resolved', origin: 'Unknown', pattern: [] })]);
+assert.equal(unresolved.length, 0, 'unresolved route identity is not promoted to a planner row');
+
+console.log('PASS Alpha.15 adversarial PlannerServiceGroup coverage: operators, variants, served stops, timetable basis, physical journeys, calendars, circular controls, corridors and unresolved identities.');

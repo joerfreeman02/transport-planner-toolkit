@@ -28,7 +28,7 @@ const planner = buildPlannerBusServiceSummaries([
 assert.equal(planner.length, 3, 'main direction, genuine branch and opposite direction remain distinct');
 const main = planner.find(row => row.destination === 'Chingford');
 assert.ok(main);
-assert.equal(main.servedAtText, 'Waltham Cross Bus Station — G · 82 m');
+assert.equal(main.servedAtText, 'Waltham Cross Bus Station — G · 82 m (timetable basis)\nWaltham Cross Bus Station — H · 120 m');
 assert.deepEqual(main.departuresByDay.monday, [360, 360, 420, 480, 540, 600, 660], 'same representative-stop schedules are consolidated without cross-stop addition while a destination-distinguished short working remains represented');
 assert.deepEqual(main.typicalFrequencyLines, ['Mon-Fri: Every ~60 mins', 'Sat: 2 journeys/day', 'Sun: 1 journey/day']);
 assert.match(main.operatingPeriodLines.join(' '), /Sun: Departs approx\. 10:00/);
@@ -225,7 +225,7 @@ assert.equal(builtSummary.departureEvidenceByDay.monday[0].minute, 678, 'raw sum
 const wordRows = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [route279[0]], serviceSummaries: [] })[1].rows;
 assert.equal(wordRows[0][2], route279[0].directionPatternText, 'Word consumes the same direction model as Browser');
 assert.equal(wordRows[0][5], route279[0].typicalFrequencyText, 'Word consumes the same frequency model as Browser');
-assert.equal(wordRows.filter(row => !Array.isArray(row) && row.text === 'Typical frequencies and operating periods are based on the de-duplicated departures at the assessed representative stop. Additional source evidence remains available in the ATLAS assessment workspace.').length, 1, 'Word carries the shared planner methodology note once');
+assert.equal(wordRows.filter(row => !Array.isArray(row) && row.text === 'Frequency and operating periods are derived from scheduled departures at the closest timetable-evidenced served stop (the representative stop), marked “(timetable basis)”. Other served stops remain listed for completeness. Additional source evidence remains available in the ATLAS assessment workspace.').length, 1, 'Word carries the shared planner methodology note once');
 const reviewWordRows = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [], serviceSummaries: [], reviewItems: [{ route: '279', stop: 'A', source: 'TfL', message: 'Review this timetable evidence.' }] })[1].rows;
 assert.equal(reviewWordRows.some(row => !Array.isArray(row) && row.text === 'Evidence items to review: Route 279 · Stop A · TfL: Review this timetable evidence.'), true, 'Word carries the same scoped review item naming as Browser');
 

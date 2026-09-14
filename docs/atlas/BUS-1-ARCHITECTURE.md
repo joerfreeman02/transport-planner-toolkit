@@ -1,6 +1,6 @@
 # BUS-1 authoritative bus-assessment architecture
 
-Reviewed: 2026-09-13
+Reviewed: 2026-09-14
 
 ## Source hierarchy and cost position
 
@@ -49,6 +49,10 @@ Empty principal locations are context-sensitive: `Route endpoints only` is reser
 Material qualifications generate one conditional full-width `Service note:` row. This includes school-day/date exceptions, weekday-only or limited operation, no weekend service, circular patterns, overnight journeys, route variants, or missing operator/timetable information. Normal services do not receive empty note rows.
 
 The existing `calculateScheduledFrequency()` remains the low-level scheduled-frequency calculation. The planner-facing rule calculates each Monday-Sunday result from one representative selected stop, so nearby calls cannot multiply one physical journey. Five or fewer journeys use journeys/day; otherwise regular schedules use deterministic `Every ~X mins` wording, with irregular schedules remaining explicitly irregular. Adjacent daily results are compressed only when their basis, classification and values are equivalent; non-adjacent matches remain separate. TfL `FrequencyMinutes` evidence may support `Every X mins` or `Every X–Y mins` only when its original type, representative StopPoint and positive band are defensible; other period types remain unavailable for planner frequency calculation without creating timestamps. No buses/hour or journey count is inferred from a non-minute period type.
+
+### Alpha.15 production-fidelity PlannerServiceGroup
+
+Alpha.15 makes the planner service group a first-class, auditable boundary between prepared timetable summaries and Browser/Word rows. Route number formatting is normalized for grouping, then compatible records are connected by public endpoint orientation and genuine corridor evidence. Operator, feed, registration, pattern and selected-stop differences are retained as group evidence rather than row identity; a source direction marker is not treated as globally stable when the deployed feeds disagree. Reverse endpoints/patterns, disjoint corridors and unresolved route identities remain protected. The group lists every selected served stop with distance and marks the one closest stop with scheduled evidence as `(timetable basis)`. Only that basis supplies frequency and operating-period metrics. A physical journey copy is deduplicated across providers only when its semantic departure agrees; distinct same-minute journeys remain visible. The deterministic deployed Waltham Cross replay is checked by the Alpha.15 production fixture and an adversarial group test, and `npm run review:atlas:alpha15` prints the exact planner rows for local review without manual JSON editing.
 
 ## Routed access, map and output
 

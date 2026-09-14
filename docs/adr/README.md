@@ -18,3 +18,4 @@ Required fields: status, date, owner, context, options, decision and consequence
 | ADR-010 | Separate Site identity from the assessment point | Accepted for SITE-1 engineering implementation |
 | ADR-011 | Prepared national bus data for the static ATLAS application | Accepted for Alpha.4 engineering implementation; Product Owner acceptance pending |
 | ADR-013 | Production-representative planner row consolidation | Accepted for Alpha.14 implementation; Technical Director review required |
+| ADR-014 | Production-fidelity PlannerServiceGroup abstraction | Proposed for Alpha.15 Technical Director review |

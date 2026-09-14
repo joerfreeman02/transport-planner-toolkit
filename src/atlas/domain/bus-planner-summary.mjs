@@ -252,11 +252,52 @@ function patternCorridorRelationship(first, second) {
   return false;
 }
 
+function markerAliasPairs(services) {
+  const byEndpoint = new Map();
+  for (const service of services) {
+    const pair = endpointPair(service);
+    if (!pair.origin || !pair.destination) continue;
+    const key = `${pair.origin}|${pair.destination}`;
+    const current = byEndpoint.get(key) ?? [];
+    current.push(service);
+    byEndpoint.set(key, current);
+  }
+  const aliases = [];
+  for (const endpointServices of byEndpoint.values()) {
+    const markers = unique(endpointServices.map(explicitDirectionMarker).filter(Boolean));
+    // A directed endpoint pair with exactly two feed-local markers is a
+    // useful cross-feed alias.  Endpoint pairs with three or more markers
+    // are directionally ambiguous and must be resolved by stronger evidence.
+    if (markers.length !== 2) continue;
+    const first = endpointServices.find(service => explicitDirectionMarker(service) === markers[0]);
+    const second = endpointServices.find(service => explicitDirectionMarker(service) === markers[1]);
+    const firstSource = normal(first?.timetableSource || first?.frequencyEvidenceSource || first?.source?.provider || first?.provider);
+    const secondSource = normal(second?.timetableSource || second?.frequencyEvidenceSource || second?.source?.provider || second?.provider);
+    // Marker aliasing is a cross-feed reconciliation rule.  Within one
+    // source, a marker conflict remains meaningful direction evidence.
+    if (first && second && firstSource && secondSource && firstSource !== secondSource && operatorFamilyCompatible(first, second)) aliases.push({ first, second });
+  }
+  return aliases;
+}
+
+function markerAliasMatch(first, second, aliases) {
+  const leftMarker = explicitDirectionMarker(first), rightMarker = explicitDirectionMarker(second);
+  if (!leftMarker || !rightMarker || leftMarker === rightMarker) return false;
+  return aliases.some(alias => {
+    const aliasLeft = explicitDirectionMarker(alias.first), aliasRight = explicitDirectionMarker(alias.second);
+    return ((leftMarker === aliasLeft && rightMarker === aliasRight
+      && operatorFamilyCompatible(first, alias.first) && operatorFamilyCompatible(second, alias.second))
+      || (leftMarker === aliasRight && rightMarker === aliasLeft
+        && operatorFamilyCompatible(first, alias.second) && operatorFamilyCompatible(second, alias.first)));
+  });
+}
+
 function connectedServiceComponents(services) {
+  const aliases = markerAliasPairs(services);
   const compatiblePairs = new Set();
   for (let left = 0; left < services.length; left += 1) {
     for (let right = left + 1; right < services.length; right += 1) {
-      if (!compatibleDirection(services[left], services[right])) continue;
+      if (!compatibleDirection(services[left], services[right], aliases)) continue;
       compatiblePairs.add(`${left}:${right}`);
     }
   }
@@ -302,7 +343,7 @@ function connectedServiceComponents(services) {
   return components;
 }
 
-function compatibleDirection(first, second) {
+function compatibleDirection(first, second, aliases = []) {
   // Operator and feed identity are evidence fields, not public direction
   // identity.  The same route-direction can therefore be represented by
   // more than one current operator or prepared feed.
@@ -310,20 +351,28 @@ function compatibleDirection(first, second) {
   const leftEndpoints = endpointPair(first), rightEndpoints = endpointPair(second);
   if (leftEndpoints.origin && leftEndpoints.destination && rightEndpoints.origin && rightEndpoints.destination) {
     if (leftEndpoints.origin === rightEndpoints.origin || leftEndpoints.destination === rightEndpoints.destination) {
-      const leftMarker = explicitDirectionMarker(first);
-      const rightMarker = explicitDirectionMarker(second);
-      // A feed's direction marker is useful within one operator/lineage, but
-      // it is not globally stable: the deployed 242 evidence reverses the
-      // marker convention between Uno and Central Connect.  Do not let a
-      // same-operator marker conflict bridge the two public directions.
-      if (leftMarker && rightMarker && leftMarker !== rightMarker && operatorFamilyCompatible(first, second)) return false;
+      // When both endpoint pairs are complete, physical endpoint orientation
+      // is the primary public-direction evidence.  BODS/TNDS and operator
+      // feeds may use different local markers for the same direction, so a
+      // marker conflict must not split an otherwise evidenced corridor.
       const exactEndpointPair = leftEndpoints.origin === rightEndpoints.origin && leftEndpoints.destination === rightEndpoints.destination;
+      const markerConflict = explicitDirectionMarker(first)
+        && explicitDirectionMarker(second)
+        && explicitDirectionMarker(first) !== explicitDirectionMarker(second);
+      const sharedStops = sharedStopIds(first, second);
       const corridorEvidence = exactEndpointPair
         || sameServiceLineage(first, second)
         || provenPatternRelationship(first, second)
         || sharedPatternValues(first, second).size > 0
         || (sameServiceLineage(first, second) && sharedCorridorNames(first, second).size > 0)
-        || sharedStopIds(first, second).size >= 2;
+        || sharedStops.size >= 2;
+      // A cross-feed marker conflict is safe only with an exact directed
+      // endpoint pair or at least two shared physical stops.  This permits
+      // BODS/TNDS variants to meet while preventing a marker from bridging
+      // opposite directions through a single central stop.
+      if (markerConflict) return markerAliasMatch(first, second, aliases)
+        || sharedStops.size >= 2
+        || provenPatternRelationship(first, second);
       return corridorEvidence;
     }
   }
@@ -382,8 +431,15 @@ function candidateStopIds(component) {
 function hasTimetableEvidenceAt(service, id) {
   const stop = text(id);
   if (!stop) return false;
-  if (text(service?.frequencyBasisStopId) === stop && DAY_ORDER.some(day => (service?.departuresByDay?.[day] ?? []).length || (service?.departureEvidenceByDay?.[day] ?? []).length)) return true;
-  return DAY_ORDER.some(day => (service?.departureEvidenceByDay?.[day] ?? []).some(item => !text(item?.stopPointId) || text(item.stopPointId) === stop));
+  const hasScheduledEntries = DAY_ORDER.some(day => (service?.departuresByDay?.[day] ?? []).length || (service?.departureEvidenceByDay?.[day] ?? []).length);
+  if (text(service?.frequencyBasisStopId) === stop && hasScheduledEntries) return true;
+  if (DAY_ORDER.some(day => (service?.departureEvidenceByDay?.[day] ?? []).some(item => text(item?.stopPointId) === stop))) return true;
+  const candidates = unique([...(service?.stopIds ?? []), ...(service?.assessedStops ?? [])]);
+  const hasUnboundEntries = DAY_ORDER.some(day => [
+    ...(service?.departuresByDay?.[day] ?? []),
+    ...(service?.departureEvidenceByDay?.[day] ?? [])
+  ].some(item => !text(item?.stopPointId)));
+  return hasUnboundEntries && candidates.length === 1 && candidates[0] === stop;
 }
 
 function stopRank(stop) {
@@ -413,7 +469,14 @@ function serviceAtRepresentative(service, representativeId) {
   if (!representativeId) return false;
   const basis = text(service?.frequencyBasisStopId);
   if (basis) return basis === representativeId;
-  return (service?.stopIds ?? []).map(text).includes(representativeId);
+  if (DAY_ORDER.some(day => (service?.departureEvidenceByDay?.[day] ?? []).some(item => text(item?.stopPointId) === representativeId))) return true;
+  const candidates = unique([...(service?.stopIds ?? []), ...(service?.assessedStops ?? [])]);
+  const hasUnboundEntries = DAY_ORDER.some(day => [
+    ...(service?.departuresByDay?.[day] ?? []),
+    ...(service?.departureEvidenceByDay?.[day] ?? [])
+  ].some(item => !text(item?.stopPointId)));
+  if (hasUnboundEntries) return candidates.length === 1 && candidates[0] === representativeId;
+  return false;
 }
 
 function departureIdentity(item) {
@@ -516,7 +579,7 @@ function calendarPartition(entries, profileId, ordinaryEntries, hasOrdinaryProfi
 }
 
 function profileFrequencyEvidence(component, representativeId, profileId) {
-  return component.flatMap(service => (service.frequencyEvidence ?? [])
+  return component.filter(service => serviceAtRepresentative(service, representativeId)).flatMap(service => (service.frequencyEvidence ?? [])
     .filter(item => !item.stopPointId || text(item.stopPointId) === representativeId)
     .filter(item => calendarProfileFromEntry(service, item) === profileId));
 }
@@ -583,7 +646,8 @@ function compareMain(first, second, representativeId, component = [first, second
 }
 
 function frequencyEvidence(component, representativeId) {
-  return component.flatMap(service => (service.frequencyEvidence ?? []).filter(item => !item.stopPointId || text(item.stopPointId) === representativeId));
+  return component.filter(service => serviceAtRepresentative(service, representativeId))
+    .flatMap(service => (service.frequencyEvidence ?? []).filter(item => !item.stopPointId || text(item.stopPointId) === representativeId));
 }
 
 function plannerDirection(service) {

@@ -88,6 +88,25 @@ const incompleteNearestRows = rows([record({
 assert.equal(incompleteNearestRows[0].frequencyBasisStopId, 'B', 'a nearer stop without timetable evidence cannot become the basis');
 assert.deepEqual(incompleteNearestRows[0].stopIds, ['A', 'B'], 'the nearer served stop is still listed');
 
+const unboundMultiStop = record({ id: 'unbound-multi', routeNumber: 'UNBOUND', stopIds: ['A', 'B'], minutes: [420] });
+delete unboundMultiStop.frequencyBasisStopId;
+delete unboundMultiStop.frequencyBasisStopName;
+unboundMultiStop.departureEvidenceByDay = Object.fromEntries(DAYS.map(day => [day, [{ minute: 420, journeyIdentity: `unbound-${day}`, provider: 'BODS' }]]));
+const boundStop = record({ id: 'bound-stop', routeNumber: 'UNBOUND', stopIds: ['B'], basis: 'B', minutes: [480] });
+const unboundRows = rows([unboundMultiStop, boundStop]);
+assert.equal(unboundRows.length, 1, 'unbound multi-stop evidence remains in the service group');
+assert.equal(unboundRows[0].frequencyBasisStopId, 'B', 'unbound multi-stop evidence cannot select or bind the nearest stop');
+assert.deepEqual(unboundRows[0].canonicalDeparturePopulation.monday.map(entry => entry.minute), [480], 'unbound multi-stop departures cannot inflate the representative-stop frequency');
+assert.deepEqual(unboundRows[0].stopIds, ['A', 'B'], 'unbound service stops remain visible as served-stop evidence');
+
+const unboundSingleStop = record({ id: 'unbound-single', routeNumber: 'UNBOUND-SINGLE', stopIds: ['A'], minutes: [450] });
+delete unboundSingleStop.frequencyBasisStopId;
+delete unboundSingleStop.frequencyBasisStopName;
+unboundSingleStop.departureEvidenceByDay = Object.fromEntries(DAYS.map(day => [day, [{ minute: 450, journeyIdentity: `single-${day}`, provider: 'BODS' }]]));
+const unboundSingleRows = rows([unboundSingleStop]);
+assert.equal(unboundSingleRows[0].frequencyBasisStopId, 'A', 'single-stop unbound legacy evidence remains eligible');
+assert.deepEqual(unboundSingleRows[0].canonicalDeparturePopulation.monday.map(entry => entry.minute), [450]);
+
 const physicalEvidence = Object.fromEntries(DAYS.map(day => [day, [
   { minute: 420, stopPointId: 'A', journeyIdentity: 'physical-1', provider: 'BODS', destination: 'Destination' },
   { minute: 420, stopPointId: 'A', journeyIdentity: 'physical-1', provider: 'National feed', destination: 'Destination' },

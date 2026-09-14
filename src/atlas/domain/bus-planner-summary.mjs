@@ -115,14 +115,13 @@ function operatorIdentityKey(value) {
 
 function operatorDisplayNames(services) {
   const candidates = unique(services.map(service => service?.operator));
-  const families = new Map();
+  const families = [];
   for (const candidate of candidates) {
-    const key = operatorIdentityKey(candidate) || normal(candidate);
-    const current = families.get(key) ?? [];
-    current.push(candidate);
-    families.set(key, current);
+    const family = families.find(names => names.some(name => operatorFamilyCompatible({ operator: name }, { operator: candidate })));
+    if (family) family.push(candidate);
+    else families.push([candidate]);
   }
-  return [...families.values()]
+  return families
     .map(names => names.slice().sort((left, right) => normal(left).length - normal(right).length || left.localeCompare(right))[0])
     .sort((left, right) => left.localeCompare(right));
 }
@@ -595,7 +594,22 @@ function selectRepresentativeStop(component, stops) {
   const byId = new Map((stops ?? []).map(stop => [stopId(stop), stop]).filter(([id]) => id));
   const ids = candidateStopIds(component);
   const evidenceIds = ids.filter(id => component.some(service => hasTimetableEvidenceAt(service, id)));
-  const candidates = (evidenceIds.length ? evidenceIds : ids).map(id => byId.get(id)).filter(Boolean);
+  const activity = id => component.reduce((total, service) => total + DAY_ORDER.reduce((dayTotal, day) => {
+    const explicit = (service?.departureEvidenceByDay?.[day] ?? []).filter(item => !text(item?.stopPointId) || text(item.stopPointId) === id);
+    const scheduled = service?.departuresByDay?.[day] ?? [];
+    return dayTotal + (explicit.length || (serviceAtRepresentative(service, id) ? scheduled.length : 0));
+  }, 0), 0);
+  const evidenceActivity = evidenceIds.map(id => activity(id));
+  const maximumActivity = Math.max(0, ...evidenceActivity);
+  // Walking distance remains the first choice, except where the nearest
+  // timetable-evidenced stop would expose only a materially small subset of
+  // the direction's population.  That prevents short calendar/variant feeds
+  // from becoming the headline basis for an otherwise regular service.
+  const robustEvidenceIds = maximumActivity > 0
+    ? evidenceIds.filter(id => activity(id) >= maximumActivity * 0.5)
+    : evidenceIds;
+  const candidates = (robustEvidenceIds.length ? robustEvidenceIds : (evidenceIds.length ? evidenceIds : ids))
+    .map(id => byId.get(id)).filter(Boolean);
   const stop = [...candidates].sort(compareStopRank)[0] ?? null;
   const fallbackId = (evidenceIds[0] || ids[0]) || null;
   return { stop, id: stopId(stop) || fallbackId, name: text(stop?.name) || text(component.find(service => service.frequencyBasisStopId === fallbackId)?.frequencyBasisStopName) || null };
@@ -633,13 +647,13 @@ function serviceDepartureEntries(service, representativeId) {
       const minute = Number(item?.minute ?? item?.departureMinute ?? item?.time ?? item);
       if (!Number.isFinite(minute)) return null;
       const calendarProfileId = calendarProfileFromEntry(service, item);
-      return { day, minute, stopPointId: text(item?.stopPointId) || representativeId, journeyIdentity: departureIdentity(item) || null, provider: text(item?.provider || service?.timetableSource || service?.source?.provider) || null, sourceRecordId: text(item?.sourceRecordId || service?.id) || null, routeNumber: text(item?.routeNumber || service?.routeNumber), direction: text(item?.direction || service?.direction || service?.destination || service?.origin), origin: text(item?.origin || service?.origin), destination: text(item?.destination || service?.destination), calendarProfileId, calendarProfileIds: [calendarProfileId] };
+      return { day, minute, stopPointId: text(item?.stopPointId) || representativeId, journeyIdentity: departureIdentity(item) || null, provider: text(item?.provider || service?.timetableSource || service?.source?.provider) || null, sourceRecordId: text(item?.sourceRecordId || service?.id) || null, routeNumber: text(item?.routeNumber || service?.routeNumber), direction: text(item?.direction || service?.direction || service?.destination || service?.origin), origin: text(item?.origin || service?.origin), destination: text(item?.destination || service?.destination), publicOrigin: text(service?.publicOrigin || service?.origin), publicDestination: text(service?.publicDestination || service?.destination), calendarProfileId, calendarProfileIds: [calendarProfileId] };
     }).filter(Boolean);
   });
 }
 
 function semanticDepartureKey(entry) {
-  return [entry.routeNumber, entry.direction, entry.origin, entry.destination, entry.stopPointId, entry.day, entry.minute, entry.calendarProfileId].map(normal).join('|');
+  return [entry.routeNumber, entry.publicOrigin || entry.origin, entry.publicDestination || entry.destination, entry.stopPointId, entry.day, entry.minute, entry.calendarProfileId].map(normal).join('|');
 }
 
 function deduplicateDepartureEntries(entries) {
@@ -792,8 +806,160 @@ function plannerDirection(service) {
   return value;
 }
 
+const GENERIC_ENDPOINT_LABEL = /^(?:temporary\s+|temp\s+)?bus\s+station(?:\b|,)/i;
+const STOP_DESCRIPTOR = /\b(?:station|railway|road|lane|street|close|roundabout|rdbt|parade|school|college|hospital|garage|retail|centre|center|ph|gardens?|drive|avenue|crescent)\b/i;
+const STREET_ENDPOINT_DESCRIPTOR = /\b(?:road|lane|street|close|roundabout|rdbt|drive|avenue|crescent)\b/i;
+const PHYSICAL_ENDPOINT_DESCRIPTOR = /\b(?:road|lane|street|close|roundabout|rdbt|drive|avenue|crescent|school|college|hospital|garage|retail)\b/i;
+
+function cleanPublicEndpoint(value) {
+  const candidate = text(value).replace(/\s+/g, ' ').replace(/\s*\([^)]*\)\s*$/, '').trim();
+  if (!candidate || GENERIC_ENDPOINT_LABEL.test(candidate)) return '';
+  return candidate
+    .replace(/\s+Railway\s+Station$/i, '')
+    .replace(/\s+Bus\s+Station$/i, '')
+    .replace(/\s+Station$/i, '')
+    .trim();
+}
+
+function endpointLooksPhysical(value) {
+  const candidate = text(value);
+  return !candidate || GENERIC_ENDPOINT_LABEL.test(candidate) || PHYSICAL_ENDPOINT_DESCRIPTOR.test(candidate);
+}
+
+function descriptionEndpoints(values) {
+  const output = [];
+  for (const value of unique(values)) {
+    const parts = value.replace(/&amp;/gi, '&').replace(/\r?\n/g, '|')
+      .split(/\s*(?:\||↔|<->|\s[-–—]\s|\s+to\s+)\s*/i)
+      .map(item => cleanPublicEndpoint(item))
+      .filter(Boolean);
+    if (parts.length >= 2) output.push(parts.slice(0, 2));
+  }
+  return output;
+}
+
+function publicLocalityCandidates(services, selectedLocalities) {
+  const selected = new Set(selectedLocalities.map(normal));
+  const counts = new Map();
+  for (const service of services) {
+    for (const value of service?.principalLocations ?? []) {
+      const candidate = text(value);
+      if (!candidate || STOP_DESCRIPTOR.test(candidate) || GENERIC_ENDPOINT_LABEL.test(candidate)) continue;
+      const key = normal(candidate);
+      if (!key || selected.has(key)) continue;
+      counts.set(candidate, (counts.get(candidate) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])).map(([value]) => value);
+}
+
+function currentRouteDescriptions(services) {
+  return [...services]
+    .filter(service => text(service?.description))
+    .sort((first, second) => text(second.validFrom || second.validity?.from).localeCompare(text(first.validFrom || first.validity?.from)) || text(first.id).localeCompare(text(second.id)))
+    .map(service => text(service.description));
+}
+
+function selectedStopLocality(service, side, stops) {
+  const id = text(side === 'origin' ? service?.originStopPointId : service?.destinationStopPointId);
+  const stop = (stops ?? []).find(candidate => stopId(candidate) === id);
+  return cleanPublicEndpoint(stop?.locality || stop?.localityQualifier || stop?.parentLocality);
+}
+
+function resolvePublicEndpoint(service, side, context) {
+  const raw = text(side === 'origin' ? service?.origin : service?.destination);
+  const stopLocality = selectedStopLocality(service, side, context.stops);
+  const ownDescription = descriptionEndpoints([service?.description])[0] ?? [];
+  const currentDescription = context.descriptions.flatMap(value => descriptionEndpoints([value])).find(pair => pair.length >= 2) ?? [];
+  const descriptions = currentDescription.length ? currentDescription : ownDescription;
+  const rawPublic = cleanPublicEndpoint(raw);
+  if (!raw && !stopLocality && !descriptions.length) return { value: '', qualifier: '' };
+  const local = stopLocality || (rawPublic && !STREET_ENDPOINT_DESCRIPTOR.test(raw) ? rawPublic : '');
+  const opposite = side === 'origin' ? 1 : 0;
+  if (descriptions.length >= 2 && STREET_ENDPOINT_DESCRIPTOR.test(raw) && !GENERIC_ENDPOINT_LABEL.test(raw)
+    && (!rawPublic || !descriptions.some(description => normal(description) === normal(rawPublic)))) {
+    const locality = context.localities.find(value => !descriptions.some(description => normal(description) === normal(value)));
+    if (locality) {
+      const qualifier = descriptions.find(value => STOP_DESCRIPTOR.test(value)) || raw;
+      return { value: locality, qualifier: /street|road|lane/i.test(qualifier) ? qualifier : '' };
+    }
+  }
+  if (local) {
+    if (descriptions.length >= 2) {
+      const localIndex = descriptions.findIndex(value => normal(value) === normal(local));
+      if (localIndex >= 0) return { value: local, qualifier: '' };
+      const selectedMatch = context.selectedLocalities.find(value => normal(value) === normal(local));
+      if (selectedMatch) return { value: selectedMatch, qualifier: '' };
+    }
+    if (!endpointLooksPhysical(raw) && (!descriptions.length || descriptions.some(value => normal(value) === normal(local)))) return { value: local, qualifier: '' };
+  }
+  if (descriptions.length >= 2 && GENERIC_ENDPOINT_LABEL.test(raw)) {
+    const nonSelected = descriptions.filter(value => !context.selectedLocalities.some(selected => normal(selected) === normal(value)));
+    if (nonSelected.length === 1) return { value: nonSelected[0], qualifier: '' };
+  }
+  if (descriptions.length >= 2 && STREET_ENDPOINT_DESCRIPTOR.test(raw)) {
+    const nonSelected = descriptions.filter(value => !context.selectedLocalities.some(selected => normal(selected) === normal(value)));
+    if (nonSelected.length === 1) return { value: nonSelected[0], qualifier: '' };
+  }
+  if (descriptions.length >= 2) {
+    const descriptionValue = descriptions[opposite];
+    const known = context.selectedLocalities.find(value => normal(value) === normal(descriptions[0]) || normal(value) === normal(descriptions[1]));
+    const preferred = local && descriptions.some(value => normal(value) === normal(local)) ? descriptions[opposite] : descriptionValue;
+    if (preferred && (!rawPublic || normal(rawPublic) !== normal(preferred) || endpointLooksPhysical(raw))) return { value: preferred, qualifier: '' };
+    if (known && descriptions.some(value => normal(value) === normal(known))) return { value: descriptions.find(value => normal(value) !== normal(known)) || known, qualifier: '' };
+  }
+  if (rawPublic && !endpointLooksPhysical(raw)) return { value: rawPublic, qualifier: '' };
+  const locality = context.localities.find(value => !context.selectedLocalities.some(selected => normal(selected) === normal(value))) || context.selectedLocalities[0] || '';
+  if (locality) {
+    const qualifier = ownDescription.flatMap(value => value).find(value => STOP_DESCRIPTOR.test(value)) || '';
+    return { value: locality, qualifier: qualifier && /street|road|lane/i.test(qualifier) ? qualifier : '' };
+  }
+  return { value: '', qualifier: '' };
+}
+
+function publicDirectionForService(service, stops, familyServices) {
+  const selectedLocalities = unique((stops ?? []).map(stop => stop?.locality || stop?.localityQualifier || stop?.parentLocality).map(cleanPublicEndpoint));
+  const context = {
+    stops,
+    selectedLocalities,
+    descriptions: currentRouteDescriptions(familyServices),
+    localities: publicLocalityCandidates(familyServices, selectedLocalities)
+  };
+  const origin = resolvePublicEndpoint(service, 'origin', context);
+  const destination = resolvePublicEndpoint(service, 'destination', context);
+  return {
+    publicOrigin: origin.value || null,
+    publicDestination: destination.value || null,
+    publicDestinationQualifier: destination.qualifier || null,
+    publicDirectionConfidence: origin.value && destination.value ? 'resolved' : 'review-required'
+  };
+}
+
+function decoratePublicDirections(services, stops) {
+  return services.map(service => ({ ...service, ...publicDirectionForService(service, stops, services) }));
+}
+
+function componentPublicDirection(component) {
+  const candidates = component.map(service => ({
+    origin: plannerOrigin(service),
+    destination: plannerDestination(service),
+    qualifier: text(service.publicDestinationQualifier),
+    confidence: service.publicDirectionConfidence === 'resolved'
+  })).filter(pair => pair.confidence && pair.origin && pair.destination && normal(pair.origin) !== normal(pair.destination));
+  if (!candidates.length) return {};
+  const counts = new Map();
+  for (const candidate of candidates) {
+    const key = `${normal(candidate.origin)}|${normal(candidate.destination)}`;
+    const current = counts.get(key) ?? { ...candidate, count: 0 };
+    current.count += 1;
+    counts.set(key, current);
+  }
+  const selected = [...counts.values()].sort((first, second) => second.count - first.count || `${first.origin}|${first.destination}`.localeCompare(`${second.origin}|${second.destination}`))[0];
+  return { publicOrigin: selected.origin, publicDestination: selected.destination, publicDestinationQualifier: selected.qualifier || null, publicDirectionConfidence: 'resolved' };
+}
+
 function directionPatternText(service) {
-  const destination = text(service?.destination);
+  const destination = text(service?.publicDestination || service?.destination);
   const direction = plannerDirection(service);
   if (service?.circular) {
     const names = orderedPatternNames(service);
@@ -806,7 +972,7 @@ function directionPatternText(service) {
     if (!value) value = 'Circular service';
     return direction ? `${value} (${direction})` : value;
   }
-  const locality = text(service?.destinationLocality || service?.destinationLocalityName || service?.destinationQualifier);
+  const locality = text(service?.publicDestinationQualifier || service?.destinationLocality || service?.destinationLocalityName || service?.destinationQualifier);
   const target = destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination)
     ? destination
     : direction && !sourceDirectionMarker(direction) ? direction : '';
@@ -846,10 +1012,15 @@ function noteAppliesToCanonicalPopulation(note, schedules) {
 }
 
 function plannerDestination(service) {
-  const destination = text(service?.destination);
+  const destination = text(service?.publicDestination || service?.destination);
   return destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination) && !sourceDirectionMarker(destination)
     ? destination
     : '';
+}
+
+function plannerOrigin(service) {
+  const origin = text(service?.publicOrigin || service?.origin);
+  return origin && !/^(?:origin not supplied|origin not resolved)$/i.test(origin) && !sourceDirectionMarker(origin) ? origin : '';
 }
 
 function destinationNames(values) {
@@ -874,13 +1045,15 @@ function variantNote(component, main) {
   const alternatives = alternateDestinations(component, main);
   const hasVariant = component.length > 1 && ((endpoints.length > 1 && !sharedJourneyIdentity) || patterns.length > 1 || component.some(service => Number(service.patternVariantCount) > 1));
   if (!hasVariant) return null;
+  const publicOrigin = plannerOrigin(main);
+  if (alternatives.length === 1 && normal(alternatives[0]) === normal(publicOrigin)) return `Selected journeys terminate at ${alternatives[0]}.`;
   if (alternatives.length === 1) return `Additional variants and short workings operate, including journeys towards ${alternatives[0]}.`;
   if (alternatives.length > 1) return `Additional variants and short workings operate, including journeys towards ${alternatives.slice(0, -1).join(', ')} and ${alternatives.at(-1)}.`;
   return 'Additional short workings and timetable variants operate.';
 }
 
 function resolvedPlannerDestination(service) {
-  const destination = text(service?.destination);
+  const destination = text(service?.publicDestination || service?.destination);
   const direction = plannerDirection(service);
   return Boolean(destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination) && !sourceDirectionMarker(destination))
     || Boolean(direction && !sourceDirectionMarker(direction));
@@ -899,6 +1072,19 @@ function principalText(main) {
   return locations.length ? locations.join(', ') : 'See route origin / destination';
 }
 
+function compactPrincipalLocations(component, main, { publicOrigin = '', publicDestination = '' } = {}) {
+  const endpoints = new Set([normal(publicOrigin), normal(publicDestination)].filter(Boolean));
+  const candidates = unique(component.flatMap(service => service?.principalLocations ?? []));
+  const scored = candidates.map((value, index) => {
+    const key = normal(value);
+    const locality = !STOP_DESCRIPTOR.test(value) && !GENERIC_ENDPOINT_LABEL.test(value);
+    const endpoint = endpoints.has(key);
+    return { value, index, score: (endpoint ? 3 : 0) + (locality ? 2 : 0) };
+  });
+  return scored.sort((left, right) => right.score - left.score || left.index - right.index || left.value.localeCompare(right.value))
+    .slice(0, 5).map(item => item.value);
+}
+
 function plannerStopLabel(stop, { basis = false } = {}) {
   const name = text(stop?.name) || stopId(stop) || 'Selected stop';
   const indicator = text(stop?.indicator);
@@ -908,7 +1094,8 @@ function plannerStopLabel(stop, { basis = false } = {}) {
 }
 
 function publicDirectionIdentity(component, main) {
-  const pairs = component.map(endpointPair).filter(pair => pair.origin || pair.destination);
+  const pairs = component.map(service => ({ origin: plannerOrigin(service), destination: plannerDestination(service) }))
+    .filter(pair => pair.origin || pair.destination);
   const origins = unique(pairs.map(pair => pair.origin));
   const destinations = unique(pairs.map(pair => pair.destination));
   if (origins.length === 1 && destinations.length > 0) return `from:${origins[0]}`;
@@ -923,6 +1110,8 @@ function publicDirectionIdentity(component, main) {
  * than treating any one source record as the row identity.
  */
 function buildPlannerServiceGroup(component, stops, main, representative) {
+  const resolvedPublicDirection = componentPublicDirection(component);
+  const publicMain = { ...main, ...resolvedPublicDirection };
   const byId = new Map((stops ?? []).map(stop => [stopId(stop), stop]).filter(([id]) => id));
   const ids = candidateStopIds(component);
   const evidenceIds = ids.filter(id => component.some(service => hasTimetableEvidenceAt(service, id)));
@@ -947,11 +1136,11 @@ function buildPlannerServiceGroup(component, stops, main, representative) {
   const endpointEvidence = unique(component.map(service => `${text(service.origin)} → ${text(service.destination)}`)).sort();
   const endpointIdentity = endpointEvidence.map(value => normal(value)).join('~');
   return Object.freeze({
-    serviceIdentity: `${routeGroupKey(main)}|${publicDirectionIdentity(component, main)}|${endpointIdentity}`,
+    serviceIdentity: `${routeGroupKey(main)}|${publicDirectionIdentity(component, publicMain)}|${endpointIdentity}`,
     routeNumber: text(main?.routeNumber) || 'Not supplied',
     publicDirection: publicDirectionIdentity(component, main),
-    principalDestination: plannerDestination(main) || null,
-    principalOrigin: text(main?.origin) || null,
+    principalDestination: plannerDestination(publicMain) || null,
+    principalOrigin: plannerOrigin(publicMain) || null,
     operatorNames: Object.freeze(operatorNames),
     rawOperatorNames: Object.freeze(rawOperatorNames),
     operatorIdentities: Object.freeze(unique(rawOperatorNames.map(operatorIdentityKey))),
@@ -983,11 +1172,29 @@ export function buildPlannerServiceGroups(serviceSummaries = [], stops = []) {
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key).push(service);
   }
-  return [...grouped.entries()].flatMap(([routeKey, services]) => connectedServiceComponents(services).map(component => {
+  return [...grouped.entries()].flatMap(([routeKey, services]) => {
+    const decorated = decoratePublicDirections(services, stops);
+    const connected = connectedServiceComponents(decorated);
+    const operatorSeparated = connected.flatMap(component => {
+      const groups = [];
+      for (const service of component) {
+        const group = groups.find(candidate => candidate.every(member => operatorFamilyCompatible(member, service)));
+        if (group) group.push(service);
+        else groups.push([service]);
+      }
+      const ambiguous = component.ambiguousServices ?? [];
+      for (const group of groups) Object.defineProperty(group, 'ambiguousServices', {
+        value: Object.freeze(ambiguous.filter(service => group.some(member => compatibleDirection(member, service)))),
+        enumerable: false
+      });
+      return groups;
+    });
+    return operatorSeparated.map(component => {
     const representative = selectRepresentativeStop(component, stops);
     const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
     return buildPlannerServiceGroup(component, stops, main, representative);
-  }));
+    });
+  });
 }
 
 function profileLines(lines, profileLabel) {
@@ -998,6 +1205,8 @@ function profileLines(lines, profileLabel) {
 function buildPlannerRow(component, stops, componentIndex, routeFamilyServices = component) {
   const representative = selectRepresentativeStop(component, stops);
   const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
+  const resolvedPublicDirection = componentPublicDirection(component);
+  const publicMain = { ...main, ...resolvedPublicDirection };
   const plannerServiceGroup = buildPlannerServiceGroup(component, stops, main, representative);
   const rowCircular = resolveCircularPresentation(component, routeFamilyServices);
   const canonical = canonicalDeparturePopulation(component, representative.id, main);
@@ -1012,20 +1221,24 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     calculateProfileResult(component, representative.id, profileId, calendarPartition(canonical.entries, profileId, ordinaryEntries, hasOrdinaryProfile))
   ]));
   const effectiveProfileIds = profileIds.filter(profileId => profileResults.get(profileId).entries.length);
-  const displayProfileId = effectiveProfileIds.includes('ordinary') ? 'ordinary' : effectiveProfileIds[0] ?? profileIds[0] ?? UNKNOWN_CALENDAR_PROFILE;
+  const resolvedEffectiveProfileIds = effectiveProfileIds.filter(profileId => profileId !== UNKNOWN_CALENDAR_PROFILE);
+  const displayProfileId = resolvedEffectiveProfileIds.includes('ordinary') ? 'ordinary' : resolvedEffectiveProfileIds[0] ?? effectiveProfileIds[0] ?? profileIds[0] ?? UNKNOWN_CALENDAR_PROFILE;
   const displayResult = profileResults.get(displayProfileId) ?? calculateProfileResult(component, representative.id, displayProfileId, { entries: [], schedules: emptySchedule() });
-  const mixedProfileOutput = effectiveProfileIds.length > 1;
-  const outputProfileIds = mixedProfileOutput ? effectiveProfileIds : [displayProfileId];
-  const unresolvedNeedsQualification = profileIds.includes(UNKNOWN_CALENDAR_PROFILE)
-    && (profileIds.length > 1 || component.some(hasCalendarMetadata));
+  const unresolvedPopulation = profileResults.get(UNKNOWN_CALENDAR_PROFILE)?.entries ?? [];
+  const unresolvedNeedsReview = unresolvedPopulation.length > 0;
+  const mixedProfileOutput = resolvedEffectiveProfileIds.length > 1;
+  const outputProfileIds = mixedProfileOutput ? resolvedEffectiveProfileIds : [displayProfileId];
   const displayFrequencyLines = [...displayResult.frequencyLines];
   const displayOperatingLines = [...displayResult.operatingLines];
   let frequencyLines = displayFrequencyLines;
   let operatingLines = displayOperatingLines;
-  if (mixedProfileOutput) {
+  if (unresolvedNeedsReview) {
+    frequencyLines = ['Review required: calendar applicability could not be safely established.'];
+    operatingLines = ['Review required: calendar applicability could not be safely established.'];
+  } else if (mixedProfileOutput) {
     frequencyLines = outputProfileIds.flatMap(profileId => calendarQualifiedLines(profileResults.get(profileId).frequencyLines, profileId, hasOrdinaryProfile && profileId !== 'ordinary'));
     operatingLines = outputProfileIds.flatMap(profileId => calendarQualifiedLines(profileResults.get(profileId).operatingLines, profileId, hasOrdinaryProfile && profileId !== 'ordinary'));
-  } else if (displayProfileId !== 'ordinary' && (displayProfileId !== UNKNOWN_CALENDAR_PROFILE || unresolvedNeedsQualification)) {
+  } else if (displayProfileId !== 'ordinary' && displayProfileId !== UNKNOWN_CALENDAR_PROFILE) {
     frequencyLines = profileLines(displayFrequencyLines, calendarProfileLabel(displayProfileId));
     operatingLines = profileLines(displayOperatingLines, calendarProfileLabel(displayProfileId));
   }
@@ -1033,13 +1246,15 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const calendarProfile = calendarProfileLabel(calendarProfileId);
   const profileNotes = [];
   if (mixedProfileOutput) profileNotes.push('Calendar profile variation is shown as profile-qualified frequency and operating-period lines within this route-direction row.');
-  if (unresolvedNeedsQualification) profileNotes.push('Some timetable evidence has unresolved calendar applicability; it is retained for review and is not combined with resolved service levels.');
+  if (unresolvedNeedsReview) profileNotes.push('Review required before relying on frequency or operating period because calendar applicability is unresolved.');
   const notes = unique(component.flatMap(service => text(service.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean)))
     .filter(note => noteAppliesToCanonicalPopulation(note, displayResult.schedules))
     .filter(note => !(mixedProfileOutput && hasCalendarTaxonomyNote(note)));
   notes.push(...profileNotes);
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
-  const principalLocations = unique(main.principalLocations ?? []);
+  const publicDestination = plannerDestination(publicMain);
+  const publicOrigin = plannerOrigin(publicMain);
+  const principalLocations = compactPrincipalLocations(component, main, { publicOrigin, publicDestination });
   const profileSchedules = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).schedules])));
   const profilePopulations = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).entries])));
   const profileFrequency = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).frequencyByDay])));
@@ -1051,8 +1266,8 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     id: 'planner:' + plannerServiceGroup.serviceIdentity + '|' + (componentIndex + 1),
     routeNumber: text(main.routeNumber) || 'Not supplied',
     operator: plannerServiceGroup.operatorNames.join(' · ') || 'Operator not supplied in the timetable',
-    origin: text(main.origin) || 'Origin not supplied',
-    destination: text(main.destination) || 'Destination not supplied',
+    origin: publicOrigin || 'Origin not supplied',
+    destination: publicDestination || 'Destination not supplied',
     direction: text(main.direction),
     stopDirection: text(main.stopDirection) || null,
     circular: rowCircular,
@@ -1060,8 +1275,16 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     calendarProfileLabel: calendarProfile,
     calendarProfileIds: Object.freeze(profileIds),
     calendarProfileLabels: Object.freeze(profileIds.map(calendarProfileDisplayLabel)),
+    calendarConfidence: unresolvedNeedsReview ? 'unresolved' : profileIds.some(profileId => profileId !== UNKNOWN_CALENDAR_PROFILE && profileResults.get(profileId)?.entries.length) ? 'resolved' : 'unresolved',
+    reviewRequired: unresolvedNeedsReview || publicMain.publicDirectionConfidence === 'review-required',
+    reviewReasons: Object.freeze([
+      ...(unresolvedNeedsReview ? ['calendar-applicability-unresolved'] : []),
+      ...(publicMain.publicDirectionConfidence === 'review-required' ? ['public-direction-unresolved'] : [])
+    ]),
     directionFamily: directionKey(main),
-    directionPatternText: directionPatternText({ ...main, circular: rowCircular }),
+    directionPatternText: directionPatternText({ ...publicMain, circular: rowCircular }),
+    publicDirectionConfidence: publicMain.publicDirectionConfidence || 'review-required',
+    publicDestinationQualifier: publicMain.publicDestinationQualifier || null,
     servedAtStopId: representative.id,
     servedAtText: servedAtLines.join('\n') || servedAtText(representative),
     servedAtStops: Object.freeze(servedAtLines),
@@ -1070,7 +1293,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     frequencyBasisStopId: representative.id,
     frequencyBasisStopName: representative.name,
     principalLocations: Object.freeze(principalLocations),
-    principalLocationsText: principalText(main),
+    principalLocationsText: principalText({ principalLocations }),
     typicalFrequency: displayResult.frequencyByDay[DAY_ORDER.find(day => !displayResult.frequencyByDay[day].noService) ?? 'monday'],
     typicalFrequencyLines: Object.freeze(frequencyLines),
     typicalFrequencyText: frequencyLines.join('\n'),
@@ -1095,7 +1318,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     routePatternExtent: Math.max(0, ...component.map(service => Number(service.routePatternExtent) || explicitPattern(service).length)),
     routePatternStops: Object.freeze([...(main.routePatternStops ?? [])]),
     recordActivity: Math.max(0, ...component.map(service => Number(service.recordActivity) || 0)),
-    presentation: Object.freeze({ principalLocationsText: principalText(main), rank: 0 }),
+    presentation: Object.freeze({ principalLocationsText: principalText({ principalLocations }), rank: 0 }),
     rawServiceSummaries: Object.freeze(component),
     ambiguousServiceSummaries: Object.freeze([...(component.ambiguousServices ?? [])]),
     plannerServiceGroup,

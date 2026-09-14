@@ -130,8 +130,8 @@ const route242Groups = buildPlannerServiceGroups([
   record({ id: 'uno-out', routeNumber: '242', operator: 'Uno', routeId: 'uno', directionId: '1', origin: 'Bus Station', destination: 'Potters Bar Railway Station' }),
   record({ id: 'uno-in', routeNumber: '242', operator: 'Uno', routeId: 'uno', directionId: '0', origin: 'Potters Bar Railway Station', destination: 'Bus Station', pattern: ['DESTINATION', 'MID', 'ORIGIN'] })
 ], stops);
-assert.equal(route242Groups.length, 2, 'operator-specific direction markers cannot split or cross-bridge the public 242 directions');
-assert.deepEqual(route242Groups.map(group => group.operatorNames.slice().sort()), [['Central Connect', 'Uno'], ['Uno']].sort((a, b) => a.join().localeCompare(b.join())));
+assert.equal(route242Groups.length, 3, 'distinct current operators remain separate while direction evidence stays coherent');
+assert.deepEqual(route242Groups.map(group => group.operatorNames.slice().sort()), [['Central Connect'], ['Uno'], ['Uno']].sort((a, b) => a.join().localeCompare(b.join())));
 
 const circularRows = rows([
   record({ id: '230-loop', routeNumber: '230', routeId: '230-line', origin: 'Loop Hub', destination: 'Loop Hub', direction: 'Clockwise', pattern: ['LOOP-A', 'LOOP-B', 'LOOP-A'], circular: true }),

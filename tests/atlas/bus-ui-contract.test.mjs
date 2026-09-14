@@ -3,8 +3,8 @@ import fs from 'node:fs';
 
 const html = fs.readFileSync(new URL('../../atlas/index.html', import.meta.url), 'utf8');
 const app = fs.readFileSync(new URL('../../atlas/assets/js/app.mjs', import.meta.url), 'utf8');
-assert.match(html, /2\.0\.0-alpha\.15/);
-assert.match(html, /ATLAS-2\.0\.0-alpha\.15-20260914/);
+assert.match(html, /2\.0\.0-alpha\.16/);
+assert.match(html, /ATLAS-2\.0\.0-alpha\.16-20260914/);
 for (const id of ['dataStatusMessage', 'preparedDataDate', 'naptanDataState', 'bodsDataState', 'tndsDataDate', 'tflDataState', 'updateBusData', 'refreshDataStatus', 'recommendedSelection', 'selectAllRows', 'clearAllRows', 'toggleDetailedEvidence', 'serviceDetailPanel', 'assessmentScope', 'radius', 'taskStatus', 'taskStatusMessage', 'taskStatusProgress', 'taskStatusProgressText', 'taskStatusStages', 'serviceSummaryMethodology']) assert.match(html, new RegExp(`id="${id}"`));
 assert.match(html, /<progress id="taskStatusProgress"/);
 assert.equal((html.match(/data-task-stage=/g) ?? []).length, 5);
@@ -44,4 +44,4 @@ assert.match(app, /Checked successfully — no changes detected/);
 assert.match(app, /Live source — checked when a London assessment is run/);
 assert.match(html, /Traveline National Dataset \(TNDS\)/);
 assert.match(html, /Open Government Licence v3\.0/);
-console.log('PASS Bus UI contract - Alpha.15 planner service group, task status, selection, full-week frequency, radius map and local maintenance controls are exposed without browser credentials.');
+console.log('PASS Bus UI contract - Alpha.16 planner service group, task status, selection, full-week frequency, radius map and local maintenance controls are exposed without browser credentials.');

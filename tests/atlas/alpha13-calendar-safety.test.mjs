@@ -117,10 +117,11 @@ for (const label of ['G', 'H']) {
     calendarRecord({ routeNumber: label, id: `${label}-unresolved`, profile: label === 'G' ? 'unresolved' : undefined, departures: weekdayAt(510) })
   ]);
   assert.equal(rows.length, 1, `${label}: unresolved calendar record remains in the route row`);
-  assert.match(rows[0].typicalFrequencyText, /Ordinary service: Mon-Fri: 1 journey\/day/);
-  assert.match(rows[0].typicalFrequencyText, /Calendar applicability unresolved(?: \(additional\))?: Mon-Fri: 1 journey\/day/);
-  assert.match(rows[0].serviceNote, /unresolved calendar applicability/i);
-  assertNoUnconditionalCombinedFrequency(rows[0], `${label}: unresolved evidence cannot inflate resolved service`);
+  assert.match(rows[0].typicalFrequencyText, /Review required: calendar applicability could not be safely established/);
+  assert.match(rows[0].operatingPeriodLines.join('\n'), /Review required/);
+  assert.equal(rows[0].reviewRequired, true);
+  assert.equal(rows[0].calendarConfidence, 'unresolved');
+  assert.equal(rows[0].canonicalDeparturePopulation.monday.length, 1, `${label}: unresolved evidence cannot inflate resolved service`);
 }
 
 // I. A physical journey repeated in two calendar records is deduplicated but retains both profiles.

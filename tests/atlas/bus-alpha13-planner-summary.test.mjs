@@ -15,7 +15,7 @@ const week = {
 };
 const stop = { id: 'A', name: 'Waltham Cross Bus Station', indicator: 'G', distanceMetres: 110, walking: { status: 'routed', distanceMetres: 82 } };
 const secondStop = { id: 'B', name: 'Waltham Cross Bus Station', indicator: 'H', distanceMetres: 95, walking: { status: 'routed', distanceMetres: 120 } };
-const base = { routeNumber: '657', operator: 'Example Buses', direction: 'outbound', directionFamily: 'gtfs:0', origin: 'Waltham Cross', destination: 'Chingford', principalLocations: ['Enfield', 'Chingford Mount'], routePatternStopIds: ['A', 'B', 'C'], frequencyBasisStopId: 'A', stopIds: ['A'], departuresByDay: week, frequencyEvidence: [], sourceRecordIds: ['main'], serviceNote: 'School-day-only service.' };
+const base = { routeNumber: '657', operator: 'Example Buses', direction: 'outbound', directionFamily: 'gtfs:0', origin: 'Waltham Cross', destination: 'Chingford', principalLocations: ['Enfield', 'Chingford Mount'], routePatternStopIds: ['A', 'B', 'C'], frequencyBasisStopId: 'A', stopIds: ['A'], departuresByDay: week, frequencyEvidence: [], sourceRecordIds: ['main'], serviceNote: 'School-day-only service.', calendarProfileId: 'ordinary' };
 
 const planner = buildPlannerBusServiceSummaries([
   base,
@@ -90,6 +90,7 @@ const plannerRecord = ({ routeNumber = '279', destination = 'Theobalds Grove', d
   frequencyEvidence: [],
   sourceRecordIds: [ids],
   serviceNote,
+  calendarProfileId: 'ordinary',
   ...extra
 });
 const coherentStops = [
@@ -204,7 +205,7 @@ assert.equal(circularRows.length, 2, 'circular directions remain distinct where 
 const namedCircular = buildPlannerBusServiceSummaries([plannerRecord({ routeNumber: '230', destination: 'Lyons Community Centre', direction: 'Southeastbound', circular: true, pattern: ['A', 'B', 'A'], departures: [420], ids: 'named-circular', routePatternStops: [{ id: 'A', name: 'Lyons Community Centre' }, { id: 'B', name: 'Caddington Woods' }, { id: 'A', name: 'Lyons Community Centre' }] })], coherentStops)[0];
 assert.equal(namedCircular.directionPatternText, 'Circular — Lyons Community Centre via Caddington Woods (Southeastbound)');
 const distinctEndpoint310 = buildPlannerBusServiceSummaries([plannerRecord({ routeNumber: '310', origin: 'Hertford Bus Station', destination: 'Waltham Cross Bus Station', direction: 'towards Waltham Cross Bus Station', pattern: ['HERTFORD-BS', 'HODDESDON', 'WALTHAM-CROSS-BS'], departures: [480], ids: 'distinct-endpoints', circular: false })], coherentStops)[0];
-assert.equal(distinctEndpoint310.directionPatternText, 'Towards Waltham Cross Bus Station');
+assert.equal(distinctEndpoint310.directionPatternText, 'Towards Waltham Cross');
 assert.doesNotMatch(distinctEndpoint310.directionPatternText, /^Circular —/);
 const sharedRouteCharacteristics = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: '46', direction: 'outbound', directionFamily: 'outbound', destination: 'North Terminal', serviceNote: 'School days only.' }),

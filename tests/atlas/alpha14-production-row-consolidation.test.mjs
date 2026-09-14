@@ -299,16 +299,15 @@ assert.ok(review25c, '25C principal production direction is present');
 assert.ok(review25c.rawServiceSummaries.some(service => service.destination === 'Maple Gate'));
 assert.ok(review25c.rawServiceSummaries.some(service => service.destination === 'Maynard Court'));
 const review25cRouteNotes = review25cRows.map(row => row.routeGroupNote || '').filter(Boolean).join(' ');
-assert.equal(review25cRouteNotes, 'Additional variants and short workings operate, including journeys towards Temp Bus Station, Maple Gate and Maynard Court.');
-assert.equal(review25c.destination, 'Bus Station');
+assert.match(review25cRouteNotes, /Additional variants and short workings operate/);
+assert.notEqual(review25c.destination, 'Bus Station', 'public endpoint resolution must not promote a generic Bus Station label');
+assert.doesNotMatch(review25c.directionPatternText, /Bus Station/);
 assert.equal(review25c.servedAtStopId, 'REP-A');
 assert.ok(!review25c.departuresByDay.monday.some(minute => [900, 960].includes(minute)), 'nearby-stop departures cannot inflate the representative-stop headline');
 assert.ok(alpha14ReviewRecords.some(service => service.routeNumber === '25C' && service.stopSchedules['REP-B'].monday.some(minute => [900, 960].includes(minute))));
 const wordReview = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: alpha14ReviewRows, serviceSummaries: [] });
-const word25cNotes = wordReview[1].rows.filter(row => !Array.isArray(row) && /Temp Bus Station|Maple Gate|Maynard Court/.test(row.text)).map(row => row.text).join(' ');
-assert.match(word25cNotes, /Temp Bus Station/);
-assert.match(word25cNotes, /Maple Gate/);
-assert.match(word25cNotes, /Maynard Court/);
+const word25cNotes = wordReview[1].rows.filter(row => !Array.isArray(row) && /Additional variants and short workings operate/.test(row.text)).map(row => row.text).join(' ');
+assert.match(word25cNotes, /Additional variants and short workings operate/);
 assert.equal(wordReview[1].widths.length, 7, 'Word Table 3.3 keeps the seven-column planner contract');
 
 const legacyAlpha13IdentityCount = alpha14ReviewRecords.filter(record => record.routeNumber === '25C' && record.source.directionId === '0')
@@ -332,11 +331,11 @@ const rows46 = alpha14ReviewRows.filter(row => row.routeNumber === '46');
 assert.equal(rows46.length, 2);
 assert.deepEqual(new Set(rows46.map(row => row.directionFamily)), new Set(['gtfs:0', 'gtfs:1']));
 assert.ok(rows46.every(row => row.rawServiceSummaries.some(service => /Centrebus/.test(service.operator))));
-assert.match(rows46.map(row => row.routeGroupNote || '').join(' '), /Hemel Hempstead/);
-assert.match(rows46.map(row => row.routeGroupNote || '').join(' '), /Luton, Park Square/);
-const word46Notes = wordReview[1].rows.filter(row => !Array.isArray(row) && /Hemel Hempstead|Luton, Park Square/.test(row.text)).map(row => row.text).join(' ');
-assert.match(word46Notes, /Hemel Hempstead/);
-assert.match(word46Notes, /Luton, Park Square/);
+assert.ok(rows46.some(row => row.rawServiceSummaries.some(service => /Hemel Hempstead/.test(service.destination))));
+assert.ok(rows46.some(row => row.rawServiceSummaries.some(service => /Luton, Park Square/.test(service.destination))));
+assert.match(rows46.map(row => row.routeGroupNote || '').join(' '), /short workings|timetable variants/i);
+const word46Notes = wordReview[1].rows.filter(row => !Array.isArray(row) && /Additional variants and short workings operate/.test(row.text)).map(row => row.text).join(' ');
+assert.match(word46Notes, /Additional variants and short workings operate/);
 
 const rows230 = alpha14ReviewRows.filter(row => row.routeNumber === '230');
 assert.equal(rows230.length, 1);

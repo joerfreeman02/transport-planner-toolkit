@@ -1,5 +1,5 @@
 import { hasScheduledEvidence } from './scheduled-evidence.mjs';
-import { calendarProfileLabel, calendarQualificationNotes } from './service-calendar.mjs';
+import { calendarProfileLabel, calendarQualificationNotes, createServiceCalendarEvidence } from './service-calendar.mjs';
 
 const DAY_ORDER = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 const DAY_LABELS = Object.freeze({ monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday' });
@@ -251,6 +251,37 @@ function departureEvidenceForRecords(records, stopId) {
   return Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, Object.freeze(evidence[day])])))
 }
 
+// Older prepared BODS snapshots contain the already-qualified active weekday
+// schedules but not the calendar object that produced them.  Recover the
+// deterministic ordinary profile at this boundary, while leaving genuinely
+// absent calendar evidence unresolved.  The prepared feed builder now emits
+// the richer evidence directly; this compatibility path keeps historical
+// snapshots auditable during the transition.
+function preparedCalendarEvidence(record) {
+  const provider = text(record?.timetableSource || record?.source?.provider).toUpperCase();
+  if (provider !== 'BODS') return [];
+  const days = [...new Set(Object.values(record?.stopSchedules ?? {}).flatMap(schedule =>
+    DAY_ORDER.filter(day => Array.isArray(schedule?.[day]) && schedule[day].length)))];
+  if (!days.length) return [];
+  return [createServiceCalendarEvidence({
+    daysOfWeek: days,
+    calendarResolved: true,
+    calendarProfileId: 'ordinary',
+    sourceCalendarLabel: 'prepared GTFS calendar day set',
+    qualificationMetadata: { source: 'prepared schedule active-day set' },
+    provenance: { provider: 'BODS', authority: 'Bus Open Data prepared feed', sourceField: 'calendar.txt active days' },
+    resolutionStatus: 'derived',
+    warnings: []
+  })];
+}
+
+function enrichPreparedCalendar(record) {
+  if (record?.calendarEvidence?.length || record?.operatingCalendarEvidence?.length || record?.calendarProfileId) return record;
+  const evidence = preparedCalendarEvidence(record);
+  if (!evidence.length) return record;
+  return { ...record, calendarProfileId: 'ordinary', calendarEvidence: evidence };
+}
+
 function materialQualification(note) {
   return note && !GENERIC_QUALIFICATION_PATTERNS.some(pattern => pattern.test(note));
 }
@@ -286,6 +317,18 @@ function directionGroupKey(service) {
   const match = text(service?.id).match(/:([01]):[0-9a-f]{12}$/i);
   if (match) return `gtfs:${match[1]}`;
   return `headsign:${normal(service?.direction || service?.destination || service?.origin)}`;
+}
+
+function calendarGroupingKey(service) {
+  const profile = text(service?.calendarProfileId || service?.source?.calendarProfileId);
+  // Historical prepared BODS snapshots can be enriched from their active
+  // weekday schedule, but that derived evidence must not split an otherwise
+  // identical cross-authority service from a record that has no calendar
+  // field. Explicit source calendar profiles remain grouping boundaries.
+  const evidence = service?.calendarEvidence ?? service?.operatingCalendarEvidence ?? [];
+  const derivedOrdinary = profile.toLowerCase() === 'ordinary'
+    && (Array.isArray(evidence) ? evidence : [evidence]).some(item => text(item?.resolutionStatus).toLowerCase() === 'derived');
+  return derivedOrdinary ? '' : profile;
 }
 
 function recordActivity(record, stopIds) {
@@ -343,7 +386,7 @@ function representativeRecord(records, stopIds) {
 }
 
 export function buildServiceSummaries(stops, serviceRecords) {
-  const preparedRecords = deduplicateServiceRecords(serviceRecords);
+  const preparedRecords = deduplicateServiceRecords(serviceRecords).map(enrichPreparedCalendar);
   const selectedIds = new Set((stops ?? []).map(stop => text(stop.id || stop.sourceId)).filter(Boolean));
   const selectedStopsById = new Map((stops ?? []).map(stop => [text(stop.id || stop.sourceId), stop]));
   const groups = new Map();
@@ -355,7 +398,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const stopDirections = unique(relevantStops.map(id => selectedStopDirectionKey(selectedStopsById.get(id))).filter(Boolean)).sort().join(',');
     const directionKey = directionGroupKey(service);
     const terminiKey = `${service.origin}|${service.destination}`;
-    const calendarProfileId = text(service.calendarProfileId || service.source?.calendarProfileId);
+    const calendarProfileId = calendarGroupingKey(service);
     const identity = [service.routeNumber, service.operator, directionKey, terminiKey, stopDirections, calendarProfileId].map(value => text(value).toLowerCase()).join('|');
     if (!groups.has(identity)) groups.set(identity, []);
     groups.get(identity).push({ ...service, relevantStops });
@@ -415,6 +458,16 @@ export function buildServiceSummaries(stops, serviceRecords) {
       calendarProfileLabel: calendarProfileLabel(first.calendarProfileId || first.source?.calendarProfileId),
       sourceRouteIds: Object.freeze(unique(records.map(record => record.source?.routeId || record.routeId))),
       principalLocations,
+      description: text(first.description || first.source?.description) || null,
+      originStopPointId: text(first.originStopPointId || first.routePatternStopIds?.[0]) || null,
+      destinationStopPointId: text(first.destinationStopPointId || first.routePatternStopIds?.at(-1)) || null,
+      timetableSource: text(first.timetableSource || first.source?.provider) || null,
+      sourceProviders: Object.freeze(unique(records.map(record => record.timetableSource || record.source?.provider))),
+      sourceRecords: Object.freeze(records.map(record => Object.freeze({
+        id: text(record.id) || null,
+        provider: text(record.timetableSource || record.source?.provider) || null,
+        source: record.source ?? null
+      }))),
       routePatternStops: Object.freeze([...(first.routePatternStops ?? [])]),
       calendarEvidence: Object.freeze(calendarEvidence),
       directionFamily: directionGroupKey(first),

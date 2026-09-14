@@ -12,6 +12,7 @@
     "test:atlas:review-server": "node tests/atlas/review-environment.test.mjs",
     "test:atlas:review-browser": "node tests/atlas/review-environment-browser.mjs",
     "review:atlas:alpha15": "node tools/atlas-review/alpha15-waltham-cross-report.mjs",
+    "test:atlas:alpha16": "node tests/atlas/alpha16-bus-semantic-golden.test.mjs",
     "test:atlas:live": "node tests/atlas/live/tfl-crystal-palace-smoke.mjs",
     "test:atlas:live-non-london": "node tests/atlas/live/naptan-waltham-cross-smoke.mjs",
     "test:atlas:live-third-area": "node tests/atlas/live/cambridge-national-smoke.mjs",

@@ -380,6 +380,8 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             "validFrom": None,
             "validTo": None,
             "qualifications": set(),
+            "calendarEvidence": [],
+            "departureEvidenceByDay": {day: [] for day in DAYS},
             "stopSchedules": {},
             "source": {"region": region, "routeId": clean(trip.get("route_id"))},
         }
@@ -398,13 +400,43 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
         trip.get("service_id"), trip.get("trip_headsign"), trip.get("trip_short_name"),
         route.get("route_long_name"), route.get("route_desc")
     )).lower()
-    if re.search(r"\b(?:school|schools|schoolday|school day|college day|term time|pupil)\b", service_description):
+    school_only = bool(re.search(r"\b(?:school|schools|schoolday|school day|college day|pupil)\b", service_description))
+    term_time_only = bool(re.search(r"\bterm time\b", service_description))
+    if school_only or term_time_only:
         record["qualifications"].add("School-day or term-time service identified in the source timetable; check the assessment date before formal use.")
+    profile_id = "term-time" if term_time_only else "school-day" if school_only else "ordinary"
+    calendar_evidence = {
+        "days": list(trip["active_days"]),
+        "daysOfWeek": list(trip["active_days"]),
+        "calendarResolved": True,
+        "resolved": True,
+        "schoolDayOnly": school_only,
+        "termTimeOnly": term_time_only,
+        "nonSchoolDayOnly": False,
+        "holidayOnly": False,
+        "calendarProfileId": profile_id,
+        "sourceCalendarLabel": clean(trip.get("service_id")) or None,
+        "dateExceptions": sorted(exceptions.get(clean(trip.get("service_id")), {}).keys()),
+        "qualificationMetadata": {"source": "GTFS calendar.txt", "exceptionCount": exception_count},
+        "provenance": {"provider": "BODS", "authority": "Bus Open Data", "sourceField": "calendar.txt"},
+        "resolutionStatus": "partial" if exception_count else "resolved",
+        "warnings": ["The source calendar contains date-specific exceptions; check the assessment date before formal use."] if exception_count else [],
+    }
+    if calendar_evidence not in record["calendarEvidence"]:
+        record["calendarEvidence"].append(calendar_evidence)
     for stop, departure in matched:
         stop["routes"].add(route_number)
         schedule = record["stopSchedules"].setdefault(stop["id"], {day: [] for day in DAYS})
         for day in trip["active_days"]:
             schedule[day].append(departure)
+            record["departureEvidenceByDay"][day].append({
+                "minute": departure,
+                "stopPointId": stop["id"],
+                "journeyIdentity": clean(trip.get("trip_id")) or None,
+                "sourceRecordId": service_id,
+                "provider": "BODS",
+                "calendarProfileId": profile_id,
+            })
 
 
 def process_region(path: Path, dates: dict[str, date], naptan_stops: dict, aliases: dict, shard_key_length: int) -> tuple[str, dict[str, list[dict]], dict]:

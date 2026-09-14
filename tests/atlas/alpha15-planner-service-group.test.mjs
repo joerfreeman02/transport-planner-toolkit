@@ -25,6 +25,7 @@ function record({
   minutes = [420, 480],
   calendarProfileId = 'ordinary',
   circular = false,
+  principalLocations = ['Waltham Cross Bus Station'],
   departureEvidenceByDay
 } = {}) {
   return {
@@ -44,7 +45,7 @@ function record({
     departureEvidenceByDay: departureEvidenceByDay ?? Object.fromEntries(DAYS.map(day => [day, minutes.map(minute => ({ minute, stopPointId: basis, journeyIdentity: `${id}:${day}:${minute}`, provider: 'BODS' }))])),
     calendarProfileId,
     circular,
-    principalLocations: ['Waltham Cross Bus Station'],
+    principalLocations,
     sourceRecordIds: [id],
     routePatternStops: pattern.map(name => ({ id: name, name })),
     timetableSource: 'BODS'
@@ -143,6 +144,46 @@ const independentCorridors = rows([
   record({ id: 'corridor-b', routeNumber: '230', routeId: 'corridor-b', origin: 'South Interchange', destination: 'South Terminal', pattern: ['S1', 'S2', 'S3'] })
 ]);
 assert.equal(independentCorridors.length, 2, 'distinct corridors with common route number remain separate');
+
+const branchStops = [
+  ...stops,
+  ...['COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-B', 'NORTH-TERM', 'EAST-A', 'EAST-B', 'EAST-TERM']
+    .map(id => ({ id, name: id, distanceMetres: 200, walking: { status: 'routed', distanceMetres: 200 } }))
+];
+const sharedTrunkBranches = buildPlannerBusServiceSummaries([
+  record({
+    id: 'shared-trunk-north',
+    routeNumber: 'BRANCH',
+    routeId: 'shared-trunk-line',
+    origin: 'Hub',
+    destination: 'North Terminal',
+    direction: 'northbound',
+    stopIds: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-B', 'NORTH-TERM'],
+    basis: 'A',
+    pattern: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-B', 'NORTH-TERM'],
+    principalLocations: ['Hub', 'Common A', 'Common B', 'North A', 'North B', 'North Terminal']
+  }),
+  record({
+    id: 'shared-trunk-east',
+    routeNumber: 'BRANCH',
+    routeId: 'shared-trunk-line',
+    origin: 'Hub',
+    destination: 'East Terminal',
+    direction: 'eastbound',
+    stopIds: ['A', 'COMMON-A', 'COMMON-B', 'EAST-A', 'EAST-B', 'EAST-TERM'],
+    basis: 'A',
+    pattern: ['A', 'COMMON-A', 'COMMON-B', 'EAST-A', 'EAST-B', 'EAST-TERM'],
+    principalLocations: ['Hub', 'Common A', 'Common B', 'East A', 'East B', 'East Terminal']
+  })
+], branchStops);
+assert.equal(sharedTrunkBranches.length, 2, 'materially divergent same-lineage branches remain separate public rows');
+
+const shortWorkingRows = buildPlannerBusServiceSummaries([
+  record({ id: 'short-main', routeNumber: 'SHORT-BRANCH', routeId: 'short-line', origin: 'Hub', destination: 'North Terminal', direction: 'outbound', pattern: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A', 'NORTH-TERM'] }),
+  record({ id: 'short-working', routeNumber: 'SHORT-BRANCH', routeId: 'short-line', origin: 'Hub', destination: 'North A', direction: 'outbound', pattern: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A'] })
+], stops);
+assert.equal(shortWorkingRows.length, 1, 'an ordered-subsequence short working remains within the principal direction row');
+assert.match(`${shortWorkingRows[0].serviceNote} ${shortWorkingRows[0].routeGroupNote || ''}`, /short workings|variants/i);
 
 const markerlessOpposites = rows([
   record({ id: 'forward', routeNumber: 'MD', routeId: 'markerless', directionId: undefined, direction: '', origin: 'A Terminal', destination: 'B Terminal', pattern: ['A', 'MID', 'B'] }),

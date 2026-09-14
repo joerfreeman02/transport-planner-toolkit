@@ -6,7 +6,7 @@ Owner: ATLAS engineering
 
 ## Context
 
-The deployed Waltham Cross replay exposed a production failure mode that could not be represented safely by source-record identity: one public route direction was split across operator names, feed records, timetable registrations, short workings and nearby served stops. Route 242 was promoted to four planner rows although the evidence established two public directions. Frequency was also at risk of being calculated from a non-basis stop or from duplicated provider records.
+The deployed Waltham Cross replay exposed a production failure mode that could not be represented safely by source-record identity: one public route direction was split across operator names, feed records, timetable registrations, short workings and nearby served stops. The faithful runtime replay promotes 242 to eight Alpha.14 planner rows; Alpha.15 consolidates that same evidence to two public directions. Frequency was also at risk of being calculated from a non-basis stop or from duplicated provider records.
 
 ## Options
 

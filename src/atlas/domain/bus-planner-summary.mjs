@@ -187,6 +187,12 @@ function strictSubsequence(shorter, longer) {
   return true;
 }
 
+function commonPatternPrefixLength(left, right) {
+  let length = 0;
+  while (length < left.length && length < right.length && left[length] === right[length]) length += 1;
+  return length;
+}
+
 function provenPatternRelationship(first, second) {
   const left = explicitPattern(first);
   const right = explicitPattern(second);
@@ -362,24 +368,26 @@ function compatibleDirection(first, second, aliases = []) {
       const sharedStops = sharedStopIds(first, second);
       const leftPattern = explicitPattern(first);
       const rightPattern = explicitPattern(second);
-      const leftNamedDirection = normal(first?.direction || first?.stopDirection);
-      const rightNamedDirection = normal(second?.direction || second?.stopDirection);
-      const sameNamedDirection = leftNamedDirection && leftNamedDirection === rightNamedDirection;
-      const sharedPatternSet = sharedPatternValues(first, second);
-      const leftPatternNames = new Set(orderedPatternNames(first).map(normal));
-      const sharedPatternNameCount = orderedPatternNames(second).map(normal)
-        .filter(name => name && leftPatternNames.has(name)).length;
+      const commonPrefixLength = commonPatternPrefixLength(leftPattern, rightPattern);
+      const leftTailLength = leftPattern.length - commonPrefixLength;
+      const rightTailLength = rightPattern.length - commonPrefixLength;
+      const leftDestinationInRightPattern = orderedPatternNames(second).some(name => normal(name) === rightEndpoints.destination);
+      const rightDestinationInLeftPattern = orderedPatternNames(first).some(name => normal(name) === leftEndpoints.destination);
       const materiallyDivergentBranchPatterns = leftPattern.length >= 2
         && rightPattern.length >= 2
+        && commonPrefixLength >= 2
+        && leftTailLength >= 2
+        && rightTailLength >= 2
         && !provenPatternRelationship(first, second)
-        && !sameNamedDirection
-        && !(sharedPatternSet.size === 0 && sharedPatternNameCount >= 2)
-        && sharedCorridorNames(first, second).size >= 2
+        && !leftDestinationInRightPattern
+        && !rightDestinationInLeftPattern
         && (leftEndpoints.origin !== rightEndpoints.origin || leftEndpoints.destination !== rightEndpoints.destination);
-      // A shared route lineage and trunk stops do not, by themselves, prove that
-      // two complete patterned services are one public row.  Preserve genuine
-      // short workings (strict subsequences) while keeping divergent branches
-      // distinct even when their feeds reuse the same direction marker.
+      // A shared route lineage, direction label and trunk do not, by themselves,
+      // prove that two complete patterned services are one public row.  When
+      // both patterns share an ordered trunk and then carry material unique
+      // tails to different endpoints, retain two physical branches.  A genuine
+      // short working remains eligible because its pattern is a strict ordered
+      // subsequence and therefore cannot satisfy both tail thresholds.
       if (materiallyDivergentBranchPatterns) return false;
       const corridorEvidence = exactEndpointPair
         || sameServiceLineage(first, second)

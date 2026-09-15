@@ -123,6 +123,12 @@ test('missing selected stop direction does not create guessed bracket text', () 
   assert.equal(formatServiceOriginDestination(summary), 'A - B');
 });
 
+test('unresolved principal endpoints use neutral wording rather than export placeholders', () => {
+  const wording = formatServiceOriginDestination({ origin: null, destination: null });
+  assert.equal(wording, 'Principal origin not resolved - Principal destination not resolved');
+  assert.doesNotMatch(wording, /Origin not supplied|Destination not supplied/);
+});
+
 for (const [name, fn] of tests) {
   await fn();
   console.log(`PASS Bus service assessment - ${name}`);

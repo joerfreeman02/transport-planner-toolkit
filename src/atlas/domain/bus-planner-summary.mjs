@@ -1470,7 +1470,7 @@ function directionPatternText(service) {
 
 function servedAtText(representative) {
   const stop = representative.stop;
-  const name = text(stop?.name) || representative.name || 'Representative stop not supplied';
+  const name = text(stop?.name) || representative.name || 'Representative stop not resolved';
   const indicator = text(stop?.indicator);
   const distance = stop?.walking?.status === 'routed' ? Number(stop.walking.distanceMetres) : Number(stop?.distanceMetres);
   const suffix = Number.isFinite(distance) ? ' · ' + Math.round(distance).toLocaleString('en-GB') + ' m' : '';
@@ -1518,8 +1518,7 @@ function destinationNames(values) {
   const normalised = names.map(name => ({ name, key: normal(name), words: normal(name).split(' ').filter(Boolean) }));
   return normalised
     .filter(candidate => !normalised.some(other => other !== candidate && other.words.length > candidate.words.length && other.key.includes(candidate.key)))
-    .map(candidate => candidate.name)
-    .slice(0, 4);
+    .map(candidate => candidate.name);
 }
 
 function alternateDestinations(component, main) {
@@ -1588,7 +1587,7 @@ function compactPrincipalLocations(component, main, { publicOrigin = '', publicD
     return { value, index, score: (endpoint ? 3 : 0) + (locality ? 2 : 0) };
   });
   return scored.sort((left, right) => right.score - left.score || left.index - right.index || left.value.localeCompare(right.value))
-    .slice(0, 5).map(item => item.value);
+    .map(item => item.value);
 }
 
 function plannerStopLabel(stop, { basis = false } = {}) {
@@ -1810,9 +1809,9 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     routeNumber: displayedRouteNumber,
     rawRouteNumbers: Object.freeze(rawRouteNumbers),
     variantRouteNumbers: Object.freeze(rawRouteNumbers.filter(route => normal(route).replace(/\s+/g, '') !== normal(displayedRouteNumber).replace(/\s+/g, ''))),
-    operator: plannerServiceGroup.operatorNames.join(' · ') || 'Operator not supplied in the timetable',
-    origin: publicOrigin || 'Origin not supplied',
-    destination: publicDestination || 'Destination not supplied',
+    operator: plannerServiceGroup.operatorNames.join(' · ') || 'Operator identity not resolved',
+    origin: publicOrigin || null,
+    destination: publicDestination || null,
     direction: text(main.direction),
     stopDirection: text(main.stopDirection) || null,
     circular: rowCircular,
@@ -1865,6 +1864,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     recordActivity: Math.max(0, ...component.map(service => Number(service.recordActivity) || 0)),
     presentation: Object.freeze({ principalLocationsText: principalText({ principalLocations }), rank: 0 }),
     rawServiceSummaries: Object.freeze(component),
+    consolidatedSourceRecordIds: Object.freeze([]),
     ambiguousServiceSummaries: Object.freeze([...(component.ambiguousServices ?? [])]),
     plannerServiceGroup,
     operatorRawNames: plannerServiceGroup.rawOperatorNames,
@@ -1893,7 +1893,7 @@ function principalCorridorForRows(rows, principalRoute) {
   const principalRows = rows.filter(row => (row.rawRouteNumbers ?? []).some(route => normal(route).replace(/\s+/g, '') === normal(principalRoute)));
   const candidates = new Map();
   for (const row of principalRows) {
-    const origin = text(row.origin), destination = text(row.destination);
+    const origin = plannerOrigin(row), destination = plannerDestination(row);
     if (!origin || !destination || normal(origin) === normal(destination)) continue;
     const key = `${normal(origin)}|${normal(destination)}`;
     const current = candidates.get(key) ?? { origin, destination, count: 0, extent: 0, activity: 0 };
@@ -1944,6 +1944,18 @@ function plannerFamilyNote(rows) {
 }
 
 function consolidateOneSidedVariantRows(rows) {
+  const mergeRawServiceSummaries = (left = [], right = []) => {
+    const merged = [];
+    const seen = new Set();
+    for (const service of [...left, ...right]) {
+      const key = text(service?.id)
+        || `${text(service?.routeNumber)}|${text(service?.origin)}|${text(service?.destination)}|${text(service?.direction)}|${(service?.sourceRecordIds ?? []).join(',')}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(service);
+    }
+    return Object.freeze(merged);
+  };
   const retained = rows.slice();
   const folded = new Map();
   for (const row of retained) folded.set(row, row);
@@ -1960,10 +1972,22 @@ function consolidateOneSidedVariantRows(rows) {
         || text(left.destination).localeCompare(text(right.destination)))[0];
     if (!parent) continue;
     const current = folded.get(parent);
+    const foldedEvidence = unique([
+      ...(current.consolidatedSourceRecordIds ?? []),
+      text(row.id),
+      ...(row.sourceRecordIds ?? []),
+      ...(row.variantServiceIds ?? []),
+      ...(row.consolidatedSourceRecordIds ?? [])
+    ].filter(Boolean));
     folded.set(parent, Object.freeze({
       ...current,
       routeVariantNote: current.routeVariantNote || 'Additional short workings and timetable variants operate.',
-      alternateDestinationNames: Object.freeze(unique([...(current.alternateDestinationNames ?? []), plannerDestination(row)]))
+      alternateDestinationNames: Object.freeze(unique([...(current.alternateDestinationNames ?? []), plannerDestination(row)])),
+      sourceRecordIds: Object.freeze(unique([...(current.sourceRecordIds ?? []), ...(row.sourceRecordIds ?? [])])),
+      variantCount: (Number(current.variantCount) || 0) + (Number(row.variantCount) || 0),
+      variantServiceIds: Object.freeze(unique([...(current.variantServiceIds ?? []), ...(row.variantServiceIds ?? [])])),
+      rawServiceSummaries: mergeRawServiceSummaries(current.rawServiceSummaries, row.rawServiceSummaries),
+      consolidatedSourceRecordIds: Object.freeze(foldedEvidence)
     }));
     folded.delete(row);
   }
@@ -2016,7 +2040,7 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
     componentIndexes.set(routeKey, index + 1);
     const routeFamilyServices = serviceGroup.routeFamilyServices || plannerRecords.filter(service => routeGroupKey(service) === routeKey);
     const row = buildPlannerRow(component, stops, index, routeFamilyServices);
-    if (resolvedPlannerDestination(row)) rows.push(row);
+    if (resolvedPlannerDestination(row) || component.some(service => resolvedPlannerDestination(service))) rows.push(row);
   }
   const sorted = consolidateOneSidedVariantRows(rows.sort((first, second) => text(first.routeNumber).localeCompare(text(second.routeNumber), undefined, { numeric: true })
     || text(first.operator).localeCompare(text(second.operator))
@@ -2027,6 +2051,76 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
 }
 
 export const buildPlannerBusServiceSummary = buildPlannerBusServiceSummaries;
+
+function serviceEvidenceKeys(service) {
+  return unique([
+    text(service?.id),
+    ...(service?.sourceRecordIds ?? []),
+    ...(service?.sourceRecords ?? []).map(record => record?.id)
+  ].filter(Boolean));
+}
+
+function rowEvidenceKeys(row) {
+  return unique([
+    text(row?.id),
+    ...(row?.sourceRecordIds ?? []),
+    ...(row?.variantServiceIds ?? []),
+    ...(row?.consolidatedSourceRecordIds ?? []),
+    ...(row?.rawServiceSummaries ?? []).flatMap(serviceEvidenceKeys),
+    ...(row?.plannerServiceGroup?.sourceRecordIds ?? [])
+  ].filter(Boolean));
+}
+
+export function buildPlannerServiceReconciliation(serviceSummaries = [], plannerRows = []) {
+  const rows = plannerRows ?? [];
+  const entries = (serviceSummaries ?? []).map(service => {
+    const sourceKeys = serviceEvidenceKeys(service);
+    const row = rows.find(candidate => rowEvidenceKeys(candidate).some(key => sourceKeys.includes(key)));
+    if (!row) {
+      const destinationResolved = resolvedPlannerDestination(service);
+      return Object.freeze({
+        status: 'excluded',
+        reason: destinationResolved ? 'planner-row-not-built' : 'planner-identity-unresolved',
+        sourceSummaryId: text(service?.id) || null,
+        sourceRecordIds: Object.freeze(unique(service?.sourceRecordIds ?? [])),
+        routeNumber: text(service?.routeNumber) || null,
+        destinationResolved,
+        plannerRowId: null,
+        plannerRouteNumber: null,
+        retainedDestinations: Object.freeze([])
+      });
+    }
+    const consolidated = new Set(row.consolidatedSourceRecordIds ?? []);
+    const isConsolidated = sourceKeys.some(key => consolidated.has(key));
+    return Object.freeze({
+      status: isConsolidated ? 'consolidated' : 'represented',
+      reason: null,
+      sourceSummaryId: text(service?.id) || null,
+      sourceRecordIds: Object.freeze(unique(service?.sourceRecordIds ?? [])),
+      routeNumber: text(service?.routeNumber) || null,
+      destinationResolved: resolvedPlannerDestination(service),
+      plannerRowId: text(row?.id) || null,
+      plannerRouteNumber: text(row?.routeNumber) || null,
+      retainedDestinations: Object.freeze(unique([
+        plannerDestination(row),
+        ...(row?.alternateDestinationNames ?? [])
+      ].filter(Boolean)))
+    });
+  });
+  const sourceRecordIds = unique(entries.flatMap(entry => entry.sourceRecordIds ?? []));
+  const excludedSourceRecordIds = new Set(entries.filter(entry => entry.status === 'excluded').flatMap(entry => entry.sourceRecordIds ?? []));
+  return Object.freeze({
+    sourceServiceCount: entries.length,
+    sourceRecordCount: sourceRecordIds.length,
+    representedCount: entries.filter(entry => entry.status === 'represented').length,
+    consolidatedCount: entries.filter(entry => entry.status === 'consolidated').length,
+    excludedCount: entries.filter(entry => entry.status === 'excluded').length,
+    representedSourceRecordCount: sourceRecordIds.filter(id => !excludedSourceRecordIds.has(id)).length,
+    excludedSourceRecordCount: excludedSourceRecordIds.size,
+    unexpectedExclusionCount: entries.filter(entry => entry.status === 'excluded' && entry.reason !== 'planner-identity-unresolved').length,
+    entries: Object.freeze(entries)
+  });
+}
 
 export function buildPlannerSummaryAudit(rows = [], expectedRowCounts = {}) {
   const routeNumbers = unique([

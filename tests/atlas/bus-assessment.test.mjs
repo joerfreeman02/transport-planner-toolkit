@@ -18,6 +18,8 @@ test('complete assessment joins stops, timetable services and separate routed mo
   assert.equal(result.stops[0].walking.distanceMetres, 250);
   assert.equal(result.stops[0].cycling.distanceMetres, 300);
   assert.equal(result.serviceSummaries[0].routeNumber, '10');
+  assert.equal(result.plannerReconciliation.sourceServiceCount, 1);
+  assert.equal(result.plannerReconciliation.excludedCount, 0);
 });
 
 test('timetable and routing failures produce an honest partial assessment', async () => {

@@ -33,7 +33,7 @@ export function buildBusWordTables(result) {
         service.routeNumber,
         service.operator,
         service.directionPatternText || formatServiceOriginDestination(service, ' – '),
-        service.servedAtText || 'Representative stop not supplied',
+        service.servedAtText || 'Representative stop not resolved',
         principalLocationsText(service),
         service.typicalFrequencyText || 'Frequency unavailable',
         (service.operatingPeriodLines ?? []).join('\n')

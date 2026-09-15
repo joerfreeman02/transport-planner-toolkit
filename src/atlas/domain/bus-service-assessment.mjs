@@ -480,9 +480,9 @@ export function buildServiceSummaries(stops, serviceRecords) {
     return Object.freeze({
       id: identity,
       routeNumber: text(first.routeNumber) || 'Not supplied',
-      operator: text(first.operator) || 'Operator not supplied in the timetable',
-      origin: text(first.origin) || 'Origin not supplied',
-      destination: text(first.destination) || 'Destination not supplied',
+      operator: text(first.operator) || null,
+      origin: text(first.origin) || null,
+      destination: text(first.destination) || null,
       direction: text(first.direction),
       stopDirection: serviceStopDirection(frequencyStop),
       stopDirectionEvidenceId: frequencyBasisStopId,
@@ -712,8 +712,8 @@ function deterministicFrequencyBand(evidence, day) {
 }
 
 export function formatServiceOriginDestination(service, separator = ' - ') {
-  const origin = text(service?.origin) || 'Origin not supplied';
-  const destination = text(service?.destination) || 'Destination not supplied';
+  const origin = text(service?.origin) || 'Principal origin not resolved';
+  const destination = text(service?.destination) || 'Principal destination not resolved';
   const base = `${origin}${separator}${destination}${service?.circular && service?.direction ? ` (${service.direction})` : ''}`;
   const directed = service?.stopDirection ? `${base} (${service.stopDirection})` : base;
   return service?.stopContext ? `${directed}; ${service.stopContext}` : directed;
@@ -905,7 +905,7 @@ export function buildControlledBusWording(serviceSummaries, { nearestGroupName =
   const services = serviceSummaries ?? [];
   if (!services.length) return 'No bus-service summary wording is available for the confirmed assessment point.';
   const routes = unique(services.map(service => service.routeNumber));
-  const locations = controlledLocationLabels(services.flatMap(service => service.principalLocations)).slice(0, 8);
+  const locations = controlledLocationLabels(services.flatMap(service => service.principalLocations));
   const routeWords = routes.length === 1 ? `bus route ${routes[0]}` : `bus routes ${routes.join(', ')}`;
   const nearestLead = nearestGroupName ? `The nearest assessed bus stop group is ${nearestGroupName}. ` : '';
   return `${nearestLead}The assessed stop${nearestGroupName ? ' group is' : 's are'} served by ${routeWords}${locations.length ? `, providing direct connections to ${locations.join(', ')}` : ''}. Timetable periods and any material qualifications are shown in the Bus Service Summary.`;

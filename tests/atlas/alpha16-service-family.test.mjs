@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildPlannerBusServiceSummaries } from '../../src/atlas/domain/bus-planner-summary.mjs';
+import { buildPlannerBusServiceSummaries, buildPlannerServiceReconciliation } from '../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildControlledBusWording } from '../../src/atlas/domain/bus-service-assessment.mjs';
 
 const week = { monday: [420], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] };
@@ -47,6 +47,36 @@ const shortWorking = buildPlannerBusServiceSummaries([
 ], stops)[0];
 assert.equal(shortWorking.destination, 'Harlow');
 assert.match(shortWorking.routeGroupNote, /principal Route|variants|shorter? workings|service family/i);
+
+const shortWorkingLineageSource = [
+  record({ routeNumber: 'G-LINEAGE', ids: 'lineage-full', destination: 'Principal Town', pattern: ['A', 'B', 'C'], departures: [420, 480] }),
+  record({ routeNumber: 'G-LINEAGE', ids: 'lineage-short', destination: 'Short Town', pattern: ['A', 'B'], departures: [450] })
+];
+const shortWorkingLineageRows = buildPlannerBusServiceSummaries(shortWorkingLineageSource, stops);
+const shortWorkingLineage = buildPlannerServiceReconciliation(shortWorkingLineageSource, shortWorkingLineageRows);
+assert.equal(shortWorkingLineage.excludedCount, 0, 'short working source evidence cannot silently disappear');
+assert.equal(shortWorkingLineage.representedCount, 2, 'main and short-working source summaries are both represented');
+assert.ok(shortWorkingLineageRows[0].rawServiceSummaries.some(service => service.id === 'G-LINEAGE-lineage-short'), 'folded source summary remains attached to the retained row');
+assert.ok(shortWorkingLineageRows[0].alternateDestinationNames.includes('Short Town'), 'short-working destination remains useful planner evidence');
+
+const manyDestinationRows = buildPlannerBusServiceSummaries([
+  record({ routeNumber: 'G-DESTINATIONS', ids: 'dest-main', destination: 'Principal Town', pattern: ['A', 'B', 'C', 'D', 'E', 'F'] }),
+  ...['Short Alpha', 'Short Bravo', 'Short Charlie', 'Short Delta', 'Short Echo'].map((destination, index) => record({
+    routeNumber: 'G-DESTINATIONS', ids: `dest-short-${index}`, destination, pattern: ['A', 'B'], departures: [430 + index]
+  }))
+], stops);
+assert.equal(manyDestinationRows.length, 1, 'one-sided destination variants consolidate into the principal row');
+for (const destination of ['Short Alpha', 'Short Bravo', 'Short Charlie', 'Short Delta', 'Short Echo']) assert.ok(manyDestinationRows[0].alternateDestinationNames.includes(destination), `destination ${destination} is not arbitrarily truncated`);
+
+const neutralPlannerText = buildControlledBusWording([{
+  routeNumber: 'G-NEUTRAL',
+  principalLocations: [],
+  origin: null,
+  destination: null,
+  directionPatternText: 'Destination not resolved',
+  routeVariantNote: null
+}]);
+assert.doesNotMatch(neutralPlannerText, /Origin not supplied|Destination not supplied/);
 
 const branches = buildPlannerBusServiceSummaries([
   record({ routeNumber: '66', ids: 'main-branch', destination: 'Terminal One', pattern: ['A', 'B', 'C', 'D', 'E'] }),

@@ -199,7 +199,7 @@ export function calculateScheduledFrequency(departures, { startMinute, endMinute
   });
 }
 
-export function derivePrincipalLocations(calls, { maximum = 7 } = {}) {
+export function derivePrincipalLocations(calls, { maximum = null } = {}) {
   const clean = (calls ?? []).map((call, index) => ({
     index,
     name: text(call?.name),
@@ -218,7 +218,8 @@ export function derivePrincipalLocations(calls, { maximum = 7 } = {}) {
     if (locality) previousLocality = locality.toLowerCase();
   }
   if (chosen.length < 2) [0.25, 0.5, 0.75].forEach(position => add(clean[Math.round((clean.length - 1) * position)]?.name));
-  return chosen.slice(0, Math.max(1, Number(maximum) || 7));
+  const explicitMaximum = Number.isFinite(Number(maximum)) && Number(maximum) > 0 ? Math.floor(Number(maximum)) : null;
+  return explicitMaximum ? chosen.slice(0, explicitMaximum) : chosen;
 }
 
 function mergeDepartures(records, stopIds) {

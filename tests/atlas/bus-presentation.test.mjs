@@ -43,10 +43,10 @@ const ruralCalls = ['Town A', 'Village B', 'Village C', 'Village D', 'Village E'
 const ruralLocations = derivePrincipalLocations(ruralCalls);
 assert.ok(ruralLocations.length > 0);
 assert.deepEqual(ruralLocations, ['Village B', 'Village C', 'Village D', 'Village E']);
-assert.ok(ruralLocations.length <= 7);
 assert.doesNotMatch(ruralLocations.join(', '), /Town A|Town F/);
 const manyRuralCalls = ['Town A', ...Array.from({ length: 10 }, (_, index) => `Village ${String.fromCharCode(66 + index)}`), 'Town Z'].map(name => ({ name, locality: name }));
-assert.ok(derivePrincipalLocations(manyRuralCalls).length <= 7);
+assert.equal(derivePrincipalLocations(manyRuralCalls).length, 10, 'deterministic principal locations are not silently capped');
+assert.equal(derivePrincipalLocations(manyRuralCalls, { maximum: 7 }).length, 7, 'an explicit caller maximum remains available for a deliberate presentation policy');
 const ruralPresentation = buildServicePresentation([{ ...base, id: 'rural', routeNumber: 'R1', routePatternStopIds: ['A', 'B', 'C', 'D', 'E', 'F'], routePatternExtent: 6, principalLocations: ruralLocations }])[0];
 assert.equal(ruralPresentation.presentation.principalLocationsText, ruralLocations.join(', '));
 assert.doesNotMatch(ruralPresentation.presentation.principalLocationsText, /Route endpoints only|See route origin \/ destination/);

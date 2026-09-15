@@ -40,7 +40,7 @@ assert.equal(planner.filter(row => row.routeNumber === '657').length, 3);
 const word = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [main], serviceSummaries: [] });
 assert.deepEqual(word[1].headers, ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']);
 assert.equal(word[1].rows[0][3], main.servedAtText);
-assert.ok(word[1].rows.some(row => !Array.isArray(row) && /Served at|timetable basis/.test(row.text)));
+assert.deepEqual(word[1].beforeTableNotes, [PLANNER_METHODOLOGY_NOTE.replace(/ Other source evidence is available under Show detailed evidence\.$/, '')]);
 
 assert.equal(formatAtlasTaskStatus({ phase: 'finding-stops' }), 'Step 1 of 5 · Finding nearby stops');
 assert.equal(formatAtlasTaskStatus({ phase: 'routing-stops', completed: 2, total: 4 }), 'Step 2 of 5 · Routing stops — 2 of 4');
@@ -227,12 +227,13 @@ const builtSummary = buildServiceSummaries([{ id: 'A', name: 'Waltham Cross Bus 
 }])[0];
 assert.equal(builtSummary.departureEvidenceByDay.monday[0].minute, 678, 'raw summary retains traceable departure evidence for planner deduplication');
 
-const wordRows = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [route279[0]], serviceSummaries: [] })[1].rows;
+const wordServiceTable = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [route279[0]], serviceSummaries: [] })[1];
+const wordRows = wordServiceTable.rows;
 assert.equal(wordRows[0][2], route279[0].directionPatternText, 'Word consumes the same direction model as Browser');
 assert.equal(wordRows[0][5], route279[0].typicalFrequencyText, 'Word consumes the same frequency model as Browser');
-assert.equal(wordRows.filter(row => !Array.isArray(row) && row.text === PLANNER_METHODOLOGY_NOTE).length, 1, 'Word carries the shared planner methodology note once');
+assert.deepEqual(wordServiceTable.beforeTableNotes, [PLANNER_METHODOLOGY_NOTE.replace(/ Other source evidence is available under Show detailed evidence\.$/, '')], 'Word carries the shared planner methodology note once outside Table 3.3');
 const reviewWordRows = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [], serviceSummaries: [], reviewItems: [{ route: '279', stop: 'A', source: 'TfL', message: 'Review this timetable evidence.' }] })[1].rows;
-assert.equal(reviewWordRows.some(row => !Array.isArray(row) && row.text === 'Evidence items to review: Route 279 · Stop A · TfL: Review this timetable evidence.'), true, 'Word carries the same scoped review item naming as Browser');
+assert.equal(reviewWordRows.some(row => !Array.isArray(row) && /Evidence items to review|Review this timetable evidence/.test(row.text)), false, 'Word keeps internal review diagnostics out of the client-facing planner table');
 
 const variable = calculateTypicalServiceFrequency([300, 310, 320, 330, 340, 350, 365, 380], { day: 'monday' });
 assert.equal(variable.classification, 'variable-frequency');

@@ -199,7 +199,7 @@ button.compact { padding: 7px 10px; font-size: .78rem; }
 .service-detail p { margin: 4px 0 0; color: var(--atlas-muted); font-size: .9em; }
 .service-note td { border-top: 0; background: #fff8e8; color: #614200; padding-top: 8px; padding-bottom: 9px; }
 .assessment-wording { margin-top: 24px; padding: 16px 18px; border-left: 4px solid var(--atlas-lime); background: #f4f8fd; }
-.planner-methodology { margin: 9px 0 0; }
+.planner-methodology { margin: 0 0 12px; padding: 11px 13px; border-left: 3px solid var(--atlas-lime); background: #f4f8fd; color: var(--atlas-ink); line-height: 1.5; }
 .assessment-wording p:last-child { margin: 8px 0 0; color: var(--atlas-ink); }
 .route-unavailable { color: #7b5500; font-weight: 700; }
 details { margin-top: 15px; border: 1px solid var(--atlas-line); border-radius: 8px; padding: 10px 13px; }

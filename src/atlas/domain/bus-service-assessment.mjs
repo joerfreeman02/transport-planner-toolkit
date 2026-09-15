@@ -28,6 +28,23 @@ function numeric(values) { return unique(values).map(Number).filter(Number.isFin
 function ordered(values) { return (values ?? []).map(Number).filter(Number.isFinite).sort((a, b) => a - b); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
 
+function locationIdentity(value) {
+  return normal(value).replace(/\b(?:railway|bus|coach) station\b|\binterchange\b/g, '').trim();
+}
+
+function controlledLocationLabels(values) {
+  const labels = unique(values);
+  return labels.filter((label, index) => {
+    const key = locationIdentity(label);
+    return !labels.some((candidate, candidateIndex) => {
+      if (candidateIndex === index) return false;
+      const candidateKey = locationIdentity(candidate);
+      if (!key) return normal(candidate).includes(normal(label));
+      return candidateKey === key && candidate.length > label.length;
+    });
+  });
+}
+
 function departureEvidenceKey(entry) {
   return [
     text(entry?.stopPointId),
@@ -888,7 +905,7 @@ export function buildControlledBusWording(serviceSummaries, { nearestGroupName =
   const services = serviceSummaries ?? [];
   if (!services.length) return 'No bus-service summary wording is available for the confirmed assessment point.';
   const routes = unique(services.map(service => service.routeNumber));
-  const locations = unique(services.flatMap(service => service.principalLocations)).slice(0, 8);
+  const locations = controlledLocationLabels(services.flatMap(service => service.principalLocations)).slice(0, 8);
   const routeWords = routes.length === 1 ? `bus route ${routes[0]}` : `bus routes ${routes.join(', ')}`;
   const nearestLead = nearestGroupName ? `The nearest assessed bus stop group is ${nearestGroupName}. ` : '';
   return `${nearestLead}The assessed stop${nearestGroupName ? ' group is' : 's are'} served by ${routeWords}${locations.length ? `, providing direct connections to ${locations.join(', ')}` : ''}. Timetable periods and any material qualifications are shown in the Bus Service Summary.`;

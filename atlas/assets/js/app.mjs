@@ -16,7 +16,7 @@ import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-tas
 import { buildPlannerBusServiceSummaries, PLANNER_METHODOLOGY_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
-import { downloadWordDocument } from '../../../assets/js/word-export.js';
+import { downloadWordDocument } from '../../../src/atlas/presentation/word-export.mjs';
 
 const $ = id => document.getElementById(id);
 const taskStatus = createAtlasTaskStatus({ messageElement: $('taskStatusMessage'), regionElement: $('taskStatus'), progressElement: $('taskStatusProgress'), countElement: $('taskStatusProgressText'), stageElements: [...document.querySelectorAll('[data-task-stage]')] });

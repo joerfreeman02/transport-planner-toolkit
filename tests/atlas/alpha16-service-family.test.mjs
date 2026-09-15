@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { buildPlannerBusServiceSummaries } from '../../src/atlas/domain/bus-planner-summary.mjs';
+import { buildControlledBusWording } from '../../src/atlas/domain/bus-service-assessment.mjs';
 
 const week = { monday: [420], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] };
 const stops = [
@@ -61,5 +62,13 @@ const genericInfrastructure = buildPlannerBusServiceSummaries([record({
 assert.equal(genericInfrastructure.origin, 'Waltham Cross');
 assert.equal(genericInfrastructure.destination, 'Hertford');
 assert.equal(genericInfrastructure.circular, false, 'generic infrastructure wording does not manufacture a circular row');
+
+const controlledWording = buildControlledBusWording([{
+  routeNumber: '310',
+  principalLocations: ['Waltham Cross Railway Station', 'Railway Station', 'Waltham Cross', 'Town Centre']
+}]);
+assert.match(controlledWording, /Waltham Cross Railway Station/);
+assert.match(controlledWording, /Town Centre/);
+assert.doesNotMatch(controlledWording, /Railway Station, Waltham Cross Railway Station|Waltham Cross Railway Station, Railway Station, Waltham Cross/);
 
 console.log('PASS Alpha.16 service-family CASE A-F contracts.');

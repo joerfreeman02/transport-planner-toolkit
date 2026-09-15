@@ -375,6 +375,18 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             "originStopPointId": clean(calls[0].get("stop_id")) or None,
             "destinationStopPointId": clean(calls[-1].get("stop_id")) or None,
             "direction": clean(trip.get("trip_headsign")) or (f"towards {last_name}" if last_name else ""),
+            # Preserve the feed's public route identity and the complete
+            # ordered pattern.  Principal locations are corridor evidence;
+            # these fields are the evidence that may establish public termini.
+            "description": " ".join(clean(value) for value in (
+                route.get("route_long_name"), route.get("route_desc")
+            ) if clean(value)) or None,
+            "routePatternStopIds": [clean(call.get("stop_id")) for call in calls if clean(call.get("stop_id"))],
+            "routePatternStops": [{
+                "id": clean(call.get("stop_id")),
+                "name": clean(call.get("name")),
+                "locality": clean(call.get("locality")) or None
+            } for call in calls if clean(call.get("stop_id"))],
             "circular": circular,
             "principalLocations": principal_locations(calls),
             "validFrom": None,
@@ -383,7 +395,13 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             "calendarEvidence": [],
             "departureEvidenceByDay": {day: [] for day in DAYS},
             "stopSchedules": {},
-            "source": {"region": region, "routeId": clean(trip.get("route_id"))},
+            "source": {
+                "region": region,
+                "routeId": clean(trip.get("route_id")),
+                "routeDescription": " ".join(clean(value) for value in (
+                    route.get("route_long_name"), route.get("route_desc")
+                ) if clean(value)) or None,
+            },
         }
         services[service_id] = record
     calendar = calendars.get(clean(trip.get("service_id")), {})

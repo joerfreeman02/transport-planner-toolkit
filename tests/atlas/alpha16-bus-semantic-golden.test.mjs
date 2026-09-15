@@ -56,6 +56,25 @@ for (const row of rows.filter(row => ['25C', '66', '242', '310', 'A1'].includes(
   assert.doesNotMatch(reportText(row), /calendar evidence|source record|diagnostic|prepared feed|GTFS|TNDS|BODS|internal/i, `${row.routeNumber}: internal evidence wording must not leak into the report headline`);
 }
 
+const legacyBodsRecord = {
+  id: 'legacy-bods-school-calendar',
+  routeNumber: 'CASE-LEGACY',
+  operator: 'Example Buses',
+  origin: 'Origin Town',
+  destination: 'Destination Town',
+  direction: 'outbound',
+  timetableSource: 'BODS',
+  qualifications: ['School-day only service'],
+  stopSchedules: { A: { monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420], saturday: [], sunday: [] } },
+  stopIds: ['A'],
+  frequencyBasisStopId: 'A',
+  routePatternStopIds: ['A', 'B'],
+  sourceRecordIds: ['legacy-bods-school-calendar']
+};
+const legacySummary = buildServiceSummaries([{ id: 'A', name: 'Origin Town' }], [legacyBodsRecord])[0];
+assert.equal(legacySummary.calendarProfileId, 'school-day', 'legacy BODS qualification blocks ordinary-calendar promotion');
+assert.equal(legacySummary.calendarEvidence[0].resolutionStatus, 'derived');
+
 const wordTable = buildBusWordTables({ ok: true, stops: fixture.stops, plannerServiceSummaries: rows, serviceSummaries: [] })[1];
 const wordRows = wordTable.rows.filter(row => Array.isArray(row));
 for (const row of rows) {

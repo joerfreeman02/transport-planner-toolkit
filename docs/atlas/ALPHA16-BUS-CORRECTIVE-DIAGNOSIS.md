@@ -1,6 +1,6 @@
 # ATLAS Alpha.16 Bus Corrective Diagnosis
 
-Date: 2026-09-14
+Date: 2026-09-15
 Branch: `codex/atlas-bus-alpha16-consultancy-acceptance`
 Baseline commit: `4e9485efa786fe6a663f6414d098f1fb2fc52a41`
 Baseline tree: `b4bfd05868c8de033a012168d98492b01be2b2d0`
@@ -23,6 +23,14 @@ node tests/atlas/bus-word-export.test.mjs
 The replay fixture is `tests/atlas/fixtures/alpha15-waltham-cross-production.json`, from workflow run `34783354786` and artifact `10327455051`. It contains 16 selected stops, 53 route-scoped prepared records and 48 service summaries after source-record consolidation. The runtime boundary records 3,776 BODS rows / 97 route-scoped BODS rows, 7,075 TNDS rows / 373 route-scoped TNDS rows, 156 composed records, and 22 successful TfL requests out of 22. The assessment coordinates are withheld from the public fixture.
 
 This is a replay of committed evidence, not a claim that the six-week-old source artifact is live current data. Current live timetable verification remains a separate acceptance activity.
+
+## 1A. Phase A current Product Owner live-acceptance reproduction
+
+The current Alpha.16 prepared runtime was replayed mechanically against the same 16 selected public StopPoint identities, using the current BODS manifest (`2026-09-04`, source hash retained in the evidence file), the current legacy TNDS manifest (`2026-09-04`) and live TfL timetable requests. The run loaded 71 route-scoped prepared records, composed 23 planner rows and made 22 live TfL requests; all 22 HTTP requests completed, with national evidence retained where TfL did not resolve an outside-London StopPoint request.
+
+The sanitized result is `docs/atlas/alpha16-waltham-cross-live-current.json`. It contains no assessment coordinate or private site metadata. This reproduction exposed the Product Owner failure in the current prepared snapshot: 13/13A/13B/13C were separate raw identities before family consolidation, and the legacy prepared records still presented generic or physical endpoint labels for 310 (Bus Station ↔ Bus Station), while 66 and 242 required endpoint-family interpretation. The failure is retained as evidence; it is not overwritten by the corrected semantic golden fixture.
+
+The corrective implementation now preserves route descriptions and ordered GTFS pattern termini at the static-index boundary. It resolves public family endpoints from those fields first, keeps selected-stop locality as orientation support only, rejects circular presentation where open evidence exists, and uses schedule overlap plus feed identity to join same-direction BODS/TNDS copies without bridging opposite generic-marker directions. A rebuild of the prepared bundle is required before the Technical Director live re-test so the new route-description/pattern fields are present in the runtime data.
 
 ## 2. Root causes found
 
@@ -65,6 +73,7 @@ Detailed replay output is available from `node tools/atlas-review/alpha15-waltha
 - `tools/atlas-bus-data/build_static_index.py` now preserves GTFS calendar qualifications, date exceptions, provenance and per-day departure evidence.
 - `src/atlas/domain/bus-service-assessment.mjs` carries calendar evidence and source-record provenance into normalized summaries, with a bounded compatibility path for historical BODS snapshots.
 - `src/atlas/domain/bus-planner-summary.mjs` adds generic public endpoint resolution, operator-family compatibility, coverage-aware representative-stop selection, semantic departure deduplication, concise principal locations and explicit review state.
+- `tests/atlas/alpha16-service-family.test.mjs` adds generic fabricated CASE A–F contracts for family consolidation, separate corridors, cross-provider deduplication, short workings, material branches and generic infrastructure wording.
 - `tests/atlas/alpha16-bus-semantic-golden.test.mjs` protects the route semantics, no-fabrication boundary, calendar safety, retained evidence and Browser/Word equivalence.
 - Alpha.15 and Alpha.13 regression tests were updated where their old assertions encoded the corrected failure mode, while their source-provenance and calendar-safety protections remain active.
 
@@ -78,4 +87,4 @@ The repository already retains Dependabot configuration and it remains the appro
 
 ## 7. Acceptance status
 
-The deterministic suite, Alpha.16 semantic golden test, DOCX parity checks, review-environment browser test, and all three browser gate scripts pass. The implementation commit is `fe293c5d63a5c0b64dba512c1ea7934431082833` (tree `d4878f9fdf4283aace1178d1fc3e5ae845921aa7`), and the requested branch is pushed to `origin`. Alpha.16 is ready for consultancy acceptance. It does not merge or alter `main`.
+The deterministic Alpha.13/Alpha.16 semantic and family-contract tests pass, including Browser/Word semantic parity in the Alpha.16 golden test. The current prepared snapshot still needs to be rebuilt with the corrected static-index fields before live acceptance can be retested. This branch remains unmerged and does not alter `main`.

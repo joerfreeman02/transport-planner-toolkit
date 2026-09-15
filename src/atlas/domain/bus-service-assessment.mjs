@@ -263,12 +263,28 @@ function preparedCalendarEvidence(record) {
   const days = [...new Set(Object.values(record?.stopSchedules ?? {}).flatMap(schedule =>
     DAY_ORDER.filter(day => Array.isArray(schedule?.[day]) && schedule[day].length)))];
   if (!days.length) return [];
+  const qualificationText = unique([
+    ...(record?.qualifications ?? []),
+    record?.serviceNote,
+    record?.source?.qualification,
+    record?.source?.calendarLabel
+  ]).join(' ');
+  const hasSchool = /school[- ]?days?|schooldays?/i.test(qualificationText);
+  const hasTerm = /term[- ]?time|term[- ]only/i.test(qualificationText);
+  const hasNonSchool = /non[- ]school|school holidays?/i.test(qualificationText);
+  const calendarProfileId = hasTerm && !hasSchool && !hasNonSchool
+    ? 'term-time'
+    : hasSchool && !hasNonSchool
+      ? 'school-day'
+      : hasNonSchool && !hasSchool
+        ? 'non-school-day'
+        : 'ordinary';
   return [createServiceCalendarEvidence({
     daysOfWeek: days,
     calendarResolved: true,
-    calendarProfileId: 'ordinary',
-    sourceCalendarLabel: 'prepared GTFS calendar day set',
-    qualificationMetadata: { source: 'prepared schedule active-day set' },
+    calendarProfileId,
+    sourceCalendarLabel: calendarProfileId === 'ordinary' ? 'prepared GTFS calendar day set' : 'prepared BODS qualification and active-day set',
+    qualificationMetadata: { source: calendarProfileId === 'ordinary' ? 'prepared schedule active-day set' : 'legacy BODS qualification' },
     provenance: { provider: 'BODS', authority: 'Bus Open Data prepared feed', sourceField: 'calendar.txt active days' },
     resolutionStatus: 'derived',
     warnings: []
@@ -279,7 +295,7 @@ function enrichPreparedCalendar(record) {
   if (record?.calendarEvidence?.length || record?.operatingCalendarEvidence?.length || record?.calendarProfileId) return record;
   const evidence = preparedCalendarEvidence(record);
   if (!evidence.length) return record;
-  return { ...record, calendarProfileId: 'ordinary', calendarEvidence: evidence };
+  return { ...record, calendarProfileId: text(evidence[0]?.calendarProfileId) || 'ordinary', calendarEvidence: evidence };
 }
 
 function materialQualification(note) {

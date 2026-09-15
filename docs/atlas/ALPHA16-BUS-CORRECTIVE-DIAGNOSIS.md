@@ -32,6 +32,27 @@ The sanitized result is `docs/atlas/alpha16-waltham-cross-live-current.json`. It
 
 The corrective implementation now preserves route descriptions and ordered GTFS pattern termini at the static-index boundary. It resolves public family endpoints from those fields first, keeps selected-stop locality as orientation support only, rejects circular presentation where open evidence exists, and uses schedule overlap plus feed identity to join same-direction BODS/TNDS copies without bridging opposite generic-marker directions. A rebuild of the prepared bundle is required before the Technical Director live re-test so the new route-description/pattern fields are present in the runtime data.
 
+## 1B. Phase B isolated rebuilt-candidate gate
+
+No TNDS credentials were present in the runner, so a complete authoritative refresh was not possible. The permitted fallback was used: the 4 September 2026 authoritative NaPTAN/BODS acquisition was rebuilt with the corrected Alpha.16 static-index builder, while the already-validated TNDS bundle was copied unchanged. The candidate is explicitly consultancy acceptance evidence, not a complete production refresh. NaPTAN source hash: `e2f865542306359dcb6cc1c5288775979cdd3d55a76d21c98e5b6beb34e81f9a`. BODS aggregate hash: `1afc9b982913056d7c0c4c25fbd4a4580399e974c030528f0fa66a15c06bf35b`; all nine regional archive hashes are retained in the rebuilt manifest and candidate artifact.
+
+The safe isolated build completed with the following integrity comparison:
+
+| Metric | Before (`2026-09-04`) | Rebuilt candidate (`2026-09-15`) |
+|---|---:|---:|
+| NaPTAN stops | 375,514 | 375,514 |
+| BODS regions | 9 | 9 |
+| BODS prepared services | 39,702 | 39,550 |
+| NaPTAN stop shards | 664 | 664 |
+| BODS service-shard files | 706 | 705 |
+| TNDS regions/services | legacy `SE` / 1 | legacy `SE` / 1 |
+
+The 152-service (0.38%) BODS difference is attributable to the changed representative week (`2026-09-07`–`2026-09-13` versus `2026-09-18`–`2026-09-24`) against the same hashed source archives, not planner consolidation or deliberate record filtering. The builder retained ordered pattern stops, calendar evidence and departure provenance; the safe builder's staging validation passed. No authoritative source archive was deleted or rewritten. The full candidate validator did not pass: it correctly rejected the reused legacy TNDS manifest because it lacks the required eight-region, five-character stop-prefix shard structure. That limitation was not bypassed or fabricated.
+
+The compact sanitized after-artifact is `docs/atlas/alpha16-waltham-cross-rebuilt-candidate.json`; the full rebuilt candidate remains isolated under the ignored `tmp/` tree. The rebuilt records contain `routePatternStopIds`, ordered `routePatternStops` with names/localities, calendar evidence, per-day departure provenance and source route/operator IDs. The current GTFS routes supplied no non-empty route description for the selected examples, so the description fields are present but null where the source was null. The rebuilt 310 records specifically retain Hertford → Waltham Cross and Waltham Cross → Hertford ordered pattern evidence, despite raw GTFS endpoint names both being `Bus Station`.
+
+The candidate semantic replay produced 71 selected route records and 23 planner rows, but it is not accepted for PAT: 13 was presented as `Towards Epping` despite North Weald/The Talbot pattern evidence; 16/16C still produced a circular headline; 242 presented only `Towards Waltham Cross` with Potters Bar in a variant note; 491 presented `Towards Waltham Cross` rather than the required North Middlesex Hospital principal endpoint. The 22 retained live TfL requests all returned HTTP 400/unresolved for the selected request identities. These are reproducible acceptance failures, not grounds for adding new heuristics in this gate.
+
 ## 2. Root causes found
 
 ### Calendar qualification and parsing

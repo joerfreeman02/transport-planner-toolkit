@@ -434,7 +434,10 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
         "holidayOnly": False,
         "calendarProfileId": profile_id,
         "sourceCalendarLabel": clean(trip.get("service_id")) or None,
-        "dateExceptions": sorted(exceptions.get(clean(trip.get("service_id")), {}).keys()),
+        "dateExceptions": sorted(
+            value.isoformat() if isinstance(value, date) else str(value)
+            for value in exceptions.get(clean(trip.get("service_id")), {}).keys()
+        ),
         "qualificationMetadata": {"source": "GTFS calendar.txt", "exceptionCount": exception_count},
         "provenance": {"provider": "BODS", "authority": "Bus Open Data", "sourceField": "calendar.txt"},
         "resolutionStatus": "partial" if exception_count else "resolved",

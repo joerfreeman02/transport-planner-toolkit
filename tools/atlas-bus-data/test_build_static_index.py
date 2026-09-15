@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import unittest
+from datetime import date
 from pathlib import Path
 
 
@@ -27,6 +28,7 @@ class CircularIdentityTests(unittest.TestCase):
         first_id: str | None,
         last_id: str | None,
         include_intermediate: bool = False,
+        exceptions: dict | None = None,
     ) -> dict:
         first_gtfs = f"{route_id}-first"
         last_gtfs = f"{route_id}-last"
@@ -68,7 +70,7 @@ class CircularIdentityTests(unittest.TestCase):
             {route_id: {"route_short_name": route_id, "route_type": "3", "agency_id": "agency"}},
             gtfs_stops,
             {"weekday": {"start_date": "20260901", "end_date": "20260930"}},
-            {},
+            exceptions or {},
             naptan_stops,
             aliases,
             services,
@@ -127,6 +129,19 @@ class CircularIdentityTests(unittest.TestCase):
             {"name": "Bus Station", "locality": "Same locality"},
             {"name": "Bus Station", "locality": "Same locality"},
         ]))
+
+    def test_calendar_date_exceptions_are_serializable_iso_dates(self):
+        record = self.build_record(
+            route_id="calendar-exception",
+            first_name="First",
+            last_name="Last",
+            first_locality="First locality",
+            last_locality="Last locality",
+            first_id="FIRST-EXCEPTION",
+            last_id="LAST-EXCEPTION",
+            exceptions={"weekday": {date(2026, 9, 15): 2}},
+        )
+        self.assertEqual(record["calendarEvidence"][0]["dateExceptions"], ["2026-09-15"])
 
 
 if __name__ == "__main__":

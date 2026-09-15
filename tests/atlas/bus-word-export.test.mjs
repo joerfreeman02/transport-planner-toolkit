@@ -50,6 +50,7 @@ const plannerWord = buildBusWordTables({
   }]
 });
 const plannerWordNotes = plannerWord[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
+assert.deepEqual(plannerWord[1].widths, [8, 11, 12, 15, 20, 17, 17]);
 assert.equal(plannerWord[1].beforeTableNotes[0], PLANNER_WORD_METHODOLOGY_NOTE);
 assert.equal(plannerWordNotes.includes('Served at'), false);
 console.log('PASS Word export respects planner-selected stop and service rows.');

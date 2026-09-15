@@ -88,6 +88,21 @@ const multiLoopRows = buildPlannerBusServiceSummaries([
 ], stops);
 assert.ok(multiLoopRows.every(row => !row.circular && !row.directionPatternText.startsWith('Circular —')), 'multiple closed variants with open evidence remain linear in the planner');
 
+const orderedEndpointStops = (service, localities, closedEndpointIds = false) => ({
+  ...service,
+  routePatternStopIds: localities.map((_, index) => closedEndpointIds && index === localities.length - 1 ? `${service.id}-pattern-0` : `${service.id}-pattern-${index}`),
+  routePatternStops: localities.map((locality, index) => ({ id: `${service.id}-pattern-${index}`, name: 'Bus Station', locality }))
+});
+const actual310StructureRows = buildPlannerBusServiceSummaries([
+  orderedEndpointStops(record({ routeNumber: '310', id: '310-loop-fragment', origin: 'Bus Station', destination: 'Bus Station', direction: 'Waltham Cross Bus Station', directionFamily: 'gtfs:0', circular: true, principalLocations: ['Waltham Cross', 'Theobalds Grove', 'Waltham Cross'] }), ['Waltham Cross', 'Theobalds Grove', 'Waltham Cross'], true),
+  orderedEndpointStops(record({ routeNumber: '310', id: '310-full-outbound', origin: 'Bus Station', destination: 'Bus Station', direction: 'Hertford Bus Station', directionFamily: 'gtfs:0', principalLocations: ['Waltham Cross', 'Ware', 'Hertford'] }), ['Waltham Cross', 'Ware', 'Hertford']),
+  orderedEndpointStops(record({ routeNumber: '310', id: '310-full-inbound', origin: 'Bus Station', destination: 'Bus Station', direction: 'Waltham Cross Bus Station', directionFamily: 'gtfs:1', principalLocations: ['Hertford', 'Ware', 'Waltham Cross'] }), ['Hertford', 'Ware', 'Waltham Cross']),
+  orderedEndpointStops(record({ routeNumber: '310', id: '310-ware-short', origin: 'Bus Station', destination: 'Ware', direction: 'Ware', directionFamily: 'gtfs:0', principalLocations: ['Waltham Cross', 'Ware'] }), ['Waltham Cross', 'Ware'])
+], stops);
+assert.equal(actual310StructureRows.some(row => row.circular || row.directionPatternText.startsWith('Circular —')), false, `ordered linear family evidence overrides a generic closed local fragment: ${JSON.stringify(actual310StructureRows.map(row => ({ origin: row.origin, destination: row.destination, direction: row.directionPatternText, circular: row.circular, group: row.groupIdentity })))}`);
+assert.deepEqual(new Set(actual310StructureRows.map(row => row.directionPatternText)), new Set(['Towards Hertford', 'Towards Waltham Cross']));
+assert.match(actual310StructureRows.map(row => row.routeGroupNote ?? '').join(' '), /Ware/, 'shorter Ware evidence remains subordinate to the principal corridor');
+
 const widerFamilyRows = buildPlannerBusServiceSummaries([
   record({ routeNumber: '16', id: '16-loop', origin: 'Bus Station', destination: 'Bus Station', direction: 'Waltham Cross Bus Station', directionFamily: 'gtfs:0', circular: true, pattern: ['ORIGIN', 'A', 'ORIGIN'], principalLocations: ['Waltham Cross', 'Waltham Abbey', 'Waltham Cross'] }),
   record({ routeNumber: '16C', id: '16c-loop', origin: 'Bus Station', destination: 'Bus Station', direction: 'Waltham Cross Bus Station', directionFamily: 'gtfs:0', circular: true, pattern: ['ORIGIN', 'A', 'B', 'C', 'ORIGIN'], principalLocations: ['Waltham Cross', 'Waltham Abbey', 'Loughton', 'Debden', 'Waltham Cross'] }),
@@ -121,7 +136,7 @@ assert.match(PLANNER_METHODOLOGY_NOTE, /does not represent the full route stop l
 assert.match(PLANNER_METHODOLOGY_NOTE, /timetable basis/i);
 assert.ok(PLANNER_METHODOLOGY_NOTE.startsWith(PLANNER_SERVED_AT_CORE_NOTE));
 const wordServiceTable = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: familyRows, serviceSummaries: [], reviewItems: [{ route: '13', source: 'test', message: 'internal review detail' }] })[1];
-assert.deepEqual(wordServiceTable.widths, [6, 11, 13, 16, 20, 17, 17]);
+assert.deepEqual(wordServiceTable.widths, [8, 11, 12, 15, 20, 17, 17]);
 assert.deepEqual(wordServiceTable.beforeTableNotes, [PLANNER_WORD_METHODOLOGY_NOTE]);
 assert.equal(wordServiceTable.rows.some(row => row?.kind === 'summary' && /internal review detail|Evidence items to review/.test(row.text)), false, 'Word export keeps review diagnostics out of Table 3.3');
 assert.equal(wordServiceTable.rows.some(row => row?.kind === 'summary' && /Served at/.test(row.text)), false, 'Word note is outside Table 3.3 rows');

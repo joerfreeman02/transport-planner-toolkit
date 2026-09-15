@@ -707,10 +707,14 @@ function routeFamilyComponents(services) {
 function closedPhysicalShape(service) {
   const pattern = explicitPattern(service);
   const names = orderedPatternNames(service).map(normal).filter(Boolean);
+  const patternStops = Array.isArray(service?.routePatternStops) ? service.routePatternStops : [];
+  const firstLocality = cleanPublicEndpoint(patternStops[0]?.locality || patternStops[0]?.localityQualifier || patternStops[0]?.parentLocality);
+  const lastLocality = cleanPublicEndpoint(patternStops.at(-1)?.locality || patternStops.at(-1)?.localityQualifier || patternStops.at(-1)?.parentLocality);
+  const hasDistinctOrderedLocalities = firstLocality && lastLocality && normal(firstLocality) !== normal(lastLocality);
   const endpoints = endpointPair(service);
-  return (pattern.length > 1 && pattern[0] === pattern.at(-1))
-    || (names.length > 1 && names[0] === names.at(-1))
-    || Boolean(endpoints.origin && endpoints.destination && endpoints.origin === endpoints.destination);
+  return (pattern.length > 1 && pattern[0] === pattern.at(-1) && !hasDistinctOrderedLocalities)
+    || (names.length > 1 && names[0] === names.at(-1) && !hasDistinctOrderedLocalities)
+    || Boolean(endpoints.origin && endpoints.destination && endpoints.origin === endpoints.destination && !hasDistinctOrderedLocalities);
 }
 
 function hasTwoWayDirectionEvidence(services) {
@@ -719,12 +723,13 @@ function hasTwoWayDirectionEvidence(services) {
 }
 
 function resolveCircularPresentation(component, routeFamilyServices = component) {
+  const familyServices = routeFamilyServices ?? component;
   const relevantServices = (routeFamilyServices ?? []).filter(service => component.includes(service)
     || component.some(member => operatorFamilyCompatible(member, service)
       && sameServiceLineage(member, service)
       && patternCorridorRelationship(member, service)));
   const hasClosedCircularEvidence = component.some(service => Boolean(service?.circular) && closedPhysicalShape(service));
-  const closedFamilyCount = (routeFamilyServices ?? []).filter(service => Boolean(service?.circular) && closedPhysicalShape(service)).length;
+  const closedFamilyCount = familyServices.filter(service => Boolean(service?.circular) && closedPhysicalShape(service)).length;
   const openServices = relevantServices.filter(service => service?.circular === false && !closedPhysicalShape(service));
   const hasOpenPatternPair = openServices.some(service => patternEndpointValues(service).length === 2);
   const hasOpenDirectedEvidence = openServices.filter(service => directionEndpointCandidate(service)
@@ -1024,10 +1029,11 @@ const STOP_DESCRIPTOR = /\b(?:station|railway|road|lane|street|close|roundabout|
 const STREET_ENDPOINT_DESCRIPTOR = /\b(?:road|lane|street|close|roundabout|rdbt|drive|avenue|crescent)\b/i;
 const PHYSICAL_ENDPOINT_DESCRIPTOR = /\b(?:road|lane|street|close|roundabout|rdbt|drive|avenue|crescent|school|college|hospital|garage|retail)\b/i;
 
-function cleanPublicEndpoint(value) {
-  const candidate = text(value).replace(/\s+/g, ' ').replace(/\s*\([^)]*\)\s*$/, '').trim();
-  if (!candidate || GENERIC_ENDPOINT_LABEL.test(candidate)) return '';
-  return candidate
+function cleanPublicEndpoint(value, preserveQualifier = false) {
+  const candidate = text(value).replace(/\s+/g, ' ').trim();
+  const withoutQualifier = preserveQualifier ? candidate : candidate.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  if (!withoutQualifier || GENERIC_ENDPOINT_LABEL.test(withoutQualifier)) return '';
+  return withoutQualifier
     .replace(/\s+Railway\s+Station$/i, '')
     .replace(/\s+Bus\s+Station$/i, '')
     .replace(/\s+Station$/i, '')
@@ -1044,7 +1050,8 @@ function patternEndpointValue(service, side) {
   if (stops.length < 2) return '';
   const stop = side === 'origin' ? stops[0] : stops.at(-1);
   const name = cleanPublicEndpoint(stop?.name || stop?.commonName);
-  const locality = cleanPublicEndpoint(stop?.locality || stop?.parentLocality);
+  const locality = cleanPublicEndpoint(stop?.locality || stop?.localityQualifier || stop?.parentLocality
+    || service?.[`${side}Locality`] || service?.[`${side}LocalityName`] || service?.[`${side}ParentLocality`]);
   const raw = cleanPublicEndpoint(side === 'origin' ? service?.origin : service?.destination);
   const headsign = directionEndpointCandidate(service);
   // A non-generic terminal name is promoted only when the current service
@@ -1053,7 +1060,8 @@ function patternEndpointValue(service, side) {
   // preserving authoritative terminal names such as a named hospital.
   if (name && !GENERIC_ENDPOINT_LABEL.test(name)
     && (headsign && normal(headsign) === normal(name)
-      || (raw && normal(raw) === normal(name) && /\b(?:airport|college|hospital|university)\b/i.test(name)))) return name;
+      || (raw && normal(raw) === normal(name)
+        && (!endpointLooksPhysical(name) || /\b(?:airport|college|hospital|university)\b/i.test(name))))) return name;
   if (locality) return locality;
   if (raw && !endpointLooksPhysical(raw)) return raw;
   return name && !GENERIC_ENDPOINT_LABEL.test(name) && !STREET_ENDPOINT_DESCRIPTOR.test(name) ? name : '';
@@ -1088,15 +1096,15 @@ function patternEndpointValues(service) {
 }
 
 function explicitPublicEndpointPair(service) {
-  const origin = cleanPublicEndpoint(service?.publicRouteOrigin || service?.routeOrigin || service?.source?.routeOrigin);
-  const destination = cleanPublicEndpoint(service?.publicRouteDestination || service?.routeDestination || service?.source?.routeDestination);
+  const origin = cleanPublicEndpoint(service?.publicRouteOrigin || service?.routeOrigin || service?.source?.routeOrigin, true);
+  const destination = cleanPublicEndpoint(service?.publicRouteDestination || service?.routeDestination || service?.source?.routeDestination, true);
   return origin && destination && normal(origin) !== normal(destination) ? [origin, destination] : [];
 }
 
 function directionEndpointCandidate(service) {
   const value = text(service?.direction || service?.stopDirection);
   if (!value || sourceDirectionMarker(value)) return '';
-  const candidate = cleanPublicEndpoint(value.replace(/^towards?\s+/i, '').split(/[,;|]/)[0]);
+  const candidate = cleanPublicEndpoint(value.replace(/^towards?\s+/i, '').split(/[,;|]/)[0], true);
   return candidate && !endpointLooksPhysical(candidate) ? candidate : '';
 }
 
@@ -1254,14 +1262,14 @@ function resolvePublicEndpoint(service, side, context) {
   const descriptions = context.endpointPair;
   const rawPublic = cleanPublicEndpoint(raw);
   const headsign = directionEndpointCandidate(service);
+  const patternValues = patternEndpointValues(service);
+  const patternEndpoint = side === 'origin' ? patternValues[0] : patternValues.at(-1);
   if (descriptions.length === 2) {
     const matches = value => descriptions.findIndex(item => normal(item) === normal(value));
     const rawIndex = matches(rawPublic);
     const headsignIndex = matches(headsign);
     if (rawIndex >= 0) return { value: descriptions[rawIndex], qualifier: '' };
     if (headsignIndex >= 0) return { value: descriptions[side === 'destination' ? headsignIndex : 1 - headsignIndex], qualifier: '' };
-    const patternValues = patternEndpointValues(service);
-    const patternEndpoint = side === 'origin' ? patternValues[0] : patternValues.at(-1);
     const patternIndex = matches(patternEndpoint);
     if (patternIndex >= 0
       && GENERIC_ENDPOINT_LABEL.test(text(service.origin))
@@ -1276,6 +1284,12 @@ function resolvePublicEndpoint(service, side, context) {
     }
     if (rawPublic && !endpointLooksPhysical(raw)) return { value: rawPublic, qualifier: '' };
     return { value: '', qualifier: '' };
+  }
+  if (patternEndpoint && (GENERIC_ENDPOINT_LABEL.test(raw) || endpointLooksPhysical(raw))) {
+    return { value: patternEndpoint, qualifier: '' };
+  }
+  if (stopLocality && (GENERIC_ENDPOINT_LABEL.test(raw) || endpointLooksPhysical(raw))) {
+    return { value: stopLocality, qualifier: '' };
   }
   if (rawPublic && endpointLooksPhysical(raw)) {
     const contextual = contextualLocalityForEndpoint(context.services ?? [service], rawPublic, context.selectedLocalities);
@@ -1450,7 +1464,7 @@ function directionPatternText(service) {
   const target = destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination)
     ? destination
     : direction && !sourceDirectionMarker(direction) ? direction : '';
-  if (!target || sourceDirectionMarker(target)) return 'Destination not resolved';
+  if (!target || sourceDirectionMarker(target) || GENERIC_ENDPOINT_LABEL.test(target)) return 'Destination not resolved';
   return locality && normal(locality) !== normal(target) ? `Towards ${target} (${locality})` : `Towards ${target}`;
 }
 
@@ -1535,8 +1549,20 @@ function variantNote(component, main) {
 function resolvedPlannerDestination(service) {
   const destination = text(service?.publicDestination || service?.destination);
   const direction = plannerDirection(service);
-  return Boolean(destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination) && !sourceDirectionMarker(destination))
-    || Boolean(direction && !sourceDirectionMarker(direction));
+  const rawDestination = text(service?.destination);
+  const hasNamedPatternEndpoint = [patternEndpointValue(service, 'origin'), patternEndpointValue(service, 'destination')]
+    .some(value => value && !GENERIC_ENDPOINT_LABEL.test(value) && !/^(?:origin|destination) not supplied$/i.test(value));
+  const unresolvedGeneric = Boolean(service?.reviewRequired && hasNamedPatternEndpoint && (
+    GENERIC_ENDPOINT_LABEL.test(destination)
+      || GENERIC_ENDPOINT_LABEL.test(rawDestination)
+      || GENERIC_ENDPOINT_LABEL.test(direction)
+  ));
+  if (/^(?:destination not supplied|destination not resolved)$/i.test(destination)
+    && !hasNamedPatternEndpoint
+    && (!direction || GENERIC_ENDPOINT_LABEL.test(direction) || sourceDirectionMarker(direction))) return false;
+  return Boolean(destination && !GENERIC_ENDPOINT_LABEL.test(destination) && !/^(?:destination not supplied|destination not resolved)$/i.test(destination) && !sourceDirectionMarker(destination))
+    || Boolean(direction && text(service?.destination) && !GENERIC_ENDPOINT_LABEL.test(direction) && !sourceDirectionMarker(direction))
+    || unresolvedGeneric;
 }
 
 export function plannerSourceWarning(service) {

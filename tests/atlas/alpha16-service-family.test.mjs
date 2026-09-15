@@ -63,6 +63,60 @@ assert.equal(genericInfrastructure.origin, 'Waltham Cross');
 assert.equal(genericInfrastructure.destination, 'Hertford');
 assert.equal(genericInfrastructure.circular, false, 'generic infrastructure wording does not manufacture a circular row');
 
+const genericEndpoint = buildPlannerBusServiceSummaries([record({
+  routeNumber: 'G-A', ids: 'town-a', origin: 'Site Town Bus Station', destination: 'Bus Station', direction: 'Bus Station',
+  routePatternStops: [
+    { id: 'A', name: 'Site Town Bus Station', locality: 'Site Town' },
+    { id: 'B', name: 'Bus Station', locality: 'Town A' }
+  ], routePatternStopIds: ['A', 'B']
+})], stops)[0];
+assert.equal(genericEndpoint.directionPatternText, 'Towards Town A', 'generic terminal infrastructure resolves from the terminal locality');
+
+const remoteGenericEndpoint = buildPlannerBusServiceSummaries([record({
+  routeNumber: 'G-B', ids: 'other-town', origin: 'Bus Station', destination: 'Bus Station', direction: 'Other Town Bus Station',
+  routePatternStops: [
+    { id: 'A', name: 'Bus Station', locality: 'Site Town' },
+    { id: 'B', name: 'Bus Station', locality: 'Other Town' }
+  ], routePatternStopIds: ['A', 'B']
+})], stops)[0];
+assert.equal(remoteGenericEndpoint.directionPatternText, 'Towards Other Town', 'a remote terminal locality is not replaced by the selected-site locality');
+
+const unresolvedGenericEndpoint = buildPlannerBusServiceSummaries([record({
+  routeNumber: 'G-C', ids: 'unresolved', origin: 'Bus Station', destination: 'Bus Station', direction: 'Bus Station',
+  routePatternStops: [{ id: 'A', name: 'Bus Station' }, { id: 'B', name: 'Bus Station' }], routePatternStopIds: ['A', 'B']
+})], stops);
+assert.equal(unresolvedGenericEndpoint.length, 0, 'generic terminal labels without safe locality evidence are not promoted to a planner row');
+
+const publicTerminus = buildPlannerBusServiceSummaries([record({
+  routeNumber: 'G-D', ids: 'public-terminus', origin: 'Town A', destination: 'High Street Bus Stand', direction: 'Town A (District Centre)',
+  routeOrigin: 'Town A', routeDestination: 'Town A (District Centre)',
+  routePatternStops: [{ id: 'A', name: 'Town A Bus Station', locality: 'Town A' }, { id: 'B', name: 'High Street Bus Stand', locality: 'Town A' }],
+  routePatternStopIds: ['A', 'B']
+})], stops)[0];
+assert.equal(publicTerminus.directionPatternText, 'Towards Town A (District Centre)', 'specific public terminus wording outranks the physical terminal stand');
+assert.match(publicTerminus.rawServiceSummaries.map(service => service.destination).join(' '), /High Street Bus Stand/, 'physical terminal wording remains in detailed source evidence');
+
+const namedPublicStops = [
+  { id: 'A', name: 'Bus Station', locality: 'Town A', distanceMetres: 100 },
+  { id: 'B', name: 'Trafalgar Square', locality: 'Charing Cross', distanceMetres: 100 },
+  { id: 'C', name: 'Bus Station', locality: 'Town A', distanceMetres: 110 },
+  { id: 'D', name: 'Trafalgar Square', locality: 'Charing Cross', distanceMetres: 110 }
+];
+const namedPublicFamily = buildPlannerBusServiceSummaries([
+  record({ routeNumber: 'G-E', ids: 'named-forward', origin: 'Bus Station', destination: 'Trafalgar Square', direction: 'Trafalgar Square', pattern: ['A', 'B'], routePatternStops: [
+    { id: 'A', name: 'Bus Station', locality: 'Town A' },
+    { id: 'B', name: 'Trafalgar Square', locality: 'Charing Cross' }
+  ] }),
+  record({ routeNumber: 'G-E', ids: 'named-reverse', origin: 'Trafalgar Square', destination: 'Bus Station', direction: 'Town A, Bus Station', pattern: ['D', 'C'], routePatternStops: [
+    { id: 'D', name: 'Trafalgar Square', locality: 'Charing Cross' },
+    { id: 'C', name: 'Bus Station', locality: 'Town A' }
+  ] })
+], namedPublicStops);
+assert.deepEqual(namedPublicFamily.map(row => `${row.origin} -> ${row.destination}`).sort(), [
+  'Town A -> Trafalgar Square',
+  'Trafalgar Square -> Town A'
+].sort(), 'specific public terminal names outrank associated localities in both directions');
+
 const controlledWording = buildControlledBusWording([{
   routeNumber: '310',
   principalLocations: ['Waltham Cross Railway Station', 'Railway Station', 'Waltham Cross', 'Town Centre']

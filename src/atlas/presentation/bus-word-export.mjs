@@ -63,7 +63,7 @@ export function buildBusWordTables(result) {
         ? ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']
         : ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period'],
       rows: serviceRows,
-      widths: hasPlannerSummary ? [6, 11, 13, 16, 20, 17, 17] : [7, 14, 22, 25, 17, 15],
+      widths: hasPlannerSummary ? [8, 11, 12, 15, 20, 17, 17] : [7, 14, 22, 25, 17, 15],
       beforeTableNotes: hasPlannerSummary ? [PLANNER_WORD_METHODOLOGY_NOTE] : []
     }
   ];

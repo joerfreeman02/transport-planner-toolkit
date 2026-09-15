@@ -1,6 +1,7 @@
 import { docxBlob } from '../../assets/js/word-export.js';
 import assert from 'node:assert/strict';
 import { buildBusWordTables, busWordFilename } from '../../src/atlas/presentation/bus-word-export.mjs';
+import { PLANNER_METHODOLOGY_NOTE } from '../../src/atlas/domain/bus-planner-summary.mjs';
 
 const result = {
   ok: true,
@@ -49,8 +50,8 @@ const plannerWord = buildBusWordTables({
   }]
 });
 const plannerWordNotes = plannerWord[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
-assert.match(plannerWordNotes, /Additional source evidence remains available in the ATLAS assessment workspace/);
-assert.doesNotMatch(plannerWordNotes, /Show detailed evidence/);
+assert.match(plannerWordNotes, /Served at.*selected search radius/);
+assert.equal(plannerWordNotes.includes(PLANNER_METHODOLOGY_NOTE), true);
 console.log('PASS Word export respects planner-selected stop and service rows.');
 console.log('PASS Alpha.5 Plaistow Word export contract.');
 

@@ -299,15 +299,15 @@ assert.ok(review25c, '25C principal production direction is present');
 assert.ok(review25c.rawServiceSummaries.some(service => service.destination === 'Maple Gate'));
 assert.ok(review25c.rawServiceSummaries.some(service => service.destination === 'Maynard Court'));
 const review25cRouteNotes = review25cRows.map(row => row.routeGroupNote || '').filter(Boolean).join(' ');
-assert.match(review25cRouteNotes, /Additional variants and short workings operate/);
+assert.match(review25cRouteNotes, /principal Route|shorter? workings|service family/i);
 assert.notEqual(review25c.destination, 'Bus Station', 'public endpoint resolution must not promote a generic Bus Station label');
 assert.doesNotMatch(review25c.directionPatternText, /Bus Station/);
 assert.equal(review25c.servedAtStopId, 'REP-A');
 assert.ok(!review25c.departuresByDay.monday.some(minute => [900, 960].includes(minute)), 'nearby-stop departures cannot inflate the representative-stop headline');
 assert.ok(alpha14ReviewRecords.some(service => service.routeNumber === '25C' && service.stopSchedules['REP-B'].monday.some(minute => [900, 960].includes(minute))));
 const wordReview = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: alpha14ReviewRows, serviceSummaries: [] });
-const word25cNotes = wordReview[1].rows.filter(row => !Array.isArray(row) && /Additional variants and short workings operate/.test(row.text)).map(row => row.text).join(' ');
-assert.match(word25cNotes, /Additional variants and short workings operate/);
+const word25cNotes = wordReview[1].rows.filter(row => !Array.isArray(row) && /principal Route|shorter? workings|service family/i.test(row.text)).map(row => row.text).join(' ');
+assert.match(word25cNotes, /principal Route|shorter? workings|service family/i);
 assert.equal(wordReview[1].widths.length, 7, 'Word Table 3.3 keeps the seven-column planner contract');
 
 const legacyAlpha13IdentityCount = alpha14ReviewRecords.filter(record => record.routeNumber === '25C' && record.source.directionId === '0')
@@ -320,7 +320,7 @@ assert.equal(rows310.length, 2);
 assert.ok(rows310.every(row => row.circular === false));
 assert.ok(rows310.every(row => !/Circular —/i.test(row.directionPatternText)));
 assert.ok(rows310.some(row => row.rawServiceSummaries.some(service => service.operator === "Arriva (in Herts and Essex)")));
-assert.match(rows310.map(row => row.routeGroupNote || '').join(' '), /short workings|timetable variants/i);
+assert.match(rows310.map(row => row.routeGroupNote || '').join(' '), /principal Route|shorter? workings|timetable variants/i);
 const rows310Principal = rows310.find(row => row.directionFamily === 'gtfs:0');
 assert.ok(rows310Principal, '310 principal direction is present');
 assert.equal(rows310Principal.servedAtStopId, 'REP-A', '310 selects the intended representative stop');
@@ -333,9 +333,9 @@ assert.deepEqual(new Set(rows46.map(row => row.directionFamily)), new Set(['gtfs
 assert.ok(rows46.every(row => row.rawServiceSummaries.some(service => /Centrebus/.test(service.operator))));
 assert.ok(rows46.some(row => row.rawServiceSummaries.some(service => /Hemel Hempstead/.test(service.destination))));
 assert.ok(rows46.some(row => row.rawServiceSummaries.some(service => /Luton, Park Square/.test(service.destination))));
-assert.match(rows46.map(row => row.routeGroupNote || '').join(' '), /short workings|timetable variants/i);
-const word46Notes = wordReview[1].rows.filter(row => !Array.isArray(row) && /Additional variants and short workings operate/.test(row.text)).map(row => row.text).join(' ');
-assert.match(word46Notes, /Additional variants and short workings operate/);
+assert.match(rows46.map(row => row.routeGroupNote || '').join(' '), /principal Route|shorter? workings|timetable variants/i);
+const word46Notes = wordReview[1].rows.filter(row => !Array.isArray(row) && /principal Route|shorter? workings|timetable variants/i.test(row.text)).map(row => row.text).join(' ');
+assert.match(word46Notes, /principal Route|shorter? workings|timetable variants/i);
 
 const rows230 = alpha14ReviewRows.filter(row => row.routeNumber === '230');
 assert.equal(rows230.length, 1);

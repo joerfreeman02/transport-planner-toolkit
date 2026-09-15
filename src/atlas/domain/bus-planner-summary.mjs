@@ -9,7 +9,7 @@ import {
 } from './bus-service-assessment.mjs';
 import { calendarProfileLabel, deriveCalendarProfileId } from './service-calendar.mjs';
 
-export const PLANNER_METHODOLOGY_NOTE = 'Frequency and operating periods are derived from scheduled departures at the closest timetable-evidenced served stop (the representative stop), marked “(timetable basis)”. Other served stops remain listed for completeness. Additional source evidence remains available in the ATLAS assessment workspace.';
+export const PLANNER_METHODOLOGY_NOTE = "The 'Served at' column lists only route stops within the selected search radius; it is not the complete list of stops served along the route. Typical frequency and operating period are derived from the closest of these stops with timetable evidence, identified as the '(timetable basis)' stop. Other served stops remain listed for completeness; detailed source evidence is available under Show detailed evidence.";
 
 const UNKNOWN_CALENDAR_PROFILE = 'unresolved';
 const CALENDAR_PROFILE_ORDER = Object.freeze(['ordinary', 'school-day', 'term-time', 'non-school-day', 'holiday', 'other-resolved', UNKNOWN_CALENDAR_PROFILE]);
@@ -722,11 +722,12 @@ function resolveCircularPresentation(component, routeFamilyServices = component)
       && sameServiceLineage(member, service)
       && patternCorridorRelationship(member, service)));
   const hasClosedCircularEvidence = component.some(service => Boolean(service?.circular) && closedPhysicalShape(service));
+  const closedFamilyCount = relevantServices.filter(service => Boolean(service?.circular) && closedPhysicalShape(service)).length;
   const openServices = relevantServices.filter(service => service?.circular === false && !closedPhysicalShape(service));
   const hasOpenPatternPair = openServices.some(service => patternEndpointValues(service).length === 2);
   const hasOpenDirectedEvidence = openServices.filter(service => directionEndpointCandidate(service)
     && [service?.origin, service?.destination].some(value => cleanPublicEndpoint(value))).length >= 2;
-  const hasSameLoopFamilyShortWorking = openServices.some(open => component.some(closed =>
+  const hasSameLoopFamilyShortWorking = closedFamilyCount === 1 && openServices.some(open => component.some(closed =>
     Boolean(closed?.circular)
       && sameServiceLineage(closed, open)
       && endpointPair(closed).origin
@@ -1137,10 +1138,14 @@ function familyPublicEndpointPair(services, selectedLocalities = []) {
       const contextualPair = pair.map(value => contextualLocalityForEndpoint(services, value, selectedLocalities));
       const key = contextualPair.map(normal).sort().join('|');
       const principalSupport = principalRoute.filter(service => endpointEvidencePairs([service])
-        .some(candidate => samePair(candidate, contextualPair))).length;
-      const current = counts.get(key) ?? { pair: contextualPair, count: 0, support: 0, principalSupport: 0 };
+        .some(candidate => samePair(candidate.map(value => contextualLocalityForEndpoint(services, value, selectedLocalities)), contextualPair))).length;
+      const patternExtent = services
+        .filter(service => endpointEvidencePairs([service]).some(candidate => samePair(candidate.map(value => contextualLocalityForEndpoint(services, value, selectedLocalities)), contextualPair)))
+        .reduce((maximum, service) => Math.max(maximum, Number(service.routePatternExtent) || explicitPattern(service).length), 0);
+      const current = counts.get(key) ?? { pair: contextualPair, count: 0, support: 0, principalSupport: 0, patternExtent: 0 };
       current.count += 1;
       current.principalSupport += principalSupport;
+      current.patternExtent = Math.max(current.patternExtent, patternExtent);
       current.support += services.filter(service => {
         const rawValues = [service?.origin, service?.destination, directionEndpointCandidate(service)]
           .map(cleanPublicEndpoint).filter(value => value && !endpointLooksPhysical(value)).map(normal);
@@ -1149,6 +1154,7 @@ function familyPublicEndpointPair(services, selectedLocalities = []) {
       counts.set(key, current);
     }
     return [...counts.values()].sort((left, right) => right.principalSupport - left.principalSupport
+      || right.patternExtent - left.patternExtent
       || right.count - left.count
       || right.support - left.support
       || left.pair.join('|').localeCompare(right.pair.join('|')))[0].pair;
@@ -1799,6 +1805,63 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   return Object.freeze(row);
 }
 
+function routeNumbersForRows(rows) {
+  return unique(rows.flatMap(row => row.rawRouteNumbers ?? []))
+    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+}
+
+function routeNumberForRoot(rows) {
+  const root = normal(rows[0]?.routeGroupKey);
+  const routeNumbers = routeNumbersForRows(rows);
+  return routeNumbers.find(route => normal(route).replace(/\s+/g, '') === root)
+    || (routeNumbers.length === 1 ? routeNumbers[0] : null);
+}
+
+function principalCorridorForRows(rows, principalRoute) {
+  const principalRows = rows.filter(row => (row.rawRouteNumbers ?? []).some(route => normal(route).replace(/\s+/g, '') === normal(principalRoute)));
+  const candidates = new Map();
+  for (const row of principalRows) {
+    const origin = text(row.origin), destination = text(row.destination);
+    if (!origin || !destination || normal(origin) === normal(destination)) continue;
+    const key = `${normal(origin)}|${normal(destination)}`;
+    const current = candidates.get(key) ?? { origin, destination, count: 0, extent: 0, activity: 0 };
+    current.count += 1;
+    current.extent = Math.max(current.extent, Number(row.routePatternExtent) || 0);
+    current.activity = Math.max(current.activity, Number(row.recordActivity) || 0);
+    candidates.set(key, current);
+  }
+  const pairs = [...candidates.values()];
+  const hasTwoWayEvidence = pairs.some(pair => pairs.some(other =>
+    normal(pair.origin) === normal(other.destination) && normal(pair.destination) === normal(other.origin)));
+  if (!pairs.length || (rows.length > 1 && !hasTwoWayEvidence)) return null;
+  return pairs.sort((left, right) => right.extent - left.extent || right.activity - left.activity
+    || right.count - left.count || `${left.origin}|${left.destination}`.localeCompare(`${right.origin}|${right.destination}`))[0];
+}
+
+function plannerFamilyNote(rows) {
+  const routeNumbers = routeNumbersForRows(rows);
+  if (!routeNumbers.length) return null;
+  const principalRoute = routeNumberForRoot(rows);
+  const corridor = principalRoute ? principalCorridorForRows(rows, principalRoute) : null;
+  const sentences = [];
+  if (principalRoute && corridor) {
+    sentences.push(`The principal Route ${principalRoute} service operates between ${corridor.origin} and ${corridor.destination}.`);
+    const included = routeNumbers.filter(route => normal(route).replace(/\s+/g, '') !== normal(principalRoute));
+    if (included.length) sentences.push(`The service family also includes ${included.length === 1 ? 'Route' : 'Routes'} ${included.join(included.length === 2 ? ' and ' : ', ').replace(/, ([^,]*)$/, ', and $1')}.`);
+  } else if (routeNumbers.length > 1) {
+    sentences.push(`The service family includes Routes ${routeNumbers.slice(0, -1).join(', ')} and ${routeNumbers.at(-1)}.`);
+  } else if (!principalRoute && rows.some(row => row.routeVariantNote || row.variantCount > 1)) {
+    sentences.push(`The service family includes Route ${routeNumbers[0]}.`);
+  }
+  const principalEndpoints = new Set(rows.flatMap(row => [row.origin, row.destination]).map(normal).filter(Boolean));
+  const variantRows = rows.filter(row => row.routeVariantNote);
+  const alternatives = destinationNames(variantRows.flatMap(row => row.alternateDestinationNames ?? [])
+    .filter(destination => !principalEndpoints.has(normal(destination))));
+  if (alternatives.length === 1) sentences.push(`Some journeys operate shorter workings to ${alternatives[0]}.`);
+  else if (alternatives.length > 1) sentences.push(`Additional journeys and shorter workings serve ${alternatives.slice(0, -1).join(', ')} and ${alternatives.at(-1)}.`);
+  return sentences.join(' ') || null;
+}
+
 function attachRouteNotes(rows) {
   const groups = new Map();
   rows.forEach((row, index) => { if (!groups.has(row.routeGroupKey)) groups.set(row.routeGroupKey, []); groups.get(row.routeGroupKey).push({ row, index }); });
@@ -1810,7 +1873,9 @@ function attachRouteNotes(rows) {
     const shared = [...sharedTaxonomy].filter(note => rowNotes.length > 1 && rowNotes.every(notes => notes.includes(note)));
     const hasVariant = group.some(({ row }) => row.routeVariantNote);
     const routeNotes = [...shared];
-    if (hasVariant) {
+    const plannerNote = plannerFamilyNote(group.map(({ row }) => row));
+    if (plannerNote) routeNotes.push(plannerNote);
+    else if (hasVariant) {
       const headlineDestinations = new Set(group.map(({ row }) => normal(plannerDestination(row))));
       const alternatives = destinationNames(group.flatMap(({ row }) => row.alternateDestinationNames ?? [])
         .filter(destination => !headlineDestinations.has(normal(destination))));

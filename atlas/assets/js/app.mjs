@@ -13,7 +13,7 @@ import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-
 import { createBusAssessment, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/atlas/application/bus-assessment.mjs';
 import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
 import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-task-status.mjs';
-import { buildPlannerBusServiceSummaries } from '../../../src/atlas/domain/bus-planner-summary.mjs';
+import { buildPlannerBusServiceSummaries, PLANNER_METHODOLOGY_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
@@ -553,6 +553,7 @@ function renderAssessment(result) {
     }
   }
   renderBusStopMarkers(result.stops);
+  $('serviceSummaryMethodology').textContent = PLANNER_METHODOLOGY_NOTE;
   $('assessmentWording').textContent = buildControlledBusWording(presentedServices.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => selectedStopIds.has(String(id)))), { nearestGroupName: result.nearestGroup?.name ?? null });
   const stopProvenance = result.provenance.stops ?? {};
   const timetableProvenance = result.provenance.timetables ?? {};

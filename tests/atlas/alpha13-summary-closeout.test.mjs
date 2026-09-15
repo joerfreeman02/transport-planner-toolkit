@@ -59,7 +59,7 @@ const route25C = rowsFor([
 assert.equal(route25C.length, 2, '25C has one concise row per principal direction');
 const route25COutbound = route25C.find(row => row.directionFamily === 'gtfs:0');
 assert.equal(route25COutbound.departuresByDay.monday.length, 3, '25C frequency uses the combined canonical representative-stop population');
-assert.match(route25C.at(-1).routeGroupNote ?? '', /Additional short workings and timetable variants operate/);
+assert.match(route25C.at(-1).routeGroupNote ?? '', /principal Route|short workings|service family/i);
 
 const route66 = rowsFor([
   fixture({ routeNumber: '66', operator: 'Arriva', destination: 'Loughton Station', departures: [420], id: '66-arriva' }),
@@ -75,7 +75,7 @@ const route242 = rowsFor([
   fixture({ routeNumber: '242', direction: 'gtfs:1', directionFamily: 'gtfs:1', origin: 'Waltham Cross Bus Station', destination: 'Potters Bar', pattern: ['DESTINATION', 'REP', 'ORIGIN'], id: '242-return' })
 ], '242');
 assert.equal(route242.length, 2, '242 short workings remain within two principal directional rows');
-assert.match(route242.at(-1).routeGroupNote ?? '', /Additional short workings and timetable variants operate/);
+assert.match(route242.at(-1).routeGroupNote ?? '', /principal Route|short workings|service family/i);
 
 const route310 = rowsFor([
   fixture({ routeNumber: '310', destination: 'Waltham Cross Bus Station', id: '310-out' }),

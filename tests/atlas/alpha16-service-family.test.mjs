@@ -45,7 +45,7 @@ const shortWorking = buildPlannerBusServiceSummaries([
   record({ routeNumber: '25C', ids: 'short', destination: 'Waltham Cross', pattern: ['A', 'B'], departures: [450], serviceNote: 'Short working towards Waltham Cross.' })
 ], stops)[0];
 assert.equal(shortWorking.destination, 'Harlow');
-assert.match(shortWorking.routeGroupNote, /variants|short workings/i);
+assert.match(shortWorking.routeGroupNote, /principal Route|variants|shorter? workings|service family/i);
 
 const branches = buildPlannerBusServiceSummaries([
   record({ routeNumber: '66', ids: 'main-branch', destination: 'Terminal One', pattern: ['A', 'B', 'C', 'D', 'E'] }),

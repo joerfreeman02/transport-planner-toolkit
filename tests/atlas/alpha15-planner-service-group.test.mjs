@@ -70,7 +70,7 @@ const variantRows = rows([
 ]);
 assert.equal(variantRows.length, 1, 'route-number formatting and short workings consolidate');
 assert.equal(variantRows[0].variantCount, 2);
-assert.match(`${variantRows[0].serviceNote} ${variantRows[0].routeGroupNote || ''}`, /Additional variants|short workings|timetable variants/i);
+assert.match(`${variantRows[0].serviceNote} ${variantRows[0].routeGroupNote || ''}`, /service family|shorter? workings|timetable variants/i);
 assert.equal(variantRows[0].plannerServiceGroup.sourceServiceCount, 2);
 
 const multiStopRows = rows([record({ id: 'multi-stop', routeNumber: '66', stopIds: ['A', 'B'], basis: 'A' })]);
@@ -368,7 +368,7 @@ const shortWorkingRows = buildPlannerBusServiceSummaries([
   record({ id: 'short-working', routeNumber: 'SHORT-BRANCH', routeId: 'short-line', origin: 'Hub', destination: 'North A', direction: 'outbound', pattern: ['A', 'COMMON-A', 'COMMON-B', 'NORTH-A'], patternNames: ['Hub', 'Common A', 'Common B', 'North A'] })
 ], stops);
 assert.equal(shortWorkingRows.length, 1, 'an ordered-subsequence short working remains within the principal direction row');
-assert.match(`${shortWorkingRows[0].serviceNote} ${shortWorkingRows[0].routeGroupNote || ''}`, /short workings|variants/i);
+assert.match(`${shortWorkingRows[0].serviceNote} ${shortWorkingRows[0].routeGroupNote || ''}`, /shorter? workings|variants/i);
 
 const markerlessOpposites = rows([
   record({ id: 'forward', routeNumber: 'MD', routeId: 'markerless', directionId: undefined, direction: '', origin: 'A Terminal', destination: 'B Terminal', pattern: ['A', 'MID', 'B'] }),

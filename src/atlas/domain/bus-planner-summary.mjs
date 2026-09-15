@@ -461,6 +461,17 @@ function connectedServiceComponents(services) {
           .some(index => hardCorridorSeparation(services[index], services[candidate]));
         const queuedContinuation = queue.some(index => provenPatternRelationship(services[index], services[candidate]));
         if (reservedConflict && !queuedContinuation) continue;
+        const candidateOrigin = plannerOrigin(services[candidate]);
+        const candidateDestination = plannerDestination(services[candidate]);
+        const reversePublicConflict = [...componentIndexes, ...queue].some(index => {
+          const memberOrigin = plannerOrigin(services[index]);
+          const memberDestination = plannerDestination(services[index]);
+          return candidateOrigin && candidateDestination && memberOrigin && memberDestination
+            && normal(candidateOrigin) === normal(memberDestination)
+            && normal(candidateDestination) === normal(memberOrigin)
+            && normal(candidateOrigin) !== normal(memberOrigin);
+        });
+        if (reversePublicConflict) continue;
         const currentChoice = ambiguousMarkerChoice.get(current);
         const candidateChoice = ambiguousMarkerChoice.get(candidate);
         const currentMarker = explicitDirectionMarker(services[candidate]);
@@ -488,7 +499,85 @@ function compatibleDirection(first, second, aliases = []) {
   // identity.  The same route-direction can therefore be represented by
   // more than one current operator or prepared feed.
   if (hardCorridorSeparation(first, second)) return false;
-  if (reverseEndpointRelationship(first, second)) return false;
+  const firstPublic = { origin: plannerOrigin(first), destination: plannerDestination(first) };
+  const secondPublic = { origin: plannerOrigin(second), destination: plannerDestination(second) };
+  const firstMarker = explicitDirectionMarker(first), secondMarker = explicitDirectionMarker(second);
+  const markerConflict = firstMarker && secondMarker && firstMarker !== secondMarker;
+  const samePublicPair = firstPublic.origin && firstPublic.destination && secondPublic.origin && secondPublic.destination
+    && normal(firstPublic.origin) === normal(secondPublic.origin)
+    && normal(firstPublic.destination) === normal(secondPublic.destination);
+  // Some providers expose opposite physical endpoint pairs for a single
+  // public direction (for example a long working plus its return-labelled
+  // pattern).  Permit that only when public endpoint resolution agrees and
+  // ordered pattern evidence confirms the same corridor; otherwise retain
+  // the reverse-endpoint separation for genuine opposite directions.
+  if (reverseEndpointRelationship(first, second)
+    && !(samePublicPair && markerConflict && reversePatternRelationship(first, second))) return false;
+  if (markerConflict && ((first?.circular && closedPhysicalShape(first))
+    || (second?.circular && closedPhysicalShape(second)))) return false;
+  const genericRawEndpoints = service => GENERIC_ENDPOINT_LABEL.test(text(service.origin))
+    && GENERIC_ENDPOINT_LABEL.test(text(service.destination));
+  const sourceIdentity = service => normal(service?.timetableSource || service?.frequencyEvidenceSource
+    || service?.source?.provider || service?.provider);
+  const crossProviderPublicAgreement = samePublicPair
+    && sourceIdentity(first) && sourceIdentity(second)
+    && sourceIdentity(first) !== sourceIdentity(second)
+    && routeGroupKey(first) === routeGroupKey(second)
+    && operatorFamilyCompatible(first, second);
+  if (markerConflict && genericRawEndpoints(first) && genericRawEndpoints(second)
+    && !crossProviderPublicAgreement) return false;
+  if (markerConflict && (genericRawEndpoints(first) || genericRawEndpoints(second))
+    && sharedPatternValues(first, second).size < 2 && !provenPatternRelationship(first, second)
+    && !crossProviderPublicAgreement) return false;
+  // Prepared GTFS records can share a feed-local direction marker even when
+  // their ordered patterns represent opposite public travel.  Once endpoint
+  // resolution has established both public pairs, reverse pairs are never
+  // one planner direction; short workings can still join the matching side
+  // through the one-sided pattern evidence below.
+  if (firstPublic.origin && firstPublic.destination && secondPublic.origin && secondPublic.destination
+    && firstPublic.origin !== firstPublic.destination
+    && secondPublic.origin !== secondPublic.destination
+    && normal(firstPublic.origin) === normal(secondPublic.destination)
+      && normal(firstPublic.destination) === normal(secondPublic.origin)
+      && !(normal(firstPublic.origin) === normal(secondPublic.origin)
+      && normal(firstPublic.destination) === normal(secondPublic.destination))) return false;
+  if (samePublicPair) {
+    let samePublicDirection = !markerConflict;
+    if (markerConflict) {
+      const familyPair = Array.isArray(first.publicFamilyEndpointPair) && first.publicFamilyEndpointPair.length === 2
+        ? first.publicFamilyEndpointPair : [];
+      const firstPatternDirection = orderedPatternDirectionEndpoint(first, familyPair);
+      const secondPatternDirection = orderedPatternDirectionEndpoint(second, familyPair);
+      const orderedAgrees = firstPatternDirection && secondPatternDirection
+        && normal(firstPatternDirection.origin) === normal(secondPatternDirection.origin)
+        && normal(firstPatternDirection.destination) === normal(secondPatternDirection.destination);
+      const downstreamVariant = [first, second].some(service => {
+        const values = patternEndpointValues(service);
+        return values.length === 2
+          && familyPair.some(value => normal(value) === normal(values[1]))
+          && [service.origin, service.destination].some(value => {
+            const cleaned = cleanPublicEndpoint(value);
+            return cleaned && !GENERIC_ENDPOINT_LABEL.test(text(value));
+          });
+      });
+      samePublicDirection = Boolean(
+        (orderedAgrees && !reversePatternRelationship(first, second)
+          && (sharedPatternValues(first, second).size >= 2 || provenPatternRelationship(first, second)))
+        || (downstreamVariant && sameServiceLineage(first, second))
+        || (samePublicPair && markerConflict && reverseEndpointRelationship(first, second)
+          && reversePatternRelationship(first, second)
+          && routeGroupKey(first) === routeGroupKey(second)
+          && operatorFamilyCompatible(first, second))
+      );
+    }
+    if (samePublicDirection) return true;
+  }
+  if ((!firstPublic.origin || !firstPublic.destination || !secondPublic.origin || !secondPublic.destination)
+    && firstMarker && secondMarker && firstMarker === secondMarker
+    && (sameServiceLineage(first, second)
+      || provenPatternRelationship(first, second)
+      || sharedCorridorNames(first, second).size >= 1
+      || sharedStopIds(first, second).size >= 1)) return true;
   const leftEndpoints = endpointPair(first), rightEndpoints = endpointPair(second);
   if (leftEndpoints.origin && leftEndpoints.destination && rightEndpoints.origin && rightEndpoints.destination) {
     if (leftEndpoints.origin === rightEndpoints.origin || leftEndpoints.destination === rightEndpoints.destination) {
@@ -575,7 +664,11 @@ function routeGroupKey(service) {
   // circular classification variant to consolidate with its principal
   // direction when the route/pattern evidence supports that relationship.
   const route = normal(service?.routeNumber).replace(/\s+/g, '');
-  const match = route.match(/^(\d+)[a-z]+$/i);
+  // Most public suffixes are numeric roots (25C), but the abstraction also
+  // supports alphanumeric public codes used by smaller/community feeds
+  // (X/XA).  A single-letter code is kept intact; only a non-empty root with
+  // an appended alphabetic suffix is reduced.
+  const match = route.match(/^(.+?)[a-z]+$/i);
   return match ? match[1] : route;
 }
 
@@ -591,7 +684,12 @@ function routeFamilyCompatible(first, second) {
   // Suffix removal is only a candidate-family signal.  A suffix route must
   // also share physical selected-stop evidence and a material corridor with
   // the base route; the suffix alone is never allowed to merge services.
-  return sharedStopIds(first, second).size >= 2 && sharedCorridorNames(first, second).size >= 2;
+  // Prepared feeds may expose the assessment stop as the only shared stop
+  // ID while still retaining an ordered named trunk.  Two shared corridor
+  // names are sufficient family evidence; the divergent-suffix case is
+  // rejected because it has no such shared ordered corridor.
+  return (sharedStopIds(first, second).size >= 2 || sharedCorridorNames(first, second).size >= 2)
+    && (provenPatternRelationship(first, second) || sharedCorridorNames(first, second).size >= 2);
 }
 
 function routeFamilyComponents(services) {
@@ -624,14 +722,32 @@ function resolveCircularPresentation(component, routeFamilyServices = component)
       && sameServiceLineage(member, service)
       && patternCorridorRelationship(member, service)));
   const hasClosedCircularEvidence = component.some(service => Boolean(service?.circular) && closedPhysicalShape(service));
-  const hasOpenLinearEvidence = relevantServices.some(service => service?.circular === false && !closedPhysicalShape(service));
+  const openServices = relevantServices.filter(service => service?.circular === false && !closedPhysicalShape(service));
+  const hasOpenPatternPair = openServices.some(service => patternEndpointValues(service).length === 2);
+  const hasOpenDirectedEvidence = openServices.filter(service => directionEndpointCandidate(service)
+    && [service?.origin, service?.destination].some(value => cleanPublicEndpoint(value))).length >= 2;
+  const hasSameLoopFamilyShortWorking = openServices.some(open => component.some(closed =>
+    Boolean(closed?.circular)
+      && sameServiceLineage(closed, open)
+      && endpointPair(closed).origin
+      && endpointPair(closed).origin === endpointPair(open).origin
+      && sharedPatternValues(closed, open).size >= 2));
+  const hasOpenPublicEvidence = hasOpenPatternPair || hasOpenDirectedEvidence
+    || openServices.some(service => {
+      const pair = endpointPair(service);
+      return pair.origin && pair.destination
+        && !GENERIC_ENDPOINT_LABEL.test(text(service.origin))
+        && !GENERIC_ENDPOINT_LABEL.test(text(service.destination));
+    });
   // A source may label one direction as a loop while the route family also
   // contains an open counterpart.  Once both direction markers and an open
   // pattern are present in the family, the loop label is not a safe public
   // row identity (the deployed 310 evidence is the motivating case).
-  if (hasTwoWayDirectionEvidence(routeFamilyServices) && hasOpenLinearEvidence) return false;
-  if (hasClosedCircularEvidence) return true;
-  return component.some(service => Boolean(service?.circular));
+  if (hasOpenPublicEvidence && !hasSameLoopFamilyShortWorking) return false;
+  // A circular flag without a closed ordered physical pattern is insufficient
+  // public evidence.  Keep the row linear/uncertain rather than presenting a
+  // loop merely because one provider supplied a source label.
+  return hasClosedCircularEvidence;
 }
 
 function candidateStopIds(component) {
@@ -920,6 +1036,26 @@ function endpointLooksPhysical(value) {
   return !candidate || GENERIC_ENDPOINT_LABEL.test(candidate) || PHYSICAL_ENDPOINT_DESCRIPTOR.test(candidate);
 }
 
+function patternEndpointValue(service, side) {
+  const stops = Array.isArray(service?.routePatternStops) ? service.routePatternStops : [];
+  if (stops.length < 2) return '';
+  const stop = side === 'origin' ? stops[0] : stops.at(-1);
+  const name = cleanPublicEndpoint(stop?.name || stop?.commonName);
+  const locality = cleanPublicEndpoint(stop?.locality || stop?.parentLocality);
+  const raw = cleanPublicEndpoint(side === 'origin' ? service?.origin : service?.destination);
+  const headsign = directionEndpointCandidate(service);
+  // A non-generic terminal name is promoted only when the current service
+  // itself identifies it as the public endpoint.  This keeps a hospital or
+  // road stop from displacing its locality on unrelated short workings while
+  // preserving authoritative terminal names such as a named hospital.
+  if (name && !GENERIC_ENDPOINT_LABEL.test(name)
+    && (headsign && normal(headsign) === normal(name)
+      || (raw && normal(raw) === normal(name) && /\b(?:airport|college|hospital|university)\b/i.test(name)))) return name;
+  if (locality) return locality;
+  if (raw && !endpointLooksPhysical(raw)) return raw;
+  return name && !GENERIC_ENDPOINT_LABEL.test(name) && !STREET_ENDPOINT_DESCRIPTOR.test(name) ? name : '';
+}
+
 function descriptionEndpoints(values) {
   const output = [];
   for (const value of unique(values)) {
@@ -943,10 +1079,8 @@ function routeDescriptionValues(service) {
 }
 
 function patternEndpointValues(service) {
-  const stops = Array.isArray(service?.routePatternStops) ? service.routePatternStops : [];
-  if (stops.length < 2) return [];
-  const first = cleanPublicEndpoint(stops[0]?.locality || stops[0]?.parentLocality || stops[0]?.name || stops[0]?.commonName);
-  const last = cleanPublicEndpoint(stops.at(-1)?.locality || stops.at(-1)?.parentLocality || stops.at(-1)?.name || stops.at(-1)?.commonName);
+  const first = patternEndpointValue(service, 'origin');
+  const last = patternEndpointValue(service, 'destination');
   return first && last && normal(first) !== normal(last) ? [first, last] : [];
 }
 
@@ -993,13 +1127,20 @@ function contextualLocalityForEndpoint(services, value, selectedLocalities = [])
 
 function familyPublicEndpointPair(services, selectedLocalities = []) {
   const pairs = endpointEvidencePairs(services);
+  const principalRoute = services.filter(service => normal(service?.routeNumber).replace(/\s+/g, '') === routeGroupKey(service));
+  const samePair = (first, second) => first.length === 2 && second.length === 2
+    && new Set(first.map(normal)).size === 2
+    && first.every(value => second.some(candidate => normal(candidate) === normal(value)));
   if (pairs.length) {
     const counts = new Map();
     for (const pair of pairs) {
       const contextualPair = pair.map(value => contextualLocalityForEndpoint(services, value, selectedLocalities));
       const key = contextualPair.map(normal).sort().join('|');
-      const current = counts.get(key) ?? { pair: contextualPair, count: 0, support: 0 };
+      const principalSupport = principalRoute.filter(service => endpointEvidencePairs([service])
+        .some(candidate => samePair(candidate, contextualPair))).length;
+      const current = counts.get(key) ?? { pair: contextualPair, count: 0, support: 0, principalSupport: 0 };
       current.count += 1;
+      current.principalSupport += principalSupport;
       current.support += services.filter(service => {
         const rawValues = [service?.origin, service?.destination, directionEndpointCandidate(service)]
           .map(cleanPublicEndpoint).filter(value => value && !endpointLooksPhysical(value)).map(normal);
@@ -1007,9 +1148,11 @@ function familyPublicEndpointPair(services, selectedLocalities = []) {
       }).length;
       counts.set(key, current);
     }
-    return [...counts.values()].sort((left, right) => right.count - left.count || right.support - left.support || left.pair.join('|').localeCompare(right.pair.join('|')))[0].pair;
+    return [...counts.values()].sort((left, right) => right.principalSupport - left.principalSupport
+      || right.count - left.count
+      || right.support - left.support
+      || left.pair.join('|').localeCompare(right.pair.join('|')))[0].pair;
   }
-  const principalRoute = services.filter(service => normal(service?.routeNumber).replace(/\s+/g, '') === routeGroupKey(service));
   const principalHeadsigns = new Map();
   for (const service of principalRoute) {
     const candidate = directionEndpointCandidate(service);
@@ -1066,8 +1209,8 @@ function resolvePublicEndpoint(service, side, context) {
     const headsignIndex = matches(headsign);
     if (rawIndex >= 0) return { value: descriptions[rawIndex], qualifier: '' };
     if (headsignIndex >= 0) return { value: descriptions[side === 'destination' ? headsignIndex : 1 - headsignIndex], qualifier: '' };
-    const patternNames = orderedPatternNames(service).map(cleanPublicEndpoint).filter(Boolean);
-    const patternEndpoint = side === 'origin' ? patternNames[0] : patternNames.at(-1);
+    const patternValues = patternEndpointValues(service);
+    const patternEndpoint = side === 'origin' ? patternValues[0] : patternValues.at(-1);
     const patternIndex = matches(patternEndpoint);
     if (patternIndex >= 0
       && GENERIC_ENDPOINT_LABEL.test(text(service.origin))
@@ -1124,10 +1267,55 @@ function publicDirectionForService(service, stops, familyServices) {
 function decoratePublicDirections(services, stops) {
   const selectedLocalities = unique((stops ?? []).map(stop => stop?.locality || stop?.localityQualifier || stop?.parentLocality).map(cleanPublicEndpoint));
   const familyPair = familyPublicEndpointPair(services, selectedLocalities);
-  return services.map(service => ({ ...service, ...publicDirectionForService(service, stops, services), publicFamilyEndpointPair: familyPair }));
+  return services.map(service => {
+    const patternDirection = endpointDirectionFromSelectedStop(service, familyPair, stops)
+      || orderedPatternDirectionEndpoint(service, familyPair);
+    return {
+      ...service,
+      ...publicDirectionForService(service, stops, services),
+      ...(patternDirection ? {
+        publicOrigin: patternDirection.origin,
+        publicDestination: patternDirection.destination,
+        publicDirectionConfidence: 'resolved'
+      } : {}),
+      publicFamilyEndpointPair: familyPair
+    };
+  });
 }
 
-function componentPublicDirection(component) {
+function endpointDirectionFromSelectedStop(service, familyPair, stops) {
+  if (!Array.isArray(familyPair) || familyPair.length !== 2 || !Array.isArray(stops)) return null;
+  const byId = new Map(stops.map(stop => [text(stopId(stop)), stop]).filter(([id]) => id));
+  const endpointLocality = stopId => cleanPublicEndpoint(byId.get(text(stopId))?.locality
+    || byId.get(text(stopId))?.localityQualifier
+    || byId.get(text(stopId))?.parentLocality);
+  const origin = endpointLocality(service?.originStopPointId);
+  const destination = endpointLocality(service?.destinationStopPointId);
+  const originIndex = familyPair.findIndex(value => normal(value) === normal(origin));
+  const destinationIndex = familyPair.findIndex(value => normal(value) === normal(destination));
+  if (originIndex >= 0 && destinationIndex < 0) return { origin: familyPair[originIndex], destination: familyPair[1 - originIndex] };
+  if (destinationIndex >= 0 && originIndex < 0) return { origin: familyPair[1 - destinationIndex], destination: familyPair[destinationIndex] };
+  return null;
+}
+
+function orderedPatternDirectionEndpoint(service, familyPair) {
+  if (!Array.isArray(familyPair) || familyPair.length !== 2) return null;
+  const values = patternEndpointValues(service);
+  if (values.length !== 2) return null;
+  const firstIndex = familyPair.findIndex(value => normal(value) === normal(values[0]));
+  const lastIndex = familyPair.findIndex(value => normal(value) === normal(values[1]));
+  if (lastIndex >= 0) return { origin: familyPair[1 - lastIndex], destination: familyPair[lastIndex] };
+  const rawDestination = cleanPublicEndpoint(service?.destination);
+  if (rawDestination && !endpointLooksPhysical(rawDestination)
+    && !familyPair.some(value => normal(value) === normal(rawDestination))) return null;
+  // A short working may terminate before the principal endpoint.  Its
+  // ordered starting endpoint still identifies which principal endpoint is
+  // downstream; retain the short terminus as variant evidence below.
+  if (firstIndex >= 0) return { origin: familyPair[firstIndex], destination: familyPair[1 - firstIndex] };
+  return null;
+}
+
+function componentPublicDirection(component, stops = []) {
   const familyPair = component.find(service => Array.isArray(service.publicFamilyEndpointPair) && service.publicFamilyEndpointPair.length === 2)?.publicFamilyEndpointPair ?? [];
   const directCandidates = component.map(service => ({
     origin: text(service.publicOrigin),
@@ -1135,7 +1323,11 @@ function componentPublicDirection(component) {
     qualifier: text(service.publicDestinationQualifier)
   })).filter(pair => pair.origin && pair.destination && normal(pair.origin) !== normal(pair.destination));
   const directKeys = unique(directCandidates.map(pair => `${normal(pair.origin)}|${normal(pair.destination)}`));
-  if (directKeys.length === 1) {
+  // When the family has an evidenced endpoint pair, ordered pattern
+  // orientation is stronger than a single decorated record.  The latter can
+  // have generic station names or a feed-local headsign that points at the
+  // wrong side of the pair.
+  if (familyPair.length !== 2 && directKeys.length === 1) {
     const selected = directCandidates[0];
     return { publicOrigin: selected.origin, publicDestination: selected.destination, publicDestinationQualifier: selected.qualifier || null, publicDirectionConfidence: 'resolved' };
   }
@@ -1150,15 +1342,11 @@ function componentPublicDirection(component) {
       const headsign = directionEndpointCandidate(service);
       let orientedOrigin = origin;
       let orientedDestination = destination;
-      const pattern = explicitPattern(service);
-      const basis = text(service.frequencyBasisStopId) || text(service.stopIds?.[0]);
-      const position = basis ? pattern.indexOf(basis) : -1;
-      if (position >= 0 && pattern.length > 1
-        && (GENERIC_ENDPOINT_LABEL.test(text(service.origin))
-          || GENERIC_ENDPOINT_LABEL.test(text(service.destination)))) {
-        const target = position <= (pattern.length - 1) / 2 ? familyPair[0] : familyPair[1];
-        orientedDestination = target;
-        orientedOrigin = familyPair.find(value => normal(value) !== normal(target)) || origin;
+      const patternDirection = endpointDirectionFromSelectedStop(service, familyPair, stops)
+        || orderedPatternDirectionEndpoint(service, familyPair);
+      if (patternDirection) {
+        orientedOrigin = patternDirection.origin;
+        orientedDestination = patternDirection.destination;
       }
       const key = `${normal(orientedOrigin)}|${normal(orientedDestination)}`;
       const current = counts.get(key) ?? { origin: orientedOrigin, destination: orientedDestination, count: 0, evidenceScore: 0 };
@@ -1248,14 +1436,16 @@ function noteAppliesToCanonicalPopulation(note, schedules) {
 
 function plannerDestination(service) {
   const destination = text(service?.publicDestination || service?.destination);
-  return destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination) && !sourceDirectionMarker(destination)
+  return destination && !GENERIC_ENDPOINT_LABEL.test(destination)
+    && !/^(?:destination not supplied|destination not resolved)$/i.test(destination) && !sourceDirectionMarker(destination)
     ? destination
     : '';
 }
 
 function plannerOrigin(service) {
   const origin = text(service?.publicOrigin || service?.origin);
-  return origin && !/^(?:origin not supplied|origin not resolved)$/i.test(origin) && !sourceDirectionMarker(origin) ? origin : '';
+  return origin && !GENERIC_ENDPOINT_LABEL.test(origin)
+    && !/^(?:origin not supplied|origin not resolved)$/i.test(origin) && !sourceDirectionMarker(origin) ? origin : '';
 }
 
 function destinationNames(values) {
@@ -1268,8 +1458,11 @@ function destinationNames(values) {
 }
 
 function alternateDestinations(component, main) {
-  const mainDestination = normal(plannerDestination(main));
-  return destinationNames(component.map(plannerDestination).filter(value => normal(value) !== mainDestination));
+  const principalEndpoints = new Set([plannerOrigin(main), plannerDestination(main)].map(normal).filter(Boolean));
+  const evidence = component.flatMap(service => [
+    plannerOrigin(service), plannerDestination(service), ...patternEndpointValues(service)
+  ]).filter(value => value && !principalEndpoints.has(normal(value)));
+  return destinationNames(evidence);
 }
 
 function variantNote(component, main) {
@@ -1345,7 +1538,7 @@ function publicDirectionIdentity(component, main) {
  * than treating any one source record as the row identity.
  */
 function buildPlannerServiceGroup(component, stops, main, representative) {
-  const resolvedPublicDirection = componentPublicDirection(component);
+  const resolvedPublicDirection = componentPublicDirection(component, stops);
   const publicMain = { ...main, ...resolvedPublicDirection };
   const byId = new Map((stops ?? []).map(stop => [stopId(stop), stop]).filter(([id]) => id));
   const ids = candidateStopIds(component);
@@ -1389,7 +1582,7 @@ function buildPlannerServiceGroup(component, stops, main, representative) {
     ambiguousEvidence: Object.freeze([...(component.ambiguousServices ?? [])]),
     services: Object.freeze(component),
     sourceServiceCount: component.length,
-    alternateDestinations: Object.freeze(alternateDestinations(component, main)),
+    alternateDestinations: Object.freeze(alternateDestinations(component, publicMain)),
     endpointEvidence: Object.freeze(endpointEvidence),
     calendarEvidence: Object.freeze(component.flatMap(service => service.calendarEvidence ?? [])),
     patternEvidence: Object.freeze(component.map(service => Object.freeze({
@@ -1474,7 +1667,7 @@ function profileLines(lines, profileLabel) {
 function buildPlannerRow(component, stops, componentIndex, routeFamilyServices = component) {
   const representative = selectRepresentativeStop(component, stops);
   const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
-  const resolvedPublicDirection = componentPublicDirection(component);
+  const resolvedPublicDirection = componentPublicDirection(component, stops);
   const publicMain = { ...main, ...resolvedPublicDirection };
   const plannerServiceGroup = buildPlannerServiceGroup(component, stops, main, representative);
   const rowCircular = resolveCircularPresentation(component, routeFamilyServices);
@@ -1518,6 +1711,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   if (unresolvedNeedsReview) profileNotes.push('Review required before relying on frequency or operating period because calendar applicability is unresolved.');
   const notes = unique(component.flatMap(service => text(service.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean)))
     .filter(note => noteAppliesToCanonicalPopulation(note, displayResult.schedules))
+    .filter(note => rowCircular || !/^Circular service\.$/i.test(note))
     .filter(note => !(mixedProfileOutput && hasCalendarTaxonomyNote(note)));
   notes.push(...profileNotes);
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
@@ -1598,7 +1792,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     operatorRawNames: plannerServiceGroup.rawOperatorNames,
     operatorIdentities: plannerServiceGroup.operatorIdentities,
     sourceSelection: canonical.eligible.length ? 'representative-stop scheduled evidence' : 'representative-stop summary fallback',
-    routeVariantNote: variantNote(component, main),
+    routeVariantNote: variantNote(component, publicMain),
     alternateDestinationNames: Object.freeze(alternateDestinations(component, main)),
     sourceWarnings: Object.freeze(unique(component.flatMap(service => service.sourceWarnings ?? [])))
   };

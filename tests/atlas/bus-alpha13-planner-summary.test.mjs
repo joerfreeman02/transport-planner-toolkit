@@ -194,8 +194,12 @@ assert.equal(operatorRecords.length, 1, 'an unresolved operator duplicate does n
 const internalNotes = buildPlannerBusServiceSummaries([plannerRecord({ routeNumber: 'N', departures: [420], ids: 'notes', serviceNote: 'TfL route metadata did not establish full route identity. Limited service: no more than three scheduled journeys on any represented day.' })], coherentStops)[0];
 assert.doesNotMatch(internalNotes.serviceNote, /route metadata|limited service|no more than three/i, 'source diagnostics and redundant limited banners stay out of planner service notes');
 
-const separateRoutes = buildPlannerBusServiceSummaries(['13', '13A', '13B', '13C'].map(routeNumber => plannerRecord({ routeNumber, departures: [420], ids: routeNumber })), coherentStops);
-assert.deepEqual(separateRoutes.map(row => row.routeNumber), ['13', '13A', '13B', '13C'], 'related route labels remain separate route families');
+const separateRoutes = buildPlannerBusServiceSummaries(['13', '13A', '13B', '13C'].map((routeNumber, index) => plannerRecord({
+  routeNumber, origin: `Origin ${index}`, destination: `Destination ${index}`,
+  principalLocations: [`Origin ${index}`, `Destination ${index}`],
+  pattern: [`A${index}`, `B${index}`, `C${index}`], departures: [420], ids: routeNumber
+})), coherentStops);
+assert.deepEqual(separateRoutes.map(row => row.routeNumber), ['13', '13A', '13B', '13C'], 'similar route labels with divergent corridors remain separate route families');
 
 const circularRows = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: 'C', destination: 'Town Centre', direction: 'Clockwise', pattern: ['A', 'B', 'C'], departures: [420], ids: 'clockwise', circular: true }),

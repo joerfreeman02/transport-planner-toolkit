@@ -160,7 +160,7 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     if (!/could not|unresolved|unsupported|quarantin|incomplete|not supplied|no deterministically/i.test(String(warning))) continue;
     add({ code: 'service-source-evidence', route: service.routeNumber, stop: service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0], source: service.timetableSource || service.source?.provider || 'timetable source', message: String(warning) });
   }
-  for (const service of serviceSummaries) if (!service.routeNumber || !service.destination || /not supplied|not resolved/i.test(service.destination)) add({ code: 'planner-route-identity', route: service.routeNumber, stop: service.frequencyBasisStopId, source: service.frequencyEvidenceSource || 'timetable source', message: 'The timetable pattern did not provide a complete planner-facing destination; review Detailed Evidence before using the row.' });
+  for (const service of serviceSummaries) if (!service.routeNumber || !service.destination || /not supplied|not resolved/i.test(service.destination)) add({ code: 'planner-route-identity', route: service.routeNumber, stop: service.frequencyBasisStopId, source: service.frequencyEvidenceSource || 'timetable source', message: 'The timetable pattern did not provide a complete planner-facing destination; the scheduled service remains visible in the planner row and should be reviewed against Detailed Evidence.' });
   for (const entry of plannerReconciliation?.entries ?? []) if (entry.status === 'excluded') add({
     code: 'planner-reconciliation',
     severity: entry.reason === 'planner-row-not-built' ? 'error' : 'warning',

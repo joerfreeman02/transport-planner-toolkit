@@ -115,7 +115,17 @@ const unresolvedGenericEndpoint = buildPlannerBusServiceSummaries([record({
   routeNumber: 'G-C', ids: 'unresolved', origin: 'Bus Station', destination: 'Bus Station', direction: 'Bus Station',
   routePatternStops: [{ id: 'A', name: 'Bus Station' }, { id: 'B', name: 'Bus Station' }], routePatternStopIds: ['A', 'B']
 })], stops);
-assert.equal(unresolvedGenericEndpoint.length, 0, 'generic terminal labels without safe locality evidence are not promoted to a planner row');
+assert.equal(unresolvedGenericEndpoint.length, 1, 'a scheduled service remains visible even when generic terminal labels have no safe locality evidence');
+assert.equal(unresolvedGenericEndpoint[0].directionPatternText, 'Destination not resolved');
+const unresolvedGenericReconciliation = buildPlannerServiceReconciliation([
+  record({ routeNumber: 'G-C', ids: 'unresolved', origin: 'Bus Station', destination: 'Bus Station', direction: 'Bus Station', routePatternStops: [{ id: 'A', name: 'Bus Station' }, { id: 'B', name: 'Bus Station' }], routePatternStopIds: ['A', 'B'] })
+], unresolvedGenericEndpoint);
+assert.equal(unresolvedGenericReconciliation.entries[0].status, 'represented-unresolved');
+assert.equal(unresolvedGenericReconciliation.unexpectedExclusionCount, 0);
+const missingUnresolvedReconciliation = buildPlannerServiceReconciliation([
+  record({ routeNumber: 'G-C', ids: 'missing-unresolved', origin: 'Bus Station', destination: 'Bus Station', direction: 'Bus Station' })
+], []);
+assert.equal(missingUnresolvedReconciliation.unexpectedExclusionCount, 1, 'reconciliation fails acceptance when a scheduled service is missing solely because its destination is unresolved');
 
 const publicTerminus = buildPlannerBusServiceSummaries([record({
   routeNumber: 'G-D', ids: 'public-terminus', origin: 'Town A', destination: 'High Street Bus Stand', direction: 'Town A (District Centre)',

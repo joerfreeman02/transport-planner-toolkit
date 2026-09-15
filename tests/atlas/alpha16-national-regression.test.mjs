@@ -118,7 +118,8 @@ function departuresCount(service) {
   const resolved = rowsFor([record({ id: 'tfl-ok', routeNumber: 'T1', origin: 'City Centre', destination: 'Hospital', source: 'TfL' })]);
   assert.equal(resolved[0].directionPatternText, 'Towards Hospital');
   const unresolved = rowsFor([record({ id: 'tfl-unresolved', routeNumber: 'T2', origin: 'Bus Station', destination: 'Bus Station', direction: '', source: 'TfL', patternNames: ['Bus Station', 'Bus Station'] })]);
-  assert.equal(unresolved.length, 0, 'unresolved TfL identity is withheld rather than invented');
+  assert.equal(unresolved.length, 1, 'unresolved TfL identity remains visible without inventing a destination');
+  assert.equal(unresolved[0].directionPatternText, 'Destination not resolved');
 }
 
 // 10. A material branch remains separately visible.

@@ -377,6 +377,7 @@ const markerlessOpposites = rows([
 assert.equal(markerlessOpposites.length, 2, 'reverse endpoint and pattern evidence keeps directions separate without markers');
 
 const unresolved = rows([record({ id: 'unresolved', routeNumber: 'Q', direction: '', destination: 'Destination not resolved', origin: 'Unknown', pattern: [] })]);
-assert.equal(unresolved.length, 0, 'unresolved route identity is not promoted to a planner row');
+assert.equal(unresolved.length, 1, 'unresolved scheduled route identity remains visible as a planner row');
+assert.equal(unresolved[0].directionPatternText, 'Destination not resolved');
 
 console.log('PASS Alpha.15 adversarial PlannerServiceGroup coverage: operators, variants, served stops, timetable basis, physical journeys, calendars, circular controls, corridors and unresolved identities.');

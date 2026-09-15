@@ -182,7 +182,9 @@ assert.equal(bridgedDirections.length, 2, 'an ambiguous direction record cannot 
 assert.ok(bridgedDirections.every(row => row.rawServiceSummaries.length < 3));
 
 const unresolvedRecord = plannerRecord({ routeNumber: 'U', destination: '', direction: '', directionFamily: '', pattern: ['A', 'B'], departures: [420], ids: 'u' });
-assert.deepEqual(buildPlannerBusServiceSummaries([unresolvedRecord], coherentStops), [], 'unresolved route identity is not presented as a normal planner row');
+const unresolvedRows = buildPlannerBusServiceSummaries([unresolvedRecord], coherentStops);
+assert.equal(unresolvedRows.length, 1, 'unresolved scheduled route identity remains visible as a restrained planner row');
+assert.equal(unresolvedRows[0].directionPatternText, 'Destination not resolved');
 assert.match(plannerSourceWarning(unresolvedRecord).join(' '), /Detailed Evidence/);
 
 const operatorRecords = buildPlannerBusServiceSummaries([

@@ -724,6 +724,7 @@ function hasTwoWayDirectionEvidence(services) {
 
 function resolveCircularPresentation(component, routeFamilyServices = component) {
   const familyServices = routeFamilyServices ?? component;
+  const hasOpposingFeedDirections = hasTwoWayDirectionEvidence(familyServices);
   const relevantServices = (routeFamilyServices ?? []).filter(service => component.includes(service)
     || component.some(member => operatorFamilyCompatible(member, service)
       && sameServiceLineage(member, service)
@@ -745,8 +746,12 @@ function resolveCircularPresentation(component, routeFamilyServices = component)
       const pair = endpointPair(service);
       return pair.origin && pair.destination
         && !GENERIC_ENDPOINT_LABEL.test(text(service.origin))
-        && !GENERIC_ENDPOINT_LABEL.test(text(service.destination));
+      && !GENERIC_ENDPOINT_LABEL.test(text(service.destination));
     });
+  // Opposing feed directions on generic terminal labels are not sufficient
+  // evidence for a public circular service.  Keep the row linear/uncertain
+  // until an ordered closed pattern proves the loop independently.
+  if (hasOpposingFeedDirections && familyServices.some(service => GENERIC_ENDPOINT_LABEL.test(text(service.origin)) && GENERIC_ENDPOINT_LABEL.test(text(service.destination)))) return false;
   // A source may label one direction as a loop while the route family also
   // contains an open counterpart.  Once both direction markers and an open
   // pattern are present in the family, the loop label is not a safe public
@@ -1121,6 +1126,36 @@ function endpointEvidencePairs(services) {
   return pairs;
 }
 
+function rawLocalityEndpointPairs(services, selectedLocalities = []) {
+  const selected = unique(selectedLocalities).filter(Boolean);
+  if (!selected.length) return [];
+  const maximumActivity = Math.max(0, ...services.map(service => Number(service?.recordActivity) || 0));
+  const candidates = new Map();
+  for (const service of services) {
+    const named = [service?.origin, service?.destination]
+      .map(cleanPublicEndpoint)
+      .filter(value => value && !endpointLooksPhysical(value));
+    if (!named.length) continue;
+    const activity = Number(service?.recordActivity) || 0;
+    // A raw terminal plus an authoritative selected-stop locality can orient
+    // a family when the feed uses infrastructure labels for the other end.
+    // Low-activity named terminals are deliberately withheld here: they are
+    // commonly short workings and must not displace a stronger full pattern.
+    if (maximumActivity > 0 && activity < maximumActivity * 0.2) continue;
+    for (const endpoint of named) for (const locality of selected) {
+      if (normal(endpoint) === normal(locality)) continue;
+      const key = [endpoint, locality].map(normal).sort().join('|');
+      const current = candidates.get(key) ?? { pair: [endpoint, locality], activity: 0, support: 0 };
+      current.activity = Math.max(current.activity, activity);
+      current.support += 1;
+      candidates.set(key, current);
+    }
+  }
+  return [...candidates.values()]
+    .sort((left, right) => right.activity - left.activity || right.support - left.support || left.pair.join('|').localeCompare(right.pair.join('|')))
+    .map(candidate => candidate.pair);
+}
+
 function orderedLoopLocalities(service) {
   const patternStops = Array.isArray(service?.routePatternStops) ? service.routePatternStops : [];
   const patternLocalities = unique(patternStops.map(stop => cleanPublicEndpoint(stop?.locality || stop?.parentLocality)).filter(Boolean));
@@ -1168,7 +1203,7 @@ function contextualLocalityForEndpoint(services, value, selectedLocalities = [])
 }
 
 function familyPublicEndpointPair(services, selectedLocalities = []) {
-  const pairs = endpointEvidencePairs(services);
+  const pairs = [...endpointEvidencePairs(services), ...rawLocalityEndpointPairs(services, selectedLocalities)];
   const principalRoute = services.filter(service => normal(service?.routeNumber).replace(/\s+/g, '') === routeGroupKey(service));
   const samePair = (first, second) => first.length === 2 && second.length === 2
     && new Set(first.map(normal)).size === 2
@@ -1567,7 +1602,7 @@ function resolvedPlannerDestination(service) {
 export function plannerSourceWarning(service) {
   const route = text(service?.routeNumber) || 'Unknown route';
   const warnings = [];
-  if (!resolvedPlannerDestination(service)) warnings.push(`Route ${route} — one timetable pattern could not be assigned a complete route identity. The scheduled evidence is retained under Detailed Evidence and is not presented as a separate planner service.`);
+  if (!resolvedPlannerDestination(service)) warnings.push(`Route ${route} — one timetable pattern could not be assigned a complete headline destination. The scheduled evidence remains represented in the planner service row and is retained under Detailed Evidence.`);
   if (!text(service?.operator) || /not supplied/i.test(text(service?.operator))) warnings.push(`Route ${route} — operator identity was not deterministically supplied for one timetable pattern. The source evidence is retained under Detailed Evidence.`);
   return warnings;
 }
@@ -2040,7 +2075,11 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
     componentIndexes.set(routeKey, index + 1);
     const routeFamilyServices = serviceGroup.routeFamilyServices || plannerRecords.filter(service => routeGroupKey(service) === routeKey);
     const row = buildPlannerRow(component, stops, index, routeFamilyServices);
-    if (resolvedPlannerDestination(row) || component.some(service => resolvedPlannerDestination(service))) rows.push(row);
+    // A scheduled component is a planner disposition even when its public
+    // endpoint remains unresolved.  Reconciliation is a QA backstop, not a
+    // presentation filter: destination uncertainty must be visible as a
+    // restrained row rather than silently removing the service.
+    rows.push(row);
   }
   const sorted = consolidateOneSidedVariantRows(rows.sort((first, second) => text(first.routeNumber).localeCompare(text(second.routeNumber), undefined, { numeric: true })
     || text(first.operator).localeCompare(text(second.operator))
@@ -2093,12 +2132,12 @@ export function buildPlannerServiceReconciliation(serviceSummaries = [], planner
     const consolidated = new Set(row.consolidatedSourceRecordIds ?? []);
     const isConsolidated = sourceKeys.some(key => consolidated.has(key));
     return Object.freeze({
-      status: isConsolidated ? 'consolidated' : 'represented',
+      status: isConsolidated ? 'consolidated' : resolvedPlannerDestination(row) ? 'represented' : 'represented-unresolved',
       reason: null,
       sourceSummaryId: text(service?.id) || null,
       sourceRecordIds: Object.freeze(unique(service?.sourceRecordIds ?? [])),
       routeNumber: text(service?.routeNumber) || null,
-      destinationResolved: resolvedPlannerDestination(service),
+      destinationResolved: resolvedPlannerDestination(row),
       plannerRowId: text(row?.id) || null,
       plannerRouteNumber: text(row?.routeNumber) || null,
       retainedDestinations: Object.freeze(unique([
@@ -2117,7 +2156,10 @@ export function buildPlannerServiceReconciliation(serviceSummaries = [], planner
     excludedCount: entries.filter(entry => entry.status === 'excluded').length,
     representedSourceRecordCount: sourceRecordIds.filter(id => !excludedSourceRecordIds.has(id)).length,
     excludedSourceRecordCount: excludedSourceRecordIds.size,
-    unexpectedExclusionCount: entries.filter(entry => entry.status === 'excluded' && entry.reason !== 'planner-identity-unresolved').length,
+    // Any source summary that reaches reconciliation without a row is an
+    // acceptance failure.  A missing row cannot be excused merely because
+    // the destination resolver was the reason it disappeared.
+    unexpectedExclusionCount: entries.filter(entry => entry.status === 'excluded').length,
     entries: Object.freeze(entries)
   });
 }

@@ -906,10 +906,35 @@ export function buildControlledBusWording(serviceSummaries, { nearestGroupName =
   const services = serviceSummaries ?? [];
   if (!services.length) return 'No bus-service summary wording is available for the confirmed assessment point.';
   const routes = unique(services.map(service => service.routeNumber));
-  const locations = controlledLocationLabels(services.flatMap(service => service.principalLocations));
+  const locationCandidates = new Map();
+  const endpointKeys = new Set(services.flatMap(service => [service.origin, service.destination]).map(locationIdentity).filter(Boolean));
+  for (const service of services) for (const value of controlledLocationLabels(service.principalLocations ?? [])) {
+    const key = locationIdentity(value);
+    if (!key) continue;
+    const current = locationCandidates.get(key) ?? { value, score: 0, occurrences: 0 };
+    const label = normal(value);
+    const endpoint = endpointKeys.has(key);
+    const materialPlace = /\b(?:station|interchange|hospital|university|airport|centre|center|town|city)\b/i.test(label);
+    const genericDescriptor = /^(?:railway|bus|coach) station$|^town centre$|^city centre$/i.test(label);
+    current.value = current.value.length >= value.length ? current.value : value;
+    current.occurrences += 1;
+    current.score += (endpoint ? 8 : 0) + (materialPlace ? 4 : 1) + (genericDescriptor ? -2 : 0);
+    locationCandidates.set(key, current);
+  }
+  // The statement has a bounded consultant-facing budget selected by
+  // endpoint/interchange relevance and repeated evidence. Complete
+  // principalLocations arrays remain on service rows and in Detailed Evidence.
+  const locations = [];
+  for (const candidate of [...locationCandidates.values()].sort((left, right) => right.score - left.score || right.occurrences - left.occurrences || left.value.localeCompare(right.value))) {
+    if (locations.length >= 10) break;
+    if (candidate.score < 2 && locations.length >= 5) break;
+    locations.push(candidate.value);
+  }
   const routeWords = routes.length === 1 ? `bus route ${routes[0]}` : `bus routes ${routes.join(', ')}`;
   const nearestLead = nearestGroupName ? `The nearest assessed bus stop group is ${nearestGroupName}. ` : '';
-  return `${nearestLead}The assessed stop${nearestGroupName ? ' group is' : 's are'} served by ${routeWords}${locations.length ? `, providing direct connections to ${locations.join(', ')}` : ''}. Timetable periods and any material qualifications are shown in the Bus Service Summary.`;
+  const evidenceLead = locations.length ? `, providing direct connections to ${locations.join(', ')}` : '';
+  const continuation = locationCandidates.size > locations.length ? ' Additional principal and variant destinations remain itemised in the Bus Service Summary.' : '';
+  return `${nearestLead}The assessed stop${nearestGroupName ? ' group is' : 's are'} served by ${routeWords}${evidenceLead}.${continuation} Timetable periods and any material qualifications are shown in the Bus Service Summary.`;
 }
 
 export { DAY_ORDER };

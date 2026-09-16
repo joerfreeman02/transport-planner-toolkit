@@ -101,7 +101,7 @@ The actual Sources and checks panel showed 10 “Points to note” entries and 2
 
 ## Hard-coding audit
 
-Searched modified runtime production files for the acceptance place names and route identifiers listed in the task. No route-specific endpoint lookup, Waltham Cross exception, or site-specific branch was found. **Runtime special cases: none.** Route numbers and acceptance anchors occur only in tests/documentation, not in production endpoint decision logic.
+Searched modified runtime production files for the acceptance place names and route identifiers listed in the task. No acceptance place name, route-specific endpoint lookup, Waltham Cross exception, or site-specific branch was found. The strings `310` and `25C` appear in explanatory comments describing generic direction/route-family rules; neither is used by a route-specific production decision. **Runtime special cases: none.**
 
 ## Data pipeline
 

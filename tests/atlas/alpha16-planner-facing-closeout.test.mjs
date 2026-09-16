@@ -41,6 +41,7 @@ function record({
     circular,
     routePatternStopIds: pattern,
     routePatternStops: pattern.map((stopId, index) => ({ id: stopId, name: stopId === 'ORIGIN' ? origin : stopId === 'DESTINATION' ? destination : `Pattern stop ${index}` })),
+    routePatternCompleteness: 'complete',
     principalLocations,
     frequencyBasisStopId: 'A',
     stopIds: ['A', 'B'],
@@ -110,8 +111,9 @@ const widerFamilyRows = buildPlannerBusServiceSummaries([
   record({ routeNumber: '16', id: '16-short', origin: 'Waltham Cross', destination: 'Waltham Abbey', direction: 'Waltham Abbey', directionFamily: 'gtfs:0', pattern: ['ORIGIN', 'A'], principalLocations: ['Waltham Cross', 'Waltham Abbey'] })
 ], [{ ...stops[0], locality: '' }]);
 assert.ok(widerFamilyRows.some(row => row.rawRouteNumbers.includes('16C')
-  && /Loughton/.test(`${row.origin} ${row.destination}`)
-  && /Waltham Cross/.test(`${row.origin} ${row.destination}`)), 'a wider loop-family endpoint is selected from ordered public locality evidence');
+  && !['Waltham Abbey', 'Maple Gate'].includes(row.origin)
+  && !['Waltham Abbey', 'Maple Gate'].includes(row.destination)), 'a short working cannot be promoted over the wider unresolved family');
+assert.ok(widerFamilyRows.some(row => row.principalLocations.includes('Loughton')), 'the intermediate remains available as supporting planner evidence');
 const widerFamilyNote = widerFamilyRows.map(row => `${row.serviceNote ?? ''} ${row.routeGroupNote ?? ''}`).join(' ');
 assert.match(widerFamilyNote, /Waltham Abbey/);
 assert.match(widerFamilyNote, /Maple Gate/);

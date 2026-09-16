@@ -1,7 +1,8 @@
 # GitHub tooling adoption review
 
-Reviewed: 2026-09-14 for Alpha.15 correction. No new repository tool was
-installed or enabled. Existing Dependabot configuration was left unchanged.
+Reviewed: 2026-09-16 for Alpha.16 endpoint safety recovery. No installation
+milestone has been reached. No new repository tool was installed or enabled;
+existing Dependabot configuration was left unchanged.
 
 ## Dependabot — retain
 

@@ -14,6 +14,7 @@ const stops = [
 
 const bods = {
   id: 'bods-25c', routeNumber: '25C', operator: 'Arriva', origin: 'Rural Origin', destination: 'Town Terminal', direction: 'outbound',
+  publicRouteOrigin: 'Rural Origin', publicRouteDestination: 'Town Terminal',
   principalLocations: ['Village Green', 'Market Cross'], routePatternStopIds: ['A', 'B', 'C'],
   stopSchedules: { A: schedule([420, 435, 450, 465, 480, 495]), B: schedule([420, 435, 450, 465, 480, 495]), C: schedule([420, 435, 450, 465, 480, 495]) }, timetableSource: 'BODS'
 };

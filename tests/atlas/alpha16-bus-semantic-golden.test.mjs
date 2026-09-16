@@ -30,7 +30,10 @@ assert.ok(rowsFor('25C').every(row => row.calendarProfileIds.length === 1 && row
 assert.ok(rowsFor('25C').every(row => row.canonicalDeparturePopulationAll.monday.length === 1));
 assert.ok(rowsFor('25C').every(row => row.canonicalDeparturePopulationAll.saturday.length === 0 && row.canonicalDeparturePopulationAll.sunday.length === 0));
 
-assert.deepEqual(directionsFor('66'), new Set(['Towards Cheshunt (Hammond Street)', 'Towards Loughton']));
+assert.deepEqual(directionsFor('66'), new Set(['Towards Hammond Street', 'Towards Loughton']));
+assert.ok(rowsFor('66').every(row => row.publicEndpointEvidence.origin.status === 'resolved'
+  && row.publicEndpointEvidence.destination.status === 'resolved'
+  && row.publicEndpointEvidence.origin.evidenceClass === 'route-description'));
 assert.ok(rowsFor('66').every(row => row.operator === 'Arriva'));
 assert.ok(rowsFor('66').every(row => row.frequencyBasisStopId === '210021703430'));
 assert.ok(rowsFor('66').every(row => row.rawServiceSummaries.some(service => service.operator === 'Arriva Herts and Essex')));

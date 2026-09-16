@@ -15,6 +15,7 @@ function record({ routeNumber = '13', operator = 'Example Buses', origin = 'Walt
     id: `${routeNumber}-${ids}`,
     routeNumber, operator, origin, destination, description, direction: 'outbound', directionFamily: 'outbound',
     routePatternStopIds: pattern, principalLocations: [origin, destination], frequencyBasisStopId: 'A', stopIds: ['A'],
+    routePatternCompleteness: 'complete',
     departuresByDay: { ...week, monday: departures }, departureEvidenceByDay: evidence, sourceRecordIds: [ids],
     timetableSource: source, calendarProfileId: 'ordinary', serviceNote, circular, ...extra
   };

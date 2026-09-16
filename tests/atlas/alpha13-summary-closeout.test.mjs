@@ -13,9 +13,11 @@ function fixture({
   origin = 'Origin',
   destination,
   pattern = ['ORIGIN', 'REP', 'DESTINATION'],
+  routePatternStops = [],
   departures = [420],
   id,
   circular = false,
+  routePatternCompleteness,
   calendarProfileId,
   serviceNote = '',
   activeDays = days
@@ -35,6 +37,8 @@ function fixture({
     destination,
     circular,
     routePatternStopIds: pattern,
+    routePatternCompleteness,
+    routePatternStops,
     principalLocations: ['Representative Stop', destination],
     frequencyBasisStopId: 'REP',
     stopIds: ['REP'],
@@ -92,7 +96,7 @@ const route46 = rowsFor([
 assert.equal(route46.length, 2, 'Centrebus aliases consolidate to two meaningful directions');
 assert.equal(route46.find(row => row.directionFamily === 'gtfs:0').departuresByDay.monday.length, 2);
 
-const route230 = rowsFor([fixture({ routeNumber: '230', operator: 'Centrebus', destination: 'Lyons Community Centre', direction: 'clockwise', directionFamily: 'clockwise', pattern: ['REP', 'PIPERS', 'REP'], circular: true, id: '230-circular' })], '230');
+const route230 = rowsFor([fixture({ routeNumber: '230', operator: 'Centrebus', destination: 'Lyons Community Centre', direction: 'clockwise', directionFamily: 'clockwise', pattern: ['REP', 'PIPERS', 'REP'], routePatternCompleteness: 'complete', routePatternStops: [{ id: 'REP', name: 'Lyons Community Centre' }, { id: 'PIPERS', name: 'Caddington Woods' }, { id: 'REP', name: 'Lyons Community Centre' }], circular: true, id: '230-circular' })], '230');
 assert.equal(route230.length, 1);
 assert.equal(route230[0].circular, true);
 assert.match(route230[0].directionPatternText, /^Circular —/);

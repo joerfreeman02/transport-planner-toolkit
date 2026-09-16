@@ -29,7 +29,7 @@ try {
   const atlasHtml = await atlas.text();
   assert.match(atlasHtml, /ATLAS — Transport and Location Assessment/);
   assert.match(atlasHtml, /2\.0\.0-alpha\.16/);
-  assert.match(atlasHtml, /ATLAS-2\.0\.0-alpha\.16-20260914/);
+  assert.match(atlasHtml, /ATLAS-2\.0\.0-alpha\.16-20260916/);
   const updateResponse = await fetch(new URL('/__atlas-review/update-bus-data', review.url), { method: 'POST' });
   assert.equal(updateResponse.status, 200);
   assert.equal(updaterOpened, rootDir);

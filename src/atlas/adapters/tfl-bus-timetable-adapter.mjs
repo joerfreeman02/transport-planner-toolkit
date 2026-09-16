@@ -325,6 +325,9 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         ? 'TfL route metadata did not establish one complete route identity for this timetable pattern. ATLAS retained the scheduled pattern without inventing full origin or destination.'
         : 'TfL route metadata could not be checked. ATLAS retained the scheduled pattern without inventing full origin or destination.');
       const hasPeriods = timing.hasPeriods;
+      const completePattern = Boolean(identity
+        && normal(pattern.stations[0]?.name) === normal(identity.origin)
+        && normal(pattern.stations.at(-1)?.name) === normal(identity.destination));
       const profileTimings = timing.profiles ?? [{ calendarProfileId: null, schedule: timing.schedule, departureEvidence: timing.departureEvidence, frequencyEvidence: timing.frequencyEvidence, calendarEvidence: timing.calendarEvidence, evidence: timing.evidence }];
       for (const profileTiming of profileTimings) services.push({
         id: `tfl:${lineId}:${normal(direction)}:${normal(pattern.id || `pattern-${index + 1}`)}${timing.splitByCalendarProfile ? `:calendar:${normal(profileTiming.calendarProfileId)}` : ''}`,
@@ -332,9 +335,13 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         operator: text(route?.operator ?? response?.operator),
         origin: identity?.origin ?? '',
         destination: identity?.destination ?? '',
+        publicRouteOrigin: identity?.origin ?? '',
+        publicRouteDestination: identity?.destination ?? '',
         direction,
         principalLocations: derivePrincipalLocations(pattern.stations),
         routePatternStopIds: pattern.stations.map(station => station.id),
+        routePatternStops: pattern.stations,
+        routePatternCompleteness: completePattern ? 'complete' : 'partial',
         operatingPeriodEvidence: hasPeriods,
         stopSchedules: { [stopPointId]: profileTiming.schedule },
         departureEvidenceByDay: profileTiming.departureEvidence,
@@ -342,7 +349,17 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         calendarEvidence: profileTiming.calendarEvidence,
         calendarProfileId: profileTiming.calendarProfileId,
         frequencyBasisStopId: stopPointId,
-        source: { provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId, calendarProfileId: profileTiming.calendarProfileId, routeMetadata: identity ? 'matched' : 'incomplete' },
+        source: {
+          provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId,
+          calendarProfileId: profileTiming.calendarProfileId, routeMetadata: identity ? 'matched' : 'incomplete',
+          routeMetadataEvidence: identity ? {
+            provider: SOURCE,
+            endpoint: metadataResult?.provenance?.endpoint || null,
+            retrievedAt: metadataResult?.provenance?.retrievedAt || null,
+            cacheStatus: metadataResult?.cache?.status || 'unknown',
+            routeSection: { direction: identity.direction, origin: identity.origin, destination: identity.destination, validFrom: identity.validFrom, validTo: identity.validTo }
+          } : null
+        },
         timetableSource: 'TfL',
         serviceNotes: calendarQualificationNotes(profileTiming.calendarEvidence),
         sourceWarnings: profileTiming.calendarEvidence.filter(calendar => !calendar.resolved).map(calendar => `TfL timetable period "${calendar.sourceCalendarLabel}" could not be safely mapped to operating days; no unverified days were fabricated.`),
@@ -391,7 +408,7 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
     if (!line || !stop) return sourceFailure({ code: 'invalid_request', message: 'A TfL line and StopPoint identity are required.', provenance });
     const metadataResult = routeMetadata ?? await routeMetadataForLines([line], { forceRefresh, progress });
     const endpoint = new URL(`/Line/${encodeURIComponent(line)}/Timetable/${encodeURIComponent(stop)}`, baseUrl).toString();
-    return runCachedSourceQuery({ cache, cacheKey: `tfl-timetable:${line}:${stop}`, freshForMs: 5 * 60 * 1000, forceRefresh, load: async () => {
+    const result = await runCachedSourceQuery({ cache, cacheKey: `tfl-timetable:${line}:${stop}`, freshForMs: 5 * 60 * 1000, forceRefresh, load: async () => {
       const response = await requestScheduler.schedule('timetable', () => requestJson({ url: endpoint, fetchImpl, timeoutMs }), { progress: progress ?? {} });
       const source = { ...provenance, endpoint, retrievedAt: clock().toISOString(), httpStatus: response.status ?? null };
       if (!response.ok) return sourceFailure({ code: response.code, message: `TfL scheduled timetable could not be checked: ${response.message}`, status: response.status, provenance: source });
@@ -405,6 +422,27 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
       const routeMetadataRequests = routeMetadata ? 0 : metadataResult.cache?.status === 'hit' ? 0 : 1;
       return sourceSuccess({ data: parsed.services, evidence, warnings, provenance: { ...source, requestedStopPointId: stop, departureStopId: responseDepartureStopId || stop, departureStopMatched: !responseDepartureStopId || responseDepartureStopId === stop, resultCount: matchedServices.length, serviceDiscovery: 'scheduled-timetable', timetableRequests: 1, routeMetadataRequests, realtimeArrivalsUsed: false, timetableConclusion: matchedServices.length ? 'MATCHED' : 'UNRESOLVED' } });
     }});
+    if (!result.ok) return result;
+    const data = result.data.map(service => ({
+      ...service,
+      source: {
+        ...service.source,
+        timetableEvidence: {
+          provider: SOURCE,
+          endpoint,
+          retrievedAt: result.provenance?.retrievedAt || null,
+          cacheStatus: result.cache?.status || 'unknown',
+          requestedStopPointId: stop
+        }
+      }
+    }));
+    const byId = new Map(data.map(service => [service.id, service]));
+    const evidence = result.evidence.map(item => ({
+      ...item,
+      value: byId.get(item.subject?.id) || item.value,
+      cache: { ...(item.cache ?? {}), status: result.cache?.status || 'unknown' }
+    }));
+    return sourceSuccess({ ...result, data, evidence });
   }
   return Object.freeze({ id: 'tfl-bus-timetable-v1', servicesForStop, routeMetadataForLines });
 }

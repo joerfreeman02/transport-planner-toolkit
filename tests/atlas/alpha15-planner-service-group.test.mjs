@@ -20,6 +20,7 @@ function record({
   destination = 'Destination',
   direction = destination,
   pattern = ['ORIGIN', 'MID', 'DESTINATION'],
+  routePatternCompleteness,
   stopIds = ['A'],
   basis = stopIds[0],
   minutes = [420, 480],
@@ -39,6 +40,7 @@ function record({
     directionFamily: `gtfs:${directionId}`,
     sourceRouteIds: [routeId],
     routePatternStopIds: pattern,
+    routePatternCompleteness,
     stopIds,
     frequencyBasisStopId: basis,
     frequencyBasisStopName: stops.find(stop => stop.id === basis)?.name,
@@ -134,7 +136,7 @@ assert.equal(route242Groups.length, 3, 'distinct current operators remain separa
 assert.deepEqual(route242Groups.map(group => group.operatorNames.slice().sort()), [['Central Connect'], ['Uno'], ['Uno']].sort((a, b) => a.join().localeCompare(b.join())));
 
 const circularRows = rows([
-  record({ id: '230-loop', routeNumber: '230', routeId: '230-line', origin: 'Loop Hub', destination: 'Loop Hub', direction: 'Clockwise', pattern: ['LOOP-A', 'LOOP-B', 'LOOP-A'], circular: true }),
+  record({ id: '230-loop', routeNumber: '230', routeId: '230-line', origin: 'Loop Hub', destination: 'Loop Hub', direction: 'Clockwise', pattern: ['LOOP-A', 'LOOP-B', 'LOOP-A'], routePatternCompleteness: 'complete', circular: true }),
   record({ id: '230-short', routeNumber: '230', routeId: '230-line', origin: 'Loop Hub', destination: 'Bus Station', direction: 'Clockwise', pattern: ['LOOP-A', 'LOOP-B', 'BUS'], circular: false })
 ]);
 assert.equal(circularRows.length, 1);

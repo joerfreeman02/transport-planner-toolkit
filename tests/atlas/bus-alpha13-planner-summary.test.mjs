@@ -15,14 +15,14 @@ const week = {
 };
 const stop = { id: 'A', name: 'Waltham Cross Bus Station', indicator: 'G', distanceMetres: 110, walking: { status: 'routed', distanceMetres: 82 } };
 const secondStop = { id: 'B', name: 'Waltham Cross Bus Station', indicator: 'H', distanceMetres: 95, walking: { status: 'routed', distanceMetres: 120 } };
-const base = { routeNumber: '657', operator: 'Example Buses', direction: 'outbound', directionFamily: 'gtfs:0', origin: 'Waltham Cross', destination: 'Chingford', principalLocations: ['Enfield', 'Chingford Mount'], routePatternStopIds: ['A', 'B', 'C'], frequencyBasisStopId: 'A', stopIds: ['A'], departuresByDay: week, frequencyEvidence: [], sourceRecordIds: ['main'], serviceNote: 'School-day-only service.', calendarProfileId: 'ordinary' };
+const base = { routeNumber: '657', operator: 'Example Buses', direction: 'outbound', directionFamily: 'gtfs:0', origin: 'Waltham Cross', destination: 'Chingford', principalLocations: ['Enfield', 'Chingford Mount'], routePatternStopIds: ['A', 'B', 'C'], routePatternCompleteness: 'complete', routePatternStops: [{ id: 'A', name: 'Waltham Cross' }, { id: 'B', name: 'Interchange' }, { id: 'C', name: 'Chingford' }], frequencyBasisStopId: 'A', stopIds: ['A'], departuresByDay: week, frequencyEvidence: [], sourceRecordIds: ['main'], serviceNote: 'School-day-only service.', calendarProfileId: 'ordinary' };
 
 const planner = buildPlannerBusServiceSummaries([
   base,
-  { ...base, id: 'short', origin: 'Waltham Cross', destination: 'Enfield', routePatternStopIds: ['A', 'B'], departuresByDay: { ...week, monday: [360], tuesday: [360], wednesday: [360], thursday: [360], friday: [360], saturday: [], sunday: [] }, frequencyBasisStopId: 'A', stopIds: ['A'], sourceRecordIds: ['short'], serviceNote: 'Includes scheduled short workings or route variants in this direction; the main origin/destination shown is the most extensive pattern in the source timetable.' },
+  { ...base, id: 'short', origin: 'Waltham Cross', destination: 'Enfield', routePatternStopIds: ['A', 'B'], routePatternStops: [{ id: 'A', name: 'Waltham Cross' }, { id: 'B', name: 'Enfield' }], departuresByDay: { ...week, monday: [360], tuesday: [360], wednesday: [360], thursday: [360], friday: [360], saturday: [], sunday: [] }, frequencyBasisStopId: 'A', stopIds: ['A'], sourceRecordIds: ['short'], serviceNote: 'Includes scheduled short workings or route variants in this direction; the main origin/destination shown is the most extensive pattern in the source timetable.' },
   { ...base, id: 'other-stop', frequencyBasisStopId: 'B', stopIds: ['B'], departuresByDay: { ...week, monday: [720, 780, 840], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] }, sourceRecordIds: ['other-stop'] },
-  { ...base, id: 'branch', destination: 'Hoddesdon', routePatternStopIds: ['X', 'Y'], frequencyBasisStopId: 'A', stopIds: ['A'], departuresByDay: { ...week, monday: [400, 500], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] }, sourceRecordIds: ['branch'] },
-  { ...base, id: 'inbound', direction: 'inbound', directionFamily: 'gtfs:1', origin: 'Chingford', destination: 'Waltham Cross', routePatternStopIds: ['C', 'B', 'A'], frequencyBasisStopId: 'A', stopIds: ['A'], departuresByDay: week, sourceRecordIds: ['inbound'] }
+  { ...base, id: 'branch', destination: 'Hoddesdon', routePatternStopIds: ['X', 'Y'], routePatternStops: [{ id: 'X', name: 'Waltham Cross' }, { id: 'Y', name: 'Hoddesdon' }], frequencyBasisStopId: 'A', stopIds: ['A'], departuresByDay: { ...week, monday: [400, 500], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] }, sourceRecordIds: ['branch'] },
+  { ...base, id: 'inbound', direction: 'inbound', directionFamily: 'gtfs:1', origin: 'Chingford', destination: 'Waltham Cross', routePatternStopIds: ['C', 'B', 'A'], routePatternStops: [{ id: 'C', name: 'Chingford' }, { id: 'B', name: 'Interchange' }, { id: 'A', name: 'Waltham Cross' }], frequencyBasisStopId: 'A', stopIds: ['A'], departuresByDay: week, sourceRecordIds: ['inbound'] }
 ], [stop, secondStop]);
 
 assert.equal(planner.length, 3, 'main direction, genuine branch and opposite direction remain distinct');
@@ -82,6 +82,8 @@ const plannerRecord = ({ routeNumber = '279', destination = 'Theobalds Grove', d
   direction,
   directionFamily: direction,
   routePatternStopIds: pattern,
+  routePatternCompleteness: 'complete',
+  routePatternStops: pattern.map((id, index) => ({ id, name: index === 0 ? extra.origin ?? 'Waltham Cross' : index === pattern.length - 1 ? destination : id })),
   principalLocations: ['Waltham Cross', 'Theobalds Grove'],
   frequencyBasisStopId: 'A',
   stopIds: ['A'],
@@ -208,9 +210,9 @@ const circularRows = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: 'C', destination: 'Town Centre', direction: 'Anticlockwise', pattern: ['C', 'B', 'A'], departures: [420], ids: 'anticlockwise', circular: true })
 ], coherentStops);
 assert.equal(circularRows.length, 2, 'circular directions remain distinct where timetable evidence distinguishes them');
-const namedCircular = buildPlannerBusServiceSummaries([plannerRecord({ routeNumber: '230', destination: 'Lyons Community Centre', direction: 'Southeastbound', circular: true, pattern: ['A', 'B', 'A'], departures: [420], ids: 'named-circular', routePatternStops: [{ id: 'A', name: 'Lyons Community Centre' }, { id: 'B', name: 'Caddington Woods' }, { id: 'A', name: 'Lyons Community Centre' }] })], coherentStops)[0];
+const namedCircular = buildPlannerBusServiceSummaries([plannerRecord({ routeNumber: '230', destination: 'Lyons Community Centre', direction: 'Southeastbound', circular: true, pattern: ['A', 'B', 'A'], departures: [420], ids: 'named-circular', routePatternCompleteness: 'complete', routePatternStops: [{ id: 'A', name: 'Lyons Community Centre' }, { id: 'B', name: 'Caddington Woods' }, { id: 'A', name: 'Lyons Community Centre' }] })], coherentStops)[0];
 assert.equal(namedCircular.directionPatternText, 'Circular — Lyons Community Centre via Caddington Woods (Southeastbound)');
-const distinctEndpoint310 = buildPlannerBusServiceSummaries([plannerRecord({ routeNumber: '310', origin: 'Hertford Bus Station', destination: 'Waltham Cross Bus Station', direction: 'towards Waltham Cross Bus Station', pattern: ['HERTFORD-BS', 'HODDESDON', 'WALTHAM-CROSS-BS'], departures: [480], ids: 'distinct-endpoints', circular: false })], coherentStops)[0];
+const distinctEndpoint310 = buildPlannerBusServiceSummaries([plannerRecord({ routeNumber: '310', origin: 'Bus Station', destination: 'Bus Station', direction: 'towards Waltham Cross Bus Station', pattern: ['HERTFORD-BS', 'HODDESDON', 'WALTHAM-CROSS-BS'], routePatternCompleteness: 'complete', routePatternStops: [{ id: 'HERTFORD-BS', name: 'Hertford Bus Station' }, { id: 'HODDESDON', name: 'Hoddesdon Town Centre' }, { id: 'WALTHAM-CROSS-BS', name: 'Waltham Cross Bus Station' }], departures: [480], ids: 'distinct-endpoints', circular: false })], coherentStops)[0];
 assert.equal(distinctEndpoint310.directionPatternText, 'Towards Waltham Cross');
 assert.doesNotMatch(distinctEndpoint310.directionPatternText, /^Circular —/);
 const sharedRouteCharacteristics = buildPlannerBusServiceSummaries([

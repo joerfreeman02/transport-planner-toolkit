@@ -4,12 +4,12 @@
 
 | Version | `2.0.0-alpha.16` |
 |---|---|
-| Visible build | `ATLAS-2.0.0-alpha.16-20260914` |
+| Visible build | `ATLAS-2.0.0-alpha.16-20260916` |
 | Branch | `codex/atlas-bus-alpha16-consultancy-acceptance` |
-| Starting SHA | `4e9485efa786fe6a663f6414d098f1fb2fc52a41` |
-| Status | Corrective implementation candidate; consultancy acceptance and Technical Director review required |
+| Starting SHA | `0e4153d2a0c18cd550aa33dc5787304f11e19297` |
+| Status | Endpoint safety recovery candidate; Product Owner endpoint re-test required |
 
-Alpha.16 corrects calendar applicability provenance, public corridor endpoint resolution, operator alias grouping, representative-stop coverage, and semantic BODS/TNDS departure deduplication. It preserves raw source evidence and served stops while keeping unresolved calendar records review-required rather than silently treating them as ordinary service. Browser and Word Table 3.3 consume the same planner rows. The production-shaped Waltham Cross replay remains network-free and covers routes 13, 25C, 66, 242, 310, A1 and N279, with no invented row when prepared evidence is absent.
+Alpha.16 endpoint safety recovery adds an explicit public-endpoint evidence hierarchy and machine-readable endpoint provenance. Full ordered patterns are distinguished from partial/local fragments; weaker localities and raw labels cannot silently become public endpoints, and scheduled rows remain visible when endpoint evidence is insufficient. Browser and Word Table 3.3 continue to consume the same planner rows. NPTG is not implemented or acquired.
 
 ## BUS-QA-06 Alpha.15 production-fidelity bus service abstraction
 

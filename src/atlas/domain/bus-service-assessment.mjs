@@ -484,6 +484,8 @@ export function buildServiceSummaries(stops, serviceRecords) {
       operator: text(first.operator) || null,
       origin: text(first.origin) || null,
       destination: text(first.destination) || null,
+      publicRouteOrigin: text(first.publicRouteOrigin) || null,
+      publicRouteDestination: text(first.publicRouteDestination) || null,
       direction: text(first.direction),
       stopDirection: serviceStopDirection(frequencyStop),
       stopDirectionEvidenceId: frequencyBasisStopId,
@@ -503,6 +505,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
         source: record.source ?? null
       }))),
       routePatternStops: Object.freeze([...(first.routePatternStops ?? [])]),
+      routePatternCompleteness: text(first.routePatternCompleteness || first.source?.routePatternCompleteness) || null,
       calendarEvidence: Object.freeze(calendarEvidence),
       directionFamily: directionGroupKey(first),
       routePatternStopIds: Object.freeze([...(first.routePatternStopIds ?? [])]),

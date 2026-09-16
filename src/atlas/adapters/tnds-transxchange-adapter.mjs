@@ -244,6 +244,7 @@ function parseService({ source, serviceBlock, serviceBlocks, patternById, journe
       principalLocations: [...variant.principalLocations],
       routePatternStopIds: [...variant.routePatternStopIds],
       routePatternStops: [...(variant.routePatternStops ?? [])],
+      routePatternCompleteness: variant.status === 'valid' ? 'complete' : 'partial',
       patternVariants: [variant],
       description: first(serviceBlock, 'Description'),
       validFrom: first(blocks(serviceBlock, 'OperatingPeriod')[0] || blocks(source, 'OperatingPeriod')[0] || '', 'StartDate') || null,

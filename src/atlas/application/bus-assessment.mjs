@@ -13,9 +13,22 @@ import { buildStopTimetableSourcePresentation } from '../domain/bus-source-prese
 export const TFL_REQUEST_WINDOW_LIMIT = DEFAULT_TFL_REQUEST_LIMIT;
 export const TFL_ASSESSMENT_FIXED_REQUESTS = 2;
 export const TFL_SAFE_DETAILED_PAIR_LIMIT = TFL_REQUEST_WINDOW_LIMIT - TFL_ASSESSMENT_FIXED_REQUESTS;
+const staleEndpointWarning = 'Route endpoints supported only by stale or undated prepared national timetable data were left unresolved. Refresh the authoritative data and re-test before formal use.';
 
 function routingFor(result, index) { return result?.routes?.[index] ?? Object.freeze({ status: 'unavailable', distanceMetres: null, durationSeconds: null }); }
 function stopKey(stop) { return String(stop?.id || stop?.sourceId || ''); }
+function withEndpointFreshness(services, freshness) {
+  if (!freshness || !['stale', 'unknown'].includes(String(freshness.status).toLowerCase())) return services;
+  return services.map(service => {
+    const timetableSource = String(service?.timetableSource ?? '').trim();
+    const provider = String(service?.source?.provider ?? '').trim();
+    const isTfLPrimary = /^tfl(?:\b|\s)/i.test(timetableSource) || /^tfl$/i.test(provider);
+    const isNationalPrimary = /\bbods\b|bus open data|\btnds\b|traveline national dataset/i.test(`${timetableSource} ${provider}`);
+    return !isTfLPrimary && isNationalPrimary
+      ? { ...service, endpointEvidenceFreshness: String(freshness.status).toLowerCase() }
+      : service;
+  });
+}
 function routePairs(stops) { return new Set((stops ?? []).flatMap(stop => (stop.routes ?? []).map(route => `${route}|${stopKey(stop)}`))); }
 function hasServiceForStops(services, stops) {
   const selectedIds = new Set(stops.map(stopKey));
@@ -302,6 +315,11 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
       servicesResult = await timetableData.servicesForStops(enrichedDiscoveredStops, { forceRefresh, site, onProgress });
       services = servicesResult.ok ? servicesResult.data : [];
     }
+    const nationalDataFreshness = servicesResult?.provenance?.nationalDataFreshness
+      ?? servicesResult?.provenance?.dataFreshness
+      ?? null;
+    const endpointFreshnessUnverified = Boolean(nationalDataFreshness && ['stale', 'unknown'].includes(String(nationalDataFreshness.status).toLowerCase()));
+    if (endpointFreshnessUnverified) services = withEndpointFreshness(services, nationalDataFreshness);
     onProgress({ phase: 'reconciling-evidence' });
     const serviceSummaries = buildServiceSummaries(selectedStops, services);
     onProgress({ phase: 'preparing-assessment' });
@@ -314,7 +332,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
       const timetableEvidence = buildStopTimetableEvidence(stop, services, servicesResult);
       return Object.freeze({ ...stop, routes: [...new Set([...(stop.routes ?? []), ...(routesByStop.get(stopKey(stop)) ?? new Set())])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })), timetableMatch: (routesByStop.get(stopKey(stop))?.size ?? 0) > 0, timetableEvidence: timetableEvidence.label, timetableEvidenceStatus: timetableEvidence.status, timetableEvidenceSources: timetableEvidence.sources ?? [] });
     });
-    const warnings = [...new Set([...(assessmentWarnings ?? commonWarnings), ...(servicesResult?.warnings ?? []), ...collectServiceWarnings(services), ...plannerSourceWarnings, ...(!servicesResult?.ok ? ['Timetable information is unavailable. Stop and routed-access results are still shown.'] : []), ...(!prepared.walkingResult?.ok ? ['Walking routes could not be checked. Please try again.'] : []), ...(!prepared.cyclingResult?.ok ? ['Cycling routes could not be checked. Please try again.'] : [])])];
+    const warnings = [...new Set([...(assessmentWarnings ?? commonWarnings), ...(servicesResult?.warnings ?? []), ...(endpointFreshnessUnverified ? [staleEndpointWarning] : []), ...collectServiceWarnings(services), ...plannerSourceWarnings, ...(!servicesResult?.ok ? ['Timetable information is unavailable. Stop and routed-access results are still shown.'] : []), ...(!prepared.walkingResult?.ok ? ['Walking routes could not be checked. Please try again.'] : []), ...(!prepared.cyclingResult?.ok ? ['Cycling routes could not be checked. Please try again.'] : [])])];
     const routingComplete = selectedStops.every(stop => stop.walking.status === 'routed' && stop.cycling.status === 'routed');
     const stopCoverageComplete = prepared.stopsResult.provenance?.stopCoverageComplete !== false;
     const nationalEvidenceComplete = servicesResult?.provenance?.nationalSourceAvailable !== false && !(servicesResult?.provenance?.nationalUnresolvedRoutes?.length);

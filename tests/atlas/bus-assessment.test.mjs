@@ -73,6 +73,39 @@ test('timetable source warnings reach the assessment without raw parser diagnost
   assert.doesNotMatch(result.warnings.join(' '), /JP-|\.xml|RunTime/);
 });
 
+test('stale national-only endpoint evidence is suppressed while fresh TfL endpoints remain eligible', async () => {
+  const tflService = {
+    ...service,
+    id: 'live-tfl-service',
+    routeNumber: '20',
+    timetableSource: 'TfL',
+    source: { provider: 'TfL' },
+    stopSchedules: { ...service.stopSchedules }
+  };
+  const bodsFallback = {
+    ...service,
+    id: 'stale-bods-fallback',
+    timetableSource: 'BODS fallback after TfL unresolved',
+    source: { provider: 'BODS', fallbackFor: 'TfL unresolved timetable result' }
+  };
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [{ ...stop, routes: ['10', '20'] }], evidence: [], warnings: [], provenance: {} }) },
+    timetableData: { servicesForStops: async () => ({
+      ok: true,
+      data: [bodsFallback, tflService],
+      warnings: ['The prepared bus dataset is 12 days old and should be refreshed before formal use.'],
+      provenance: { nationalDataFreshness: { status: 'stale', preparedAt: '2026-09-04T08:00:00Z' } }
+    }) },
+    accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 60 }], warnings: [], provenance: {} }) }
+  });
+  const result = await assessment.assess({});
+  assert.equal(result.services.find(item => item.id === bodsFallback.id).endpointEvidenceFreshness, 'stale');
+  assert.equal(result.services.find(item => item.id === tflService.id).endpointEvidenceFreshness, undefined);
+  assert.equal(result.serviceSummaries.find(item => item.routeNumber === '10').endpointEvidenceFreshness, 'stale');
+  assert.equal(result.serviceSummaries.find(item => item.routeNumber === '20').endpointEvidenceFreshness, null);
+  assert.match(result.warnings.join(' '), /Route endpoints supported only by stale or undated prepared national timetable data were left unresolved/);
+});
+
 for (const [name, fn] of tests) {
   await fn();
   console.log(`PASS Bus assessment - ${name}`);

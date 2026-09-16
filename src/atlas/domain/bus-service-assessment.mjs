@@ -478,6 +478,10 @@ export function buildServiceSummaries(stops, serviceRecords) {
       : null;
     const integrityWarnings = unique(records.flatMap(record => record.scheduleIntegrityWarnings ?? []));
     if (integrityWarnings.length) notes.push(`Schedule integrity note: ${integrityWarnings.join(' ')}`);
+    const unverifiedEndpointStatuses = records.map(record => text(record.endpointEvidenceFreshness).toLowerCase()).filter(status => ['stale', 'unknown'].includes(status));
+    const endpointEvidenceFreshness = unverifiedEndpointStatuses.length === records.length
+      ? unverifiedEndpointStatuses.includes('stale') ? 'stale' : 'unknown'
+      : null;
     return Object.freeze({
       id: identity,
       routeNumber: text(first.routeNumber) || 'Not supplied',
@@ -502,8 +506,10 @@ export function buildServiceSummaries(stops, serviceRecords) {
       sourceRecords: Object.freeze(records.map(record => Object.freeze({
         id: text(record.id) || null,
         provider: text(record.timetableSource || record.source?.provider) || null,
+        endpointEvidenceFreshness: text(record.endpointEvidenceFreshness).toLowerCase() || null,
         source: record.source ?? null
       }))),
+      endpointEvidenceFreshness,
       routePatternStops: Object.freeze([...(first.routePatternStops ?? [])]),
       routePatternCompleteness: text(first.routePatternCompleteness || first.source?.routePatternCompleteness) || null,
       calendarEvidence: Object.freeze(calendarEvidence),

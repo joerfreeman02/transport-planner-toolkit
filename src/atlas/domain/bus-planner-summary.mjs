@@ -27,6 +27,7 @@ const CALENDAR_PROFILE_LABELS = Object.freeze({
 
 function text(value) { return String(value ?? '').trim(); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
+function endpointEvidenceIsUnverified(service) { return ['stale', 'unknown'].includes(normal(service?.endpointEvidenceFreshness)); }
 function unique(values) { return [...new Set((values ?? []).map(text).filter(Boolean))]; }
 function numeric(values) { return unique(values).map(Number).filter(Number.isFinite).sort((a, b) => a - b); }
 function stopId(stop) { return text(stop?.id || stop?.sourceId); }
@@ -1053,14 +1054,24 @@ function endpointLooksPhysical(value) {
   return !candidate || GENERIC_ENDPOINT_LABEL.test(candidate) || PHYSICAL_ENDPOINT_DESCRIPTOR.test(candidate);
 }
 
-function patternEndpointValue(service, side) {
+function selectedTerminalLocality(patternStop, selectedStops = []) {
+  const terminalId = text(patternStop?.id || patternStop?.stopPointId || patternStop?.sourceId);
+  if (!terminalId) return '';
+  const selected = (selectedStops ?? []).find(stop => [stopId(stop), text(stop?.sourceId), text(stop?.naptanCode)]
+    .filter(Boolean).includes(terminalId));
+  return cleanPublicEndpoint(selected?.locality || selected?.localityQualifier || selected?.parentLocality);
+}
+
+function patternEndpointValue(service, side, selectedStops = []) {
+  if (endpointEvidenceIsUnverified(service)) return '';
   if (!hasCompletePublicPattern(service)) return '';
   const stops = Array.isArray(service?.routePatternStops) ? service.routePatternStops : [];
   if (stops.length < 2) return '';
   const stop = side === 'origin' ? stops[0] : stops.at(-1);
   const name = cleanPublicEndpoint(stop?.name || stop?.commonName);
   const locality = cleanPublicEndpoint(stop?.locality || stop?.localityQualifier || stop?.parentLocality
-    || service?.[`${side}Locality`] || service?.[`${side}LocalityName`] || service?.[`${side}ParentLocality`]);
+    || service?.[`${side}Locality`] || service?.[`${side}LocalityName`] || service?.[`${side}ParentLocality`]
+    || selectedTerminalLocality(stop, selectedStops));
   const raw = cleanPublicEndpoint(side === 'origin' ? service?.origin : service?.destination);
   const headsign = directionEndpointCandidate(service);
   // A non-generic terminal name is promoted only when the current service
@@ -1098,9 +1109,9 @@ function routeDescriptionValues(service) {
   ]);
 }
 
-function patternEndpointValues(service) {
-  const first = patternEndpointValue(service, 'origin');
-  const last = patternEndpointValue(service, 'destination');
+function patternEndpointValues(service, selectedStops = []) {
+  const first = patternEndpointValue(service, 'origin', selectedStops);
+  const last = patternEndpointValue(service, 'destination', selectedStops);
   return first && last && normal(first) !== normal(last) ? [first, last] : [];
 }
 
@@ -1111,18 +1122,20 @@ function explicitPublicEndpointPair(service) {
 }
 
 function directionEndpointCandidate(service) {
+  if (endpointEvidenceIsUnverified(service)) return '';
   const value = text(service?.direction || service?.stopDirection);
   if (!value || sourceDirectionMarker(value)) return '';
   const candidate = cleanPublicEndpoint(value.replace(/^towards?\s+/i, '').split(/[,;|]/)[0], true);
   return candidate && !endpointLooksPhysical(candidate) ? candidate : '';
 }
 
-function endpointEvidencePairs(services) {
+function endpointEvidencePairs(services, selectedStops = []) {
   const pairs = [];
   for (const service of services) {
+    if (endpointEvidenceIsUnverified(service)) continue;
     const described = descriptionEndpoints(routeDescriptionValues(service));
     const explicit = explicitPublicEndpointPair(service);
-    const patterned = patternEndpointValues(service);
+    const patterned = patternEndpointValues(service, selectedStops);
     for (const pair of [explicit, ...described, patterned]) {
       if (pair.length === 2) pairs.push(pair);
     }
@@ -1131,10 +1144,11 @@ function endpointEvidencePairs(services) {
 }
 
 function hasLongerRelatedPattern(service, familyServices = []) {
+  if (endpointEvidenceIsUnverified(service)) return false;
   const pattern = explicitPattern(service);
   if (!hasCompletePublicPattern(service) || pattern.length < 2) return false;
   return familyServices.some(other => {
-    if (other === service || !hasCompletePublicPattern(other)) return false;
+    if (other === service || endpointEvidenceIsUnverified(other) || !hasCompletePublicPattern(other)) return false;
     if (normal(other?.operator) !== normal(service?.operator)) return false;
     if (!sameServiceLineage(service, other) && routeGroupKey(service) !== routeGroupKey(other)) return false;
     const otherPattern = explicitPattern(other);
@@ -1142,7 +1156,8 @@ function hasLongerRelatedPattern(service, familyServices = []) {
   });
 }
 
-function endpointEvidenceClassForPair(service, pair, familyServices = []) {
+function endpointEvidenceClassForPair(service, pair, familyServices = [], selectedStops = []) {
+  if (endpointEvidenceIsUnverified(service)) return '';
   const samePair = candidate => candidate.length === 2 && pair.length === 2
     && pair.every(value => candidate.some(item => normal(item) === normal(value)));
   if (samePair(explicitPublicEndpointPair(service))) {
@@ -1150,7 +1165,7 @@ function endpointEvidenceClassForPair(service, pair, familyServices = []) {
       || (service?.sourceRecords ?? []).some(record => record?.source?.routeMetadata === 'matched');
     return routeSectionMatched ? 'authoritative-route-section' : 'explicit-public-endpoints';
   }
-  if (patternEndpointValues(service).length === 2 && samePair(patternEndpointValues(service))) {
+  if (patternEndpointValues(service, selectedStops).length === 2 && samePair(patternEndpointValues(service, selectedStops))) {
     return hasLongerRelatedPattern(service, familyServices) ? 'short-working-pattern-terminals' : 'complete-pattern-terminals';
   }
   if (descriptionEndpoints(routeDescriptionValues(service)).some(samePair)) return 'route-description';
@@ -1167,6 +1182,34 @@ function endpointEvidenceRank(evidenceClass) {
   })[evidenceClass] ?? 0;
 }
 
+function hasEquallyCurrentEndpointConflict(services, selectedStops = []) {
+  const pairs = new Map();
+  for (const pair of endpointEvidencePairs(services, selectedStops)) {
+    const key = pair.map(normal).sort().join('|');
+    const candidate = pairs.get(key) ?? { pair, evidenceRank: 0, latestValidFrom: '', patternExtent: 0, evidenceFamilies: [] };
+    for (const service of services) {
+      const evidenceClass = endpointEvidenceClassForPair(service, pair, services, selectedStops);
+      const rank = endpointEvidenceRank(evidenceClass);
+      if (!rank) continue;
+      candidate.evidenceRank = Math.max(candidate.evidenceRank, rank);
+      candidate.latestValidFrom = [candidate.latestValidFrom, text(service?.validFrom || service?.validity?.from)].sort().at(-1) || '';
+      candidate.patternExtent = Math.max(candidate.patternExtent, explicitPattern(service).length);
+      candidate.evidenceFamilies = unique([...candidate.evidenceFamilies, `${normal(service?.routeNumber)}|${normal(service?.operator)}`]);
+    }
+    pairs.set(key, candidate);
+  }
+  const ranked = [...pairs.values()].sort((left, right) => right.evidenceRank - left.evidenceRank
+    || right.latestValidFrom.localeCompare(left.latestValidFrom));
+  const selected = ranked[0];
+  if (!selected || selected.evidenceRank < 3) return false;
+  return ranked.some(candidate => candidate !== selected
+    && candidate.evidenceRank === selected.evidenceRank
+    && candidate.latestValidFrom === selected.latestValidFrom
+    && candidate.patternExtent === selected.patternExtent
+    && candidate.pair.some(value => !selected.pair.some(other => normal(other) === normal(value)))
+    && candidate.evidenceFamilies.some(family => selected.evidenceFamilies.includes(family)));
+}
+
 function orderedLoopLocalities(service) {
   if (!hasCompletePublicPattern(service)) return [];
   const patternStops = Array.isArray(service?.routePatternStops) ? service.routePatternStops : [];
@@ -1176,8 +1219,9 @@ function orderedLoopLocalities(service) {
 
 function loopDerivedEndpointPairs(services, selectedLocalities = []) {
   const pairs = [];
-  const closedServices = services.filter(service => hasCompletePublicPattern(service) && Boolean(service?.circular) && closedPhysicalShape(service));
-  const hasOpenEvidence = services.some(service => service?.circular === false && !closedPhysicalShape(service));
+  const trustedServices = services.filter(service => !endpointEvidenceIsUnverified(service));
+  const closedServices = trustedServices.filter(service => hasCompletePublicPattern(service) && Boolean(service?.circular) && closedPhysicalShape(service));
+  const hasOpenEvidence = trustedServices.some(service => service?.circular === false && !closedPhysicalShape(service));
   if (closedServices.length < 2 || !hasOpenEvidence) return pairs;
 const orderedServices = closedServices
     .map(service => ({ service, localities: orderedLoopLocalities(service) }))
@@ -1204,8 +1248,9 @@ function contextualLocalityForEndpoint(services, value, selectedLocalities = [])
   return value;
 }
 
-function familyPublicEndpointPair(services, selectedLocalities = []) {
-  const pairs = endpointEvidencePairs(services);
+function familyPublicEndpointPair(services, selectedStops = []) {
+  const selectedLocalities = unique((selectedStops ?? []).map(stop => stop?.locality || stop?.localityQualifier || stop?.parentLocality).map(cleanPublicEndpoint));
+  const pairs = endpointEvidencePairs(services, selectedStops);
   const principalRoute = services.filter(service => normal(service?.routeNumber).replace(/\s+/g, '') === routeGroupKey(service));
   const samePair = (first, second) => first.length === 2 && second.length === 2
     && new Set(first.map(normal)).size === 2
@@ -1217,24 +1262,25 @@ function familyPublicEndpointPair(services, selectedLocalities = []) {
       const contextualPair = pair.map(value => contextualLocalityForEndpoint(services, value, selectedLocalities));
       const key = contextualPair.map(normal).sort().join('|');
       const loopSupport = loopPairs.some(candidate => samePair(candidate.map(value => contextualLocalityForEndpoint(services, value, selectedLocalities)), contextualPair)) ? 1 : 0;
-      const principalSupport = principalRoute.filter(service => endpointEvidencePairs([service])
+      const principalSupport = principalRoute.filter(service => endpointEvidencePairs([service], selectedStops)
         .some(candidate => samePair(candidate.map(value => contextualLocalityForEndpoint(services, value, selectedLocalities)), contextualPair))).length;
       const matchingEvidence = services.map(service => ({
         service,
-        evidenceClass: endpointEvidenceClassForPair(service, pair, services)
+        evidenceClass: endpointEvidenceClassForPair(service, pair, services, selectedStops)
       })).filter(item => item.evidenceClass);
       const evidenceClass = matchingEvidence.map(item => item.evidenceClass)
         .sort((left, right) => endpointEvidenceRank(right) - endpointEvidenceRank(left))[0] || '';
       const patternExtent = services
-        .filter(service => endpointEvidencePairs([service]).some(candidate => samePair(candidate.map(value => contextualLocalityForEndpoint(services, value, selectedLocalities)), contextualPair)))
+        .filter(service => endpointEvidencePairs([service], selectedStops).some(candidate => samePair(candidate.map(value => contextualLocalityForEndpoint(services, value, selectedLocalities)), contextualPair)))
         .reduce((maximum, service) => Math.max(maximum, Number(service.routePatternExtent) || explicitPattern(service).length), 0);
-      const current = counts.get(key) ?? { pair: contextualPair, count: 0, support: 0, principalSupport: 0, patternExtent: 0, loopSupport: 0, evidenceRank: 0, evidenceClass: '', latestValidFrom: '' };
+      const current = counts.get(key) ?? { pair: contextualPair, count: 0, support: 0, principalSupport: 0, patternExtent: 0, loopSupport: 0, evidenceRank: 0, evidenceClass: '', latestValidFrom: '', evidenceFamilies: [] };
       current.count += 1;
       if (endpointEvidenceRank(evidenceClass) > current.evidenceRank) {
         current.evidenceRank = endpointEvidenceRank(evidenceClass);
         current.evidenceClass = evidenceClass;
       }
       current.latestValidFrom = [current.latestValidFrom, ...matchingEvidence.map(item => text(item.service?.validFrom || item.service?.validity?.from))].sort().at(-1) || '';
+      current.evidenceFamilies = unique([...current.evidenceFamilies, ...matchingEvidence.map(({ service }) => `${normal(service?.routeNumber)}|${normal(service?.operator)}`)]);
       current.principalSupport += principalSupport;
       current.patternExtent = Math.max(current.patternExtent, patternExtent);
       current.loopSupport = Math.max(current.loopSupport, loopSupport);
@@ -1248,21 +1294,26 @@ function familyPublicEndpointPair(services, selectedLocalities = []) {
     for (const pair of loopPairs) {
       const contextualPair = pair.map(value => contextualLocalityForEndpoint(services, value, selectedLocalities));
       const key = contextualPair.map(normal).sort().join('|');
-      const current = counts.get(key) ?? { pair: contextualPair, count: 0, support: 0, principalSupport: 0, patternExtent: 0, loopSupport: 0, evidenceRank: 0, evidenceClass: '', latestValidFrom: '' };
+      const current = counts.get(key) ?? { pair: contextualPair, count: 0, support: 0, principalSupport: 0, patternExtent: 0, loopSupport: 0, evidenceRank: 0, evidenceClass: '', latestValidFrom: '', evidenceFamilies: [] };
       current.loopSupport = 1;
       current.evidenceRank = Math.max(current.evidenceRank, endpointEvidenceRank('complete-pattern-terminals'));
       current.evidenceClass ||= 'complete-pattern-terminals';
       current.patternExtent = Math.max(current.patternExtent, ...services.filter(service => Boolean(service?.circular) && closedPhysicalShape(service)).map(service => explicitPattern(service).length));
       counts.set(key, current);
     }
-    const selected = [...counts.values()].sort((left, right) => right.evidenceRank - left.evidenceRank
+    const rankedPairs = [...counts.values()].sort((left, right) => right.evidenceRank - left.evidenceRank
       || right.latestValidFrom.localeCompare(left.latestValidFrom)
       || right.loopSupport - left.loopSupport
       || right.principalSupport - left.principalSupport
       || right.patternExtent - left.patternExtent
       || right.count - left.count
       || right.support - left.support
-      || left.pair.join('|').localeCompare(right.pair.join('|')))[0];
+      || left.pair.join('|').localeCompare(right.pair.join('|')));
+    const selected = rankedPairs[0];
+    // Competing, equally-ranked endpoint pairs for the same route/operator
+    // cannot be resolved by duplicate counts, pattern length, or activity.
+    // Keep the service visible, but leave its public corridor unresolved.
+    if (selected && hasEquallyCurrentEndpointConflict(services, selectedStops)) return [];
     if (selected.evidenceRank >= 3) return selected.pair;
     // The only available pairs are short-working evidence. Do not fall back
     // to those same headsigns as though they established the principal route.
@@ -1270,6 +1321,7 @@ function familyPublicEndpointPair(services, selectedLocalities = []) {
   }
   const principalHeadsigns = new Map();
   for (const service of principalRoute) {
+    if (endpointEvidenceIsUnverified(service)) continue;
     const candidate = directionEndpointCandidate(service);
     if (candidate && !hasLongerRelatedPattern(service, services)) principalHeadsigns.set(normal(candidate), candidate);
   }
@@ -1279,6 +1331,7 @@ function familyPublicEndpointPair(services, selectedLocalities = []) {
   // deliberately does not inspect principalLocations or selected localities.
   const candidates = new Map();
   for (const service of services) {
+    if (endpointEvidenceIsUnverified(service)) continue;
     const candidate = directionEndpointCandidate(service);
     if (candidate) {
       const current = candidates.get(normal(candidate)) ?? { value: candidate, count: 0 };
@@ -1290,9 +1343,10 @@ function familyPublicEndpointPair(services, selectedLocalities = []) {
   return [...candidates.values()].sort((left, right) => right.count - left.count || left.value.localeCompare(right.value)).slice(0, 2).map(item => item.value);
 }
 
-function publicEndpointQualifier(value, services, selectedLocalities = []) {
+function publicEndpointQualifier(value, services, selectedStops = []) {
   const target = normal(value);
-  for (const pair of endpointEvidencePairs(services)) for (const endpoint of pair) {
+  const selectedLocalities = unique((selectedStops ?? []).map(stop => stop?.locality || stop?.localityQualifier || stop?.parentLocality).map(cleanPublicEndpoint));
+  for (const pair of endpointEvidencePairs(services, selectedStops)) for (const endpoint of pair) {
     const contextual = contextualLocalityForEndpoint(services, endpoint, selectedLocalities);
     if (normal(contextual) === target && normal(endpoint) !== target && STREET_ENDPOINT_DESCRIPTOR.test(endpoint)) return endpoint;
   }
@@ -1311,7 +1365,7 @@ function resolvePublicEndpoint(service, side, context) {
   const descriptions = context.endpointPair;
   const rawPublic = cleanPublicEndpoint(raw);
   const headsign = directionEndpointCandidate(service);
-  const patternValues = patternEndpointValues(service);
+  const patternValues = patternEndpointValues(service, context.selectedStops);
   const patternEndpoint = side === 'origin' ? patternValues[0] : patternValues.at(-1);
   if (descriptions.length === 2) {
     const matches = value => descriptions.findIndex(item => normal(item) === normal(value));
@@ -1342,11 +1396,12 @@ function publicDirectionForService(service, stops, familyServices, endpointPairO
   const selectedLocalities = unique((stops ?? []).map(stop => stop?.locality || stop?.localityQualifier || stop?.parentLocality).map(cleanPublicEndpoint));
   const endpointPair = endpointPairOverride?.length === 2
     ? endpointPairOverride
-    : familyPublicEndpointPair(familyServices, selectedLocalities);
+    : familyPublicEndpointPair(familyServices, stops);
   const context = {
     stops,
     endpointPair,
     selectedLocalities,
+    selectedStops: stops,
     services: familyServices
   };
   const origin = resolvePublicEndpoint(service, 'origin', context);
@@ -1358,7 +1413,7 @@ function publicDirectionForService(service, stops, familyServices, endpointPairO
     if (destination.value && !origin.value && destinationIndex >= 0) origin.value = endpointPair[1 - destinationIndex];
   }
   const destinationQualifier = destination.value
-    ? publicEndpointQualifier(destination.value, familyServices, selectedLocalities)
+    ? publicEndpointQualifier(destination.value, familyServices, stops)
     : '';
   return {
     publicOrigin: origin.value || null,
@@ -1369,17 +1424,18 @@ function publicDirectionForService(service, stops, familyServices, endpointPairO
 }
 
 function publicEndpointEvidenceForDirection(origin, destination, services, stops = []) {
+  const trustedServices = services.filter(service => !endpointEvidenceIsUnverified(service));
   const selectedLocalities = unique((stops ?? []).map(stop => stop?.locality || stop?.localityQualifier || stop?.parentLocality).map(cleanPublicEndpoint));
-  const familyPair = familyPublicEndpointPair(services, selectedLocalities);
+  const familyPair = familyPublicEndpointPair(trustedServices, stops);
   const pairMatches = (first, second) => first.length === 2 && second.length === 2
     && first.every(value => second.some(candidate => normal(candidate) === normal(value)));
   const pair = familyPair.length === 2 && pairMatches(familyPair, [origin, destination])
     ? familyPair
     : origin && destination ? [origin, destination] : familyPair;
   const pairKey = pair.map(normal).sort().join('|');
-  const headSigns = services.map(service => ({ service, value: directionEndpointCandidate(service) })).filter(item => item.value);
+  const headSigns = trustedServices.map(service => ({ service, value: directionEndpointCandidate(service) })).filter(item => item.value);
   const pairedHeadSigns = new Set(headSigns.map(item => normal(item.value))).size === 2;
-  const typedEvidence = services.map(service => ({ service, evidenceClass: endpointEvidenceClassForPair(service, pair, services) }))
+  const typedEvidence = trustedServices.map(service => ({ service, evidenceClass: endpointEvidenceClassForPair(service, pair, trustedServices, stops) }))
     .filter(item => item.evidenceClass && pairKey);
   const evidenceClass = typedEvidence.map(item => item.evidenceClass)
     .sort((left, right) => endpointEvidenceRank(right) - endpointEvidenceRank(left))[0]
@@ -1395,14 +1451,14 @@ function publicEndpointEvidenceForDirection(origin, destination, services, stops
   ]).filter(Boolean));
   const fullPatternSupport = relevant.some(hasCompletePublicPattern);
   const reciprocalSupport = pairedHeadSigns || (typedEvidence.some(({ service }) => {
-    const candidate = endpointEvidencePairs([service])[0] ?? [];
+    const candidate = endpointEvidencePairs([service], stops)[0] ?? [];
     return candidate.length === 2 && normal(candidate[0]) === normal(destination) && normal(candidate[1]) === normal(origin);
   }) && typedEvidence.some(({ service }) => {
-    const candidate = endpointEvidencePairs([service])[0] ?? [];
+    const candidate = endpointEvidencePairs([service], stops)[0] ?? [];
     return candidate.length === 2 && normal(candidate[0]) === normal(origin) && normal(candidate[1]) === normal(destination);
   }));
   const localitySupport = relevant.some(service => hasCompletePublicPattern(service)
-    && (service.routePatternStops ?? []).some(stop => [stop?.locality, stop?.localityQualifier, stop?.parentLocality]
+    && (service.routePatternStops ?? []).some(stop => [stop?.locality, stop?.localityQualifier, stop?.parentLocality, selectedTerminalLocality(stop, stops)]
       .some(locality => normal(locality) === normal(origin) || normal(locality) === normal(destination))));
   const makeEndpoint = value => Object.freeze({
     value: value || null,
@@ -1420,23 +1476,31 @@ function publicEndpointEvidenceForDirection(origin, destination, services, stops
 }
 
 function decoratePublicDirections(services, stops) {
-  const selectedLocalities = unique((stops ?? []).map(stop => stop?.locality || stop?.localityQualifier || stop?.parentLocality).map(cleanPublicEndpoint));
-  const familyPair = familyPublicEndpointPair(services, selectedLocalities);
-  const familyEvidenceRank = Math.max(0, ...endpointEvidencePairs(services).flatMap(pair => services
-    .map(service => endpointEvidenceRank(endpointEvidenceClassForPair(service, pair, services)))));
+  const familyPair = familyPublicEndpointPair(services, stops);
+  const conflictingCurrentEvidence = hasEquallyCurrentEndpointConflict(services, stops);
+  const familyEvidenceRank = Math.max(0, ...endpointEvidencePairs(services, stops).flatMap(pair => services
+    .map(service => endpointEvidenceRank(endpointEvidenceClassForPair(service, pair, services, stops)))));
   const pairMatches = (first, second) => first.length === 2 && second.length === 2
     && first.every(value => second.some(candidate => normal(candidate) === normal(value)));
   return services.map(service => {
-    const patternPair = patternEndpointValues(service);
-    const independentCompletePattern = patternPair.length === 2
+    if (endpointEvidenceIsUnverified(service)) return {
+      ...service,
+      publicOrigin: null,
+      publicDestination: null,
+      publicDestinationQualifier: null,
+      publicDirectionConfidence: 'review-required',
+      publicFamilyEndpointPair: []
+    };
+    const patternPair = patternEndpointValues(service, stops);
+    const independentCompletePattern = !conflictingCurrentEvidence && patternPair.length === 2
       && !hasLongerRelatedPattern(service, services)
-      && endpointEvidenceRank(endpointEvidenceClassForPair(service, patternPair, services)) >= 4
+      && endpointEvidenceRank(endpointEvidenceClassForPair(service, patternPair, services, stops)) >= 4
       && familyEvidenceRank < endpointEvidenceRank('authoritative-route-section');
     const servicePair = independentCompletePattern && !pairMatches(patternPair, familyPair)
       ? patternPair
       : familyPair;
     const patternDirection = endpointDirectionFromSelectedStop(service, servicePair, stops)
-      || orderedPatternDirectionEndpoint(service, servicePair);
+      || orderedPatternDirectionEndpoint(service, servicePair, stops);
     return {
       ...service,
       ...publicDirectionForService(service, stops, services, servicePair),
@@ -1465,9 +1529,9 @@ function endpointDirectionFromSelectedStop(service, familyPair, stops) {
   return null;
 }
 
-function orderedPatternDirectionEndpoint(service, familyPair) {
+function orderedPatternDirectionEndpoint(service, familyPair, stops = []) {
   if (!Array.isArray(familyPair) || familyPair.length !== 2) return null;
-  const values = patternEndpointValues(service);
+  const values = patternEndpointValues(service, stops);
   if (values.length !== 2) return null;
   const firstIndex = familyPair.findIndex(value => normal(value) === normal(values[0]));
   const lastIndex = familyPair.findIndex(value => normal(value) === normal(values[1]));
@@ -1549,6 +1613,7 @@ function componentPublicDirection(component, stops = []) {
 }
 
 function directionPatternText(service) {
+  if (endpointEvidenceIsUnverified(service)) return 'Destination not resolved';
   const destination = Object.hasOwn(service ?? {}, 'publicDirectionConfidence')
     ? text(service?.publicDestination)
     : text(service?.publicDestination || service?.destination);
@@ -1602,6 +1667,7 @@ function noteAppliesToCanonicalPopulation(note, schedules) {
 }
 
 function plannerDestination(service) {
+  if (endpointEvidenceIsUnverified(service)) return '';
   const destination = text(service?.publicDestination || service?.destination);
   return destination && !GENERIC_ENDPOINT_LABEL.test(destination)
     && !/^(?:destination not supplied|destination not resolved)$/i.test(destination) && !sourceDirectionMarker(destination)
@@ -1610,6 +1676,7 @@ function plannerDestination(service) {
 }
 
 function plannerOrigin(service) {
+  if (endpointEvidenceIsUnverified(service)) return '';
   const origin = text(service?.publicOrigin || service?.origin);
   return origin && !GENERIC_ENDPOINT_LABEL.test(origin)
     && !/^(?:origin not supplied|origin not resolved)$/i.test(origin) && !sourceDirectionMarker(origin) ? origin : '';
@@ -1624,8 +1691,9 @@ function destinationNames(values) {
 }
 
 function alternateDestinations(component, main) {
+  const trusted = component.filter(service => !endpointEvidenceIsUnverified(service));
   const principalEndpoints = new Set([plannerOrigin(main), plannerDestination(main)].map(normal).filter(Boolean));
-  const evidence = component.flatMap(service => [
+  const evidence = trusted.flatMap(service => [
     plannerOrigin(service), plannerDestination(service), ...patternEndpointValues(service),
     ...[service?.origin, service?.destination].map(cleanPublicEndpoint).filter(value => value && !endpointLooksPhysical(value))
   ]).filter(value => value && !principalEndpoints.has(normal(value)));
@@ -1633,14 +1701,17 @@ function alternateDestinations(component, main) {
 }
 
 function variantNote(component, main) {
-  const endpoints = unique(component.map(service => text(service.origin) + ' → ' + text(service.destination)));
-  const patterns = unique(component.map(service => explicitPattern(service).map(text).join('>')).filter(Boolean));
-  const journeyIdentitySets = component.map(service => new Set(DAY_ORDER.flatMap(day => (service.departureEvidenceByDay?.[day] ?? []).map(item => departureIdentity(item)).filter(Boolean))));
+  const trusted = component.filter(service => !endpointEvidenceIsUnverified(service));
+  if (!trusted.length) return null;
+  const trustedMain = endpointEvidenceIsUnverified(main) ? trusted[0] : main;
+  const endpoints = unique(trusted.map(service => text(service.origin) + ' → ' + text(service.destination)));
+  const patterns = unique(trusted.map(service => explicitPattern(service).map(text).join('>')).filter(Boolean));
+  const journeyIdentitySets = trusted.map(service => new Set(DAY_ORDER.flatMap(day => (service.departureEvidenceByDay?.[day] ?? []).map(item => departureIdentity(item)).filter(Boolean))));
   const sharedJourneyIdentity = journeyIdentitySets.length > 1 && journeyIdentitySets.every(set => set.size) && [...journeyIdentitySets[0]].some(identity => journeyIdentitySets.every(set => set.has(identity)));
-  const alternatives = alternateDestinations(component, main);
-  const hasVariant = component.length > 1 && ((endpoints.length > 1 && !sharedJourneyIdentity) || patterns.length > 1 || component.some(service => Number(service.patternVariantCount) > 1));
+  const alternatives = alternateDestinations(trusted, trustedMain);
+  const hasVariant = trusted.length > 1 && ((endpoints.length > 1 && !sharedJourneyIdentity) || patterns.length > 1 || trusted.some(service => Number(service.patternVariantCount) > 1));
   if (!hasVariant) return null;
-  const publicOrigin = plannerOrigin(main);
+  const publicOrigin = plannerOrigin(trustedMain);
   if (alternatives.length === 1 && normal(alternatives[0]) === normal(publicOrigin)) return `Selected journeys terminate at ${alternatives[0]}.`;
   if (alternatives.length === 1) return `Additional variants and short workings operate, including journeys towards ${alternatives[0]}.`;
   if (alternatives.length > 1) return `Additional variants and short workings operate, including journeys towards ${alternatives.slice(0, -1).join(', ')} and ${alternatives.at(-1)}.`;
@@ -1676,7 +1747,8 @@ export function plannerSourceWarning(service) {
 
 function principalText(main) {
   const locations = unique(main?.principalLocations ?? []);
-  return locations.length ? locations.join(', ') : 'See route origin / destination';
+  if (locations.length) return locations.join(', ');
+  return endpointEvidenceIsUnverified(main) ? 'Not shown — source data stale or undated' : 'See route origin / destination';
 }
 
 function compactPrincipalLocations(component, main, { publicOrigin = '', publicDestination = '' } = {}) {
@@ -1896,7 +1968,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const profileNotes = [];
   if (mixedProfileOutput) profileNotes.push('Calendar profile variation is shown as profile-qualified frequency and operating-period lines within this route-direction row.');
   if (unresolvedNeedsReview) profileNotes.push('Review required before relying on frequency or operating period because calendar applicability is unresolved.');
-  const notes = unique(component.flatMap(service => text(service.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean)))
+  const notes = unique(component.filter(service => !endpointEvidenceIsUnverified(service)).flatMap(service => text(service.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean)))
     .filter(note => noteAppliesToCanonicalPopulation(note, displayResult.schedules))
     .filter(note => rowCircular || !/^Circular service\.$/i.test(note))
     .filter(note => !(mixedProfileOutput && hasCalendarTaxonomyNote(note)));
@@ -1906,7 +1978,12 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const publicOrigin = text(resolvedPublicDirection.publicOrigin);
   const endpointEvidenceServices = routeFamilyServices.filter(service => component.some(member => operatorFamilyCompatible(member, service)));
   const publicEndpointEvidence = publicEndpointEvidenceForDirection(publicOrigin, publicDestination, endpointEvidenceServices, stops);
-  const principalLocations = compactPrincipalLocations(component, main, { publicOrigin, publicDestination });
+  // Stale/undated national snapshots may still support service inclusion and
+  // timetable inspection, but must not publish derived locality claims in the
+  // planner-facing locations column or controlled statement wording.
+  const principalLocations = endpointEvidenceIsUnverified(main)
+    ? []
+    : compactPrincipalLocations(component, main, { publicOrigin, publicDestination });
   const profileSchedules = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).schedules])));
   const profilePopulations = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).entries])));
   const profileFrequency = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).frequencyByDay])));
@@ -1924,6 +2001,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     operator: plannerServiceGroup.operatorNames.join(' · ') || 'Operator identity not resolved',
     origin: publicOrigin || null,
     destination: publicDestination || null,
+    endpointEvidenceFreshness: endpointEvidenceIsUnverified(main) ? text(main.endpointEvidenceFreshness) : null,
     publicEndpointEvidence,
     direction: text(main.direction),
     stopDirection: text(main.stopDirection) || null,
@@ -1950,7 +2028,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     frequencyBasisStopId: representative.id,
     frequencyBasisStopName: representative.name,
     principalLocations: Object.freeze(principalLocations),
-    principalLocationsText: principalText({ principalLocations }),
+    principalLocationsText: principalText({ principalLocations, endpointEvidenceFreshness: main.endpointEvidenceFreshness }),
     typicalFrequency: displayResult.frequencyByDay[DAY_ORDER.find(day => !displayResult.frequencyByDay[day].noService) ?? 'monday'],
     typicalFrequencyLines: Object.freeze(frequencyLines),
     typicalFrequencyText: frequencyLines.join('\n'),
@@ -1975,7 +2053,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     routePatternExtent: Math.max(0, ...component.map(service => Number(service.routePatternExtent) || explicitPattern(service).length)),
     routePatternStops: Object.freeze([...(main.routePatternStops ?? [])]),
     recordActivity: Math.max(0, ...component.map(service => Number(service.recordActivity) || 0)),
-    presentation: Object.freeze({ principalLocationsText: principalText({ principalLocations }), rank: 0 }),
+    presentation: Object.freeze({ principalLocationsText: principalText({ principalLocations, endpointEvidenceFreshness: main.endpointEvidenceFreshness }), rank: 0 }),
     rawServiceSummaries: Object.freeze(component),
     consolidatedSourceRecordIds: Object.freeze([]),
     ambiguousServiceSummaries: Object.freeze([...(component.ambiguousServices ?? [])]),
@@ -2026,8 +2104,9 @@ function principalCorridorForRows(rows, principalRoute) {
 function plannerFamilyNote(rows) {
   const routeNumbers = routeNumbersForRows(rows);
   if (!routeNumbers.length) return null;
+  const trustedRows = rows.filter(row => !endpointEvidenceIsUnverified(row));
   const principalRoute = routeNumberForRoot(rows);
-  const corridor = principalRoute ? principalCorridorForRows(rows, principalRoute) : null;
+  const corridor = principalRoute ? principalCorridorForRows(trustedRows, principalRoute) : null;
   const sentences = [];
   if (principalRoute && corridor) {
     sentences.push(`The principal Route ${principalRoute} service operates between ${corridor.origin} and ${corridor.destination}.`);
@@ -2039,9 +2118,9 @@ function plannerFamilyNote(rows) {
     sentences.push(`The service family includes Route ${routeNumbers[0]}.`);
   }
   const principalEndpoints = new Set(rows.flatMap(row => [row.origin, row.destination]).map(normal).filter(Boolean));
-  const variantRows = rows.filter(row => row.routeVariantNote);
+  const variantRows = trustedRows.filter(row => row.routeVariantNote);
   const familyPrincipalLocations = routeNumbers.length > 1
-    ? rows.flatMap(row => row.principalLocations ?? [])
+    ? trustedRows.flatMap(row => row.principalLocations ?? [])
     : [];
   const alternatives = destinationNames([
     ...variantRows.flatMap(row => row.alternateDestinationNames ?? []),

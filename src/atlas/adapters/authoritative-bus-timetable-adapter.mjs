@@ -293,6 +293,8 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       noCurrentRequestIdentities: [...new Set(noCurrentRequestIdentities)],
       nationalUnresolvedRequestIdentities,
       nationalSourceAvailable,
+      dataPreparedAt: national.provenance?.dataPreparedAt ?? null,
+      nationalDataFreshness: national.provenance?.dataFreshness ?? null,
       nationalUnresolvedRoutes,
       tflTimetableAttempted: processedRequests.length > 0,
       nationalTimetableAttempted: nationalRequired,

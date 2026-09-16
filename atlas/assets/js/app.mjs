@@ -591,7 +591,8 @@ function renderAssessment(result) {
   const diagnosticLines = [
     `Stop source reference: ${stopProvenance.endpoint || 'not supplied'}`,
     `Timetable source reference: ${timetableProvenance.endpoint || 'not supplied'}`,
-    `Prepared dataset time: ${timetableProvenance.dataPreparedAt || stopProvenance.dataPreparedAt || 'not supplied'}`,
+    `Prepared dataset time: ${timetableProvenance.dataPreparedAt || timetableProvenance.nationalDataFreshness?.preparedAt || stopProvenance.dataPreparedAt || 'not supplied'}`,
+    `Prepared national endpoint freshness: ${timetableProvenance.nationalDataFreshness?.status || timetableProvenance.dataFreshness?.status || 'not supplied'}`,
     `Assessment mode: ${result.assessmentMode || 'full'}`,
     `Discovery radius: ${result.provenance.stops?.actualDiscoveryRadiusMetres || result.provenance.stops?.radiusMetres || selectedRadius()} metres`,
     `Nearest stop-group method: ${result.nearestGroup?.basis || 'not applicable'}`,
@@ -732,12 +733,21 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
   }
 }
 
-function exportBusWord() {
+async function exportBusWord() {
   if (!currentBusResult?.ok || !confirmedSite) return setCallout($('stopStatus'), 'Build a Bus assessment before exporting to Word.', 'warning');
   const report = selectedResult();
   if (!report.stops.length && !(report.plannerServiceSummaries ?? report.serviceSummaries).length) return setCallout($('stopStatus'), 'Select at least one stop or service before exporting.', 'warning');
-  downloadWordDocument(busWordFilename(confirmedSite), 'ATLAS Bus Assessment', buildBusWordTables(report), report.wording);
-  setCallout($('stopStatus'), 'Word export created from the checked Bus assessment.', 'success');
+  const exportButton = $('exportBusWord');
+  exportButton.disabled = true;
+  setCallout($('stopStatus'), 'Preparing the Word export from the checked Bus assessment.', 'neutral');
+  try {
+    const output = await downloadWordDocument(busWordFilename(confirmedSite), 'ATLAS Bus Assessment', buildBusWordTables(report), report.wording);
+    setCallout($('stopStatus'), `Word download started: ${output.filename}.`, 'success');
+  } catch {
+    setCallout($('stopStatus'), 'The Word export could not be created. The checked Browser assessment is unchanged.', 'error');
+  } finally {
+    exportButton.disabled = !currentBusResult;
+  }
 }
 
 function initMap() {

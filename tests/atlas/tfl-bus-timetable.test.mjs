@@ -316,6 +316,18 @@ const fallbackResult = await fallback.servicesForStops([stop], { site: { latitud
 assert.equal(fallbackResult.ok, true);
 assert.equal(fallbackResult.data[0].timetableSource, 'BODS fallback after TfL failure');
 assert.match(fallbackResult.warnings.join(' '), /explicit supplementary fallback/);
+const staleNationalFallback = createAuthoritativeBusTimetableAdapter({
+  tflAdapter: failureTfl,
+  nationalAdapter: { servicesForStops: async () => ({
+    ok: true,
+    data: [matchingBods],
+    warnings: [],
+    provenance: { source: 'BODS', dataPreparedAt: '2026-09-04T00:00:00Z', dataFreshness: { status: 'stale', preparedAt: '2026-09-04T00:00:00Z', ageDays: 12, refreshAfterDays: 8 } }
+  }) }
+});
+const staleNationalFallbackResult = await staleNationalFallback.servicesForStops([stop], { site: { latitude: 51.418, longitude: -0.082 } });
+assert.equal(staleNationalFallbackResult.provenance.dataPreparedAt, '2026-09-04T00:00:00Z');
+assert.equal(staleNationalFallbackResult.provenance.nationalDataFreshness.status, 'stale');
 const allFailed = await createAuthoritativeBusTimetableAdapter({ tflAdapter: failureTfl, nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS' } }) } }).servicesForStops([stop], { site: { latitude: 51.418, longitude: -0.082 } });
 assert.equal(allFailed.ok, false);
 assert.match(allFailed.message, /No London zero-service conclusion/);

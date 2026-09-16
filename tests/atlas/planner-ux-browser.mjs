@@ -82,6 +82,17 @@ try {
   assert.match(await page.locator('#plannerChecks').innerText(), /Stops:\s*Transport for London/);
   assert.match(await page.locator('#plannerChecks').innerText(), /Result:\s*Complete/);
 
+  const visibleHeadline = (await page.locator('#serviceRows tr:not(.service-note) td:nth-child(4)').first().innerText()).trim();
+  const [wordDownload] = await Promise.all([
+    page.waitForEvent('download', { timeout: 10000 }),
+    page.getByRole('button', { name: 'Export Word (.docx)' }).click()
+  ]);
+  assert.match(wordDownload.suggestedFilename(), /\.docx$/i);
+  const wordBytes = fs.readFileSync(await wordDownload.path());
+  assert.ok(wordBytes.includes(Buffer.from('Table 3.3 - Bus Service Summary')), 'Downloaded DOCX is missing Table 3.3.');
+  assert.ok(wordBytes.includes(Buffer.from(visibleHeadline)), 'Downloaded Table 3.3 does not contain the visible Browser headline.');
+  await page.getByText(/Word download started:/).waitFor({ timeout: 5000 });
+
   const prohibited = /\b(?:HTTP|API|endpoint|TTL|JSON|schema|adapter|cache hit|payload|CORS|geocoder|query relaxation)\b/i;
   assert.doesNotMatch(await page.locator('body').innerText(), prohibited, 'Normal planner view exposed software terminology.');
   assert.equal(await page.locator('.technical-details').last().getByText('View technical details', { exact: true }).isVisible(), true);

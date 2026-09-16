@@ -264,4 +264,46 @@ function departuresCount(service) {
   assert.ok(rows.filter(row => row.destination === 'New Town').every(row => row.publicEndpointEvidence.destination.evidenceClass === 'authoritative-route-section'), JSON.stringify(rows.map(row => ({ o: row.origin, d: row.destination, evidence: row.publicEndpointEvidence }))));
 }
 
-console.log('PASS Alpha.16 national planner regression matrix: 22/22 cases.');
+// 23. A generic complete-pattern terminal may use locality metadata from the
+// exact selected terminal stop, but not from a nearby site stop.
+{
+  const terminalStop = { id: 'SEL', name: 'Bus Station', locality: 'Town B' };
+  const service = record({ id: 'matched-generic-terminal', routeNumber: 'I23', origin: 'Town A', destination: 'Bus Station', patternNames: ['Town A', 'Midpoint', 'Bus Station'], routePatternStops: [
+    { id: 'Town A-0', name: 'Town A', locality: 'Town A' },
+    { id: 'Midpoint-1', name: 'Midpoint', locality: 'Midpoint' },
+    { id: 'SEL', name: 'Bus Station' }
+  ] });
+  const [row] = rowsFor([service], [terminalStop]);
+  assert.equal(row.destination, 'Town B');
+  assert.equal(row.publicEndpointEvidence.destination.localitySupport, true);
+}
+
+// 24. Equally current complete patterns that disagree for the same public
+// route/operator remain visible without one corridor winning by duplicate count.
+{
+  const rows = rowsFor([
+    record({ id: 'conflicting-current-a', routeNumber: 'I24', origin: 'Town A', destination: 'Town B', patternNames: ['Town A', 'Midpoint', 'Town B'], validFrom: '2026-09-04' }),
+    record({ id: 'conflicting-current-b', routeNumber: 'I24', origin: 'Town A', destination: 'Town C', direction: 'Town C', patternNames: ['Town A', 'Midpoint', 'Town C'], validFrom: '2026-09-04' }),
+    record({ id: 'conflicting-current-a-copy', routeNumber: 'I24', origin: 'Town A', destination: 'Town B', patternNames: ['Town A', 'Midpoint', 'Town B'], validFrom: '2026-09-04' })
+  ]);
+  assert.ok(rows.length > 0, 'conflicted schedules remain represented');
+  assert.ok(rows.every(row => row.directionPatternText === 'Destination not resolved'), JSON.stringify(rows.map(row => row.directionPatternText)));
+  assert.ok(rows.every(row => row.publicEndpointEvidence.destination.status === 'unresolved'));
+}
+
+// 25. Stale national snapshots remain represented, but cannot publish a public corridor.
+{
+  const rows = rowsFor([
+    record({ id: 'stale-279-manor-out', routeNumber: '279', operator: 'Arriva London North', origin: 'Bus Station', destination: 'Manor House Station', direction: 'Manor House Station', patternNames: ['Bus Station', 'Manor House Station'], endpointEvidenceFreshness: 'stale' }),
+    record({ id: 'stale-279-rookwood-out', routeNumber: '279', operator: 'Arriva London North', origin: 'Bus Station', destination: 'Rookwood Road', direction: 'Rookwood Road', patternNames: ['Bus Station', 'Rookwood Road'], endpointEvidenceFreshness: 'stale' }),
+    record({ id: 'stale-279-manor-back', routeNumber: '279', operator: 'Arriva London North', origin: 'Manor House Station', destination: 'Bus Station', direction: 'Bus Station', patternNames: ['Manor House Station', 'Bus Station'], endpointEvidenceFreshness: 'stale' }),
+    record({ id: 'stale-279-rookwood-back', routeNumber: '279', operator: 'Arriva London North', origin: 'Rookwood Road', destination: 'Bus Station', direction: 'Bus Station', patternNames: ['Rookwood Road', 'Bus Station'], endpointEvidenceFreshness: 'stale' })
+  ]);
+  assert.ok(rows.length > 0, 'stale scheduled services remain represented');
+  assert.ok(rows.every(row => row.destination === null && row.directionPatternText === 'Destination not resolved'), JSON.stringify(rows.map(row => ({ destination: row.destination, direction: row.directionPatternText }))));
+  assert.ok(rows.every(row => row.publicEndpointEvidence.destination.status === 'unresolved'));
+  assert.ok(rows.every(row => row.principalLocations.length === 0 && row.principalLocationsText === 'Not shown — source data stale or undated'), 'stale national localities cannot appear as planner-facing principal locations');
+  assert.doesNotMatch(rows.map(row => `${row.serviceNote} ${row.routeGroupNote}`).join(' '), /Manor House|Rookwood Road/i);
+}
+
+console.log('PASS Alpha.16 national planner regression matrix: 25/25 cases.');

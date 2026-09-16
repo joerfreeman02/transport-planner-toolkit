@@ -74,11 +74,14 @@ test('invalid NaPTAN modification timestamps are not promoted into Evidence meta
 });
 
 test('prepared BODS lookup joins schedules by authoritative stop ID', async () => {
-  const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchFixture, baseUrl: 'https://atlas.example/data/' });
+  const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchFixture, baseUrl: 'https://atlas.example/data/', clock: () => new Date('2026-09-16T10:00:00Z') });
   const result = await adapter.servicesForStops([stop]);
   assert.equal(result.ok, true);
   assert.equal(result.data[0].routeNumber, '10');
   assert.equal(result.provenance.apiKeyEmbedded, false);
+  assert.equal(result.provenance.dataFreshness.status, 'stale');
+  assert.equal(result.provenance.dataFreshness.preparedAt, manifest.generatedAt);
+  assert.match(result.warnings.join(' '), /12 days old and should be refreshed/);
 });
 
 test('TNDS quarantine warns only when an affected selected stop is assessed', async () => {

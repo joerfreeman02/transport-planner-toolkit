@@ -24,6 +24,10 @@ Paired public direction/headsign evidence is a lower-confidence fallback. Generi
 
 Where only partial patterns and non-terminal local evidence exist, the row remains present with restrained unresolved endpoint wording. Endpoint uncertainty does not remove a scheduled service; Route 310 is an explicit acceptance sentinel for this invariant.
 
+## Freshness gate
+
+Endpoint evidence from a prepared national snapshot is usable for a public endpoint only while its manifest-derived freshness is `current`. A stale or undated snapshot may continue to support service inclusion and source inspection, but it cannot resolve the planner headline direction, principal locations, short-working notes, or controlled connection wording. Freshness is carried with the endpoint provenance and shown in Sources and checks. A refresh is a data-pipeline follow-up; this Alpha.16 resolver change does not alter acquisition or updater scheduling.
+
 ## Route families and variants
 
 Evidence is ranked before activity, frequency, support counts, or pattern length. A shorter pattern that is a strict subsequence of a longer related complete pattern is treated as short-working evidence. It remains retained as a variant, while the stronger full public pair stays principal. Operator families are evaluated separately so one operator's endpoint evidence cannot resolve another operator's service.

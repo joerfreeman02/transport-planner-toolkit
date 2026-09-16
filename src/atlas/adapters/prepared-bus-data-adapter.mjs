@@ -111,14 +111,23 @@ export function createPreparedBusDataAdapter({
     return sourceSuccess({ data: response.data, provenance: { source: `${STOP_SOURCE} and ${TIMETABLE_SOURCE}`, endpoint: resolveUrl(baseUrl, 'manifest.json') } });
   }
 
-  function snapshotWarnings(data) {
-    const warnings = [];
+  function snapshotFreshness(data) {
     const generated = Date.parse(data.generatedAt);
-    if (!Number.isFinite(generated)) warnings.push('The prepared bus dataset does not contain a valid update time.');
-    else {
-      const ageDays = (clock().getTime() - generated) / 86400000;
-      if (ageDays > Number(data.refreshAfterDays || 8)) warnings.push(`The prepared bus dataset is ${Math.floor(ageDays)} days old and should be refreshed before formal use.`);
-    }
+    const refreshAfterDays = Number(data.refreshAfterDays || 8);
+    if (!Number.isFinite(generated)) return Object.freeze({ status: 'unknown', preparedAt: null, ageDays: null, refreshAfterDays });
+    const ageDays = (clock().getTime() - generated) / 86400000;
+    return Object.freeze({
+      status: ageDays < 0 ? 'unknown' : ageDays > refreshAfterDays ? 'stale' : 'current',
+      preparedAt: data.generatedAt,
+      ageDays,
+      refreshAfterDays
+    });
+  }
+
+  function snapshotWarnings(data, freshness = snapshotFreshness(data)) {
+    const warnings = [];
+    if (freshness.status === 'unknown') warnings.push('The prepared bus dataset does not contain a valid update time or is future-dated.');
+    else if (freshness.status === 'stale') warnings.push(`The prepared bus dataset is ${Math.floor(freshness.ageDays)} days old and should be refreshed before formal use.`);
     return warnings;
   }
 
@@ -175,6 +184,7 @@ export function createPreparedBusDataAdapter({
     const manifestResult = await manifest(forceRefresh);
     if (!manifestResult.ok) return manifestResult;
     const index = manifestResult.data;
+    const dataFreshness = snapshotFreshness(index);
     const stopIds = new Set((stops ?? []).map(stop => String(stop.id || stop.sourceId || '')).filter(Boolean));
     const prefixLength = Number(index.serviceShardKeyLength || 3);
     const shardKeys = [...new Set((stops ?? []).map(stop => String(stop.id || stop.sourceId || '').slice(0, prefixLength)).filter(code => code.length === prefixLength))];
@@ -256,7 +266,7 @@ export function createPreparedBusDataAdapter({
         tndsProvenance = { source: 'Traveline National Dataset supplementary data', dataPreparedAt: manifest.generatedAt, regions: manifest.regions, serving: legacy ? 'bounded-legacy-manifest' : 'stop-prefix-shards', shardRequests: [...new Set(shardPaths)].length, unresolvedRequestIdentities };
     }
     const checkedAt = clock().toISOString();
-    const warnings = [...snapshotWarnings(index), ...tndsWarnings];
+    const warnings = [...snapshotWarnings(index, dataFreshness), ...tndsWarnings];
     if (!mergedServices.some(service => scheduledStopIds(service).length)) warnings.push('No current BODS timetable records matched the selected authoritative stop identifiers.');
     const unresolvedRequestIdentities = [...new Set(tndsProvenance?.unresolvedRequestIdentities ?? [])].sort();
     const timetableConclusion = mergedServices.some(service => scheduledStopIds(service).length)
@@ -264,7 +274,7 @@ export function createPreparedBusDataAdapter({
       : unresolvedRequestIdentities.length ? 'UNRESOLVED' : 'NO_CURRENT_MATCH';
     return sourceSuccess({
       data: mergedServices, evidence: [], warnings,
-      provenance: { source: tndsProvenance ? `${TIMETABLE_SOURCE}; ${tndsProvenance.source}` : TIMETABLE_SOURCE, endpoint: index.sources.bods.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, tndsPreparedAt: tndsProvenance?.dataPreparedAt || null, tndsServing: tndsProvenance?.serving || null, tndsShardRequests: tndsProvenance?.shardRequests ?? null, datasetVersion: index.sources.bods.sha256, regions: index.sources.bods.regions, representativeDates: index.representativeDates, anonymousRequest: true, apiKeyEmbedded: false, attribution: TIMETABLE_ATTRIBUTION, unresolvedRequestIdentities, nationalUnresolvedRequestIdentities: unresolvedRequestIdentities, timetableConclusion }
+      provenance: { source: tndsProvenance ? `${TIMETABLE_SOURCE}; ${tndsProvenance.source}` : TIMETABLE_SOURCE, endpoint: index.sources.bods.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, dataFreshness, tndsPreparedAt: tndsProvenance?.dataPreparedAt || null, tndsServing: tndsProvenance?.serving || null, tndsShardRequests: tndsProvenance?.shardRequests ?? null, datasetVersion: index.sources.bods.sha256, regions: index.sources.bods.regions, representativeDates: index.representativeDates, anonymousRequest: true, apiKeyEmbedded: false, attribution: TIMETABLE_ATTRIBUTION, unresolvedRequestIdentities, nationalUnresolvedRequestIdentities: unresolvedRequestIdentities, timetableConclusion }
     });
   }
 

@@ -110,6 +110,20 @@ export async function copyWordTables(tables) {
   await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([wordFragment(tables)], { type: 'text/html' }), 'text/plain': new Blob([plainTables(tables)], { type: 'text/plain' }) })]);
 }
 
-export function downloadWordDocument(filename, title, tables, wording = '') {
-  docxBlob(title, tables, wording).arrayBuffer().then(bytes => { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })), link = document.createElement('a'); link.href = url; link.download = filename.replace(/\.doc$/i, '.docx'); link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); });
+export async function downloadWordDocument(filename, title, tables, wording = '') {
+  const bytes = await docxBlob(title, tables, wording).arrayBuffer();
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename.replace(/\.doc$/i, '.docx');
+  link.style.position = 'fixed';
+  link.style.left = '-10000px';
+  link.style.top = '0';
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 1000);
+  return { filename: link.download, sizeBytes: bytes.byteLength };
 }

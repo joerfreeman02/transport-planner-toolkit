@@ -15,7 +15,7 @@ const week = {
 };
 const stop = { id: 'A', name: 'Waltham Cross Bus Station', indicator: 'G', distanceMetres: 110, walking: { status: 'routed', distanceMetres: 82 } };
 const secondStop = { id: 'B', name: 'Waltham Cross Bus Station', indicator: 'H', distanceMetres: 95, walking: { status: 'routed', distanceMetres: 120 } };
-const base = { routeNumber: '657', operator: 'Example Buses', direction: 'outbound', directionFamily: 'gtfs:0', origin: 'Waltham Cross', destination: 'Chingford', principalLocations: ['Enfield', 'Chingford Mount'], routePatternStopIds: ['A', 'B', 'C'], routePatternCompleteness: 'complete', routePatternStops: [{ id: 'A', name: 'Waltham Cross' }, { id: 'B', name: 'Interchange' }, { id: 'C', name: 'Chingford' }], frequencyBasisStopId: 'A', stopIds: ['A'], departuresByDay: week, frequencyEvidence: [], sourceRecordIds: ['main'], serviceNote: 'School-day-only service.', calendarProfileId: 'ordinary' };
+const base = { routeNumber: '657', operator: 'Example Buses', direction: 'outbound', directionFamily: 'gtfs:0', origin: 'Waltham Cross', destination: 'Chingford', principalLocations: ['Enfield', 'Chingford Mount'], routePatternStopIds: ['A', 'B', 'C'], routePatternCompleteness: 'complete', routePatternStops: [{ id: 'A', name: 'Waltham Cross' }, { id: 'B', name: 'Interchange' }, { id: 'C', name: 'Chingford' }], endpointProvenance: { origin: { value: 'Waltham Cross', provider: 'Test GTFS', endpoint: 'fixture', preparedAt: '2026-09-15T00:00:00Z', freshness: { status: 'current' }, evidenceClass: 'complete-pattern-terminals', sourceKind: 'GTFS complete public pattern' }, destination: { value: 'Chingford', provider: 'Test GTFS', endpoint: 'fixture', preparedAt: '2026-09-15T00:00:00Z', freshness: { status: 'current' }, evidenceClass: 'complete-pattern-terminals', sourceKind: 'GTFS complete public pattern' } }, frequencyBasisStopId: 'A', stopIds: ['A'], departuresByDay: week, frequencyEvidence: [], sourceRecordIds: ['main'], serviceNote: 'School-day-only service.', calendarProfileId: 'ordinary' };
 
 const planner = buildPlannerBusServiceSummaries([
   base,
@@ -93,6 +93,12 @@ const plannerRecord = ({ routeNumber = '279', destination = 'Theobalds Grove', d
   sourceRecordIds: [ids],
   serviceNote,
   calendarProfileId: 'ordinary',
+  endpointProvenance: Object.fromEntries(['origin', 'destination'].map(side => [side, {
+    value: side === 'origin' ? extra.origin ?? 'Waltham Cross' : destination,
+    provider: 'Test GTFS', endpoint: 'fixture', preparedAt: '2026-09-15T00:00:00Z',
+    freshness: { status: 'current' }, evidenceClass: 'complete-pattern-terminals', sourceKind: 'GTFS complete public pattern'
+  }])),
+  timetableSource: 'Test GTFS',
   ...extra
 });
 const coherentStops = [

@@ -50,6 +50,11 @@ function productionRecord({
     routePatternStopIds: pattern,
     routePatternCompleteness: 'complete',
     routePatternStops: pattern.map((patternId, index) => ({ id: patternId, name: patternNames[index] || patternId })),
+    endpointProvenance: Object.fromEntries(['origin', 'destination'].map(side => [side, {
+      value: side === 'origin' ? origin : destination,
+      provider: 'BODS', endpoint: 'prepared BODS fixture', preparedAt: '2026-09-14T12:00:00Z',
+      freshness: { status: 'current' }, evidenceClass: 'complete-pattern-terminals', sourceKind: 'BODS complete route pattern'
+    }])),
     stopSchedules: weeklySchedule(minutes, stopId),
     departureEvidenceByDay: evidenceByDay(minutes, id, stopId),
     calendarProfileId,
@@ -57,7 +62,9 @@ function productionRecord({
       provider: 'BODS',
       routeId,
       directionId,
-      vehicleJourneyCode: `${routeId}:${id}`
+      vehicleJourneyCode: `${routeId}:${id}`,
+      preparedAt: '2026-09-14T12:00:00Z',
+      endpoint: 'prepared BODS fixture'
     },
     timetableSource: 'BODS'
   };
@@ -168,6 +175,11 @@ function reviewRecord({
     routePatternStopIds: pattern,
     routePatternCompleteness: 'complete',
     routePatternStops: pattern.map((patternId, index) => ({ id: patternId, name: patternNames[index] || patternId })),
+    endpointProvenance: Object.fromEntries(['origin', 'destination'].map(side => [side, {
+      value: side === 'origin' ? origin : destination,
+      provider: 'BODS', endpoint: 'prepared BODS fixture', preparedAt: '2026-09-14T12:00:00Z',
+      freshness: { status: 'current' }, evidenceClass: 'complete-pattern-terminals', sourceKind: 'BODS complete route pattern'
+    }])),
     stopSchedules: Object.fromEntries(Object.entries(stopMinutes).map(([stopId, minutes]) => [stopId, dailyMinutes(minutes)])),
     departureEvidenceByDay: evidenceForStops({ id, stopMinutes }),
     calendarProfileId,
@@ -181,7 +193,9 @@ function reviewRecord({
       routeId,
       directionId,
       patternId: `${routeId}:${id}:pattern`,
-      vehicleJourneyCode: `${routeId}:${id}`
+      vehicleJourneyCode: `${routeId}:${id}`,
+      preparedAt: '2026-09-14T12:00:00Z',
+      endpoint: 'prepared BODS fixture'
     },
     timetableSource: 'BODS'
   };

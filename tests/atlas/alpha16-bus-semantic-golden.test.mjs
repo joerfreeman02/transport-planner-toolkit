@@ -40,7 +40,12 @@ assert.ok(rowsFor('66').every(row => row.rawServiceSummaries.some(service => ser
 
 assert.equal(rowsFor('242').length, 4, '242 keeps two public directions for each current operator');
 assert.deepEqual(new Set(rowsFor('242').map(row => row.operator)), new Set(['Central Connect', 'Uno']));
-assert.deepEqual(new Set(rowsFor('242').map(row => row.destination)), new Set(['Potters Bar', 'Waltham Cross']));
+assert.deepEqual(new Set(rowsFor('242').filter(row => row.operator === 'Uno').map(row => row.destination)), new Set(['Potters Bar', 'Waltham Cross']), 'Uno retains its supported public corridor');
+assert.ok(rowsFor('242').filter(row => row.operator === 'Central Connect').every(row => row.origin === null && row.destination === null
+  && row.publicEndpointEvidence.origin.status === 'unresolved'
+  && row.publicEndpointEvidence.destination.status === 'unresolved'
+  && !row.publicEndpointEvidence.origin.sourceProviders.length
+  && !row.publicEndpointEvidence.destination.sourceProviders.length), 'unsupported Central Connect endpoint labels remain unresolved without fabricated provenance');
 assert.ok(rowsFor('242').some(row => row.rawServiceSummaries.some(service => /Welham Green/i.test(`${service.origin} ${service.destination}`))), 'historical Welham Green evidence remains retained below the public headline');
 
 assert.deepEqual(directionsFor('310'), new Set(['Towards Hertford', 'Towards Waltham Cross']));
@@ -53,7 +58,8 @@ assert.ok(rowsFor('A1').every(row => row.operator === 'Central Connect'));
 assert.ok(rowsFor('A1').some(row => row.rawServiceSummaries.some(service => /Quaker Lane|Highbridge/i.test(`${service.origin} ${service.destination}`))), 'A1 alternate terminus evidence remains retained below the public headline');
 
 for (const row of rows.filter(row => ['25C', '66', '242', '310', 'A1'].includes(row.routeNumber))) {
-  assert.equal(row.reviewRequired, false, `${row.routeNumber}: resolved production evidence needs no review flag`);
+  const unresolved242Endpoints = row.routeNumber === '242' && row.operator === 'Central Connect';
+  assert.equal(row.reviewRequired, unresolved242Endpoints, `${row.routeNumber} ${row.operator}: only unsupported unresolved endpoints require review`);
   assert.ok(row.operatorRawNames.length > 0, `${row.routeNumber}: raw operator evidence is retained`);
   assert.match(row.servedAtText, /timetable basis/);
   assert.doesNotMatch(reportText(row), /calendar evidence|source record|diagnostic|prepared feed|GTFS|TNDS|BODS|internal/i, `${row.routeNumber}: internal evidence wording must not leak into the report headline`);
@@ -81,7 +87,8 @@ assert.equal(legacySummary.calendarEvidence[0].resolutionStatus, 'derived');
 const wordTable = buildBusWordTables({ ok: true, stops: fixture.stops, plannerServiceSummaries: rows, serviceSummaries: [] })[1];
 const wordRows = wordTable.rows.filter(row => Array.isArray(row));
 for (const row of rows) {
-  const wordRow = wordRows.find(candidate => candidate[0] === row.routeNumber && candidate[1] === row.operator && candidate[2] === row.directionPatternText);
+  const wordRow = wordRows.find(candidate => candidate[0] === row.routeNumber && candidate[1] === row.operator && candidate[2] === row.directionPatternText
+    && candidate[3] === row.servedAtText && candidate[5] === row.typicalFrequencyText);
   assert.ok(wordRow, `${row.routeNumber} ${row.directionPatternText}: Word row exists`);
   assert.deepEqual(wordRow.slice(0, 7), [
     row.routeNumber,

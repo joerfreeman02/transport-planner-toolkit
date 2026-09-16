@@ -27,7 +27,64 @@ const CALENDAR_PROFILE_LABELS = Object.freeze({
 
 function text(value) { return String(value ?? '').trim(); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
-function endpointEvidenceIsUnverified(service) { return ['stale', 'unknown'].includes(normal(service?.endpointEvidenceFreshness)); }
+const publishableEndpointFreshness = new Set(['live-current', 'cached-current', 'current']);
+const publishableEndpointClasses = new Set(['authoritative-route-section', 'explicit-public-endpoints', 'complete-pattern-terminals', 'route-description', 'paired-public-direction-headsigns']);
+function endpointEvidenceIsUnverified(service, side = null) {
+  if (side) {
+    const provenance = service?.endpointProvenance?.[side];
+    const status = text(provenance?.freshness?.status).toLowerCase().replace(/\s+/g, '-');
+    if (provenance && status) return !publishableEndpointFreshness.has(status);
+  }
+  const recordFreshness = normal(service?.endpointEvidenceFreshness);
+  if (!['stale', 'unknown'].includes(recordFreshness)) return false;
+  const completeCurrentIdentity = ['origin', 'destination'].every(endpointSide => {
+    const provenance = service?.endpointProvenance?.[endpointSide];
+    const freshness = text(provenance?.freshness?.status).toLowerCase().replace(/\s+/g, '-');
+    return Boolean(text(provenance?.value) && text(provenance?.provider)
+      && publishableEndpointFreshness.has(freshness)
+      && publishableEndpointClasses.has(text(provenance?.evidenceClass)));
+  });
+  return !completeCurrentIdentity;
+}
+function currentTfLRouteSection(service) {
+  const routeMetadataCandidates = [
+    service?.routeMetadataEvidence,
+    service?.source?.routeMetadataEvidence,
+    ...(service?.sourceRecords ?? []).map(record => record?.source?.routeMetadataEvidence)
+  ].filter(evidence => evidence?.routeSection?.origin && evidence?.routeSection?.destination);
+  const sectionIdentities = unique(routeMetadataCandidates.map(evidence => {
+    const section = evidence.routeSection;
+    return [normal(section.direction), normal(cleanPublicEndpoint(section.origin, true)),
+      normal(cleanPublicEndpoint(section.destination, true))].join('|');
+  }));
+  if (sectionIdentities.length !== 1) return null;
+  const routeMetadataEvidence = routeMetadataCandidates[0];
+  const section = routeMetadataEvidence?.routeSection;
+  if (!section?.origin || !section?.destination || !section?.direction) return null;
+  const metadataFreshness = text(routeMetadataEvidence?.freshness).toLowerCase().replace(/\s+/g, '-');
+  if (metadataFreshness && !publishableEndpointFreshness.has(metadataFreshness)) return null;
+  const provenanceIsCurrent = ['origin', 'destination'].every(side => {
+    const provenance = service?.endpointProvenance?.[side];
+    const freshness = text(provenance?.freshness?.status).toLowerCase().replace(/\s+/g, '-');
+    return /^tfl\b/i.test(text(provenance?.provider))
+      && publishableEndpointFreshness.has(freshness)
+      && provenance?.evidenceClass === 'authoritative-route-section';
+  });
+  return provenanceIsCurrent ? section : null;
+}
+function sameCurrentTfLRouteDirection(first, second) {
+  const left = currentTfLRouteSection(first), right = currentTfLRouteSection(second);
+  if (!left || !right || normal(left.direction) !== normal(right.direction)) return false;
+  const routeIdFor = service => service?.routeMetadataEvidence?.routeId
+    || service?.source?.routeMetadataEvidence?.routeId
+    || (service?.sourceRecords ?? []).map(record => record?.source?.routeMetadataEvidence?.routeId).find(Boolean)
+    || service?.source?.lineId || service?.source?.routeId || service?.routeNumber;
+  const leftRoute = normal(routeIdFor(first));
+  const rightRoute = normal(routeIdFor(second));
+  return Boolean(leftRoute && rightRoute && leftRoute === rightRoute
+    && normal(cleanPublicEndpoint(left.origin, true)) === normal(cleanPublicEndpoint(right.origin, true))
+    && normal(cleanPublicEndpoint(left.destination, true)) === normal(cleanPublicEndpoint(right.destination, true)));
+}
 function unique(values) { return [...new Set((values ?? []).map(text).filter(Boolean))]; }
 function numeric(values) { return unique(values).map(Number).filter(Number.isFinite).sort((a, b) => a - b); }
 function stopId(stop) { return text(stop?.id || stop?.sourceId); }
@@ -509,7 +566,8 @@ function compatibleDirection(first, second, aliases = []) {
   const firstPublic = { origin: plannerOrigin(first), destination: plannerDestination(first) };
   const secondPublic = { origin: plannerOrigin(second), destination: plannerDestination(second) };
   const firstMarker = explicitDirectionMarker(first), secondMarker = explicitDirectionMarker(second);
-  const markerConflict = firstMarker && secondMarker && firstMarker !== secondMarker;
+  const markerConflict = firstMarker && secondMarker && firstMarker !== secondMarker
+    && !sameCurrentTfLRouteDirection(first, second);
   const samePublicPair = firstPublic.origin && firstPublic.destination && secondPublic.origin && secondPublic.destination
     && normal(firstPublic.origin) === normal(secondPublic.origin)
     && normal(firstPublic.destination) === normal(secondPublic.destination);
@@ -519,6 +577,7 @@ function compatibleDirection(first, second, aliases = []) {
   // ordered pattern evidence confirms the same corridor; otherwise retain
   // the reverse-endpoint separation for genuine opposite directions.
   if (reverseEndpointRelationship(first, second)
+    && !sameCurrentTfLRouteDirection(first, second)
     && !(samePublicPair && markerConflict && reversePatternRelationship(first, second))) return false;
   if (markerConflict && ((first?.circular && closedPhysicalShape(first))
     || (second?.circular && closedPhysicalShape(second)))) return false;
@@ -1063,7 +1122,7 @@ function selectedTerminalLocality(patternStop, selectedStops = []) {
 }
 
 function patternEndpointValue(service, side, selectedStops = []) {
-  if (endpointEvidenceIsUnverified(service)) return '';
+  if (endpointEvidenceIsUnverified(service, side)) return '';
   if (!hasCompletePublicPattern(service)) return '';
   const stops = Array.isArray(service?.routePatternStops) ? service.routePatternStops : [];
   if (stops.length < 2) return '';
@@ -1116,13 +1175,14 @@ function patternEndpointValues(service, selectedStops = []) {
 }
 
 function explicitPublicEndpointPair(service) {
+  if (endpointEvidenceIsUnverified(service, 'origin') || endpointEvidenceIsUnverified(service, 'destination')) return [];
   const origin = cleanPublicEndpoint(service?.publicRouteOrigin || service?.routeOrigin || service?.source?.routeOrigin, true);
   const destination = cleanPublicEndpoint(service?.publicRouteDestination || service?.routeDestination || service?.source?.routeDestination, true);
   return origin && destination && normal(origin) !== normal(destination) ? [origin, destination] : [];
 }
 
 function directionEndpointCandidate(service) {
-  if (endpointEvidenceIsUnverified(service)) return '';
+  if (endpointEvidenceIsUnverified(service, 'destination')) return '';
   const value = text(service?.direction || service?.stopDirection);
   if (!value || sourceDirectionMarker(value)) return '';
   const candidate = cleanPublicEndpoint(value.replace(/^towards?\s+/i, '').split(/[,;|]/)[0], true);
@@ -1132,10 +1192,11 @@ function directionEndpointCandidate(service) {
 function endpointEvidencePairs(services, selectedStops = []) {
   const pairs = [];
   for (const service of services) {
-    if (endpointEvidenceIsUnverified(service)) continue;
-    const described = descriptionEndpoints(routeDescriptionValues(service));
     const explicit = explicitPublicEndpointPair(service);
-    const patterned = patternEndpointValues(service, selectedStops);
+    const globallyUnverified = endpointEvidenceIsUnverified(service);
+    if (globallyUnverified && !explicit.length) continue;
+    const described = globallyUnverified ? [] : descriptionEndpoints(routeDescriptionValues(service));
+    const patterned = globallyUnverified ? [] : patternEndpointValues(service, selectedStops);
     for (const pair of [explicit, ...described, patterned]) {
       if (pair.length === 2) pairs.push(pair);
     }
@@ -1157,14 +1218,17 @@ function hasLongerRelatedPattern(service, familyServices = []) {
 }
 
 function endpointEvidenceClassForPair(service, pair, familyServices = [], selectedStops = []) {
-  if (endpointEvidenceIsUnverified(service)) return '';
+  const explicit = explicitPublicEndpointPair(service);
+  const globallyUnverified = endpointEvidenceIsUnverified(service);
+  if (globallyUnverified && !explicit.length) return '';
   const samePair = candidate => candidate.length === 2 && pair.length === 2
     && pair.every(value => candidate.some(item => normal(item) === normal(value)));
-  if (samePair(explicitPublicEndpointPair(service))) {
+  if (samePair(explicit)) {
     const routeSectionMatched = service?.source?.routeMetadata === 'matched'
       || (service?.sourceRecords ?? []).some(record => record?.source?.routeMetadata === 'matched');
     return routeSectionMatched ? 'authoritative-route-section' : 'explicit-public-endpoints';
   }
+  if (globallyUnverified) return '';
   if (patternEndpointValues(service, selectedStops).length === 2 && samePair(patternEndpointValues(service, selectedStops))) {
     return hasLongerRelatedPattern(service, familyServices) ? 'short-working-pattern-terminals' : 'complete-pattern-terminals';
   }
@@ -1178,7 +1242,8 @@ function endpointEvidenceRank(evidenceClass) {
     'explicit-public-endpoints': 4,
     'complete-pattern-terminals': 4,
     'short-working-pattern-terminals': 2,
-    'route-description': 3
+    'route-description': 3,
+    'paired-public-direction-headsigns': 2
   })[evidenceClass] ?? 0;
 }
 
@@ -1306,8 +1371,6 @@ function familyPublicEndpointPair(services, selectedStops = []) {
       || right.loopSupport - left.loopSupport
       || right.principalSupport - left.principalSupport
       || right.patternExtent - left.patternExtent
-      || right.count - left.count
-      || right.support - left.support
       || left.pair.join('|').localeCompare(right.pair.join('|')));
     const selected = rankedPairs[0];
     // Competing, equally-ranked endpoint pairs for the same route/operator
@@ -1424,14 +1487,18 @@ function publicDirectionForService(service, stops, familyServices, endpointPairO
 }
 
 function publicEndpointEvidenceForDirection(origin, destination, services, stops = []) {
-  const trustedServices = services.filter(service => !endpointEvidenceIsUnverified(service));
+  const trustedServices = services.filter(service => !endpointEvidenceIsUnverified(service)
+    || ['origin', 'destination'].some(side => service?.endpointProvenance?.[side]
+      && !endpointEvidenceIsUnverified(service, side)));
   const selectedLocalities = unique((stops ?? []).map(stop => stop?.locality || stop?.localityQualifier || stop?.parentLocality).map(cleanPublicEndpoint));
   const familyPair = familyPublicEndpointPair(trustedServices, stops);
   const pairMatches = (first, second) => first.length === 2 && second.length === 2
     && first.every(value => second.some(candidate => normal(candidate) === normal(value)));
+  const familyPairHasCurrentTflIdentity = familyPair.length === 2 && trustedServices.some(service =>
+    endpointEvidenceClassForPair(service, familyPair, trustedServices, stops) === 'authoritative-route-section');
   const pair = familyPair.length === 2 && pairMatches(familyPair, [origin, destination])
     ? familyPair
-    : origin && destination ? [origin, destination] : familyPair;
+    : origin && destination ? [origin, destination] : familyPairHasCurrentTflIdentity ? familyPair : [];
   const pairKey = pair.map(normal).sort().join('|');
   const headSigns = trustedServices.map(service => ({ service, value: directionEndpointCandidate(service) })).filter(item => item.value);
   const pairedHeadSigns = new Set(headSigns.map(item => normal(item.value))).size === 2;
@@ -1447,6 +1514,7 @@ function publicEndpointEvidenceForDirection(origin, destination, services, stops
     text(service?.id), ...(service?.sourceRecordIds ?? []), ...(service?.sourceRecords ?? []).map(record => text(record?.id))
   ]).filter(Boolean));
   const sourceProviders = unique(relevant.flatMap(service => [
+    text(service?.endpointProvenance?.origin?.provider), text(service?.endpointProvenance?.destination?.provider),
     text(service?.timetableSource), text(service?.source?.provider), ...(service?.sourceProviders ?? [])
   ]).filter(Boolean));
   const fullPatternSupport = relevant.some(hasCompletePublicPattern);
@@ -1460,19 +1528,78 @@ function publicEndpointEvidenceForDirection(origin, destination, services, stops
   const localitySupport = relevant.some(service => hasCompletePublicPattern(service)
     && (service.routePatternStops ?? []).some(stop => [stop?.locality, stop?.localityQualifier, stop?.parentLocality, selectedTerminalLocality(stop, stops)]
       .some(locality => normal(locality) === normal(origin) || normal(locality) === normal(destination))));
-  const makeEndpoint = value => Object.freeze({
-    value: value || null,
-    status: value ? 'resolved' : 'unresolved',
-    evidenceClass: value ? evidenceClass : 'insufficient-endpoint-evidence',
-    sourceIds: Object.freeze(value ? sourceIds : unique(services.flatMap(service => [text(service?.id), ...(service?.sourceRecordIds ?? [])]).filter(Boolean))),
-    sourceProviders: Object.freeze(value ? sourceProviders : unique(services.flatMap(service => [text(service?.timetableSource), text(service?.source?.provider)]).filter(Boolean))),
-    fullPatternSupport: Boolean(value && fullPatternSupport),
-    reciprocalSupport: Boolean(value && reciprocalSupport),
-    localitySupport: Boolean(value && localitySupport),
-    explicit: Boolean(value && ['authoritative-route-section', 'explicit-public-endpoints'].includes(evidenceClass)),
-    confidence: !value ? 'unresolved' : endpointEvidenceRank(evidenceClass) >= 4 ? 'high' : 'medium'
-  });
-  return Object.freeze({ origin: makeEndpoint(origin), destination: makeEndpoint(destination) });
+  const endpointProvenanceFor = (value, side) => {
+    if (!value || !publishableEndpointClasses.has(evidenceClass)) return null;
+    const endpointLabelMatches = candidate => {
+      const sourceLabel = cleanPublicEndpoint(candidate, true);
+      const publicLabel = cleanPublicEndpoint(value, true);
+      return Boolean(sourceLabel && publicLabel && normal(sourceLabel) === normal(publicLabel));
+    };
+    const matchingSourceSide = service => ['origin', 'destination'].find(sourceSide => {
+      const direct = service?.endpointProvenance?.[sourceSide];
+      const publicField = `publicRoute${sourceSide[0].toUpperCase()}${sourceSide.slice(1)}`;
+      return [direct?.value, service?.[publicField], service?.[sourceSide]].some(endpointLabelMatches);
+    });
+    const supporters = relevant.filter(service => {
+      const sourceSide = matchingSourceSide(service);
+      const direct = sourceSide ? service?.endpointProvenance?.[sourceSide] : null;
+      const declaredPublicValue = service?.[side === 'origin' ? 'publicOrigin' : 'publicDestination'];
+      const matchesDerivedPublicValue = endpointLabelMatches(declaredPublicValue);
+      const candidates = [direct?.value, ...(sourceSide ? [service?.[`publicRoute${sourceSide[0].toUpperCase()}${sourceSide.slice(1)}`], service?.[sourceSide]] : []),
+        ...(matchesDerivedPublicValue ? [declaredPublicValue] : []), patternEndpointValue(service, side, stops),
+        directionEndpointCandidate(service), ...descriptionEndpoints(routeDescriptionValues(service)).flat()]
+        .filter(Boolean);
+      return candidates.some(endpointLabelMatches);
+    });
+    const candidates = supporters.map(service => {
+      const sourceSide = matchingSourceSide(service);
+      const direct = (sourceSide ? service?.endpointProvenance?.[sourceSide] : null)
+        ?? service?.endpointProvenance?.[side] ?? {};
+      const provider = text(direct.provider || service?.source?.provider || service?.timetableSource || service?.sourceProviders?.[0]);
+      const status = text(direct.freshness?.status || service?.endpointEvidenceFreshness || 'current').toLowerCase().replace(/\s+/g, '-');
+      const freshness = publishableEndpointFreshness.has(status) ? status : '';
+      const sourceKind = text(direct.sourceKind || (provider === 'TfL' ? 'tfl-timetable' : provider));
+      return {
+        value,
+        sourceEndpointValue: text(direct.sourceEndpointValue || direct.value) || null,
+        sourceEndpointSide: text(direct.sourceEndpointSide || sourceSide || side),
+        provider,
+        source: text(direct.source || service?.source?.provider || service?.timetableSource),
+        endpoint: text(direct.endpoint || service?.source?.routeMetadataEvidence?.endpoint || service?.source?.endpoint || service?.source?.apiEndpoint || 'source-record'),
+        retrievedAt: direct.retrievedAt || service?.source?.routeMetadataEvidence?.retrievedAt || service?.source?.retrievedAt || null,
+        preparedAt: direct.preparedAt || service?.source?.preparedAt || service?.source?.dataPreparedAt || null,
+        freshness: { status: freshness || status, assessedAt: direct.freshness?.assessedAt || null },
+        evidenceClass: direct.evidenceClass || evidenceClass,
+        routeOrSectionId: direct.routeOrSectionId || direct.sectionId || service?.source?.routeMetadataEvidence?.routeSection?.id || service?.source?.routeId || service?.id || null,
+        routeId: direct.routeId || service?.source?.lineId || service?.source?.routeId || service?.routeNumber || null,
+        sectionId: direct.sectionId || service?.source?.routeMetadataEvidence?.routeSection?.id || null,
+        sourceKind
+      };
+    }).filter(item => item.provider && publishableEndpointClasses.has(item.evidenceClass) && publishableEndpointFreshness.has(item.freshness.status));
+    return candidates.sort((left, right) => endpointEvidenceRank(right.evidenceClass) - endpointEvidenceRank(left.evidenceClass))[0] ?? null;
+  };
+  const makeEndpoint = (value, side) => {
+    const endpointProvenance = endpointProvenanceFor(value, side);
+    const resolvedValue = endpointProvenance ? value : null;
+    const providers = endpointProvenance ? [endpointProvenance.provider] : [];
+    const evidence = endpointProvenance?.evidenceClass || 'insufficient-endpoint-evidence';
+    return Object.freeze({
+      value: resolvedValue,
+      status: resolvedValue ? 'resolved' : 'unresolved',
+      evidenceClass: evidence,
+      sourceIds: Object.freeze(resolvedValue ? sourceIds : unique(services.flatMap(service => [text(service?.id), ...(service?.sourceRecordIds ?? [])]).filter(Boolean))),
+      sourceProviders: Object.freeze(providers),
+      provenance: endpointProvenance ? Object.freeze(endpointProvenance) : null,
+      fullPatternSupport: Boolean(resolvedValue && fullPatternSupport),
+      reciprocalSupport: Boolean(resolvedValue && reciprocalSupport),
+      localitySupport: Boolean(resolvedValue && localitySupport),
+      explicit: Boolean(resolvedValue && ['authoritative-route-section', 'explicit-public-endpoints'].includes(evidence)),
+      confidence: !resolvedValue ? 'unresolved' : endpointEvidenceRank(evidence) >= 4 ? 'high' : 'medium'
+    });
+  };
+  const evidenceOrigin = origin && pair.some(value => normal(value) === normal(origin)) ? origin : pair[0] || '';
+  const evidenceDestination = destination && pair.some(value => normal(value) === normal(destination)) ? destination : pair[1] || '';
+  return Object.freeze({ origin: makeEndpoint(evidenceOrigin, 'origin'), destination: makeEndpoint(evidenceDestination, 'destination') });
 }
 
 function decoratePublicDirections(services, stops) {
@@ -1491,20 +1618,33 @@ function decoratePublicDirections(services, stops) {
       publicDirectionConfidence: 'review-required',
       publicFamilyEndpointPair: []
     };
+    const authoritativeSection = currentTfLRouteSection(service);
+    const authoritativePair = authoritativeSection
+      ? [cleanPublicEndpoint(authoritativeSection.origin, true), cleanPublicEndpoint(authoritativeSection.destination, true)]
+      : [];
     const patternPair = patternEndpointValues(service, stops);
     const independentCompletePattern = !conflictingCurrentEvidence && patternPair.length === 2
       && !hasLongerRelatedPattern(service, services)
       && endpointEvidenceRank(endpointEvidenceClassForPair(service, patternPair, services, stops)) >= 4
       && familyEvidenceRank < endpointEvidenceRank('authoritative-route-section');
-    const servicePair = independentCompletePattern && !pairMatches(patternPair, familyPair)
+    const servicePair = authoritativePair.length === 2 && authoritativePair.every(Boolean)
+      ? authoritativePair
+      : independentCompletePattern && !pairMatches(patternPair, familyPair)
       ? patternPair
       : familyPair;
     const patternDirection = endpointDirectionFromSelectedStop(service, servicePair, stops)
       || orderedPatternDirectionEndpoint(service, servicePair, stops);
     return {
       ...service,
-      ...publicDirectionForService(service, stops, services, servicePair),
-      ...(patternDirection ? {
+      ...(authoritativePair.length === 2 && authoritativePair.every(Boolean)
+        ? {
+          publicOrigin: authoritativePair[0],
+          publicDestination: authoritativePair[1],
+          publicDestinationQualifier: null,
+          publicDirectionConfidence: 'resolved'
+        }
+        : publicDirectionForService(service, stops, services, servicePair)),
+      ...(!authoritativeSection && patternDirection ? {
         publicOrigin: patternDirection.origin,
         publicDestination: patternDirection.destination,
         publicDirectionConfidence: 'resolved'
@@ -1548,6 +1688,23 @@ function orderedPatternDirectionEndpoint(service, familyPair, stops = []) {
 
 function componentPublicDirection(component, stops = []) {
   const familyPair = component.find(service => Array.isArray(service.publicFamilyEndpointPair) && service.publicFamilyEndpointPair.length === 2)?.publicFamilyEndpointPair ?? [];
+  const authoritativeSections = component.map(currentTfLRouteSection);
+  if (authoritativeSections.length && authoritativeSections.every(Boolean)) {
+    const first = authoritativeSections[0];
+    const sameSectionDirection = authoritativeSections.every(section => normal(section.direction) === normal(first.direction)
+      && normal(cleanPublicEndpoint(section.origin, true)) === normal(cleanPublicEndpoint(first.origin, true))
+      && normal(cleanPublicEndpoint(section.destination, true)) === normal(cleanPublicEndpoint(first.destination, true)));
+    const origin = cleanPublicEndpoint(first.origin, true);
+    const destination = cleanPublicEndpoint(first.destination, true);
+    if (sameSectionDirection && origin && destination && normal(origin) !== normal(destination)) {
+      return {
+        publicOrigin: origin,
+        publicDestination: destination,
+        publicDestinationQualifier: null,
+        publicDirectionConfidence: 'resolved'
+      };
+    }
+  }
   const directCandidates = component.map(service => ({
     origin: text(service.publicOrigin),
     destination: text(service.publicDestination),
@@ -1860,7 +2017,8 @@ export function buildPlannerServiceGroups(serviceSummaries = [], stops = []) {
           const secondMarker = explicitDirectionMarker(second);
           const bothProviderLocalMarkers = /^gtfs:\s*\d+$/i.test(firstMarker)
             && /^gtfs:\s*\d+$/i.test(secondMarker);
-          const markerJoin = !firstMarker || !secondMarker || firstMarker === secondMarker
+          const markerJoin = sameCurrentTfLRouteDirection(first, second)
+            || !firstMarker || !secondMarker || firstMarker === secondMarker
             || (feedIdentity(first) && feedIdentity(second)
               && feedIdentity(first) !== feedIdentity(second)
               && scheduledDepartureOverlap(first, second) >= (bothProviderLocalMarkers ? 2 : 1));
@@ -1978,6 +2136,25 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const publicOrigin = text(resolvedPublicDirection.publicOrigin);
   const endpointEvidenceServices = routeFamilyServices.filter(service => component.some(member => operatorFamilyCompatible(member, service)));
   const publicEndpointEvidence = publicEndpointEvidenceForDirection(publicOrigin, publicDestination, endpointEvidenceServices, stops);
+  const publishableOrigin = text(publicEndpointEvidence.origin.value);
+  const publishableDestination = text(publicEndpointEvidence.destination.value);
+  const trustedCircularEvidence = component.some(service => Boolean(service?.circular) && hasCompletePublicPattern(service)
+    && Object.values(service?.endpointProvenance ?? {}).some(provenance => {
+      const status = text(provenance?.freshness?.status).toLowerCase().replace(/\s+/g, '-');
+      return Boolean(text(provenance?.value) && text(provenance?.provider) && text(provenance?.endpoint)
+        && (provenance?.retrievedAt || provenance?.preparedAt)
+        && publishableEndpointFreshness.has(status)
+        && provenance?.evidenceClass === 'complete-pattern-terminals');
+    }));
+  const publishedDirection = {
+    ...publicMain,
+    publicOrigin: publishableOrigin,
+    publicDestination: publishableDestination,
+    publicDirectionConfidence: publishableOrigin && publishableDestination ? publicMain.publicDirectionConfidence : 'review-required',
+    directionPatternText: publishableOrigin && publishableDestination ? null
+      : rowCircular && trustedCircularEvidence ? directionPatternText({ ...publicMain, circular: true })
+        : 'Destination not resolved'
+  };
   // Stale/undated national snapshots may still support service inclusion and
   // timetable inspection, but must not publish derived locality claims in the
   // planner-facing locations column or controlled statement wording.
@@ -1999,8 +2176,8 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     rawRouteNumbers: Object.freeze(rawRouteNumbers),
     variantRouteNumbers: Object.freeze(rawRouteNumbers.filter(route => normal(route).replace(/\s+/g, '') !== normal(displayedRouteNumber).replace(/\s+/g, ''))),
     operator: plannerServiceGroup.operatorNames.join(' · ') || 'Operator identity not resolved',
-    origin: publicOrigin || null,
-    destination: publicDestination || null,
+    origin: publishableOrigin || null,
+    destination: publishableDestination || null,
     endpointEvidenceFreshness: endpointEvidenceIsUnverified(main) ? text(main.endpointEvidenceFreshness) : null,
     publicEndpointEvidence,
     direction: text(main.direction),
@@ -2011,15 +2188,15 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     calendarProfileIds: Object.freeze(profileIds),
     calendarProfileLabels: Object.freeze(profileIds.map(calendarProfileDisplayLabel)),
     calendarConfidence: unresolvedNeedsReview ? 'unresolved' : profileIds.some(profileId => profileId !== UNKNOWN_CALENDAR_PROFILE && profileResults.get(profileId)?.entries.length) ? 'resolved' : 'unresolved',
-    reviewRequired: unresolvedNeedsReview || publicMain.publicDirectionConfidence === 'review-required',
+    reviewRequired: unresolvedNeedsReview || publishedDirection.publicDirectionConfidence === 'review-required',
     reviewReasons: Object.freeze([
       ...(unresolvedNeedsReview ? ['calendar-applicability-unresolved'] : []),
-      ...(publicMain.publicDirectionConfidence === 'review-required' ? ['public-direction-unresolved'] : [])
+      ...(publishedDirection.publicDirectionConfidence === 'review-required' ? ['public-direction-unresolved'] : [])
     ]),
     directionFamily: directionKey(main),
-    directionPatternText: directionPatternText({ ...publicMain, circular: rowCircular }),
-    publicDirectionConfidence: publicMain.publicDirectionConfidence || 'review-required',
-    publicDestinationQualifier: publicMain.publicDestinationQualifier || null,
+    directionPatternText: publishedDirection.directionPatternText || directionPatternText({ ...publishedDirection, circular: rowCircular }),
+    publicDirectionConfidence: publishedDirection.publicDirectionConfidence || 'review-required',
+    publicDestinationQualifier: publishableDestination ? publicMain.publicDestinationQualifier || null : null,
     servedAtStopId: representative.id,
     servedAtText: servedAtLines.join('\n') || servedAtText(representative),
     servedAtStops: Object.freeze(servedAtLines),

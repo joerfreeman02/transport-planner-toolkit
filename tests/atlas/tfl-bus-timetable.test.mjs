@@ -282,7 +282,7 @@ assert.equal(n123Summary.operatingPeriods.monday.overnight, true);
 assert.match(n123Summary.operatingPeriodLines.join(' '), /Approx\. 22:30–01:20 \(next day\)/);
 assert.equal(nightRequests.filter(url => url.includes('/Route')).length, 1);
 assert.equal(nightRequests.filter(url => url.includes('/Timetable/')).length, 1);
-assert.ok(nightRequests.some(url => /serviceTypes=Regular&serviceTypes=Night/.test(url)));
+assert.ok(nightRequests.some(url => /serviceTypes=Regular%2CNight/.test(url)));
 const ambiguous = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => response(String(url).includes('/Route') ? routeFixture : ambiguousFixture) });
 const ambiguousResult = await ambiguous.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });
 assert.equal(ambiguousResult.data.length, 0);
@@ -416,7 +416,7 @@ const busyResult = await busyAuthority.servicesForStops(busyStops, { site: { lat
 assert.equal(busyResult.ok, true);
 assert.equal(busyTimetable, 12);
 assert.equal(busyRoute, 1, 'route metadata batches distinct lines once');
-assert.match(busyRouteUrls[0], /\/Line\/322,323\/Route\?serviceTypes=Regular&serviceTypes=Night$/);
+assert.match(busyRouteUrls[0], /\/Line\/322,323\/Route\?serviceTypes=Regular%2CNight$/);
 assert.equal(busyResult.provenance.timetableRequests, 12);
 assert.equal(busyResult.provenance.routeMetadataRequests, 1);
 assert.equal(busyResult.provenance.totalTfLRequests, 13);

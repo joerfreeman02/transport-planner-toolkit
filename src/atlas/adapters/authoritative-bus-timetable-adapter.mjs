@@ -54,13 +54,40 @@ function chunks(values, size) {
 function isTnds(service) { return /^tnds:/i.test(text(service?.id)) || /TNDS|Traveline National Dataset/i.test(text(service?.timetableSource || service?.source?.provider || service?.source?.schema || service?.source?.type)); }
 function isBods(service) { return !isTnds(service); }
 
-function matchNationalRequest(lineId, stopPointId, nationalServices) {
-  const candidates = (nationalServices ?? []).filter(service => normal(service.routeNumber) === normal(lineId) && hasScheduledEvidenceAt(service, stopPointId));
-  for (const type of ['BODS', 'TNDS']) {
-    const typed = candidates.filter(service => type === 'BODS' ? isBods(service) : isTnds(service));
-    if (typed.length === 1) return typed[0];
+function nationalEndpointProvenance(service, provenance = {}) {
+  const provider = isTnds(service) ? 'TNDS' : 'BODS';
+  const preparedAt = isTnds(service)
+    ? service?.source?.preparedAt || provenance.tndsPreparedAt || provenance.dataPreparedAt || null
+    : service?.source?.preparedAt || provenance.dataPreparedAt || null;
+  const freshnessStatus = text(service?.endpointEvidenceFreshness || provenance.dataFreshness?.status || 'unknown').toLowerCase();
+  const endpoint = service?.source?.endpoint || service?.source?.apiEndpoint || (isTnds(service) ? 'Prepared TNDS service shard' : provenance.endpoint || 'Prepared BODS service data');
+  const existing = service?.endpointProvenance ?? {};
+  const source = {
+    endpoint,
+    provider,
+    source: provider === 'TNDS' ? 'Traveline National Dataset' : 'Department for Transport Bus Open Data Service',
+    retrievedAt: provenance.retrievedAt || null,
+    preparedAt,
+    freshness: { status: freshnessStatus, assessedAt: provenance.retrievedAt || null },
+    evidenceClass: 'explicit-public-endpoints',
+    routeOrSectionId: service?.source?.routeId || service?.source?.serviceCode || service?.id || null,
+    routeId: service?.source?.routeId || service?.routeNumber || null,
+    sectionId: service?.source?.patternVariantId || service?.source?.patternId || null,
+    sourceKind: provider
+  };
+  const output = { ...existing };
+  for (const side of ['origin', 'destination']) {
+    const value = text(service?.[`publicRoute${side[0].toUpperCase()}${side.slice(1)}`] || service?.[side]);
+    if (value && !output[side]) output[side] = Object.freeze({ ...source, value });
   }
-  return candidates.length === 1 ? candidates[0] : null;
+  return { ...service, endpointProvenance: output };
+}
+
+function nationalCandidatesForRequest(lineId, stopPointId, nationalServices) {
+  const candidates = (nationalServices ?? []).filter(service => normal(service.routeNumber) === normal(lineId) && hasScheduledEvidenceAt(service, stopPointId));
+  const bods = candidates.filter(isBods);
+  if (bods.length) return bods;
+  return candidates.filter(isTnds);
 }
 
 function requestIdentity(request) { return request?.lineId && request?.stopPointId ? `${request.lineId}|${request.stopPointId}` : null; }
@@ -106,14 +133,22 @@ function sameSequence(left, right) { return Array.isArray(left) && Array.isArray
 
 function supplement(tfl, bods) {
   const match = matchBods(tfl, bods);
-  if (!match) return { service: tfl, matched: false, conflict: false };
+  if (!match) return { service: tfl, matched: false, conflict: false, matchService: null };
   let supplemented = false, conflict = false;
-  const service = { ...tfl };
+  const service = { ...tfl, endpointProvenance: { ...(tfl.endpointProvenance ?? {}) } };
   for (const field of textFields) {
     const tfValue = service[field], bodsValue = match[field];
     const tfEmpty = Array.isArray(tfValue) ? tfValue.length === 0 : !text(tfValue);
     const bodsEmpty = Array.isArray(bodsValue) ? bodsValue.length === 0 : !text(bodsValue);
-    if (tfEmpty && !bodsEmpty) { service[field] = Array.isArray(bodsValue) ? [...bodsValue] : bodsValue; supplemented = true; }
+    if (tfEmpty && !bodsEmpty) {
+      service[field] = Array.isArray(bodsValue) ? [...bodsValue] : bodsValue;
+      if (field === 'origin' || field === 'destination') {
+        const side = field;
+        const provenance = match.endpointProvenance?.[side] || null;
+        if (provenance) service.endpointProvenance[side] = Object.freeze({ ...provenance, value: text(bodsValue) });
+      }
+      supplemented = true;
+    }
     else if (!tfEmpty && !bodsEmpty && !sameText(tfValue, bodsValue)) conflict = true;
   }
   if ((!Array.isArray(service.principalLocations) || !service.principalLocations.length) && Array.isArray(match.principalLocations) && match.principalLocations.length) { service.principalLocations = [...match.principalLocations]; supplemented = true; }
@@ -122,14 +157,134 @@ function supplement(tfl, bods) {
   else if (service.routePatternStopIds?.length && match.routePatternStopIds?.length && !sameSequence(service.routePatternStopIds, match.routePatternStopIds)) conflict = true;
   service.timetableSource = supplemented ? 'TfL + BODS supplementary' : 'TfL';
   service.source = { ...service.source, supplementaryProvider: supplemented ? 'BODS' : null };
-  return { service, matched: true, conflict };
+  return { service, matched: true, conflict, matchService: match };
 }
 
-function fallbackService(service, request, reason = 'failure') {
+function lowerAuthorityEndpointEvidence(service) {
+  const provider = isTnds(service) ? 'TNDS' : 'BODS';
+  return Object.freeze({
+    provider,
+    sourceId: service.id,
+    origin: text(service.publicRouteOrigin || service.origin) || null,
+    destination: text(service.publicRouteDestination || service.destination) || null,
+    direction: text(service.direction) || null,
+    preparedAt: service.source?.preparedAt || service.source?.dataPreparedAt
+      || service.endpointProvenance?.origin?.preparedAt || service.endpointProvenance?.destination?.preparedAt || null,
+    validity: { from: service.validFrom || service.validity?.from || null, to: service.validTo || service.validity?.to || null },
+    calendarEvidence: service.calendarEvidence || service.operatingCalendarEvidence || service.source?.calendarEvidence || null,
+    calendarProfileId: service.calendarProfileId || service.source?.calendarProfileId || null,
+    endpointProvenance: service.endpointProvenance ?? null
+  });
+}
+
+function hasCurrentTfLRouteIdentity(service) {
+  return ['origin', 'destination'].every(side => {
+    const evidence = service?.endpointProvenance?.[side];
+    return evidence?.provider === 'TfL'
+      && evidence?.evidenceClass === 'authoritative-route-section'
+      && ['live-current', 'cached-current', 'current'].includes(text(evidence?.freshness?.status).toLowerCase())
+      && text(evidence?.value);
+  });
+}
+
+function routeMetadataEvidence(routeIdentity, currentRouteMetadata) {
+  if (routeIdentity) return {
+    provider: routeIdentity.source,
+    endpoint: routeIdentity.endpoint,
+    retrievedAt: routeIdentity.retrievedAt,
+    freshness: routeIdentity.freshness,
+    routeId: routeIdentity.routeId || null,
+    routeSection: {
+      id: routeIdentity.id || routeIdentity.sectionId || null,
+      direction: routeIdentity.direction,
+      origin: routeIdentity.origin,
+      destination: routeIdentity.destination,
+      sourceOrigin: routeIdentity.sourceOrigin || routeIdentity.origin,
+      sourceDestination: routeIdentity.sourceDestination || routeIdentity.destination,
+      validFrom: routeIdentity.validFrom,
+      validTo: routeIdentity.validTo
+    }
+  };
+  return {
+    provider: currentRouteMetadata.provider,
+    endpoint: currentRouteMetadata.endpoint,
+    retrievedAt: currentRouteMetadata.retrievedAt || null,
+    freshness: currentRouteMetadata.freshness,
+    currentRouteSections: currentRouteMetadata.sections
+  };
+}
+
+function applyRouteIdentity(service, routeIdentity = null, currentRouteMetadata = null, lowerEvidence = null) {
+  if (!routeIdentity && !currentRouteMetadata) return service;
+  const isTfLPrimary = /^tfl(?:\b|\s)/i.test(text(service?.timetableSource)) || /^tfl$/i.test(text(service?.source?.provider));
+  const lowerAuthority = lowerEvidence || (isTfLPrimary ? null : lowerAuthorityEndpointEvidence(service));
+  if (hasCurrentTfLRouteIdentity(service)) {
+    return lowerAuthority ? {
+      ...service,
+      source: { ...service.source, lowerAuthorityEndpointEvidence: lowerAuthority }
+    } : service;
+  }
+  if (!routeIdentity) {
+    const retrievedAt = currentRouteMetadata.retrievedAt || null;
+    const endpointProvenance = Object.fromEntries(['origin', 'destination'].map(side => {
+      const value = side === 'origin'
+        ? text(service.publicRouteOrigin || service.origin)
+        : text(service.publicRouteDestination || service.destination);
+      const existing = service.endpointProvenance?.[side] ?? {};
+      return [side, Object.freeze({
+        ...existing,
+        value: value || null,
+        provider: existing.provider || lowerAuthority?.provider || null,
+        endpoint: existing.endpoint || service.source?.endpoint || service.source?.apiEndpoint || null,
+        retrievedAt: existing.retrievedAt || null,
+        preparedAt: existing.preparedAt || service.source?.preparedAt || service.source?.dataPreparedAt || null,
+        freshness: Object.freeze({ status: 'unverified', assessedAt: retrievedAt }),
+        evidenceClass: 'unmatched-current-route-metadata',
+        routeOrSectionId: existing.routeOrSectionId || service.source?.routeId || service.source?.serviceCode || service.id || null,
+        routeId: currentRouteMetadata.routeId || service.routeNumber || null,
+        sectionId: existing.sectionId || service.source?.patternVariantId || service.source?.patternId || null,
+        sourceKind: existing.sourceKind || lowerAuthority?.provider || null
+      })];
+    }));
+    return {
+      ...service,
+      publicRouteOrigin: null,
+      publicRouteDestination: null,
+      endpointEvidenceFreshness: 'unknown',
+      endpointProvenance,
+      source: {
+        ...service.source,
+        routeMetadata: 'unmatched',
+        routeMetadataEvidence: routeMetadataEvidence(null, currentRouteMetadata),
+        lowerAuthorityEndpointEvidence: lowerAuthority
+      }
+    };
+  }
+  return {
+    ...service,
+    origin: routeIdentity.origin,
+    destination: routeIdentity.destination,
+    publicRouteOrigin: routeIdentity.origin,
+    publicRouteDestination: routeIdentity.destination,
+    endpointProvenance: {
+      ...(service.endpointProvenance ?? {}),
+      origin: Object.freeze({ ...routeIdentity, value: routeIdentity.origin, sourceEndpointValue: routeIdentity.sourceOrigin || routeIdentity.origin, sourceEndpointSide: 'origin', freshness: typeof routeIdentity.freshness === 'string' ? { status: routeIdentity.freshness, assessedAt: routeIdentity.retrievedAt || null } : routeIdentity.freshness }),
+      destination: Object.freeze({ ...routeIdentity, value: routeIdentity.destination, sourceEndpointValue: routeIdentity.sourceDestination || routeIdentity.destination, sourceEndpointSide: 'destination', freshness: typeof routeIdentity.freshness === 'string' ? { status: routeIdentity.freshness, assessedAt: routeIdentity.retrievedAt || null } : routeIdentity.freshness })
+    },
+    source: {
+      ...service.source,
+      routeMetadata: 'matched',
+      routeMetadataEvidence: routeMetadataEvidence(routeIdentity, currentRouteMetadata),
+      lowerAuthorityEndpointEvidence: lowerAuthority
+    }
+  };
+}
+
+function fallbackService(service, request, reason = 'failure', routeIdentity = null, currentRouteMetadata = null) {
   const provider = isTnds(service) ? 'TNDS' : 'BODS';
   const fallbackReason = reason === 'unresolved' ? 'TfL unresolved timetable result' : 'TfL scheduled timetable failure';
   const sourceLabel = reason === 'unresolved' ? 'TfL unresolved' : 'TfL failure';
-  return {
+  const fallback = {
     ...scopedScheduledService(service, [request.stopPointId]),
     timetableSource: `${provider} fallback after ${sourceLabel}`,
     source: {
@@ -137,12 +292,13 @@ function fallbackService(service, request, reason = 'failure') {
       fallbackSourceId: service.id, requestedLineId: request.lineId, requestedStopPointId: request.stopPointId
     }
   };
+  return applyRouteIdentity(fallback, routeIdentity, currentRouteMetadata, lowerAuthorityEndpointEvidence(service));
 }
 
 function scopeNationalResult(result, stops) {
   if (!result?.ok) return result;
   const selectedStopIds = new Set((stops ?? []).map(stopKey));
-  const data = (result.data ?? []).map(service => scopedScheduledService(service, selectedStopIds))
+  const data = (result.data ?? []).map(service => scopedScheduledService(nationalEndpointProvenance(service, result.provenance), selectedStopIds))
     .filter(service => scheduledStopIds(service).length);
   const unresolvedRequestIdentities = [...new Set([
     ...(result.provenance?.unresolvedRequestIdentities ?? []),
@@ -207,7 +363,7 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     const national = nationalEvidenceRequired || insideLondon
       ? await (insideLondon ? londonSupplementAdapter : nationalAdapter).servicesForStops(nationalStops.length ? nationalStops : stops, options)
       : sourceSuccess({ data: [], warnings: [], provenance: { source: 'National timetable authority not required for the selected TfL-only scope', authority: 'not-required', nationalEvidenceRequired: false, nationalEvidenceNotRequired: true, nationalSourceAvailable: true, timetableConclusion: 'NO_CURRENT_MATCH', tflTimetableAttempted: false, nationalTimetableAttempted: false, nationalSupplementaryAttempted: false, nationalTimetableStopIds: [], nationalTimetableProviders: [] } });
-    const nationalServices = national.ok ? national.data ?? [] : [];
+    const nationalServices = national.ok ? (national.data ?? []).map(service => nationalEndpointProvenance(service, national.provenance)) : [];
     const bods = nationalServices.filter(isBods);
     const requests = stagedRequests(tflStops, { insideLondon });
     const stageSize = Math.max(1, Number(requestLimit) || 20);
@@ -247,7 +403,7 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       return !actualTfLServices({ result, request }).length;
     });
     const services = successful.flatMap(entry => actualTfLServices(entry));
-    const unresolvedEntries = unresolvedObserved.filter(({ request }) => !matchNationalRequest(request?.lineId, request?.stopPointId, nationalServices));
+    const unresolvedEntries = unresolvedObserved.filter(({ request }) => !nationalCandidatesForRequest(request?.lineId, request?.stopPointId, nationalServices).length);
     const tflUnresolvedRequestIdentities = unresolvedEntries.map(({ request }) => requestIdentity(request)).filter(Boolean);
     const noCurrentRequestIdentities = resultEntries
       .filter(({ result }) => result?.ok && (result.timetableConclusion || result.provenance?.timetableConclusion) === 'NO_CURRENT_MATCH')
@@ -259,20 +415,53 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     ])].map(String);
     const fallbackServices = unresolvedObserved.flatMap(({ result, request }) => {
       if (!request) return [];
-      const fallback = matchNationalRequest(request.lineId, request.stopPointId, nationalServices);
+      const candidates = nationalCandidatesForRequest(request.lineId, request.stopPointId, nationalServices);
       const unresolved = Boolean(result?.ok) && result?.provenance?.timetableConclusion === 'UNRESOLVED';
-      return fallback ? [fallbackService(fallback, request, unresolved ? 'unresolved' : 'failure')] : [];
+      return candidates.map(candidate => {
+        const routeIdentity = tflAdapter.routeIdentityForNationalService
+          ? tflAdapter.routeIdentityForNationalService({ lineId: request.lineId, service: candidate, routeMetadata })
+          : null;
+        const currentRouteMetadata = tflAdapter.currentRouteMetadataForLine
+          ? tflAdapter.currentRouteMetadataForLine({ lineId: request.lineId, routeMetadata })
+          : null;
+        return fallbackService(candidate, request, unresolved ? 'unresolved' : 'failure', routeIdentity, currentRouteMetadata);
+      });
     });
     const nationalUnresolvedRequestIdentities = rawNationalUnresolvedRequestIdentities.filter(identity => !fallbackServices.some(fallback => `${fallback.source?.requestedLineId}|${fallback.source?.requestedStopPointId}` === identity));
     const unresolvedRequestIdentities = [...new Set([...tflUnresolvedRequestIdentities, ...nationalUnresolvedRequestIdentities])];
     let conflicts = 0;
-    const composed = services.map(service => { const result = supplement(service, bods); if (result.conflict) conflicts += 1; return result.service; });
+    const composed = services.map(service => {
+      const result = supplement(service, bods);
+      if (result.conflict) conflicts += 1;
+      const lineId = text(service.source?.lineId || service.routeNumber);
+      const identitySource = result.matchService || service;
+      let routeIdentity = tflAdapter.routeIdentityForNationalService
+        ? tflAdapter.routeIdentityForNationalService({ lineId, service: identitySource, routeMetadata })
+        : null;
+      if (!routeIdentity && identitySource !== service && tflAdapter.routeIdentityForNationalService) {
+        routeIdentity = tflAdapter.routeIdentityForNationalService({ lineId, service, routeMetadata });
+      }
+      const currentRouteMetadata = tflAdapter.currentRouteMetadataForLine
+        ? tflAdapter.currentRouteMetadataForLine({ lineId, routeMetadata })
+        : null;
+      const lowerEvidence = result.matchService ? lowerAuthorityEndpointEvidence(result.matchService) : null;
+      return applyRouteIdentity(result.service, routeIdentity, currentRouteMetadata, lowerEvidence);
+    });
     composed.push(...fallbackServices);
     if (!insideLondon) {
       const nationalOnlyStopIds = new Set(nationalStops.map(stopKey));
       for (const service of nationalServices) {
         const retained = nationalCoverageAfterAuthority(service, services, fallbackServices, nationalOnlyStopIds);
-        if (retained) composed.push(retained);
+        if (retained) {
+          const lineId = text(retained.routeNumber);
+          const routeIdentity = tflAdapter.routeIdentityForNationalService
+            ? tflAdapter.routeIdentityForNationalService({ lineId, service: retained, routeMetadata })
+            : null;
+          const currentRouteMetadata = tflAdapter.currentRouteMetadataForLine
+            ? tflAdapter.currentRouteMetadataForLine({ lineId, routeMetadata })
+            : null;
+          composed.push(applyRouteIdentity(retained, routeIdentity, currentRouteMetadata, lowerAuthorityEndpointEvidence(retained)));
+        }
       }
     }
     if (conflicts) warnings.push(conflictWarning);
@@ -290,6 +479,10 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       unprocessedRequestIdentities: unprocessed.map(request => `${request.lineId}|${request.stopPointId}`), timetableRequests: results.length,
       routeMetadataRequests, totalTfLRequests: results.length + routeMetadataRequests, successfulRequests: successful.length, failedRequests: failed.length,
       unresolvedRequests: unresolvedRequestIdentities.length, unresolvedRequestIdentities,
+      tflTimetableDiagnosticRequestIdentities: [...new Set(unresolvedObserved.map(({ request }) => requestIdentity(request)).filter(Boolean))],
+      routeIdentityResolvedRequestIdentities: [...new Set(fallbackServices.filter(service => service.source?.routeMetadata === 'matched').map(service => `${service.source.requestedLineId}|${service.source.requestedStopPointId}`))],
+      routeIdentityUnresolvedRequestIdentities: [...new Set(fallbackServices.filter(service => service.source?.routeMetadata === 'unmatched').map(service => `${service.source.requestedLineId}|${service.source.requestedStopPointId}`))],
+      nationalFallbackRequestIdentities: [...new Set(fallbackServices.map(service => `${service.source.requestedLineId}|${service.source.requestedStopPointId}`))],
       noCurrentRequestIdentities: [...new Set(noCurrentRequestIdentities)],
       nationalUnresolvedRequestIdentities,
       nationalSourceAvailable,

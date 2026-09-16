@@ -18,15 +18,44 @@ const staleEndpointWarning = 'Route endpoints supported only by stale or undated
 function routingFor(result, index) { return result?.routes?.[index] ?? Object.freeze({ status: 'unavailable', distanceMetres: null, durationSeconds: null }); }
 function stopKey(stop) { return String(stop?.id || stop?.sourceId || ''); }
 function withEndpointFreshness(services, freshness) {
-  if (!freshness || !['stale', 'unknown'].includes(String(freshness.status).toLowerCase())) return services;
+  if (!freshness) return services;
   return services.map(service => {
     const timetableSource = String(service?.timetableSource ?? '').trim();
     const provider = String(service?.source?.provider ?? '').trim();
     const isTfLPrimary = /^tfl(?:\b|\s)/i.test(timetableSource) || /^tfl$/i.test(provider);
     const isNationalPrimary = /\bbods\b|bus open data|\btnds\b|traveline national dataset/i.test(`${timetableSource} ${provider}`);
-    return !isTfLPrimary && isNationalPrimary
-      ? { ...service, endpointEvidenceFreshness: String(freshness.status).toLowerCase() }
-      : service;
+    const status = String(freshness.status ?? 'unknown').toLowerCase();
+    const endpointProvenance = { ...(service?.endpointProvenance ?? {}) };
+    for (const side of ['origin', 'destination']) {
+      const value = String(service?.[`publicRoute${side[0].toUpperCase()}${side.slice(1)}`] || service?.[side] || '').trim();
+      if (!value || endpointProvenance[side]?.value === value) continue;
+      const endpointIsLiveTfL = endpointProvenance[side]?.provider === 'TfL'
+        && ['live-current', 'cached-current', 'current'].includes(String(endpointProvenance[side]?.freshness?.status ?? '').toLowerCase());
+      if (endpointIsLiveTfL) continue;
+      endpointProvenance[side] = Object.freeze({
+        value,
+        provider: isTfLPrimary ? 'TfL' : /\btnds\b|traveline national dataset/i.test(`${timetableSource} ${provider}`) ? 'TNDS' : 'BODS',
+        source: service?.source?.name || service?.source?.provider || timetableSource || 'Prepared national timetable data',
+        endpoint: service?.source?.endpoint || service?.source?.apiEndpoint || null,
+        retrievedAt: service?.source?.retrievedAt || null,
+        preparedAt: service?.source?.preparedAt || service?.source?.dataPreparedAt || freshness.preparedAt || null,
+        freshness: Object.freeze({ status: isTfLPrimary ? 'live-current' : status, assessedAt: freshness.assessedAt || null }),
+        evidenceClass: 'explicit-public-endpoints',
+        routeOrSectionId: service?.source?.routeId || service?.source?.serviceCode || service?.id || null,
+        routeId: service?.source?.routeId || service?.routeNumber || null,
+        sectionId: service?.source?.patternVariantId || null,
+        sourceKind: isTfLPrimary ? 'tfl-timetable' : /\btnds\b|traveline national dataset/i.test(`${timetableSource} ${provider}`) ? 'TNDS' : 'BODS'
+      });
+    }
+    const hasLiveTflRouteIdentity = ['origin', 'destination'].every(side => endpointProvenance[side]?.provider === 'TfL'
+      && ['live-current', 'cached-current', 'current'].includes(String(endpointProvenance[side]?.freshness?.status ?? '').toLowerCase()));
+    return {
+      ...service,
+      endpointProvenance,
+      ...(!isTfLPrimary && isNationalPrimary && ['stale', 'unknown'].includes(status) && !hasLiveTflRouteIdentity
+        ? { endpointEvidenceFreshness: status }
+        : {})
+    };
   });
 }
 function routePairs(stops) { return new Set((stops ?? []).flatMap(stop => (stop.routes ?? []).map(route => `${route}|${stopKey(stop)}`))); }
@@ -146,6 +175,25 @@ function requestParts(identity) {
   return { route: parts[0] || null, stop: parts.slice(1).join('|') || null };
 }
 
+function conflictingCurrentRouteEndpointVariant(service) {
+  if (service?.source?.routeMetadata !== 'unmatched') return null;
+  const sections = service?.source?.routeMetadataEvidence?.currentRouteSections;
+  if (!Array.isArray(sections) || !sections.length) return null;
+  const comparableTerminal = value => String(value ?? '').toLowerCase()
+    .replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').replace(/\b(?:bus )?station\b/g, ' ').replace(/\s+/g, ' ').trim();
+  const currentTerminals = new Set(sections.flatMap(section => [section.origin, section.destination])
+    .map(comparableTerminal).filter(Boolean));
+  const lowerEvidence = service?.source?.lowerAuthorityEndpointEvidence;
+  const candidates = Array.isArray(lowerEvidence) ? lowerEvidence : [lowerEvidence];
+  for (const candidate of candidates) {
+    const terminals = [candidate?.origin, candidate?.destination].map(comparableTerminal)
+      .filter(value => value && !/^(?:bus )?station$|^(?:bus )?terminus$|^(?:bus )?stand$/.test(value));
+    const conflicting = terminals.filter(value => !currentTerminals.has(value));
+    if (conflicting.length) return { candidate, conflicting };
+  }
+  return null;
+}
+
 function buildReviewItems({ selectedStops = [], services = [], serviceSummaries = [], plannerReconciliation = null, servicesResult = null, prepared = null, stopCoverageComplete = true, routingComplete = true } = {}) {
   const items = new Map();
   const add = ({ code, severity = 'warning', actionability = 'review', route = null, stop = null, source = 'timetable source', message }) => {
@@ -155,9 +203,43 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     if (!items.has(key)) items.set(key, Object.freeze({ id: code + ':' + items.size, code, severity, actionability, route: route ? String(route) : null, stop: stop ? String(stop) : null, source, message: cleanMessage }));
   };
   const provenance = servicesResult?.provenance ?? {};
-  for (const identity of [...(provenance.unresolvedRequestIdentities ?? []), ...(provenance.nationalUnresolvedRequestIdentities ?? [])]) {
+  const unresolvedIdentities = new Set([...(provenance.unresolvedRequestIdentities ?? []), ...(provenance.nationalUnresolvedRequestIdentities ?? [])].map(String));
+  for (const identity of unresolvedIdentities) {
     const parts = requestParts(identity);
     add({ code: 'unresolved-timetable-request', route: parts.route, stop: parts.stop, source: 'timetable source', message: 'This route/stop timetable request remained unresolved; inspect the returned source evidence before formal use.' });
+  }
+  const metadataResolved = new Set((provenance.routeIdentityResolvedRequestIdentities ?? []).map(String));
+  const metadataUnresolved = new Set((provenance.routeIdentityUnresolvedRequestIdentities ?? []).map(String));
+  for (const identity of provenance.tflTimetableDiagnosticRequestIdentities ?? []) {
+    if (unresolvedIdentities.has(String(identity))) continue;
+    const parts = requestParts(identity);
+    add({
+      code: 'tfl-timetable-source-diagnostic',
+      severity: metadataResolved.has(String(identity)) ? 'info' : 'warning',
+      actionability: metadataResolved.has(String(identity)) ? 'diagnostic' : 'review',
+      route: parts.route,
+      stop: parts.stop,
+      source: 'TfL stop-specific timetable',
+      message: metadataResolved.has(String(identity))
+        ? 'TfL could not confirm a timetable for this stop. Current public route details and scheduled departures from the national timetable are shown separately; those departures are not a TfL timetable.'
+        : metadataUnresolved.has(String(identity))
+          ? 'TfL could not confirm a timetable for this stop, and current TfL route sections could not be matched unambiguously to the national schedule direction. The national schedule is retained, but its endpoint is not published as the TfL route identity.'
+          : 'TfL could not confirm a timetable for this stop. ATLAS could not verify a complete current public route identity from the available sources.'
+    });
+  }
+  for (const service of services) {
+    const conflict = conflictingCurrentRouteEndpointVariant(service);
+    if (!conflict) continue;
+    const lower = conflict.candidate;
+    add({
+      code: 'current-route-identity-conflict',
+      severity: 'info',
+      actionability: 'diagnostic',
+      route: service.routeNumber,
+      stop: service.source?.requestedStopPointId || Object.keys(service.stopSchedules ?? {})[0],
+      source: `${lower.provider || 'national timetable'} endpoint evidence`,
+      message: `Current TfL route sections conflict with the retained national endpoint variant “${lower.origin || 'not supplied'} → ${lower.destination || 'not supplied'}”. The national pair remains in Detailed Evidence and is not substituted for current TfL route identity.`
+    });
   }
   for (const identity of [...(provenance.unprocessedRequestIdentities ?? [])]) {
     const parts = requestParts(identity);
@@ -319,7 +401,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
       ?? servicesResult?.provenance?.dataFreshness
       ?? null;
     const endpointFreshnessUnverified = Boolean(nationalDataFreshness && ['stale', 'unknown'].includes(String(nationalDataFreshness.status).toLowerCase()));
-    if (endpointFreshnessUnverified) services = withEndpointFreshness(services, nationalDataFreshness);
+    if (nationalDataFreshness) services = withEndpointFreshness(services, nationalDataFreshness);
     onProgress({ phase: 'reconciling-evidence' });
     const serviceSummaries = buildServiceSummaries(selectedStops, services);
     onProgress({ phase: 'preparing-assessment' });

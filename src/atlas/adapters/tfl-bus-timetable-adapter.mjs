@@ -262,40 +262,146 @@ function scheduleForPattern(route, pattern, stopPointId, responseDepartureStopId
   return { schedule: result, departureEvidence, frequencyEvidence, calendarEvidence, profiles, splitByCalendarProfile, evidence, ambiguous, hasPeriods, chronologyIncomplete };
 }
 
+function canonicalRouteTerminal(value) {
+  return text(value).replace(/\bSq\b/gi, 'Square').replace(/\bStn\b/gi, 'Station');
+}
+
 function sectionsFromMetadata(data, lineId) {
   const lines = Array.isArray(data) ? data : [data];
   const sections = lines.filter(line => normal(line?.id ?? line?.name) === normal(lineId)).flatMap(line => Array.isArray(line?.routeSections) ? line.routeSections : []).map(section => ({
     id: text(section?.id),
     direction: text(section?.direction),
-    origin: text(section?.originationName),
-    destination: text(section?.destinationName),
+    origin: canonicalRouteTerminal(text(section?.originationName)),
+    destination: canonicalRouteTerminal(text(section?.destinationName)),
+    sourceOrigin: text(section?.originationName),
+    sourceDestination: text(section?.destinationName),
     validFrom: text(section?.validFrom) || null,
-    validTo: text(section?.validTo) || null
+    validTo: text(section?.validTo) || null,
+    validityConflict: false
   })).filter(section => section.origin && section.destination);
-  const identities = new Map();
+  const byId = new Map();
   for (const section of sections) {
+    const key = section.id || [normal(section.direction), normal(section.origin), normal(section.destination)].join('|');
+    const existing = byId.get(key);
+    if (!existing) byId.set(key, [section]);
+    else if (existing.some(item => item.validFrom !== section.validFrom || item.validTo !== section.validTo)) {
+      existing.forEach(item => { item.validityConflict = true; });
+      section.validityConflict = true;
+      existing.push(section);
+    } else existing.push(section);
+  }
+  return sections;
+}
+
+function sectionIsCurrent(section, asOf) {
+  if (section.validityConflict) return false;
+  const date = text(asOf).slice(0, 10);
+  const from = text(section.validFrom).slice(0, 10);
+  const to = text(section.validTo).slice(0, 10);
+  if (from && (!/^\d{4}-\d{2}-\d{2}$/.test(from) || date < from)) return false;
+  if (to && (!/^\d{4}-\d{2}-\d{2}$/.test(to) || date > to)) return false;
+  return true;
+}
+
+function currentRouteSections(data, lineId, asOf) {
+  const all = sectionsFromMetadata(data, lineId);
+  const current = all.filter(section => sectionIsCurrent(section, asOf));
+  const identities = new Map();
+  for (const section of current) {
     const key = [normal(section.direction), normal(section.origin), normal(section.destination)].join('|');
+    const identitySections = all.filter(item => [normal(item.direction), normal(item.origin), normal(item.destination)].join('|') === key);
+    const validityDisputed = new Set(identitySections.map(item => `${item.validFrom ?? ''}|${item.validTo ?? ''}`)).size > 1;
     const existing = identities.get(key);
-    if (!existing) identities.set(key, section);
-    else if (existing.validFrom !== section.validFrom || existing.validTo !== section.validTo) { existing.validFrom = null; existing.validTo = null; }
+    if (!existing || text(section.validFrom).localeCompare(text(existing.validFrom)) > 0
+      || (section.validFrom === existing.validFrom && section.id.localeCompare(existing.id) < 0)) identities.set(key, { ...section, validityDisputed });
   }
   return [...identities.values()];
 }
 
-function identityForPattern(pattern, metadata, direction) {
-  const directed = (metadata ?? []).filter(section => !direction || normal(section.direction) === normal(direction));
+function publicTerminalLabels(value) {
+  return [...new Set([text(value), ...text(value).split(/[,/;|]+/).map(text)]
+    .map(label => normal(label).replace(/\b(?:bus\s+)?station\b/g, ' ').replace(/\bbus\b/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(Boolean))];
+}
+
+function routeIdentityForService({ lineId, service, routeMetadata, asOf }) {
+  if (!routeMetadata?.ok) return null;
+  const sections = currentRouteSections(routeMetadata.data, lineId, asOf);
+  if (!sections.length) return null;
+  const directionValues = [service?.direction, service?.stopDirection].map(text).filter(value => /^(?:inbound|outbound|northbound|southbound|eastbound|westbound|clockwise|anticlockwise)$/i.test(value));
+  const direction = normal(directionValues[0]);
+  const headsigns = [...new Set([service?.stopDirection, service?.direction]
+    .map(text)
+    .filter(value => value && !/^(?:gtfs:\s*\d+|inbound|outbound|northbound|southbound|eastbound|westbound|clockwise|anticlockwise)$/i.test(value))
+    .flatMap(value => publicTerminalLabels(value.replace(/^towards?\s+/i, ''))))];
+  const origin = normal(service?.origin || service?.publicRouteOrigin);
+  const byDirection = direction ? sections.filter(section => normal(section.direction) === direction) : [];
+  if (byDirection.length === 1) return byDirection[0];
+  for (const headsign of headsigns) {
+    const byHeadsign = sections.filter(section => publicTerminalLabels(section.destination).includes(headsign));
+    if (byHeadsign.length === 1) return byHeadsign[0];
+  }
+  // A national variant may retain an obsolete destination. Its origin may
+  // orient one unique current TfL section, but its old destination never does.
+  const byOrigin = origin ? sections.filter(section => normal(section.origin) === origin) : [];
+  return byOrigin.length === 1 ? byOrigin[0] : null;
+}
+
+function routeMetadataIdentityForLine({ lineId, routeMetadata, asOf }) {
+  if (!routeMetadata?.ok) return null;
+  const sections = currentRouteSections(routeMetadata.data, lineId, asOf);
+  if (!sections.length) return null;
+  return Object.freeze({
+    provider: 'TfL',
+    endpoint: routeMetadata.provenance?.endpoint || null,
+    retrievedAt: routeMetadata.provenance?.retrievedAt || null,
+    freshness: routeMetadata.cache?.status === 'hit' ? 'cached-current' : 'live-current',
+    routeId: text(lineId),
+    sections: Object.freeze(sections.map(section => Object.freeze({
+      id: section.id || null,
+      direction: section.direction || null,
+      origin: section.origin || null,
+      destination: section.destination || null,
+      sourceOrigin: section.sourceOrigin || section.origin || null,
+      sourceDestination: section.sourceDestination || section.destination || null,
+      validFrom: section.validFrom || null,
+      validTo: section.validTo || null
+    })))
+  });
+}
+
+function routeEndpointProvenance(identity, side, metadataResult, lineId) {
+  const value = side === 'origin' ? identity.origin : identity.destination;
+  const status = metadataResult?.cache?.status === 'hit' ? 'cached-current' : 'live-current';
+  return Object.freeze({
+    value, sourceEndpointValue: side === 'origin' ? identity.sourceOrigin || value : identity.sourceDestination || value,
+    sourceEndpointSide: side, provider: 'TfL', source: SOURCE,
+    endpoint: metadataResult?.provenance?.endpoint || null,
+    retrievedAt: metadataResult?.provenance?.retrievedAt || null,
+    preparedAt: null,
+    freshness: Object.freeze({ status, assessedAt: metadataResult?.provenance?.retrievedAt || null }),
+    evidenceClass: 'authoritative-route-section',
+    routeOrSectionId: identity.id || lineId,
+    routeId: lineId, sectionId: identity.id || null,
+    routeDirection: identity.direction || null,
+    sourceKind: 'tfl-route-metadata'
+  });
+}
+
+function identityForPattern(pattern, metadata, direction, asOf) {
+  const directed = (metadata ?? []).filter(section => sectionIsCurrent(section, asOf) && (!direction || normal(section.direction) === normal(direction)));
   const terminal = pattern.stations.at(-1)?.name;
   const destinationMatched = terminal ? directed.filter(section => normal(section.destination) === normal(terminal)) : [];
   const candidates = terminal ? destinationMatched : directed;
   return candidates.length === 1 ? candidates[0] : null;
 }
 
-function routeRecords(response, stopPointId, responseDepartureStopId, metadataResult) {
+function routeRecords(response, stopPointId, responseDepartureStopId, metadataResult, asOf) {
   const routes = Array.isArray(response?.timetable?.routes) ? response.timetable.routes : Array.isArray(response?.routes) ? response.routes : [];
   const lineId = text(response?.lineId ?? response?.lineName);
   const lineName = text(response?.lineName ?? response?.lineId);
   const direction = text(response?.direction);
-  const metadata = metadataResult?.ok ? sectionsFromMetadata(metadataResult.data, lineId) : [];
+  const metadata = metadataResult?.ok ? currentRouteSections(metadataResult.data, lineId, asOf) : [];
   const warnings = [];
   const services = [];
   for (const route of routes) {
@@ -320,7 +426,7 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         warnings.push('TfL returned an interval pattern without deterministically associated scheduled journeys. The pattern has not been presented as a scheduled service.');
         continue;
       }
-      const identity = identityForPattern(pattern, metadata, direction);
+      const identity = identityForPattern(pattern, metadata, direction, asOf);
       if (!identity) warnings.push(metadataResult?.ok
         ? 'TfL route metadata did not establish one complete route identity for this timetable pattern. ATLAS retained the scheduled pattern without inventing full origin or destination.'
         : 'TfL route metadata could not be checked. ATLAS retained the scheduled pattern without inventing full origin or destination.');
@@ -357,9 +463,14 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
             endpoint: metadataResult?.provenance?.endpoint || null,
             retrievedAt: metadataResult?.provenance?.retrievedAt || null,
             cacheStatus: metadataResult?.cache?.status || 'unknown',
-            routeSection: { direction: identity.direction, origin: identity.origin, destination: identity.destination, validFrom: identity.validFrom, validTo: identity.validTo }
+            freshness: metadataResult?.cache?.status === 'hit' ? 'cached-current' : 'live-current',
+            routeSection: { id: identity.id || null, direction: identity.direction, origin: identity.origin, destination: identity.destination, validFrom: identity.validityDisputed ? null : identity.validFrom, validTo: identity.validityDisputed ? null : identity.validTo }
           } : null
         },
+        endpointProvenance: identity ? {
+          origin: routeEndpointProvenance(identity, 'origin', metadataResult, lineId),
+          destination: routeEndpointProvenance(identity, 'destination', metadataResult, lineId)
+        } : null,
         timetableSource: 'TfL',
         serviceNotes: calendarQualificationNotes(profileTiming.calendarEvidence),
         sourceWarnings: profileTiming.calendarEvidence.filter(calendar => !calendar.resolved).map(calendar => `TfL timetable period "${calendar.sourceCalendarLabel}" could not be safely mapped to operating days; no unverified days were fabricated.`),
@@ -367,8 +478,8 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
           ...(hasPeriods ? ['TfL supplied operating-period/frequency evidence; ATLAS retained only exact scheduled journeys and first/last journey boundaries, without synthesising departures from frequency ranges.'] : []),
           ...(!identity ? ['Full TfL route origin and destination were not deterministically established for this selected-stop timetable pattern.'] : [])
         ],
-        validFrom: identity?.validFrom ?? null,
-        validTo: identity?.validTo ?? null
+        validFrom: identity?.validityDisputed ? null : identity?.validFrom ?? null,
+        validTo: identity?.validityDisputed ? null : identity?.validTo ?? null
       });
     }
   }
@@ -389,8 +500,9 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
     if (!forceRefresh && metadataInflight.has(key)) return metadataInflight.get(key);
     const task = runCachedSourceQuery({ cache, cacheKey: key, freshForMs: 5 * 60 * 1000, forceRefresh, load: async () => {
       const endpointUrl = new URL(`/Line/${lines.map(encodeURIComponent).join(',')}/Route`, baseUrl);
-      endpointUrl.searchParams.append('serviceTypes', 'Regular');
-      endpointUrl.searchParams.append('serviceTypes', 'Night');
+      // TfL accepts service types as one comma-delimited value. Repeated
+      // query keys are parsed as a .NET List and rejected with HTTP 400.
+      endpointUrl.searchParams.set('serviceTypes', 'Regular,Night');
       const endpoint = endpointUrl.toString();
       const response = await requestScheduler.schedule('route-metadata', () => requestJson({ url: endpoint, fetchImpl, timeoutMs }), { progress: progress ?? {} });
       const source = { ...provenance, endpoint, retrievedAt: clock().toISOString(), httpStatus: response.status ?? null, requestCount: 1, lineIds: lines };
@@ -414,7 +526,7 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
       if (!response.ok) return sourceFailure({ code: response.code, message: `TfL scheduled timetable could not be checked: ${response.message}`, status: response.status, provenance: source });
       if (!validResponse(response.data)) return sourceFailure({ code: 'invalid_response', message: 'TfL returned a scheduled timetable response that ATLAS could not safely interpret.', provenance: source });
       const responseDepartureStopId = text(response.data?.timetable?.departureStopId) || null;
-      const parsed = routeRecords(response.data, stop, responseDepartureStopId, metadataResult);
+    const parsed = routeRecords(response.data, stop, responseDepartureStopId, metadataResult, clock().toISOString());
       if (responseDepartureStopId && responseDepartureStopId !== stop) parsed.warnings.push(`TfL response departureStopId ${responseDepartureStopId} did not match requested StopPoint ${stop}; only exact StopPoint-level journey evidence was retained.`);
       const matchedServices = parsed.services.filter(service => Object.values(service.stopSchedules?.[stop] ?? {}).some(day => Array.isArray(day) && day.length));
       const warnings = matchedServices.length ? parsed.warnings : [...parsed.warnings, 'TfL returned scheduled timetable data without a deterministically resolved route pattern. No route or zero-service conclusion has been assumed.'];
@@ -444,5 +556,26 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
     }));
     return sourceSuccess({ ...result, data, evidence });
   }
-  return Object.freeze({ id: 'tfl-bus-timetable-v1', servicesForStop, routeMetadataForLines });
+  function routeIdentityForNationalService({ lineId, service, routeMetadata } = {}) {
+    const line = text(lineId);
+    const identity = routeIdentityForService({ lineId: line, service, routeMetadata, asOf: clock().toISOString() });
+    if (!identity) return null;
+    return Object.freeze({
+      ...identity,
+      provider: 'TfL', source: SOURCE,
+      sourceOrigin: identity.sourceOrigin || identity.origin,
+      sourceDestination: identity.sourceDestination || identity.destination,
+      endpoint: routeMetadata?.provenance?.endpoint || null,
+      retrievedAt: routeMetadata?.provenance?.retrievedAt || null,
+      freshness: routeMetadata?.cache?.status === 'hit' ? 'cached-current' : 'live-current',
+      evidenceClass: 'authoritative-route-section', routeId: line,
+      sourceKind: 'tfl-route-metadata'
+    });
+  }
+
+  function currentRouteMetadataForLine({ lineId, routeMetadata } = {}) {
+    return routeMetadataIdentityForLine({ lineId: text(lineId), routeMetadata, asOf: clock().toISOString() });
+  }
+
+  return Object.freeze({ id: 'tfl-bus-timetable-v1', servicesForStop, routeMetadataForLines, routeIdentityForNationalService, currentRouteMetadataForLine });
 }

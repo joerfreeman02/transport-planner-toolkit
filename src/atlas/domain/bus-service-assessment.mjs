@@ -482,6 +482,12 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const endpointEvidenceFreshness = unverifiedEndpointStatuses.length === records.length
       ? unverifiedEndpointStatuses.includes('stale') ? 'stale' : 'unknown'
       : null;
+    const endpointProvenance = Object.freeze(Object.fromEntries(['origin', 'destination'].map(side => {
+      const candidates = records.map(record => record.endpointProvenance?.[side]).filter(item => item?.value);
+      candidates.sort((left, right) => Number(right.evidenceClass === 'authoritative-route-section') - Number(left.evidenceClass === 'authoritative-route-section')
+        || Number(['stale', 'unknown'].includes(String(left.freshness?.status ?? '').toLowerCase())) - Number(['stale', 'unknown'].includes(String(right.freshness?.status ?? '').toLowerCase())));
+      return [side, candidates[0] ? Object.freeze({ ...candidates[0] }) : null];
+    })));
     return Object.freeze({
       id: identity,
       routeNumber: text(first.routeNumber) || 'Not supplied',
@@ -507,8 +513,12 @@ export function buildServiceSummaries(stops, serviceRecords) {
         id: text(record.id) || null,
         provider: text(record.timetableSource || record.source?.provider) || null,
         endpointEvidenceFreshness: text(record.endpointEvidenceFreshness).toLowerCase() || null,
+        endpointProvenance: record.endpointProvenance ?? null,
         source: record.source ?? null
       }))),
+      endpointProvenance,
+      routeMetadataEvidence: records.map(record => record.source?.routeMetadataEvidence)
+        .find(evidence => evidence?.routeSection?.origin && evidence?.routeSection?.destination) ?? null,
       endpointEvidenceFreshness,
       routePatternStops: Object.freeze([...(first.routePatternStops ?? [])]),
       routePatternCompleteness: text(first.routePatternCompleteness || first.source?.routePatternCompleteness) || null,

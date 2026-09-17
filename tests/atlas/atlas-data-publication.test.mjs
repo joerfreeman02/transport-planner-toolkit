@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { allocateTndsRegions, assertPublicationFits, buildAtlasDataSources, measurePublicationTree, PAGES_DATASET_LIMIT_BYTES, preparePublications, renderAtlasDataSourcesModule, SAFE_PUBLICATION_LIMIT_BYTES, TNDS_REGIONS } from '../../tools/atlas-data-publication/publication.mjs';
+import { allocateTndsRegions, assertPublicationFits, buildAtlasDataSources, measureCandidateDatasets, measurePublicationTree, PAGES_DATASET_LIMIT_BYTES, preparePublications, renderAtlasDataSourcesModule, SAFE_PUBLICATION_LIMIT_BYTES, TNDS_REGIONS } from '../../tools/atlas-data-publication/publication.mjs';
 import { createAtlasDataSourceResolver } from '../../src/atlas/infrastructure/atlas-data-sources.mjs';
 import { createPreparedBusDataAdapter, nearbyGridCellKeys } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { confirmSite, createSite } from '../../src/atlas/domain/site.mjs';
@@ -34,6 +34,16 @@ const regionalFixture = { files: TNDS_REGIONS.map(region => ({ path: `services/1
 assert.equal(Object.keys(allocateTndsRegions(regionalFixture, TNDS_REGIONS).regions).length, 8);
 assert.throws(() => allocateTndsRegions(regionalFixture, [...TNDS_REGIONS, 'ZZ']), /missing expected/);
 assert.throws(() => assertPublicationFits({ bytes: SAFE_PUBLICATION_LIMIT_BYTES + 1, fileCount: 1 }, 'total site'), /safe bounded-publication limit/);
+const oversizedCandidate = path.join(temp, 'oversized-candidate');
+await fs.cp(candidate, oversizedCandidate, { recursive: true });
+await fs.writeFile(path.join(oversizedCandidate, 'atlas', 'data', 'bus-tnds', 'manifest.json'), JSON.stringify({ schema: 'atlas-prepared-bus-tnds-v1', expectedRegions: TNDS_REGIONS }));
+const syntheticOversizedTnds = { root: 'synthetic', files: [{ path: 'manifest.json', bytes: 8, sha256: 'manifest' }, ...TNDS_REGIONS.map(region => ({ path: `services/synthetic-${region.toLowerCase()}.json`, bytes: 112624999, sha256: region }))], fileCount: 9, bytes: 901000000, sha256: 'oversized', largest: [] };
+const oversizedMeasurement = await measureCandidateDatasets(oversizedCandidate, { measureTree: async root => root.endsWith(`${path.sep}bus-tnds`) ? syntheticOversizedTnds : measurePublicationTree(root) });
+assert.equal(oversizedMeasurement.tnds.candidateBytes, 901000000);
+assert.equal(oversizedMeasurement.tnds.candidateFiles, 9);
+assert.equal(oversizedMeasurement.tnds.fitsSafeLimit, false);
+assert.equal(Object.values(oversizedMeasurement.tnds.regions.regions).filter(region => region.fileCount > 0).length, 8);
+assert.equal(oversizedMeasurement.proposedPublicationGroups.tnds.find(group => group.group === 'national-tnds').fitsSafeLimit, false);
 
 const externalSite = confirmSite(createSite({ suppliedAddress: 'External fixture', displayAddress: 'External fixture', latitude: 51.6858, longitude: -0.033, assessmentPoint: { method: 'coordinates_entered' } }), { confirmedAt: '2026-09-17T00:00:00Z' });
 const externalCell = nearbyGridCellKeys(externalSite, 700, 0.1)[0];

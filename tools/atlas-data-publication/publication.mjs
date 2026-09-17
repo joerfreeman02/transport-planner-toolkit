@@ -50,6 +50,15 @@ export function assertPublicationFits(measurement, label, limit = SAFE_PUBLICATI
   return measurement;
 }
 
+function capacitySummary(bytes) {
+  return {
+    bytes,
+    safeLimitBytes: SAFE_PUBLICATION_LIMIT_BYTES,
+    fitsSafeLimit: bytes <= SAFE_PUBLICATION_LIMIT_BYTES,
+    overSafeLimitBytes: Math.max(0, bytes - SAFE_PUBLICATION_LIMIT_BYTES)
+  };
+}
+
 function normaliseBaseUrl(value) {
   const url = new URL(String(value));
   if (!url.href.endsWith('/')) return `${url.href}/`;
@@ -162,6 +171,25 @@ export async function stageBoundedPublication({ candidateSite, repository, datas
     await writePublicationManifest(path.join(staging, candidateSlot), dataset, publicationVersion, sourceMeasurement, generatedAt, regionAllocation);
     const candidateMeasurement = assertPublicationFits(await measurePublicationTree(path.join(staging, candidateSlot)), `${dataset.toUpperCase()} candidate slot`);
     const totalMeasurement = assertPublicationFits(await measurePublicationTree(staging), `${dataset.toUpperCase()} total site including rollback slot`);
+    const auditDirectory = path.join(staging, 'audit');
+    await fs.mkdir(auditDirectory, { recursive: true });
+    const currentAudit = path.join(repository, 'audit', 'current.json');
+    if (await fs.stat(currentAudit).then(() => true).catch(() => false)) await fs.copyFile(currentAudit, path.join(auditDirectory, 'previous.json'));
+    const audit = {
+      schema: 'atlas-reference-data-publication-audit-v1',
+      publicationVersion,
+      applicationConfigVersion: publicationVersion,
+      generatedAt,
+      dataset,
+      sourceSha256: sourceMeasurement.sha256,
+      candidateSha256: candidateMeasurement.sha256,
+      candidateBytes: candidateMeasurement.bytes,
+      candidateFiles: candidateMeasurement.fileCount,
+      activeSlot: activeSlot ?? null,
+      candidateSlot,
+      regionAllocation
+    };
+    await fs.writeFile(path.join(auditDirectory, 'current.json'), `${JSON.stringify(audit, null, 2)}\n`);
     const state = {
       schema: 'atlas-reference-data-publication-state-v2',
       dataset,
@@ -171,12 +199,14 @@ export async function stageBoundedPublication({ candidateSite, repository, datas
       activeSlot: activeSlot ?? null,
       candidateSlot,
       previousSlot: activeSlot ?? null,
+      applicationConfigVersion: publicationVersion,
       safetyLimitBytes: SAFE_PUBLICATION_LIMIT_BYTES,
       pagesLimitBytes: PAGES_DATASET_LIMIT_BYTES,
       safetyMarginBytes: PUBLICATION_SAFETY_MARGIN_BYTES,
       candidate: { fileCount: candidateMeasurement.fileCount, bytes: candidateMeasurement.bytes, sha256: candidateMeasurement.sha256 },
       totalSite: { fileCount: totalMeasurement.fileCount, bytes: totalMeasurement.bytes, sha256: totalMeasurement.sha256 },
-      regionAllocation
+      regionAllocation,
+      audit: { current: 'audit/current.json', previous: 'audit/previous.json' }
     };
     await fs.writeFile(path.join(staging, 'publication-state.json'), `${JSON.stringify(state, null, 2)}\n`);
     const finalMeasurement = assertPublicationFits(await measurePublicationTree(staging), `${dataset.toUpperCase()} total site including lifecycle metadata`);
@@ -197,21 +227,26 @@ export async function preparePublications({ candidateSite, busRepository, tndsRe
   return { config, bus, tnds, safetyLimitBytes: SAFE_PUBLICATION_LIMIT_BYTES, pagesLimitBytes: PAGES_DATASET_LIMIT_BYTES, safetyMarginBytes: PUBLICATION_SAFETY_MARGIN_BYTES };
 }
 
-export async function measureCandidateDatasets(candidateSite) {
+export async function measureCandidateDatasets(candidateSite, { measureTree = measurePublicationTree } = {}) {
   const candidateData = path.join(candidateSite, 'atlas', 'data');
-  const bus = assertPublicationFits(await measurePublicationTree(path.join(candidateData, 'bus')), 'Bus candidate');
+  const bus = await measureTree(path.join(candidateData, 'bus'));
   const tndsRoot = path.join(candidateData, 'bus-tnds');
-  const tnds = assertPublicationFits(await measurePublicationTree(tndsRoot), 'TNDS candidate');
+  const tnds = await measureTree(tndsRoot);
   const manifest = await readManifest(tndsRoot);
   const expectedRegions = manifest.expectedRegions ?? manifest.regions ?? TNDS_REGIONS;
   const regions = allocateTndsRegions(tnds, expectedRegions);
+  const proposedBus = [{ group: 'national-bus', ...capacitySummary(bus.bytes), files: bus.fileCount }];
+  const proposedTnds = [
+    { group: 'national-tnds', ...capacitySummary(tnds.bytes), files: tnds.fileCount },
+    ...expectedRegions.map(region => ({ group: `tnds-${region}`, ...capacitySummary(regions.regions[region].bytes), files: regions.regions[region].fileCount, region }))
+  ];
   return {
     safetyLimitBytes: SAFE_PUBLICATION_LIMIT_BYTES,
     pagesLimitBytes: PAGES_DATASET_LIMIT_BYTES,
     safetyMarginBytes: PUBLICATION_SAFETY_MARGIN_BYTES,
-    bus: { candidateBytes: bus.bytes, candidateFiles: bus.fileCount, projectedWithEqualSizedRollbackBytes: bus.bytes * 2, sha256: bus.sha256, largest: bus.largest },
-    tnds: { candidateBytes: tnds.bytes, candidateFiles: tnds.fileCount, projectedWithEqualSizedRollbackBytes: tnds.bytes * 2, sha256: tnds.sha256, largest: tnds.largest, regions },
-    proposedPublicationGroups: { bus: [{ group: 'national-bus', bytes: bus.bytes, files: bus.fileCount }], tnds: [{ group: 'national-tnds-regional-routing', bytes: tnds.bytes, files: tnds.fileCount, regions: expectedRegions }] }
+    bus: { candidateBytes: bus.bytes, candidateFiles: bus.fileCount, ...capacitySummary(bus.bytes), projectedBlueGreenBytes: bus.bytes * 2, projectedBlueGreenFitsSafeLimit: bus.bytes * 2 <= SAFE_PUBLICATION_LIMIT_BYTES, sha256: bus.sha256, largest: bus.largest },
+    tnds: { candidateBytes: tnds.bytes, candidateFiles: tnds.fileCount, ...capacitySummary(tnds.bytes), projectedBlueGreenBytes: tnds.bytes * 2, projectedBlueGreenFitsSafeLimit: tnds.bytes * 2 <= SAFE_PUBLICATION_LIMIT_BYTES, sha256: tnds.sha256, largest: tnds.largest, regions },
+    proposedPublicationGroups: { bus: proposedBus, tnds: proposedTnds }
   };
 }
 

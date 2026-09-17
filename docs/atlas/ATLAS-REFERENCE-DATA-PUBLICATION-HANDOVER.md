@@ -11,7 +11,7 @@ Pages setting or production refresh was created or run by this task.
 - Branch: `codex/atlas-data-publication-layer`
 - Worktree: `C:\Users\joe.freeman\OneDrive - EAS Transport\Documents\Transport Planner Toolkit\atlas-data-publication-layer`
 - Prior implementation SHA: `754dab29ec97f81fe3d91fdcc949eaf79465dbce`
-- Final SHA: `5caff10` (includes `44747e6`, `Correct bounded reference-data publication lifecycle`)
+- Final SHA: `74a6207` (includes `44747e6`, `Correct bounded reference-data publication lifecycle`)
 - Push state: review branch only; no production deployment was triggered
 
 The quarantined `source` checkout, experimental Alpha.16 checkout and

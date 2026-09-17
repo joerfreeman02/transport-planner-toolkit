@@ -11,7 +11,7 @@ Pages setting or production refresh was created or run by this task.
 - Branch: `codex/atlas-data-publication-layer`
 - Worktree: `C:\Users\joe.freeman\OneDrive - EAS Transport\Documents\Transport Planner Toolkit\atlas-data-publication-layer`
 - Prior implementation SHA: `754dab29ec97f81fe3d91fdcc949eaf79465dbce`
-- Final SHA: record after the 0D.1 correction commit
+- Final SHA: `44747e6` (`Correct bounded reference-data publication lifecycle`)
 - Push state: review branch only; no production deployment was triggered
 
 The quarantined `source` checkout, experimental Alpha.16 checkout and
@@ -127,6 +127,3 @@ default is already `pages-publish`; do not point it at application `main`.
 - `pnpm test:bus`
 - syntax checks for publication, measurement and fetch scripts
 - `git diff --check`
-
-The final handover should replace “Final SHA: record after...” with the actual
-0D.1 commit SHA after verification and push.

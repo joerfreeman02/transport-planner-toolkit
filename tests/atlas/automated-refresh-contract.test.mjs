@@ -54,11 +54,12 @@ assert.doesNotMatch(workflow.slice(0, workflow.indexOf('    steps:')), /TNDS_USE
 assert.match(publication, /PAGES_DATASET_LIMIT_BYTES = 1_000_000_000/);
 assert.match(publication, /SAFE_PUBLICATION_LIMIT_BYTES/);
 assert.match(publication, /EA.*EM.*NE.*NW.*SE.*SW.*WM.*Y/);
-assert.match(publication, /publication-state-v2/);
-assert.match(publication, /atlas-reference-data-publication-audit-v1/);
+assert.match(publication, /publication-state-v3/);
+assert.match(publication, /atlas-reference-data-publication-audit-v2/);
 assert.match(publication, /assertPublicationFits/);
 assert.match(sourceConfig, /pathRoots/);
 assert.match(availability, /10 \* 60 \* 1000/);
+assert.match(workflow, /validate-publication\.mjs/);
 assert.match(refresh, /TNDS_USERNAME/);
 assert.match(refresh, /TNDS_PASSWORD/);
 assert.match(refresh, /set\(TNDS_REGIONS\)/);

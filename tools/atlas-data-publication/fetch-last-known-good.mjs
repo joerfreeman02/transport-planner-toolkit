@@ -18,7 +18,8 @@ if (configText) await fs.writeFile(configPath, configText);
 const config = configText ? JSON.parse(configText) : null;
 await fs.writeFile(path.join(outputRoot, 'active-slots.json'), `${JSON.stringify({
   bus: config?.datasets?.bus?.slot ?? null,
-  tnds: config?.datasets?.tnds?.slot ?? null
+  tnds: config?.datasets?.tnds?.slot ?? null,
+  tndsRoots: Object.fromEntries((config?.datasets?.tnds?.roots ?? []).map(root => [root.id, root.slot ?? null]))
 }, null, 2)}\n`);
 const fallback = {
   bus: new URL('data/bus/', root),

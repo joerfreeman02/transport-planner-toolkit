@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { allocateTndsRegions, assertPublicationFits, buildAtlasDataSources, measureCandidateDatasets, measurePublicationTree, PAGES_DATASET_LIMIT_BYTES, preparePublications, renderAtlasDataSourcesModule, SAFE_PUBLICATION_LIMIT_BYTES, TNDS_REGIONS } from '../../tools/atlas-data-publication/publication.mjs';
+import { allocateTndsPublicationRoots, allocateTndsRegions, assertPublicationFits, buildAtlasDataSources, measureCandidateDatasets, measurePublicationTree, PAGES_DATASET_LIMIT_BYTES, preparePublications, promoteBoundedPublication, renderAtlasDataSourcesModule, rollbackBoundedPublication, SAFE_PUBLICATION_LIMIT_BYTES, TNDS_REGIONS } from '../../tools/atlas-data-publication/publication.mjs';
 import { createAtlasDataSourceResolver } from '../../src/atlas/infrastructure/atlas-data-sources.mjs';
 import { createPreparedBusDataAdapter, nearbyGridCellKeys } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { confirmSite, createSite } from '../../src/atlas/domain/site.mjs';
+import { validatePublishedConfiguration } from '../../tools/atlas-data-publication/validate-publication.mjs';
 
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'atlas-data-publication-'));
 const candidate = path.join(temp, 'candidate');
@@ -15,8 +16,8 @@ await fs.mkdir(path.join(candidate, 'atlas', 'data', 'bus-tnds', 'services'), { 
 await fs.writeFile(path.join(candidate, 'atlas', 'data', 'bus', 'manifest.json'), JSON.stringify({ schema: 'atlas-prepared-bus-data-v1', generatedAt: '2026-09-17T00:00:00Z', sources: { bods: { regions: [{ region: 'SE' }] } } }));
 await fs.writeFile(path.join(candidate, 'atlas', 'data', 'bus', 'stops', 'g1.json.gz'), 'stop');
 await fs.writeFile(path.join(candidate, 'atlas', 'data', 'bus', 'services', '100-se.json.gz'), 'service');
-await fs.writeFile(path.join(candidate, 'atlas', 'data', 'bus-tnds', 'manifest.json'), JSON.stringify({ schema: 'atlas-prepared-bus-tnds-v1', generatedAt: '2026-09-17T00:00:00Z', regions: ['SE'] }));
-await fs.writeFile(path.join(candidate, 'atlas', 'data', 'bus-tnds', 'services', '100-se.json'), 'tnds');
+await fs.writeFile(path.join(candidate, 'atlas', 'data', 'bus-tnds', 'manifest.json'), JSON.stringify({ schema: 'atlas-prepared-bus-tnds-v1', generatedAt: '2026-09-17T00:00:00Z', expectedRegions: TNDS_REGIONS, regions: TNDS_REGIONS }));
+for (const region of TNDS_REGIONS) await fs.writeFile(path.join(candidate, 'atlas', 'data', 'bus-tnds', 'services', `100-${region.toLowerCase()}.json`), `tnds-${region}`);
 
 const bus = await measurePublicationTree(path.join(candidate, 'atlas', 'data', 'bus'));
 assert.equal(bus.fileCount, 3);
@@ -32,7 +33,13 @@ assert.equal(regionalResolver.fileUrl('tnds', 'services/100-ea.json'), 'https://
 assert.equal(regionalResolver.fileUrl('tnds', 'services/100-se.json'), 'https://se.example.test/tnds/slot-b/services/100-se.json');
 const regionalFixture = { files: TNDS_REGIONS.map(region => ({ path: `services/100-${region.toLowerCase()}.json`, bytes: 1, sha256: 'x' })) };
 assert.equal(Object.keys(allocateTndsRegions(regionalFixture, TNDS_REGIONS).regions).length, 8);
-assert.throws(() => allocateTndsRegions(regionalFixture, [...TNDS_REGIONS, 'ZZ']), /missing expected/);
+assert.throws(() => allocateTndsRegions(regionalFixture, [...TNDS_REGIONS, 'ZZ']), /unsupported expected|missing expected/);
+const routingMeasurement = { files: [{ path: 'manifest.json', bytes: 8, sha256: 'manifest' }, ...TNDS_REGIONS.map(region => ({ path: `services/large-${region.toLowerCase()}.json.gz`, bytes: 200_000_000, sha256: region }))] };
+const routing = allocateTndsPublicationRoots(routingMeasurement);
+assert.equal(routing.roots.length, 4);
+assert.deepEqual([...Object.values(routing.shardToRoot)].sort(), ['root-1', 'root-1', 'root-2', 'root-2', 'root-3', 'root-3', 'root-4', 'root-4']);
+assert.ok(routing.roots.every(root => root.fit && root.projectedTotalPublicationFootprintBytes <= SAFE_PUBLICATION_LIMIT_BYTES));
+assert.throws(() => allocateTndsPublicationRoots(routingMeasurement, { rootIds: ['only-root'], allowAdditionalRoots: false }), /Configured TNDS publication roots/);
 assert.throws(() => assertPublicationFits({ bytes: SAFE_PUBLICATION_LIMIT_BYTES + 1, fileCount: 1 }, 'total site'), /safe bounded-publication limit/);
 const oversizedCandidate = path.join(temp, 'oversized-candidate');
 await fs.cp(candidate, oversizedCandidate, { recursive: true });
@@ -75,14 +82,14 @@ const busRepository = path.join(temp, 'bus-publication');
 const tndsRepository = path.join(temp, 'tnds-publication');
 const result = await preparePublications({ candidateSite: candidate, busRepository, tndsRepository, publicationVersion: '20260917T000000Z', generatedAt: '2026-09-17T00:00:00Z', busSiteUrl: 'https://example.test/bus', tndsSiteUrl: 'https://example.test/tnds', configOutput: path.join(temp, 'app', 'atlas', 'config', 'atlas-data-sources.mjs') });
 assert.equal(result.bus.candidate.fileCount, 4);
-assert.equal(result.tnds.candidate.fileCount, 3);
+assert.equal(result.tnds[0].candidate.fileCount, 10);
 assert.equal(result.bus.candidateSlot, 'slot-a');
-assert.equal(result.tnds.candidateSlot, 'slot-a');
+assert.equal(result.tnds[0].candidateSlot, 'slot-a');
 assert.ok(result.bus.totalSite.bytes < SAFE_PUBLICATION_LIMIT_BYTES);
-assert.ok(result.tnds.totalSite.bytes < SAFE_PUBLICATION_LIMIT_BYTES);
+assert.ok(result.tnds[0].totalSite.bytes < SAFE_PUBLICATION_LIMIT_BYTES);
 const second = await preparePublications({ candidateSite: candidate, busRepository, tndsRepository, activeBusSlot: 'slot-a', activeTndsSlot: 'slot-a', publicationVersion: '20260918T000000Z', generatedAt: '2026-09-18T00:00:00Z', busSiteUrl: 'https://example.test/bus', tndsSiteUrl: 'https://example.test/tnds', configOutput: path.join(temp, 'app', 'atlas', 'config', 'atlas-data-sources.mjs') });
 assert.equal(second.bus.candidateSlot, 'slot-b');
-assert.equal(second.tnds.candidateSlot, 'slot-b');
+assert.equal(second.tnds[0].candidateSlot, 'slot-b');
 assert.equal((await fs.readdir(busRepository)).filter(name => name.startsWith('slot-')).length, 2);
 assert.equal((await fs.readdir(tndsRepository)).filter(name => name.startsWith('slot-')).length, 2);
 assert.equal((await fs.stat(path.join(busRepository, 'releases')).catch(() => null)), null);
@@ -90,4 +97,29 @@ const publishedConfig = JSON.parse(await fs.readFile(path.join(temp, 'app', 'atl
 assert.equal(publishedConfig.publicationVersion, '20260918T000000Z');
 assert.equal(publishedConfig.datasets.bus.slot, 'slot-b');
 assert.equal(publishedConfig.datasets.tnds.slot, 'slot-b');
+assert.equal(publishedConfig.datasets.tnds.roots[0].slot, 'slot-b');
+const publicationFetch = async url => {
+  const parsed = new URL(url);
+  const repository = parsed.hostname === 'example.test' && parsed.pathname.startsWith('/bus/') ? busRepository : tndsRepository;
+  const relative = parsed.pathname.split('/').filter(Boolean).slice(1).join('/');
+  try { return new Response(await fs.readFile(path.join(repository, relative)), { status: 200 }); }
+  catch { return new Response('', { status: 404 }); }
+};
+const validation = await validatePublishedConfiguration({ config: publishedConfig, fetchImpl: publicationFetch });
+assert.equal(validation.ok, true);
+assert.equal(validation.validatedTndsShardCount, 8);
+const badFetch = async url => {
+  const response = await publicationFetch(url);
+  if (new URL(url).pathname.endsWith('/services/100-se.json')) return new Response('tampered', { status: 200 });
+  return response;
+};
+await assert.rejects(() => validatePublishedConfiguration({ config: publishedConfig, fetchImpl: badFetch }), /checksum|byte-count/);
+assert.deepEqual(JSON.parse(await fs.readFile(path.join(temp, 'app', 'atlas', 'config', 'atlas-data-sources.json'), 'utf8')), publishedConfig);
+
+const promoted = await promoteBoundedPublication({ repository: busRepository, candidateSlot: 'slot-b', publicationVersion: '20260918T000000Z' });
+assert.equal(promoted.lifecycle, 'current');
+assert.equal(promoted.currentSlot, 'slot-b');
+const rolledBack = await rollbackBoundedPublication({ repository: busRepository });
+assert.equal(rolledBack.lifecycle, 'rolled-back');
+assert.equal(rolledBack.currentSlot, 'slot-a');
 console.log('PASS ATLAS data publication measurement, regional routing, bounded lifecycle, config resolution and publication contracts.');

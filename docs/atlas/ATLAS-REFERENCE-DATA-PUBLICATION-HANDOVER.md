@@ -1,133 +1,188 @@
-# BUS-RECOVERY-0D.2 handover
+# BUS-RECOVERY-0D.1 — publication capacity and lifecycle correction handover
 
 Recommendation: **READY FOR TECHNICAL DIRECTOR REVIEW**
+Production publication remains blocked until the fresh national-data
+diagnostic has been run and its root plan approved.
 
-0D.2 corrects the diagnostic, review-branch safety and publication-snapshot
-mechanism. No external repository, secret, token, Pages setting, merge,
-deployment or production refresh was created or run.
+## 1. Repository / branch / worktree state
 
-## REPOSITORY STATE
-
+- Repository: `joerfreeman02/transport-planner-toolkit`
 - Branch: `codex/atlas-data-publication-layer`
 - Worktree: `C:\Users\joe.freeman\OneDrive - EAS Transport\Documents\Transport Planner Toolkit\atlas-data-publication-layer`
-- Starting head: `4d8cb85e132e39c320dbccd4f4325b686a66a0c6`
-- Final branch head: report the actual pushed head in the final response
-- Existing 0D.1 implementation: `44747e6`
-- Review branch only; protected application `main` was not changed
+- Worktree was clean before this correction and contains the existing 0D work.
+- No merge, release, tag, external repository, secret, token or deployment was
+  created.
+- The unsafe source checkout and experimental Alpha16 checkout were not touched.
 
-The quarantined Recovery-0, `source` and Alpha16 checkouts were not modified.
-The tracked document intentionally does not self-reference its final commit
-SHA; the actual branch head is reported with the handover.
+## 2. Starting and final SHA
 
-## DIAGNOSTIC CORRECTION
+- Starting SHA: `b1d2e1d` (`Correct diagnostic and snapshot publication safety`)
+- Final SHA: reported in the final response; this handover intentionally avoids a self-referential commit hash.
 
-`measureCandidateDatasets()` now measures without applying the production
-size gate. It reports complete Bus/TNDS bytes and files, largest files,
-aggregate hashes, projected blue-green sizes, explicit fit/fail booleans and
-proposed-group fit booleans. It still fails closed on malformed data or
-ambiguous/missing expected TNDS region identity.
+## 3. Exact files changed
 
-TNDS allocation is explicit for `EA`, `EM`, `NE`, `NW`, `SE`, `SW`, `WM` and
-`Y`. A deterministic synthetic candidate above the 900 MB safe limit is fully
-measured and region-allocated by the test suite. Production staging continues
-to reject an over-limit candidate before installation or publication.
+- `.github/workflows/atlas-bus-data-refresh.yml`
+- `docs/atlas/ADR-001-REFERENCE-DATA-PUBLICATION.md`
+- `docs/atlas/ATLAS-REFERENCE-DATA-PUBLICATION-HANDOVER.md`
+- `tests/atlas/atlas-data-publication.test.mjs`
+- `tests/atlas/automated-refresh-contract.test.mjs`
+- `tools/atlas-data-publication/fetch-last-known-good.mjs`
+- `tools/atlas-data-publication/publication.mjs`
+- `tools/atlas-data-publication/validate-publication.mjs` (new)
 
-## REVIEW-BRANCH SAFETY
+## 4. 0D defects corrected
 
-The workflow now permits `refs/heads/main` and manually dispatched runs from
-non-main refs. A manually dispatched non-main run is inherently
-diagnostic-only, even if `measure_only` is false. It may acquire, prepare,
-validate and measure fresh data, but cannot require publication repositories or
-`ATLAS_REFERENCE_DATA_TOKEN`, push data, configure Pages, upload the app
-artifact or deploy.
+1. Fresh national capacity is now measured as a complete diagnostic with Bus
+   and TNDS totals, per-region totals, largest files/shards and a proposed
+   publication-root allocation. The checkout fixture is explicitly labelled
+   incomplete; no fresh national measurement is fabricated.
+2. The unbounded release directory is replaced with two slots per publication
+   root and bounded current/previous audit records. The resulting tree is
+   measured, including lifecycle metadata.
+3. Human-governed application source and machine-generated publication output
+   are separated. Automated writes target only `pages-publish` in configured
+   data repositories.
 
-Normal publication and deployment remain main-only. Main also retains the
-explicit `measure_only` diagnostic option.
+## 5. Final publication topology
 
-## SNAPSHOT PUBLICATION CORRECTION
+The application shell remains in the main toolkit Pages site. Bus data uses a
+bounded two-slot publication root. TNDS uses one or more configured roots; the
+number is selected by deterministic capacity-fit allocation of complete
+authoritative regions, largest region first with stable region-name tie-break.
+The deployment can supply root IDs/repositories/sites through the publication
+API/CLI. The default remains one root for backward compatibility.
 
-The unsafe `git switch --orphan` sequence was removed. The publisher first
-constructs the complete desired tree outside the tracked checkout, retaining
-the active rollback slot and installing the inactive candidate slot. A
-temporary Git repository then creates one snapshot commit and pushes it with
-`force-with-lease` only to the dedicated machine branch `pages-publish`.
+`atlas-data-sources.json` records the active slot for each root and an exact
+`pathMap` for every TNDS service shard. The resolver therefore sends each shard
+to exactly one root. The diagnostic and tests prove no missing or duplicate
+shard allocation. Regions are never silently truncated or split.
 
-Each publication repository contains only `slot-a`, `slot-b`, lightweight
-metadata and the current publication content. There is no `releases/<version>`
-accumulation and no generated dataset history on application `main`.
+## 6. Bounded lifecycle design
 
-## TWO-PUBLICATION GIT INTEGRATION TEST
+Each root contains `slot-a`, `slot-b`, `.nojekyll`, `publication-state.json`,
+`audit/current.json` and optionally `audit/previous.json`. A refresh stages the
+candidate in the inactive slot while retaining the current slot. Publication
+history is force-with-lease replaced with one snapshot commit on
+`pages-publish`, so history does not accumulate complete datasets.
 
-`tests/atlas/atlas-publication-snapshot.integration.test.mjs` uses a temporary
-working repository and bare remote. It performs Publication 1 and Publication
-2, then proves both slots and rollback content exist, obsolete `releases/`
-and third slots are absent, the `pages-publish` history remains one commit,
-audit current/previous records exist, and no orphan-switch failure occurs.
+`promoteBoundedPublication()` records a validated candidate as current, while
+`rollbackBoundedPublication()` selects the previous slot. Application rollback
+uses the previous validated application configuration and slot set.
 
-## AUDIT HISTORY
+## 7. Capacity and safety margin
 
-Each publication retains bounded `audit/current.json` and
-`audit/previous.json` records containing publication version, generated time,
-application/config version, source and candidate hashes, candidate bytes/files,
-regional TNDS allocation and active/candidate slots. `publication-state.json`
-and the slot manifests provide the lifecycle and checksum records. All of this
-metadata is included in the total-site safety gate. Historic full Bus/TNDS
-datasets are not retained.
+- GitHub Pages nominal limit: `1,000,000,000` bytes.
+- Operational safe limit: `900,000,000` bytes.
+- Deliberate safety margin: `100,000,000` bytes.
+- Planning metadata budget: `1,000,000` bytes.
 
-## SEMANTIC INTEGRITY
+The diagnostic reports, per root, projected current footprint, candidate/
+rollback overhead, projected total footprint and remaining margin. The staging
+gate measures the actual resulting tree, including manifests, indexed hashes,
+audit and state metadata. A root or complete region that cannot fit fails
+closed. The diagnostic can propose additional virtual roots; production cannot
+stage them until corresponding configured repositories are supplied.
 
-No changes were made to service discovery, NaPTAN, BODS, TNDS, TfL, destination
-or endpoint logic, grouping, circulars, frequency, calendars, planner
-presentation or Word export. No coverage was truncated. NPTG is not
-implemented.
+## 8. TNDS regional routing
 
-## TEST RESULTS
+TNDS service shard filenames are parsed for exactly one of `EA`, `EM`, `NE`,
+`NW`, `SE`, `SW`, `WM`, `Y`. The allocator groups all shards of a region and
+assigns that group to one root. It produces `shardToRoot` and exact config
+`pathMap` entries. Tests cover all eight required regions, missing identities,
+duplicate/incomplete allocation guards and multi-root capacity packing.
 
-The focused tests and syntax checks pass. The full verification run is:
+## 9. Fresh-data measurements
 
-- `pnpm test:atlas` — PASS
-- `pnpm test:bus` — PASS
+No genuine fresh national Bus/TNDS acquisition was available in this local
+session because the acquisition requires the authorised workflow credentials.
+The checked-out TNDS data is a small fixture and is not reported as national
+capacity evidence.
+
+Exactly one Product Owner action is required:
+
+**GitHub → Actions → ATLAS Bus data refresh → Run workflow → select
+`codex/atlas-data-publication-layer` → set `force_refresh=true` → Run.**
+
+Return the resulting `atlas-candidate-measurement.json` as evidence, including
+Bus totals/largest files, TNDS national and eight regional totals/largest
+shards, proposed root allocation, projected current/candidate/rollback/total
+bytes and remaining safety margins. Do not publish or create roots before
+Technical Director review of that evidence.
+
+## 10. Rollback / LKG behaviour
+
+The existing application configuration remains untouched until every required
+publication root passes manifest identity, per-file byte/hash and aggregate
+checksum validation. If any candidate publication or validation fails, the old
+configuration remains usable. The existing `fetch-last-known-good` step now
+also records per-root active slots for a future multi-root run.
+
+## 11. Audit / provenance design
+
+Slot publication manifests contain the prepared manifest identity, source
+identity, publication version, regional allocation and exact indexed payload
+hashes. Bounded audit records contain version, timestamp, source/candidate
+hashes, counts, bytes, root/slot allocation and configuration version. Only
+current and previous audit records are retained; full historic national
+datasets are not retained for audit.
+
+## 12. Atomic application switch
+
+The workflow sequence is acquire → prepare → validate → measure → stage all
+roots → publish → wait → validate all publication contents → install the
+candidate config → deploy the small shell. HTTP 200 is only a wait condition.
+`validate-publication.mjs` recomputes indexed file hashes and the aggregate
+checksum and confirms all manifest-referenced TNDS service shards are present
+across the validated roots. Config installation is therefore downstream of the
+complete publication barrier.
+
+## 13. Bus semantic freeze
+
+No planner-facing Bus behaviour was changed. Nearby stop discovery, service
+inclusion/exclusion, BODS/TNDS interpretation, TfL route/direction semantics,
+NaPTAN logic, destination interpretation, grouping, circular classification,
+frequencies, calendars, planner tables, browser presentation and Word
+presentation remain unchanged. Alpha.15 remains the accepted semantic
+baseline. NPTG was not implemented; its configuration slot remains null.
+
+## 14. Tests and verification
+
+Local commands run for this handover:
+
 - `node tests/atlas/atlas-data-publication.test.mjs` — PASS
 - `node tests/atlas/atlas-publication-snapshot.integration.test.mjs` — PASS
 - `node tests/atlas/automated-refresh-contract.test.mjs` — PASS
-- syntax checks for publication, snapshot, measurement and fetch scripts —
-  PASS
-- `git diff --check` — PASS
+- `node --check tools/atlas-data-publication/publication.mjs` — PASS
+- `node --check tools/atlas-data-publication/validate-publication.mjs` — PASS
+- `pnpm test:atlas` — run below and report result
+- `pnpm test:bus` — run below and report result
+- `git diff --check` — run below and report result
 
-## NPTG NOT IMPLEMENTED
+These are local results. No GitHub CI/check-run was created or verified by this
+sprint; GitHub CI status is therefore **not claimed**.
 
-NPTG remains a null/future configuration entry. No source, data or planner
-semantics were added.
+## 15. GitHub tooling adoption review
 
-## GITHUB TOOLING ADOPTION REVIEW
-
-- Dependabot: retain/enabled.
-- Codecov: optional; not required for this deterministic contract-test change.
-- OpenSSF Scorecard: recommended for app and publication repositories.
-- Sentry: not adopted for this static data transport layer.
+- Dependabot: retain for Actions and dependency updates.
+- Codecov: optional; not required for this deterministic infrastructure suite.
+- OpenSSF Scorecard: recommended for application and publication repositories.
+- Sentry: not adopted for static reference-data publication.
 - Renovate: not adopted alongside Dependabot.
-- Branch protection: application `main` is currently behaviourally protected
-  by programme governance, but GitHub branch protection is not yet enabled.
-  This remains a Product Owner follow-up; generated data must stay on
-  `pages-publish`.
 
-## EXACT NEXT PRODUCT OWNER ACTION
+## 16. Remaining external Product Owner actions
 
-After reviewing this branch, run exactly:
+Run the one diagnostic action in section 9, return its measurement evidence,
+then obtain Technical Director approval for the resulting root count and
+configure the narrowly scoped publication repositories/Pages sites, token,
+branch rules and workflow variables. Those external changes are deliberately
+not performed here.
 
-GitHub → Actions → **ATLAS Bus data refresh** → **Run workflow** → select
-`codex/atlas-data-publication-layer` → set `force_refresh=true` → Run.
+## 17. NPTG
 
-Because the selected ref is non-main, the workflow automatically behaves as a
-diagnostic-only run. It requires no publication repositories or publication
-token and does not change production state. Record the complete fresh Bus and
-TNDS totals, all eight TNDS regional allocations, projected blue-green sizes
-and proposed-group fit results. Do not create external repositories yet and
-do not attempt production publication until the topology is approved from
-those measurements.
+NPTG was **NOT implemented**.
 
-## RECOMMENDATION
+## Recommendation
 
-**READY FOR TECHNICAL DIRECTOR REVIEW; NOT PRODUCTION-PUBLICATION READY.**
-The remaining decision is the minimum safe TNDS/publication topology based on
-genuine fresh national measurements.
+**READY FOR TECHNICAL DIRECTOR REVIEW** — infrastructure correction is locally
+implemented and tested; production publication is pending genuine fresh
+national measurement and external Product Owner/Technical Director approval.

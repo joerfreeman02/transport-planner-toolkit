@@ -207,6 +207,10 @@ jobs:
             "$ATLAS_BUS_DATA_SITE_URL/$BUS_SLOT/publication-manifest.json" \
             "$ATLAS_TNDS_DATA_SITE_URL/$TNDS_SLOT/manifest.json" \
             "$ATLAS_TNDS_DATA_SITE_URL/$TNDS_SLOT/publication-manifest.json"
+      - name: Validate publication identity and required contents
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true
+        shell: bash
+        run: node tools/atlas-data-publication/validate-publication.mjs --config publication-config/atlas-data-sources.json
       - name: Install validated app data-source config
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
         shell: bash

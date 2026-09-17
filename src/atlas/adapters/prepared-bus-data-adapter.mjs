@@ -83,18 +83,22 @@ export function createPreparedBusDataAdapter({
   fetchImpl = globalThis.fetch,
   baseUrl,
   tndsBaseUrl = null,
+  busFileUrl = null,
+  tndsFileUrl = null,
   clock = () => new Date(),
   timeoutMs = 20000
 } = {}) {
   if (!baseUrl) throw new Error('Prepared bus-data base URL is required.');
+  const resolveBusUrl = relativePath => busFileUrl ? busFileUrl(relativePath) : resolveUrl(baseUrl, relativePath);
+  const resolveTndsUrl = relativePath => tndsFileUrl ? tndsFileUrl(relativePath) : resolveUrl(tndsBaseUrl, relativePath);
   let manifestPromise = null;
   const documentPromises = new Map();
 
   async function loadJson(relativePath, forceRefresh = false) {
     if (forceRefresh) documentPromises.delete(relativePath);
     if (!documentPromises.has(relativePath)) documentPromises.set(relativePath, relativePath.endsWith('.gz')
-      ? requestPreparedJson({ url: resolveUrl(baseUrl, relativePath), fetchImpl, timeoutMs })
-      : requestJson({ url: resolveUrl(baseUrl, relativePath), fetchImpl, timeoutMs }));
+      ? requestPreparedJson({ url: resolveBusUrl(relativePath), fetchImpl, timeoutMs })
+      : requestJson({ url: resolveBusUrl(relativePath), fetchImpl, timeoutMs }));
     const response = await documentPromises.get(relativePath);
     if (!response.ok) documentPromises.delete(relativePath);
     return response;
@@ -106,9 +110,9 @@ export function createPreparedBusDataAdapter({
     const response = await manifestPromise;
     if (!response.ok || response.data?.schema !== 'atlas-prepared-bus-data-v1') {
       manifestPromise = null;
-      return sourceFailure({ code: response.code || 'invalid_response', message: 'National bus information could not be checked. Please try again.', provenance: { source: `${STOP_SOURCE} and ${TIMETABLE_SOURCE}`, endpoint: resolveUrl(baseUrl, 'manifest.json') } });
+      return sourceFailure({ code: response.code || 'invalid_response', message: 'National bus information could not be checked. Please try again.', provenance: { source: `${STOP_SOURCE} and ${TIMETABLE_SOURCE}`, endpoint: resolveBusUrl('manifest.json') } });
     }
-    return sourceSuccess({ data: response.data, provenance: { source: `${STOP_SOURCE} and ${TIMETABLE_SOURCE}`, endpoint: resolveUrl(baseUrl, 'manifest.json') } });
+    return sourceSuccess({ data: response.data, provenance: { source: `${STOP_SOURCE} and ${TIMETABLE_SOURCE}`, endpoint: resolveBusUrl('manifest.json') } });
   }
 
   function snapshotWarnings(data) {
@@ -123,7 +127,7 @@ export function createPreparedBusDataAdapter({
   }
 
   async function nearbyStops(site, { radius = 700, forceRefresh = false } = {}) {
-    const provenance = { source: STOP_SOURCE, authoritativeFor: 'NaPTAN public-transport access-node records', endpoint: resolveUrl(baseUrl, 'manifest.json'), retrievedAt: null };
+    const provenance = { source: STOP_SOURCE, authoritativeFor: 'NaPTAN public-transport access-node records', endpoint: resolveBusUrl('manifest.json'), retrievedAt: null };
     if (!isConfirmedSite(site)) return sourceFailure({ code: 'invalid_request', message: 'Confirm a valid site before checking nearby stops.', provenance });
     const numericRadius = Number(radius);
     if (!Number.isFinite(numericRadius) || numericRadius < 100 || numericRadius > 2000) return sourceFailure({ code: 'invalid_request', message: 'Search radius must be between 100 and 2,000 metres.', provenance });
@@ -213,30 +217,30 @@ export function createPreparedBusDataAdapter({
     const tndsWarnings = new Set();
     const quarantinedRequestIdentities = new Set();
     if (tndsBaseUrl) {
-      const tndsManifest = await requestJson({ url: resolveUrl(tndsBaseUrl, 'manifest.json'), fetchImpl, timeoutMs });
-      if (!tndsManifest.ok || tndsManifest.data?.schema !== 'atlas-prepared-bus-tnds-v1') return sourceFailure({ code: 'unavailable_source', message: 'Supplementary bus timetable information could not be safely checked. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveUrl(tndsBaseUrl, 'manifest.json') }, warnings: ['Prepared supplementary timetable coverage is unavailable or malformed.'] });
+      const tndsManifest = await requestJson({ url: resolveTndsUrl('manifest.json'), fetchImpl, timeoutMs });
+      if (!tndsManifest.ok || tndsManifest.data?.schema !== 'atlas-prepared-bus-tnds-v1') return sourceFailure({ code: 'unavailable_source', message: 'Supplementary bus timetable information could not be safely checked. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveTndsUrl('manifest.json') }, warnings: ['Prepared supplementary timetable coverage is unavailable or malformed.'] });
       const manifest = tndsManifest.data;
       const hasShards = manifest.serviceShards && typeof manifest.serviceShards === 'object' && !Array.isArray(manifest.serviceShards);
       let shardPaths = [];
       let legacy = false;
       if (hasShards) {
         const tndsPrefixLength = Number(manifest.serviceShardKeyLength);
-        if (!Number.isInteger(tndsPrefixLength) || tndsPrefixLength < 1 || tndsPrefixLength > 32 || !Object.keys(manifest.serviceShards).length) return sourceFailure({ code: 'invalid_response', message: 'Supplementary bus timetable information could not be safely interpreted. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveUrl(tndsBaseUrl, 'manifest.json') }, warnings: ['Prepared supplementary timetable shard coverage was malformed.'] });
+        if (!Number.isInteger(tndsPrefixLength) || tndsPrefixLength < 1 || tndsPrefixLength > 32 || !Object.keys(manifest.serviceShards).length) return sourceFailure({ code: 'invalid_response', message: 'Supplementary bus timetable information could not be safely interpreted. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveTndsUrl('manifest.json') }, warnings: ['Prepared supplementary timetable shard coverage was malformed.'] });
         const selectedKeys = [...new Set([...stopIds].map(stopId => stopId.slice(0, tndsPrefixLength)).filter(Boolean))];
         for (const key of selectedKeys) {
           if (!Object.prototype.hasOwnProperty.call(manifest.serviceShards, key)) continue;
           const configured = manifest.serviceShards[key];
-          if (!Array.isArray(configured) || configured.length === 0) return sourceFailure({ code: 'invalid_response', message: 'Supplementary bus timetable information could not be safely interpreted. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveUrl(tndsBaseUrl, 'manifest.json') }, warnings: ['Prepared supplementary timetable shard coverage was malformed.'] });
+          if (!Array.isArray(configured) || configured.length === 0) return sourceFailure({ code: 'invalid_response', message: 'Supplementary bus timetable information could not be safely interpreted. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveTndsUrl('manifest.json') }, warnings: ['Prepared supplementary timetable shard coverage was malformed.'] });
           shardPaths.push(...configured);
         }
       } else if (Array.isArray(manifest.services) && manifest.services.length <= MAX_LEGACY_TNDS_SERVICES) {
         shardPaths = manifest.services;
         legacy = true;
-      } else return sourceFailure({ code: 'invalid_response', message: 'Supplementary bus timetable information could not be safely interpreted. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveUrl(tndsBaseUrl, 'manifest.json') }, warnings: ['Prepared supplementary timetable data requires stop-prefix shards.'] });
-      const responses = (await Promise.all([...new Set(shardPaths)].map(file => (file.endsWith('.gz') ? requestPreparedJson : requestJson)({ url: resolveUrl(tndsBaseUrl, file), fetchImpl, timeoutMs }))));
-      if (responses.some(row => !row.ok)) return sourceFailure({ code: 'unavailable_source', message: 'Supplementary bus timetable information could not be safely checked. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveUrl(tndsBaseUrl, 'manifest.json') }, warnings: ['One or more prepared supplementary timetable shards could not be loaded.'] });
-      if (!legacy && responses.some(row => !Array.isArray(row.data?.services) || row.data?.schema !== 'atlas-prepared-bus-tnds-v1')) return sourceFailure({ code: 'invalid_response', message: 'Supplementary bus timetable information could not be safely interpreted. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveUrl(tndsBaseUrl, 'manifest.json') }, warnings: ['One or more prepared supplementary timetable shards were malformed.'] });
-      if (hasShards && responses.some(row => !row.data?.stopPrefix)) return sourceFailure({ code: 'invalid_response', message: 'Supplementary bus timetable information could not be safely interpreted. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveUrl(tndsBaseUrl, 'manifest.json') }, warnings: ['One or more prepared supplementary timetable shards were missing their stop-prefix identity.'] });
+      } else return sourceFailure({ code: 'invalid_response', message: 'Supplementary bus timetable information could not be safely interpreted. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveTndsUrl('manifest.json') }, warnings: ['Prepared supplementary timetable data requires stop-prefix shards.'] });
+      const responses = (await Promise.all([...new Set(shardPaths)].map(file => (file.endsWith('.gz') ? requestPreparedJson : requestJson)({ url: resolveTndsUrl(file), fetchImpl, timeoutMs }))));
+      if (responses.some(row => !row.ok)) return sourceFailure({ code: 'unavailable_source', message: 'Supplementary bus timetable information could not be safely checked. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveTndsUrl('manifest.json') }, warnings: ['One or more prepared supplementary timetable shards could not be loaded.'] });
+      if (!legacy && responses.some(row => !Array.isArray(row.data?.services) || row.data?.schema !== 'atlas-prepared-bus-tnds-v1')) return sourceFailure({ code: 'invalid_response', message: 'Supplementary bus timetable information could not be safely interpreted. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveTndsUrl('manifest.json') }, warnings: ['One or more prepared supplementary timetable shards were malformed.'] });
+      if (hasShards && responses.some(row => !row.data?.stopPrefix)) return sourceFailure({ code: 'invalid_response', message: 'Supplementary bus timetable information could not be safely interpreted. Please try again.', provenance: { source: 'Traveline National Dataset supplementary data', endpoint: resolveTndsUrl('manifest.json') }, warnings: ['One or more prepared supplementary timetable shards were missing their stop-prefix identity.'] });
       const tndsRows = (legacy ? responses.map(row => row.data) : responses.flatMap(row => row.data.services)).map(service => normalisePreparedService(service)).map(service => {
           const scoped = scopedScheduledService(service, stopIds);
           const affectedAtStop = (service.tndsQuarantine?.affectedStopIds || []).filter(id => stopIds.has(id));

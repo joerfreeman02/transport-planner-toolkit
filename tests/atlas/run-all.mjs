@@ -43,4 +43,5 @@ await import('./legacy-isolation.test.mjs');
 await import('./review-environment.test.mjs');
 await import('./automated-refresh-contract.test.mjs');
 await import('./refresh-freshness.test.mjs');
+await import('./atlas-data-publication.test.mjs');
 console.log('ATLAS Alpha.15 deterministic suite passed.');

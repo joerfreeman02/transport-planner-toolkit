@@ -1,0 +1,20 @@
+{
+  "schema": "atlas-data-sources-v1",
+  "publicationVersion": "local-checkout",
+  "generatedAt": null,
+  "datasets": {
+    "bus": {
+      "baseUrl": "../data/bus/",
+      "manifest": "manifest.json",
+      "publicationManifest": "publication-manifest.json",
+      "pathRoots": []
+    },
+    "tnds": {
+      "baseUrl": "../data/bus-tnds/",
+      "manifest": "manifest.json",
+      "publicationManifest": "publication-manifest.json",
+      "pathRoots": []
+    },
+    "nptg": null
+  }
+}

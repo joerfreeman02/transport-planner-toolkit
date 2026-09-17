@@ -8,6 +8,11 @@ on:
         required: false
         default: false
         type: boolean
+      measure_only:
+        description: 'Acquire and measure a fresh candidate without publishing or deploying it.'
+        required: false
+        default: false
+        type: boolean
   schedule:
     # Temporary Alpha.14 unattended canary for Monday 2026-09-14.
     - cron: '37 5 * * 1'
@@ -23,7 +28,7 @@ env:
   ATLAS_TNDS_DATA_REPOSITORY: ${{ vars.ATLAS_TNDS_DATA_REPOSITORY }}
   ATLAS_BUS_DATA_SITE_URL: ${{ vars.ATLAS_BUS_DATA_SITE_URL }}
   ATLAS_TNDS_DATA_SITE_URL: ${{ vars.ATLAS_TNDS_DATA_SITE_URL }}
-  ATLAS_REFERENCE_DATA_BRANCH: ${{ vars.ATLAS_REFERENCE_DATA_BRANCH || 'main' }}
+  ATLAS_REFERENCE_DATA_BRANCH: ${{ vars.ATLAS_REFERENCE_DATA_BRANCH || 'pages-publish' }}
 
 concurrency:
   group: atlas-bus-pages
@@ -103,6 +108,7 @@ jobs:
           mkdir pages-site
           rsync -a --exclude='.git' --exclude='pages-site' --exclude='atlas/data/bus' --exclude='atlas/data/bus-tnds' ./ pages-site/
       - name: Require reference-data publication targets
+        if: inputs.measure_only != true
         shell: bash
         run: |
           test -n "$ATLAS_BUS_DATA_REPOSITORY"
@@ -125,7 +131,11 @@ jobs:
         run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site
       - name: Run deterministic ATLAS checks
         run: node tests/atlas/run-all.mjs
+      - name: Measure fresh candidate publication capacity
+        shell: bash
+        run: node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json
       - name: Check out Bus reference-data publication repository
+        if: inputs.measure_only != true
         uses: actions/checkout@v4
         with:
           repository: ${{ vars.ATLAS_BUS_DATA_REPOSITORY }}
@@ -133,53 +143,73 @@ jobs:
           path: reference-data/bus-repository
           ref: ${{ env.ATLAS_REFERENCE_DATA_BRANCH }}
       - name: Check out TNDS reference-data publication repository
+        if: inputs.measure_only != true
         uses: actions/checkout@v4
         with:
           repository: ${{ vars.ATLAS_TNDS_DATA_REPOSITORY }}
           token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
           path: reference-data/tnds-repository
           ref: ${{ env.ATLAS_REFERENCE_DATA_BRANCH }}
-      - name: Prepare and size-gate versioned reference-data publications
+      - name: Prepare and size-gate bounded reference-data publications
+        if: inputs.measure_only != true
         id: publications
         shell: bash
         env:
           PUBLICATION_VERSION: ${{ github.run_id }}-${{ github.sha }}
           GENERATED_AT: ${{ github.run_started_at }}
         run: |
+          ACTIVE_BUS_SLOT=$(node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('last-known-good/active-slots.json','utf8'));process.stdout.write(x.bus||'')")
+          ACTIVE_TNDS_SLOT=$(node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('last-known-good/active-slots.json','utf8'));process.stdout.write(x.tnds||'')")
           node tools/atlas-data-publication/publication.mjs \
             --candidate-site pages-site \
-            --bus-destination "reference-data/bus-repository/releases/$PUBLICATION_VERSION" \
-            --tnds-destination "reference-data/tnds-repository/releases/$PUBLICATION_VERSION" \
+            --bus-repository reference-data/bus-repository \
+            --tnds-repository reference-data/tnds-repository \
             --version "$PUBLICATION_VERSION" \
             --generated-at "$GENERATED_AT" \
-            --bus-base-url "$ATLAS_BUS_DATA_SITE_URL/releases/$PUBLICATION_VERSION/" \
-            --tnds-base-url "$ATLAS_TNDS_DATA_SITE_URL/releases/$PUBLICATION_VERSION/" \
-            --config-output pages-site/atlas/config/atlas-data-sources.mjs
+            --bus-site-url "$ATLAS_BUS_DATA_SITE_URL" \
+            --tnds-site-url "$ATLAS_TNDS_DATA_SITE_URL" \
+            --active-bus-slot "$ACTIVE_BUS_SLOT" \
+            --active-tnds-slot "$ACTIVE_TNDS_SLOT" \
+            --config-output publication-config/atlas-data-sources.mjs
       - name: Publish validated Bus reference-data version
+        if: inputs.measure_only != true
         shell: bash
         run: |
           git -C reference-data/bus-repository config user.name 'github-actions[bot]'
           git -C reference-data/bus-repository config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git -C reference-data/bus-repository add "releases/${{ github.run_id }}-${{ github.sha }}"
-          git -C reference-data/bus-repository commit -m "Publish ATLAS Bus reference data ${{ github.run_id }}" || test $? -eq 1
-          git -C reference-data/bus-repository push origin "HEAD:$ATLAS_REFERENCE_DATA_BRANCH"
+          git -C reference-data/bus-repository switch --orphan publication-reset
+          git -C reference-data/bus-repository add -A
+          git -C reference-data/bus-repository commit -m "Publish ATLAS Bus bounded slot ${{ github.run_id }}"
+          git -C reference-data/bus-repository push --force-with-lease origin "HEAD:$ATLAS_REFERENCE_DATA_BRANCH"
       - name: Publish validated TNDS reference-data version
+        if: inputs.measure_only != true
         shell: bash
         run: |
           git -C reference-data/tnds-repository config user.name 'github-actions[bot]'
           git -C reference-data/tnds-repository config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git -C reference-data/tnds-repository add "releases/${{ github.run_id }}-${{ github.sha }}"
-          git -C reference-data/tnds-repository commit -m "Publish ATLAS TNDS reference data ${{ github.run_id }}" || test $? -eq 1
-          git -C reference-data/tnds-repository push origin "HEAD:$ATLAS_REFERENCE_DATA_BRANCH"
-      - name: Wait for both immutable Pages publications
+          git -C reference-data/tnds-repository switch --orphan publication-reset
+          git -C reference-data/tnds-repository add -A
+          git -C reference-data/tnds-repository commit -m "Publish ATLAS TNDS bounded slot ${{ github.run_id }}"
+          git -C reference-data/tnds-repository push --force-with-lease origin "HEAD:$ATLAS_REFERENCE_DATA_BRANCH"
+      - name: Wait for both bounded Pages publications
+        if: inputs.measure_only != true
         shell: bash
         run: |
+          BUS_SLOT=$(node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('publication-config/atlas-data-sources.json','utf8'));process.stdout.write(x.datasets.bus.slot)")
+          TNDS_SLOT=$(node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('publication-config/atlas-data-sources.json','utf8'));process.stdout.write(x.datasets.tnds.slot)")
           node tools/atlas-data-publication/wait-for-publication.mjs \
-            "$ATLAS_BUS_DATA_SITE_URL/releases/${{ github.run_id }}-${{ github.sha }}/manifest.json" \
-            "$ATLAS_BUS_DATA_SITE_URL/releases/${{ github.run_id }}-${{ github.sha }}/publication-manifest.json" \
-            "$ATLAS_TNDS_DATA_SITE_URL/releases/${{ github.run_id }}-${{ github.sha }}/manifest.json" \
-            "$ATLAS_TNDS_DATA_SITE_URL/releases/${{ github.run_id }}-${{ github.sha }}/publication-manifest.json"
+            "$ATLAS_BUS_DATA_SITE_URL/$BUS_SLOT/manifest.json" \
+            "$ATLAS_BUS_DATA_SITE_URL/$BUS_SLOT/publication-manifest.json" \
+            "$ATLAS_TNDS_DATA_SITE_URL/$TNDS_SLOT/manifest.json" \
+            "$ATLAS_TNDS_DATA_SITE_URL/$TNDS_SLOT/publication-manifest.json"
+      - name: Install validated app data-source config
+        if: inputs.measure_only != true
+        shell: bash
+        run: |
+          cp publication-config/atlas-data-sources.mjs pages-site/atlas/config/atlas-data-sources.mjs
+          cp publication-config/atlas-data-sources.json pages-site/atlas/config/atlas-data-sources.json
       - name: Remove reference data from the application Pages payload
+        if: inputs.measure_only != true
         shell: bash
         run: rm -rf pages-site/atlas/data/bus pages-site/atlas/data/bus-tnds
       - name: Validate complete legacy and ATLAS artifact
@@ -188,11 +218,20 @@ jobs:
           test -f pages-site/index.html
           test -f pages-site/atlas/index.html
           test -f pages-site/atlas/data/status/manifest.json
-          test -f pages-site/atlas/config/atlas-data-sources.mjs
-          test -f pages-site/atlas/config/atlas-data-sources.json
+          if [ "${{ inputs.measure_only }}" != "true" ]; then
+            test -f pages-site/atlas/config/atlas-data-sources.mjs
+            test -f pages-site/atlas/config/atlas-data-sources.json
+          else
+            test -f pages-site/atlas/config/atlas-candidate-measurement.json
+          fi
+      - name: Complete diagnostic-only run
+        if: inputs.measure_only == true
+        run: echo 'Fresh candidate measured; no external repository or Pages publication was changed.'
       - name: Configure GitHub Pages
+        if: inputs.measure_only != true
         uses: actions/configure-pages@v5
       - name: Upload validated Pages artifact
+        if: inputs.measure_only != true
         uses: actions/upload-pages-artifact@v3
         with:
           path: pages-site
@@ -200,7 +239,7 @@ jobs:
   deploy:
     name: Deploy validated Pages artifact
     needs: [main-guard, freshness, build-validate]
-    if: needs.freshness.outputs.refresh_required == 'true' && needs.build-validate.result == 'success' && github.ref == 'refs/heads/main'
+    if: needs.freshness.outputs.refresh_required == 'true' && needs.build-validate.result == 'success' && github.ref == 'refs/heads/main' && inputs.measure_only != true
     runs-on: ubuntu-latest
     permissions:
       pages: write

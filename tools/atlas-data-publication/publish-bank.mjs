@@ -8,6 +8,7 @@ if (!planPath) throw new Error('Usage: node publish-bank.mjs --plan <plan.json> 
 const plan = JSON.parse(await fs.readFile(path.resolve(planPath), 'utf8'));
 const bank = plan.banks.find(item => item.id === plan.candidateBankId);
 if (!bank) throw new Error(`Candidate bank ${plan.candidateBankId} is absent from the plan.`);
+const token = process.env.ATLAS_REFERENCE_DATA_TOKEN;
 const published = [];
-for (const root of bank.roots) published.push(await publishSnapshot({ repository: path.resolve(root.repository), branch, message: `Publish ATLAS TNDS bank ${bank.id} root ${root.id}` }));
+for (const root of bank.roots) published.push(await publishSnapshot({ repository: path.resolve(root.repository), branch, message: `Publish ATLAS TNDS bank ${bank.id} root ${root.id}`, token }));
 console.log(JSON.stringify({ bank: bank.id, roots: published }, null, 2));

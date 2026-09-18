@@ -1,11 +1,11 @@
-# BUS-RECOVERY-0D.3A — coherent full-publication rollback correction
+# BUS-RECOVERY-0D.3B — transient publication authentication correction
 
 Recommendation: **READY FOR TECHNICAL DIRECTOR REVIEW**
 
 ## Scope and evidence
 
 Branch: `codex/atlas-data-publication-layer`
-Starting SHA: `f9a2ae2c253f77bc7d9342854dc64ba520e9be00`
+Starting SHA: `e46ea7cb0d58164e0d4d4945930ab505918c6d51`
 Main baseline remains `4e9485efa786fe6a663f6414d098f1fb2fc52a41`.
 
 Run #22 evidence from 2026-09-17 is encoded in the deterministic allocator
@@ -69,8 +69,14 @@ LKG remains the rollback route until the second bank has been successfully
 published and validated.
 
 Git checkout authentication uses askpass/environment handling and public
-remote URLs. Publication results do not return or serialise credential-bearing
-Git remotes.
+remote URLs. The corrected publication path now applies the same transient
+askpass/environment handling to `ls-remote` and `push --force-with-lease` in
+the temporary snapshot repository. Bus and every TNDS root receive the
+existing `ATLAS_REFERENCE_DATA_TOKEN` only through the main-only publication
+steps. Local/file remotes remain tokenless; GitHub HTTPS publication fails
+early when the token is absent. Remote URLs, JSON, logs, returned objects,
+repository config and retained files remain credential-free, and the temporary
+askpass directory is removed after publication attempts.
 
 ## Tests run locally
 
@@ -88,6 +94,8 @@ pnpm test:bus
 node tests/atlas/atlas-data-publication.test.mjs
 node tests/atlas/atlas-publication-snapshot.integration.test.mjs
 node tests/atlas/automated-refresh-contract.test.mjs
+node --check tools/atlas-data-publication/publish-snapshot.mjs
+node --check tools/atlas-data-publication/publish-bank.mjs
 node --check tools/atlas-data-publication/publication.mjs
 node --check tools/atlas-data-publication/validate-publication.mjs
 git diff --check
@@ -98,6 +106,13 @@ Results: `pnpm test:atlas` — PASS; `pnpm test:bus` — PASS;
 `node tests/atlas/atlas-publication-snapshot.integration.test.mjs` — PASS;
 `node tests/atlas/automated-refresh-contract.test.mjs` — PASS;
 all changed-file `node --check` commands — PASS; `git diff --check` — PASS.
+
+The snapshot integration also proves credential-bearing GitHub remotes are
+sanitised, missing GitHub HTTPS credentials fail before network use, injected
+askpass credentials are available only to the publication environment, the
+askpass file is removed, local bare publication succeeds without a token, two
+snapshots retain one bounded branch commit, and no token appears in the safe
+publication result.
 
 The publication test proves A(v1) → B(v2) rollback to coherent v1 and
 B(v2) → A(v3) rollback to coherent v2. Each rollback passes

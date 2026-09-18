@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { publishSnapshot } from '../../tools/atlas-data-publication/publish-snapshot.mjs';
+import { createTransientGitAuth, publicRemote, publishSnapshot } from '../../tools/atlas-data-publication/publish-snapshot.mjs';
 import { stageBoundedPublication } from '../../tools/atlas-data-publication/publication.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -25,6 +25,22 @@ await fs.writeFile(path.join(candidate, 'atlas', 'data', 'bus-tnds', 'services',
 await run(temp, ['init', '--bare', 'publication-remote.git']);
 await run(temp, ['init', '--quiet', 'publication-repository']);
 await run(repository, ['remote', 'add', 'origin', remote]);
+assert.equal(publicRemote(remote), remote);
+
+const githubRemoteWithCredential = 'https://x-access-token:INJECTED_TEST_TOKEN@github.com/example/reference-data.git';
+assert.equal(publicRemote(githubRemoteWithCredential), 'https://github.com/example/reference-data.git');
+assert.doesNotMatch(JSON.stringify({ remote: publicRemote(githubRemoteWithCredential) }), /INJECTED_TEST_TOKEN/);
+await assert.rejects(
+  () => createTransientGitAuth({ remote: githubRemoteWithCredential, token: '' }),
+  /requires ATLAS_REFERENCE_DATA_TOKEN/
+);
+const authentication = await createTransientGitAuth({ remote: githubRemoteWithCredential, token: 'INJECTED_TEST_TOKEN' });
+assert.match(authentication.environment.GIT_ASKPASS, /askpass\.sh$/);
+assert.equal(authentication.environment.ATLAS_GIT_TOKEN, 'INJECTED_TEST_TOKEN');
+const askpassPath = authentication.askpassPath;
+await assert.doesNotReject(() => fs.access(askpassPath));
+await authentication.cleanup();
+await assert.rejects(() => fs.access(askpassPath));
 
 const first = await stageBoundedPublication({ candidateSite: candidate, repository, dataset: 'bus', activeSlot: null, publicationVersion: 'publication-1', generatedAt: '2026-09-17T00:00:00Z' });
 assert.equal(first.candidateSlot, 'slot-a');

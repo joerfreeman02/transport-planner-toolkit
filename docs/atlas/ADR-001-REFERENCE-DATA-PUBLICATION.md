@@ -1,7 +1,7 @@
 # ADR-001: ATLAS reference-data publication layer
 
 Status: Proposed for Technical Director review
-Correction: BUS-RECOVERY-0D.3A
+Correction: BUS-RECOVERY-0D.3B
 Date: 2026-09-18
 
 ## Decision
@@ -114,9 +114,15 @@ validated configuration; until a second bank has also been populated, rollback
 uses the existing deployed Alpha.15 publication/LKG route. Dual-bank rollback
 becomes available only after both banks have completed validated publications.
 
-Publication checkout uses Git askpass with the token held in process
-environment rather than a credential-bearing remote URL. Publication command
-results expose only safe repository/root identity and commit data.
+Publication checkout and temporary snapshot publication use Git askpass with
+the token held in the process environment rather than a credential-bearing
+remote URL. `publishSnapshot` applies that transient environment to both
+`ls-remote` and `push --force-with-lease`, then removes the askpass directory.
+The workflow exposes the existing token explicitly to the main-only Bus and
+TNDS publication steps. Local/file remotes require no token; GitHub HTTPS
+publication fails early without one. Publication command results expose only
+safe repository/root identity and commit data, and no credential is retained
+in URLs, JSON, logs, config or files.
 
 ## Tooling adoption review
 

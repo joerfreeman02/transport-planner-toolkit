@@ -141,9 +141,13 @@ jobs:
           node tools/atlas-data-publication/publication.mjs --candidate-site pages-site --bus-repository reference-data/bus --version "${{ github.run_id }}-${{ github.sha }}" --generated-at "${{ github.run_started_at }}" --bus-site-url "$ATLAS_BUS_DATA_SITE_URL" --active-bus-slot "$ACTIVE_BUS_SLOT" --tnds-bank-plan publication-config/bank-plan.json --config-output publication-config/atlas-data-sources.mjs
       - name: Publish Bus and every candidate TNDS root
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
+        env:
+          ATLAS_REFERENCE_DATA_TOKEN: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
         run: node tools/atlas-data-publication/publish-bank.mjs --plan publication-config/bank-plan.json --branch "$ATLAS_REFERENCE_DATA_BRANCH"
       - name: Publish validated Bus bounded snapshot
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
+        env:
+          ATLAS_REFERENCE_DATA_TOKEN: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
         run: node tools/atlas-data-publication/publish-snapshot.mjs --repository reference-data/bus --branch "$ATLAS_REFERENCE_DATA_BRANCH" --message "Publish ATLAS Bus snapshot ${{ github.run_id }}"
       - name: Wait for every candidate-bank root publication
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true

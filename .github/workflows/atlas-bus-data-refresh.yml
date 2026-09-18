@@ -13,6 +13,11 @@ on:
         required: false
         default: false
         type: boolean
+      resume_checkpoint_run_id:
+        description: 'Explicitly resume a prior verified candidate checkpoint by producer workflow run ID.'
+        required: false
+        default: ''
+        type: string
   schedule:
     - cron: '37 5 * * 1'
 
@@ -38,6 +43,11 @@ jobs:
         if: github.ref != 'refs/heads/main' && github.event_name != 'workflow_dispatch'
         run: |
           echo "::error::Only refs/heads/main or a manually dispatched diagnostic may run this workflow; refusing $GITHUB_REF."
+          exit 1
+      - name: Refuse checkpoint resume outside trusted production context
+        if: inputs.resume_checkpoint_run_id != '' && github.ref != 'refs/heads/main'
+        run: |
+          echo '::error::Cross-run checkpoint resume is allowed only from refs/heads/main.'
           exit 1
       - name: Record safe execution mode
         run: |
@@ -65,7 +75,7 @@ jobs:
       - name: Decide whether a full refresh is required
         id: decision
         env:
-          FORCE_REFRESH: ${{ (github.event_name == 'workflow_dispatch' && inputs.force_refresh) || (github.event_name == 'schedule') }}
+          FORCE_REFRESH: ${{ (github.event_name == 'workflow_dispatch' && (inputs.force_refresh || inputs.resume_checkpoint_run_id != '')) || (github.event_name == 'schedule') }}
         run: node tools/atlas-bus-data/refresh-freshness.mjs --status last-known-good/atlas/data/status/manifest.json --bus last-known-good/atlas/data/bus/manifest.json --tnds last-known-good/atlas/data/bus-tnds/manifest.json --force-refresh "$FORCE_REFRESH" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       - name: Record freshness decision
         run: echo "${{ steps.decision.outputs.message }}"
@@ -82,7 +92,9 @@ jobs:
       id-token: write
     env:
       ATLAS_DIAGNOSTIC_ONLY: ${{ inputs.measure_only || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') }}
-      ATLAS_CANDIDATE_CACHE_KEY: atlas-verified-candidate-checkpoint-v1-${{ github.run_id }}-${{ github.sha }}
+      ATLAS_CHECKPOINT_PRODUCER_RUN_ID: ${{ inputs.resume_checkpoint_run_id || github.run_id }}
+      ATLAS_CURRENT_CANDIDATE_CACHE_KEY: atlas-verified-candidate-checkpoint-v2-${{ github.run_id }}
+      ATLAS_CANDIDATE_CACHE_KEY: atlas-verified-candidate-checkpoint-v2-${{ inputs.resume_checkpoint_run_id || github.run_id }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -119,7 +131,15 @@ jobs:
         env:
           ATLAS_CACHE_EXACT_HIT: ${{ steps.candidate-cache.outputs.cache-hit }}
           ATLAS_CACHE_MATCHED_KEY: ${{ steps.candidate-cache.outputs.cache-matched-key }}
-        run: node tools/atlas-data-publication/candidate-checkpoint.mjs --restore --candidate-site pages-site --run-id "${{ github.run_id }}" --commit-sha "${{ github.sha }}" --workflow-name "${{ github.workflow }}" --cache-hit "$ATLAS_CACHE_EXACT_HIT" --cache-matched-key "$ATLAS_CACHE_MATCHED_KEY"
+        run: node tools/atlas-data-publication/candidate-checkpoint.mjs --restore --candidate-site pages-site --requested-producer-run-id "$ATLAS_CHECKPOINT_PRODUCER_RUN_ID" --current-run-id "${{ github.run_id }}" --current-commit-sha "${{ github.sha }}" --workflow-name "${{ github.workflow }}" --current-ref "${{ github.ref }}" --event-name "${{ github.event_name }}" --explicit-resume "${{ inputs.resume_checkpoint_run_id != '' }}" --repository-root "$GITHUB_WORKSPACE" --cache-hit "$ATLAS_CACHE_EXACT_HIT" --cache-matched-key "$ATLAS_CACHE_MATCHED_KEY"
+      - name: Record checkpoint resume decision
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true
+        run: |
+          if [[ "${{ steps.checkpoint-restore.outputs.valid }}" == "true" ]]; then
+            echo "Authoritative acquisition SKIPPED; verified candidate checkpoint restored from producer run $ATLAS_CHECKPOINT_PRODUCER_RUN_ID."
+          else
+            echo "Authoritative acquisition REQUIRED; checkpoint restore was not accepted: ${{ steps.checkpoint-restore.outputs.reason }}"
+          fi
       - name: Prepare candidate workspace for authoritative acquisition
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true && steps.checkpoint-restore.outputs.valid != 'true'
         run: |
@@ -150,15 +170,18 @@ jobs:
         id: candidate-timestamp
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
         run: echo "value=$(node tools/atlas-data-publication/candidate-checkpoint.mjs --timestamp-only --candidate-site pages-site)" >> "$GITHUB_OUTPUT"
+      - name: Rebase verified checkpoint for current run
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true && steps.checkpoint-restore.outputs.valid == 'true' && steps.checkpoint-restore.outputs.cross_run == 'true'
+        run: node tools/atlas-data-publication/candidate-checkpoint.mjs --rebase --candidate-site pages-site --current-run-id "${{ github.run_id }}" --current-commit-sha "${{ github.sha }}" --run-attempt "${{ github.run_attempt }}" --workflow-name "${{ github.workflow }}" --current-ref "${{ github.ref }}" --event-name "${{ github.event_name }}" --repository-root "$GITHUB_WORKSPACE" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
       - name: Create verified candidate checkpoint
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true && steps.checkpoint-restore.outputs.valid != 'true'
-        run: node tools/atlas-data-publication/candidate-checkpoint.mjs --create --candidate-site pages-site --run-id "${{ github.run_id }}" --run-attempt "${{ github.run_attempt }}" --commit-sha "${{ github.sha }}" --workflow-name "${{ github.workflow }}" --cache-key "$ATLAS_CANDIDATE_CACHE_KEY"
+        run: node tools/atlas-data-publication/candidate-checkpoint.mjs --create --candidate-site pages-site --current-run-id "${{ github.run_id }}" --run-attempt "${{ github.run_attempt }}" --current-commit-sha "${{ github.sha }}" --workflow-name "${{ github.workflow }}" --current-ref "${{ github.ref }}" --event-name "${{ github.event_name }}" --repository-root "$GITHUB_WORKSPACE" --cache-key "$ATLAS_CURRENT_CANDIDATE_CACHE_KEY" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
       - name: Save verified candidate checkpoint
-        if: github.ref == 'refs/heads/main' && inputs.measure_only != true && steps.checkpoint-restore.outputs.valid != 'true'
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true && (steps.checkpoint-restore.outputs.valid != 'true' || steps.checkpoint-restore.outputs.cross_run == 'true')
         uses: actions/cache/save@v4
         with:
           path: pages-site
-          key: ${{ env.ATLAS_CANDIDATE_CACHE_KEY }}
+          key: ${{ env.ATLAS_CURRENT_CANDIDATE_CACHE_KEY }}
       - name: Complete diagnostic-only run
         if: env.ATLAS_DIAGNOSTIC_ONLY == 'true'
         run: echo 'Fresh candidate measured; no publication repository, Pages site or production configuration was changed.'

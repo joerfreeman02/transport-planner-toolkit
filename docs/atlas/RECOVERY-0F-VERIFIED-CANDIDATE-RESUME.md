@@ -1,4 +1,4 @@
-# Recovery-0F: verified candidate resume
+# Recovery-0F.1: verified candidate resume
 
 Status: implementation on the dedicated Recovery-0F branch; no production run or publication was performed.
 
@@ -24,22 +24,23 @@ The publication version remains the stable workflow-run identity `${github.run_i
 
 The checkpoint uses GitHub Actions cache only as transient runner-to-runner transport. It is not an authoritative source and does not replace DfT, NaPTAN, BODS, TNDS or the validated publication repositories.
 
-The cache path is the complete prepared `pages-site`. The exact key is:
+The cache path is the complete prepared `pages-site`. The v2 exact key is:
 
 ```text
-atlas-verified-candidate-checkpoint-v1-${github.run_id}-${github.sha}
+atlas-verified-candidate-checkpoint-v2-<producer-workflow-run-id>
 ```
 
-`github.run_attempt` is recorded for evidence but is deliberately not part of the key: rerunning the same failed workflow run must be eligible to reuse its candidate. A new scheduled or manually dispatched workflow has a new run ID and cannot reuse the previous run's checkpoint. There are no `restore-keys`.
+`github.run_attempt` is recorded for evidence but is deliberately not part of the key: rerunning the same failed workflow run must be eligible to reuse its candidate. A new run selects its own key unless an operator explicitly supplies `resume_checkpoint_run_id` on a trusted manual dispatch. There are no `restore-keys`.
 
 GitHub cache retention and eviction are operational limitations. A cache miss, eviction or unavailable cache causes fresh authoritative acquisition. The cache is also scoped by key/version/branch, and the manifest independently checks the workflow run, commit, workflow name and exact key.
 
 The checkpoint manifest at `.atlas-recovery/verified-candidate.json` records:
 
 - checkpoint schema/version and exact cache key;
-- workflow name, run ID, original run attempt and application commit;
+- separate producer and current-run workflow identity, including original run attempt and application commits;
 - ATLAS release/build identity;
 - candidate-generation timestamp;
+- candidate-generation compatibility fingerprint and freshness bound;
 - Bus and TNDS file counts, byte counts, aggregate SHA-256 values, manifest SHA-256 values, schemas and timestamps;
 - capacity-gate results and validation state;
 - required manifest/configuration paths.
@@ -120,3 +121,42 @@ Alpha.15 planner semantics, NPTG status (`NULL / UNIMPLEMENTED`), source interpr
 - OpenSSF Scorecard: possible later adoption.
 - `main` branch protection: remains a post-State-C Product Owner authorization item.
 - `pages-publish` machine branches: remain compatible with approved `force-with-lease` publication.
+
+## Recovery-0F.1 cross-commit resume contract
+
+The v2 checkpoint key is based on the producer workflow run only:
+
+```text
+atlas-verified-candidate-checkpoint-v2-<producer-workflow-run-id>
+```
+
+There are still no `restore-keys`. A different workflow run may select an
+older key only when an operator manually dispatches from trusted `main` with
+`resume_checkpoint_run_id=<producer run ID>`. The workflow requests exactly
+that key and rejects the input outside `refs/heads/main`; it never searches by
+prefix or silently falls back to another run.
+
+The checkpoint separates producer provenance from current-run association. It
+records producer run/attempt/SHA/ref/workflow/event, current run/SHA/attempt,
+release/build, candidate timestamp, measurements, manifest checksums and the
+candidate-generation compatibility fingerprint. The fingerprint covers the
+candidate-producing, validation and measurement contract: `build_static_index.py`,
+`refresh_bus_data.py`, `prepare_tnds.mjs`, `validate_candidate.py`,
+`measure-candidate.mjs`, `publication.mjs`, the fingerprint module and release metadata. Publication-only
+workflow, publish, wait and checkpoint-orchestration files are excluded, so a
+publication-only change does not invalidate an already validated candidate.
+`publication.mjs` is included conservatively because it contains candidate
+measurement and allocation logic.
+
+Cross-run restore requires the original producer to be a trusted production
+`main` run, the current workflow to have the same candidate-generation
+fingerprint, and the candidate to remain within the Bus manifest's
+`refreshAfterDays` freshness bound (currently eight days). Candidate validator,
+deterministic checks, capacity measurement and timestamp checks run again. The
+candidate timestamp is retained. After those checks, the checkpoint is rebased
+under the current run key; only current-run association and publication
+identity change, while producer provenance remains original. This makes a
+later same-run retry eligible without rewriting what produced the candidate.
+
+Run #23 remains unrecoverable because its ephemeral runner created no
+checkpoint. Recovery-0F.1 does not dispatch or recover Run #24.

@@ -384,7 +384,7 @@ def run(args: argparse.Namespace) -> dict:
         site_bus = site / "atlas" / "data" / "bus"
         site_tnds = site / "atlas" / "data" / "bus-tnds"
         site_bus.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run([sys.executable, str(Path(__file__).with_name("build_static_index.py")), "--naptan", str(naptan), "--gtfs-dir", str(gtfs), "--output", str(site_bus), "--snapshot-date", datetime.now(timezone.utc).date().isoformat()], check=True)
+        subprocess.run([sys.executable, str(Path(__file__).with_name("build_static_index.py")), "--naptan", str(naptan), "--gtfs-dir", str(gtfs), "--output", str(site_bus), "--snapshot-date", datetime.now(timezone.utc).date().isoformat(), "--generated-at", started], check=True)
         prepared_manifest_path = site_bus / "manifest.json"
         prepared_manifest = json.loads(prepared_manifest_path.read_text(encoding="utf-8"))
         for source in ("naptan", "bods"):

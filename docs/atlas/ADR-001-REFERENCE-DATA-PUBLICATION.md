@@ -196,3 +196,54 @@ grouping, circular classification, frequencies, calendars, planner tables,
 browser presentation or Word presentation. NPTG remains null/unimplemented.
 No merge to `main`, release, tag, external repository, secret, deployment,
 unsafe checkout or Alpha16 import is part of this decision.
+
+## Recovery-0F.1 amendment: transient verified candidate checkpoint
+
+Recovery-0F.1 retains the bounded recovery optimisation from Recovery-0F. After
+authoritative acquisition, candidate validation, deterministic ATLAS checks and
+capacity gates pass, the prepared Pages candidate is saved to GitHub Actions
+cache under the exact key
+`atlas-verified-candidate-checkpoint-v2-<producer-workflow-run-id>`. Only the
+candidate data, status, measurement and checkpoint paths are cached; the
+current checkout's application/site files remain authoritative. The
+checkpoint is not authoritative data and is never restored through a loose
+prefix or `restore-keys` fallback. A rerun of the same workflow run may reuse
+it; another run requires the explicit trusted-main `resume_checkpoint_run_id`
+workflow-dispatch input.
+
+The cache entry contains a versioned manifest binding the candidate to the
+producer and current-run identity, ATLAS build, stable candidate-generation
+timestamp, compatibility fingerprint, Bus/TNDS aggregate measurements and
+manifest checksums. Restore is fail-closed: the exact cache-hit signal and
+trusted producer boundary are checked, then the manifest, required files,
+release identity, fingerprint, freshness, candidate timestamp and aggregate
+Bus/TNDS hashes are independently verified. The candidate validator,
+deterministic ATLAS suite and capacity measurement run again before
+publication. A successful cross-run restore continues to use the immutable
+producer checkpoint without rebasing or duplicating it under the current key.
+Any miss, eviction, corruption,
+stale/incompatible candidate, schema/identity mismatch or integrity failure
+falls back to fresh authoritative acquisition.
+
+The stable `generatedAt` value is the UTC start of the validated candidate
+refresh transaction. It is deliberately not a publication-attempt timestamp;
+republishing the same candidate retains its candidate-generation time while
+the workflow-run publication version remains stable. Run #23 remains
+unrecoverable because its ephemeral runner created no checkpoint.
+
+The exact operational procedure and boundaries are recorded in
+`RECOVERY-0F-VERIFIED-CANDIDATE-RESUME.md`. GitHub Actions cache eviction and
+retention remain explicit operational risks; this mechanism is not a service
+level guarantee and does not change active-bank, capacity, hash, token,
+publication-wait or rollback safeguards.
+
+Recovery-0F.2 corrects the cross-commit contract. The v2 key is
+`atlas-verified-candidate-checkpoint-v2-<producer-workflow-run-id>` and can be
+selected from another run only through the explicit main-branch
+`workflow_dispatch` input `resume_checkpoint_run_id`. Restore is exact,
+trust-bound, fingerprint-checked, status-provenance-checked and
+freshness-bounded; the immutable producer checkpoint remains the source of
+truth. The fingerprint covers only generator-sensitive inputs and is explicitly
+versioned, so publication-preparation, workflow, checkpoint-orchestration and
+validation/measurement corrections do not automatically force new acquisition.
+Run #24 is not dispatched by this amendment.

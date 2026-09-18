@@ -509,7 +509,14 @@ def build(args: argparse.Namespace) -> dict:
         stop_shards[key] = relative
 
     combined_bods_hash = hashlib.sha256("".join(item["sha256"] for item in region_metadata).encode("ascii")).hexdigest()
-    generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    generated_at = args.generated_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    try:
+        parsed_generated_at = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError("generated_at must be an ISO-8601 UTC timestamp") from error
+    if parsed_generated_at.tzinfo is None:
+        raise ValueError("generated_at must include a UTC offset")
+    generated_at = parsed_generated_at.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     manifest = {
         "schema": SCHEMA,
         "version": "1.0.0",
@@ -537,6 +544,7 @@ def main() -> None:
     parser.add_argument("--gtfs-dir", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--snapshot-date", required=True)
+    parser.add_argument("--generated-at", help="Validated candidate-generation timestamp shared by all prepared manifests")
     parser.add_argument("--grid-size", type=float, default=0.25)
     parser.add_argument("--service-shard-key-length", type=int, default=5)
     args = parser.parse_args()

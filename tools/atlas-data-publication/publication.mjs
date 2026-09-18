@@ -7,6 +7,9 @@ export const PAGES_DATASET_LIMIT_BYTES = 1_000_000_000;
 export const PUBLICATION_SAFETY_MARGIN_BYTES = 100_000_000;
 export const SAFE_PUBLICATION_LIMIT_BYTES = PAGES_DATASET_LIMIT_BYTES - PUBLICATION_SAFETY_MARGIN_BYTES;
 export const PUBLICATION_METADATA_BUDGET_BYTES = 1_000_000;
+export const SAFE_GIT_BLOB_LIMIT_BYTES = 95 * 1024 * 1024;
+export const SITE_HEALTH_MARKER_FILE = 'atlas-publication-site.json';
+export const SITE_HEALTH_MARKER = Object.freeze({ schema: 'atlas-publication-site-v1' });
 export const TNDS_REGIONS = Object.freeze(['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y']);
 export const PUBLICATION_SLOTS = Object.freeze(['slot-a', 'slot-b']);
 
@@ -38,7 +41,14 @@ export async function measurePublicationTree(root) {
 }
 
 export function assertPublicationFits(measurement, label, limit = SAFE_PUBLICATION_LIMIT_BYTES) {
+  assertPublicationGitBlobsFit(measurement, label);
   if (measurement.bytes > limit) throw new Error(`${label} publication is ${measurement.bytes} bytes across ${measurement.fileCount} files; the safe bounded-publication limit is ${limit} bytes (GitHub Pages limit ${PAGES_DATASET_LIMIT_BYTES} bytes, leaving ${PUBLICATION_SAFETY_MARGIN_BYTES} bytes safety margin).`);
+  return measurement;
+}
+
+export function assertPublicationGitBlobsFit(measurement, label, limit = SAFE_GIT_BLOB_LIMIT_BYTES) {
+  const oversized = (measurement.files ?? []).find(file => file.bytes > limit);
+  if (oversized) throw new Error(`${label} contains file ${oversized.path} at ${oversized.bytes} bytes, exceeding the safe Git blob limit of ${limit} bytes. Stop and report an architectural publication blocker; authoritative content must not be truncated or split silently.`);
   return measurement;
 }
 
@@ -166,6 +176,10 @@ async function writePublicationManifest(destination, dataset, publicationVersion
   await fs.writeFile(path.join(destination, 'publication-manifest.json'), `${JSON.stringify(publication, null, 2)}\n`);
 }
 
+async function writeSiteHealthMarker(destination) {
+  await fs.writeFile(path.join(destination, SITE_HEALTH_MARKER_FILE), `${JSON.stringify(SITE_HEALTH_MARKER)}\n`);
+}
+
 function otherSlot(activeSlot) { if (!activeSlot) return PUBLICATION_SLOTS[0]; if (!PUBLICATION_SLOTS.includes(activeSlot)) throw new Error(`Active publication slot must be slot-a or slot-b, received ${activeSlot}.`); return PUBLICATION_SLOTS.find(slot => slot !== activeSlot); }
 
 async function replaceRepositoryContents(repository, staging) {
@@ -186,7 +200,7 @@ async function stageBusPublication({ candidateSite, repository, activeSlot, publ
   const staging = path.join(path.dirname(repository), `.atlas-bus-staging-${process.pid}`);
   await fs.rm(staging, { recursive: true, force: true });
   try {
-    await fs.mkdir(staging, { recursive: true }); await fs.writeFile(path.join(staging, '.nojekyll'), '');
+    await fs.mkdir(staging, { recursive: true }); await fs.writeFile(path.join(staging, '.nojekyll'), ''); await writeSiteHealthMarker(staging);
     if (activeSlot && await exists(path.join(repository, activeSlot))) await fs.cp(path.join(repository, activeSlot), path.join(staging, activeSlot), { recursive: true });
     await copyCandidateSubset(candidateRoot, path.join(staging, candidateSlot));
     const payload = await measurePublicationTree(path.join(staging, candidateSlot));
@@ -224,7 +238,7 @@ async function stageTndsBankRoot({ candidateSite, repository, bankId, rootDefini
   const staging = path.join(path.dirname(repository), `.atlas-tnds-${bankId}-${rootDefinition.id}-staging-${process.pid}`);
   await fs.rm(staging, { recursive: true, force: true });
   try {
-    await fs.mkdir(staging, { recursive: true }); await fs.writeFile(path.join(staging, '.nojekyll'), '');
+    await fs.mkdir(staging, { recursive: true }); await fs.writeFile(path.join(staging, '.nojekyll'), ''); await writeSiteHealthMarker(staging);
     await copyCandidateSubset(candidateRoot, staging, rootAllocation.files.map(file => file.path));
     const payload = await measurePublicationTree(staging);
     await writePublicationManifest(staging, 'tnds', publicationVersion, payload, generatedAt, { bankId, rootId: rootDefinition.id, sourceSha256: source.sha256, sourceManifest: await readManifest(candidateRoot), regionAllocation: { bankId, rootId: rootDefinition.id, regions: rootAllocation.regions, files: rootAllocation.files.map(file => ({ path: file.path, bytes: file.bytes, sha256: file.sha256 })) } });

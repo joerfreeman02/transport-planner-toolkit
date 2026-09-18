@@ -1,7 +1,7 @@
 # ADR-001: ATLAS reference-data publication layer
 
 Status: Proposed for Technical Director review
-Correction: BUS-RECOVERY-0D.3B
+Correction: BUS-RECOVERY-0D.3D
 Date: 2026-09-18
 
 ## Decision
@@ -116,10 +116,12 @@ malformed bank JSON, anything other than two banks with three unique roots each,
 duplicate bank/root/repository/site identities, invalid HTTPS Pages contracts,
 an active bank absent from the contract, an ambiguous candidate bank, a
 candidate root that is already active, a missing token, inaccessible publication
-repositories, or an unsafe toolkit-repository target. It performs authenticated
-`git ls-remote` for each required repository. A missing `pages-publish` branch is
-accepted only as the explicit bootstrap state because the safe first push can
-create it; GitHub Pages still must be enabled separately.
+repositories, or an unsafe toolkit-repository target. It requires the seeded
+`pages-publish` branch and the `atlas-publication-site.json` marker on all seven
+sites, performs authenticated `git ls-remote`, and checks reported push
+permission for each required repository. Missing branches, unavailable markers
+or read-only tokens fail before acquisition. GitHub Pages must be enabled
+separately from `pages-publish` at the repository root.
 
 During the initial migration from the existing Alpha.15 single-root/local
 configuration, no fictional opposite bank is created. The first controlled
@@ -128,9 +130,11 @@ validated configuration; until a second bank has also been populated, rollback
 uses the existing deployed Alpha.15 publication/LKG route. Dual-bank rollback
 becomes available only after both banks have completed validated publications.
 
-The first-run contract is one Bus site plus TNDS A1/A2/A3 and B1/B2/B3. No
-minimal seed commit is required for `pages-publish`, but each repository must
-exist and Pages must be configured to serve that branch. Before two validated
+The first-run contract is one Bus site plus TNDS A1/A2/A3 and B1/B2/B3. Each
+repository must contain a seeded `pages-publish` branch with the tiny,
+non-sensitive `atlas-publication-site.json` marker using schema
+`atlas-publication-site-v1`; Pages must be configured to serve that branch at
+the repository root. Before two validated
 external states exist, recovery is not `rollbackPublication`: redeploy the
 accepted Alpha.15 baseline at
 `4e9485efa786fe6a663f6414d098f1fb2fc52a41` through the approved existing Pages
@@ -145,9 +149,15 @@ Reachable publication history is intentionally one snapshot commit, but this
 does not guarantee remote Git object storage is physically bounded because
 force-pushed unreachable objects may await hosting-provider garbage collection.
 Preflight measures local/file remote object stores where possible and fails over
-the configurable conservative default of 3,000,000,000 bytes. GitHub-hosted
-physical size is surfaced as an explicit unavailable-size warning for recording
-during the first live cycle; no destructive cleanup is automated.
+the configurable conservative default of 3,000,000,000 bytes. GitHub
+repository metadata is used to measure reported size where available; if the
+hosting provider does not expose it, the limitation is surfaced explicitly and
+threshold enforcement is not claimed. No destructive cleanup is automated.
+
+Every published Bus/TNDS file must remain below the safe 95 MiB Git blob limit,
+below GitHub's 100 MiB hard object limit. Run #22's approximately 87.2 MB
+largest shard passes; an over-limit file stops publication as an architectural
+blocker rather than being truncated or silently split.
 
 The first live publication must record for every root: pushed bytes, push-to-
 identity-visible duration, Pages deployment result, final public bytes, HTTP

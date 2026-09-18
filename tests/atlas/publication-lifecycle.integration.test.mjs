@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { prepareBankRepositories } from '../../tools/atlas-data-publication/checkout-bank.mjs';
 import { preparePublications } from '../../tools/atlas-data-publication/publication.mjs';
 import { publishSnapshot } from '../../tools/atlas-data-publication/publish-snapshot.mjs';
+import { preflightPublication } from '../../tools/atlas-data-publication/preflight-publication.mjs';
 import { validatePublishedConfiguration as validateConfig } from '../../tools/atlas-data-publication/validate-publication.mjs';
 import { publicationTargetsFromConfig, waitForPublicationIdentity } from '../../tools/atlas-data-publication/wait-for-bank.mjs';
 
@@ -37,6 +38,12 @@ for (const root of bankDefinitions) {
   await run(path.join(temp, root.id), ['remote', 'add', 'origin', remote]);
 }
 const banks = ['A', 'B'].map(id => ({ id, roots: bankDefinitions.filter(root => root.id.startsWith(id)) }));
+let markerChecks = 0;
+const preflightBanks = ['A', 'B'].map(bank => ({ id: bank, roots: [1, 2, 3].map(index => ({ id: `${bank}${index}`, repository: `owner/${bank.toLowerCase()}${index}`, siteUrl: `https://${bank.toLowerCase()}${index}.example.test/` })) }));
+const bootstrapPreflight = await preflightPublication({ busRepository: 'owner/bus-data', busSiteUrl: 'https://bus.example.test/', banksJson: JSON.stringify(preflightBanks), activeConfig: null, token: 'INJECTED_TEST_TOKEN', probe: async () => ({ branchPresent: true }), permissionProbe: async () => ({ push: true, metadata: { size: 1 } }), siteHealthProbe: async ({ siteUrl }) => { markerChecks += 1; return { ok: true, markerUrl: `${siteUrl}atlas-publication-site.json` }; }, healthCheck: async ({ remote, sizeLimitBytes }) => ({ status: 'measured', source: 'fixture', remote, sizeBytes: 1024, sizeLimitBytes, warning: null }) });
+assert.equal(bootstrapPreflight.bootstrap, true);
+assert.equal(bootstrapPreflight.repositories.length, 7);
+assert.equal(markerChecks, 7);
 const plan = { candidateBankId: 'A', banks: banks.map(bank => ({ ...bank, roots: bank.roots.map(root => ({ ...root, remoteRepository: 'owner/' + root.id.toLowerCase() })) })) };
 await fs.mkdir(path.join(temp, 'A1', 'services'), { recursive: true });
 await fs.writeFile(path.join(temp, 'A1', 'services', 'old-service.json'), 'old payload must not be staged');

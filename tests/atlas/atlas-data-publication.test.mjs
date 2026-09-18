@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { allocateTndsPublicationRoots, allocateTndsRegions, assertPublicationFits, measurePublicationTree, preparePublications, rollbackToOppositeBank, SAFE_PUBLICATION_LIMIT_BYTES, TNDS_REGIONS } from '../../tools/atlas-data-publication/publication.mjs';
+import { allocateTndsPublicationRoots, allocateTndsRegions, assertPublicationFits, assertPublicationGitBlobsFit, measurePublicationTree, preparePublications, rollbackToOppositeBank, SAFE_GIT_BLOB_LIMIT_BYTES, SAFE_PUBLICATION_LIMIT_BYTES, SITE_HEALTH_MARKER_FILE, TNDS_REGIONS } from '../../tools/atlas-data-publication/publication.mjs';
 import { validatePublishedConfiguration } from '../../tools/atlas-data-publication/validate-publication.mjs';
 import { createAtlasDataSourceResolver } from '../../src/atlas/infrastructure/atlas-data-sources.mjs';
 
@@ -19,6 +19,8 @@ assert.deepEqual(allocateTndsPublicationRoots(run22Measurement, { rootIds: ['A1'
 assert.equal(Object.keys(allocateTndsRegions(run22Measurement, TNDS_REGIONS).regions).length, 8);
 assert.throws(() => allocateTndsPublicationRoots({ files: [{ path: 'manifest.json', bytes: 1, sha256: 'x' }, ...['EA', 'EM', 'NE', 'NW'].map(region => ({ path: `services/${region}.json`, bytes: 450_000_000, sha256: region }))] }, { expectedRegions: ['EA', 'EM', 'NE', 'NW'], rootIds: ['A1', 'A2', 'A3'] }), /cannot contain the complete candidate/);
 assert.throws(() => assertPublicationFits({ bytes: SAFE_PUBLICATION_LIMIT_BYTES + 1, fileCount: 1 }, 'total site'), /safe bounded-publication limit/);
+assert.doesNotThrow(() => assertPublicationGitBlobsFit({ files: [{ path: 'services/national-SE.json.gz', bytes: 87_203_939 }] }, 'Run #22-scale TNDS root'));
+assert.throws(() => assertPublicationGitBlobsFit({ files: [{ path: 'services/oversized.json.gz', bytes: SAFE_GIT_BLOB_LIMIT_BYTES + 1 }] }, 'oversized TNDS root'), /oversized\.json\.gz.*safe Git blob limit/);
 
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'atlas-dual-bank-'));
 const candidate = path.join(temp, 'candidate');
@@ -38,6 +40,8 @@ const configOutput = path.join(temp, 'app', 'atlas', 'config', 'atlas-data-sourc
 const first = await preparePublications({ candidateSite: candidate, busRepository: repo('bus'), tndsBanks: bankDefinitions, candidateTndsBank: 'A', publicationVersion: 'v1', generatedAt: '2026-09-17T00:00:00Z', busSiteUrl: 'https://bus.example.test/', configOutput });
 assert.equal(first.config.datasets.tnds.activeBank, 'A');
 assert.equal(first.tnds.length, 3);
+assert.deepEqual(JSON.parse(await fs.readFile(path.join(repo('bus'), SITE_HEALTH_MARKER_FILE), 'utf8')), { schema: 'atlas-publication-site-v1' });
+assert.deepEqual(JSON.parse(await fs.readFile(path.join(repo('A1'), SITE_HEALTH_MARKER_FILE), 'utf8')), { schema: 'atlas-publication-site-v1' });
 assert.ok(first.tnds.every(root => !root.totalSite.files.some(file => file.path.startsWith('slot-'))));
 assert.equal(first.config.datasets.nptg, null);
 const firstActiveHashes = await Promise.all(first.tnds.map(async root => [root.root, (await measurePublicationTree(repo(root.root))).sha256]));

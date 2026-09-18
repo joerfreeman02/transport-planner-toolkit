@@ -1,11 +1,11 @@
-# BUS-RECOVERY-0D.3C — final publication-path hardening and preflight gate
+# BUS-RECOVERY-0D.3D — final bootstrap and preflight closeout
 
 Recommendation: **READY FOR TECHNICAL DIRECTOR REVIEW**
 
 ## Scope and evidence
 
 Branch: `codex/atlas-data-publication-layer`
-Starting SHA: `c105099f68aeb5e0e040938daeda1acc1f76725e`
+Starting SHA: `6516373b9fdc057442e363b89b90f65c38409ea5`
 Main baseline remains `4e9485efa786fe6a663f6414d098f1fb2fc52a41`.
 
 Run #22 evidence from 2026-09-17 is encoded in the deterministic allocator
@@ -70,11 +70,12 @@ published and validated.
 
 The exact supported bootstrap contract is seven external repositories/sites:
 one Bus repository/site plus TNDS A1/A2/A3 and B1/B2/B3. Each repository must
-exist, use an owner/repository identity, and be readable by authenticated
-`git ls-remote`. A `pages-publish` branch does not need a seed commit: the
-first safe force-with-lease publication creates it when absent. GitHub Pages
-must nevertheless be enabled and pointed at that branch before the public site
-can serve it; Pages configuration is a Product Owner setup action. The first
+exist, use an owner/repository identity, contain a seeded `pages-publish`
+branch with the tiny `atlas-publication-site.json` marker, and be readable and
+writable by the narrowly scoped publication token. GitHub Pages must be
+enabled for each repository from `pages-publish` at the repository root and
+must serve that marker before acquisition begins; Pages configuration is a
+Product Owner setup action. The first
 publication has no automatic external dual-bank rollback. If that deployment
 must be abandoned before two validated external states exist, stop publication
 and redeploy the accepted Alpha.15 baseline at
@@ -94,7 +95,7 @@ early when the token is absent. Remote URLs, JSON, logs, returned objects,
 repository config and retained files remain credential-free, and the temporary
 askpass directory is removed after publication attempts.
 
-BUS-RECOVERY-0D.3C adds the final adjacent production gates. The publication
+BUS-RECOVERY-0D.3D adds the final bootstrap and adjacent production gates. The publication
 wait now requires the candidate `publicationVersion` and identity, not merely
 HTTP 200: Bus must expose the candidate slot and every TNDS root must expose
 the candidate bank and root ID. The wait reports attempts and elapsed time so
@@ -104,11 +105,12 @@ Production preflight runs after last-known-good metadata is obtained and
 before national acquisition, only for main production runs. It validates the
 Bus and HTTPS Pages contracts, exactly two banks, exactly three roots per bank,
 unique bank/root/repository/site identities, active/candidate-bank safety,
-token presence, authenticated `git ls-remote` access to all seven publication
-repositories, and the bootstrap branch contract. A missing `pages-publish`
-branch is an explicit supported bootstrap state; inaccessible repositories or
-invalid configuration stop before acquisition. Manual non-main diagnostics do
-not run this preflight.
+token presence, an existing seeded `pages-publish` branch, authenticated
+`git ls-remote` access and reported push permission for all seven publication
+repositories, every Pages site-health marker, and repository-health thresholds.
+Missing branches, unavailable markers, read-only tokens, inaccessible
+repositories or invalid configuration stop before acquisition. Manual non-main
+diagnostics do not run this preflight.
 
 TNDS preparation now creates a clean local Git working repository with a
 credential-free public origin and does not clone, fetch or copy the previous
@@ -118,9 +120,21 @@ its active slot is needed while staging the candidate slot.
 
 Preflight also performs repository-health monitoring where the remote exposes a
 measurable Git object store, with a configurable conservative default threshold
-of 3,000,000,000 bytes. Unavailable hosting-provider physical-size data is a
-visible warning, not a false claim of bounded on-disk storage; no destructive
-garbage collection or repository deletion is automated.
+of 3,000,000,000 bytes. GitHub repository metadata is used where available to
+measure reported repository size and enforce that threshold. Unavailable
+hosting-provider physical-size data is a visible warning, not a false claim of
+bounded on-disk storage; no destructive garbage collection or repository
+deletion is automated.
+
+Every Bus and TNDS payload file is also checked against the deliberate
+95 MiB safe Git blob ceiling. The known approximately 87.2 MB Run #22 shard
+passes; an over-limit authoritative file fails closed with its path and size.
+
+Legacy-config handling is deterministic: a genuinely absent
+`atlas/config/atlas-data-sources.json` is treated as `activeConfig: null`,
+selects the first configured bank for bootstrap, and never fabricates a
+rollback target. A present but malformed or unreadable file fails closed.
+The real CLI subprocess path is covered for the absent-file bootstrap case.
 
 ## Tests run locally
 
@@ -170,9 +184,11 @@ publication result.
 `publication-wait.test.mjs` proves stale HTTP 200 responses, repeated stale
 polls, eventual exact-version visibility, wrong bank/root/Bus-slot rejection,
 and timeout without active-configuration mutation. `publication-preflight.test.mjs`
-proves malformed JSON, duplicate identities, missing token, inaccessible
-repositories, bootstrap branch handling, active-bank safety, Pages URL
-contracts and the repository-health threshold. The synthetic lifecycle test
+proves malformed JSON and present-config failure, legacy absent-config CLI
+bootstrap, duplicate identities, missing token, inaccessible repositories,
+seeded-branch and marker enforcement, authenticated write permission, active-
+bank safety, Pages URL contracts, GitHub metadata/local repository-health
+thresholds and the safe per-file blob ceiling. The synthetic lifecycle test
 proves bootstrap A, stale-aware B, overwrite A without inactive-bank cloning,
 A→B→A validation, and a failed candidate that leaves the active configuration
 unchanged.
@@ -195,13 +211,16 @@ Product Owner/Technical Director approval is still required to configure:
 
 1. six TNDS publication repositories/sites (or the approved configurable
    equivalent), three roots in each bank, plus one Bus repository/site;
-2. GitHub Pages enabled for all seven sites and pointed at `pages-publish`
-   (the branch itself may be created by the first safe publication);
-3. `ATLAS_TNDS_BANKS_JSON`, Bus repository/site variables and the narrowly
+2. Seeded `pages-publish` branches in all seven repositories, each containing
+   the non-sensitive `atlas-publication-site.json` marker with schema
+   `atlas-publication-site-v1`;
+3. GitHub Pages enabled for all seven sites from `pages-publish` at the
+   repository root and verified to serve the marker;
+4. `ATLAS_TNDS_BANKS_JSON`, Bus repository/site variables and the narrowly
    scoped reference-data token;
-4. optional `ATLAS_PUBLICATION_REPOSITORY_SIZE_LIMIT_BYTES` override only if
+5. optional `ATLAS_PUBLICATION_REPOSITORY_SIZE_LIMIT_BYTES` override only if
    Product Owner governance approves a different conservative threshold;
-5. technical GitHub branch protection for `main`.
+6. technical GitHub branch protection for `main`.
 
 No external repository, secret, token, Pages setting or deployment was created
 by this sprint. Product Owner must authorise any tooling adoption.

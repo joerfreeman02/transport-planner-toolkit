@@ -56,8 +56,8 @@ jobs:
       reason: ${{ steps.decision.outputs.reason }}
       message: ${{ steps.decision.outputs.message }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.x'
       - name: Obtain deployed last-known-good configuration and manifests
@@ -83,11 +83,11 @@ jobs:
     env:
       ATLAS_DIAGNOSTIC_ONLY: ${{ inputs.measure_only || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.x'
       - name: Prepare isolated Pages site
@@ -126,7 +126,7 @@ jobs:
         run: echo 'Fresh candidate measured; no publication repository, Pages site or production configuration was changed.'
       - name: Check out Bus reference-data publication repository
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ vars.ATLAS_BUS_DATA_REPOSITORY }}
           token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
@@ -175,10 +175,10 @@ jobs:
           if [ "$ATLAS_DIAGNOSTIC_ONLY" != "true" ]; then test -f pages-site/atlas/config/atlas-data-sources.mjs; test -f pages-site/atlas/config/atlas-data-sources.json; else test -f pages-site/atlas/config/atlas-candidate-measurement.json; fi
       - name: Configure GitHub Pages
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Upload validated Pages artifact
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: pages-site
 
@@ -193,7 +193,7 @@ jobs:
     environment:
       name: github-pages
     steps:
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v5
 
   freshness-no-op:
     name: Confirm already-fresh Bus data

@@ -104,6 +104,11 @@ jobs:
           test -n "${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}"
       - name: Obtain last-known-good deployed metadata
         run: node tools/atlas-data-publication/fetch-last-known-good.mjs 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/' last-known-good
+      - name: Run production publication preflight before acquisition
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true
+        env:
+          ATLAS_REFERENCE_DATA_TOKEN: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+        run: node tools/atlas-data-publication/preflight-publication.mjs --config last-known-good/atlas/config/atlas-data-sources.json
       - name: Acquire and build validated Bus/TNDS candidate
         env:
           TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
@@ -125,6 +130,7 @@ jobs:
         with:
           repository: ${{ vars.ATLAS_BUS_DATA_REPOSITORY }}
           token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+          persist-credentials: false
           path: reference-data/bus
           ref: ${{ env.ATLAS_REFERENCE_DATA_BRANCH }}
       - name: Select and check out the inactive TNDS bank
@@ -133,7 +139,7 @@ jobs:
           ATLAS_REFERENCE_DATA_TOKEN: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
         run: |
           node tools/atlas-data-publication/select-bank.mjs --config last-known-good/atlas/config/atlas-data-sources.json --banks-json "$ATLAS_TNDS_BANKS_JSON" --output publication-config/bank-plan.json --repository-root reference-data/tnds
-          node tools/atlas-data-publication/checkout-bank.mjs --plan publication-config/bank-plan.json --token "$ATLAS_REFERENCE_DATA_TOKEN" --branch "$ATLAS_REFERENCE_DATA_BRANCH"
+          node tools/atlas-data-publication/checkout-bank.mjs --plan publication-config/bank-plan.json --branch "$ATLAS_REFERENCE_DATA_BRANCH"
       - name: Prepare all bounded publications and candidate application configuration
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
         run: |
@@ -151,9 +157,7 @@ jobs:
         run: node tools/atlas-data-publication/publish-snapshot.mjs --repository reference-data/bus --branch "$ATLAS_REFERENCE_DATA_BRANCH" --message "Publish ATLAS Bus snapshot ${{ github.run_id }}"
       - name: Wait for every candidate-bank root publication
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
-        run: |
-          node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('publication-config/atlas-data-sources.json','utf8'));for(const r of x.datasets.tnds.activeRoots) console.log(r.baseUrl+'manifest.json');console.log(x.datasets.bus.baseUrl+'manifest.json')" > publication-urls.txt
-          node tools/atlas-data-publication/wait-for-bank.mjs $(cat publication-urls.txt)
+        run: node tools/atlas-data-publication/wait-for-bank.mjs --config publication-config/atlas-data-sources.json
       - name: Validate every candidate root and exact cross-root allocation
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
         run: node tools/atlas-data-publication/validate-publication.mjs --config publication-config/atlas-data-sources.json

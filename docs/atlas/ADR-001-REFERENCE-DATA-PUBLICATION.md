@@ -63,11 +63,15 @@ The production sequence is:
 3. Acquire, prepare, validate and measure the complete candidate.
 4. Allocate all eight regions across every candidate-bank root.
 5. Stage Bus in its inactive slot and stage every candidate TNDS root.
-6. Publish all candidate roots using the temporary snapshot and
+6. Run the main-only production preflight against the seven external
+   repository/site contracts and authenticated Git access before acquisition.
+7. Prepare inactive TNDS roots as clean local Git repositories without
+   cloning their previous snapshots.
+8. Publish all candidate roots using the temporary snapshot and
    force-with-lease branch mechanism.
-7. Wait for every remote manifest, then validate version identity, exact file
+9. Wait for every remote publication identity, then validate version identity, exact file
    counts/bytes, per-file hashes, aggregate hashes, regions and shard mapping.
-8. Install the generated application configuration only after the complete
+10. Install the generated application configuration only after the complete
    candidate bank passes validation, then deploy ATLAS.
 
 If any root fails, the application configuration and active bank remain
@@ -107,12 +111,49 @@ The external contract is `ATLAS_TNDS_BANKS_JSON`, containing bank IDs, root
 IDs, repositories and public site URLs. This sprint does not create those
 repositories, tokens, secrets or Pages sites.
 
+The production preflight runs before acquisition on main runs only. It rejects
+malformed bank JSON, anything other than two banks with three unique roots each,
+duplicate bank/root/repository/site identities, invalid HTTPS Pages contracts,
+an active bank absent from the contract, an ambiguous candidate bank, a
+candidate root that is already active, a missing token, inaccessible publication
+repositories, or an unsafe toolkit-repository target. It performs authenticated
+`git ls-remote` for each required repository. A missing `pages-publish` branch is
+accepted only as the explicit bootstrap state because the safe first push can
+create it; GitHub Pages still must be enabled separately.
+
 During the initial migration from the existing Alpha.15 single-root/local
 configuration, no fictional opposite bank is created. The first controlled
 production publication must populate one approved bank and install its
 validated configuration; until a second bank has also been populated, rollback
 uses the existing deployed Alpha.15 publication/LKG route. Dual-bank rollback
 becomes available only after both banks have completed validated publications.
+
+The first-run contract is one Bus site plus TNDS A1/A2/A3 and B1/B2/B3. No
+minimal seed commit is required for `pages-publish`, but each repository must
+exist and Pages must be configured to serve that branch. Before two validated
+external states exist, recovery is not `rollbackPublication`: redeploy the
+accepted Alpha.15 baseline at
+`4e9485efa786fe6a663f6414d098f1fb2fc52a41` through the approved existing Pages
+deployment path if the first external application deployment is abandoned.
+
+The wait barrier checks both manifest availability and exact candidate identity:
+publication version, Bus slot, and each TNDS bank/root pair. It continues
+polling stale-but-HTTP-200 Pages content until the candidate is visible. Full
+byte/hash/content validation remains a separate mandatory gate.
+
+Reachable publication history is intentionally one snapshot commit, but this
+does not guarantee remote Git object storage is physically bounded because
+force-pushed unreachable objects may await hosting-provider garbage collection.
+Preflight measures local/file remote object stores where possible and fails over
+the configurable conservative default of 3,000,000,000 bytes. GitHub-hosted
+physical size is surfaced as an explicit unavailable-size warning for recording
+during the first live cycle; no destructive cleanup is automated.
+
+The first live publication must record for every root: pushed bytes, push-to-
+identity-visible duration, Pages deployment result, final public bytes, HTTP
+availability and validation completion time. If any root cannot reliably meet
+the Pages operational limits, publication stops with evidence and topology is
+not silently changed.
 
 Publication checkout and temporary snapshot publication use Git askpass with
 the token held in the process environment rather than a credential-bearing

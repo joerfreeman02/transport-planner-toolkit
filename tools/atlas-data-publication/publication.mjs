@@ -160,9 +160,9 @@ async function readManifest(root) { return JSON.parse(await fs.readFile(path.joi
 function publicFiles(measurement) { return measurement.files.map(file => ({ path: file.path, bytes: file.bytes, sha256: file.sha256 })); }
 const exists = target => fs.stat(target).then(() => true).catch(() => false);
 
-async function writePublicationManifest(destination, dataset, publicationVersion, payloadMeasurement, generatedAt, { bankId = null, rootId = null, regionAllocation = null, sourceSha256 = payloadMeasurement.sha256, sourceManifest = null } = {}) {
+async function writePublicationManifest(destination, dataset, publicationVersion, payloadMeasurement, generatedAt, { bankId = null, rootId = null, slot = null, regionAllocation = null, sourceSha256 = payloadMeasurement.sha256, sourceManifest = null } = {}) {
   const manifest = sourceManifest ?? await readManifest(destination);
-  const publication = { schema: 'atlas-reference-data-publication-v4', dataset, bankId, rootId, publicationVersion, generatedAt, datasetManifest: 'manifest.json', sourceManifest: { schema: manifest.schema, generatedAt: manifest.generatedAt ?? null, snapshotDate: manifest.snapshotDate ?? null, source: manifest.source ?? null, regions: manifest.regions ?? manifest.sources?.bods?.regions?.map(region => region.region) ?? null, expectedRegions: manifest.expectedRegions ?? null, serviceShardPaths: Object.values(manifest.serviceShards ?? {}).flat().filter(Boolean).sort(), sourceSha256 }, regionAllocation, payload: { fileCount: payloadMeasurement.fileCount, bytes: payloadMeasurement.bytes, sha256: payloadMeasurement.sha256, files: publicFiles(payloadMeasurement) } };
+  const publication = { schema: 'atlas-reference-data-publication-v4', dataset, bankId, rootId, slot, publicationVersion, generatedAt, datasetManifest: 'manifest.json', sourceManifest: { schema: manifest.schema, generatedAt: manifest.generatedAt ?? null, snapshotDate: manifest.snapshotDate ?? null, source: manifest.source ?? null, regions: manifest.regions ?? manifest.sources?.bods?.regions?.map(region => region.region) ?? null, expectedRegions: manifest.expectedRegions ?? null, serviceShardPaths: Object.values(manifest.serviceShards ?? {}).flat().filter(Boolean).sort(), sourceSha256 }, regionAllocation, payload: { fileCount: payloadMeasurement.fileCount, bytes: payloadMeasurement.bytes, sha256: payloadMeasurement.sha256, files: publicFiles(payloadMeasurement) } };
   await fs.writeFile(path.join(destination, 'publication-manifest.json'), `${JSON.stringify(publication, null, 2)}\n`);
 }
 
@@ -190,7 +190,7 @@ async function stageBusPublication({ candidateSite, repository, activeSlot, publ
     if (activeSlot && await exists(path.join(repository, activeSlot))) await fs.cp(path.join(repository, activeSlot), path.join(staging, activeSlot), { recursive: true });
     await copyCandidateSubset(candidateRoot, path.join(staging, candidateSlot));
     const payload = await measurePublicationTree(path.join(staging, candidateSlot));
-    await writePublicationManifest(path.join(staging, candidateSlot), 'bus', publicationVersion, payload, generatedAt, { sourceSha256: source.sha256 });
+    await writePublicationManifest(path.join(staging, candidateSlot), 'bus', publicationVersion, payload, generatedAt, { slot: candidateSlot, sourceSha256: source.sha256 });
     const candidateMeasurement = assertPublicationFits(await measurePublicationTree(path.join(staging, candidateSlot)), 'BUS candidate slot');
     const totalSite = assertPublicationFits(await measurePublicationTree(staging), 'BUS total site including rollback slot');
     const auditDirectory = path.join(staging, 'audit'); await fs.mkdir(auditDirectory, { recursive: true });

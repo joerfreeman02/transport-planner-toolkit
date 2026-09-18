@@ -30,7 +30,7 @@ function referencedPayloadPaths(manifest) {
   return paths;
 }
 
-export async function validatePublishedRoot({ dataset, baseUrl, expectedVersion, expectedBankId = null, expectedRootId = null, fetchImpl = globalThis.fetch }) {
+export async function validatePublishedRoot({ dataset, baseUrl, expectedVersion, expectedBankId = null, expectedRootId = null, expectedSlot = null, fetchImpl = globalThis.fetch }) {
   const root = normaliseUrl(baseUrl);
   const manifest = await jsonAt(new URL('manifest.json', root), fetchImpl);
   const publicationManifest = await jsonAt(new URL('publication-manifest.json', root), fetchImpl);
@@ -38,6 +38,7 @@ export async function validatePublishedRoot({ dataset, baseUrl, expectedVersion,
   if (publicationManifest.dataset !== dataset || publicationManifest.publicationVersion !== expectedVersion) throw new Error(`${dataset} publication identity does not match the candidate configuration.`);
   if (expectedBankId !== null && publicationManifest.bankId !== expectedBankId) throw new Error(`${dataset} publication bank identity does not match configuration.`);
   if (expectedRootId !== null && publicationManifest.rootId !== expectedRootId) throw new Error(`${dataset} publication root identity does not match configuration.`);
+  if (expectedSlot !== null && publicationManifest.slot !== expectedSlot) throw new Error(`${dataset} publication slot identity does not match configuration.`);
   if (!Array.isArray(publicationManifest.payload?.files) || !publicationManifest.payload.files.length) throw new Error(`${dataset} publication manifest has no content index.`);
   const files = [];
   for (const expected of publicationManifest.payload.files) {
@@ -59,7 +60,7 @@ function configuredTndsRoots(config) { return config?.datasets?.tnds?.activeRoot
 
 export async function validatePublishedConfiguration({ config, fetchImpl = globalThis.fetch }) {
   if (!config?.publicationVersion) throw new Error('Candidate data-source configuration has no publication version.');
-  const bus = await validatePublishedRoot({ dataset: 'bus', baseUrl: config.datasets.bus.baseUrl, expectedVersion: config.publicationVersion, fetchImpl });
+  const bus = await validatePublishedRoot({ dataset: 'bus', baseUrl: config.datasets.bus.baseUrl, expectedVersion: config.publicationVersion, expectedSlot: config.datasets.bus.slot ?? null, fetchImpl });
   for (const file of referencedPayloadPaths(bus.manifest)) if (!bus.indexedPaths.has(file)) throw new Error(`Bus required shard ${file} is not present in the validated publication root.`);
   const tndsConfig = config.datasets.tnds;
   if (!tndsConfig?.activeBank) throw new Error('Candidate TNDS configuration has no active bank identity.');

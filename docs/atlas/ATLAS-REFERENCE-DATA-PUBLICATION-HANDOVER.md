@@ -1,11 +1,11 @@
-# BUS-RECOVERY-0D.3B — transient publication authentication correction
+# BUS-RECOVERY-0D.3C — final publication-path hardening and preflight gate
 
 Recommendation: **READY FOR TECHNICAL DIRECTOR REVIEW**
 
 ## Scope and evidence
 
 Branch: `codex/atlas-data-publication-layer`
-Starting SHA: `e46ea7cb0d58164e0d4d4945930ab505918c6d51`
+Starting SHA: `c105099f68aeb5e0e040938daeda1acc1f76725e`
 Main baseline remains `4e9485efa786fe6a663f6414d098f1fb2fc52a41`.
 
 Run #22 evidence from 2026-09-17 is encoded in the deterministic allocator
@@ -68,6 +68,22 @@ bank. The first approved publication populates one bank; the legacy deployed
 LKG remains the rollback route until the second bank has been successfully
 published and validated.
 
+The exact supported bootstrap contract is seven external repositories/sites:
+one Bus repository/site plus TNDS A1/A2/A3 and B1/B2/B3. Each repository must
+exist, use an owner/repository identity, and be readable by authenticated
+`git ls-remote`. A `pages-publish` branch does not need a seed commit: the
+first safe force-with-lease publication creates it when absent. GitHub Pages
+must nevertheless be enabled and pointed at that branch before the public site
+can serve it; Pages configuration is a Product Owner setup action. The first
+publication has no automatic external dual-bank rollback. If that deployment
+must be abandoned before two validated external states exist, stop publication
+and redeploy the accepted Alpha.15 baseline at
+`4e9485efa786fe6a663f6414d098f1fb2fc52a41` through the approved existing Pages
+deployment path, restoring the baseline application configuration/artifact;
+do not invoke `rollbackPublication` as though an external previous bank
+existed. Normal `rollbackPublication` begins only after two validated external
+publications.
+
 Git checkout authentication uses askpass/environment handling and public
 remote URLs. The corrected publication path now applies the same transient
 askpass/environment handling to `ls-remote` and `push --force-with-lease` in
@@ -77,6 +93,34 @@ steps. Local/file remotes remain tokenless; GitHub HTTPS publication fails
 early when the token is absent. Remote URLs, JSON, logs, returned objects,
 repository config and retained files remain credential-free, and the temporary
 askpass directory is removed after publication attempts.
+
+BUS-RECOVERY-0D.3C adds the final adjacent production gates. The publication
+wait now requires the candidate `publicationVersion` and identity, not merely
+HTTP 200: Bus must expose the candidate slot and every TNDS root must expose
+the candidate bank and root ID. The wait reports attempts and elapsed time so
+the first live cycle can record publication propagation latency.
+
+Production preflight runs after last-known-good metadata is obtained and
+before national acquisition, only for main production runs. It validates the
+Bus and HTTPS Pages contracts, exactly two banks, exactly three roots per bank,
+unique bank/root/repository/site identities, active/candidate-bank safety,
+token presence, authenticated `git ls-remote` access to all seven publication
+repositories, and the bootstrap branch contract. A missing `pages-publish`
+branch is an explicit supported bootstrap state; inaccessible repositories or
+invalid configuration stop before acquisition. Manual non-main diagnostics do
+not run this preflight.
+
+TNDS preparation now creates a clean local Git working repository with a
+credential-free public origin and does not clone, fetch or copy the previous
+full snapshot. `publishSnapshot` supplies the remote lease query and push
+authentication transiently. Bus keeps its existing bounded checkout because
+its active slot is needed while staging the candidate slot.
+
+Preflight also performs repository-health monitoring where the remote exposes a
+measurable Git object store, with a configurable conservative default threshold
+of 3,000,000,000 bytes. Unavailable hosting-provider physical-size data is a
+visible warning, not a false claim of bounded on-disk storage; no destructive
+garbage collection or repository deletion is automated.
 
 ## Tests run locally
 
@@ -94,8 +138,14 @@ pnpm test:bus
 node tests/atlas/atlas-data-publication.test.mjs
 node tests/atlas/atlas-publication-snapshot.integration.test.mjs
 node tests/atlas/automated-refresh-contract.test.mjs
+node tests/atlas/publication-wait.test.mjs
+node tests/atlas/publication-preflight.test.mjs
+node tests/atlas/publication-lifecycle.integration.test.mjs
 node --check tools/atlas-data-publication/publish-snapshot.mjs
 node --check tools/atlas-data-publication/publish-bank.mjs
+node --check tools/atlas-data-publication/wait-for-bank.mjs
+node --check tools/atlas-data-publication/checkout-bank.mjs
+node --check tools/atlas-data-publication/preflight-publication.mjs
 node --check tools/atlas-data-publication/publication.mjs
 node --check tools/atlas-data-publication/validate-publication.mjs
 git diff --check
@@ -105,6 +155,9 @@ Results: `pnpm test:atlas` — PASS; `pnpm test:bus` — PASS;
 `node tests/atlas/atlas-data-publication.test.mjs` — PASS;
 `node tests/atlas/atlas-publication-snapshot.integration.test.mjs` — PASS;
 `node tests/atlas/automated-refresh-contract.test.mjs` — PASS;
+`node tests/atlas/publication-wait.test.mjs` — PASS;
+`node tests/atlas/publication-preflight.test.mjs` — PASS;
+`node tests/atlas/publication-lifecycle.integration.test.mjs` — PASS;
 all changed-file `node --check` commands — PASS; `git diff --check` — PASS.
 
 The snapshot integration also proves credential-bearing GitHub remotes are
@@ -113,6 +166,16 @@ askpass credentials are available only to the publication environment, the
 askpass file is removed, local bare publication succeeds without a token, two
 snapshots retain one bounded branch commit, and no token appears in the safe
 publication result.
+
+`publication-wait.test.mjs` proves stale HTTP 200 responses, repeated stale
+polls, eventual exact-version visibility, wrong bank/root/Bus-slot rejection,
+and timeout without active-configuration mutation. `publication-preflight.test.mjs`
+proves malformed JSON, duplicate identities, missing token, inaccessible
+repositories, bootstrap branch handling, active-bank safety, Pages URL
+contracts and the repository-health threshold. The synthetic lifecycle test
+proves bootstrap A, stale-aware B, overwrite A without inactive-bank cloning,
+A→B→A validation, and a failed candidate that leaves the active configuration
+unchanged.
 
 The publication test proves A(v1) → B(v2) rollback to coherent v1 and
 B(v2) → A(v3) rollback to coherent v2. Each rollback passes
@@ -131,11 +194,14 @@ claimed unless independently observed after push.
 Product Owner/Technical Director approval is still required to configure:
 
 1. six TNDS publication repositories/sites (or the approved configurable
-   equivalent), three roots in each bank;
-2. `ATLAS_TNDS_BANKS_JSON`, Bus repository/site variables and the narrowly
+   equivalent), three roots in each bank, plus one Bus repository/site;
+2. GitHub Pages enabled for all seven sites and pointed at `pages-publish`
+   (the branch itself may be created by the first safe publication);
+3. `ATLAS_TNDS_BANKS_JSON`, Bus repository/site variables and the narrowly
    scoped reference-data token;
-3. Pages publication settings and the `pages-publish` branch policy;
-4. technical GitHub branch protection for `main`.
+4. optional `ATLAS_PUBLICATION_REPOSITORY_SIZE_LIMIT_BYTES` override only if
+   Product Owner governance approves a different conservative threshold;
+5. technical GitHub branch protection for `main`.
 
 No external repository, secret, token, Pages setting or deployment was created
 by this sprint. Product Owner must authorise any tooling adoption.

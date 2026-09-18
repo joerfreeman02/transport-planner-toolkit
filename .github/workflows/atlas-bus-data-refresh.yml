@@ -66,8 +66,8 @@ jobs:
       reason: ${{ steps.decision.outputs.reason }}
       message: ${{ steps.decision.outputs.message }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.x'
       - name: Obtain deployed last-known-good configuration and manifests
@@ -96,11 +96,11 @@ jobs:
       ATLAS_CURRENT_CANDIDATE_CACHE_KEY: atlas-verified-candidate-checkpoint-v2-${{ github.run_id }}
       ATLAS_CANDIDATE_CACHE_KEY: atlas-verified-candidate-checkpoint-v2-${{ inputs.resume_checkpoint_run_id || github.run_id }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.x'
       - name: Prepare isolated Pages site
@@ -121,7 +121,7 @@ jobs:
         id: candidate-cache
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
         continue-on-error: true
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             pages-site/atlas/data/bus
@@ -182,7 +182,7 @@ jobs:
         run: node tools/atlas-data-publication/candidate-checkpoint.mjs --create --candidate-site pages-site --current-run-id "${{ github.run_id }}" --run-attempt "${{ github.run_attempt }}" --current-commit-sha "${{ github.sha }}" --workflow-name "${{ github.workflow }}" --current-ref "${{ github.ref }}" --event-name "${{ github.event_name }}" --repository-root "$GITHUB_WORKSPACE" --cache-key "$ATLAS_CURRENT_CANDIDATE_CACHE_KEY" --gate-candidate-validation passed --gate-deterministic-checks passed --gate-capacity-measurement passed --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
       - name: Save verified candidate checkpoint
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true && steps.checkpoint-restore.outputs.valid != 'true' && (steps.candidate-cache.outputs.cache-hit != 'true' || inputs.resume_checkpoint_run_id != '')
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             pages-site/atlas/data/bus
@@ -196,7 +196,7 @@ jobs:
         run: echo 'Fresh candidate measured; no publication repository, Pages site or production configuration was changed.'
       - name: Check out Bus reference-data publication repository
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ vars.ATLAS_BUS_DATA_REPOSITORY }}
           token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
@@ -245,10 +245,10 @@ jobs:
           if [ "$ATLAS_DIAGNOSTIC_ONLY" != "true" ]; then test -f pages-site/atlas/config/atlas-data-sources.mjs; test -f pages-site/atlas/config/atlas-data-sources.json; else test -f pages-site/atlas/config/atlas-candidate-measurement.json; fi
       - name: Configure GitHub Pages
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Upload validated Pages artifact
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: pages-site
 
@@ -263,7 +263,7 @@ jobs:
     environment:
       name: github-pages
     steps:
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v5
 
   freshness-no-op:
     name: Confirm already-fresh Bus data

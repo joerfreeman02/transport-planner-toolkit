@@ -2,6 +2,7 @@ import { createSiteSelector } from '../../../src/atlas/application/site-selector
 import { SITE_LOCATION_METHODS } from '../../../src/atlas/domain/site.mjs';
 import { isGreaterLondonPoint } from '../../../src/atlas/domain/geography.mjs';
 import { createJsonCache } from '../../../src/atlas/infrastructure/cache.mjs';
+import { createAtlasDataSourceResolver } from '../../../src/atlas/infrastructure/atlas-data-sources.mjs';
 import { createNominatimGeocodingAdapter } from '../../../src/atlas/adapters/nominatim-geocoding-adapter.mjs';
 import { createTflBusStopAdapter } from '../../../src/atlas/adapters/tfl-bus-stop-adapter.mjs';
 import { createPreparedBusDataAdapter } from '../../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
@@ -24,7 +25,13 @@ const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha13
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tflRequestScheduler = createTflRequestScheduler({ onEvent: event => taskStatus.update(event) });
 const tfl = createTflBusStopAdapter({ cache, requestScheduler: tflRequestScheduler });
-const preparedBusData = createPreparedBusDataAdapter({ baseUrl: new URL('../../data/bus/', import.meta.url), tndsBaseUrl: new URL('../../data/bus-tnds/', import.meta.url) });
+const atlasData = createAtlasDataSourceResolver();
+const preparedBusData = createPreparedBusDataAdapter({
+  baseUrl: atlasData.baseUrl('bus'),
+  tndsBaseUrl: atlasData.baseUrl('tnds'),
+  busFileUrl: relativePath => atlasData.fileUrl('bus', relativePath),
+  tndsFileUrl: relativePath => atlasData.fileUrl('tnds', relativePath)
+});
 const tflTimetable = createTflBusTimetableAdapter({ cache, requestScheduler: tflRequestScheduler });
 const authoritativeTimetable = createAuthoritativeBusTimetableAdapter({ tflAdapter: tflTimetable, nationalAdapter: preparedBusData, londonSupplementAdapter: preparedBusData });
 const accessRouting = createOsrmAccessRoutingAdapter();

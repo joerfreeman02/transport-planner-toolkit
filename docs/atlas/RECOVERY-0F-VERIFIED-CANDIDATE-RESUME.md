@@ -152,7 +152,8 @@ timestamp, status-manifest checksum, measurements, release/build and the
 candidate-generation compatibility fingerprint. The fingerprint is explicitly
 schema-versioned and covers generator-sensitive code only: `build_static_index.py`,
 `refresh_bus_data.py`, `prepare_tnds.mjs`, the TransXChange adapter, scheduled
-evidence rules and release metadata. Current validation, measurement,
+evidence rules, Bus service assessment, service calendar and release metadata.
+Current validation, measurement,
 publication preparation, workflow and checkpoint-orchestration code runs again
 and is deliberately excluded. The fingerprint implementation itself is not
 hashed. Therefore a correction to publication preparation or transport remains

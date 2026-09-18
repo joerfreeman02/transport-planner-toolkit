@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { candidateCacheKey, CHECKPOINT_RELATIVE_PATH, createVerifiedCandidateCheckpoint, resolveCandidateTimestamp, restoreVerifiedCandidateCheckpoint } from '../../tools/atlas-data-publication/candidate-checkpoint.mjs';
-import { computeCandidateGenerationCompatibilityFingerprint } from '../../tools/atlas-data-publication/candidate-compatibility.mjs';
+import { CANDIDATE_COMPATIBILITY_FILES, computeCandidateGenerationCompatibilityFingerprint } from '../../tools/atlas-data-publication/candidate-compatibility.mjs';
 import { measurePublicationTree } from '../../tools/atlas-data-publication/publication.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -21,6 +21,35 @@ const producerRunId = '35336892470';
 const currentRunId = '35336892471';
 const workflowName = 'ATLAS Bus data refresh';
 const producerCacheKey = candidateCacheKey({ runId: producerRunId });
+
+async function localEsmDependencyClosure(relativeEntry) {
+  const closure = new Set();
+  const importPattern = /(?:import|export)\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g;
+  async function visit(relative) {
+    const normalised = relative.replaceAll('\\', '/');
+    if (closure.has(normalised)) return;
+    closure.add(normalised);
+    const source = await fs.readFile(path.join(root, ...normalised.split('/')), 'utf8');
+    for (const match of source.matchAll(importPattern)) {
+      if (!match[1].startsWith('.')) continue;
+      const dependency = path.posix.normalize(path.posix.join(path.posix.dirname(normalised), match[1]));
+      await visit(dependency);
+    }
+  }
+  await visit(relativeEntry);
+  return [...closure].sort();
+}
+
+const expectedTndsGeneratorClosure = [
+  'src/atlas/adapters/tnds-transxchange-adapter.mjs',
+  'src/atlas/domain/bus-service-assessment.mjs',
+  'src/atlas/domain/scheduled-evidence.mjs',
+  'src/atlas/domain/service-calendar.mjs',
+  'tools/atlas-bus-data/prepare_tnds.mjs'
+].sort();
+const actualTndsGeneratorClosure = await localEsmDependencyClosure('tools/atlas-bus-data/prepare_tnds.mjs');
+assert.deepEqual(actualTndsGeneratorClosure, expectedTndsGeneratorClosure, 'TNDS generator local dependency closure must remain explicit and bounded');
+for (const dependency of actualTndsGeneratorClosure) assert.ok(CANDIDATE_COMPATIBILITY_FILES.includes(dependency), `${dependency} must be covered by the candidate-generation compatibility contract`);
 
 await fs.mkdir(path.join(candidate, 'atlas', 'data', 'bus', 'services'), { recursive: true });
 await fs.mkdir(path.join(candidate, 'atlas', 'data', 'bus-tnds', 'services'), { recursive: true });
@@ -128,10 +157,10 @@ for (const relative of ['.github/workflows/atlas-bus-data-refresh.yml', 'tools/a
   const publicationOnly = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: root, fileOverrides: { [relative]: Buffer.from(`downstream correction ${relative}`) } });
   assert.deepEqual(publicationOnly, fingerprint, `${relative} correction must not invalidate candidate-generation compatibility`);
 }
-const candidateCodeChange = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: root, fileOverrides: { 'tools/atlas-bus-data/build_static_index.py': Buffer.from('candidate-generation change') } });
-assert.notEqual(candidateCodeChange.sha256, fingerprint.sha256, 'candidate-producing changes must invalidate compatibility');
-const tndsSchemaChange = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: root, fileOverrides: { 'tools/atlas-bus-data/prepare_tnds.mjs': Buffer.from('candidate TNDS schema change') } });
-assert.notEqual(tndsSchemaChange.sha256, fingerprint.sha256, 'TNDS schema-producing changes must invalidate compatibility');
+for (const relative of CANDIDATE_COMPATIBILITY_FILES) {
+  const generatorChange = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: root, fileOverrides: { [relative]: Buffer.from(`synthetic generator change ${relative}`) } });
+  assert.notEqual(generatorChange.sha256, fingerprint.sha256, `${relative} changes must invalidate compatibility`);
+}
 
 for (const relative of ['tools/atlas-data-publication/publication.mjs', 'tools/atlas-data-publication/candidate-compatibility.mjs']) {
   const file = path.join(root, ...relative.split('/'));

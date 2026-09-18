@@ -14,6 +14,8 @@ export const CANDIDATE_COMPATIBILITY_FILES = Object.freeze([
   'tools/atlas-bus-data/prepare_tnds.mjs',
   'src/atlas/adapters/tnds-transxchange-adapter.mjs',
   'src/atlas/domain/scheduled-evidence.mjs',
+  'src/atlas/domain/bus-service-assessment.mjs',
+  'src/atlas/domain/service-calendar.mjs',
   'atlas/config/atlas-release.json'
 ]);
 

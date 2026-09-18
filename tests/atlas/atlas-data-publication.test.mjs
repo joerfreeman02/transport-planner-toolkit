@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { allocateTndsPublicationRoots, allocateTndsRegions, assertPublicationFits, measurePublicationTree, preparePublications, rollbackToOppositeBank, SAFE_PUBLICATION_LIMIT_BYTES, TNDS_REGIONS } from '../../tools/atlas-data-publication/publication.mjs';
 import { validatePublishedConfiguration } from '../../tools/atlas-data-publication/validate-publication.mjs';
+import { createAtlasDataSourceResolver } from '../../src/atlas/infrastructure/atlas-data-sources.mjs';
 
 const run22 = { EA: 60_883_253, EM: 275_641_976, NE: 110_188_604, NW: 414_171_929, SE: 519_315_700, SW: 359_859_025, WM: 307_380_041, Y: 273_746_344 };
 const run22Measurement = { files: [{ path: 'manifest.json', bytes: 24_599, sha256: 'common' }, ...TNDS_REGIONS.map(region => ({ path: `services/national-${region}.json.gz`, bytes: run22[region], sha256: region }))] };
@@ -60,12 +61,33 @@ assert.deepEqual(secondActiveHashes, firstActiveHashes, 'Active Bank A must rema
 assert.equal((await fs.readdir(repo('B1'))).includes('slot-a'), false);
 const validSecond = await validatePublishedConfiguration({ config: second.config, fetchImpl: fetchPublished });
 assert.equal(validSecond.activeTndsBank, 'B');
+const rollbackV1 = rollbackToOppositeBank(second.config);
+assert.equal(rollbackV1.publicationVersion, 'v1');
+assert.equal(rollbackV1.datasets.bus.slot, 'slot-a');
+assert.equal(rollbackV1.datasets.tnds.activeBank, 'A');
+assert.equal(Object.keys(rollbackV1.datasets.tnds.pathMap).length, 8);
+assert.equal((await validatePublishedConfiguration({ config: rollbackV1, fetchImpl: fetchPublished })).activeTndsBank, 'A');
+for (const root of rollbackV1.datasets.tnds.activeRoots) {
+  const shard = Object.entries(rollbackV1.datasets.tnds.pathMap).find(([, baseUrl]) => new URL(baseUrl).hostname === new URL(root.baseUrl).hostname);
+  assert.ok(shard, `Rollback v1 has no shard mapping for ${root.id}.`);
+  assert.equal(new URL(createAtlasDataSourceResolver(rollbackV1).fileUrl('tnds', shard[0])).hostname, new URL(root.baseUrl).hostname);
+}
 
 const third = await preparePublications({ candidateSite: candidate, busRepository: repo('bus'), tndsBanks: bankDefinitions, activeTndsBank: 'B', candidateTndsBank: 'A', previousConfig: second.config, activeBusSlot: 'slot-b', publicationVersion: 'v3', generatedAt: '2026-09-19T00:00:00Z', busSiteUrl: 'https://bus.example.test/', configOutput });
 assert.equal(third.config.datasets.tnds.activeBank, 'A');
 assert.equal(third.config.datasets.tnds.rollbackBank.id, 'B');
 assert.equal((await validatePublishedConfiguration({ config: third.config, fetchImpl: fetchPublished })).activeTndsBank, 'A');
-assert.equal(rollbackToOppositeBank(third.config).datasets.tnds.activeBank, 'B');
+const rollbackV2 = rollbackToOppositeBank(third.config);
+assert.equal(rollbackV2.publicationVersion, 'v2');
+assert.equal(rollbackV2.datasets.bus.slot, 'slot-b');
+assert.equal(rollbackV2.datasets.tnds.activeBank, 'B');
+assert.equal(Object.keys(rollbackV2.datasets.tnds.pathMap).length, 8);
+assert.equal((await validatePublishedConfiguration({ config: rollbackV2, fetchImpl: fetchPublished })).activeTndsBank, 'B');
+for (const root of rollbackV2.datasets.tnds.activeRoots) {
+  const shard = Object.entries(rollbackV2.datasets.tnds.pathMap).find(([, baseUrl]) => new URL(baseUrl).hostname === new URL(root.baseUrl).hostname);
+  assert.ok(shard, `Rollback v2 has no shard mapping for ${root.id}.`);
+  assert.equal(new URL(createAtlasDataSourceResolver(rollbackV2).fileUrl('tnds', shard[0])).hostname, new URL(root.baseUrl).hostname);
+}
 assert.ok((await fs.readdir(repo('A1'))).every(name => name !== 'slot-a' && name !== 'slot-b'));
 
 const seRootHost = new URL(second.config.datasets.tnds.activeRoots.find(root => root.regions.includes('SE')).baseUrl).hostname;
@@ -77,4 +99,4 @@ const tamperedFetch = async url => {
 await assert.rejects(() => validatePublishedConfiguration({ config: second.config, fetchImpl: tamperedFetch }), /checksum|byte-count/);
 assert.equal(first.config.datasets.tnds.activeBank, 'A', 'A remains the application known-good configuration after candidate validation failure.');
 assert.equal(crypto.createHash('sha256').update(JSON.stringify(first.config)).digest('hex').length, 64);
-console.log('PASS BUS-RECOVERY-0D.3 dual-bank allocation, exact shard coverage, A-to-B-to-A cycles, rollback, failure isolation and Bus bounded-slot lifecycle.');
+console.log('PASS BUS-RECOVERY-0D.3A dual-bank allocation, complete A-to-B and B-to-A rollback, exact cross-root routing, failure isolation and Bus bounded-slot lifecycle.');

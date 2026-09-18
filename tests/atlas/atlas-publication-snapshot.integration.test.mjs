@@ -28,7 +28,9 @@ await run(repository, ['remote', 'add', 'origin', remote]);
 
 const first = await stageBoundedPublication({ candidateSite: candidate, repository, dataset: 'bus', activeSlot: null, publicationVersion: 'publication-1', generatedAt: '2026-09-17T00:00:00Z' });
 assert.equal(first.candidateSlot, 'slot-a');
-await publishSnapshot({ repository, branch: 'pages-publish', message: 'Publication 1' });
+const firstPublished = await publishSnapshot({ repository, branch: 'pages-publish', message: 'Publication 1' });
+assert.equal('remote' in firstPublished, false);
+assert.doesNotMatch(JSON.stringify(firstPublished), /INJECTED_TEST_TOKEN/);
 assert.equal(await bareRun(['rev-list', '--count', 'pages-publish']), '1');
 
 await fs.writeFile(path.join(candidate, 'atlas', 'data', 'bus', 'services', '100-se.json.gz'), 'bus publication 2');

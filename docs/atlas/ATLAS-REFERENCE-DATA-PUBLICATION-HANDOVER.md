@@ -1,4 +1,4 @@
-# BUS-RECOVERY-0D.3 — TNDS dual-bank publication handover
+# BUS-RECOVERY-0D.3A — coherent full-publication rollback correction
 
 Recommendation: **READY FOR TECHNICAL DIRECTOR REVIEW**
 
@@ -15,6 +15,16 @@ EM 275,641,976, NE 110,188,604, NW 414,171,929, SE 519,315,700,
 SW 359,859,025, WM 307,380,041 and Y 273,746,344 bytes. No national
 acquisition was re-run during development.
 
+## Root cause corrected
+
+BUS-RECOVERY-0D.3 stored only a `rollbackBank` label and root list. Its
+`rollbackToOppositeBank()` implementation then cleared `tnds.pathMap`, so a
+rolled-back application could fall back to root 1 for shards belonging to the
+other two roots. It also left the current Bus slot and publication version in
+place. BUS-RECOVERY-0D.3A replaces that partial mutation with one bounded,
+non-recursive `rollbackPublication` snapshot of the complete previous active
+Bus/TNDS routing state.
+
 ## Implemented correction
 
 - Bus keeps its bounded `slot-a`/`slot-b` publication lifecycle.
@@ -27,6 +37,9 @@ acquisition was re-run during development.
   including the metadata budget. Capacity failure stops the refresh.
 - The generated config records active bank/version, active roots, URLs,
   region allocation, shard-to-root map, checksums/manifests and rollback bank.
+- The generated config retains one bounded `rollbackPublication` snapshot of
+  the previous complete Bus/TNDS routing state, including its version,
+  timestamp, Bus slot/base URL, TNDS `pathMap`/`pathRoots` and manifest names.
 - The resolver remains transparent to planner-facing Bus code.
 - `fetch-last-known-good` reconstructs active Bus slot, active TNDS bank,
   active roots, rollback bank and publication version.
@@ -42,15 +55,30 @@ The active bank is never overwritten. A failure in any candidate root leaves
 the deployed configuration and active bank unchanged; no partial candidate is
 promoted. Once a candidate bank is fully validated, its configuration becomes
 active and the former bank remains the immediate rollback/LKG dataset.
-Rollback selects `rollbackBank` in the application configuration without a
-national rebuild. Bus continues to use its previous publication slot.
+Rollback reconstructs the complete previous configuration from
+`rollbackPublication`: Bus returns to its previous slot, TNDS returns to the
+previous bank and exact cross-root routing map, and the previous publication
+version is restored. The former current publication becomes the new bounded
+rollback target. Bus/TNDS publication validators pass against the still-
+retained previous repositories; no national rebuild is required.
+
+The initial migration is a controlled bootstrap exception: an existing
+Alpha.15 deployment without dual-bank metadata has no fabricated rollback
+bank. The first approved publication populates one bank; the legacy deployed
+LKG remains the rollback route until the second bank has been successfully
+published and validated.
+
+Git checkout authentication uses askpass/environment handling and public
+remote URLs. Publication results do not return or serialise credential-bearing
+Git remotes.
 
 ## Tests run locally
 
 The targeted publication test covers Run #22 three-root fit, complete region
 coverage, exact service-shard coverage, deterministic allocation, fail-closed
 capacity, A→B→A refresh cycles, active-bank immutability, all-root validation,
-failure isolation, rollback, bounded TNDS history, Bus slots and NPTG null.
+failure isolation, complete A→B and B→A rollback, bounded TNDS history, Bus
+slots, cross-root resolver routing and NPTG null.
 
 The final handover records the exact command results for:
 
@@ -70,6 +98,11 @@ Results: `pnpm test:atlas` — PASS; `pnpm test:bus` — PASS;
 `node tests/atlas/atlas-publication-snapshot.integration.test.mjs` — PASS;
 `node tests/atlas/automated-refresh-contract.test.mjs` — PASS;
 all changed-file `node --check` commands — PASS; `git diff --check` — PASS.
+
+The publication test proves A(v1) → B(v2) rollback to coherent v1 and
+B(v2) → A(v3) rollback to coherent v2. Each rollback passes
+`validatePublishedConfiguration()` and resolves shards across all three
+previous-bank roots.
 
 GitHub CI/check-run status: not observed. The workflow is schedule/manual-only
 and the post-push GitHub API query was unavailable through the configured

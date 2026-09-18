@@ -10,6 +10,8 @@ const validator = fs.readFileSync(path.join(root, 'tools/atlas-data-publication/
 const lkg = fs.readFileSync(path.join(root, 'tools/atlas-data-publication/fetch-last-known-good.mjs'), 'utf8');
 const selectBank = fs.readFileSync(path.join(root, 'tools/atlas-data-publication/select-bank.mjs'), 'utf8');
 const sourceConfig = fs.readFileSync(path.join(root, 'src/atlas/infrastructure/atlas-data-sources.mjs'), 'utf8');
+const snapshot = fs.readFileSync(path.join(root, 'tools/atlas-data-publication/publish-snapshot.mjs'), 'utf8');
+const checkout = fs.readFileSync(path.join(root, 'tools/atlas-data-publication/checkout-bank.mjs'), 'utf8');
 const release = JSON.parse(fs.readFileSync(path.join(root, 'atlas/config/atlas-release.json'), 'utf8'));
 
 assert.equal(release.version, '2.0.0-alpha.15');
@@ -30,6 +32,7 @@ assert.match(publication, /atlas-reference-data-publication-v4/);
 assert.match(publication, /exact-minimax/);
 assert.match(publication, /activeTndsBank/);
 assert.match(publication, /rollbackToOppositeBank/);
+assert.match(publication, /createRollbackPublicationSnapshot/);
 assert.match(validator, /expectedBankId/);
 assert.match(validator, /exact candidate allocation/);
 assert.match(lkg, /active-publication\.json/);
@@ -37,4 +40,7 @@ assert.match(lkg, /rollbackBank/);
 assert.match(selectBank, /selectOppositeTndsBank/);
 assert.match(sourceConfig, /pathMap/);
 assert.match(sourceConfig, /fileUrl/);
-console.log('PASS BUS-RECOVERY-0D.3 workflow, dual-bank contract, timeout, diagnostic-only and resolver checks.');
+assert.doesNotMatch(snapshot, /return \{ branch, commit, remote \}/);
+assert.match(checkout, /GIT_ASKPASS/);
+assert.doesNotMatch(checkout, /x-access-token:\$\{encodeURIComponent\(token\)\}/);
+console.log('PASS BUS-RECOVERY-0D.3A workflow, dual-bank contract, timeout, diagnostic-only, rollback and credential-output checks.');

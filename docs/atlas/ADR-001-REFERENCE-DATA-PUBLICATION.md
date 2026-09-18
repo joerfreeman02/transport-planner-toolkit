@@ -1,7 +1,7 @@
 # ADR-001: ATLAS reference-data publication layer
 
 Status: Proposed for Technical Director review
-Correction: BUS-RECOVERY-0D.3
+Correction: BUS-RECOVERY-0D.3A
 Date: 2026-09-18
 
 ## Decision
@@ -76,16 +76,21 @@ next attempt. The active bank is never a staging target.
 
 The configuration records the active bank, publication version, active root
 IDs and URLs, exact region allocation, exact service-shard-to-root mapping,
-root hashes/manifests, and the still-valid opposite bank for rollback. The
-runtime resolver routes TNDS shards through the mapping; planner-facing Bus
-code remains unaware of banks.
+root hashes/manifests, and the still-valid opposite bank for rollback. It also
+retains one bounded, non-recursive `rollbackPublication` snapshot containing
+the previous publication version/timestamp, Bus slot/base URL, TNDS active
+bank/roots/base URL, exact previous `pathMap`/`pathRoots`, manifest identities,
+and `nptg: null`. The runtime resolver routes TNDS shards through the mapping;
+planner-facing Bus code remains unaware of banks.
 
 ## Rollback and lifecycle bounds
 
 The deployed configuration is the authority for active bank identity. Its
-`rollbackBank` points to the still-valid opposite bank. Rollback is a
-configuration switch and does not rebuild national data. Bus rollback uses its
-existing previous slot. TNDS roots retain only one generated snapshot plus
+`rollbackPublication` is the authority for a coherent previous full
+publication. Rollback restores that complete snapshot, including Bus slot,
+publication version and every TNDS routing entry, then retains the former
+current snapshot as the new bounded rollback target. Rollback does not rebuild
+national data. Bus rollback uses its existing previous slot. TNDS roots retain only one generated snapshot plus
 `publication-state.json`, `audit/current.json` and at most
 `audit/previous.json`; publication branches are replaced with one snapshot
 commit, so complete weekly history does not accumulate.
@@ -101,6 +106,17 @@ tokens, publish, alter Pages, deploy, or change production configuration.
 The external contract is `ATLAS_TNDS_BANKS_JSON`, containing bank IDs, root
 IDs, repositories and public site URLs. This sprint does not create those
 repositories, tokens, secrets or Pages sites.
+
+During the initial migration from the existing Alpha.15 single-root/local
+configuration, no fictional opposite bank is created. The first controlled
+production publication must populate one approved bank and install its
+validated configuration; until a second bank has also been populated, rollback
+uses the existing deployed Alpha.15 publication/LKG route. Dual-bank rollback
+becomes available only after both banks have completed validated publications.
+
+Publication checkout uses Git askpass with the token held in process
+environment rather than a credential-bearing remote URL. Publication command
+results expose only safe repository/root identity and commit data.
 
 ## Tooling adoption review
 

@@ -85,6 +85,15 @@ export async function validatePublishedConfiguration({ config, fetchImpl = globa
   const declaredPaths = new Set(tndsRoots.flatMap(root => (root.publicationManifest.regionAllocation?.files ?? []).filter(file => file.path?.startsWith('services/')).map(file => file.path)));
   for (const file of actualPaths) if (!declaredPaths.has(file)) throw new Error(`TNDS shard ${file} is published but not present in the exact candidate allocation.`);
   if (actualPaths.size !== declaredPaths.size) throw new Error('TNDS candidate allocation has a missing or duplicated service shard.');
+  const pathMap = tndsConfig.pathMap ?? {};
+  for (const file of actualPaths) {
+    const mappedBase = pathMap[file];
+    if (!mappedBase) throw new Error(`TNDS shard ${file} has no exact configuration path mapping.`);
+    const mappedRoot = configuredRoots.find(root => normaliseUrl(root.baseUrl) === normaliseUrl(mappedBase));
+    if (!mappedRoot) throw new Error(`TNDS shard ${file} maps to an unconfigured publication root.`);
+    const publishedRoot = tndsRoots.find(root => root.rootId === mappedRoot.id);
+    if (!publishedRoot?.indexedPaths.has(file)) throw new Error(`TNDS shard ${file} maps to root ${mappedRoot.id}, but that root does not publish it.`);
+  }
   const actualRegions = new Set([...actualPaths].map(regionFromTndsPath));
   if (expectedRegions.size && (actualRegions.size !== expectedRegions.size || [...expectedRegions].some(region => !actualRegions.has(region)))) throw new Error('TNDS candidate bank does not represent all authoritative regions exactly once.');
   for (const configured of configuredRoots) {

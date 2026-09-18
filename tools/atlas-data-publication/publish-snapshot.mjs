@@ -34,7 +34,9 @@ export async function publishSnapshot({ repository, branch = 'pages-publish', me
     await git(temporaryRoot, ['commit', '--quiet', '-m', message]);
     const commit = await git(temporaryRoot, ['rev-parse', 'HEAD']);
     await git(temporaryRoot, ['push', `--force-with-lease=refs/heads/${branch}:${expected}`, remote, `HEAD:${branch}`]);
-    return { branch, commit, remote };
+    // Never return the Git remote: actions/checkout may have embedded a token
+    // in it, and callers serialise this result into workflow output.
+    return { branch, commit, repository: path.basename(path.resolve(repository)) };
   } finally {
     await fs.rm(temporaryRoot, { recursive: true, force: true });
   }

@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +23,11 @@ function candidatePath(candidateSite, relativePath) {
 
 async function readJson(candidateSite, relativePath) {
   return JSON.parse(await fs.readFile(candidatePath(candidateSite, relativePath), 'utf8'));
+}
+
+async function sha256File(candidateSite, relativePath) {
+  const bytes = await fs.readFile(candidatePath(candidateSite, relativePath));
+  return crypto.createHash('sha256').update(bytes).digest('hex');
 }
 
 function requireString(value, label) {
@@ -68,9 +74,15 @@ function measurementManifestSha(measurement, label) {
   return manifest.sha256.toLowerCase();
 }
 
+function tndsCapacityPasses(measurement) {
+  if (measurement?.tnds?.proposedPublication?.allRootsFitSafeLimit === true) return true;
+  const roots = measurement?.proposedPublication?.roots;
+  return Array.isArray(roots) && roots.length > 0 && roots.every(root => root?.fit === true);
+}
+
 export function assertPublicationCapacity(measurement) {
   if (measurement?.bus?.fitsSafeLimit !== true) throw new Error('Bus candidate does not fit the safe bounded-publication limit.');
-  if (measurement?.tnds?.proposedPublication?.allRootsFitSafeLimit !== true) throw new Error('TNDS candidate does not fit the safe bounded publication-root limits.');
+  if (!tndsCapacityPasses(measurement)) throw new Error('TNDS candidate does not fit the safe bounded publication-root limits.');
   return measurement;
 }
 
@@ -113,7 +125,8 @@ async function readCandidateState(candidateSite) {
     measurePublicationTree(candidatePath(candidateSite, 'atlas/data/bus')),
     measurePublicationTree(candidatePath(candidateSite, 'atlas/data/bus-tnds'))
   ]);
-  return { bus, tnds, status, release, measurement, candidateGenerationTimestamp, busMeasurement, tndsMeasurement };
+  const statusManifestSha256 = await sha256File(candidateSite, STATUS_MANIFEST_RELATIVE_PATH);
+  return { bus, tnds, status, release, measurement, candidateGenerationTimestamp, statusManifestSha256, busMeasurement, tndsMeasurement };
 }
 
 function validateExpectedIdentity(checkpoint, expected) {
@@ -141,6 +154,15 @@ function validateMeasurementAgainstCheckpoint(state, checkpoint) {
   if (checkpoint.candidate.tnds.manifestSha256 !== measurementManifestSha(state.tndsMeasurement, 'TNDS candidate')) throw new Error('TNDS candidate manifest checksum does not match the checkpoint.');
   if (state.measurement.bus?.sha256 !== state.busMeasurement.sha256 || state.measurement.tnds?.sha256 !== state.tndsMeasurement.sha256) throw new Error('Candidate capacity measurement does not match the restored candidate.');
   assertPublicationCapacity(state.measurement);
+}
+
+function validateStatusAgainstCheckpoint(state, checkpoint) {
+  const identity = checkpoint.identity ?? {};
+  if (state.status.schema !== 'atlas-bus-refresh-status-v1' || state.status.status !== 'validated' || state.status.validation !== 'passed') throw new Error('Candidate status manifest is not validated.');
+  if (state.status.repositoryCommit !== identity.producerCommitSha) throw new Error('Candidate status repositoryCommit does not match producer provenance.');
+  if (state.status.workflowRun !== identity.producerRunId) throw new Error('Candidate status workflowRun does not match producer provenance.');
+  if (state.status.successfulRefreshAt !== identity.candidateGenerationTimestamp) throw new Error('Candidate status timestamp does not match producer provenance.');
+  if (checkpoint.statusManifestSha256 !== state.statusManifestSha256) throw new Error('Candidate status manifest checksum does not match the checkpoint.');
 }
 
 function checkpointIdentity({ producerRunId, producerRunAttempt, producerCommitSha, currentRunId, currentCommitSha, workflowName, ref, eventName, state, fingerprint }) {
@@ -193,11 +215,12 @@ export async function createVerifiedCandidateCheckpoint({ candidateSite, runId, 
     createdAt: normaliseCandidateTimestamp(checkpointCreatedAt, 'checkpoint createdAt'),
     identity: checkpointIdentity({ producerRunId: currentRunId, producerRunAttempt: runAttempt, producerCommitSha: currentCommitSha, currentRunId, currentCommitSha, workflowName, ref, eventName, state, fingerprint }),
     validationState: { candidate: 'passed', deterministic: 'passed', capacity: 'passed' },
+    statusManifestSha256: state.statusManifestSha256,
     candidate: {
       bus: { ...bus, manifestSha256: measurementManifestSha(state.busMeasurement, 'Bus candidate'), manifestSchema: state.bus.schema, generatedAt: state.bus.generatedAt },
       tnds: { ...tnds, manifestSha256: measurementManifestSha(state.tndsMeasurement, 'TNDS candidate'), manifestSchema: state.tnds.schema, generatedAt: state.tnds.generatedAt }
     },
-    capacity: { busFitsSafeLimit: state.measurement.bus.fitsSafeLimit, tndsRootsFitSafeLimit: state.measurement.tnds.proposedPublication.allRootsFitSafeLimit, measurementSchema: state.measurement.diagnosticSchema ?? null },
+    capacity: { busFitsSafeLimit: state.measurement.bus.fitsSafeLimit, tndsRootsFitSafeLimit: tndsCapacityPasses(state.measurement), measurementSchema: state.measurement.diagnosticSchema ?? null },
     freshness,
     files: { candidateMeasurement: CANDIDATE_MEASUREMENT_RELATIVE_PATH, busManifest: BUS_MANIFEST_RELATIVE_PATH, tndsManifest: TNDS_MANIFEST_RELATIVE_PATH, statusManifest: STATUS_MANIFEST_RELATIVE_PATH, releaseMetadata: RELEASE_RELATIVE_PATH }
   };
@@ -224,37 +247,13 @@ export async function restoreVerifiedCandidateCheckpoint({ candidateSite, cacheE
     if (state.candidateGenerationTimestamp !== checkpoint.identity.candidateGenerationTimestamp) throw new Error('Candidate-generation timestamp does not match the checkpoint.');
     if (state.release.version !== checkpoint.identity.release.version || state.release.build !== checkpoint.identity.release.build) throw new Error('ATLAS release/build identity does not match the checkpoint.');
     candidateFreshness({ candidateGenerationTimestamp: state.candidateGenerationTimestamp, maxAgeDays: Number(checkpoint.identity.freshness?.maxAgeDays ?? DEFAULT_MAX_CANDIDATE_AGE_DAYS), now });
+    validateStatusAgainstCheckpoint(state, checkpoint);
     validateMeasurementAgainstCheckpoint(state, checkpoint);
     if (!crossRun && checkpoint.identity.currentCommitSha !== currentSha) throw new Error('Candidate checkpoint current commit identity does not match.');
     return { ok: true, reason: crossRun ? 'exact verified candidate checkpoint restored from explicit producer run' : 'exact verified candidate checkpoint restored', checkpoint, crossRun };
   } catch (error) {
     return { ok: false, reason: error.message, crossRun };
   }
-}
-
-export async function rebaseVerifiedCandidateCheckpoint({ candidateSite, currentRunId, currentCommitSha, runAttempt, workflowName, currentRef = 'refs/heads/main', eventName = 'workflow_dispatch', repositoryRoot = process.cwd(), now = new Date(), checkpointCreatedAt = new Date().toISOString() }) {
-  const currentId = runIdText(currentRunId);
-  const currentSha = shaText(currentCommitSha, 'current application commit SHA');
-  if (currentRef !== 'refs/heads/main' || eventName !== 'workflow_dispatch') throw new Error('Checkpoint rebasing requires an explicit main-branch workflow dispatch.');
-  const source = await readJson(candidateSite, CHECKPOINT_RELATIVE_PATH);
-  if (source.schema !== CHECKPOINT_SCHEMA || source.validationState?.candidate !== 'passed' || source.validationState?.deterministic !== 'passed' || source.validationState?.capacity !== 'passed') throw new Error('Source checkpoint is not a complete verified candidate checkpoint.');
-  const sourceProducerRunId = runIdText(source.identity?.producerRunId);
-  const sourceCacheKey = candidateCacheKey({ runId: sourceProducerRunId });
-  if (source.cacheKey !== sourceCacheKey || source.identity.producerRef !== 'refs/heads/main' || source.identity.productionEligible !== true) throw new Error('Checkpoint producer provenance is not trusted for rebasing.');
-  const state = await readCandidateState(candidateSite);
-  const fingerprint = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: repositoryRoot });
-  if (JSON.stringify(source.identity.candidateGenerationCompatibilityFingerprint) !== JSON.stringify(fingerprint)) throw new Error('Candidate-generation compatibility fingerprint does not match the current workflow.');
-  if (state.candidateGenerationTimestamp !== source.identity.candidateGenerationTimestamp) throw new Error('Candidate-generation timestamp does not match the source checkpoint.');
-  candidateFreshness({ candidateGenerationTimestamp: state.candidateGenerationTimestamp, maxAgeDays: Number(source.identity.freshness?.maxAgeDays ?? DEFAULT_MAX_CANDIDATE_AGE_DAYS), now });
-  validateMeasurementAgainstCheckpoint(state, source);
-  const rebased = {
-    ...source,
-    cacheKey: candidateCacheKey({ runId: currentId }),
-    cacheIdentity: { schema: CHECKPOINT_SCHEMA, runId: currentId },
-    createdAt: normaliseCandidateTimestamp(checkpointCreatedAt, 'checkpoint createdAt'),
-    identity: { ...source.identity, currentRunId: currentId, currentCommitSha: currentSha, currentRunAttempt: String(runAttempt ?? '') }
-  };
-  return writeCheckpoint(candidateSite, rebased);
 }
 
 function option(name) {
@@ -272,16 +271,12 @@ async function cli() {
     if (output) await fs.appendFile(output, `valid=${result.ok ? 'true' : 'false'}\nreason=${String(result.reason).replace(/[\r\n]/g, ' ')}\ncross_run=${result.crossRun ? 'true' : 'false'}\n`);
     console.log(JSON.stringify(result, null, 2)); return;
   }
-  if (process.argv.includes('--capacity-only')) { const state = await readCandidateState(path.resolve(candidateSite)); assertPublicationCapacity(state.measurement); console.log(JSON.stringify({ ok: true, bus: state.measurement.bus, tnds: state.measurement.tnds.proposedPublication }, null, 2)); return; }
+  if (process.argv.includes('--capacity-only')) { const state = await readCandidateState(path.resolve(candidateSite)); assertPublicationCapacity(state.measurement); console.log(JSON.stringify({ ok: true, bus: state.measurement.bus, tnds: state.measurement.tnds?.proposedPublication ?? state.measurement.proposedPublication }, null, 2)); return; }
   if (process.argv.includes('--create')) {
-    const checkpoint = await createVerifiedCandidateCheckpoint({ candidateSite: path.resolve(candidateSite), runId: option('--current-run-id') ?? option('--run-id'), runAttempt: option('--run-attempt'), commitSha: option('--current-commit-sha') ?? option('--commit-sha'), workflowName: option('--workflow-name'), cacheKey: option('--cache-key'), ref: option('--current-ref') ?? 'refs/heads/main', eventName: option('--event-name') ?? 'workflow_dispatch', repositoryRoot: option('--repository-root') ?? process.cwd(), now: option('--now') ?? new Date() });
+    const checkpoint = await createVerifiedCandidateCheckpoint({ candidateSite: path.resolve(candidateSite), runId: option('--current-run-id') ?? option('--run-id'), runAttempt: option('--run-attempt'), commitSha: option('--current-commit-sha') ?? option('--commit-sha'), workflowName: option('--workflow-name'), cacheKey: option('--cache-key'), gates: { candidateValidation: option('--gate-candidate-validation'), deterministicChecks: option('--gate-deterministic-checks'), capacityMeasurement: option('--gate-capacity-measurement') }, ref: option('--current-ref') ?? 'refs/heads/main', eventName: option('--event-name') ?? 'workflow_dispatch', repositoryRoot: option('--repository-root') ?? process.cwd(), now: option('--now') ?? new Date() });
     console.log(JSON.stringify({ schema: checkpoint.schema, cacheKey: checkpoint.cacheKey, candidateGenerationTimestamp: checkpoint.identity.candidateGenerationTimestamp }, null, 2)); return;
   }
-  if (process.argv.includes('--rebase')) {
-    const checkpoint = await rebaseVerifiedCandidateCheckpoint({ candidateSite: path.resolve(candidateSite), currentRunId: option('--current-run-id'), currentCommitSha: option('--current-commit-sha'), runAttempt: option('--run-attempt'), workflowName: option('--workflow-name'), currentRef: option('--current-ref') ?? 'refs/heads/main', eventName: option('--event-name') ?? 'workflow_dispatch', repositoryRoot: option('--repository-root') ?? process.cwd(), now: option('--now') ?? new Date() });
-    console.log(JSON.stringify({ schema: checkpoint.schema, cacheKey: checkpoint.cacheKey, producerRunId: checkpoint.identity.producerRunId, currentRunId: checkpoint.identity.currentRunId }, null, 2)); return;
-  }
-  throw new Error('Expected --timestamp-only, --restore, --capacity-only, --create or --rebase.');
+  throw new Error('Expected --timestamp-only, --restore, --capacity-only or --create.');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) cli().catch(error => { console.error(`Candidate checkpoint operation failed: ${error.message}`); process.exitCode = 1; });

@@ -1,6 +1,6 @@
 # Recovery-0F.1: verified candidate resume
 
-Status: implementation on the dedicated Recovery-0F branch; no production run or publication was performed.
+Status: Recovery-0F.2 implementation on the dedicated branch; no production run or publication was performed.
 
 ## Run #23 root cause
 
@@ -24,7 +24,18 @@ The publication version remains the stable workflow-run identity `${github.run_i
 
 The checkpoint uses GitHub Actions cache only as transient runner-to-runner transport. It is not an authoritative source and does not replace DfT, NaPTAN, BODS, TNDS or the validated publication repositories.
 
-The cache path is the complete prepared `pages-site`. The v2 exact key is:
+The cache contains only verified candidate material from the prepared site. Its
+paths are:
+
+```text
+pages-site/atlas/data/bus
+pages-site/atlas/data/bus-tnds
+pages-site/atlas/data/status
+pages-site/atlas/config/atlas-candidate-measurement.json
+pages-site/.atlas-recovery/verified-candidate.json
+```
+
+The v2 exact key is:
 
 ```text
 atlas-verified-candidate-checkpoint-v2-<producer-workflow-run-id>
@@ -55,7 +66,7 @@ The workflow prepares the isolated Pages site, fetches last-known-good metadata,
 
 ### Successful checkpoint creation
 
-Only after all three prerequisite gates pass does the workflow write the checkpoint manifest and save the complete prepared candidate under the exact run/commit key. Capacity must pass both the Bus safe limit and deterministic TNDS root allocation limits.
+Only after all three prerequisite gates pass does the workflow write the checkpoint manifest and save the candidate-only payload under the exact producer-run key. Capacity must pass both the Bus safe limit and deterministic TNDS root allocation limits.
 
 ### Downstream failure and retry
 
@@ -67,7 +78,7 @@ The cache action's exact-hit signal is necessary but not sufficient. Missing, pa
 
 ### New genuine refresh
 
-A new scheduled or manually dispatched run has a different run ID. It cannot select this checkpoint, even if the commit is unchanged. Source freshness rules and candidate identity therefore continue to govern new refreshes.
+A new scheduled or manually dispatched run has a different run ID. It selects an older checkpoint only when the operator explicitly supplies `resume_checkpoint_run_id` from trusted `main`; otherwise source freshness rules and candidate identity govern a new refresh.
 
 ## Failure-domain review
 
@@ -97,12 +108,12 @@ Non-blocking warning: existing official setup/checkout actions have Node-runtime
 
 ## Operator procedure after a downstream failure
 
-1. Do not dispatch a new refresh.
-2. Inspect the failed run and confirm the failure occurred after the checkpoint-save step.
-3. Rerun the failed workflow run, preserving the same run ID and commit.
-4. Confirm the checkpoint restore, candidate validation, deterministic checks and capacity gate all pass.
+1. For a fresh Run #24, leave `resume_checkpoint_run_id` empty: acquire, validate, save candidate-only checkpoint material, then publish.
+2. If Run #24 fails downstream without a code correction, rerun Run #24.
+3. If a code correction is required, start a new manual `main` workflow and enter `resume_checkpoint_run_id=<Run #24 ID>`.
+4. Confirm only the candidate payload was restored, current application files remain current, and current validation, deterministic, capacity, freshness and provenance checks pass.
 5. Confirm publication wait and cross-root validation pass before Pages upload/deployment is allowed.
-6. If the exact cache is absent or any verification fails, allow the workflow to perform one fresh authoritative acquisition; do not bypass validation.
+6. If the exact cache is absent, stale, immutable-invalid or incompatible, allow fresh authoritative acquisition; do not bypass validation.
 
 Run #23 itself remains unrecoverable: its ephemeral runner is gone and it created no persisted checkpoint. Recovery-0F protects a future validated candidate from avoidable late-stage reacquisition; it does not recover Run #23's candidate.
 
@@ -136,27 +147,32 @@ older key only when an operator manually dispatches from trusted `main` with
 that key and rejects the input outside `refs/heads/main`; it never searches by
 prefix or silently falls back to another run.
 
-The checkpoint separates producer provenance from current-run association. It
-records producer run/attempt/SHA/ref/workflow/event, current run/SHA/attempt,
-release/build, candidate timestamp, measurements, manifest checksums and the
-candidate-generation compatibility fingerprint. The fingerprint covers the
-candidate-producing, validation and measurement contract: `build_static_index.py`,
-`refresh_bus_data.py`, `prepare_tnds.mjs`, `validate_candidate.py`,
-`measure-candidate.mjs`, `publication.mjs`, the fingerprint module and release metadata. Publication-only
-workflow, publish, wait and checkpoint-orchestration files are excluded, so a
-publication-only change does not invalidate an already validated candidate.
-`publication.mjs` is included conservatively because it contains candidate
-measurement and allocation logic.
+The checkpoint records producer run/attempt/SHA/ref/workflow/event, candidate
+timestamp, status-manifest checksum, measurements, release/build and the
+candidate-generation compatibility fingerprint. The fingerprint is explicitly
+schema-versioned and covers generator-sensitive code only: `build_static_index.py`,
+`refresh_bus_data.py`, `prepare_tnds.mjs`, the TransXChange adapter, scheduled
+evidence rules and release metadata. Current validation, measurement,
+publication preparation, workflow and checkpoint-orchestration code runs again
+and is deliberately excluded. The fingerprint implementation itself is not
+hashed. Therefore a correction to publication preparation or transport remains
+eligible to operate on a compatible candidate, while a generator or output
+schema change invalidates reuse.
 
 Cross-run restore requires the original producer to be a trusted production
 `main` run, the current workflow to have the same candidate-generation
 fingerprint, and the candidate to remain within the Bus manifest's
 `refreshAfterDays` freshness bound (currently eight days). Candidate validator,
-deterministic checks, capacity measurement and timestamp checks run again. The
-candidate timestamp is retained. After those checks, the checkpoint is rebased
-under the current run key; only current-run association and publication
-identity change, while producer provenance remains original. This makes a
-later same-run retry eligible without rewriting what produced the candidate.
+deterministic checks, capacity measurement, status provenance and timestamp
+checks run again. The candidate timestamp and producer identity remain
+unchanged. The current workflow uses the restored candidate for publication;
+it does not rebase or duplicate the checkpoint under a new run key.
+
+The cache is immutable. If an exact same-run entry is present but invalid, the
+workflow performs fresh acquisition but does not claim to replace that entry
+under the same key. The log records this condition; a future retry will again
+fail closed against the immutable invalid entry unless a new producer run is
+used.
 
 Run #23 remains unrecoverable because its ephemeral runner created no
 checkpoint. Recovery-0F.1 does not dispatch or recover Run #24.

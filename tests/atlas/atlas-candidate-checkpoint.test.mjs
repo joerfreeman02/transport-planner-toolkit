@@ -1,13 +1,17 @@
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { candidateCacheKey, CHECKPOINT_RELATIVE_PATH, createVerifiedCandidateCheckpoint, resolveCandidateTimestamp, restoreVerifiedCandidateCheckpoint } from '../../tools/atlas-data-publication/candidate-checkpoint.mjs';
 import { computeCandidateGenerationCompatibilityFingerprint } from '../../tools/atlas-data-publication/candidate-compatibility.mjs';
 import { measurePublicationTree } from '../../tools/atlas-data-publication/publication.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const execFileAsync = promisify(execFile);
+const checkpointCli = path.join(root, 'tools', 'atlas-data-publication', 'candidate-checkpoint.mjs');
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'atlas-recovery-0f-'));
 const candidate = path.join(temp, 'candidate');
 const generatedAt = '2026-09-18T10:00:00Z';
@@ -40,16 +44,31 @@ await assert.rejects(() => resolveCandidateTimestamp(candidate), /successfulRefr
 await fs.writeFile(statusPath, JSON.stringify({ schema: 'atlas-bus-refresh-status-v1', status: 'validated', validation: 'passed', successfulRefreshAt: generatedAt, repositoryCommit: producerSha, workflowRun: producerRunId }));
 
 const checkpointFile = path.join(candidate, CHECKPOINT_RELATIVE_PATH);
+const runCli = args => execFileAsync(process.execPath, [checkpointCli, ...args], { cwd: root, maxBuffer: 10 * 1024 * 1024 });
 await assert.rejects(() => createVerifiedCandidateCheckpoint({ candidateSite: candidate, runId: producerRunId, runAttempt: '1', commitSha: producerSha, workflowName, cacheKey: producerCacheKey, repositoryRoot: root, gates: { candidateValidation: 'failed', deterministicChecks: 'passed', capacityMeasurement: 'passed' } }), /requires candidate validation/);
 assert.equal(await fs.stat(checkpointFile).then(() => true, () => false), false, 'checkpoint must not be saved before all validation gates pass');
 
-const checkpoint = await createVerifiedCandidateCheckpoint({ candidateSite: candidate, runId: producerRunId, runAttempt: '1', commitSha: producerSha, workflowName, cacheKey: producerCacheKey, repositoryRoot: root, checkpointCreatedAt: '2026-09-18T10:05:00Z', now: '2026-09-18T10:05:00Z', gates: { candidateValidation: 'passed', deterministicChecks: 'passed', capacityMeasurement: 'passed' } });
+const cliArgs = ['--create', '--candidate-site', candidate, '--current-run-id', producerRunId, '--run-attempt', '1', '--current-commit-sha', producerSha, '--workflow-name', workflowName, '--current-ref', 'refs/heads/main', '--event-name', 'workflow_dispatch', '--repository-root', root, '--cache-key', producerCacheKey, '--gate-candidate-validation', 'passed', '--gate-deterministic-checks', 'passed', '--gate-capacity-measurement', 'passed', '--now', '2026-09-18T10:05:00Z'];
+const cliCreate = await runCli(cliArgs);
+assert.match(cliCreate.stdout, /atlas-verified-candidate-checkpoint-v2/);
+const checkpoint = await fs.readFile(checkpointFile, 'utf8').then(JSON.parse);
 assert.equal(checkpoint.schema, 'atlas-verified-candidate-checkpoint-v2');
 assert.equal(checkpoint.identity.candidateGenerationTimestamp, generatedAt);
 assert.equal(checkpoint.identity.producerRunId, producerRunId);
 assert.equal(checkpoint.identity.producerCommitSha, producerSha);
 assert.equal(checkpoint.candidate.bus.fileCount, busMeasurement.fileCount);
 assert.equal(checkpoint.candidate.tnds.fileCount, tndsMeasurement.fileCount);
+assert.match(checkpoint.statusManifestSha256, /^[a-f0-9]{64}$/);
+
+await fs.rm(checkpointFile);
+const missingGateArgs = [...cliArgs];
+for (const gate of ['--gate-candidate-validation', '--gate-deterministic-checks', '--gate-capacity-measurement']) { const index = missingGateArgs.indexOf(gate); missingGateArgs.splice(index, 2); }
+await assert.rejects(() => runCli(missingGateArgs), /Candidate checkpoint operation failed/);
+assert.equal(await fs.stat(checkpointFile).then(() => true, () => false), false, 'actual CLI must fail closed when workflow gate plumbing is missing');
+await runCli(cliArgs);
+
+const cliRestore = await runCli(['--restore', '--candidate-site', candidate, '--requested-producer-run-id', producerRunId, '--current-run-id', producerRunId, '--current-commit-sha', producerSha, '--workflow-name', workflowName, '--current-ref', 'refs/heads/main', '--event-name', 'workflow_dispatch', '--explicit-resume', 'false', '--repository-root', root, '--cache-hit', 'true', '--cache-matched-key', producerCacheKey, '--now', '2026-09-18T10:10:00Z']);
+assert.match(cliRestore.stdout, /exact verified candidate checkpoint restored/);
 
 const sameRunRetry = await restoreVerifiedCandidateCheckpoint({ candidateSite: candidate, cacheExactHit: 'true', cacheMatchedKey: producerCacheKey, requestedProducerRunId: producerRunId, currentRunId: producerRunId, currentCommitSha: producerSha, workflowName, repositoryRoot: root, now: '2026-09-18T10:10:00Z' });
 assert.equal(sameRunRetry.ok, true, 'same-run retry must restore the exact producer checkpoint');
@@ -60,7 +79,7 @@ const crossRun = await restoreVerifiedCandidateCheckpoint({ candidateSite: candi
 assert.equal(crossRun.ok, true, 'explicit cross-commit resume must restore a compatible producer checkpoint');
 assert.equal(crossRun.crossRun, true);
 assert.equal(crossRun.checkpoint.identity.producerCommitSha, producerSha, 'producer provenance must remain original');
-assert.equal(crossRun.checkpoint.identity.currentCommitSha, producerSha, 'restore must not rewrite provenance before rebase');
+assert.equal(crossRun.checkpoint.identity.currentCommitSha, producerSha, 'cross-run restore must not rewrite producer provenance');
 
 assert.equal((await restoreVerifiedCandidateCheckpoint({ candidateSite: candidate, cacheExactHit: 'true', cacheMatchedKey: producerCacheKey, requestedProducerRunId: producerRunId, currentRunId, currentCommitSha: currentSha, workflowName, currentRef: 'refs/heads/main', eventName: 'workflow_dispatch', explicitResume: false, repositoryRoot: root, now: '2026-09-18T10:15:00Z' })).ok, false, 'cross-run resume must require the explicit resume input');
 assert.equal((await restoreVerifiedCandidateCheckpoint({ candidateSite: candidate, cacheExactHit: 'true', cacheMatchedKey: producerCacheKey, requestedProducerRunId: producerRunId, currentRunId, currentCommitSha: currentSha, workflowName, currentRef: 'refs/heads/main', eventName: 'push', explicitResume: true, repositoryRoot: root, now: '2026-09-18T10:15:00Z' })).ok, false, 'cross-run resume must require workflow_dispatch');
@@ -83,6 +102,16 @@ await rewriteCheckpoint(value => ({ ...value, candidate: { ...value.candidate, b
 assert.equal((await restoreVerifiedCandidateCheckpoint({ candidateSite: candidate, cacheExactHit: 'true', cacheMatchedKey: producerCacheKey, requestedProducerRunId: producerRunId, currentRunId: producerRunId, currentCommitSha: producerSha, workflowName, repositoryRoot: root, now: '2026-09-18T10:10:00Z' })).ok, false, 'manifest checksum mismatch must fail closed');
 await fs.writeFile(checkpointFile, `${JSON.stringify(checkpoint, null, 2)}\n`);
 
+await fs.writeFile(statusPath, JSON.stringify({ schema: 'atlas-bus-refresh-status-v1', status: 'validated', validation: 'passed', successfulRefreshAt: generatedAt, repositoryCommit: producerSha, workflowRun: producerRunId, tampered: true }));
+assert.equal((await restoreVerifiedCandidateCheckpoint({ candidateSite: candidate, cacheExactHit: 'true', cacheMatchedKey: producerCacheKey, requestedProducerRunId: producerRunId, currentRunId: producerRunId, currentCommitSha: producerSha, workflowName, repositoryRoot: root, now: '2026-09-18T10:10:00Z' })).ok, false, 'status manifest corruption must fail closed');
+await fs.writeFile(statusPath, JSON.stringify({ schema: 'atlas-bus-refresh-status-v1', status: 'validated', validation: 'passed', successfulRefreshAt: generatedAt, repositoryCommit: currentSha, workflowRun: producerRunId }));
+assert.equal((await restoreVerifiedCandidateCheckpoint({ candidateSite: candidate, cacheExactHit: 'true', cacheMatchedKey: producerCacheKey, requestedProducerRunId: producerRunId, currentRunId: producerRunId, currentCommitSha: producerSha, workflowName, repositoryRoot: root, now: '2026-09-18T10:10:00Z' })).ok, false, 'status producer commit substitution must fail closed');
+await fs.writeFile(statusPath, JSON.stringify({ schema: 'atlas-bus-refresh-status-v1', status: 'validated', validation: 'passed', successfulRefreshAt: generatedAt, repositoryCommit: producerSha, workflowRun: producerRunId }));
+
+await rewriteCheckpoint(value => ({ ...value, statusManifestSha256: '0'.repeat(64) }));
+assert.equal((await restoreVerifiedCandidateCheckpoint({ candidateSite: candidate, cacheExactHit: 'true', cacheMatchedKey: producerCacheKey, requestedProducerRunId: producerRunId, currentRunId: producerRunId, currentCommitSha: producerSha, workflowName, repositoryRoot: root, now: '2026-09-18T10:10:00Z' })).ok, false, 'checkpoint status provenance hash corruption must fail closed');
+await fs.writeFile(checkpointFile, `${JSON.stringify(checkpoint, null, 2)}\n`);
+
 await rewriteCheckpoint(value => ({ ...value, identity: { ...value.identity, producerRef: 'refs/heads/untrusted', productionEligible: false } }));
 assert.equal((await restoreVerifiedCandidateCheckpoint({ candidateSite: candidate, cacheExactHit: 'true', cacheMatchedKey: producerCacheKey, requestedProducerRunId: producerRunId, currentRunId, currentCommitSha: currentSha, workflowName, currentRef: 'refs/heads/main', eventName: 'workflow_dispatch', explicitResume: true, repositoryRoot: root, now: '2026-09-18T10:15:00Z' })).ok, false, 'untrusted producer must fail closed');
 await fs.writeFile(checkpointFile, `${JSON.stringify(checkpoint, null, 2)}\n`);
@@ -95,9 +124,25 @@ assert.equal((await restoreVerifiedCandidateCheckpoint({ candidateSite: candidat
 await fs.writeFile(path.join(candidate, 'atlas', 'data', 'bus-tnds', 'services', 'tnds.json'), 'tnds-fixture');
 
 const fingerprint = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: root });
-const publicationOnly = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: root, fileOverrides: { 'tools/atlas-data-publication/publish-snapshot.mjs': Buffer.from('publication-only change') } });
-assert.deepEqual(publicationOnly, fingerprint, 'publication-only changes must not invalidate candidate-generation compatibility');
+for (const relative of ['.github/workflows/atlas-bus-data-refresh.yml', 'tools/atlas-data-publication/publish-bank.mjs', 'tools/atlas-data-publication/publish-snapshot.mjs', 'tools/atlas-data-publication/wait-for-bank.mjs', 'tools/atlas-data-publication/validate-publication.mjs', 'tools/atlas-data-publication/candidate-checkpoint.mjs', 'tools/atlas-data-publication/publication.mjs', 'tools/atlas-data-publication/candidate-compatibility.mjs']) {
+  const publicationOnly = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: root, fileOverrides: { [relative]: Buffer.from(`downstream correction ${relative}`) } });
+  assert.deepEqual(publicationOnly, fingerprint, `${relative} correction must not invalidate candidate-generation compatibility`);
+}
 const candidateCodeChange = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: root, fileOverrides: { 'tools/atlas-bus-data/build_static_index.py': Buffer.from('candidate-generation change') } });
 assert.notEqual(candidateCodeChange.sha256, fingerprint.sha256, 'candidate-producing changes must invalidate compatibility');
+const tndsSchemaChange = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: root, fileOverrides: { 'tools/atlas-bus-data/prepare_tnds.mjs': Buffer.from('candidate TNDS schema change') } });
+assert.notEqual(tndsSchemaChange.sha256, fingerprint.sha256, 'TNDS schema-producing changes must invalidate compatibility');
 
-console.log('PASS Recovery-0F.1 v2 checkpoint: same-run retry, explicit cross-commit resume, exact producer key, provenance, freshness, trust boundary, fingerprint compatibility and payload-integrity fail-closed coverage.');
+for (const relative of ['tools/atlas-data-publication/publication.mjs', 'tools/atlas-data-publication/candidate-compatibility.mjs']) {
+  const file = path.join(root, ...relative.split('/'));
+  const original = await fs.readFile(file);
+  try {
+    await fs.writeFile(file, Buffer.concat([original, Buffer.from('\n// synthetic downstream correction\n')]));
+    const compatibleAfterCorrection = await restoreVerifiedCandidateCheckpoint({ candidateSite: candidate, cacheExactHit: 'true', cacheMatchedKey: producerCacheKey, requestedProducerRunId: producerRunId, currentRunId: producerRunId, currentCommitSha: producerSha, workflowName, repositoryRoot: root, now: '2026-09-18T10:10:00Z' });
+    assert.equal(compatibleAfterCorrection.ok, true, `${relative} correction must leave the candidate eligible`);
+  } finally {
+    await fs.writeFile(file, original);
+  }
+}
+
+console.log('PASS Recovery-0F.2 v2 checkpoint: same-run retry, explicit cross-commit resume, exact producer key, provenance, freshness, trust boundary, fingerprint compatibility and payload-integrity fail-closed coverage.');

@@ -11,22 +11,37 @@ const fetchText = async url => {
   if (!response.ok) return null;
   return response.text();
 };
+const writeJson = async (relative, value) => {
+  const target = path.join(outputRoot, relative);
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await fs.writeFile(target, `${JSON.stringify(value, null, 2)}\n`);
+};
+
 const configText = await fetchText(new URL('config/atlas-data-sources.json', root));
 const configPath = path.join(outputRoot, 'atlas', 'config', 'atlas-data-sources.json');
 await fs.mkdir(path.dirname(configPath), { recursive: true });
 if (configText) await fs.writeFile(configPath, configText);
 const config = configText ? JSON.parse(configText) : null;
-await fs.writeFile(path.join(outputRoot, 'active-slots.json'), `${JSON.stringify({
+const tnds = config?.datasets?.tnds ?? {};
+const activeRoots = tnds.activeRoots ?? tnds.roots ?? [];
+await writeJson('active-publication.json', {
+  schema: 'atlas-last-known-good-publication-v2',
+  publicationVersion: config?.publicationVersion ?? null,
+  bus: { activeSlot: config?.datasets?.bus?.slot ?? null },
+  tnds: { activeBank: tnds.activeBank ?? null, activeRoots, rollbackBank: tnds.rollbackBank ?? null }
+});
+// Keep the small legacy file for operators and older diagnostic tooling.
+await writeJson('active-slots.json', {
   bus: config?.datasets?.bus?.slot ?? null,
-  tnds: config?.datasets?.tnds?.slot ?? null,
-  tndsRoots: Object.fromEntries((config?.datasets?.tnds?.roots ?? []).map(root => [root.id, root.slot ?? null]))
-}, null, 2)}\n`);
-const fallback = {
-  bus: new URL('data/bus/', root),
-  tnds: new URL('data/bus-tnds/', root)
-};
-for (const [key, relative] of [['bus', 'bus'], ['tnds', 'tnds']]) {
-  const base = config?.datasets?.[key]?.baseUrl ? new URL(config.datasets[key].baseUrl, new URL('config/', root)) : fallback[key];
+  tnds: tnds.activeBank ?? tnds.slot ?? null,
+  tndsBank: tnds.activeBank ?? null,
+  tndsRoots: Object.fromEntries(activeRoots.map(item => [item.id, item.baseUrl ?? null]))
+});
+
+const fallback = { bus: new URL('data/bus/', root), tnds: new URL('data/bus-tnds/', root) };
+const busBase = config?.datasets?.bus?.baseUrl ? new URL(config.datasets.bus.baseUrl, new URL('config/', root)) : fallback.bus;
+const firstTndsBase = activeRoots[0]?.baseUrl ? new URL(activeRoots[0].baseUrl, new URL('config/', root)) : (tnds.baseUrl ? new URL(tnds.baseUrl, new URL('config/', root)) : fallback.tnds);
+for (const [key, base] of [['bus', busBase], ['tnds', firstTndsBase]]) {
   const manifest = config?.datasets?.[key]?.manifest || 'manifest.json';
   const text = await fetchText(new URL(manifest, base));
   if (text) {

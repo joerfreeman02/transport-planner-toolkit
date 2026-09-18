@@ -6,12 +6,19 @@ const localDataset = directory => Object.freeze({
 });
 
 export const atlasDataSources = Object.freeze({
-  schema: 'atlas-data-sources-v1',
+  schema: 'atlas-data-sources-v2',
   publicationVersion: 'local-checkout',
   generatedAt: null,
   datasets: Object.freeze({
     bus: localDataset('bus'),
-    tnds: localDataset('bus-tnds'),
+    tnds: {
+      ...localDataset('bus-tnds'),
+      activeBank: null,
+      activeRoots: [],
+      rollbackBank: null,
+      banks: [],
+      pathMap: {}
+    },
     nptg: null
   })
 });

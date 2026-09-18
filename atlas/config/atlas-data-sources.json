@@ -1,5 +1,5 @@
 {
-  "schema": "atlas-data-sources-v1",
+  "schema": "atlas-data-sources-v2",
   "publicationVersion": "local-checkout",
   "generatedAt": null,
   "datasets": {
@@ -11,9 +11,14 @@
     },
     "tnds": {
       "baseUrl": "../data/bus-tnds/",
+      "activeBank": null,
+      "activeRoots": [],
+      "rollbackBank": null,
+      "banks": [],
       "manifest": "manifest.json",
       "publicationManifest": "publication-manifest.json",
-      "pathRoots": []
+      "pathRoots": [],
+      "pathMap": {}
     },
     "nptg": null
   }

@@ -1,130 +1,125 @@
 # ADR-001: ATLAS reference-data publication layer
 
 Status: Proposed for Technical Director review
-Correction: BUS-RECOVERY-0D.1
-Date: 2026-09-17
+Correction: BUS-RECOVERY-0D.3
+Date: 2026-09-18
 
 ## Decision
 
-Keep the ATLAS application shell in the existing
-`joerfreeman02/transport-planner-toolkit` Pages site. Keep human-governed
-source/configuration code on the application branch. Publish prepared Bus and
-TNDS data to separate TPT-owned publication roots on their machine-managed
-`pages-publish` branches.
+ATLAS keeps its application shell and semantic code in the toolkit Pages site.
+Machine-generated reference data is published to configured external roots on
+their bounded `pages-publish` branches. Bus retains its existing two-slot
+bounded lifecycle because the fresh Bus candidate is only 87,651,022 bytes.
 
-Every root has exactly two data slots, `slot-a/` and `slot-b/`, plus bounded
-lifecycle metadata. A refresh writes the inactive slot and retains the active
-slot as rollback. There is no `releases/<version>/` directory and no generated
-full dataset is committed to application `main`.
+TNDS uses two complete publication banks. Each bank has a configurable set of
+roots; the approved initial topology is three roots per bank:
 
-TNDS regions retain their authoritative identities (`EA`, `EM`, `NE`, `NW`,
-`SE`, `SW`, `WM`, `Y`). The measured regional shards are assigned as complete
-regions to a deterministic capacity-fit set of publication roots. Shards are
-never silently dropped or split, and each shard maps to exactly one root. A
-root list is supplied by deployment configuration; diagnostics can produce a
-virtual root proposal before external roots exist. If one region cannot fit
-the safe two-slot budget, publication stops and reports the blocker.
+```text
+Bank A: A1, A2, A3       Bank B: B1, B2, B3
+```
 
-## Capacity and lifecycle
+Each TNDS root contains one snapshot and bounded metadata. It does not contain
+co-resident current and candidate national copies. The active bank is the bank
+named by the deployed application configuration. The opposite bank is the
+only bank eligible to be overwritten by the next refresh.
 
-The GitHub Pages nominal limit is 1,000,000,000 bytes. The operational safe
-limit is 900,000,000 bytes, deliberately leaving a 100,000,000-byte margin.
-The calculation covers the resulting site, not an individual release:
+## Run #22 capacity evidence
 
-`current slot + candidate slot + bounded metadata <= 900,000,000`
+The successful fresh diagnostic run on 2026-09-17 is the engineering evidence
+for this correction; development does not acquire national data again.
 
-`PUBLICATION_METADATA_BUDGET_BYTES` is 1,000,000 bytes for planning. The
-staging gate measures the actual resulting tree, including manifests, audit
-records and state, and applies the same safe limit. The diagnostic reports
-candidate totals, current footprint, candidate/rollback overhead, total root
-footprint, remaining margin, largest files and largest shards.
+| Dataset/region | Bytes | Files |
+| --- | ---: | ---: |
+| Bus | 87,651,022 | 1,370 |
+| TNDS national | 2,321,211,471 | 672 |
+| EA | 60,883,253 | 71 |
+| EM | 275,641,976 | 109 |
+| NE | 110,188,604 | 34 |
+| NW | 414,171,929 | 96 |
+| SE | 519,315,700 | 143 |
+| SW | 359,859,025 | 123 |
+| WM | 307,380,041 | 58 |
+| Y | 273,746,344 | 37 |
 
-The lifecycle is:
+Common/non-service TNDS material was approximately 24,599 bytes. The safe
+ceiling remains 900,000,000 bytes per root: the GitHub Pages nominal limit of
+1,000,000,000 bytes less a deliberate 100,000,000-byte margin. The old
+same-root two-slot model would require roughly 1.0397 GB for SE alone. It is
+therefore superseded; the ceiling is not weakened and authoritative data is
+not discarded.
 
-1. Acquire and prepare a complete candidate.
-2. Validate the candidate and calculate all regional allocations.
-3. Stage the inactive slot in every required root and size-gate each resulting
-   root.
-4. Publish the bounded snapshots to the machine branch.
-5. Validate every root's manifest identity, indexed file bytes, per-file
-   SHA-256 and aggregate checksum; also verify every manifest-referenced shard
-   is present across the roots.
-6. Install the one candidate application configuration and deploy the shell.
+The allocator assigns complete regions exactly once using an exact deterministic
+minimax search. It minimises the largest root footprint and uses stable
+region/root ordering as the tie-break. It fails closed if the configured bank
+cannot fit the complete candidate. The known Run #22 three-root arrangement
+fits below the ceiling, including the metadata budget.
 
-The application configuration is not installed after availability checks
-alone. A failed candidate therefore cannot replace the known-good configuration.
-The previous slot remains available for rollback. `promoteBoundedPublication`
-and `rollbackBoundedPublication` record the corresponding lifecycle state;
-application rollback uses the previous validated configuration and slot set.
+## Refresh and atomic switch
 
-## Governance and authentication
+The production sequence is:
 
-The application branch is human-governed and should use normal review and
-branch protection. Machine publication is limited to the dedicated
-`pages-publish` branch in the data repositories. The workflow token is scoped
-to contents read/write for those configured publication repositories only; it
-does not write application source `main`. No token, secret, repository or Pages
-setting is created by this sprint.
+1. Read the deployed data-source configuration and active TNDS bank.
+2. Select the opposite configured bank.
+3. Acquire, prepare, validate and measure the complete candidate.
+4. Allocate all eight regions across every candidate-bank root.
+5. Stage Bus in its inactive slot and stage every candidate TNDS root.
+6. Publish all candidate roots using the temporary snapshot and
+   force-with-lease branch mechanism.
+7. Wait for every remote manifest, then validate version identity, exact file
+   counts/bytes, per-file hashes, aggregate hashes, regions and shard mapping.
+8. Install the generated application configuration only after the complete
+   candidate bank passes validation, then deploy ATLAS.
 
-The workflow's normal publication path remains `refs/heads/main` after human
-review. Manual non-main runs are diagnostic-only and cannot require publication
-credentials, push data or deploy Pages.
+If any root fails, the application configuration and active bank remain
+unchanged. A partial inactive bank is harmless and will be overwritten on the
+next attempt. The active bank is never a staging target.
 
-## Provenance and audit
+The configuration records the active bank, publication version, active root
+IDs and URLs, exact region allocation, exact service-shard-to-root mapping,
+root hashes/manifests, and the still-valid opposite bank for rollback. The
+runtime resolver routes TNDS shards through the mapping; planner-facing Bus
+code remains unaware of banks.
 
-Prepared `manifest.json` remains the authoritative dataset contract. Each slot
-adds a publication manifest containing source identity, publication version,
-regional allocation and an exact indexed payload checksum. `publication-state`
-contains the lifecycle and capacity result. Only `audit/current.json` and
-`audit/previous.json` are retained, with version, timestamp, source hash,
-prepared-manifest identity, aggregate checksum, file/byte counts, regional
-allocation and configuration version. Historic complete datasets are not
-retained for audit purposes.
+## Rollback and lifecycle bounds
 
-## Fresh national-data diagnostic
+The deployed configuration is the authority for active bank identity. Its
+`rollbackBank` points to the still-valid opposite bank. Rollback is a
+configuration switch and does not rebuild national data. Bus rollback uses its
+existing previous slot. TNDS roots retain only one generated snapshot plus
+`publication-state.json`, `audit/current.json` and at most
+`audit/previous.json`; publication branches are replaced with one snapshot
+commit, so complete weekly history does not accumulate.
 
-The repository checkout contains a small TNDS fixture and is not evidence of a
-fresh national acquisition. `measureCandidateDatasets()` therefore labels the
-coverage as `fixture-or-incomplete-region-set` when the complete eight-region
-set is absent, and states that freshness is not inferred from bytes. The
-non-main workflow can acquire, prepare and measure fresh data without changing
-production state. No genuine fresh national measurement is claimed by this
-branch.
+## Operational safety and governance
 
-## Superseded 0D design
+The workflow timeout is 180 minutes because the genuine Run #22 acquisition
+and validation took approximately one hour before publication and remote
+checks. No complete 2.3 GB Actions artifact is introduced. Manual non-main
+runs remain diagnostic-only: they do not require publication repositories or
+tokens, publish, alter Pages, deploy, or change production configuration.
 
-The original unbounded `releases/version-*` model is superseded by the bounded
-two-slot model. The original single-root TNDS assumption is superseded by
-region-aware root allocation. HTTP-200 availability polling is retained only
-as a wait primitive; publication identity, checksums and required contents are
-now validated before configuration installation. The protected-main/direct-
-push contradiction is resolved by publishing only to machine-managed data
-branches.
-
-## Alternatives rejected
-
-1. Keeping immutable full releases indefinitely: unbounded repository and site
-   growth.
-2. Truncating regions, services, stops or timetable fidelity: changes the
-   authoritative dataset and is prohibited.
-3. Blindly creating eight repositories: unnecessary; measured bin packing uses
-   a measured number of roots that fit.
-4. Treating a per-release check as sufficient: the lifecycle requires total
-   resulting-site measurement.
-5. Bypassing source-branch protection: generated data belongs on the machine
-   publication branch.
+The external contract is `ATLAS_TNDS_BANKS_JSON`, containing bank IDs, root
+IDs, repositories and public site URLs. This sprint does not create those
+repositories, tokens, secrets or Pages sites.
 
 ## Tooling adoption review
 
-- Dependabot: retain for Actions and dependency updates.
+- Dependabot: retain for npm and GitHub Actions updates.
 - Codecov: optional; not required for this deterministic infrastructure suite.
-- OpenSSF Scorecard: recommended for application and publication repositories.
+- OpenSSF Scorecard: recommended for the application and publication roots.
 - Sentry: not adopted for static reference-data publication.
 - Renovate: not adopted alongside Dependabot.
+- GitHub branch protection: required follow-up. `main` is behaviourally
+  protected by programme governance today, but is not yet technically
+  protected in GitHub. Product Owner authorisation is required before any
+  tooling or branch-rule installation.
 
-## Scope exclusions
+## Semantic freeze and exclusions
 
-No Bus planner semantics, nearby-stop discovery, service selection, BODS/TNDS
-interpretation, NaPTAN logic, route grouping, calendars, frequencies,
-presentation, Word export, Alpha.15 release version or NPTG implementation was
-changed. This is BUS-RECOVERY-0D.1 infrastructure work only.
+Alpha.15 remains the accepted semantic baseline. This infrastructure change
+does not alter nearby-stop discovery, service inclusion/exclusion, BODS or
+TNDS interpretation, TfL route/direction semantics, NaPTAN, destinations,
+grouping, circular classification, frequencies, calendars, planner tables,
+browser presentation or Word presentation. NPTG remains null/unimplemented.
+No merge to `main`, release, tag, external repository, secret, deployment,
+unsafe checkout or Alpha16 import is part of this decision.

@@ -14,6 +14,7 @@ const snapshot = fs.readFileSync(path.join(root, 'tools/atlas-data-publication/p
 const checkout = fs.readFileSync(path.join(root, 'tools/atlas-data-publication/checkout-bank.mjs'), 'utf8');
 const wait = fs.readFileSync(path.join(root, 'tools/atlas-data-publication/wait-for-bank.mjs'), 'utf8');
 const preflight = fs.readFileSync(path.join(root, 'tools/atlas-data-publication/preflight-publication.mjs'), 'utf8');
+const checkpoint = fs.readFileSync(path.join(root, 'tools/atlas-data-publication/candidate-checkpoint.mjs'), 'utf8');
 const release = JSON.parse(fs.readFileSync(path.join(root, 'atlas/config/atlas-release.json'), 'utf8'));
 
 assert.equal(release.version, '2.0.0-alpha.15');
@@ -31,6 +32,22 @@ assert.ok(workflow.indexOf('preflight-publication.mjs') < workflow.indexOf('Acqu
 assert.match(workflow, /Wait for every candidate-bank root publication/);
 assert.match(workflow, /validate-publication\.mjs/);
 assert.match(workflow, /timeout-minutes: 180/);
+assert.doesNotMatch(workflow, /github\.run_started_at/);
+assert.match(workflow, /actions\/cache\/restore@v4/);
+assert.match(workflow, /actions\/cache\/save@v4/);
+assert.match(workflow, /ATLAS_CANDIDATE_CACHE_KEY: atlas-verified-candidate-checkpoint-v1-\$\{\{ github\.run_id \}\}-\$\{\{ github\.sha \}\}/);
+assert.doesNotMatch(workflow, /restore-keys:/);
+assert.match(workflow, /candidate-checkpoint\.mjs --restore/);
+assert.match(workflow, /candidate-checkpoint\.mjs --create/);
+assert.match(workflow, /candidate-checkpoint\.mjs --timestamp-only/);
+assert.ok(workflow.indexOf('Verify restored candidate checkpoint') < workflow.indexOf('Acquire and build validated Bus\/TNDS candidate'));
+assert.ok(workflow.indexOf('Create verified candidate checkpoint') < workflow.indexOf('Check out Bus reference-data publication repository'));
+assert.match(checkpoint, /atlas-verified-candidate-checkpoint-v1/);
+assert.match(checkpoint, /candidateGenerationTimestamp/);
+assert.match(checkpoint, /manifestSha256/);
+assert.match(checkpoint, /assertPublicationCapacity/);
+assert.match(checkpoint, /cacheExactHit/);
+assert.match(checkpoint, /measurePublicationTree/);
 assert.match(workflow, /github\.ref == 'refs\/heads\/main' && inputs\.measure_only != true/);
 assert.doesNotMatch(workflow.slice(0, workflow.indexOf('jobs:')), /TNDS_USERNAME|TNDS_PASSWORD/);
 assert.match(publication, /atlas-data-sources-v2/);

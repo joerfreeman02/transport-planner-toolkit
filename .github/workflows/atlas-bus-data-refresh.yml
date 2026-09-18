@@ -82,6 +82,7 @@ jobs:
       id-token: write
     env:
       ATLAS_DIAGNOSTIC_ONLY: ${{ inputs.measure_only || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') }}
+      ATLAS_CANDIDATE_CACHE_KEY: atlas-verified-candidate-checkpoint-v1-${{ github.run_id }}-${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -104,23 +105,60 @@ jobs:
           test -n "${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}"
       - name: Obtain last-known-good deployed metadata
         run: node tools/atlas-data-publication/fetch-last-known-good.mjs 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/' last-known-good
+      - name: Restore exact verified candidate checkpoint
+        id: candidate-cache
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: pages-site
+          key: ${{ env.ATLAS_CANDIDATE_CACHE_KEY }}
+      - name: Verify restored candidate checkpoint
+        id: checkpoint-restore
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true
+        env:
+          ATLAS_CACHE_EXACT_HIT: ${{ steps.candidate-cache.outputs.cache-hit }}
+          ATLAS_CACHE_MATCHED_KEY: ${{ steps.candidate-cache.outputs.cache-matched-key }}
+        run: node tools/atlas-data-publication/candidate-checkpoint.mjs --restore --candidate-site pages-site --run-id "${{ github.run_id }}" --commit-sha "${{ github.sha }}" --workflow-name "${{ github.workflow }}" --cache-hit "$ATLAS_CACHE_EXACT_HIT" --cache-matched-key "$ATLAS_CACHE_MATCHED_KEY"
+      - name: Prepare candidate workspace for authoritative acquisition
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true && steps.checkpoint-restore.outputs.valid != 'true'
+        run: |
+          rm -rf pages-site/atlas/data/bus pages-site/atlas/data/bus-tnds pages-site/atlas/data/status pages-site/.atlas-recovery
+          rm -f pages-site/atlas/config/atlas-candidate-measurement.json
       - name: Run production publication preflight before acquisition
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
         env:
           ATLAS_REFERENCE_DATA_TOKEN: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
         run: node tools/atlas-data-publication/preflight-publication.mjs --config last-known-good/atlas/config/atlas-data-sources.json
       - name: Acquire and build validated Bus/TNDS candidate
+        if: github.ref != 'refs/heads/main' || inputs.measure_only == true || steps.checkpoint-restore.outputs.valid != 'true'
         env:
           TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
           TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
           ATLAS_NODE: node
         run: python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --previous-root last-known-good
-      - name: Validate generated candidate data
+      - name: Validate fresh or restored candidate data
         run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site
       - name: Run deterministic ATLAS checks
         run: node tests/atlas/run-all.mjs
-      - name: Measure fresh candidate publication capacity
+      - name: Measure candidate publication capacity
         run: node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json
+      - name: Enforce candidate publication capacity gates
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true
+        run: node tools/atlas-data-publication/candidate-checkpoint.mjs --capacity-only --candidate-site pages-site
+      - name: Resolve validated candidate-generation timestamp
+        id: candidate-timestamp
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true
+        run: echo "value=$(node tools/atlas-data-publication/candidate-checkpoint.mjs --timestamp-only --candidate-site pages-site)" >> "$GITHUB_OUTPUT"
+      - name: Create verified candidate checkpoint
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true && steps.checkpoint-restore.outputs.valid != 'true'
+        run: node tools/atlas-data-publication/candidate-checkpoint.mjs --create --candidate-site pages-site --run-id "${{ github.run_id }}" --run-attempt "${{ github.run_attempt }}" --commit-sha "${{ github.sha }}" --workflow-name "${{ github.workflow }}" --cache-key "$ATLAS_CANDIDATE_CACHE_KEY"
+      - name: Save verified candidate checkpoint
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true && steps.checkpoint-restore.outputs.valid != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: pages-site
+          key: ${{ env.ATLAS_CANDIDATE_CACHE_KEY }}
       - name: Complete diagnostic-only run
         if: env.ATLAS_DIAGNOSTIC_ONLY == 'true'
         run: echo 'Fresh candidate measured; no publication repository, Pages site or production configuration was changed.'
@@ -144,7 +182,7 @@ jobs:
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
         run: |
           ACTIVE_BUS_SLOT=$(node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('last-known-good/active-publication.json','utf8'));process.stdout.write(x.bus.activeSlot||'')")
-          node tools/atlas-data-publication/publication.mjs --candidate-site pages-site --bus-repository reference-data/bus --version "${{ github.run_id }}-${{ github.sha }}" --generated-at "${{ github.run_started_at }}" --bus-site-url "$ATLAS_BUS_DATA_SITE_URL" --active-bus-slot "$ACTIVE_BUS_SLOT" --tnds-bank-plan publication-config/bank-plan.json --config-output publication-config/atlas-data-sources.mjs
+          node tools/atlas-data-publication/publication.mjs --candidate-site pages-site --bus-repository reference-data/bus --version "${{ github.run_id }}-${{ github.sha }}" --generated-at "${{ steps.candidate-timestamp.outputs.value }}" --bus-site-url "$ATLAS_BUS_DATA_SITE_URL" --active-bus-slot "$ACTIVE_BUS_SLOT" --tnds-bank-plan publication-config/bank-plan.json --config-output publication-config/atlas-data-sources.mjs
       - name: Publish Bus and every candidate TNDS root
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
         env:

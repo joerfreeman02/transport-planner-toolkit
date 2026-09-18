@@ -65,6 +65,16 @@ node --check tools/atlas-data-publication/validate-publication.mjs
 git diff --check
 ```
 
+Results: `pnpm test:atlas` — PASS; `pnpm test:bus` — PASS;
+`node tests/atlas/atlas-data-publication.test.mjs` — PASS;
+`node tests/atlas/atlas-publication-snapshot.integration.test.mjs` — PASS;
+`node tests/atlas/automated-refresh-contract.test.mjs` — PASS;
+all changed-file `node --check` commands — PASS; `git diff --check` — PASS.
+
+GitHub CI/check-run status: not observed. The workflow is schedule/manual-only
+and the post-push GitHub API query was unavailable through the configured
+network proxy; no status is claimed from that query.
+
 These are local results. GitHub CI/check-run status is separate and is not
 claimed unless independently observed after push.
 

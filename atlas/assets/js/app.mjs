@@ -20,6 +20,10 @@ import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation } from 
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
+const declaredTestBuild = String(document.body.dataset.atlasTestBuild || document.documentElement.dataset.atlasTestBuild || '').trim();
+document.querySelectorAll('[data-atlas-test-build]').forEach(element => {
+  element.textContent = declaredTestBuild ? `Development/Test build · ${declaredTestBuild}` : 'Development/Test build · not declared';
+});
 const taskStatus = createAtlasTaskStatus({ messageElement: $('taskStatusMessage'), regionElement: $('taskStatus'), progressElement: $('taskStatusProgress'), countElement: $('taskStatusProgressText'), stageElements: [...document.querySelectorAll('[data-task-stage]')] });
 const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha13' });
 const geocoder = createNominatimGeocodingAdapter({ cache });

@@ -1,5 +1,5 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createReadStream, existsSync } from 'node:fs';
 import { appendFile, mkdir, readFile, realpath, stat, unlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -36,6 +36,17 @@ const MIME_TYPES = Object.freeze({
 
 function rootIdentifier(rootDir) {
   return createHash('sha256').update(path.resolve(rootDir).toLowerCase()).digest('hex').slice(0, 16);
+}
+
+function cleanGitRevision(rootDir) {
+  try {
+    const status = execFileSync('git', ['-C', rootDir, 'status', '--porcelain'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    if (status.trim()) return null;
+    const revision = execFileSync('git', ['-C', rootDir, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return /^[0-9a-f]{40}$/i.test(revision) ? revision : null;
+  } catch {
+    return null;
+  }
 }
 
 export function reviewStateDirectory() {
@@ -172,8 +183,17 @@ function createRequestHandler({ rootDir, rootId, stopToken, closeServer, updater
     }
 
     const contentType = MIME_TYPES[path.extname(resolved.file).toLowerCase()] || 'application/octet-stream';
-    response.writeHead(200, { 'Content-Type': contentType, 'Content-Length': resolved.size, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+    const testBuildSha = pathname === '/atlas/' || pathname === '/atlas/index.html' ? cleanGitRevision(rootDir) : null;
+    const injectedHtml = testBuildSha
+      ? (await readFile(resolved.file, 'utf8')).replace(
+          /<body\b[^>]*>/i,
+          tag => `${tag.slice(0, -1)} data-atlas-test-build="BUS-TFL-COMPLETE · ${testBuildSha.slice(0, 7)}">`,
+        )
+      : null;
+    const contentLength = injectedHtml === null ? resolved.size : Buffer.byteLength(injectedHtml);
+    response.writeHead(200, { 'Content-Type': contentType, 'Content-Length': contentLength, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
     if (method === 'HEAD') return response.end();
+    if (injectedHtml !== null) return response.end(injectedHtml);
     const stream = createReadStream(resolved.file);
     stream.on('error', () => { if (!response.headersSent) plainResponse(response, 500, 'ATLAS could not open this review file. Please try again.'); else response.destroy(); });
     stream.pipe(response);

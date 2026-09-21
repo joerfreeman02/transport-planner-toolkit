@@ -150,11 +150,14 @@ for (const control of selectedControls) {
   if (control.id === 'normanshire-drive-700m' && (!timetable.tflTimetableAttempted || !(timetable.tflTimetableRequestIdentities ?? []).length)) throw new Error('Normanshire production-fidelity control did not attempt live TfL timetable requests.');
   const tables = buildBusWordTables(result);
   const serviceRows = tables[1]?.rows ?? [];
-  const bytes = new Uint8Array(await (await docxBlob(`ATLAS Bus Assessment — ${control.label} — ${label}`, tables, result.wording || '')).arrayBuffer());
-  const filename = `ATLAS BUS-CLOSEOUT-1A — ${label} — ${control.id}.docx`;
+  const developmentBuild = `BUS-TFL-COMPLETE · ${executedCodeSha.slice(0, 7)}`;
+  const bytes = new Uint8Array(await (await docxBlob(`ATLAS Bus Assessment — ${control.label} — ${developmentBuild}`, tables, result.wording || '')).arrayBuffer());
+  const filename = `ATLAS BUS-TFL-COMPLETE — ${label} — ${control.id} — ${executedCodeSha.slice(0, 7)}.docx`;
   await writeFile(path.join(OUTPUT_ROOT, filename), bytes);
   controls.push({
     ...control,
+    executedCodeSha,
+    developmentBuild: `BUS-TFL-COMPLETE · ${executedCodeSha.slice(0, 7)}`,
     productionControl: true,
     greaterLondon: isGreaterLondonPoint(site),
     ok: result.ok,
@@ -191,6 +194,7 @@ const register = {
   productionConfigUrl: PRODUCTION_CONFIG_URL,
   productionBaseSha: EXPECTED_PRODUCTION_BASE_SHA,
   executedCodeSha,
+  developmentBuild: `BUS-TFL-COMPLETE · ${executedCodeSha.slice(0, 7)}`,
   worktreeClean: git.clean,
   productionPublicationVersion: productionConfig.publicationVersion,
   releaseBuild: release.default?.build ?? release.build ?? null,

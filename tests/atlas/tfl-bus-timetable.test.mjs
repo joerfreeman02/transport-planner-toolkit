@@ -82,6 +82,88 @@ assert.equal(representativeMultiStopSummary.typicalFrequencyLines[0], 'Mon-Fri: 
 assert.equal(representativeMultiStopSummary.operatingPeriodLines[0], 'Mon-Fri: Departs approx. 08:05');
 assert.deepEqual(representativeMultiStopPlanner.canonicalDeparturePopulation.monday.map(item => [item.stopPointId, item.minute, item.calendarProfileId]), [['MSTOP-B', 485, 'ordinary']], 'TfL evidence remains stop- and calendar-profile-scoped through planner consolidation');
 
+const departureStopOmittedFixture = ({ lineId, stopPointId, destination = `${lineId} terminus`, departureStopId = stopPointId, includeJourney = true } = {}) => ({
+  lineId,
+  lineName: lineId,
+  direction: 'outbound',
+  stations: [{ id: stopPointId, name: `${lineId} departure stop` }, { id: `${lineId}-NEXT`, name: `${lineId} next stop` }, { id: `${lineId}-END`, name: destination }],
+  timetable: {
+    departureStopId,
+    routes: [{
+      stationIntervals: [{ id: '0', intervals: [{ stopId: `${lineId}-NEXT`, timeToArrival: 2 }, { stopId: `${lineId}-END`, timeToArrival: 12 }] }],
+      schedules: [{
+        name: 'Monday to Friday',
+        ...(includeJourney ? { knownJourneys: [{ vehicleJourneyId: `${lineId}-journey`, intervalId: 0, hour: '08', minute: '05' }] } : { knownJourneys: [] })
+      }]
+    }]
+  }
+});
+
+const omittedDepartureMetadata = lineId => ({ ok: true, data: [{ id: lineId, routeSections: [{ direction: 'outbound', originationName: `${lineId} origin`, destinationName: `${lineId} terminus` }] }] });
+for (const [lineId, stopPointId] of [
+  ['215', '490007676L'],
+  ['385', '490005178D'],
+  ['397', '490007676L'],
+  ['97', '490007676J'],
+  ['158', '490007676J'],
+  ['444', '490005178H']
+]) {
+  const omittedDeparture = createTflBusTimetableAdapter({
+    cache: cache(),
+    fetchImpl: async () => response(departureStopOmittedFixture({ lineId, stopPointId }))
+  });
+  const omittedDepartureResult = await omittedDeparture.servicesForStop({ lineId, stopPointId, routeMetadata: omittedDepartureMetadata(lineId) });
+  assert.equal(omittedDepartureResult.provenance.timetableConclusion, 'MATCHED', `${lineId}: departureStopId confirms the selected stop when StationIntervals begin at the following stop`);
+  assert.equal(omittedDepartureResult.data.length, 1, `${lineId}: the valid departure-stop response produces one service`);
+  assert.deepEqual(omittedDepartureResult.data[0].routePatternStopIds, [stopPointId, `${lineId}-NEXT`, `${lineId}-END`], `${lineId}: selected departure stop is retained in the route pattern without inventing timing`);
+  assert.deepEqual(omittedDepartureResult.data[0].stopSchedules[stopPointId].monday, [485], `${lineId}: the journey time is attributed to the confirmed departure StopPoint`);
+}
+
+const sparseDepartureFixture = departureStopOmittedFixture({ lineId: 'ALT-SPARSE', stopPointId: 'ALT-SPARSE-REQUEST' });
+sparseDepartureFixture.timetable.routes[0].stationIntervals[0].intervals = [{ stopId: 'ALT-SPARSE-NEXT', timeToArrival: 2 }];
+const sparseDepartureAdapter = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async () => response(sparseDepartureFixture) });
+const sparseDepartureResult = await sparseDepartureAdapter.servicesForStop({ lineId: 'ALT-SPARSE', stopPointId: 'ALT-SPARSE-REQUEST', routeMetadata: omittedDepartureMetadata('ALT-SPARSE') });
+assert.equal(sparseDepartureResult.provenance.timetableConclusion, 'MATCHED', 'an exact departureStopId permits a valid single-following-stop StationInterval pattern');
+assert.equal(sparseDepartureResult.data.length, 1, 'a sparse but scheduled TfL pattern is retained without route-specific logic');
+assert.deepEqual(sparseDepartureResult.data[0].routePatternStopIds, ['ALT-SPARSE-REQUEST', 'ALT-SPARSE-NEXT'], 'the confirmed departure stop is prepended to the sparse pattern');
+
+const sparseMismatchPayload = departureStopOmittedFixture({ lineId: 'ALT-SPARSE-MISMATCH', stopPointId: 'ALT-SPARSE-REQUEST', departureStopId: 'ALT-SPARSE-OTHER' });
+sparseMismatchPayload.timetable.routes[0].stationIntervals[0].intervals = [{ stopId: 'ALT-SPARSE-MISMATCH-NEXT', timeToArrival: 2 }];
+const sparseMismatchAdapter = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async () => response(sparseMismatchPayload) });
+const sparseMismatchResult = await sparseMismatchAdapter.servicesForStop({ lineId: 'ALT-SPARSE-MISMATCH', stopPointId: 'ALT-SPARSE-REQUEST', routeMetadata: omittedDepartureMetadata('ALT-SPARSE-MISMATCH') });
+assert.equal(sparseMismatchResult.data.length, 0, 'a sparse pattern with a mismatched departureStopId remains unresolved');
+
+const mismatchedDeparture = createTflBusTimetableAdapter({
+  cache: cache(),
+  fetchImpl: async () => response(departureStopOmittedFixture({ lineId: 'MISMATCH', stopPointId: 'MISMATCH-REQUEST', departureStopId: 'MISMATCH-OTHER' }))
+});
+const mismatchedDepartureResult = await mismatchedDeparture.servicesForStop({ lineId: 'MISMATCH', stopPointId: 'MISMATCH-REQUEST', routeMetadata: omittedDepartureMetadata('MISMATCH') });
+assert.equal(mismatchedDepartureResult.data.length, 0, 'a StationInterval pattern without the requested stop and with a mismatched departureStopId remains unresolved');
+assert.match(mismatchedDepartureResult.warnings.join(' '), /without the requested StopPoint/, 'mismatched departure-stop identity is not treated as proof of service');
+
+const metadataOnly = createTflBusTimetableAdapter({
+  cache: cache(),
+  fetchImpl: async () => response(departureStopOmittedFixture({ lineId: 'METADATA-ONLY', stopPointId: 'METADATA-ONLY-REQUEST', includeJourney: false }))
+});
+const metadataOnlyResult = await metadataOnly.servicesForStop({ lineId: 'METADATA-ONLY', stopPointId: 'METADATA-ONLY-REQUEST', routeMetadata: omittedDepartureMetadata('METADATA-ONLY') });
+assert.equal(metadataOnlyResult.data.length, 0, 'route metadata alone cannot fabricate a timetable service');
+assert.match(metadataOnlyResult.warnings.join(' '), /without deterministically associated scheduled journeys/, 'metadata-only response remains unresolved');
+
+const singleLineMetadata = {
+  id: 'SINGLE-METADATA',
+  name: 'SINGLE-METADATA',
+  sections: [{ direction: 'outbound', originationName: 'Single origin', destinationName: 'Single-METADATA terminus' }]
+};
+const singleLineMetadataAdapter = createTflBusTimetableAdapter({
+  cache: cache(),
+  fetchImpl: async url => String(url).includes('/Route')
+    ? response(singleLineMetadata)
+    : response(departureStopOmittedFixture({ lineId: 'SINGLE-METADATA', stopPointId: 'SINGLE-METADATA-REQUEST' }))
+});
+const singleLineMetadataResult = await singleLineMetadataAdapter.servicesForStop({ lineId: 'SINGLE-METADATA', stopPointId: 'SINGLE-METADATA-REQUEST' });
+assert.equal(singleLineMetadataResult.data[0].origin, 'Single origin', 'single-line TfL metadata object is normalised for identity matching');
+assert.equal(singleLineMetadataResult.data[0].destination, 'Single-METADATA terminus', 'current TfL sections response shape remains authoritative');
+
 const unresolvedTflFixture = { lineId: 'UNRES', lineName: 'UNRES', direction: 'outbound', stations: [{ id: 'UNRES-STOP', name: 'Unresolved stop' }, { id: 'UNRES-END', name: 'Unresolved terminus' }], timetable: { departureStopId: 'UNRES-STOP', routes: [{ stationIntervals: [{ id: 'unresolved-pattern', intervals: [{ stopId: 'UNRES-STOP', timeToArrival: 0 }, { stopId: 'UNRES-END', timeToArrival: 10 }] }], schedules: [{ name: 'Example custom period', knownJourneys: [{ vehicleJourneyId: 'UNRES-1', intervalId: 'unresolved-pattern', departureTime: { hour: 8, minute: 0 } }] }] }] } };
 const unresolvedTflMetadata = { ok: true, data: [{ id: 'UNRES', routeSections: [{ direction: 'outbound', originationName: 'Unresolved origin', destinationName: 'Unresolved terminus' }] }] };
 const unresolvedTflAdapter = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async () => response(unresolvedTflFixture) });
@@ -271,7 +353,7 @@ assert.equal(n123Summary.operatingPeriods.monday.overnight, true);
 assert.match(n123Summary.operatingPeriodLines.join(' '), /Approx\. 22:30–01:20 \(next day\)/);
 assert.equal(nightRequests.filter(url => url.includes('/Route')).length, 1);
 assert.equal(nightRequests.filter(url => url.includes('/Timetable/')).length, 1);
-assert.ok(nightRequests.some(url => /serviceTypes=Regular&serviceTypes=Night/.test(url)));
+assert.ok(nightRequests.some(url => /serviceTypes=Regular%2CNight|serviceTypes=Regular,Night/.test(url)));
 const ambiguous = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => response(String(url).includes('/Route') ? routeFixture : ambiguousFixture) });
 const ambiguousResult = await ambiguous.servicesForStop({ lineId: '322', stopPointId: '490TEST003' });
 assert.equal(ambiguousResult.data.length, 0);
@@ -393,7 +475,7 @@ const busyResult = await busyAuthority.servicesForStops(busyStops, { site: { lat
 assert.equal(busyResult.ok, true);
 assert.equal(busyTimetable, 12);
 assert.equal(busyRoute, 1, 'route metadata batches distinct lines once');
-assert.match(busyRouteUrls[0], /\/Line\/322,323\/Route\?serviceTypes=Regular&serviceTypes=Night$/);
+assert.match(busyRouteUrls[0], /\/Line\/322,323\/Route\?serviceTypes=Regular%2CNight$|\/Line\/322,323\/Route\?serviceTypes=Regular,Night$/);
 assert.equal(busyResult.provenance.timetableRequests, 12);
 assert.equal(busyResult.provenance.routeMetadataRequests, 1);
 assert.equal(busyResult.provenance.totalTfLRequests, 13);

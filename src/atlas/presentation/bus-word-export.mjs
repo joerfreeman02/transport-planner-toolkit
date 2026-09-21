@@ -14,6 +14,16 @@ function principalLocationsText(service) {
   return text(service?.principalLocationsText || service?.presentation?.principalLocationsText);
 }
 
+function reviewQualification(reviewItems) {
+  const items = Array.isArray(reviewItems) ? reviewItems.filter(Boolean) : [];
+  if (!items.length) return null;
+  const timetableItems = items.filter(item => /timetable|national-route-evidence|service-source-evidence/i.test(`${item.code ?? ''} ${item.source ?? ''} ${item.message ?? ''}`));
+  const routes = [...new Set(timetableItems.map(item => text(item.route)).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, 'en-GB', { numeric: true }));
+  if (routes.length) return `Planner review required: timetable evidence remains unresolved for routes ${routes.join(', ')} at one or more assessed stops. Detailed source evidence is retained in ATLAS and should be reviewed before formal use.`;
+  return 'Planner review required: material assessment evidence remains unresolved. Detailed evidence is retained in ATLAS and should be reviewed before formal use.';
+}
+
 export function buildBusWordTables(result) {
   if (!result?.ok) throw new Error('A completed Bus assessment is required for Word export.');
   const stopRows = (result.stops ?? []).map(stop => [
@@ -50,6 +60,8 @@ export function buildBusWordTables(result) {
     const next = services[index + 1];
     if (hasPlannerSummary && service.routeGroupNote && (!next || next.routeGroupKey !== service.routeGroupKey)) serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeGroupNote}` });
   });
+  const qualification = reviewQualification(result.reviewItems);
+  if (qualification) serviceRows.push({ kind: 'summary', text: qualification });
   if (hasPlannerSummary) serviceRows.push({ kind: 'summary', text: PLANNER_METHODOLOGY_NOTE });
 
   return [

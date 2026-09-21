@@ -76,6 +76,25 @@ assert.match(ordinarySchool[0].typicalFrequencyText, /Standard days: Mon-Fri: 1 
 assert.match(ordinarySchool[0].typicalFrequencyText, /School days \(additional\): Mon-Fri: 1 journey\/day/);
 assertNoUnconditionalCombinedFrequency(ordinarySchool[0], 'A: ordinary and school-day service are not flattened');
 
+// Single-profile rows use the profile ID as the qualification input. Each
+// resolved and unresolved profile must retain its deterministic public label.
+const singleProfileLabels = [
+  ['ordinary', null],
+  ['school-day', 'School days'],
+  ['term-time', 'Term time'],
+  ['non-school-day', 'Non-school days'],
+  ['holiday', 'Holidays'],
+  ['other-resolved', 'Specific calendar'],
+  ['unresolved', 'Calendar not confirmed']
+];
+for (const [profile, label] of singleProfileLabels) {
+  const row = planner([calendarRecord({ routeNumber: `SINGLE-${profile}`, id: `SINGLE-${profile}`, profile, departures: weekdayAt(480) })])[0];
+  assert.ok(row, `${profile}: single-profile row is present`);
+  if (label) assert.match(row.typicalFrequencyText, new RegExp(`Mon-Fri \\(${label}\\): 1 journey/day`), `${profile}: concise profile label is visible`);
+  else assert.match(row.typicalFrequencyText, /Mon-Fri: 1 journey\/day/, 'ordinary: single-profile frequency remains intentionally unqualified');
+  assert.doesNotMatch(row.typicalFrequencyText, /Calendar-specific service/, `${profile}: generic calendar label is never emitted`);
+}
+
 const profileFrequencyBands = planner([
   calendarRecord({ routeNumber: 'A-BANDS', id: 'A-BANDS-ordinary', profile: 'ordinary', departures: weekdayAt(480), frequencyEvidence: [{ periodType: 'FrequencyMinutes', day: 'monday', lowestFrequency: 10, highestFrequency: 10, calendarProfileId: 'ordinary' }] }),
   calendarRecord({ routeNumber: 'A-BANDS', id: 'A-BANDS-school', profile: 'school-day', departures: weekdayAt(510), frequencyEvidence: [{ periodType: 'FrequencyMinutes', day: 'monday', lowestFrequency: 5, highestFrequency: 5, calendarProfileId: 'school-day' }] })

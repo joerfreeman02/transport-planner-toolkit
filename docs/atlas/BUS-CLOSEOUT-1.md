@@ -1,58 +1,77 @@
-# ATLAS BUS — BUS-CLOSEOUT-1
+# ATLAS BUS — BUS-CLOSEOUT-1 / 1A
 
 ## Controlled implementation handover
 
 Date: 2026-09-21  
 Starting production `main`: `c670698dbf709a953d15b3927ee677fb502d1b3a`  
-Working branch: `codex/atlas-bus-closeout`  
-Scope: documentation, presentation and local verification only. This branch must not be merged or used to dispatch a production refresh until Technical Director review is complete.
+PR #48 reviewed head: `12df8c2b77c398a5f63e4a890939edf74a196aa5`
+Scope: bounded presentation correction, Word qualification, production-fidelity controls and forensic documentation only. This branch must not be merged or used to dispatch a production refresh until Technical Director review is complete.
+
+## Data-source distinction
+
+The earlier BUS-CLOSEOUT-1 local harness used the checkout-local `atlas/data/bus/` and `atlas/data/bus-tnds/` trees. Those are stale test data generated 2026-09-04; local TNDS coverage is incomplete and they are not Run #24 / State C controls. The earlier local Pipers result showing route `230` only must not be treated as production evidence.
+
+BUS-CLOSEOUT-1A uses the deployed ATLAS configuration and fails closed unless it reads publication `35352167115-c670698dbf709a953d15b3927ee677fb502d1b3a`. The verified production source was:
+
+- Bus publication: generated `2026-09-18T13:46:55Z`, snapshot `2026-09-18`, BODS source hash `8a2764d2309d4908b71280bdd0708cddb68b242d1a5c2b8fdfcac4bd85a17b2c`.
+- TNDS: active Bank A, roots A1/A2/A3, each generated `2026-09-18T13:46:55Z` and carrying the same publication version.
+- Release build: `ATLAS-2.0.0-alpha.15-20260914`.
+- TfL and OSRM were live requests; BODS/TNDS were loaded from the deployed publication roots.
 
 ## Forensic result: Normanshire / TfL completeness
 
-The exact production baseline was exercised through the authoritative TfL/BODS composition at Normanshire Drive using both 400 m and 700 m radii. The 700 m control produced complete assessments with routes `215`, `385` and `397` present, alongside `397A`; it also retained both approved route `444` directions: `Towards Chingford Station` and `Towards Turnpike Lane Bus Station`.
+The production-fidelity 700 m control classifies `51.6162611, -0.0125148` inside Greater London. It attempted 83 live TfL timetable requests and produced 23 unresolved request identities, all involving routes `215`, `385` and `397`. The assessment is correctly `partial`; the defect is reproduced on the actual Run #24 State C data path and must not be described as absent.
 
-The reproduction generated no TfL timetable request identities and no unresolved request identities. The returned timetable provenance was BODS (`timetableConclusion: MATCHED`). Therefore the reported Run #24 request-level defect is not reproducible from this checkout and no cause can be proven from the local evidence. The evidence is insufficient to justify a speculative adapter, scheduler or compatibility correction. Routes `215`, `385` and `397` remain an investigation item for a run/candidate-level reproduction.
+The accepted route `444` directions remain exact on both base and branch: `Towards Chingford Station` and `Towards Turnpike Lane Bus Station`. Route `397A` was not established in the current production route population and remains separately tracked as a mixed-source / London Service Permit case; no evidence establishes that it is part of the current 215/385/397 defect.
 
-Route `397A` remains a tracked mixed-source / London Service Permit case for later mixed-source handling unless the BUS-CLOSEOUT investigation proves that it is directly part of the current completeness defect.
+No TfL adapter or candidate-generation correction was made. The production evidence indicates the unresolved route/StopPoint request behavior is present in the accepted production path; the branch adds only a truthful Word qualification and fixes presentation labels.
 
-No change was made to `src/atlas/domain/service-calendar.mjs` or any other checkpoint-compatibility-impacting file. The investigation did not require a compatibility change, so it was not escalated as a stop condition.
+## Implemented corrections
 
-## Implemented bounded corrections
+- `profileLines()` now accepts a profile ID and derives its concise label exactly once. Single-profile ordinary, school-day, term-time, non-school-day, holiday, other-resolved and unresolved cases are covered by explicit regression tests.
+- Word no longer exports raw `reviewItems` messages or StopPoint/request identities. When material review items exist it emits exactly one deterministic qualification, deduplicating and numerically sorting affected timetable routes. Complete assessments with no review items receive no qualification.
+- The qualification is: `Planner review required: timetable evidence remains unresolved for routes … at one or more assessed stops. Detailed source evidence is retained in ATLAS and should be reviewed before formal use.` Generic material evidence uses the corresponding non-route-specific wording.
+- Browser/Word service population, grouping, destinations, directions, frequencies and circular semantics remain unchanged. The Transport Statement wording that material qualifications appear in the Bus Service Summary remains true.
+- No NPTG, BUS-DEST, BUS-GROUP, BUS-CIRC, route redesign, destination enrichment, publication architecture, checkpoint architecture, workflow, secret, Actions-variable, Pages or version change was made.
 
-- Planner and Word-facing calendar labels are concise while retaining uncertainty: `Standard days`, `Specific calendar` and `Calendar not confirmed`; mixed-calendar rows state that calendar profiles vary and each frequency line is labelled.
-- The Word export no longer emits the raw internal `reviewItems` diagnostic dump. Review evidence remains in the assessment result and internal evidence structures.
-- Browser/Word semantics continue to use the same planner rows; the existing parity and calendar-safety tests cover the change.
-- No NPTG, BUS-DEST, BUS-GROUP or BUS-CIRC architecture was introduced. No secrets, Actions variables, release version, caches, reference-data repositories, production refresh or publication state were changed.
+## Base-vs-branch production comparison
+
+Both worktrees used the same deployed Run #24 publication. Base executed `c670698dbf709a953d15b3927ee677fb502d1b3a`; branch executed `12df8c2b77c398a5f63e4a890939edf74a196aa5`. The following semantic fields matched for every control: discovered stop count, service-summary count, planner-row count, route population, planner route numbers, route directions, review-item types and assessment status. Key frequency/direction evidence also matched; the only intended differences were calendar wording and the one concise Word qualification on controls with material review items.
+
+| Production control | Stops | Service summaries | Planner rows | Route population | Review items | TfL requests | Word rows / notes | Branch qualification |
+| --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |
+| Normanshire 400 m | 7 | 14 | 14 | 97, 158, 215, 357, 385, 397, 444, 657, N26, W16 | 6 | 35 | 14 / 3 | 1 |
+| Normanshire 700 m | 18 | 14 | 14 | 97, 158, 215, 357, 385, 397, 444, 657, N26, W16 | 23 | 83 | 14 / 3 | 1 |
+| Pipers Lane 700 m | 11 | 4 | 3 | 230, 231 | 0 | 0 | 3 / 3 | 0 |
+| Waltham Cross 700 m | 16 | 126 | 42 | 13, 13A, 13B, 13C, 14, 15, 15A, 16, 16C, 25C, 66, 211, 212, 217, 242, 251, 279, 310, 317, 327, 491, A1, N279 | 22 | 22 | 42 / 45 | 1 |
+
+The current Run #24 Pipers publication establishes routes `230` and `231` at this control. It does not establish the previously expected `46` and `C`; those assumptions were not hard-coded or substituted. Waltham Cross uses the current 23-route State C population above, not the stale local 21-route result.
 
 ## Checkpoint compatibility
 
-The accepted Recovery-0F checkpoint producer remains reusable in principle. This branch does not alter the checkpoint schema, save/restore path, candidate identity, service-calendar compatibility logic or production workflow. A fresh production run and any post-checkpoint failure investigation remain separate Technical Director decisions.
+No checkpoint-compatibility-impacting file changed. Candidate-generation compatibility fingerprints are identical:
 
-## Local control register
+- Base: `atlas-candidate-generation-compatibility-v2`, SHA-256 `093d047c87482aba3d5b90844608046ece18bd673f9228dab504030883af2232`.
+- Branch: `atlas-candidate-generation-compatibility-v2`, SHA-256 `093d047c87482aba3d5b90844608046ece18bd673f9228dab504030883af2232`.
 
-Controls were captured from the exact starting SHA on 2026-09-21. All four local assessments completed with zero unresolved request identities and zero internal review items:
+The accepted Recovery-0F checkpoint producer remains reusable in principle. No checkpoint schema, save/restore path, candidate identity, service-calendar semantics, release build or production workflow was altered.
 
-| Control | Stops | Routes | Service summaries | Planner rows | Result |
-| --- | ---: | ---: | ---: | ---: | --- |
-| Normanshire Drive 400 m | 7 | 11 | 22 | 22 | Complete |
-| Normanshire Drive 700 m | 18 | 11 | 22 | 22 | Complete |
-| Pipers Lane 700 m | 11 | 1 | 1 | 1 | Complete; local prepared data exposes route 230 only |
-| Waltham Cross 700 m | 16 | 21 | 67 | 40 | Complete |
+## Word controls and limitations
 
-The Pipers result is a local deterministic control, not confirmation of the Run #24 candidate population: this checkout's prepared data exposes route `230` only at that location. The prepared data was dated 2026-09-04 and must be refreshed before formal use.
+Corrected branch DOCX controls are under `work/bus-closeout-1a/production-controls/`:
 
-Outputs and the full forensic register are under `work/bus-closeout-1/controls/`:
+- `ATLAS BUS-CLOSEOUT-1A — branch-400 — normanshire-drive-400m.docx`
+- `ATLAS BUS-CLOSEOUT-1A — branch — normanshire-drive-700m.docx`
+- `ATLAS BUS-CLOSEOUT-1A — branch-pipers — pipers-lane-700m.docx`
+- `ATLAS BUS-CLOSEOUT-1A — branch-waltham — waltham-cross-700m.docx`
+- Corresponding JSON registers record production base SHA, executed code SHA, publication version, manifest identities, active TNDS bank, TfL request counts/identities, unresolved identities, source status, Word row counts, qualification counts and DOCX hashes.
 
-- `ATLAS BUS-CLOSEOUT-1 — normanshire-drive-400m.docx`
-- `ATLAS BUS-CLOSEOUT-1 — normanshire-drive-700m.docx`
-- `ATLAS BUS-CLOSEOUT-1 — pipers-lane-700m.docx`
-- `ATLAS BUS-CLOSEOUT-1 — waltham-cross-700m.docx`
-- `BUS-CLOSEOUT-1-control-register.json`
+Page counts were not deterministically available in the local DOCX harness and are therefore recorded as unavailable; exact DOCX paths are supplied for manual review.
 
-Word page counts were not recorded in the local harness; the DOCX files are available for manual Word review.
+## Validation and recommendation
 
-## Validation and limitations
+The targeted calendar, mixed-profile, unresolved-calendar, Browser/Word parity, concise qualification, raw diagnostic suppression, route-444 and compatibility checks pass. The full Alpha.15 deterministic suite must be rerun after the BUS-CLOSEOUT-1A changes before final Technical Director acceptance.
 
-The full Alpha.15 deterministic suite passed, including the calendar, planner, Word export, production-fidelity, source-completeness, integrity, TfL adapter, browser/UI, checkpoint-compatibility, composition, assessment and publication checks. The first sandboxed attempt was blocked by Windows child-process permission; the same suite was then rerun with child-process execution enabled and passed.
+No production refresh, publication, Pages deployment, merge or Run #24 dispatch was performed by this branch.
 
-This branch is **NOT READY FOR PRODUCTION**. Recommendation: **ACCEPT FOR MANUAL TESTING** only, subject to Technical Director review of the PR, local DOCX controls and a future authoritative reproduction of the unresolved TfL request investigation. Do not merge, dispatch Run #24, publish reference data or deploy Pages from this branch as part of this sprint.
+Recommendation: **READY FOR TECHNICAL DIRECTOR MANUAL REVIEW / NOT READY FOR PRODUCTION**.

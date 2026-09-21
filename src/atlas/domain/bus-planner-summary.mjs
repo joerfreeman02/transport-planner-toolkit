@@ -1027,8 +1027,8 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     frequencyLines = outputProfileIds.flatMap(profileId => calendarQualifiedLines(profileResults.get(profileId).frequencyLines, profileId, hasOrdinaryProfile && profileId !== 'ordinary'));
     operatingLines = outputProfileIds.flatMap(profileId => calendarQualifiedLines(profileResults.get(profileId).operatingLines, profileId, hasOrdinaryProfile && profileId !== 'ordinary'));
   } else if (displayProfileId !== 'ordinary' && (displayProfileId !== UNKNOWN_CALENDAR_PROFILE || unresolvedNeedsQualification)) {
-    frequencyLines = profileLines(displayFrequencyLines, calendarProfileLabel(displayProfileId));
-    operatingLines = profileLines(displayOperatingLines, calendarProfileLabel(displayProfileId));
+    frequencyLines = profileLines(displayFrequencyLines, displayProfileId);
+    operatingLines = profileLines(displayOperatingLines, displayProfileId);
   }
   const calendarProfileId = profileIds.length === 1 ? profileIds[0] : null;
   const calendarProfile = calendarProfileLabel(calendarProfileId);

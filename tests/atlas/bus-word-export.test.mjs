@@ -40,19 +40,29 @@ const filtered = buildBusWordTables({ ...result, stops: [result.stops[1]], servi
 assert.equal(filtered[0].rows.length, 1);
 assert.equal(filtered[0].rows[0][1], 'Stop T (Westbound)');
 assert.equal(filtered[1].rows.length, 0);
-const plannerWord = buildBusWordTables({
+const reviewItems = [
+  { code: 'unresolved-timetable-request', route: '397', stop: '490TEST003', source: 'timetable source', message: 'Raw timetable request diagnostic.' },
+  { code: 'unresolved-timetable-request', route: '215', stop: '490TEST004', source: 'timetable source', message: 'Another raw diagnostic.' },
+  { code: 'unresolved-timetable-request', route: '397', stop: '490TEST005', source: 'timetable source', message: 'Duplicate route diagnostic.' }
+];
+const plannerInput = {
   ok: true,
   stops: [],
-  reviewItems: [{ route: '215', stop: '490TEST003', source: 'TfL', message: 'Detailed diagnostic must remain internal.' }],
+  reviewItems,
   plannerServiceSummaries: [{
     routeNumber: '310', operator: 'Arriva', directionPatternText: 'Towards Waltham Cross', servedAtText: 'Hertford Bus Station',
     principalLocationsText: 'Hoddesdon', typicalFrequencyText: 'Mon-Fri: 2 journeys/day', operatingPeriodLines: ['Mon-Fri: Approx. 08:00–18:00']
   }]
-});
+};
+const plannerWord = buildBusWordTables(plannerInput);
 const plannerWordNotes = plannerWord[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
 assert.match(plannerWordNotes, /Additional source evidence remains available in the ATLAS assessment workspace/);
+assert.match(plannerWordNotes, /Planner review required: timetable evidence remains unresolved for routes 215, 397 at one or more assessed stops\./);
+assert.equal((plannerWord[1].rows.filter(row => !Array.isArray(row) && /^Planner review required:/.test(row.text))).length, 1, 'Word emits one concise material qualification');
+assert.doesNotMatch(plannerWordNotes, /490TEST003|490TEST004|490TEST005|Raw timetable request diagnostic|Another raw diagnostic|Duplicate route diagnostic/);
 assert.doesNotMatch(plannerWordNotes, /Show detailed evidence/);
-assert.doesNotMatch(plannerWordNotes, /Evidence items to review|Detailed diagnostic must remain internal/);
+assert.deepEqual(plannerInput.reviewItems, reviewItems, 'Word export retains internal reviewItems unchanged');
+assert.equal(buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [], serviceSummaries: [], reviewItems: [] })[1].rows.some(row => !Array.isArray(row) && /^Planner review required:/.test(row.text)), false, 'Complete assessment without review items gets no qualification');
 console.log('PASS Word export respects planner-selected stop and service rows.');
 console.log('PASS Alpha.5 Plaistow Word export contract.');
 

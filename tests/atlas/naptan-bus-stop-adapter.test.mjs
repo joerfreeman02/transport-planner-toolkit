@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { createSite, confirmSite, SITE_LOCATION_METHODS } from '../../src/atlas/domain/site.mjs';
-import { createNaptanBusStopAdapter, parseCsv } from '../../src/atlas/adapters/naptan-bus-stop-adapter.mjs';
+import { createNaptanBusStopAdapter, parseCsv, parseNaptanStops } from '../../src/atlas/adapters/naptan-bus-stop-adapter.mjs';
 import { createJsonCache, createMemoryStorage } from '../../src/atlas/infrastructure/cache.mjs';
 
 const confirmed = confirmSite(createSite({ suppliedAddress: 'Waltham Cross fixture', displayAddress: 'Waltham Cross fixture', latitude: 51.685, longitude: -0.034, locationMethod: SITE_LOCATION_METHODS.COORDINATES_ENTERED }));
-const csv = `ATCOCode,NaptanCode,CommonName,Indicator,Bearing,Longitude,Latitude,StopType,Status\n2100001,hrtawpa,High Street,Stop A,N,-0.0342,51.6852,BCT,active\n2100002,hrtawpb,High Street,Stop B,S,-0.0338,51.6848,BCT,active\n2100001,hrtawpa,High Street,Stop A,N,-0.0342,51.6852,BCT,active\n9100001,,Waltham Cross Rail Station,,,-0.026,51.685,RLY,active\n`;
+const csv = `ATCOCode,NaptanCode,CommonName,Indicator,Bearing,Longitude,Latitude,StopType,Status\n2100001,hrtawpa,High Street,Stop A,N,-0.0342,51.6852,BCT,active\n2100002,hrtawpb,High Street,Stop B,S,-0.0338,51.6848,BCT,active\n2100001,hrtawpa,High Street,Stop A,N,-0.0342,51.6852,BCT,active\n2100003,hrtawpc,Outer Road,Stop C,E,-0.034,51.69131,BCT,active\n9100001,,Waltham Cross Rail Station,,,-0.026,51.685,RLY,active\n`;
 const response = body => ({ ok: true, status: 200, headers: new Headers(), text: async () => body });
 const make = (fetchImpl, resolveAtcoAreaCodes = async () => ({ atcoAreaCodes: ['210'], rationale: 'Fixture Hertfordshire resolver' })) => createNaptanBusStopAdapter({ fetchImpl, resolveAtcoAreaCodes, cache: createJsonCache({ storage: createMemoryStorage() }), clock: () => new Date('2026-08-24T14:00:00Z'), timeoutMs: 10 });
 let passed = 0;
@@ -20,6 +20,11 @@ await test('opposite-direction same-name stops remain distinct while true duplic
   assert.match(result.warnings.join(' '), /duplicate/i);
   assert.equal(result.provenance.atcoAreaCodes[0], '210');
   assert.equal(result.evidence.every(item => item.source.authoritative), true);
+});
+await test('national radius filtering retains only stops within the requested radius', () => {
+  const parsed = parseNaptanStops(csv, confirmed, 700);
+  assert.deepEqual(parsed.records.map(stop => stop.id), ['2100001', '2100002', '2100001']);
+  assert.equal(parsed.records.some(stop => stop.id === '2100003'), false);
 });
 await test('non-bus NaPTAN records are excluded', async () => assert.equal((await make(async () => response(csv)).nearbyStops(confirmed)).data.some(stop => stop.stopType === 'RLY'), false));
 await test('a genuine resolved-area zero remains a successful zero', async () => {

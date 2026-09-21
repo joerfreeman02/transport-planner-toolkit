@@ -119,6 +119,20 @@ for (const [lineId, stopPointId] of [
   assert.deepEqual(omittedDepartureResult.data[0].stopSchedules[stopPointId].monday, [485], `${lineId}: the journey time is attributed to the confirmed departure StopPoint`);
 }
 
+const sparseDepartureFixture = departureStopOmittedFixture({ lineId: 'ALT-SPARSE', stopPointId: 'ALT-SPARSE-REQUEST' });
+sparseDepartureFixture.timetable.routes[0].stationIntervals[0].intervals = [{ stopId: 'ALT-SPARSE-NEXT', timeToArrival: 2 }];
+const sparseDepartureAdapter = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async () => response(sparseDepartureFixture) });
+const sparseDepartureResult = await sparseDepartureAdapter.servicesForStop({ lineId: 'ALT-SPARSE', stopPointId: 'ALT-SPARSE-REQUEST', routeMetadata: omittedDepartureMetadata('ALT-SPARSE') });
+assert.equal(sparseDepartureResult.provenance.timetableConclusion, 'MATCHED', 'an exact departureStopId permits a valid single-following-stop StationInterval pattern');
+assert.equal(sparseDepartureResult.data.length, 1, 'a sparse but scheduled TfL pattern is retained without route-specific logic');
+assert.deepEqual(sparseDepartureResult.data[0].routePatternStopIds, ['ALT-SPARSE-REQUEST', 'ALT-SPARSE-NEXT'], 'the confirmed departure stop is prepended to the sparse pattern');
+
+const sparseMismatchPayload = departureStopOmittedFixture({ lineId: 'ALT-SPARSE-MISMATCH', stopPointId: 'ALT-SPARSE-REQUEST', departureStopId: 'ALT-SPARSE-OTHER' });
+sparseMismatchPayload.timetable.routes[0].stationIntervals[0].intervals = [{ stopId: 'ALT-SPARSE-MISMATCH-NEXT', timeToArrival: 2 }];
+const sparseMismatchAdapter = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async () => response(sparseMismatchPayload) });
+const sparseMismatchResult = await sparseMismatchAdapter.servicesForStop({ lineId: 'ALT-SPARSE-MISMATCH', stopPointId: 'ALT-SPARSE-REQUEST', routeMetadata: omittedDepartureMetadata('ALT-SPARSE-MISMATCH') });
+assert.equal(sparseMismatchResult.data.length, 0, 'a sparse pattern with a mismatched departureStopId remains unresolved');
+
 const mismatchedDeparture = createTflBusTimetableAdapter({
   cache: cache(),
   fetchImpl: async () => response(departureStopOmittedFixture({ lineId: 'MISMATCH', stopPointId: 'MISMATCH-REQUEST', departureStopId: 'MISMATCH-OTHER' }))

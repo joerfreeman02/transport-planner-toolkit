@@ -60,7 +60,7 @@ The base register was generated from a clean worktree pinned to production
 `main` and recorded executed SHA
 `c670698dbf709a953d15b3927ee677fb502d1b3a`. The branch register was generated
 from a clean worktree pinned to the committed 1B code head
-`54e6c75fe1ca6b6d8d34da4e196e46f82556c63a`. Both recorded `worktreeClean: true`
+`81435e9c2f0b397250cd0326473ce418b8264c3f`. Both recorded `worktreeClean: true`
 and the exact same Run #24 publication version.
 
 `bus-closeout-compare.mjs` passed all four controls. It compares StopPoint IDs,
@@ -139,7 +139,7 @@ The clean control commands were:
 
 ```text
 node tools/atlas-review/bus-closeout-production-controls.mjs --code-root <clean-main-worktree> --label 1b-base --expected-code-sha c670698dbf709a953d15b3927ee677fb502d1b3a
-node tools/atlas-review/bus-closeout-production-controls.mjs --code-root <clean-branch-worktree> --label 1b-branch --expected-code-sha 54e6c75fe1ca6b6d8d34da4e196e46f82556c63a
+node tools/atlas-review/bus-closeout-production-controls.mjs --code-root <clean-branch-worktree> --label 1b-final-branch --expected-code-sha 81435e9c2f0b397250cd0326473ce418b8264c3f
 node tools/atlas-review/bus-closeout-compare.mjs --base <base-register> --branch <branch-register>
 node tools/atlas-review/bus-closeout-pipers-forensics.mjs
 node tests/atlas/run-all.mjs
@@ -155,12 +155,12 @@ are not configured for this PR; no hosted CI pass is claimed.
 The 1B branch control artifacts are under
 `work/bus-closeout-1a/production-controls/`:
 
-- `ATLAS BUS-CLOSEOUT-1A — 1b-branch — normanshire-drive-400m.docx`
-- `ATLAS BUS-CLOSEOUT-1A — 1b-branch — normanshire-drive-700m.docx`
-- `ATLAS BUS-CLOSEOUT-1A — 1b-branch — pipers-lane-700m.docx`
-- `ATLAS BUS-CLOSEOUT-1A — 1b-branch — waltham-cross-700m.docx`
-- `BUS-CLOSEOUT-1A-production-control-register-1b-base.json`
-- `BUS-CLOSEOUT-1A-production-control-register-1b-branch.json`
+- `ATLAS BUS-CLOSEOUT-1A — 1b-final-branch — normanshire-drive-400m.docx`
+- `ATLAS BUS-CLOSEOUT-1A — 1b-final-branch — normanshire-drive-700m.docx`
+- `ATLAS BUS-CLOSEOUT-1A — 1b-final-branch — pipers-lane-700m.docx`
+- `ATLAS BUS-CLOSEOUT-1A — 1b-final-branch — waltham-cross-700m.docx`
+- `BUS-CLOSEOUT-1A-production-control-register-1b-final-base.json`
+- `BUS-CLOSEOUT-1A-production-control-register-1b-final-branch.json`
 
 The Pipers forensic record is under
 `work/bus-closeout-1b/forensics/BUS-CLOSEOUT-1B-pipers-route-46-C-forensics.json`.

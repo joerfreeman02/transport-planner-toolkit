@@ -70,7 +70,11 @@ Page counts were not deterministically available in the local DOCX harness and a
 
 ## Validation and recommendation
 
-The targeted calendar, mixed-profile, unresolved-calendar, Browser/Word parity, concise qualification, raw diagnostic suppression, route-444 and compatibility checks pass. The full Alpha.15 deterministic suite must be rerun after the BUS-CLOSEOUT-1A changes before final Technical Director acceptance.
+The targeted calendar, mixed-profile, unresolved-calendar, Browser/Word parity, concise qualification, raw diagnostic suppression, route-444 and compatibility checks pass. The full Alpha.15 deterministic suite also passes after the BUS-CLOSEOUT-1A changes.
+
+## GitHub tooling adoption review
+
+Dependabot is configured for weekly npm and GitHub Actions updates. No Codecov, OpenSSF Scorecard, Sentry or Renovate integration is present. GitHub reports no branch-protection rules for `main`. No tooling changes were authorised or made.
 
 No production refresh, publication, Pages deployment, merge or Run #24 dispatch was performed by this branch.
 

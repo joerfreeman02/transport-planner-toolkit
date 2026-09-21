@@ -183,7 +183,7 @@ function createRequestHandler({ rootDir, rootId, stopToken, closeServer, updater
     }
 
     const contentType = MIME_TYPES[path.extname(resolved.file).toLowerCase()] || 'application/octet-stream';
-    const testBuildSha = pathname === '/atlas/index.html' ? cleanGitRevision(rootDir) : null;
+    const testBuildSha = pathname === '/atlas/' || pathname === '/atlas/index.html' ? cleanGitRevision(rootDir) : null;
     const injectedHtml = testBuildSha
       ? (await readFile(resolved.file, 'utf8')).replace(
           /<html\b[^>]*>/i,

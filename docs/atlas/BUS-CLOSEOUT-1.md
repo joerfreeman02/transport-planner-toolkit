@@ -3,8 +3,8 @@
 ## Final forensic gap-closure handover
 
 PR: [#48](https://github.com/joerfreeman02/transport-planner-toolkit/pull/48)  
-Production `main`: `c670698dbf709a953d15b3927ee677fb502d1b3a`  
-1C executable control head: `1a00bd64e9b4ffe795d78618ce35609a13364e3b`  
+Production `main`: `c670698dbf709a953d15b3927ee677fb502d1b3a`
+1C executable control head: `1a00bd64e9b4ffe795d78618ce35609a13364e3b`
 Run #24 publication: `35352167115-c670698dbf709a953d15b3927ee677fb502d1b3a`
 
 This is a documentation and forensic handover for Technical Director review. No merge, deployment, publication, Bus refresh, secret/configuration change, Pages change, reference-data change or unrelated branch change was performed.

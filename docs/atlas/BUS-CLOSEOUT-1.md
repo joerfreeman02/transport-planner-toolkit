@@ -48,8 +48,9 @@ semantics, review categories and DOCX hashes.
 
 ## Normanshire reconciliation
 
-The accepted 700 m Run #24 set is 18 stops and is identical between base and
-branch. The current set contains no East View stop and no route 212; the older
+The verified current Run #24 production-fidelity control set is 18 stops and is
+identical between base and branch. It is an observed control result, not final
+planner/manual acceptance. The current set contains no East View stop and no route 212; the older
 wider manual output was a different/stale source-set observation. No service
 inclusion was altered to reproduce it. The unresolved live TfL identities remain
 routes 215, 385 and 397. Route 397A remains a tracked mixed-source / London
@@ -60,19 +61,23 @@ Station`.
 
 ## Waltham Cross reconciliation
 
-The accepted 700 m Run #24 set is 16 stops and is identical between base and
-branch. The current source-derived population includes 211 and 212; the
+The verified current Run #24 production-fidelity control set is 16 stops and is
+identical between base and branch. It is an observed control result, not final
+planner/manual acceptance. The current source-derived population includes 211 and 212; the
 historical count difference is a source/assessment observation, not a grouping
 or service-inclusion change in 1C.
 
 ## Pipers route-46/C forensic result
 
-The coordinates `51.852700, -0.454343` and radius 700 m are the current
-BUS-CLOSEOUT fixture only. They are not an approved historical golden point:
-project evidence recovered only an older note that route 230 was the live result
-and that historical 46/231/C expectations were not forced. No authoritative
-prior point, operating mode, radius and publication-date tuple was recoverable
-from the project evidence.
+The previous ATLAS planner assessment did produce routes `46`, `230`, `231` and
+`C`. However, the exact combination of confirmed site coordinates, assessment
+radius, assessment mode and source-data publication/version for that historical
+output has not been established sufficiently to compare it directly with the
+current explicit fixture. The current fixture is `51.852700, -0.454343`, 700 m,
+Full Assessment, using the Run #24 publication. It returns `230`/`231`; its
+route-46/C forensics remain valid for that explicit fixture. The current fixture
+is not an approved historical golden point, and the historical 46/230/231/C
+result must not be treated as though it never existed.
 
 The 1C forensic record independently queried 11 inside-radius StopPoints. None
 had route-46 or route-C scheduled evidence, and none carried route 46 or C in
@@ -137,11 +142,31 @@ The final executable control SHA is the branch commit above. Any later branch
 head used for PR submission must be proven documentation-only by its Git diff;
 no post-control executable, test or forensic-tool change is permitted.
 
-## Production state and handover
+## Post-handover production state
 
-The repository is ready for Technical Director verification. Run #24 remains
-the latest production refresh; no later refresh was dispatched. No publication,
-Pages deployment, secret/variable/configuration change or reference-data
-repository change occurred during this closeout work.
+Scheduled Run #25 (`35591771460`) is the latest attempted Bus refresh. It failed
+safely during authoritative TNDS acquisition because the TNDS North West FTP
+transfer reset on all three attempts. Candidate validation, checkpoint save,
+publication, application configuration and Pages deployment were not reached.
+
+Run #24 (`35352167115`) remains the latest successful/live production
+publication. TNDS Bank A remains active and Bank B remains untouched. The seven
+external publication repositories remain at their Run #24-state commits:
+
+| Repository | Current `main` SHA |
+| --- | --- |
+| `atlas-bus-data` | `85e2ac8b6f4bcbcc9501cc547ae4b7c51d598764` |
+| `atlas-tnds-a1` | `9fdff0b9a498d862df2703cd38ef6388dd3a75a9` |
+| `atlas-tnds-a2` | `9f4068be58a1564b2690692d3b315657689f96c7` |
+| `atlas-tnds-a3` | `a70abf59ad319f77084b311884a2253b0a151707` |
+| `atlas-tnds-b1` | `a5eac1353e3365ba26f51d5cecc30a12df54cb21` |
+| `atlas-tnds-b2` | `6acf975f5bee294e7f6f0f902a2f391c6380a197` |
+| `atlas-tnds-b3` | `3483d51c538a4a936e9fdaedae99f64543ab552a` |
+
+No Bus refresh, data publication, Pages deployment, secret/variable/configuration
+change or unrelated branch change was triggered by this merge preparation.
+The production version remains `2.0.0-alpha.15`, build identity
+`ATLAS-2.0.0-alpha.15-20260914`. The next meaningful accepted correction is the
+BUS-TFL-COMPLETE sprint; do not dispatch a refresh as part of this merge.
 
 **READY FOR TECHNICAL DIRECTOR MANUAL REVIEW — NOT READY FOR PRODUCTION.**

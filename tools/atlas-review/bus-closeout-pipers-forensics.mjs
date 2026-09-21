@@ -54,13 +54,14 @@ for (const key of keys) {
 }
 const national = await prepared.nearbyStops(point, { radius: 700, forceRefresh: true });
 const tflResult = await tfl.nearbyStops(point, { radius: 700, forceRefresh: true });
-const discovered = [...new Map([...rawStops, ...(national.data ?? []).map(stop => sourceRecord(stop, 'Run24 BODS/NaPTAN stop metadata')), ...(tflResult.data ?? []).map(stop => sourceRecord(stop, 'live TfL StopPoint metadata'))].map(stop => [String(stop.id), stop])).values()]
-  .filter(relevant)
+const allSourceStops = [...new Map([...rawStops, ...(national.data ?? []).map(stop => sourceRecord(stop, 'Run24 BODS/NaPTAN stop metadata')), ...(tflResult.data ?? []).map(stop => sourceRecord(stop, 'live TfL StopPoint metadata'))].map(stop => [String(stop.id), stop])).values()];
+const nearby = allSourceStops.filter(stop => stop.distanceMetres <= 700);
+const discovered = allSourceStops.filter(stop => stop.distanceMetres <= 2000 && relevant(stop))
   .sort((left, right) => left.distanceMetres - right.distanceMetres || String(left.id).localeCompare(String(right.id)));
 const sourceStops = [...new Map([...national.data ?? [], ...tflResult.data ?? []].map(stop => [String(stop.id), stop])).values()];
 const timetable = await prepared.servicesForStops(sourceStops, { forceRefresh: true });
 const services = timetable.data ?? [];
-const records = discovered.map(stop => {
+const recordFor = stop => {
   const bodsServices = services.filter(service => !/^tnds[:/]/i.test(String(service.id)) && String(service.routeNumber).trim().toUpperCase() === String(stop.routes?.find(route => ['46', 'C'].includes(String(route))) ?? '').trim().toUpperCase() && Object.prototype.hasOwnProperty.call(service.stopSchedules ?? {}, String(stop.id)));
   const tndsServices = services.filter(service => /^tnds[:/]/i.test(String(service.id)) && ['46', 'C'].includes(String(service.routeNumber).trim().toUpperCase()) && Object.prototype.hasOwnProperty.call(service.stopSchedules ?? {}, String(stop.id)));
   const inside = stop.distanceMetres <= 700;
@@ -69,13 +70,18 @@ const records = discovered.map(stop => {
   if (inside && !routes.some(route => ['46', 'C'].includes(route))) reason = 'Inside 700 m, but Run #24 stop metadata does not carry route 46 or C.';
   if (inside && routes.some(route => ['46', 'C'].includes(route)) && !bodsServices.length && !tndsServices.length) reason = 'Inside 700 m with route 46/C metadata, but no Run #24 BODS or TNDS scheduled evidence matched this StopPoint.';
   return { id: String(stop.id), name: String(stop.name ?? ''), latitude: Number(stop.latitude), longitude: Number(stop.longitude), discoveryDistanceMetres: stop.distanceMetres, inside700m: inside, source: stop.source, routes, bodsScheduledEvidence: bodsServices.map(service => service.id), tndsScheduledEvidence: tndsServices.map(service => service.id), reason };
-});
+};
+const records = discovered.map(recordFor);
+const nearbyRecords = nearby.map(recordFor);
 const report = {
   capturedAt: new Date().toISOString(), executedCodeSha, worktreeClean: true, productionPublicationVersion: config.publicationVersion, point: { latitude: point.latitude, longitude: point.longitude, radiusMetres: 700 },
   sourceAvailability: { nationalStops: national.ok, tflStops: tflResult.ok, nationalTimetable: timetable.ok, nationalPublicationVersion: PUBLICATION_VERSION },
+  allNearbyStopRecords: nearbyRecords,
+  nearbyStopCount: nearbyRecords.length,
+  route46OrCStopCandidatesWithin2km: records,
   knownRoute46: records.filter(record => /woodside animal farm|caddington hall/i.test(record.name) || record.routes.includes('46')),
   knownRouteC: records.filter(record => /caddington service/i.test(record.name) || record.routes.includes('C')),
-  allRelevantNearbyStopRecords: records,
+  allRelevantNearbyStopRecords: nearbyRecords,
   conclusion: 'The route 46/C result is determined from Run #24 StopPoint metadata, accepted 700 m geometry, and matched BODS/TNDS scheduled evidence. No route was inserted into the assessment.'
 };
 await mkdir(OUTPUT_DIR, { recursive: true });

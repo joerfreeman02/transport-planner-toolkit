@@ -1,81 +1,183 @@
-# ATLAS BUS — BUS-CLOSEOUT-1 / 1A
+# ATLAS BUS — BUS-CLOSEOUT-1B
 
-## Controlled implementation handover
+## Final forensic hardening handover
 
-Date: 2026-09-21  
-Starting production `main`: `c670698dbf709a953d15b3927ee677fb502d1b3a`  
-PR #48 reviewed head: `12df8c2b77c398a5f63e4a890939edf74a196aa5`
-Scope: bounded presentation correction, Word qualification, production-fidelity controls and forensic documentation only. This branch must not be merged or used to dispatch a production refresh until Technical Director review is complete.
+Previous reviewed PR head: `54f73df62d48fce4df6ec7aee07ddf14d29a90fc`  
+Production `main`: `c670698dbf709a953d15b3927ee677fb502d1b3a`  
+PR: [#48](https://github.com/joerfreeman02/transport-planner-toolkit/pull/48)  
+Scope: forensic provenance, deterministic comparison, structured review qualification, stop-set evidence and documentation only. No merge, deployment, publication or Bus refresh was performed.
 
-## Data-source distinction
+## Production source boundary
 
-The earlier BUS-CLOSEOUT-1 local harness used the checkout-local `atlas/data/bus/` and `atlas/data/bus-tnds/` trees. Those are stale test data generated 2026-09-04; local TNDS coverage is incomplete and they are not Run #24 / State C controls. The earlier local Pipers result showing route `230` only must not be treated as production evidence.
+All production-fidelity controls used the deployed Run #24 publication
+`35352167115-c670698dbf709a953d15b3927ee677fb502d1b3a`, generated
+`2026-09-18T13:46:55Z`, with Bus BODS hash
+`8a2764d2309d4908b71280bdd0708cddb68b242d1a5c2b8fdfcac4bd85a17b2c` and
+active TNDS Bank A roots A1/A2/A3. The stale checkout-local Bus/TNDS fixture
+tree is not used for acceptance evidence.
 
-BUS-CLOSEOUT-1A uses the deployed ATLAS configuration and fails closed unless it reads publication `35352167115-c670698dbf709a953d15b3927ee677fb502d1b3a`. The verified production source was:
+The production control now fails closed unless the supplied code root is a Git
+worktree, `git status --porcelain` is empty, `HEAD` resolves to a full SHA, and
+an optional `--expected-code-sha` matches exactly. Every register records
+`executedCodeSha`, `worktreeClean: true`, `productionBaseSha`, publication
+version and capture timestamp.
 
-- Bus publication: generated `2026-09-18T13:46:55Z`, snapshot `2026-09-18`, BODS source hash `8a2764d2309d4908b71280bdd0708cddb68b242d1a5c2b8fdfcac4bd85a17b2c`.
-- TNDS: active Bank A, roots A1/A2/A3, each generated `2026-09-18T13:46:55Z` and carrying the same publication version.
-- Release build: `ATLAS-2.0.0-alpha.15-20260914`.
-- TfL and OSRM were live requests; BODS/TNDS were loaded from the deployed publication roots.
+## 1B implementation
 
-## Forensic result: Normanshire / TfL completeness
+Changed:
 
-The production-fidelity 700 m control classifies `51.6162611, -0.0125148` inside Greater London. It attempted 83 live TfL timetable requests and produced 23 unresolved request identities, all involving routes `215`, `385` and `397`. The assessment is correctly `partial`; the defect is reproduced on the actual Run #24 State C data path and must not be described as absent.
+- `src/atlas/application/bus-assessment.mjs` — attaches deterministic review-item categories to existing structured codes.
+- `src/atlas/domain/review-item-taxonomy.mjs` — explicit taxonomy for timetable, national evidence, service-source, planner identity, stop coverage, access-routing, general timetable-source and other material categories.
+- `src/atlas/presentation/bus-word-export.mjs` — one concise qualification block, preserving every material category and never classifying from free-text diagnostics.
+- `tools/atlas-review/bus-closeout-production-controls.mjs` — clean-worktree provenance, exact SHA enforcement and exact stop/source/planner registers.
+- `tools/atlas-review/bus-closeout-compare.mjs` — automated fail-closed base-vs-branch comparator.
+- `tools/atlas-review/bus-closeout-pipers-forensics.mjs` — bounded Run #24 Pipers route-46/C evidence capture.
+- `tests/atlas/bus-word-export.test.mjs` — nine adversarial qualification cases.
+- `tests/atlas/bus-closeout-provenance.test.mjs` — clean-worktree and exact-SHA fail-closed tests.
+- `tools/atlas-review/bus-closeout-controls.mjs` — removed; the stale checkout-local harness is no longer retained.
 
-The accepted route `444` directions remain exact on both base and branch: `Towards Chingford Station` and `Towards Turnpike Lane Bus Station`. Route `397A` was not established in the current production route population and remains separately tracked as a mixed-source / London Service Permit case; no evidence establishes that it is part of the current 215/385/397 defect.
+No `service-calendar.mjs`, candidate-generation, checkpoint, workflow, version,
+secret, Actions-variable, Pages or external reference-data file was changed.
 
-No TfL adapter or candidate-generation correction was made. The production evidence indicates the unresolved route/StopPoint request behavior is present in the accepted production path; the branch adds only a truthful Word qualification and fixes presentation labels.
+## Structured Word qualification
 
-## Implemented corrections
+Review classification uses the deterministic `reviewItems[].code` taxonomy, not
+`source` or `message` text. The client-facing export emits at most one concise
+qualification block. Timetable-related route codes are deduplicated and sorted;
+other material categories remain visible in additional sentences. Raw StopPoint
+IDs, request identities and diagnostic messages are never exported, while the
+underlying `result.reviewItems` remains unchanged.
 
-- `profileLines()` now accepts a profile ID and derives its concise label exactly once. Single-profile ordinary, school-day, term-time, non-school-day, holiday, other-resolved and unresolved cases are covered by explicit regression tests.
-- Word no longer exports raw `reviewItems` messages or StopPoint/request identities. When material review items exist it emits exactly one deterministic qualification, deduplicating and numerically sorting affected timetable routes. Complete assessments with no review items receive no qualification.
-- The qualification is: `Planner review required: timetable evidence remains unresolved for routes … at one or more assessed stops. Detailed source evidence is retained in ATLAS and should be reviewed before formal use.` Generic material evidence uses the corresponding non-route-specific wording.
-- Browser/Word service population, grouping, destinations, directions, frequencies and circular semantics remain unchanged. The Transport Statement wording that material qualifications appear in the Bus Service Summary remains true.
-- No NPTG, BUS-DEST, BUS-GROUP, BUS-CIRC, route redesign, destination enrichment, publication architecture, checkpoint architecture, workflow, secret, Actions-variable, Pages or version change was made.
+The adversarial suite covers: unresolved timetable only; national-route evidence;
+planner route identity only; access-routing only; stop-source coverage only;
+timetable plus access-routing; timetable plus stop-source coverage; duplicate
+routes; and no review items. All cases pass and prove that no material category
+disappears.
 
-## Base-vs-branch production comparison
+## Clean base-vs-branch controls
 
-Both worktrees used the same deployed Run #24 publication. Base executed `c670698dbf709a953d15b3927ee677fb502d1b3a`; branch executed `12df8c2b77c398a5f63e4a890939edf74a196aa5`. The following semantic fields matched for every control: discovered stop count, service-summary count, planner-row count, route population, planner route numbers, route directions, review-item types and assessment status. Key frequency/direction evidence also matched; the only intended differences were calendar wording and the one concise Word qualification on controls with material review items.
+The base register was generated from a clean worktree pinned to production
+`main` and recorded executed SHA
+`c670698dbf709a953d15b3927ee677fb502d1b3a`. The branch register was generated
+from a clean worktree pinned to the committed 1B code head
+`54e6c75fe1ca6b6d8d34da4e196e46f82556c63a`. Both recorded `worktreeClean: true`
+and the exact same Run #24 publication version.
 
-| Production control | Stops | Service summaries | Planner rows | Route population | Review items | TfL requests | Word rows / notes | Branch qualification |
+`bus-closeout-compare.mjs` passed all four controls. It compares StopPoint IDs,
+coordinates, discovery distances, source authorities, route population, source
+service identities, TfL request identities, national publication identity,
+service-summary count, planner-row count, operators, destinations, directions,
+grouping, circular meaning, calculated frequencies, operating periods,
+representative timetable stops, route-444 directions, review codes, status and
+Word service-row count. The only approved differences are concise calendar
+wording and the concise Word review qualification.
+
+| Control | Stops | Service summaries | Planner rows | Route population | Review items / categories | TfL requests | Word service rows | Qualification |
 | --- | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |
-| Normanshire 400 m | 7 | 14 | 14 | 97, 158, 215, 357, 385, 397, 444, 657, N26, W16 | 6 | 35 | 14 / 3 | 1 |
-| Normanshire 700 m | 18 | 14 | 14 | 97, 158, 215, 357, 385, 397, 444, 657, N26, W16 | 23 | 83 | 14 / 3 | 1 |
-| Pipers Lane 700 m | 11 | 4 | 3 | 230, 231 | 0 | 0 | 3 / 3 | 0 |
-| Waltham Cross 700 m | 16 | 126 | 42 | 13, 13A, 13B, 13C, 14, 15, 15A, 16, 16C, 25C, 66, 211, 212, 217, 242, 251, 279, 310, 317, 327, 491, A1, N279 | 22 | 22 | 42 / 45 | 1 |
+| Normanshire 400 m | 7 | 14 | 14 | 97, 158, 215, 357, 385, 397, 444, 657, N26, W16 | 6 / timetable | 35 | 14 | 1 |
+| Normanshire 700 m | 18 | 14 | 14 | 97, 158, 215, 357, 385, 397, 444, 657, N26, W16 | 23 / timetable | 83 | 14 | 1 |
+| Pipers Lane 700 m | 11 | 4 | 3 | 230, 231 | 0 / — | 0 | 3 | 0 |
+| Waltham Cross 700 m | 16 | 126 | 42 | 13, 13A, 13B, 13C, 14, 15, 15A, 16, 16C, 25C, 66, 211, 212, 217, 242, 251, 279, 310, 317, 327, 491, A1, N279 | 22 / timetable | 22 | 42 | 1 |
 
-The current Run #24 Pipers publication establishes routes `230` and `231` at this control. It does not establish the previously expected `46` and `C`; those assumptions were not hard-coded or substituted. Waltham Cross uses the current 23-route State C population above, not the stale local 21-route result.
+The JSON registers record the exact StopPoint ID, name, coordinates, straight-line
+distance, walking/cycling routing, source authorities and routes for every stop.
+
+## Normanshire reconciliation
+
+The accepted 700 m Run #24 set is 18 stops and is identical between clean base
+and branch. The current set contains no East View stop and no route 212; the
+older wider manual output was a different/stale source-set observation, not a
+branch presentation result. No service inclusion was altered to reproduce it.
+
+The 23 unresolved live TfL request identities are exclusively routes 215, 385
+and 397. Route 397A remains a separately tracked mixed-source / London Service
+Permit case unless a later BUS-CLOSEOUT investigation proves it belongs to this
+defect. Route 444 remains exactly:
+
+- `Towards Chingford Station`
+- `Towards Turnpike Lane Bus Station`
+
+## Waltham Cross reconciliation
+
+The accepted 700 m Run #24 set is 16 stops and is identical between clean base
+and branch. The exact IDs and source-derived fields are in the registers. The
+current 23-route population includes 211 and 212; the historical count
+difference is attributable to the source/assessment observation being compared,
+not a grouping or service-inclusion change in 1B. No grouping semantics were
+modified.
+
+## Pipers route-46/C forensic result
+
+The accepted point is `51.852700, -0.454343` with a 700 m radius. Run #24
+NaPTAN/BODS stop metadata, live TfL StopPoint discovery and Run #24 BODS/TNDS
+scheduled evidence were inspected without hard-coding routes.
+
+- 11 actual stop records fall inside 700 m; none carries route 46 or C in Run #24 stop metadata.
+- Woodside Animal Farm StopPoints `021024644` and `021024645` are 725 m and 741 m away, respectively, and are excluded by radius.
+- Caddington Hall StopPoints `210021428210` and `210021428130` are 922 m and 958 m away, respectively, and are excluded by radius.
+- The inspected Run #24 candidate set returned no “Caddington Service C” StopPoint record and no inside-radius route-C record.
+- No BODS or TNDS scheduled evidence matched an inside-radius route-46/C StopPoint; no route was inserted into the assessment.
+
+The evidenced conclusion is genuine radius/source-set filtering, not a permitted
+application omission: the named Route 46 records are outside 700 m, and the
+accepted Run #24 inside-radius metadata does not carry 46/C. The complete
+machine-readable record is the Pipers forensic JSON output.
 
 ## Checkpoint compatibility
 
-No checkpoint-compatibility-impacting file changed. Candidate-generation compatibility fingerprints are identical:
+The candidate-generation compatibility fingerprint was recalculated for base and
+branch and remains identical:
 
-- Base: `atlas-candidate-generation-compatibility-v2`, SHA-256 `093d047c87482aba3d5b90844608046ece18bd673f9228dab504030883af2232`.
-- Branch: `atlas-candidate-generation-compatibility-v2`, SHA-256 `093d047c87482aba3d5b90844608046ece18bd673f9228dab504030883af2232`.
+`atlas-candidate-generation-compatibility-v2 / 093d047c87482aba3d5b90844608046ece18bd673f9228dab504030883af2232`
 
-The accepted Recovery-0F checkpoint producer remains reusable in principle. No checkpoint schema, save/restore path, candidate identity, service-calendar semantics, release build or production workflow was altered.
+No checkpoint-generation compatibility file changed. This remains a hard stop
+if any future branch fingerprint differs.
 
-## Word controls and limitations
+## Controls and local validation
 
-Corrected branch DOCX controls are under `work/bus-closeout-1a/production-controls/`:
+The clean control commands were:
 
-- `ATLAS BUS-CLOSEOUT-1A — branch-400 — normanshire-drive-400m.docx`
-- `ATLAS BUS-CLOSEOUT-1A — branch — normanshire-drive-700m.docx`
-- `ATLAS BUS-CLOSEOUT-1A — branch-pipers — pipers-lane-700m.docx`
-- `ATLAS BUS-CLOSEOUT-1A — branch-waltham — waltham-cross-700m.docx`
-- Corresponding JSON registers record production base SHA, executed code SHA, publication version, manifest identities, active TNDS bank, TfL request counts/identities, unresolved identities, source status, Word row counts, qualification counts and DOCX hashes.
+```text
+node tools/atlas-review/bus-closeout-production-controls.mjs --code-root <clean-main-worktree> --label 1b-base --expected-code-sha c670698dbf709a953d15b3927ee677fb502d1b3a
+node tools/atlas-review/bus-closeout-production-controls.mjs --code-root <clean-branch-worktree> --label 1b-branch --expected-code-sha 54e6c75fe1ca6b6d8d34da4e196e46f82556c63a
+node tools/atlas-review/bus-closeout-compare.mjs --base <base-register> --branch <branch-register>
+node tools/atlas-review/bus-closeout-pipers-forensics.mjs
+node tests/atlas/run-all.mjs
+```
 
-Page counts were not deterministically available in the local DOCX harness and are therefore recorded as unavailable; exact DOCX paths are supplied for manual review.
+The full Alpha.15 deterministic suite passed. Targeted provenance, Word
+qualification, calendar single-profile frequency/operating-period, planner
+summary, TfL timetable, and compatibility tests passed. GitHub-hosted PR checks
+are not configured for this PR; no hosted CI pass is claimed.
 
-## Validation and recommendation
+## Corrected control artifacts
 
-The targeted calendar, mixed-profile, unresolved-calendar, Browser/Word parity, concise qualification, raw diagnostic suppression, route-444 and compatibility checks pass. The full Alpha.15 deterministic suite also passes after the BUS-CLOSEOUT-1A changes.
+The 1B branch control artifacts are under
+`work/bus-closeout-1a/production-controls/`:
 
-## GitHub tooling adoption review
+- `ATLAS BUS-CLOSEOUT-1A — 1b-branch — normanshire-drive-400m.docx`
+- `ATLAS BUS-CLOSEOUT-1A — 1b-branch — normanshire-drive-700m.docx`
+- `ATLAS BUS-CLOSEOUT-1A — 1b-branch — pipers-lane-700m.docx`
+- `ATLAS BUS-CLOSEOUT-1A — 1b-branch — waltham-cross-700m.docx`
+- `BUS-CLOSEOUT-1A-production-control-register-1b-base.json`
+- `BUS-CLOSEOUT-1A-production-control-register-1b-branch.json`
 
-Dependabot is configured for weekly npm and GitHub Actions updates. No Codecov, OpenSSF Scorecard, Sentry or Renovate integration is present. GitHub reports no branch-protection rules for `main`. No tooling changes were authorised or made.
+The Pipers forensic record is under
+`work/bus-closeout-1b/forensics/BUS-CLOSEOUT-1B-pipers-route-46-C-forensics.json`.
+Page counts were not deterministically available in the local DOCX harness and
+are recorded as unavailable. These documents are for Joe/Technical Director
+manual review; they are not final planner-output acceptance.
 
-No production refresh, publication, Pages deployment, merge or Run #24 dispatch was performed by this branch.
+## Tooling status
 
-Recommendation: **READY FOR TECHNICAL DIRECTOR MANUAL REVIEW / NOT READY FOR PRODUCTION**.
+Status only, with no configuration changes: Dependabot is configured for weekly
+npm and Actions updates; Codecov, OpenSSF Scorecard, Sentry and Renovate are not
+present; GitHub reports no protection rules for `main`.
+
+## Recommendation
+
+**READY FOR TECHNICAL DIRECTOR MANUAL REVIEW — NOT READY FOR PRODUCTION.**
+
+No merge, Bus refresh, publication, Pages deployment, secret/configuration
+change, external reference-data change or unrelated branch modification was
+performed.

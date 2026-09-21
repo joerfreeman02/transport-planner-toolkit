@@ -7,6 +7,11 @@ Formal release: `2.0.0-alpha.15`
 Release identity: `ATLAS-2.0.0-alpha.15-20260914`  
 Run #24 publication: `35352167115-c670698dbf709a953d15b3927ee677fb502d1b3a`
 
+Clean committed control/review head for this closeout: `f930cedbfadd04d2f7b7aca495de78a8f40fc5dd`  
+The production executable T02A correction remains in
+`src/atlas/adapters/tfl-bus-stop-adapter.mjs`; no production executable
+semantics were changed during this closeout.
+
 ## Scope and contract
 
 Before BUS-T02A, TfL was used as a candidate-retrieval service with a
@@ -74,7 +79,9 @@ of Waltham Forest, Greater London, E4 9HB
 Confirmed point: `51.6165957, -0.0117893`  
 Mode: Full Assessment  
 Radius: 700 m  
-Code under test: `d235df36a95889e70f67df3dcb3c9de2ddc299d2`
+Clean control head: `f930cedbfadd04d2f7b7aca495de78a8f40fc5dd`  
+Production executable correction originally introduced at:
+`280472caab4eac67771a04e63b9278828103f3cf`
 
 Before BUS-T02A, the live TfL response returned 20 StopPoints and all 20 were
 retained. East View WT (`490006381N`) was calculated at approximately 765 m
@@ -110,14 +117,49 @@ Control point: `51.6857829, -0.0330001`
 Mode: Full Assessment  
 Radius: 700 m
 
-Before and after, the prepared/direct national control returned 16 stops and
-retained all 16. No provider-returned stop was excluded by the new TfL local
-check because the point is outside Greater London and the selected national
-path was already locally filtering. The route population and planner rows are
-unchanged. The sparse Stop H evidence remains present for the same TfL
-cross-boundary route patterns (including 217, 279, 317, 327, 491, and N279),
-and the control continues to report the same 16 unresolved timetable request
-identities. No timetable parser change was made.
+Before and after, the prepared national control returned 16 stops and retained
+all 16, with zero national radius exclusions. The source-aware cross-boundary
+TfL check returned and retained six StopPoints:
+
+`490003378G`, `490003378H`, `490008103E`, `490008941E`, `490008103W`,
+`490008941W`
+
+The T02A check excluded zero of those six. The final merged population remained
+16 physical StopPoints. The six cross-boundary records retained both NaPTAN and
+TfL timetable authority, with BODS and TfL route authority; the other records
+retained their NaPTAN/BODS authority. A before/after comparison against the
+clean `d235df36a95889e70f67df3dcb3c9de2ddc299d2` baseline found no change in
+StopPoint identity, source authority, timetable authority, route authority, or
+timetable-request eligibility. The only after-run improvement is that the TfL
+radius provenance now explicitly reports the provider count and zero
+exclusions.
+
+The enhanced clean-head control recorded 22 TfL timetable request identities,
+zero TfL unresolved identities, zero failed requests, zero no-current-match
+requests, and zero unprocessed requests. Each former sparse Stop H identity
+remained individually matched:
+
+| Identity | Result |
+| --- | --- |
+| `217|490003378H` | MATCHED |
+| `279|490003378H` | MATCHED |
+| `317|490003378H` | MATCHED |
+| `327|490003378H` | MATCHED |
+| `491|490003378H` | MATCHED |
+| `N279|490003378H` | MATCHED |
+
+The earlier T02A control’s 16 unresolved identities were a live-source
+snapshot, not a stable national unresolved set. The clean-head rerun reported
+zero national unresolved identities and zero combined unresolved identities;
+all 22 TfL requests were matched at that capture. The historical 16 classify
+as follows: the six Stop H identities listed above were matched on clean
+recheck; the remaining ten were non-Stop-H cross-boundary TfL request
+identities (`217|490008103W`, `317|490008103W`, `327|490008103W`,
+`217|490008103E`, `317|490008103E`, `217|490008941E`, `317|490008941E`,
+`217|490008941W`, `317|490008941W`, `327|490008941W`) whose live request
+outcomes varied between captures. They were not national BODS/TNDS unresolved
+identities, and none represents a T02A radius or sparse-parser regression.
+No timetable parser change was made.
 
 ### Pipers Lane national control
 
@@ -182,4 +224,3 @@ radius correction does not turn such evidence into fabricated service.
 The implementation satisfies the BUS-T02A acceptance scope and is:
 
 **READY FOR TECHNICAL DIRECTOR MANUAL REVIEW**
-

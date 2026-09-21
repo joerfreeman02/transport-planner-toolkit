@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { gunzipSync } from 'node:zlib';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -23,7 +24,9 @@ const executedCodeSha = execFileSync('git', ['-C', ROOT_DIR, 'rev-parse', 'HEAD'
 async function fetchJson(url) {
   const response = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'ATLAS BUS-CLOSEOUT-1B Pipers forensic control' } });
   if (!response.ok) throw new Error(`Could not load ${url}: HTTP ${response.status}`);
-  return response.json();
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const body = bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes).toString('utf8') : new TextDecoder().decode(bytes);
+  return JSON.parse(body);
 }
 function relevant(stop) {
   return (stop?.routes ?? []).some(route => ['46', 'C'].includes(String(route))) || /woodside animal farm|caddington hall|caddington service/i.test(String(stop?.name ?? ''));

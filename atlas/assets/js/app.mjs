@@ -20,7 +20,7 @@ import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation } from 
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
-const declaredTestBuild = String(document.documentElement.dataset.atlasTestBuild || '').trim();
+const declaredTestBuild = String(document.body.dataset.atlasTestBuild || document.documentElement.dataset.atlasTestBuild || '').trim();
 document.querySelectorAll('[data-atlas-test-build]').forEach(element => {
   element.textContent = declaredTestBuild ? `Development/Test build · ${declaredTestBuild}` : 'Development/Test build · not declared';
 });

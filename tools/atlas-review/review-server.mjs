@@ -186,7 +186,7 @@ function createRequestHandler({ rootDir, rootId, stopToken, closeServer, updater
     const testBuildSha = pathname === '/atlas/' || pathname === '/atlas/index.html' ? cleanGitRevision(rootDir) : null;
     const injectedHtml = testBuildSha
       ? (await readFile(resolved.file, 'utf8')).replace(
-          /<html\b[^>]*>/i,
+          /<body\b[^>]*>/i,
           tag => `${tag.slice(0, -1)} data-atlas-test-build="BUS-TFL-COMPLETE · ${testBuildSha.slice(0, 7)}">`,
         )
       : null;

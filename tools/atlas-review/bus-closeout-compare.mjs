@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { reviewItemTaxonomy } from '../../src/atlas/domain/review-item-taxonomy.mjs';
 
 function argumentValue(flag) {
   const index = process.argv.indexOf(flag);
@@ -24,15 +25,14 @@ function comparable(control) {
     plannerDirectionRows444: control.plannerDirectionRows444,
     reviewItemCount: control.reviewItemCount,
     reviewItemTypes: control.reviewItemTypes,
-    reviewItemCategories: control.reviewItemCategories,
+    reviewItemCategories: [...new Set((control.reviewItemTypes ?? []).map(code => reviewItemTaxonomy(code).category))].sort(),
     tflTimetableRequestIdentities: control.tflTimetableRequestIdentities,
     unresolvedRequestIdentities: control.unresolvedRequestIdentities,
     nationalSourcePublicationVersion: control.nationalSourcePublicationVersion,
     sourceServiceIdentities: control.sourceServiceIdentities,
     status: control.status,
     word: {
-      serviceTableRowCount: control.word?.serviceTableRowCount,
-      nonQualificationSummaryNoteRowCount: control.word?.nonQualificationSummaryNoteRowCount
+      serviceTableRowCount: control.word?.serviceTableRowCount
     }
   });
 }

@@ -79,20 +79,48 @@ The six requests are one evidenced general parser class, not six route-specific 
 
 Matched controls at `490003378G` returned HTTP 200, exact departure-stop identity, interval ID `0`, scheduled journeys, and longer interval sequences. The route metadata responses were single objects with two `routeSections`; no source or endpoint failure was observed. The correction is therefore general and evidence-based. The exact H requests return `MATCHED` with one retained service each under the corrected adapter.
 
-### Normanshire route 212
+### Route 212 — production-fidelity fixed control
 
 The East View parent is TfL StopPoint `490G00006381`. Its logical children are:
 
-- Stop WT: `490006381N`, `51.61285, -0.00249`, towards Chingford Mount or Chingford Station;
-- opposite Stop WE: `490006381S`, `51.61310, -0.00176`, towards Leytonstone or Walthamstow.
+- Stop WT: `490006381N`, `51.61285, -0.00249`, advertised routes 212 and W16;
+- opposite Stop WE: `490006381S`, `51.61310, -0.00176`, advertised route 212.
 
-From the confirmed assessment point `51.6162611, -0.0125148`, the straight-line distances are approximately 789.3 m for WT and 821.6 m for WE. Both are outside the current 700 m Full Assessment discovery radius. The live TfL timetable endpoints return HTTP 200, exact departure-stop identity, scheduled journey evidence and `MATCHED` results for both logical stops. The single-direction 212 result is therefore a stop-discovery/radius classification, specifically **BUS-STOP-STRUCTURE**, not a TfL completeness defect. No stop-discovery change was made.
+The earlier `51.6162611, -0.0125148` point is retained only as the fixed production-fidelity control used by the saved registers. It is not the address-search point used by the actual 99 Normanshire Drive planner assessment.
+
+### Route 212 — exact manual planner address assessment
+
+The actual address candidate was the Nominatim result for `99, Normanshire Drive, Chingford Mount, Highams Park, London Borough of Waltham Forest, Greater London, England, E4 9HB, United Kingdom` (OSM way `685395526`). Its confirmed assessment point was `51.6165957, -0.0117893`, selected by the address search as a `geocoded_candidate`; no coordinate substitution or manual adjustment was made. The assessment used Full Assessment mode, requested radius 700 m, Run #24 publication `35352167115-c670698dbf709a953d15b3927ee677fb502d1b3a`, formal release `ATLAS-2.0.0-alpha.15-20260914`, and tested/control identity `BUS-TFL-COMPLETE · 0bc1337`.
+
+The deployed TfL StopPoint request used `radius=700`, and the assessment recorded an actual discovery radius of 700 m. The response returned 20 StopPoints, including WT at a provider-reported straight-line distance of 765 m, but did not return WE at 794 m:
+
+| Logical stop | StopPoint | Parent / advertised routes | Coordinates | Distance | Discovered at actual assessment point | Direct TfL timetable check |
+|---|---|---|---|---:|---|---|
+| East View — Stop WT | `490006381N` | `490G00006381` / 212, W16 | `51.61285, -0.00249` | 765 m | Yes | HTTP 200; scheduled evidence; `MATCHED`; 212 inbound, Chingford Station |
+| East View — Stop WE | `490006381S` | `490G00006381` / 212 | `51.61310, -0.00176` | 794 m | No | HTTP 200; scheduled evidence; `MATCHED` when queried directly; 212 outbound, St James Street Station |
+
+The actual planner therefore contains only the WT-backed 212 direction because TfL StopPoint discovery returned WT but not WE at the confirmed address point; ATLAS never selected WE for the planner timetable pass. This is not a TfL timetable-parser loss and not a geocoder discrepancy. It is legitimate provider/radius/logical-stop selection behaviour, classified as **BUS-STOP-STRUCTURE**. No stop-discovery change was made. The fixed control and actual manual address assessment are distinct evidence sources and must not be described interchangeably.
 
 ### Normanshire W16
 
 The live assessed W16 requests at `490007574W`, `490008982W`, `490005178H`, `490005180C`, `490007574E` and `490008982E` all return HTTP 200, exact departure-stop identity, interval ID `0`, scheduled journeys and `MATCHED` results. The production-fidelity record retains TfL evidence with BODS supplementary/fallback provenance and no unresolved W16 requests.
 
 The three planner rows are therefore not a missing-timetable problem. Two Chingford-bound components have the same public destination but distinct endpoint text/pattern populations and conservative component lineage; the grouping algorithm does not merge them without deterministic shared lineage/corridor evidence. The split is **BUS-GROUP** work and remains untouched.
+
+### Waltham Cross planner-row interaction before and after the sparse correction
+
+The same Waltham Cross 700 m control was compared using the saved pre-correction register (`c78132bc9e5c85f3f3926b83a7e92da217b5b5c2`) and the final clean 1A control register (`0bc1337e9e0a6322732d8030afafd9cc74161edb`). Both used `51.6857829, -0.0330001`, Full Assessment, 700 m, Run #24 publication and live TfL. Total planner rows changed from 42 to 49; the six formerly unresolved H requests did not create unexplained duplicate source identities.
+
+| Route | Before rows | After rows | Before public directions | After public directions | Served-stop population before → after | Interpretation |
+|---|---:|---:|---|---|---|---|
+| 217 | 2 | 2 | Waltham Cross, Bus Station; Turnpike Lane Station | unchanged | `490003378G/H`, `490008103E/W`, `490008941E/W`, `210021703420/440` → unchanged | H evidence folded into existing components; no new row |
+| 279 | 2 | 4 | Waltham Cross, Bus Station; towards Rookwood Road | plus sparse `outbound` / `inbound` components | `490003378G/H`, `210021703425/440` → unchanged | Same public directions fragmented into one-stop components; BUS-GROUP debt, not duplicate source evidence |
+| 317 | 2 | 2 | Waltham Cross, Bus Station; towards Little Park Gardens | unchanged | `490003378G/H`, `490008103E/W`, `490008941E/W`, `210021703420/440` → unchanged | H evidence folded into existing components; no new row |
+| 327 | 2 | 3 | Elsinge Estate, Masons Road | plus sparse `inbound` component | `490003378G/H`, `490008103W`, `490008941W`, `210021703420/440` → unchanged | Existing direction fragmented by a one-stop H component; BUS-GROUP debt |
+| 491 | 2 | 4 | Waltham Cross; North Middlesex Hospital | plus sparse `outbound` / `inbound` components | `490003378G/H`, `210021703425/440` → unchanged | Same two public directions fragmented into one-stop components; BUS-GROUP debt |
+| N279 | 2 | 4 | Waltham Cross, Bus Station; Trafalgar Square | plus sparse `outbound` / `inbound` components | `490003378G/H`, `210021703425/440` → unchanged | Same two public directions fragmented into one-stop components; BUS-GROUP debt |
+
+The added rows are short sparse TfL components with deterministic served-stop identities, not semantically unexplained duplicates or fabricated metadata-only services. Grouping was not changed in this sprint. The interaction result is therefore carried forward as bounded BUS-GROUP debt.
 
 ## Live production-fidelity controls
 

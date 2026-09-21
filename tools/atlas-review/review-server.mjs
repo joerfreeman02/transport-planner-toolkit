@@ -185,7 +185,10 @@ function createRequestHandler({ rootDir, rootId, stopToken, closeServer, updater
     const contentType = MIME_TYPES[path.extname(resolved.file).toLowerCase()] || 'application/octet-stream';
     const testBuildSha = pathname === '/atlas/index.html' ? cleanGitRevision(rootDir) : null;
     const injectedHtml = testBuildSha
-      ? (await readFile(resolved.file, 'utf8')).replace('<html lang="en-GB">', `<html lang="en-GB" data-atlas-test-build="BUS-TFL-COMPLETE · ${testBuildSha.slice(0, 7)}">`)
+      ? (await readFile(resolved.file, 'utf8')).replace(
+          /<html\b[^>]*>/i,
+          tag => `${tag.slice(0, -1)} data-atlas-test-build="BUS-TFL-COMPLETE · ${testBuildSha.slice(0, 7)}">`,
+        )
       : null;
     const contentLength = injectedHtml === null ? resolved.size : Buffer.byteLength(injectedHtml);
     response.writeHead(200, { 'Content-Type': contentType, 'Content-Length': contentLength, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });

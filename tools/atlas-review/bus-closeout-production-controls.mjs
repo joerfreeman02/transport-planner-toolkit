@@ -38,6 +38,29 @@ async function fetchJson(url) {
   return response.json();
 }
 function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
+function sortedUnique(values) { return [...new Set((values ?? []).map(value => text(value)).filter(Boolean))].sort((left, right) => left.localeCompare(right, 'en-GB', { numeric: true })); }
+function stopDetail(stop) {
+  return {
+    id: text(stop?.id || stop?.sourceId),
+    name: text(stop?.name),
+    latitude: Number(stop?.latitude),
+    longitude: Number(stop?.longitude),
+    discoveryDistanceMetres: Number(stop?.distanceMetres),
+    sourceAuthorities: sortedUnique(stop?.sourceAuthorities),
+    timetableAuthorities: sortedUnique(stop?.timetableAuthorities),
+    routes: sortedUnique(stop?.routes),
+    routeAuthorities: stop?.routeAuthorities ?? {},
+    walking: { status: text(stop?.walking?.status), distanceMetres: Number(stop?.walking?.distanceMetres), durationSeconds: Number(stop?.walking?.durationSeconds) },
+    cycling: { status: text(stop?.cycling?.status), distanceMetres: Number(stop?.cycling?.distanceMetres), durationSeconds: Number(stop?.cycling?.durationSeconds) }
+  };
+}
+function plannerSemanticRow(row) {
+  return {
+    routeNumber: text(row?.routeNumber), operator: text(row?.operator), origin: text(row?.origin), destination: text(row?.destination), direction: text(row?.direction), stopDirection: text(row?.stopDirection), circular: row?.circular ?? null,
+    servedAtStopId: text(row?.servedAtStopId), frequencyBasisStopId: text(row?.frequencyBasisStopId), timetableBasisStopId: text(row?.plannerServiceGroup?.timetableBasis?.stopId || row?.frequencyBasisStopId),
+    frequencyByDay: row?.frequencyByDay ?? {}, operatingPeriods: row?.operatingPeriods ?? {}, stopIds: sortedUnique(row?.stopIds), servedStopIds: sortedUnique(row?.servedStopEvidence?.map(stop => stop.id))
+  };
+}
 
 const codeRoot = codeRootFromArgument();
 const label = labelFromArgument();
@@ -137,14 +160,19 @@ for (const control of selectedControls) {
     status: result.status,
     stopCount: result.stops?.length ?? 0,
     stopRoutePopulation: Object.fromEntries((result.stops ?? []).map(stop => [String(stop.id), [...(stop.routes ?? [])].sort((left, right) => String(left).localeCompare(String(right), 'en-GB', { numeric: true }))])),
+    stopDetails: (result.stops ?? []).map(stopDetail),
     routePopulation: [...new Set((result.stops ?? []).flatMap(stop => stop.routes ?? []))].sort((left, right) => String(left).localeCompare(String(right), 'en-GB', { numeric: true })),
     serviceSummaryCount: result.serviceSummaries?.length ?? 0,
     plannerRowCount: result.plannerServiceSummaries?.length ?? 0,
     plannerRoutes: [...new Set((result.plannerServiceSummaries ?? []).map(row => row.routeNumber))].sort((left, right) => String(left).localeCompare(String(right), 'en-GB', { numeric: true })),
     plannerRows: (result.plannerServiceSummaries ?? []).map(row => ({ routeNumber: row.routeNumber, directionPatternText: row.directionPatternText, typicalFrequencyText: row.typicalFrequencyText, operatingPeriodLines: row.operatingPeriodLines })),
+    plannerSemanticRows: (result.plannerServiceSummaries ?? []).map(plannerSemanticRow),
     plannerDirectionRows444: (result.plannerServiceSummaries ?? []).filter(row => row.routeNumber === '444').map(row => row.directionPatternText),
     reviewItemCount: result.reviewItems?.length ?? 0,
     reviewItemTypes: [...new Set((result.reviewItems ?? []).map(item => item.code))].sort(),
+    reviewItemCategories: [...new Set((result.reviewItems ?? []).map(item => item.category || 'other-material'))].sort(),
+    sourceServiceIdentities: sortedUnique((result.services ?? []).map(service => `${service.id}|${service.routeNumber}|${service.frequencyBasisStopId || ''}|${service.timetableSource || service.source?.provider || ''}`)),
+    nationalSourcePublicationVersion: EXPECTED_PUBLICATION_VERSION,
     reviewItemsRetainedInternally: Array.isArray(result.reviewItems),
     assessmentStatus: result.status,
     keyServiceFrequencies: (result.plannerServiceSummaries ?? []).filter(row => ['46', '215', '230', '231', '385', '397', '397A', '444', 'C'].includes(String(row.routeNumber))).map(row => ({ routeNumber: row.routeNumber, directionPatternText: row.directionPatternText, typicalFrequencyText: row.typicalFrequencyText })),
@@ -153,7 +181,7 @@ for (const control of selectedControls) {
     tflTimetableRequestIdentities: timetable.tflTimetableRequestIdentities ?? [],
     unresolvedRequestIdentities: timetable.unresolvedRequestIdentities ?? [],
     nationalSourceStatus: { nationalSourceAvailable: timetable.nationalSourceAvailable, nationalTimetableAttempted: timetable.nationalTimetableAttempted, nationalSupplementaryAttempted: timetable.nationalSupplementaryAttempted, nationalUnresolvedRoutes: timetable.nationalUnresolvedRoutes ?? [], nationalTimetableProviders: timetable.nationalTimetableProviders ?? [], timetableConclusion: timetable.timetableConclusion },
-    word: { serviceTableRowCount: serviceRows.filter(row => Array.isArray(row)).length, summaryNoteRowCount: serviceRows.filter(row => !Array.isArray(row)).length, reviewQualificationCount: serviceRows.filter(row => !Array.isArray(row) && /^Planner review required:/.test(row.text)).length, bytes: bytes.byteLength, sha256: sha256(bytes), pageCount: null, filename }
+    word: { serviceTableRowCount: serviceRows.filter(row => Array.isArray(row)).length, summaryNoteRowCount: serviceRows.filter(row => !Array.isArray(row)).length, nonQualificationSummaryNoteRowCount: serviceRows.filter(row => !Array.isArray(row) && !/^Planner review required:/.test(row.text)).length, reviewQualificationCount: serviceRows.filter(row => !Array.isArray(row) && /^Planner review required:/.test(row.text)).length, bytes: bytes.byteLength, sha256: sha256(bytes), pageCount: null, filename }
   });
 }
 

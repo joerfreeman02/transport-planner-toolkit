@@ -1,5 +1,6 @@
 import { buildServicePresentation, formatServiceOriginDestination } from '../domain/bus-service-assessment.mjs';
 import { PLANNER_METHODOLOGY_NOTE } from '../domain/bus-planner-summary.mjs';
+import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
 
 function text(value) { return String(value ?? '').trim(); }
 
@@ -17,11 +18,37 @@ function principalLocationsText(service) {
 function reviewQualification(reviewItems) {
   const items = Array.isArray(reviewItems) ? reviewItems.filter(Boolean) : [];
   if (!items.length) return null;
-  const timetableItems = items.filter(item => /timetable|national-route-evidence|service-source-evidence/i.test(`${item.code ?? ''} ${item.source ?? ''} ${item.message ?? ''}`));
-  const routes = [...new Set(timetableItems.map(item => text(item.route)).filter(Boolean))]
-    .sort((left, right) => left.localeCompare(right, 'en-GB', { numeric: true }));
-  if (routes.length) return `Planner review required: timetable evidence remains unresolved for routes ${routes.join(', ')} at one or more assessed stops. Detailed source evidence is retained in ATLAS and should be reviewed before formal use.`;
-  return 'Planner review required: material assessment evidence remains unresolved. Detailed evidence is retained in ATLAS and should be reviewed before formal use.';
+  const categories = new Map();
+  for (const item of items) {
+    const taxonomy = reviewItemTaxonomy(item.code);
+    const entry = categories.get(taxonomy.category) ?? { routeBearing: taxonomy.routeBearing, routes: new Set() };
+    entry.routeBearing ||= taxonomy.routeBearing;
+    if (taxonomy.routeBearing && text(item.route)) entry.routes.add(text(item.route));
+    categories.set(taxonomy.category, entry);
+  }
+  const sentences = [];
+  const timetable = categories.get('timetable');
+  if (timetable?.routes.size) {
+    const routes = [...timetable.routes].sort((left, right) => left.localeCompare(right, 'en-GB', { numeric: true }));
+    sentences.push(`timetable/source evidence requires review for routes ${routes.join(', ')} at one or more assessed stops.`);
+  } else if (timetable) sentences.push('timetable/source evidence requires review before formal use.');
+  const categoryLabels = {
+    'service-source': 'service-source evidence',
+    'planner-route-identity': 'planner route/destination identity evidence',
+    'stop-source-coverage': 'stop-source coverage evidence',
+    'access-routing': 'access-routing evidence',
+    'timetable-source': 'timetable-source availability evidence',
+    'other-material': 'additional assessment evidence'
+  };
+  for (const [category, entry] of categories) {
+    if (category === 'timetable') continue;
+    const label = categoryLabels[category] ?? categoryLabels['other-material'];
+    if (entry.routeBearing && entry.routes.size) {
+      const routes = [...entry.routes].sort((left, right) => left.localeCompare(right, 'en-GB', { numeric: true }));
+      sentences.push(`Additional ${label} also requires planner review for routes ${routes.join(', ')}.`);
+    } else sentences.push(`Additional ${label} also requires planner review.`);
+  }
+  return `Planner review required: ${sentences.join(' ')} Detailed evidence is retained in ATLAS and should be reviewed before formal use.`;
 }
 
 export function buildBusWordTables(result) {

@@ -9,6 +9,7 @@ import { buildPlannerBusServiceSummaries, plannerSourceWarning } from '../domain
 import { DEFAULT_TFL_REQUEST_LIMIT } from '../adapters/tfl-request-scheduler.mjs';
 import { deriveTimetableConclusion, hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
 import { buildStopTimetableSourcePresentation } from '../domain/bus-source-presentation.mjs';
+import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
 
 export const TFL_REQUEST_WINDOW_LIMIT = DEFAULT_TFL_REQUEST_LIMIT;
 export const TFL_ASSESSMENT_FIXED_REQUESTS = 2;
@@ -139,7 +140,7 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     const cleanMessage = String(message ?? '').trim();
     if (!cleanMessage) return;
     const key = [code, route, stop, source, cleanMessage].map(value => String(value ?? '').toLowerCase()).join('|');
-    if (!items.has(key)) items.set(key, Object.freeze({ id: code + ':' + items.size, code, severity, actionability, route: route ? String(route) : null, stop: stop ? String(stop) : null, source, message: cleanMessage }));
+    if (!items.has(key)) items.set(key, Object.freeze({ id: code + ':' + items.size, code, category: reviewItemTaxonomy(code).category, severity, actionability, route: route ? String(route) : null, stop: stop ? String(stop) : null, source, message: cleanMessage }));
   };
   const provenance = servicesResult?.provenance ?? {};
   for (const identity of [...(provenance.unresolvedRequestIdentities ?? []), ...(provenance.nationalUnresolvedRequestIdentities ?? [])]) {

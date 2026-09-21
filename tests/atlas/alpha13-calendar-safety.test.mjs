@@ -72,7 +72,7 @@ const ordinarySchool = planner([
   calendarRecord({ routeNumber: 'A', id: 'A-school', profile: 'school-day', departures: weekdayAt(510) })
 ]);
 assert.equal(ordinarySchool.length, 1, 'A: calendar variation does not create duplicate headline rows');
-assert.match(ordinarySchool[0].typicalFrequencyText, /Ordinary service: Mon-Fri: 1 journey\/day/);
+assert.match(ordinarySchool[0].typicalFrequencyText, /Standard days: Mon-Fri: 1 journey\/day/);
 assert.match(ordinarySchool[0].typicalFrequencyText, /School days \(additional\): Mon-Fri: 1 journey\/day/);
 assertNoUnconditionalCombinedFrequency(ordinarySchool[0], 'A: ordinary and school-day service are not flattened');
 
@@ -117,9 +117,9 @@ for (const label of ['G', 'H']) {
     calendarRecord({ routeNumber: label, id: `${label}-unresolved`, profile: label === 'G' ? 'unresolved' : undefined, departures: weekdayAt(510) })
   ]);
   assert.equal(rows.length, 1, `${label}: unresolved calendar record remains in the route row`);
-  assert.match(rows[0].typicalFrequencyText, /Ordinary service: Mon-Fri: 1 journey\/day/);
-  assert.match(rows[0].typicalFrequencyText, /Calendar applicability unresolved(?: \(additional\))?: Mon-Fri: 1 journey\/day/);
-  assert.match(rows[0].serviceNote, /unresolved calendar applicability/i);
+  assert.match(rows[0].typicalFrequencyText, /Standard days: Mon-Fri: 1 journey\/day/);
+  assert.match(rows[0].typicalFrequencyText, /Calendar not confirmed(?: \(additional\))?: Mon-Fri: 1 journey\/day/);
+  assert.match(rows[0].serviceNote, /calendar applicability is not confirmed/i);
   assertNoUnconditionalCombinedFrequency(rows[0], `${label}: unresolved evidence cannot inflate resolved service`);
 }
 

@@ -43,6 +43,7 @@ assert.equal(filtered[1].rows.length, 0);
 const plannerWord = buildBusWordTables({
   ok: true,
   stops: [],
+  reviewItems: [{ route: '215', stop: '490TEST003', source: 'TfL', message: 'Detailed diagnostic must remain internal.' }],
   plannerServiceSummaries: [{
     routeNumber: '310', operator: 'Arriva', directionPatternText: 'Towards Waltham Cross', servedAtText: 'Hertford Bus Station',
     principalLocationsText: 'Hoddesdon', typicalFrequencyText: 'Mon-Fri: 2 journeys/day', operatingPeriodLines: ['Mon-Fri: Approx. 08:00–18:00']
@@ -51,6 +52,7 @@ const plannerWord = buildBusWordTables({
 const plannerWordNotes = plannerWord[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
 assert.match(plannerWordNotes, /Additional source evidence remains available in the ATLAS assessment workspace/);
 assert.doesNotMatch(plannerWordNotes, /Show detailed evidence/);
+assert.doesNotMatch(plannerWordNotes, /Evidence items to review|Detailed diagnostic must remain internal/);
 console.log('PASS Word export respects planner-selected stop and service rows.');
 console.log('PASS Alpha.5 Plaistow Word export contract.');
 

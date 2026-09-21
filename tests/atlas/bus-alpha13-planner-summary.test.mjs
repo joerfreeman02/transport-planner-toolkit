@@ -227,7 +227,7 @@ assert.equal(wordRows[0][2], route279[0].directionPatternText, 'Word consumes th
 assert.equal(wordRows[0][5], route279[0].typicalFrequencyText, 'Word consumes the same frequency model as Browser');
 assert.equal(wordRows.filter(row => !Array.isArray(row) && row.text === 'Frequency and operating periods are derived from scheduled departures at the closest timetable-evidenced served stop (the representative stop), marked “(timetable basis)”. Other served stops remain listed for completeness. Additional source evidence remains available in the ATLAS assessment workspace.').length, 1, 'Word carries the shared planner methodology note once');
 const reviewWordRows = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [], serviceSummaries: [], reviewItems: [{ route: '279', stop: 'A', source: 'TfL', message: 'Review this timetable evidence.' }] })[1].rows;
-assert.equal(reviewWordRows.some(row => !Array.isArray(row) && row.text === 'Evidence items to review: Route 279 · Stop A · TfL: Review this timetable evidence.'), true, 'Word carries the same scoped review item naming as Browser');
+assert.equal(reviewWordRows.some(row => !Array.isArray(row) && /Evidence items to review|Review this timetable evidence/.test(row.text)), false, 'Word keeps raw review diagnostics out of the document');
 
 const variable = calculateTypicalServiceFrequency([300, 310, 320, 330, 340, 350, 365, 380], { day: 'monday' });
 assert.equal(variable.classification, 'variable-frequency');

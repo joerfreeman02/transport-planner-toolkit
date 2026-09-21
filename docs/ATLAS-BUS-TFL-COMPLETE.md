@@ -101,6 +101,8 @@ The deployed TfL StopPoint request used `radius=700`, and the assessment recorde
 
 The actual planner therefore contains only the WT-backed 212 direction because TfL StopPoint discovery returned WT but not WE at the confirmed address point; ATLAS never selected WE for the planner timetable pass. This is not a TfL timetable-parser loss and not a geocoder discrepancy. It is legitimate provider/radius/logical-stop selection behaviour, classified as **BUS-STOP-STRUCTURE**. No stop-discovery change was made. The fixed control and actual manual address assessment are distinct evidence sources and must not be described interchangeably.
 
+The radius behaviour is a general contract gap, not a Route 212 exception. The TfL bus-stop adapter requests a radius from TfL and calculates ATLAS's own WGS84 distance for returned StopPoints, but currently does not locally discard a returned StopPoint whose ATLAS-calculated distance exceeds the requested radius. The prepared national NaPTAN and direct NaPTAN discovery paths do apply their own calculated-radius filter. This is recorded as **BUS-STOP-STRUCTURE / STOP-DISCOVERY RADIUS-CONTRACT DEBT**. A future sprint must define one deterministic radius contract across TfL and NaPTAN, preserve authoritative StopArea/logical-stop relationships, address opposite-direction stop-pair completeness, and define safe boundary behaviour when logical-stop members straddle the nominal radius. No such change is implemented here.
+
 ### Normanshire W16
 
 The live assessed W16 requests at `490007574W`, `490008982W`, `490005178H`, `490005180C`, `490007574E` and `490008982E` all return HTTP 200, exact departure-stop identity, interval ID `0`, scheduled journeys and `MATCHED` results. The production-fidelity record retains TfL evidence with BODS supplementary/fallback provenance and no unresolved W16 requests.
@@ -158,6 +160,10 @@ The Run #24 candidate compatibility fingerprint remains exactly:
 No candidate-generation compatibility input was changed, including `build_static_index.py`, `refresh_bus_data.py`, `prepare_tnds.mjs`, `tnds-transxchange-adapter.mjs`, `scheduled-evidence.mjs`, `bus-service-assessment.mjs`, `service-calendar.mjs`, or `atlas-release.json`. The formal production version was not incremented.
 
 Remaining limitations are the live TfL source's normal availability/shape variability, the separate 397A mixed-source/London Service Permit case, the 212 logical-stop radius limitation, and conservative W16 grouping. No unresolved evidence was forced into a planner row, and no production publication or deployment was performed.
+
+## Manual acceptance cycle
+
+The accepted manual-test cycle is `BUS-T01`. This is an internal manual-test-cycle identifier only; the formal release remains `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`. Future review builds should use `BUS-T02`, `BUS-T03`, `BUS-T04`, and so on. Future UI work should show the cycle identity prominently with the technical executable SHA secondary. The Bus module is not designated Beta; `BUS-BETA-1` remains reserved for the later wider internal/Pat-testing milestone.
 
 ## Recommendation
 

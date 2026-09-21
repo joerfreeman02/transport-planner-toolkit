@@ -14,13 +14,13 @@ export const PLANNER_METHODOLOGY_NOTE = 'Frequency and operating periods are der
 const UNKNOWN_CALENDAR_PROFILE = 'unresolved';
 const CALENDAR_PROFILE_ORDER = Object.freeze(['ordinary', 'school-day', 'term-time', 'non-school-day', 'holiday', 'other-resolved', UNKNOWN_CALENDAR_PROFILE]);
 const CALENDAR_PROFILE_LABELS = Object.freeze({
-  ordinary: 'Ordinary service',
+  ordinary: 'Standard days',
   'school-day': 'School days',
   'term-time': 'Term time',
   'non-school-day': 'Non-school days',
   holiday: 'Holidays',
-  'other-resolved': 'Calendar-specific days',
-  unresolved: 'Calendar applicability unresolved'
+  'other-resolved': 'Specific calendar',
+  unresolved: 'Calendar not confirmed'
 });
 
 function text(value) { return String(value ?? '').trim(); }
@@ -992,7 +992,8 @@ export function buildPlannerServiceGroups(serviceSummaries = [], stops = []) {
 
 function profileLines(lines, profileLabel) {
   if (!profileLabel) return lines;
-  return lines.map(line => line.replace(/^([^:]+):\s*/, `$1 (${profileLabel}): `));
+  const label = calendarProfileDisplayLabel(profileLabel);
+  return lines.map(line => line.replace(/^([^:]+):\s*/, `$1 (${label}): `));
 }
 
 function buildPlannerRow(component, stops, componentIndex, routeFamilyServices = component) {
@@ -1026,14 +1027,14 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     frequencyLines = outputProfileIds.flatMap(profileId => calendarQualifiedLines(profileResults.get(profileId).frequencyLines, profileId, hasOrdinaryProfile && profileId !== 'ordinary'));
     operatingLines = outputProfileIds.flatMap(profileId => calendarQualifiedLines(profileResults.get(profileId).operatingLines, profileId, hasOrdinaryProfile && profileId !== 'ordinary'));
   } else if (displayProfileId !== 'ordinary' && (displayProfileId !== UNKNOWN_CALENDAR_PROFILE || unresolvedNeedsQualification)) {
-    frequencyLines = profileLines(displayFrequencyLines, calendarProfileLabel(displayProfileId));
-    operatingLines = profileLines(displayOperatingLines, calendarProfileLabel(displayProfileId));
+    frequencyLines = profileLines(displayFrequencyLines, displayProfileId);
+    operatingLines = profileLines(displayOperatingLines, displayProfileId);
   }
   const calendarProfileId = profileIds.length === 1 ? profileIds[0] : null;
   const calendarProfile = calendarProfileLabel(calendarProfileId);
   const profileNotes = [];
-  if (mixedProfileOutput) profileNotes.push('Calendar profile variation is shown as profile-qualified frequency and operating-period lines within this route-direction row.');
-  if (unresolvedNeedsQualification) profileNotes.push('Some timetable evidence has unresolved calendar applicability; it is retained for review and is not combined with resolved service levels.');
+  if (mixedProfileOutput) profileNotes.push('Calendar profiles vary; each frequency line is labelled.');
+  if (unresolvedNeedsQualification) profileNotes.push('Some calendar applicability is not confirmed; detailed evidence is retained for review.');
   const notes = unique(component.flatMap(service => text(service.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean)))
     .filter(note => noteAppliesToCanonicalPopulation(note, displayResult.schedules))
     .filter(note => !(mixedProfileOutput && hasCalendarTaxonomyNote(note)));

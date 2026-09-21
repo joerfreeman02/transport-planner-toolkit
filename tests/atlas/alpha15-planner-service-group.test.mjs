@@ -123,7 +123,7 @@ const calendarRows = rows([
 ]);
 assert.equal(calendarRows.length, 1);
 assert.deepEqual(calendarRows[0].calendarProfileIds, ['ordinary', 'school-day']);
-assert.match(calendarRows[0].typicalFrequencyText, /Ordinary service|School days/);
+assert.match(calendarRows[0].typicalFrequencyText, /Standard days|School days/);
 
 const route242Groups = buildPlannerServiceGroups([
   record({ id: 'central-out', routeNumber: '242', operator: 'Central Connect', routeId: 'central', origin: 'Bus Station', destination: 'Potters Bar Railway Station' }),

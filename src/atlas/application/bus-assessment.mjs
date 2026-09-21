@@ -9,6 +9,7 @@ import { buildPlannerBusServiceSummaries, plannerSourceWarning } from '../domain
 import { DEFAULT_TFL_REQUEST_LIMIT } from '../adapters/tfl-request-scheduler.mjs';
 import { deriveTimetableConclusion, hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
 import { buildStopTimetableSourcePresentation } from '../domain/bus-source-presentation.mjs';
+import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
 
 export const TFL_REQUEST_WINDOW_LIMIT = DEFAULT_TFL_REQUEST_LIMIT;
 export const TFL_ASSESSMENT_FIXED_REQUESTS = 2;
@@ -133,13 +134,20 @@ function requestParts(identity) {
   return { route: parts[0] || null, stop: parts.slice(1).join('|') || null };
 }
 
+export function createReviewItem({ code, severity = 'warning', actionability = 'review', route = null, stop = null, source = 'timetable source', message, id = null } = {}) {
+  const cleanMessage = String(message ?? '').trim();
+  if (!cleanMessage) return null;
+  const taxonomy = reviewItemTaxonomy(code);
+  return Object.freeze({ id: id || String(code) + ':unassigned', code, category: taxonomy.category, severity, actionability, route: route ? String(route) : null, stop: stop ? String(stop) : null, source, message: cleanMessage });
+}
+
 function buildReviewItems({ selectedStops = [], services = [], serviceSummaries = [], servicesResult = null, prepared = null, stopCoverageComplete = true, routingComplete = true } = {}) {
   const items = new Map();
   const add = ({ code, severity = 'warning', actionability = 'review', route = null, stop = null, source = 'timetable source', message }) => {
-    const cleanMessage = String(message ?? '').trim();
-    if (!cleanMessage) return;
-    const key = [code, route, stop, source, cleanMessage].map(value => String(value ?? '').toLowerCase()).join('|');
-    if (!items.has(key)) items.set(key, Object.freeze({ id: code + ':' + items.size, code, severity, actionability, route: route ? String(route) : null, stop: stop ? String(stop) : null, source, message: cleanMessage }));
+    const item = createReviewItem({ code, severity, actionability, route, stop, source, message, id: code + ':' + items.size });
+    if (!item) return;
+    const key = [code, route, stop, source, item.message].map(value => String(value ?? '').toLowerCase()).join('|');
+    if (!items.has(key)) items.set(key, item);
   };
   const provenance = servicesResult?.provenance ?? {};
   for (const identity of [...(provenance.unresolvedRequestIdentities ?? []), ...(provenance.nationalUnresolvedRequestIdentities ?? [])]) {
@@ -240,7 +248,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     let enrichedDiscoveredStops = prepared.enriched;
     if (!enrichedDiscoveredStops.length) {
       const stopCoverageComplete = prepared.stopsResult.provenance?.stopCoverageComplete !== false;
-      const reviewItems = stopCoverageComplete ? [] : [Object.freeze({ id: 'stop-source-coverage:0', code: 'stop-source-coverage', severity: 'warning', actionability: 'review', route: null, stop: null, source: 'NaPTAN', message: 'Stop-source coverage was incomplete; no authoritative zero-stop conclusion was made.' })];
+      const reviewItems = stopCoverageComplete ? [] : [createReviewItem({ id: 'stop-source-coverage:0', code: 'stop-source-coverage', source: 'NaPTAN', message: 'Stop-source coverage was incomplete; no authoritative zero-stop conclusion was made.' })];
       onProgress({ phase: stopCoverageComplete ? 'complete' : 'partial', detail: stopCoverageComplete ? 'Complete' : partialDetail(reviewItems) });
       return Object.freeze({
         ok: true,

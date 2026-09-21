@@ -264,7 +264,11 @@ function scheduleForPattern(route, pattern, stopPointId, responseDepartureStopId
 
 function sectionsFromMetadata(data, lineId) {
   const lines = Array.isArray(data) ? data : [data];
-  const sections = lines.filter(line => normal(line?.id ?? line?.name) === normal(lineId)).flatMap(line => Array.isArray(line?.routeSections) ? line.routeSections : []).map(section => ({
+  const sections = lines.filter(line => normal(line?.id ?? line?.name) === normal(lineId)).flatMap(line => {
+    if (Array.isArray(line?.routeSections)) return line.routeSections;
+    if (Array.isArray(line?.sections)) return line.sections;
+    return [];
+  }).map(section => ({
     id: text(section?.id),
     direction: text(section?.direction),
     origin: text(section?.originationName),
@@ -305,7 +309,8 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         continue;
       }
       const hasRequestedStop = pattern.stations.some(station => station.id === stopPointId);
-      if (!hasRequestedStop) {
+      const departureStopConfirmed = responseDepartureStopId === stopPointId;
+      if (!hasRequestedStop && !departureStopConfirmed) {
         warnings.push(`TfL returned a StationInterval pattern without the requested StopPoint ${stopPointId}. No adjacent-stop departure time was used.`);
         continue;
       }
@@ -334,7 +339,10 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         destination: identity?.destination ?? '',
         direction,
         principalLocations: derivePrincipalLocations(pattern.stations),
-        routePatternStopIds: pattern.stations.map(station => station.id),
+        routePatternStopIds: [
+          ...(departureStopConfirmed && !hasRequestedStop ? [stopPointId] : []),
+          ...pattern.stations.map(station => station.id)
+        ],
         operatingPeriodEvidence: hasPeriods,
         stopSchedules: { [stopPointId]: profileTiming.schedule },
         departureEvidenceByDay: profileTiming.departureEvidence,
@@ -372,14 +380,18 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
     if (!forceRefresh && metadataInflight.has(key)) return metadataInflight.get(key);
     const task = runCachedSourceQuery({ cache, cacheKey: key, freshForMs: 5 * 60 * 1000, forceRefresh, load: async () => {
       const endpointUrl = new URL(`/Line/${lines.map(encodeURIComponent).join(',')}/Route`, baseUrl);
-      endpointUrl.searchParams.append('serviceTypes', 'Regular');
-      endpointUrl.searchParams.append('serviceTypes', 'Night');
+      endpointUrl.searchParams.set('serviceTypes', 'Regular,Night');
       const endpoint = endpointUrl.toString();
       const response = await requestScheduler.schedule('route-metadata', () => requestJson({ url: endpoint, fetchImpl, timeoutMs }), { progress: progress ?? {} });
       const source = { ...provenance, endpoint, retrievedAt: clock().toISOString(), httpStatus: response.status ?? null, requestCount: 1, lineIds: lines };
       if (!response.ok) return sourceFailure({ code: response.code, message: `TfL route metadata could not be checked: ${response.message}`, status: response.status, provenance: source });
-      if (!Array.isArray(response.data)) return sourceFailure({ code: 'invalid_response', message: 'TfL returned route metadata that ATLAS could not safely interpret.', provenance: source });
-      return sourceSuccess({ data: response.data, warnings: [], provenance: source });
+      const routeMetadata = Array.isArray(response.data)
+        ? response.data
+        : response.data && typeof response.data === 'object'
+          ? [response.data]
+          : null;
+      if (!routeMetadata) return sourceFailure({ code: 'invalid_response', message: 'TfL returned route metadata that ATLAS could not safely interpret.', provenance: source });
+      return sourceSuccess({ data: routeMetadata, warnings: [], provenance: source });
     }});
     metadataInflight.set(key, task);
     try { return await task; } finally { metadataInflight.delete(key); }

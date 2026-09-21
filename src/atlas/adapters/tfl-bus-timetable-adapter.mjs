@@ -304,12 +304,12 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
   const services = [];
   for (const route of routes) {
     for (const [index, pattern] of timetablePatterns(route, response).entries()) {
-      if (!pattern.usable || pattern.stations.length < 2) {
+      const departureStopConfirmed = responseDepartureStopId === stopPointId;
+      if (!pattern.usable || pattern.stations.length < 1 || (!departureStopConfirmed && pattern.stations.length < 2)) {
         warnings.push('TfL returned multiple timetable interval patterns without distinct deterministic interval identities. No route pattern or zero-service conclusion has been assumed.');
         continue;
       }
       const hasRequestedStop = pattern.stations.some(station => station.id === stopPointId);
-      const departureStopConfirmed = responseDepartureStopId === stopPointId;
       if (!hasRequestedStop && !departureStopConfirmed) {
         warnings.push(`TfL returned a StationInterval pattern without the requested StopPoint ${stopPointId}. No adjacent-stop departure time was used.`);
         continue;

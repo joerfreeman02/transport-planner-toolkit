@@ -8,7 +8,7 @@ The verified starting `main` was `c78132bc9e5c85f3f3926b83a7e92da217b5b5c2`. Wor
 
 Production-fidelity controls used the live TfL scheduled timetable source and the Run #24 prepared-data publication `35352167115-c670698dbf709a953d15b3927ee677fb502d1b3a`. Run #25 (`35591771460`) was not used as data; it failed before candidate validation and publication.
 
-Formal release identity remains `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`. The original clean review executable identity was `BUS-TFL-COMPLETE · 8d64487` (`8d64487c9bb7ab4e606063586038c6219e332366`). The 1A sparse-pattern correction is recorded by its implementation commit and final clean control SHA in the PR handover.
+Formal release identity remains `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`. The 1A executable correction was committed in `5ac1b3d9de80a5d5aba8a15760752aadf14bfdb9`; the final clean executable/control identity is `BUS-TFL-COMPLETE · 0bc1337` (`0bc1337e9e0a6322732d8030afafd9cc74161edb`).
 
 ## Forensic root cause
 
@@ -60,7 +60,7 @@ Commands passed:
 - `node tests/atlas/review-environment.test.mjs`
 - `node tests/atlas/run-all.mjs` — complete Alpha.15 deterministic suite passed.
 
-The review server exposes `BUS-TFL-COMPLETE · <short clean SHA>` only when the worktree is clean, so the browser cannot claim a clean executable identity for dirty code. The 1A browser/manual identity must use the final clean control SHA recorded below alongside the unchanged formal release.
+The review server exposes `BUS-TFL-COMPLETE · <short clean SHA>` only when the worktree is clean, so the browser cannot claim a clean executable identity for dirty code. The 1A browser/manual identity is `BUS-TFL-COMPLETE · 0bc1337`, alongside the unchanged formal release.
 
 ## BUS-TFL-COMPLETE-1A classifications
 
@@ -103,7 +103,7 @@ The final register and fresh Word outputs are under `work/bus-closeout-1a/produc
 | Normanshire Drive | `51.6162611, -0.0125148` | 400 m | 7 | 35 | 0 | 215/385/397 rows present; both 444 directions preserved |
 | Normanshire Drive | `51.6162611, -0.0125148` | 700 m | 18 | 83 | 0 | 215/385/397 rows present; both 444 directions preserved |
 | Pipers Lane | `51.852700, -0.454343` | 700 m | 11 | 0 | 0 | Existing 230/231 control unchanged |
-| Waltham Cross | `51.6857829, -0.0330001` | 700 m | 16 | 22 | 0 after 1A correction (6 pre-fix) | Existing national/TfL service population remains stable |
+| Waltham Cross | `51.6857829, -0.0330001` | 700 m | 16 | 22 | 0 after 1A correction (6 pre-fix) | Complete; all six H requests matched; 49 planner rows |
 
 Normanshire planner rows now include:
 
@@ -114,12 +114,12 @@ Normanshire planner rows now include:
 
 The stop populations and discovered route populations remained unchanged; only legitimate timetable resolution changed. Pipers and Waltham were regression controls, not destination/grouping work.
 
-Fresh Word evidence from the original correction includes:
+Fresh final 1A Word evidence includes:
 
-- `ATLAS BUS-TFL-COMPLETE — tfl-complete-final — normanshire-drive-400m — 8d64487.docx`
-- `ATLAS BUS-TFL-COMPLETE — tfl-complete-final — normanshire-drive-700m — 8d64487.docx`
-- `ATLAS BUS-TFL-COMPLETE — tfl-complete-final — pipers-lane-700m — 8d64487.docx`
-- `ATLAS BUS-TFL-COMPLETE — tfl-complete-final — waltham-cross-700m — 8d64487.docx`
+- `ATLAS BUS-TFL-COMPLETE — tfl-complete-1a-final — normanshire-drive-400m — 0bc1337.docx`
+- `ATLAS BUS-TFL-COMPLETE — tfl-complete-1a-final — normanshire-drive-700m — 0bc1337.docx`
+- `ATLAS BUS-TFL-COMPLETE — tfl-complete-1a-final — pipers-lane-700m — 0bc1337.docx`
+- `ATLAS BUS-TFL-COMPLETE — tfl-complete-1a-final — waltham-cross-700m — 0bc1337.docx`
 
 ## Compatibility and scope protection
 
@@ -129,7 +129,7 @@ The Run #24 candidate compatibility fingerprint remains exactly:
 
 No candidate-generation compatibility input was changed, including `build_static_index.py`, `refresh_bus_data.py`, `prepare_tnds.mjs`, `tnds-transxchange-adapter.mjs`, `scheduled-evidence.mjs`, `bus-service-assessment.mjs`, `service-calendar.mjs`, or `atlas-release.json`. The formal production version was not incremented.
 
-Remaining limitations are the live TfL source's normal availability/shape variability, the separate 397A mixed-source/London Service Permit case, the 212 logical-stop radius limitation, and conservative W16 grouping. No unresolved evidence was forced into a planner row.
+Remaining limitations are the live TfL source's normal availability/shape variability, the separate 397A mixed-source/London Service Permit case, the 212 logical-stop radius limitation, and conservative W16 grouping. No unresolved evidence was forced into a planner row, and no production publication or deployment was performed.
 
 ## Recommendation
 

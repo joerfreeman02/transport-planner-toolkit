@@ -21,8 +21,17 @@ function argumentValue(flag, fallback = '') { const index = process.argv.indexOf
 function codeRootFromArgument() { return path.resolve(argumentValue('--code-root', ROOT_DIR)); }
 function labelFromArgument() { return text(argumentValue('--label', 'branch')); }
 function onlyFromArgument() { return text(argumentValue('--only')); }
+function expectedCodeShaFromArgument() { return text(argumentValue('--expected-code-sha')); }
 function importFrom(root, relative) { return import(pathToFileURL(path.join(root, ...relative.split('/'))).href); }
-function gitSha(root) { return execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(); }
+function gitState(root) {
+  const worktree = execFileSync('git', ['-C', root, 'rev-parse', '--is-inside-work-tree'], { encoding: 'utf8' }).trim();
+  if (worktree !== 'true') throw new Error(`Production control code-root is not a Git worktree: ${root}`);
+  const status = execFileSync('git', ['-C', root, 'status', '--porcelain'], { encoding: 'utf8' });
+  if (status.trim()) throw new Error(`Production control requires a clean Git worktree; ${root} has uncommitted changes.`);
+  const sha = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  if (!/^[0-9a-f]{40}$/i.test(sha)) throw new Error(`Production control could not resolve a commit SHA for ${root}.`);
+  return { sha, clean: true };
+}
 async function fetchJson(url) {
   const response = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'ATLAS BUS-CLOSEOUT-1A production-fidelity control' } });
   if (!response.ok) throw new Error(`Production control could not load ${url}: HTTP ${response.status}`);
@@ -32,7 +41,10 @@ function sha256(value) { return createHash('sha256').update(value).digest('hex')
 
 const codeRoot = codeRootFromArgument();
 const label = labelFromArgument();
-const executedCodeSha = gitSha(codeRoot);
+const expectedCodeSha = expectedCodeShaFromArgument();
+const git = gitState(codeRoot);
+const executedCodeSha = git.sha;
+if (expectedCodeSha && executedCodeSha.toLowerCase() !== expectedCodeSha.toLowerCase()) throw new Error(`Production control code SHA mismatch: expected ${expectedCodeSha}, resolved ${executedCodeSha}.`);
 const only = onlyFromArgument();
 const selectedControls = only ? CONTROLS.filter(control => control.id === only) : CONTROLS;
 if (only && !selectedControls.length) throw new Error(`Unknown control: ${only}`);
@@ -150,6 +162,7 @@ const register = {
   productionConfigUrl: PRODUCTION_CONFIG_URL,
   productionBaseSha: EXPECTED_PRODUCTION_BASE_SHA,
   executedCodeSha,
+  worktreeClean: git.clean,
   productionPublicationVersion: productionConfig.publicationVersion,
   releaseBuild: release.default?.build ?? release.build ?? null,
   busManifest: { generatedAt: busManifest.generatedAt, version: busManifest.version, schema: busManifest.schema, snapshotDate: busManifest.snapshotDate, sourceBodsSha256: busManifest.sources?.bods?.sha256, sourceNaptanSha256: busManifest.sources?.naptan?.sha256 },

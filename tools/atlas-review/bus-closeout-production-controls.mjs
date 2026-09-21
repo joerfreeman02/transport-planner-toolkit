@@ -58,6 +58,7 @@ function plannerSemanticRow(row) {
   return {
     routeNumber: text(row?.routeNumber), operator: text(row?.operator), origin: text(row?.origin), destination: text(row?.destination), direction: text(row?.direction), stopDirection: text(row?.stopDirection), circular: row?.circular ?? null,
     servedAtStopId: text(row?.servedAtStopId), frequencyBasisStopId: text(row?.frequencyBasisStopId), timetableBasisStopId: text(row?.plannerServiceGroup?.timetableBasis?.stopId || row?.frequencyBasisStopId),
+    principalLocations: row?.principalLocations ?? [], principalLocationsText: text(row?.principalLocationsText), calendarProfileId: row?.calendarProfileId ?? null, calendarProfileIds: sortedUnique(row?.calendarProfileIds),
     frequencyByDay: row?.frequencyByDay ?? {}, operatingPeriods: row?.operatingPeriods ?? {}, stopIds: sortedUnique(row?.stopIds), servedStopIds: sortedUnique(row?.servedStopEvidence?.map(stop => stop.id))
   };
 }

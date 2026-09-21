@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createBusAssessment } from '../../src/atlas/application/bus-assessment.mjs';
+import { createBusAssessment, createReviewItem } from '../../src/atlas/application/bus-assessment.mjs';
 
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
@@ -69,6 +69,29 @@ test('timetable source warnings reach the assessment without raw parser diagnost
   const result = await assessment.assess({});
   assert.equal(result.warnings.filter(warning => /Supplementary timetable evidence is incomplete/.test(warning)).length, 1);
   assert.doesNotMatch(result.warnings.join(' '), /JP-|\.xml|RunTime/);
+});
+
+test('all assessment review paths carry deterministic taxonomy categories', async () => {
+  const normalAssessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], evidence: [], warnings: [], provenance: {} }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [{ ...service, sourceWarnings: ['The source evidence is unresolved for review.'] }], warnings: [], provenance: {} }) },
+    accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 60 }], warnings: [], provenance: {} }) }
+  });
+  const normal = await normalAssessment.assess({});
+  assert.ok(normal.reviewItems.length > 0);
+  assert.ok(normal.reviewItems.every(item => item.category === 'service-source'));
+
+  const zeroStopAssessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [], warnings: [], provenance: { stopCoverageComplete: false } }) },
+    timetableData: { servicesForStops() { throw new Error('not called'); } },
+    accessRouting: { matrix() { throw new Error('not called'); } }
+  });
+  const zeroStop = await zeroStopAssessment.assess({});
+  assert.equal(zeroStop.reviewItems[0].code, 'stop-source-coverage');
+  assert.equal(zeroStop.reviewItems[0].category, 'stop-source-coverage');
+
+  const future = createReviewItem({ code: 'future-review-code', message: 'Future taxonomy code.' });
+  assert.equal(future.category, 'other-material');
 });
 
 for (const [name, fn] of tests) {

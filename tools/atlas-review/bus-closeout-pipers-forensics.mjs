@@ -11,10 +11,10 @@ import { createJsonCache, createMemoryStorage } from '../../src/atlas/infrastruc
 import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
 
 const ROOT_DIR = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
-const OUTPUT_DIR = path.join(ROOT_DIR, 'work', 'bus-closeout-1b', 'forensics');
+const OUTPUT_DIR = path.join(ROOT_DIR, 'work', 'bus-closeout-1c', 'forensics');
 const PUBLICATION_VERSION = '35352167115-c670698dbf709a953d15b3927ee677fb502d1b3a';
 const CONFIG_URL = 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/config/atlas-data-sources.json';
-const point = confirmSite(createSite({ suppliedAddress: 'Pipers Lane accepted control point', displayAddress: 'Pipers Lane accepted control point', latitude: 51.852700, longitude: -0.454343, locationMethod: 'coordinates_entered' }), { confirmedAt: new Date().toISOString() });
+const point = confirmSite(createSite({ suppliedAddress: 'Pipers Lane current BUS-CLOSEOUT fixture point', displayAddress: 'Pipers Lane current BUS-CLOSEOUT fixture point', latitude: 51.852700, longitude: -0.454343, locationMethod: 'coordinates_entered' }), { confirmedAt: new Date().toISOString() });
 const worktree = execFileSync('git', ['-C', ROOT_DIR, 'rev-parse', '--is-inside-work-tree'], { encoding: 'utf8' }).trim();
 if (worktree !== 'true') throw new Error('Pipers forensic control requires a Git worktree.');
 const status = execFileSync('git', ['-C', ROOT_DIR, 'status', '--porcelain'], { encoding: 'utf8' });
@@ -59,32 +59,63 @@ const nearby = allSourceStops.filter(stop => stop.distanceMetres <= 700);
 const discovered = allSourceStops.filter(stop => stop.distanceMetres <= 2000 && relevant(stop))
   .sort((left, right) => left.distanceMetres - right.distanceMetres || String(left.id).localeCompare(String(right.id)));
 const sourceStops = [...new Map([...national.data ?? [], ...tflResult.data ?? []].map(stop => [String(stop.id), stop])).values()];
-const timetable = await prepared.servicesForStops(sourceStops, { forceRefresh: true });
+const insideStops = [...new Map(nearby.map(stop => [String(stop.id), stop])).values()];
+const outsideRoute46Stops = discovered.filter(stop => stop.distanceMetres > 700 && (stop.routes ?? []).map(String).includes('46'));
+const evidenceStops = [...new Map([...insideStops, ...outsideRoute46Stops].map(stop => [String(stop.id), stop])).values()];
+const timetable = await prepared.servicesForStops(evidenceStops, { forceRefresh: true });
 const services = timetable.data ?? [];
+function hasScheduledEvidenceAt(service, stopId) {
+  const schedule = service?.stopSchedules?.[String(stopId)];
+  return schedule && Object.values(schedule).some(day => Array.isArray(day) && day.length > 0);
+}
+function evidenceIds(stop, routeNumber, predicate) {
+  const route = String(routeNumber).trim().toUpperCase();
+  return services.filter(service => String(service.routeNumber).trim().toUpperCase() === route && predicate(service) && hasScheduledEvidenceAt(service, stop.id)).map(service => String(service.id)).sort();
+}
 const recordFor = stop => {
-  const bodsServices = services.filter(service => !/^tnds[:/]/i.test(String(service.id)) && String(service.routeNumber).trim().toUpperCase() === String(stop.routes?.find(route => ['46', 'C'].includes(String(route))) ?? '').trim().toUpperCase() && Object.prototype.hasOwnProperty.call(service.stopSchedules ?? {}, String(stop.id)));
-  const tndsServices = services.filter(service => /^tnds[:/]/i.test(String(service.id)) && ['46', 'C'].includes(String(service.routeNumber).trim().toUpperCase()) && Object.prototype.hasOwnProperty.call(service.stopSchedules ?? {}, String(stop.id)));
+  const bodsRoute46ScheduledEvidenceIds = evidenceIds(stop, '46', service => !/^tnds[:/]/i.test(String(service.id)));
+  const tndsRoute46ScheduledEvidenceIds = evidenceIds(stop, '46', service => /^tnds[:/]/i.test(String(service.id)));
+  const bodsRouteCScheduledEvidenceIds = evidenceIds(stop, 'C', service => !/^tnds[:/]/i.test(String(service.id)));
+  const tndsRouteCScheduledEvidenceIds = evidenceIds(stop, 'C', service => /^tnds[:/]/i.test(String(service.id)));
   const inside = stop.distanceMetres <= 700;
   const routes = (stop.routes ?? []).map(String);
-  let reason = inside ? 'Inside 700 m; retained as a discovered stop. Route 46/C inclusion depends on Run #24 stop metadata and scheduled evidence.' : 'Outside 700 m; excluded by the accepted assessment radius.';
-  if (inside && !routes.some(route => ['46', 'C'].includes(route))) reason = 'Inside 700 m, but Run #24 stop metadata does not carry route 46 or C.';
-  if (inside && routes.some(route => ['46', 'C'].includes(route)) && !bodsServices.length && !tndsServices.length) reason = 'Inside 700 m with route 46/C metadata, but no Run #24 BODS or TNDS scheduled evidence matched this StopPoint.';
-  return { id: String(stop.id), name: String(stop.name ?? ''), latitude: Number(stop.latitude), longitude: Number(stop.longitude), discoveryDistanceMetres: stop.distanceMetres, inside700m: inside, source: stop.source, routes, bodsScheduledEvidence: bodsServices.map(service => service.id), tndsScheduledEvidence: tndsServices.map(service => service.id), reason };
+  const metadataRoute46 = routes.includes('46');
+  const metadataRouteC = routes.includes('C');
+  const evidenceRoute46 = bodsRoute46ScheduledEvidenceIds.length > 0 || tndsRoute46ScheduledEvidenceIds.length > 0;
+  const evidenceRouteC = bodsRouteCScheduledEvidenceIds.length > 0 || tndsRouteCScheduledEvidenceIds.length > 0;
+  let reason = inside ? 'Inside 700 m; route 46/C evidence was independently searched in Run #24 BODS/TNDS regardless of StopPoint route metadata.' : 'Outside 700 m; excluded by the 700 m assessment radius but independently inspected for route 46 evidence.';
+  if (inside && !metadataRoute46 && evidenceRoute46) reason = 'STOP: inside-radius route 46 scheduled evidence exists without route 46 StopPoint metadata; Technical Director review required.';
+  if (inside && !metadataRouteC && evidenceRouteC) reason = 'STOP: inside-radius route C scheduled evidence exists without route C StopPoint metadata; Technical Director review required.';
+  if (inside && !metadataRoute46 && !metadataRouteC && !evidenceRoute46 && !evidenceRouteC) reason = 'Inside 700 m, but neither route 46 nor route C metadata or independently matched scheduled evidence was established.';
+  return {
+    id: String(stop.id), name: String(stop.name ?? ''), latitude: Number(stop.latitude), longitude: Number(stop.longitude), discoveryDistanceMetres: stop.distanceMetres, inside700m: inside, source: stop.source, routes,
+    bodsRoute46ScheduledEvidenceIds, tndsRoute46ScheduledEvidenceIds, bodsRouteCScheduledEvidenceIds, tndsRouteCScheduledEvidenceIds,
+    metadataRoute46, metadataRouteC, evidenceRoute46, evidenceRouteC,
+    evidenceClassification: { route46: metadataRoute46 && evidenceRoute46 ? 'metadata-and-evidence' : metadataRoute46 ? 'metadata-without-evidence' : evidenceRoute46 ? 'evidence-without-metadata' : 'neither', routeC: metadataRouteC && evidenceRouteC ? 'metadata-and-evidence' : metadataRouteC ? 'metadata-without-evidence' : evidenceRouteC ? 'evidence-without-metadata' : 'neither' },
+    reason
+  };
 };
 const records = discovered.map(recordFor);
 const nearbyRecords = nearby.map(recordFor);
+if (nearbyRecords.some(record => record.evidenceClassification.route46 === 'evidence-without-metadata' || record.evidenceClassification.routeC === 'evidence-without-metadata')) throw new Error('STOP: independent route evidence was found without matching inside-radius StopPoint metadata.');
+const knownRoute46 = records.filter(record => /woodside animal farm|caddington hall/i.test(record.name) || record.routes.includes('46'));
+const knownRouteC = records.filter(record => /caddington service/i.test(record.name) || record.routes.includes('C'));
 const report = {
   capturedAt: new Date().toISOString(), executedCodeSha, worktreeClean: true, productionPublicationVersion: config.publicationVersion, point: { latitude: point.latitude, longitude: point.longitude, radiusMetres: 700 },
-  sourceAvailability: { nationalStops: national.ok, tflStops: tflResult.ok, nationalTimetable: timetable.ok, nationalPublicationVersion: PUBLICATION_VERSION },
+  fixtureStatus: 'current-fixture-not-historical-golden',
+  sourceAvailability: { nationalStops: national.ok, tflStops: tflResult.ok, nationalTimetable: timetable.ok, nationalPublicationVersion: PUBLICATION_VERSION, independentlyQueriedInsideStopCount: insideStops.length, independentlyQueriedOutsideRoute46StopCount: outsideRoute46Stops.length },
   allNearbyStopRecords: nearbyRecords,
+  insideRadiusStopRecords: nearbyRecords,
   nearbyStopCount: nearbyRecords.length,
   route46OrCStopCandidatesWithin2km: records,
-  knownRoute46: records.filter(record => /woodside animal farm|caddington hall/i.test(record.name) || record.routes.includes('46')),
-  knownRouteC: records.filter(record => /caddington service/i.test(record.name) || record.routes.includes('C')),
+  outsideRadiusRoute46Records: knownRoute46.filter(record => !record.inside700m),
+  knownRoute46,
+  knownRouteC,
   allRelevantNearbyStopRecords: nearbyRecords,
-  conclusion: 'The route 46/C result is determined from Run #24 StopPoint metadata, accepted 700 m geometry, and matched BODS/TNDS scheduled evidence. No route was inserted into the assessment.'
+  routeCIndependentSearch: { searchedInLoadedRun24Evidence: true, candidateRecords: knownRouteC, conclusion: knownRouteC.length ? 'Route C metadata or evidence was present in the loaded Run #24 evidence; no route was inserted into the assessment.' : 'No route C StopPoint candidate or scheduled evidence was found in the loaded Run #24 evidence.' },
+  conclusion: 'The current fixture result is bounded to the Run #24 publication, the 700 m geometry, and independent BODS/TNDS scheduled-evidence searches for every inside-radius StopPoint plus named outside-radius route 46 cases. No route was inserted into the assessment.'
 };
 await mkdir(OUTPUT_DIR, { recursive: true });
-const filename = path.join(OUTPUT_DIR, 'BUS-CLOSEOUT-1B-pipers-route-46-C-forensics.json');
+const filename = path.join(OUTPUT_DIR, 'BUS-CLOSEOUT-1C-pipers-route-46-C-forensics.json');
 await writeFile(filename, `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify({ ...report, output: filename }, null, 2));

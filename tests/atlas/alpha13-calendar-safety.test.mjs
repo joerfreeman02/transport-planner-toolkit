@@ -92,7 +92,11 @@ for (const [profile, label] of singleProfileLabels) {
   assert.ok(row, `${profile}: single-profile row is present`);
   if (label) assert.match(row.typicalFrequencyText, new RegExp(`Mon-Fri \\(${label}\\): 1 journey/day`), `${profile}: concise profile label is visible`);
   else assert.match(row.typicalFrequencyText, /Mon-Fri: 1 journey\/day/, 'ordinary: single-profile frequency remains intentionally unqualified');
+  const operatingPeriodText = row.operatingPeriodLines.join('\n');
+  if (label) assert.match(operatingPeriodText, new RegExp(`Mon-Fri \\(${label}\\):`), `${profile}: operating-period line carries the profile label`);
+  else assert.match(operatingPeriodText, /Mon-Fri:/, 'ordinary: single-profile operating period remains intentionally unqualified');
   assert.doesNotMatch(row.typicalFrequencyText, /Calendar-specific service/, `${profile}: generic calendar label is never emitted`);
+  assert.doesNotMatch(operatingPeriodText, /Calendar-specific service/, `${profile}: generic operating-period label is never emitted`);
 }
 
 const profileFrequencyBands = planner([

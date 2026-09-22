@@ -70,7 +70,11 @@ Formal release metadata remains unchanged:
 
 `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`
 
-The exact engineering identity is the clean Git commit SHA recorded in the final PR handover and test output. A dirty worktree must not be presented as tested. The review server currently injects the historical label `BUS-TFL-COMPLETE · <short SHA>`; that label is not a valid semantic identity for this foundation and must be corrected before BUS-T03. No release metadata or review-server redesign is included here.
+The exact clean executable/test identity for the completed deterministic suite is:
+
+`6d5fb47376ff9a9fc3cd74e909918a2aa2a4d213`
+
+A dirty worktree must not be presented as tested. The review server currently injects the historical label `BUS-TFL-COMPLETE · <short SHA>`; that label is not a valid semantic identity for this foundation and must be corrected before BUS-T03. No release metadata or review-server redesign is included here.
 
 ## Validation performed
 

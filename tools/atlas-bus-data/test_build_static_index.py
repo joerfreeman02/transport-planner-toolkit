@@ -4,15 +4,29 @@
 from __future__ import annotations
 
 import importlib.util
+import gzip
+import json
+import subprocess
+import sys
+import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 
 BUILDER_PATH = Path(__file__).with_name("build_static_index.py")
+sys.path.insert(0, str(BUILDER_PATH.parent))
 SPEC = importlib.util.spec_from_file_location("atlas_build_static_index", BUILDER_PATH)
 BUILDER = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 SPEC.loader.exec_module(BUILDER)
+V2_PATH = Path(__file__).with_name("prepared_data_v2.py")
+V2_SPEC = importlib.util.spec_from_file_location("atlas_prepared_data_v2", V2_PATH)
+V2 = importlib.util.module_from_spec(V2_SPEC)
+assert V2_SPEC and V2_SPEC.loader
+sys.modules[V2_SPEC.name] = V2
+V2_SPEC.loader.exec_module(V2)
+FIXTURES = Path(__file__).parents[2] / "tests" / "fixtures" / "atlas-bus-data-v2"
 
 
 class CircularIdentityTests(unittest.TestCase):
@@ -127,6 +141,114 @@ class CircularIdentityTests(unittest.TestCase):
             {"name": "Bus Station", "locality": "Same locality"},
             {"name": "Bus Station", "locality": "Same locality"},
         ]))
+
+
+class PreparedDataV2ParserTests(unittest.TestCase):
+    def test_bng_fallback_and_modification_attribute_match_v1_semantics(self):
+        v2 = V2.parse_naptan_xml(FIXTURES / "naptan-bng-2.1.xml")
+        v1, _, excluded = BUILDER.load_naptan(FIXTURES / "naptan-bng-v1.csv")
+        self.assertEqual(excluded, 0)
+        self.assertEqual(v2.qa["malformed_stop_point"], 1)
+        self.assertEqual(v2.stops["999000001"]["modifiedAt"], "2026-09-15T16:00:00+01:00")
+        self.assertEqual(v2.stops["999000001"]["coordinateMethod"], "NaPTAN British National Grid converted to WGS84")
+        self.assertEqual((v2.stops["999000001"]["latitude"], v2.stops["999000001"]["longitude"]), (v1["999000001"]["latitude"], v1["999000001"]["longitude"]))
+
+    def test_cli_schema_contract_does_not_require_legacy_naptan_for_v2(self):
+        python = sys.executable
+        builder = str(BUILDER_PATH)
+        v2 = subprocess.run([python, builder, "--schema", "atlas-prepared-bus-data-v2", "--naptan-xml", str(FIXTURES / "naptan-2.1.xml"), "--nptg-xml", str(FIXTURES / "nptg-2.1.xml"), "--gtfs-dir", str(FIXTURES), "--output", str(FIXTURES / "not-an-output"), "--snapshot-date", "2026-09-01"], capture_output=True, text=True)
+        self.assertNotIn("the following arguments are required: --naptan", v2.stderr)
+        v1 = subprocess.run([python, builder, "--gtfs-dir", str(FIXTURES), "--output", str(FIXTURES / "not-an-output"), "--snapshot-date", "2026-09-01"], capture_output=True, text=True)
+        self.assertIn("prepared-data v1 requires --naptan", v1.stderr)
+
+    def test_namespace_and_schema_version_variants_normalise_deterministically(self):
+        first = V2.parse_naptan_xml(FIXTURES / "naptan-2.1.xml")
+        second = V2.parse_naptan_xml(FIXTURES / "naptan-2.4.xml")
+        self.assertEqual(first.metadata["schemaVersion"], "2.1")
+        self.assertEqual(second.metadata["schemaVersion"], "2.4")
+        self.assertEqual(first.stops["490006381N"]["logicalGroupRefs"][0]["id"], "naptan:490G00006381")
+        self.assertEqual(first.groups["naptan:490G00006381"]["memberStopPointIds"], ["490006381N", "490006381S"])
+        self.assertEqual(first.qa["inactiveGroupCount"], 1)
+        self.assertEqual(second.qa["multipleGroupStopCount"], 1)
+        self.assertEqual(second.groups["naptan:210G432"]["parentGroupId"], "naptan:210G900")
+        self.assertEqual(second.groups["naptan:210G11368"]["qa"]["multipleMembershipMemberCount"], 1)
+        self.assertEqual(second.groups["naptan:210G1828"]["qa"]["multipleMembershipMemberCount"], 1)
+
+    def test_nptg_parent_district_and_cycle_qa_are_retained(self):
+        result = V2.parse_nptg_xml(FIXTURES / "nptg-2.1.xml")
+        self.assertEqual(result.localities["E0014000"]["parentLocalityId"], "nptg:E0013720")
+        self.assertEqual(result.localities["E0013720"]["districtId"], "nptg:26")
+        self.assertEqual(result.localities["E0013720"]["districtName"], "Broxbourne")
+        self.assertEqual(result.qa["cyclicLocalityCount"], 2)
+        self.assertEqual(len(result.districts), 2)
+
+    def test_unknown_structure_fails_closed(self):
+        with self.assertRaises(V2.SourceParseError):
+            V2.parse_naptan_xml(FIXTURES / "malformed-root.xml")
+
+    def test_v2_builder_emits_bounded_sidecars_and_reuses_service_semantics(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parents[2]) as temporary:
+            root = Path(temporary)
+            gtfs = root / "gtfs"
+            gtfs.mkdir()
+            archive_path = gtfs / "fixture.zip"
+            files = {
+                "agency.txt": "agency_id,agency_name\na,Fixture operator\n",
+                "routes.txt": "route_id,route_short_name,route_type,agency_id\nr1,1,3,a\n",
+                "stops.txt": "stop_id,stop_code,stop_name\n490006381N,490006381N,East View\n490006381S,490006381S,East View\n",
+                "calendar.txt": "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date\nweekday,1,1,1,1,1,0,0,20260901,20260930\n",
+                "trips.txt": "route_id,service_id,trip_id,direction_id,trip_headsign\nr1,weekday,t1,0,East View\n",
+                "stop_times.txt": "trip_id,arrival_time,departure_time,stop_id,stop_sequence\nt1,08:00:00,08:00:00,490006381N,1\nt1,08:10:00,08:10:00,490006381S,2\n",
+                "feed_info.txt": "feed_publisher_name,feed_start_date,feed_end_date\nFixture,20260901,20260930\n",
+            }
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                for name, content in files.items():
+                    archive.writestr(name, content)
+            output = root / "prepared"
+            args = type("Args", (), {
+                "naptan_xml": FIXTURES / "naptan-2.1.xml", "nptg_xml": FIXTURES / "nptg-2.1.xml",
+                "gtfs_dir": gtfs, "output": output, "snapshot_date": "2026-09-01", "generated_at": "2026-09-01T00:00:00Z",
+                "grid_size": 0.25, "service_shard_key_length": 5,
+            })()
+            result = BUILDER.build_v2(args)
+            manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(result["schema"], "atlas-prepared-bus-data-v2")
+            self.assertEqual(manifest["schema"], "atlas-prepared-bus-data-v2")
+            self.assertTrue(manifest["groupShards"])
+            self.assertTrue(manifest["localityShards"])
+            self.assertTrue(manifest["serviceShards"])
+            self.assertFalse(list(output.rglob("*.xml")))
+            self.assertNotIn("downloadedAt", manifest["sources"]["naptan"])
+            self.assertNotIn("downloadedAt", manifest["sources"]["nptg"])
+            self.assertNotIn("downloadedAt", manifest["sources"]["bods"])
+            self.assertEqual(manifest["sources"]["naptan"]["sourceCreationDateTime"], "2026-09-15T16:46:50+01:00")
+            v1_output = root / "prepared-v1"
+            v1_args = type("V1Args", (), {"naptan": FIXTURES / "naptan-v1.csv", "gtfs_dir": gtfs, "output": v1_output, "snapshot_date": "2026-09-01", "generated_at": "2026-09-01T00:00:00Z", "grid_size": 0.25, "service_shard_key_length": 5})()
+            BUILDER.build(v1_args)
+            v1_manifest = json.loads((v1_output / "manifest.json").read_text(encoding="utf-8"))
+            def read_stops(prepared_root, prepared_manifest):
+                records = {}
+                for relative in prepared_manifest["stopShards"].values():
+                    payload = json.loads(gzip.open(prepared_root / relative, "rt", encoding="utf-8").read())
+                    for record in payload["stops"]:
+                        stop = dict(zip(prepared_manifest["stopFields"], record))
+                        records[stop["id"]] = stop
+                return records
+
+            v1_stops = read_stops(v1_output, v1_manifest)
+            v2_stops = read_stops(output, manifest)
+            self.assertEqual(set(v1_stops), set(v2_stops), "complete active physical StopPoint ID set")
+            self.assertEqual(len(v1_stops), len(v2_stops))
+            legacy_stop_fields = ("id", "naptanCode", "name", "indicator", "direction", "latitude", "longitude", "stopType", "busStopType", "locality", "parentLocality", "areaCode", "modifiedAt", "routes")
+            for stop_id in sorted(v1_stops):
+                for field in legacy_stop_fields:
+                    self.assertEqual(v1_stops[stop_id].get(field), v2_stops[stop_id].get(field), f"{stop_id}:{field}")
+                self.assertEqual(set(v1_stops[stop_id].get("routes") or []), set(v2_stops[stop_id].get("routes") or []), f"{stop_id}:routes")
+            v1_service_path = next(iter(v1_manifest["serviceShards"].values()))[0]
+            v2_service_path = next(iter(manifest["serviceShards"].values()))[0]
+            v1_services = json.loads(gzip.open(v1_output / v1_service_path, "rt", encoding="utf-8").read())["services"]
+            v2_services = json.loads(gzip.open(output / v2_service_path, "rt", encoding="utf-8").read())["services"]
+            self.assertEqual(v1_services, v2_services)
 
 
 if __name__ == "__main__":

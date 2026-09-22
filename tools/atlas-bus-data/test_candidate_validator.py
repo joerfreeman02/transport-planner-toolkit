@@ -43,6 +43,52 @@ class CandidateValidatorTests(unittest.TestCase):
         self.assertEqual(result['serviceShardRecords'], 1)
         self.assertEqual(result['stopIds'], 1)
 
+    def _convert_candidate_to_v2(self):
+        bus = self.root / 'atlas/data/bus'
+        manifest_path = bus / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        old_stop_fields = ['id', 'naptanCode', 'name', 'indicator', 'direction', 'latitude', 'longitude', 'stopType', 'busStopType', 'locality', 'parentLocality', 'areaCode', 'modifiedAt', 'coordinateMethod', 'routes']
+        v2_fields = old_stop_fields[:11] + ['nptgLocalityCode'] + old_stop_fields[11:] + ['logicalGroupRefs', 'status', 'provenance', 'localityResolution']
+        stop_path = bus / 'stops/g1.json.gz'
+        with gzip.open(stop_path, 'rt', encoding='utf-8') as stream:
+            old_stop = json.load(stream)['stops'][0]
+        stop = dict(zip(old_stop_fields, old_stop))
+        stop.update({'nptgLocalityCode': 'E001', 'logicalGroupRefs': [{'id': 'naptan:GROUP-1', 'sourceId': 'GROUP-1', 'status': 'active', 'targetExists': True}], 'status': 'active', 'provenance': {'source': 'NaPTAN'}, 'localityResolution': 'resolved'})
+        with gzip.open(stop_path, 'wt', encoding='utf-8') as stream:
+            json.dump({'schema': 'atlas-prepared-bus-data-v2', 'stops': [[stop.get(field) for field in v2_fields]]}, stream)
+        service_path = bus / 'services/a.json.gz'
+        with gzip.open(service_path, 'rt', encoding='utf-8') as stream:
+            services = json.load(stream)['services']
+        with gzip.open(service_path, 'wt', encoding='utf-8') as stream:
+            json.dump({'schema': 'atlas-prepared-bus-data-v2', 'services': services}, stream)
+        (bus / 'groups').mkdir()
+        (bus / 'localities').mkdir()
+        with gzip.open(bus / 'groups/g.json.gz', 'wt', encoding='utf-8') as stream:
+            json.dump({'schema': 'atlas-prepared-logical-groups-v1', 'groups': [{'id': 'naptan:GROUP-1', 'status': 'active', 'memberStopPointIds': ['STOP-1']}]}, stream)
+        with gzip.open(bus / 'localities/e.json.gz', 'wt', encoding='utf-8') as stream:
+            json.dump({'schema': 'atlas-prepared-nptg-localities-v1', 'localities': [{'id': 'nptg:E001', 'code': 'E001', 'name': 'Example', 'districtId': 'nptg:D1', 'districtName': 'District'}]}, stream)
+        manifest.update({'schema': 'atlas-prepared-bus-data-v2', 'stopFields': v2_fields, 'groupShards': {'GRO': 'groups/g.json.gz'}, 'localityShards': {'E00': 'localities/e.json.gz'}, 'counts': {'activeStopPointCount': 1, 'logicalGroupCount': 1, 'localityCount': 1, 'districtCount': 1, 'stopShardCount': 1, 'serviceShardCount': 1, 'logicalGroupShardCount': 1, 'localityShardCount': 1}, 'qa': {'naptan': {}, 'nptg': {}}, 'sources': {**manifest['sources'], 'nptg': {'localityCount': 1, 'districtCount': 1}}})
+        manifest_path.write_text(json.dumps(manifest))
+
+    def test_v2_candidate_and_sidecars_pass_structural_validation(self):
+        self._convert_candidate_to_v2()
+        result = validate(self.root)
+        self.assertEqual(result['logicalGroupRecords'], 1)
+        self.assertEqual(result['localityRecords'], 1)
+        self.assertEqual(result['logicalGroupCount'], 1)
+        self.assertEqual(result['districtCount'], 1)
+
+    def test_v2_duplicate_sidecar_identity_fails_closed(self):
+        self._convert_candidate_to_v2()
+        duplicate = self.root / 'atlas/data/bus/groups/g2.json.gz'
+        with gzip.open(duplicate, 'wt', encoding='utf-8') as stream:
+            json.dump({'schema': 'atlas-prepared-logical-groups-v1', 'groups': [{'id': 'naptan:GROUP-1', 'status': 'active', 'memberStopPointIds': ['STOP-1']}]}, stream)
+        manifest = json.loads((self.root / 'atlas/data/bus/manifest.json').read_text())
+        manifest['groupShards']['GRO2'] = 'groups/g2.json.gz'
+        (self.root / 'atlas/data/bus/manifest.json').write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(RefreshError, 'duplicated'):
+            validate(self.root)
+
     def test_fully_quarantined_tnds_service_passes_without_schedules(self):
         self._replace_first_tnds({'id': 'tnds:EA:fixture:Q', 'stopSchedules': {}, 'source': {'region': 'EA', 'serviceCode': 'Q'}, 'tndsQuarantine': {'serviceQuarantined': True, 'affectedStopIds': ['STOP-1'], 'patterns': [{'patternId': 'JP-Q', 'reasonCode': 'incomplete_runtime_sequence', 'affectedStopIds': ['STOP-1']}]}})
         self.assertEqual(validate(self.root)['stopIds'], 1)

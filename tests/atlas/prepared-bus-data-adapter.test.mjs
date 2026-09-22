@@ -81,6 +81,45 @@ test('prepared BODS lookup joins schedules by authoritative stop ID', async () =
   assert.equal(result.provenance.apiKeyEmbedded, false);
 });
 
+test('prepared v2 decodes physical stops and exposes sidecars without changing v1 service access', async () => {
+  const v2Manifest = {
+    ...manifest,
+    schema: 'atlas-prepared-bus-data-v2',
+    groupShardKeyLength: 3,
+    localityShardKeyLength: 3,
+    stopFields: [...manifest.stopFields, 'nptgLocalityCode', 'logicalGroupRefs', 'status', 'provenance'],
+    groupShards: { '210': 'groups/210.json.gz' },
+    localityShards: { 'E00': 'localities/E00.json.gz' }
+  };
+  const group = { id: 'naptan:210G432', sourceId: '210G432', name: 'Bus Station', memberStopPointIds: ['2100A'], status: 'active' };
+  const locality = { id: 'nptg:E0013720', code: 'E0013720', name: 'Waltham Cross', districtId: 'nptg:26' };
+  const v2Stop = { ...stop, nptgLocalityCode: 'E0013720', logicalGroupRefs: [{ id: group.id, sourceId: group.sourceId, status: 'active', targetExists: true }], status: 'active', provenance: { source: 'NaPTAN' } };
+  const v2Packed = v2Manifest.stopFields.map(field => v2Stop[field] ?? null);
+  const v2Fetch = async url => {
+    const pathname = new URL(url).pathname;
+    const value = pathname.endsWith('/manifest.json') ? v2Manifest
+      : pathname.endsWith('/stops/g516_m1.json.gz') ? { schema: 'atlas-prepared-bus-data-v2', stops: [v2Packed] }
+        : pathname.endsWith('/services/2100A-south-east.json.gz') ? { schema: 'atlas-prepared-bus-data-v2', services: [service] }
+          : pathname.endsWith('/groups/210.json.gz') ? { schema: 'atlas-prepared-logical-groups-v1', groups: [group] }
+            : pathname.endsWith('/localities/E00.json.gz') ? { schema: 'atlas-prepared-nptg-localities-v1', localities: [locality] }
+              : null;
+    return Promise.resolve(value ? new Response(JSON.stringify(value), { status: 200 }) : new Response('', { status: 404 }));
+  };
+  const adapter = createPreparedBusDataAdapter({ fetchImpl: v2Fetch, baseUrl: 'https://atlas.example/data/' });
+  const nearby = await adapter.nearbyStops(site, { radius: 700 });
+  assert.equal(nearby.ok, true);
+  assert.deepEqual(nearby.data[0].logicalGroupRefs, v2Stop.logicalGroupRefs);
+  assert.equal((await adapter.servicesForStops([v2Stop])).ok, true);
+  assert.deepEqual((await adapter.logicalGroupsForStops([v2Stop])).data, [group]);
+  assert.deepEqual((await adapter.localitiesForStops([v2Stop])).data, [locality]);
+});
+
+test('prepared v1 explicitly reports absent grouping and locality sidecars', async () => {
+  const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchFixture, baseUrl: 'https://atlas.example/data/' });
+  assert.deepEqual((await adapter.logicalGroupsForStops([stop])).data, []);
+  assert.deepEqual((await adapter.localitiesForStops([stop])).data, []);
+});
+
 test('TNDS quarantine warns only when an affected selected stop is assessed', async () => {
   const tndsManifest = { schema: 'atlas-prepared-bus-tnds-v1', generatedAt: '2026-09-07T00:00:00Z', regions: ['SE'], services: ['services/quarantined.json', 'services/quarantined-2.json'] };
   const quarantined = { id: 'tnds:SE:fixture:Q', routeNumber: 'Q', operator: 'Example', stopSchedules: {}, tndsQuarantine: { serviceQuarantined: true, affectedStopIds: ['2100A'], patterns: [{ patternId: 'JP-Q', reasonCode: 'incomplete_runtime_sequence', affectedStopIds: ['2100A'] }] } };

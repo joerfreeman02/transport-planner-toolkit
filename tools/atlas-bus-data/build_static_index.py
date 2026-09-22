@@ -20,6 +20,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 SCHEMA = "atlas-prepared-bus-data-v1"
+V2_SCHEMA = "atlas-prepared-bus-data-v2"
 DAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 
 
@@ -265,6 +266,35 @@ def load_naptan(path: Path) -> tuple[dict[str, dict], dict[str, str], int]:
             if naptan_code:
                 aliases[naptan_code.lower()] = stop_id
     return stops, aliases, excluded
+
+
+def load_naptan_v2(path: Path, nptg_path: Path):
+    """Load authoritative XML into the v2 prepared-data contract.
+
+    The v1 CSV loader above remains untouched for compatibility.  v2 carries
+    the logical StopArea and NPTG records as separate deterministic sidecars;
+    the service builder still consumes the same physical-stop map and therefore
+    cannot change route/timetable semantics merely by selecting v2.
+    """
+    from prepared_data_v2 import hydrate_stop_localities, parse_naptan_xml, parse_nptg_xml
+
+    naptan = parse_naptan_xml(path)
+    nptg = parse_nptg_xml(nptg_path)
+    hydrate_stop_localities(naptan, nptg)
+    stops = {}
+    aliases = {}
+    excluded = 0
+    for stop_id, source in naptan.stops.items():
+        if source.get("status") not in ("", "active") or not str(source.get("stopType") or "").startswith("B"):
+            excluded += 1
+            continue
+        stop = {**source, "routes": set()}
+        stops[stop_id] = stop
+        aliases[stop_id] = stop_id
+        aliases[stop_id.lower()] = stop_id
+        if source.get("naptanCode"):
+            aliases[str(source["naptanCode"]).lower()] = stop_id
+    return stops, aliases, excluded, naptan, nptg
 
 
 def active_days(calendar: dict, exceptions: dict[str, dict[date, int]], dates: dict[str, date]) -> list[str]:
@@ -538,17 +568,117 @@ def build(args: argparse.Namespace) -> dict:
     return {"output": str(output), "stops": len(stops), "stopShards": len(stop_shards), "serviceAreas": len(service_shards), "regions": region_metadata}
 
 
+def build_v2(args: argparse.Namespace) -> dict:
+    """Build the v2 physical-stop index and bounded logical sidecars."""
+    from prepared_data_v2 import GROUP_SCHEMA, LOCALITY_SCHEMA, V2_SCHEMA, V2_VERSION, normalise_for_json
+
+    naptan_path = Path(args.naptan_xml).resolve()
+    nptg_path = Path(args.nptg_xml).resolve()
+    gtfs_dir = Path(args.gtfs_dir).resolve()
+    output = Path(args.output).resolve()
+    snapshot = date.fromisoformat(args.snapshot_date)
+    dates = representative_dates(snapshot)
+    gtfs_paths = sorted(path for path in gtfs_dir.glob("*.zip") if path.is_file())
+    if not gtfs_paths:
+        raise ValueError("No GTFS zip files were found.")
+    clear_output(output)
+    output.mkdir(parents=True, exist_ok=True)
+    stops, aliases, excluded, naptan, nptg = load_naptan_v2(naptan_path, nptg_path)
+    service_shards: dict[str, list[str]] = defaultdict(list)
+    region_metadata = []
+    for gtfs_path in gtfs_paths:
+        region, by_area, metadata = process_region(gtfs_path, dates, stops, aliases, args.service_shard_key_length)
+        region_metadata.append({"region": region, **metadata})
+        for area, records in sorted(by_area.items()):
+            relative = f"services/{area}-{region}.json.gz"
+            compact_json(output / relative, {"schema": V2_SCHEMA, "region": region, "stopPrefix": area, "services": sorted(records, key=lambda record: record["id"])})
+            service_shards[area].append(relative)
+
+    stop_groups: dict[str, list[dict]] = defaultdict(list)
+    stop_fields = ["id", "naptanCode", "name", "indicator", "direction", "latitude", "longitude", "stopType", "busStopType", "locality", "parentLocality", "nptgLocalityCode", "areaCode", "modifiedAt", "coordinateMethod", "routes", "logicalGroupRefs", "status", "provenance", "localityResolution"]
+    for stop in stops.values():
+        key = cell_key(stop["latitude"], stop["longitude"], args.grid_size)
+        normalised = normalise_for_json({**stop, "routes": sorted(stop["routes"], key=lambda value: (len(value), value))})
+        stop_groups[key].append([normalised.get(field) for field in stop_fields])
+    stop_shards = {}
+    for key, records in sorted(stop_groups.items()):
+        relative = f"stops/{key}.json.gz"
+        compact_json(output / relative, {"schema": V2_SCHEMA, "cell": key, "stops": sorted(records, key=lambda stop: stop[0])})
+        stop_shards[key] = relative
+
+    group_records: dict[str, list[dict]] = defaultdict(list)
+    for group_id, group in sorted(naptan.groups.items()):
+        key = group["sourceId"][:3] or "misc"
+        group_records[key].append(normalise_for_json(group))
+    group_shards = {}
+    for key, records in sorted(group_records.items()):
+        relative = f"groups/{key}.json.gz"
+        compact_json(output / relative, {"schema": GROUP_SCHEMA, "shardKey": key, "groups": sorted(records, key=lambda item: item["id"])})
+        group_shards[key] = relative
+
+    locality_records: dict[str, list[dict]] = defaultdict(list)
+    for locality_code, locality in sorted(nptg.localities.items()):
+        key = locality_code[:3] or "misc"
+        locality_records[key].append(normalise_for_json(locality))
+    locality_shards = {}
+    for key, records in sorted(locality_records.items()):
+        relative = f"localities/{key}.json.gz"
+        compact_json(output / relative, {"schema": LOCALITY_SCHEMA, "shardKey": key, "localities": sorted(records, key=lambda item: item["id"])})
+        locality_shards[key] = relative
+
+    combined_bods_hash = hashlib.sha256("".join(item["sha256"] for item in region_metadata).encode("ascii")).hexdigest()
+    generated_at = args.generated_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    try:
+        parsed_generated_at = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError("generated_at must be an ISO-8601 UTC timestamp") from error
+    if parsed_generated_at.tzinfo is None:
+        raise ValueError("generated_at must include a UTC offset")
+    generated_at = parsed_generated_at.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    manifest = {
+        "schema": V2_SCHEMA, "version": V2_VERSION, "generatedAt": generated_at, "snapshotDate": snapshot.isoformat(), "refreshAfterDays": 8,
+        "gridSize": args.grid_size, "stopFields": stop_fields, "serviceShardKeyLength": args.service_shard_key_length,
+        "groupShardKeyLength": 3, "localityShardKeyLength": 3,
+        "representativeDates": {day: value.isoformat() for day, value in dates.items()},
+        "schemas": {"logicalGroups": GROUP_SCHEMA, "localities": LOCALITY_SCHEMA},
+        "sources": {
+            "naptan": {"url": "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml", **naptan.metadata, "stopCount": len(stops), "excludedRecordCount": excluded},
+            "nptg": {"url": "https://naptan.api.dft.gov.uk/v1/nptg", **nptg.metadata, "localityCount": len(nptg.localities), "districtCount": len(nptg.districts)},
+            "bods": {"url": BODS_URL, "sha256": combined_bods_hash, "regions": region_metadata},
+        },
+        "qa": {"naptan": naptan.qa, "nptg": nptg.qa},
+        "stopShards": stop_shards, "serviceShards": dict(sorted(service_shards.items())), "groupShards": group_shards, "localityShards": locality_shards,
+        "counts": {"activeStopPointCount": len(stops), "logicalGroupCount": len(naptan.groups), "localityCount": len(nptg.localities), "districtCount": len(nptg.districts), "stopShardCount": len(stop_shards), "serviceShardCount": sum(len(paths) for paths in service_shards.values()), "logicalGroupShardCount": len(group_shards), "localityShardCount": len(locality_shards)},
+    }
+    compact_json(output / "manifest.json", manifest)
+    return {"output": str(output), "schema": V2_SCHEMA, "stops": len(stops), "groups": len(naptan.groups), "localities": len(nptg.localities), "stopShards": len(stop_shards), "groupShards": len(group_shards), "localityShards": len(locality_shards), "serviceAreas": len(service_shards), "regions": region_metadata}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--naptan", required=True)
+    parser.add_argument("--naptan", help="Legacy authoritative NaPTAN CSV input for prepared-data v1")
     parser.add_argument("--gtfs-dir", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--snapshot-date", required=True)
     parser.add_argument("--generated-at", help="Validated candidate-generation timestamp shared by all prepared manifests")
     parser.add_argument("--grid-size", type=float, default=0.25)
     parser.add_argument("--service-shard-key-length", type=int, default=5)
+    parser.add_argument("--schema", choices=(SCHEMA, V2_SCHEMA), default=SCHEMA)
+    parser.add_argument("--naptan-xml", help="Authoritative NaPTAN XML input for prepared-data v2")
+    parser.add_argument("--nptg-xml", help="Authoritative NPTG XML input for prepared-data v2")
     args = parser.parse_args()
-    print(json.dumps(build(args), indent=2))
+    if args.schema == V2_SCHEMA:
+        if args.naptan:
+            parser.error("--naptan is valid only with the default v1 schema")
+        if not args.naptan_xml or not args.nptg_xml:
+            parser.error("prepared-data v2 requires --naptan-xml and --nptg-xml")
+        print(json.dumps(build_v2(args), indent=2))
+    else:
+        if not args.naptan:
+            parser.error("prepared-data v1 requires --naptan")
+        if args.naptan_xml or args.nptg_xml:
+            parser.error("--naptan-xml and --nptg-xml are valid only with --schema atlas-prepared-bus-data-v2")
+        print(json.dumps(build(args), indent=2))
 
 
 if __name__ == "__main__":

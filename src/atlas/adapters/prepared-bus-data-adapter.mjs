@@ -12,6 +12,7 @@ const STOP_ATTRIBUTION = 'NaPTAN data provided by the Department for Transport u
 const TIMETABLE_ATTRIBUTION = 'Bus timetable data provided by the Department for Transport Bus Open Data Service under the Open Government Licence';
 const TNDS_QUARANTINE_WARNING = 'Supplementary timetable evidence is incomplete for one or more services relevant to this assessment. ATLAS excluded unsupported timetable patterns rather than estimating their timings.';
 const MAX_LEGACY_TNDS_SERVICES = 100;
+const PREPARED_BUS_SCHEMAS = new Set(['atlas-prepared-bus-data-v1', 'atlas-prepared-bus-data-v2']);
 
 function cellToken(value) { return value < 0 ? `m${Math.abs(value)}` : String(value); }
 export function gridCellKey(latitudeIndex, longitudeIndex) { return `g${cellToken(latitudeIndex)}_${cellToken(longitudeIndex)}`; }
@@ -108,7 +109,7 @@ export function createPreparedBusDataAdapter({
     if (forceRefresh) manifestPromise = null;
     if (!manifestPromise) manifestPromise = loadJson('manifest.json', forceRefresh);
     const response = await manifestPromise;
-    if (!response.ok || response.data?.schema !== 'atlas-prepared-bus-data-v1') {
+    if (!response.ok || !PREPARED_BUS_SCHEMAS.has(response.data?.schema)) {
       manifestPromise = null;
       return sourceFailure({ code: response.code || 'invalid_response', message: 'National bus information could not be checked. Please try again.', provenance: { source: `${STOP_SOURCE} and ${TIMETABLE_SOURCE}`, endpoint: resolveBusUrl('manifest.json') } });
     }
@@ -138,7 +139,7 @@ export function createPreparedBusDataAdapter({
     const paths = keys.map(key => index.stopShards?.[key]).filter(Boolean);
     const responses = await Promise.all(paths.map(path => loadJson(path, forceRefresh)));
     if (responses.some(response => !response.ok)) return sourceFailure({ code: 'unavailable_source', message: 'National bus-stop information could not be checked. Please try again.', provenance, warnings: ['The prepared NaPTAN stop files could not all be loaded.'] });
-    if (responses.some(response => response.data?.schema !== 'atlas-prepared-bus-data-v1' || !Array.isArray(response.data?.stops))) return sourceFailure({ code: 'invalid_response', message: 'National bus-stop information could not be safely interpreted. Please try again.', provenance, warnings: ['A prepared NaPTAN stop file was incomplete or malformed.'] });
+    if (responses.some(response => !PREPARED_BUS_SCHEMAS.has(response.data?.schema) || !Array.isArray(response.data?.stops))) return sourceFailure({ code: 'invalid_response', message: 'National bus-stop information could not be safely interpreted. Please try again.', provenance, warnings: ['A prepared NaPTAN stop file was incomplete or malformed.'] });
     const deduplicated = new Map();
     const fields = index.stopFields ?? [];
     for (const response of responses) for (const rawStop of response.data?.stops ?? []) {
@@ -202,7 +203,7 @@ export function createPreparedBusDataAdapter({
     }))];
     const responses = await Promise.all(paths.map(path => loadJson(path, forceRefresh)));
     if (!paths.length || responses.some(response => !response.ok)) return sourceFailure({ code: 'unavailable_source', message: 'Bus timetable information could not be checked. Please try again.', provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url }, warnings: ['One or more prepared timetable files could not be loaded.'] });
-    if (responses.some(response => response.data?.schema !== 'atlas-prepared-bus-data-v1' || !Array.isArray(response.data?.services))) return sourceFailure({ code: 'invalid_response', message: 'Bus timetable information could not be safely interpreted. Please try again.', provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url }, warnings: ['A prepared timetable file was incomplete or malformed.'] });
+    if (responses.some(response => !PREPARED_BUS_SCHEMAS.has(response.data?.schema) || !Array.isArray(response.data?.services))) return sourceFailure({ code: 'invalid_response', message: 'Bus timetable information could not be safely interpreted. Please try again.', provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url }, warnings: ['A prepared timetable file was incomplete or malformed.'] });
     const services = new Map();
     for (const response of responses) for (const rawService of response.data?.services ?? []) {
       const service = normalisePreparedService(rawService);
@@ -272,5 +273,33 @@ export function createPreparedBusDataAdapter({
     });
   }
 
-  return Object.freeze({ id: 'prepared-national-bus-data-v1', manifest, nearbyStops, servicesForStops });
+  async function logicalGroupsForStops(stops, { forceRefresh = false } = {}) {
+    const manifestResult = await manifest(forceRefresh);
+    if (!manifestResult.ok) return manifestResult;
+    const index = manifestResult.data;
+    if (index.schema !== 'atlas-prepared-bus-data-v2') return sourceSuccess({ data: [], warnings: ['Prepared v1 data does not contain logical StopArea sidecars.'], provenance: { source: STOP_SOURCE, preparedSchema: index.schema, groupingAvailable: false } });
+    const keys = [...new Set((stops ?? []).flatMap(stop => (stop.logicalGroupRefs ?? []).map(ref => String(ref.sourceId ?? '').slice(0, Number(index.groupShardKeyLength || 3))).filter(Boolean)))];
+    const paths = keys.map(key => index.groupShards?.[key]).filter(Boolean);
+    const responses = await Promise.all(paths.map(path => loadJson(path, forceRefresh)));
+    if (responses.some(response => !response.ok) || responses.some(response => response.data?.schema !== 'atlas-prepared-logical-groups-v1' || !Array.isArray(response.data?.groups))) return sourceFailure({ code: 'invalid_response', message: 'Logical bus-stop grouping could not be safely interpreted. Please try again.', provenance: { source: STOP_SOURCE, groupingAvailable: true } });
+    const wanted = new Set((stops ?? []).flatMap(stop => (stop.logicalGroupRefs ?? []).map(ref => String(ref.id ?? ''))));
+    const groups = responses.flatMap(response => response.data.groups).filter(group => wanted.has(group.id)).sort((a, b) => a.id.localeCompare(b.id));
+    return sourceSuccess({ data: groups, provenance: { source: STOP_SOURCE, preparedSchema: index.schema, groupingAvailable: true, resultCount: groups.length } });
+  }
+
+  async function localitiesForStops(stops, { forceRefresh = false } = {}) {
+    const manifestResult = await manifest(forceRefresh);
+    if (!manifestResult.ok) return manifestResult;
+    const index = manifestResult.data;
+    if (index.schema !== 'atlas-prepared-bus-data-v2') return sourceSuccess({ data: [], warnings: ['Prepared v1 data does not contain NPTG locality sidecars.'], provenance: { source: STOP_SOURCE, localityAvailable: false } });
+    const keys = [...new Set((stops ?? []).map(stop => String(stop.nptgLocalityCode ?? '').slice(0, Number(index.localityShardKeyLength || 3))).filter(Boolean))];
+    const paths = keys.map(key => index.localityShards?.[key]).filter(Boolean);
+    const responses = await Promise.all(paths.map(path => loadJson(path, forceRefresh)));
+    if (responses.some(response => !response.ok) || responses.some(response => response.data?.schema !== 'atlas-prepared-nptg-localities-v1' || !Array.isArray(response.data?.localities))) return sourceFailure({ code: 'invalid_response', message: 'NPTG locality data could not be safely interpreted.', provenance: { source: STOP_SOURCE, localityAvailable: true } });
+    const wanted = new Set((stops ?? []).map(stop => `nptg:${stop.nptgLocalityCode}`).filter(id => id !== 'nptg:'));
+    const localities = responses.flatMap(response => response.data.localities).filter(locality => wanted.has(locality.id)).sort((a, b) => a.id.localeCompare(b.id));
+    return sourceSuccess({ data: localities, provenance: { source: STOP_SOURCE, localityAvailable: true, resultCount: localities.length } });
+  }
+
+  return Object.freeze({ id: 'prepared-national-bus-data-v1-v2-compatible', manifest, nearbyStops, servicesForStops, logicalGroupsForStops, localitiesForStops });
 }

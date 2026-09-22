@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<NaPTAN xmlns="urn:gov:dft:naptan:2.1" SchemaVersion="2.1" CreationDateTime="2026-09-15T16:46:50+01:00">
+  <StopPoints>
+    <StopPoint Status="active" ModificationDateTime="2026-09-15T16:00:00+01:00">
+      <AtcoCode>490006381N</AtcoCode><NaptanCode>oxgajm</NaptanCode>
+      <Descriptor><CommonName>East View</CommonName><Indicator>Stop WT</Indicator><Bearing>N</Bearing></Descriptor>
+      <Place><NptgLocalityRef>E0014000</NptgLocalityRef><Location><Translation><Latitude>51.61285</Latitude><Longitude>-0.00249</Longitude></Translation></Location></Place>
+      <StopClassification><StopType>BCS</StopType><BusStopType>MKD</BusStopType></StopClassification>
+      <StopAreaRef Status="active">490G00006381</StopAreaRef>
+    </StopPoint>
+    <StopPoint Status="active" ModificationDateTime="2026-09-15T16:00:00+01:00">
+      <AtcoCode>490006381S</AtcoCode><NaptanCode>oxgajw</NaptanCode>
+      <Descriptor><CommonName>East View</CommonName><Indicator>Stop WE</Indicator><Bearing>SW</Bearing></Descriptor>
+      <Place><NptgLocalityRef>E0014000</NptgLocalityRef><Location><Translation><Latitude>51.61310</Latitude><Longitude>-0.00176</Longitude></Translation></Location></Place>
+      <StopClassification><StopType>BCS</StopType></StopClassification>
+      <StopAreaRef Status="active">490G00006381</StopAreaRef>
+    </StopPoint>
+    <StopPoint Status="inactive">
+      <AtcoCode>490020135W</AtcoCode><Descriptor><CommonName>Clapham Common Old Town</CommonName></Descriptor>
+      <Place><Location><Translation><Latitude>51.456</Latitude><Longitude>-0.138</Longitude></Translation></Location></Place>
+      <StopClassification><StopType>BCS</StopType></StopClassification>
+      <StopAreaRef Status="deleted">490G000460</StopAreaRef>
+    </StopPoint>
+  </StopPoints>
+  <StopAreas>
+    <StopArea Status="active">
+      <StopAreaCode>490G00006381</StopAreaCode><Name>East View</Name><StopAreaType>GPBS</StopAreaType>
+      <Location><Translation><Latitude>51.61298</Latitude><Longitude>-0.00210</Longitude></Translation></Location>
+    </StopArea>
+    <StopArea Status="inactive"><StopAreaCode>490G00145L</StopAreaCode><Name>Marylebone</Name><StopAreaType>GPBS</StopAreaType></StopArea>
+  </StopAreas>
+</NaPTAN>

@@ -5,7 +5,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from refresh_bus_data import BODS_DOWNLOAD_ROOT, BODS_REGIONS, RefreshError, TNDS_REGIONS, acquire_bods, acquire_tnds, source_outcome, tnds_region_from_filename, validate_candidate
+from refresh_bus_data import BODS_DOWNLOAD_ROOT, BODS_REGIONS, NAPTAN_XML_URL, NPTG_XML_URL, RefreshError, TNDS_REGIONS, acquire_bods, acquire_prepared_data_v2_sources, acquire_tnds, source_outcome, tnds_region_from_filename, validate_candidate
 
 
 class IncompleteFtp:
@@ -105,6 +105,21 @@ class RefreshTests(unittest.TestCase):
 
         with self.assertRaisesRegex(RefreshError, 'BODS east_anglia endpoint'):
             acquire_bods(self.root, download_fn=corrupt_download)
+
+    def test_v2_foundation_acquires_and_hashes_xml_sources_without_raw_output_contract(self):
+        urls = []
+
+        def fake_download(url, destination, label):
+            urls.append(url)
+            destination.write_bytes(f'<source url="{url}"/>'.encode())
+            return {'identity': url, 'httpStatus': 200, 'contentType': 'application/xml', 'sourceHash': 'fixture-hash'}
+
+        naptan, nptg, metadata = acquire_prepared_data_v2_sources(self.root, download_fn=fake_download)
+        self.assertEqual(urls, [NAPTAN_XML_URL, NPTG_XML_URL])
+        self.assertTrue(naptan.is_file())
+        self.assertTrue(nptg.is_file())
+        self.assertEqual(metadata['naptan']['sourceHash'], 'fixture-hash')
+        self.assertEqual(metadata['nptg']['identity'], NPTG_XML_URL)
 
     def test_incomplete_regions_fail_before_download(self):
         with self.assertRaisesRegex(RefreshError, 'missing regions'):

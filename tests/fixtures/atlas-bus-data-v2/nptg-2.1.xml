@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<NationalPublicTransportGazetteer xmlns="urn:gov:dft:nptg:2.1" SchemaVersion="2.1" ModificationDateTime="2026-01-08T10:00:00+00:00">
+  <NptgDistricts>
+    <NptgDistrict><NptgDistrictCode>26</NptgDistrictCode><DistrictName>Broxbourne</DistrictName></NptgDistrict>
+    <NptgDistrict><NptgDistrictCode>56</NptgDistrictCode><DistrictName>Dacorum</DistrictName></NptgDistrict>
+  </NptgDistricts>
+  <NptgLocalities>
+    <NptgLocality><NptgLocalityCode>E0013720</NptgLocalityCode><LocalityName>Waltham Cross</LocalityName><NptgDistrictRef>26</NptgDistrictRef><SourceLocalityType>Town</SourceLocalityType></NptgLocality>
+    <NptgLocality><NptgLocalityCode>E0014000</NptgLocalityCode><LocalityName>East View</LocalityName><ParentNptgLocalityRef>E0013720</ParentNptgLocalityRef><NptgDistrictRef>26</NptgDistrictRef></NptgLocality>
+    <NptgLocality><NptgLocalityCode>E0019999</NptgLocalityCode><LocalityName>Cycle A</LocalityName><ParentNptgLocalityRef>E0020000</ParentNptgLocalityRef></NptgLocality>
+    <NptgLocality><NptgLocalityCode>E0020000</NptgLocalityCode><LocalityName>Cycle B</LocalityName><ParentNptgLocalityRef>E0019999</ParentNptgLocalityRef></NptgLocality>
+  </NptgLocalities>
+</NationalPublicTransportGazetteer>

@@ -10,6 +10,7 @@ export const CANDIDATE_COMPATIBILITY_SCHEMA = 'atlas-candidate-generation-compat
 // part of this candidate-generation compatibility contract.
 export const CANDIDATE_COMPATIBILITY_FILES = Object.freeze([
   'tools/atlas-bus-data/build_static_index.py',
+  'tools/atlas-bus-data/prepared_data_v2.py',
   'tools/atlas-bus-data/refresh_bus_data.py',
   'tools/atlas-bus-data/prepare_tnds.mjs',
   'src/atlas/adapters/tnds-transxchange-adapter.mjs',

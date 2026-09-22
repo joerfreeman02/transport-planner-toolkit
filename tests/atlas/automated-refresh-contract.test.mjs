@@ -20,6 +20,13 @@ const release = JSON.parse(fs.readFileSync(path.join(root, 'atlas/config/atlas-r
 assert.equal(release.version, '2.0.0-alpha.15');
 assert.equal(release.build, 'ATLAS-2.0.0-alpha.15-20260914');
 assert.match(workflow, /workflow_dispatch/);
+assert.match(workflow, /prepared_schema:/);
+assert.match(workflow, /default: v1/);
+assert.match(workflow, /- v1[\s\S]*- v2/);
+assert.match(workflow, /Prepared-data v2 is diagnostic-only/);
+assert.match(workflow, /--prepared-schema/);
+assert.match(workflow, /inputs\.prepared_schema \|\| 'v1'/);
+assert.match(workflow, /FORCE_REFRESH:.*inputs\.prepared_schema == 'v2'/);
 assert.match(workflow, /Manual non-main execution is diagnostic-only/);
 assert.match(workflow, /ATLAS_TNDS_BANKS_JSON/);
 assert.match(workflow, /select-bank\.mjs/);

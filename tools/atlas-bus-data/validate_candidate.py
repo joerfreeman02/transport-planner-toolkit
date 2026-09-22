@@ -10,6 +10,9 @@ from pathlib import Path
 from refresh_bus_data import RefreshError, TNDS_REGIONS, candidate_metrics, validate_tnds_region_coverage
 
 KNOWN_TNDS_QUARANTINE_REASONS = {"incomplete_runtime_sequence", "missing_timing_links"}
+BUS_SCHEMAS = {"atlas-prepared-bus-data-v1", "atlas-prepared-bus-data-v2"}
+V2_GROUP_SCHEMA = "atlas-prepared-logical-groups-v1"
+V2_LOCALITY_SCHEMA = "atlas-prepared-nptg-localities-v1"
 
 
 def read_json(path: Path):
@@ -56,13 +59,73 @@ def validate_tnds_service(service: dict, relative: str) -> None:
         raise RefreshError(f"Candidate TNDS service is empty or malformed: {relative}")
 
 
+def shard_paths(mapping: dict, label: str) -> list[str]:
+    if not isinstance(mapping, dict) or not mapping:
+        raise RefreshError(f"Candidate {label} shards are missing or malformed")
+    paths = []
+    for key, configured in mapping.items():
+        values = configured if isinstance(configured, list) else [configured]
+        if not isinstance(key, str) or not values or any(not isinstance(value, str) or not value for value in values):
+            raise RefreshError(f"Candidate {label} shards are malformed")
+        paths.extend(values)
+    return paths
+
+
+def unpack_stop(record, fields: list[str], relative: str) -> dict:
+    if not isinstance(record, list) or len(record) != len(fields):
+        raise RefreshError(f"Candidate StopPoint record is malformed: {relative}")
+    return dict(zip(fields, record))
+
+
+def validate_v2_sidecars(bus: Path, manifest: dict, stop_ids: set[str]) -> dict:
+    group_paths = shard_paths(manifest.get("groupShards"), "logical-group")
+    locality_paths = shard_paths(manifest.get("localityShards"), "locality")
+    groups: dict[str, dict] = {}
+    localities: dict[str, dict] = {}
+    for relative in group_paths:
+        payload = read_json(bus / relative)
+        if payload.get("schema") != V2_GROUP_SCHEMA or not isinstance(payload.get("groups"), list) or not payload["groups"]:
+            raise RefreshError(f"Candidate logical-group shard is empty or malformed: {relative}")
+        for group in payload["groups"]:
+            identity = group.get("id") if isinstance(group, dict) else None
+            if not identity or identity in groups:
+                raise RefreshError(f"Candidate logical-group identity is missing or duplicated: {relative}")
+            groups[identity] = group
+    for relative in locality_paths:
+        payload = read_json(bus / relative)
+        if payload.get("schema") != V2_LOCALITY_SCHEMA or not isinstance(payload.get("localities"), list) or not payload["localities"]:
+            raise RefreshError(f"Candidate locality shard is empty or malformed: {relative}")
+        for locality in payload["localities"]:
+            identity = locality.get("id") if isinstance(locality, dict) else None
+            if not identity or identity in localities:
+                raise RefreshError(f"Candidate locality identity is missing or duplicated: {relative}")
+            localities[identity] = locality
+    for group in groups.values():
+        if group.get("status") != "active":
+            continue
+        members = group.get("memberStopPointIds")
+        if not isinstance(members, list) or len(set(members)) != len(members):
+            raise RefreshError(f"Candidate active logical-group members are malformed: {group.get('id')}")
+        missing_members = group.get("missingMemberStopPointIds", [])
+        if not isinstance(missing_members, list) or missing_members:
+            raise RefreshError(f"Candidate active logical-group has unresolved members: {group.get('id')}")
+        missing = [stop_id for stop_id in members if str(stop_id) not in stop_ids]
+        if missing:
+            raise RefreshError(f"Active logical-group member StopPoint is missing: {missing[0]}")
+    for locality in localities.values():
+        if locality.get("districtId") and not isinstance(locality.get("districtName"), str):
+            raise RefreshError(f"Candidate locality district name is missing: {locality.get('id')}")
+    return {"groups": groups, "localities": localities, "groupShardCount": len(group_paths), "localityShardCount": len(locality_paths)}
+
+
 def validate(site: Path) -> dict:
     data = site / "atlas" / "data"
     bus = data / "bus"
     tnds = data / "bus-tnds"
     bus_manifest = read_json(bus / "manifest.json")
     tnds_manifest = read_json(tnds / "manifest.json")
-    if bus_manifest.get("schema") != "atlas-prepared-bus-data-v1":
+    bus_schema = bus_manifest.get("schema")
+    if bus_schema not in BUS_SCHEMAS:
         raise RefreshError("Candidate NaPTAN/BODS manifest schema is invalid")
     if tnds_manifest.get("schema") != "atlas-prepared-bus-tnds-v1":
         raise RefreshError("Candidate TNDS manifest schema is invalid")
@@ -80,16 +143,42 @@ def validate(site: Path) -> dict:
     if metrics["bodsRegionCount"] < 8:
         raise RefreshError("Candidate BODS regional coverage is incomplete")
     stop_ids = set()
+    stop_records = []
+    stop_fields = bus_manifest.get("stopFields", [])
+    if bus_schema == "atlas-prepared-bus-data-v2" and (not isinstance(stop_fields, list) or len(set(stop_fields)) != len(stop_fields)):
+        raise RefreshError("Candidate v2 stopFields are missing or malformed")
     for relative in bus_manifest.get("stopShards", {}).values():
         payload = read_json(bus / relative)
-        if payload.get("schema") != "atlas-prepared-bus-data-v1" or not payload.get("stops"):
+        if payload.get("schema") != bus_schema or not payload.get("stops"):
             raise RefreshError(f"Candidate stop shard is empty or malformed: {relative}")
-        stop_ids.update(str(record[0]) for record in payload["stops"] if record)
+        for record in payload["stops"]:
+            stop = unpack_stop(record, stop_fields, relative) if bus_schema == "atlas-prepared-bus-data-v2" else {"id": record[0] if isinstance(record, list) and record else None}
+            if not stop.get("id") or str(stop["id"]) in stop_ids:
+                raise RefreshError(f"Candidate physical StopPoint identity is missing or duplicated: {relative}")
+            stop_ids.add(str(stop["id"]))
+            stop_records.append(stop)
+    v2_sidecars = None
+    if bus_schema == "atlas-prepared-bus-data-v2":
+        v2_sidecars = validate_v2_sidecars(bus, bus_manifest, stop_ids)
+        group_ids = set(v2_sidecars["groups"])
+        locality_ids = set(v2_sidecars["localities"])
+        for stop in stop_records:
+            refs = stop.get("logicalGroupRefs")
+            if not isinstance(refs, list):
+                raise RefreshError(f"Candidate v2 logicalGroupRefs are malformed: {stop.get('id')}")
+            for ref in refs:
+                if not isinstance(ref, dict) or not ref.get("id") or not isinstance(ref.get("targetExists"), bool):
+                    raise RefreshError(f"Candidate v2 logicalGroupRef is malformed: {stop.get('id')}")
+                if ref["id"] not in group_ids and ref["targetExists"] is not False:
+                    raise RefreshError(f"Candidate v2 logicalGroupRef is unresolved without explicit classification: {stop.get('id')}")
+            locality_code = stop.get("nptgLocalityCode")
+            if locality_code and f"nptg:{locality_code}" not in locality_ids and stop.get("localityResolution") != "unresolved":
+                raise RefreshError(f"Candidate v2 NPTG locality reference is unresolved without explicit classification: {stop.get('id')}")
     service_count = 0
     for relative_paths in bus_manifest.get("serviceShards", {}).values():
         for relative in relative_paths:
             payload = read_json(bus / relative)
-            if payload.get("schema") != "atlas-prepared-bus-data-v1" or not payload.get("services"):
+            if payload.get("schema") != bus_schema or not payload.get("services"):
                 raise RefreshError(f"Candidate service shard is empty or malformed: {relative}")
             for service in payload["services"]:
                 service_count += 1
@@ -122,7 +211,10 @@ def validate(site: Path) -> dict:
     forbidden = [path for path in data.rglob("*") if path.is_file() and path.suffix.lower() in {".csv", ".zip", ".xml"}]
     if forbidden:
         raise RefreshError(f"Raw source file leaked into public data: {forbidden[0].name}")
-    return {**metrics, "serviceShardRecords": service_count, "tndsShardRecords": tnds_service_count, "stopIds": len(stop_ids)}
+    result = {**metrics, "serviceShardRecords": service_count, "tndsShardRecords": tnds_service_count, "stopIds": len(stop_ids)}
+    if v2_sidecars:
+        result.update({"logicalGroupRecords": len(v2_sidecars["groups"]), "localityRecords": len(v2_sidecars["localities"])})
+    return result
 
 
 def main() -> None:

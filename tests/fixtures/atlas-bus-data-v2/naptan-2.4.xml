@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<NaPTAN xmlns="urn:gov:dft:naptan:2.4" SchemaVersion="2.4">
+  <StopPoints>
+    <StopPoint Status="active">
+      <AtcoCode>210021703420</AtcoCode><Descriptor><CommonName>Bus Station</CommonName><Indicator>Stop A</Indicator></Descriptor>
+      <Place><NptgLocalityRef>E0013720</NptgLocalityRef><Location><Translation><Latitude>51.6856</Latitude><Longitude>-0.0312</Longitude></Translation></Location></Place>
+      <StopClassification><StopType>BCS</StopType></StopClassification><StopAreaRef>210G432</StopAreaRef>
+    </StopPoint>
+    <StopPoint Status="active">
+      <AtcoCode>210021109155</AtcoCode><Descriptor><CommonName>Willian Road</CommonName></Descriptor>
+      <Place><NptgLocalityRef>E0013720</NptgLocalityRef><Location><Translation><Latitude>51.90</Latitude><Longitude>-0.20</Longitude></Translation></Location></Place>
+      <StopClassification><StopType>BCS</StopType></StopClassification><StopAreaRef>210G11368</StopAreaRef><StopAreaRef>210G1828</StopAreaRef>
+    </StopPoint>
+  </StopPoints>
+  <StopAreas>
+    <StopArea Status="active"><StopAreaCode>210G432</StopAreaCode><Name>Bus Station</Name><StopAreaType>GBCS</StopAreaType><ParentAreaRef>210G900</ParentAreaRef></StopArea>
+    <StopArea Status="active"><StopAreaCode>210G11368</StopAreaCode><Name>Willian Road</Name><StopAreaType>GPBS</StopAreaType></StopArea>
+    <StopArea Status="active"><StopAreaCode>210G1828</StopAreaCode><Name>Willian Road alternate</Name><StopAreaType>GPBS</StopAreaType></StopArea>
+  </StopAreas>
+</NaPTAN>

@@ -24,6 +24,8 @@ from pathlib import Path
 
 TNDS_REGIONS = ("EA", "EM", "NE", "NW", "SE", "SW", "WM", "Y")
 NAPTAN_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=csv"
+NAPTAN_XML_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"
+NPTG_XML_URL = "https://naptan.api.dft.gov.uk/v1/nptg"
 BODS_URL = "https://data.bus-data.dft.gov.uk/timetable/download/"
 BODS_DOWNLOAD_ROOT = "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/"
 BODS_REGIONS = ("east_anglia", "east_midlands", "london", "north_east", "north_west", "south_east", "south_west", "west_midlands", "yorkshire")
@@ -85,6 +87,21 @@ def download(url: str, destination: Path, label: str = "authoritative source", o
         if last_error:
             time.sleep(2 ** attempt)
     raise RefreshError(f"{label} could not be downloaded: {url}") from last_error
+
+
+def acquire_prepared_data_v2_sources(staging: Path, download_fn=download, naptan_url: str = NAPTAN_XML_URL) -> tuple[Path, Path, dict]:
+    """Acquire and hash the v2 foundation sources without building or publishing.
+
+    The caller may choose an ATCO-area query (for example 490 or 210) through
+    ``naptan_url`` for bounded checks.  No
+    source is interpreted as CSV and no raw response is retained in the
+    prepared output; only hashes and schema metadata are returned.
+    """
+    naptan = staging / "naptan.xml"
+    nptg = staging / "nptg.xml"
+    naptan_source = download_fn(naptan_url, naptan, label="NaPTAN XML source")
+    nptg_source = download_fn(NPTG_XML_URL, nptg, label="NPTG XML source")
+    return naptan, nptg, {"naptan": {"identity": naptan_url, **naptan_source}, "nptg": {"identity": NPTG_XML_URL, **nptg_source}}
 
 
 def safe_extract(archive: Path, destination: Path) -> None:
@@ -304,7 +321,8 @@ def candidate_metrics(site: Path) -> dict:
         if not (site / "atlas" / "data" / ("bus-tnds" if relative in tnds_paths else "bus") / relative).is_file():
             raise RefreshError(f"Prepared candidate references a missing file: {relative}")
     bods_regions = bus.get("sources", {}).get("bods", {}).get("regions", [])
-    return {
+    counts = bus.get("counts", {}) if bus.get("schema") == "atlas-prepared-bus-data-v2" else {}
+    metrics = {
         "naptanStopCount": bus.get("sources", {}).get("naptan", {}).get("stopCount", 0),
         "bodsRegionCount": len(bods_regions),
         "bodsServiceCount": sum(int(region.get("serviceCount", 0) or 0) for region in bods_regions),
@@ -316,6 +334,19 @@ def candidate_metrics(site: Path) -> dict:
         "tndsIgnoredRegistrationFileCounts": tnds.get("ignoredRegistrationFileCounts", {}),
         "tndsServiceCount": tnds["serviceCount"],
     }
+    if bus.get("schema") == "atlas-prepared-bus-data-v2":
+        metrics.update({
+            "activeStopPointCount": counts.get("activeStopPointCount", metrics["naptanStopCount"]),
+            "logicalGroupCount": counts.get("logicalGroupCount", 0),
+            "localityCount": counts.get("localityCount", 0),
+            "districtCount": counts.get("districtCount", 0),
+            "stopShardCount": counts.get("stopShardCount", len(bus.get("stopShards", {}))),
+            "serviceShardCount": counts.get("serviceShardCount", sum(len(value) for value in bus.get("serviceShards", {}).values())),
+            "logicalGroupShardCount": counts.get("logicalGroupShardCount", len(bus.get("groupShards", {}))),
+            "localityShardCount": counts.get("localityShardCount", len(bus.get("localityShards", {}))),
+            "v2Qa": bus.get("qa", {}),
+        })
+    return metrics
 
 
 def validate_candidate(site: Path, baseline: dict | None = None) -> dict:
@@ -373,21 +404,33 @@ def run(args: argparse.Namespace) -> dict:
         previous_status = {}
     deployed_baseline = baseline_metrics(previous_root) if previous_root and previous_status else {}
     baseline = deployed_baseline if deployed_baseline else baseline_metrics(site)
+    prepared_schema = getattr(args, "prepared_schema", "v1")
+    if prepared_schema not in {"v1", "v2"}:
+        raise RefreshError("prepared schema must be v1 or v2")
     staging = site.parent / f"atlas-bus-refresh-staging-{os.getpid()}"
     shutil.rmtree(staging, ignore_errors=True)
     staging.mkdir(parents=True)
     try:
-        naptan = staging / "naptan.csv"
-        naptan_source = download(NAPTAN_URL, naptan, label="NaPTAN source")
+        if prepared_schema == "v2":
+            naptan, nptg, xml_sources = acquire_prepared_data_v2_sources(staging)
+            naptan_source = xml_sources["naptan"]
+        else:
+            naptan = staging / "naptan.csv"
+            naptan_source = download(NAPTAN_URL, naptan, label="NaPTAN source")
         gtfs, bods = acquire_bods(staging)
         tnds_xml, tnds = acquire_tnds(staging, os.environ.get("TNDS_USERNAME", ""), os.environ.get("TNDS_PASSWORD", ""))
         site_bus = site / "atlas" / "data" / "bus"
         site_tnds = site / "atlas" / "data" / "bus-tnds"
         site_bus.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run([sys.executable, str(Path(__file__).with_name("build_static_index.py")), "--naptan", str(naptan), "--gtfs-dir", str(gtfs), "--output", str(site_bus), "--snapshot-date", datetime.now(timezone.utc).date().isoformat(), "--generated-at", started], check=True)
+        build_command = [sys.executable, str(Path(__file__).with_name("build_static_index.py")), "--gtfs-dir", str(gtfs), "--output", str(site_bus), "--snapshot-date", datetime.now(timezone.utc).date().isoformat(), "--generated-at", started]
+        if prepared_schema == "v2":
+            build_command.extend(["--schema", "atlas-prepared-bus-data-v2", "--naptan-xml", str(naptan), "--nptg-xml", str(nptg)])
+        else:
+            build_command.extend(["--naptan", str(naptan)])
+        subprocess.run(build_command, check=True)
         prepared_manifest_path = site_bus / "manifest.json"
         prepared_manifest = json.loads(prepared_manifest_path.read_text(encoding="utf-8"))
-        for source in ("naptan", "bods"):
+        for source in (("naptan", "nptg", "bods") if prepared_schema == "v2" else ("naptan", "bods")):
             prepared_manifest.get("sources", {}).get(source, {}).pop("downloadedAt", None)
         prepared_manifest_path.write_text(json.dumps(prepared_manifest, separators=(",", ":")) + "\n", encoding="utf-8")
         node = os.environ.get("ATLAS_NODE", "node")
@@ -398,11 +441,16 @@ def run(args: argparse.Namespace) -> dict:
         bods_outcome, bods_note = source_outcome(bods["sourceHash"], previous_status.get("sources", {}).get("bods"))
         tnds_outcome, tnds_note = source_outcome(tnds["sourceHash"], previous_status.get("sources", {}).get("tnds"))
         sources = {
-            "naptan": {"identity": NAPTAN_URL, "checkedAt": started, "httpStatus": naptan_source["httpStatus"], "contentType": naptan_source["contentType"], "sourceHash": naptan_hash, "outcome": naptan_outcome, "preparedCount": counts["naptanStopCount"]},
+            "naptan": {"identity": NAPTAN_XML_URL if prepared_schema == "v2" else NAPTAN_URL, "checkedAt": started, "httpStatus": naptan_source["httpStatus"], "contentType": naptan_source["contentType"], "sourceHash": naptan_hash, "outcome": naptan_outcome, "preparedCount": counts["naptanStopCount"], "format": "xml" if prepared_schema == "v2" else "csv"},
             "bods": {"identity": bods["identity"], "checkedAt": started, "sourceHash": bods["sourceHash"], "outcome": bods_outcome, "regionsChecked": bods["regions"], "preparedCount": {"regions": counts["bodsRegionCount"], "services": counts["bodsServiceCount"]}},
             "tnds": {"identity": tnds["identity"], "checkedAt": started, "sourceHash": tnds["sourceHash"], "regionHashes": tnds["regionHashes"], "regionsChecked": tnds["regions"], "outcome": tnds_outcome, "preparedCount": counts["tndsServiceCount"], "processedRegions": counts["tndsProcessedRegions"], "regionServiceCounts": counts["tndsRegionServiceCounts"], "sourceFileCounts": counts["tndsSourceFileCounts"], "parsedFileCounts": counts["tndsParsedFileCounts"], "ignoredRegistrationFileCounts": counts["tndsIgnoredRegistrationFileCounts"], "transport": "legacy FTP; credentials supplied only to the runner"},
             "tfl": {"outcome": "LIVE", "description": "Live source — checked when a London assessment is run"}
         }
+        if prepared_schema == "v2":
+            nptg_hash = sha256(nptg)
+            nptg_outcome, nptg_note = source_outcome(nptg_hash, previous_status.get("sources", {}).get("nptg"))
+            sources["nptg"] = {"identity": NPTG_XML_URL, "checkedAt": started, "httpStatus": xml_sources["nptg"]["httpStatus"], "contentType": xml_sources["nptg"]["contentType"], "sourceHash": nptg_hash, "outcome": nptg_outcome, "format": "xml"}
+            if nptg_note: sources["nptg"]["note"] = nptg_note
         for source, note in (("naptan", naptan_note), ("bods", bods_note), ("tnds", tnds_note)):
             if note: sources[source]["note"] = note
         release = load_release_metadata(site)
@@ -419,6 +467,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site-root", required=True)
     parser.add_argument("--previous-root", help="Optional read-only copy of the last successful Pages deployment")
+    parser.add_argument("--prepared-schema", choices=("v1", "v2"), default="v1", help="Prepared-data contract; v2 acquires XML NaPTAN and NPTG sources")
     args = parser.parse_args()
     try:
         print(json.dumps(run(args), indent=2))

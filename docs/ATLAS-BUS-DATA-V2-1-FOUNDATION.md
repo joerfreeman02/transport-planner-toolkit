@@ -35,11 +35,11 @@ The builder CLI has two explicit contracts:
 - v1 requires legacy `--naptan` CSV input;
 - v2 requires `--naptan-xml` and `--nptg-xml` and rejects the legacy `--naptan` argument.
 
-The workflow exposes `prepared_schema` with `v1` as the default and `v2` as an opt-in diagnostic choice. Scheduled and production paths remain v1. Publication and checkpoint-save gates remain unavailable to a v2 diagnostic run.
+The workflow exposes `prepared_schema` with `v1` as the default and `v2` as an opt-in diagnostic choice. A manually dispatched v2 request automatically sets the freshness decision to require a new acquisition/build; the operator does not need a separate `force_refresh` selection. Scheduled and ordinary manual v1 paths retain their existing behaviour. Publication and checkpoint-save gates remain unavailable to a v2 diagnostic run.
 
 ## Controlled v1/v2 parity evidence
 
-The deterministic fixture builds v1 and v2 from the same GTFS, snapshot date, and generated timestamp. Physical semantic fields (`id`, name, indicator, direction, coordinates, locality and parent locality), service records, schedules, and principal-location semantics compare equal. BNG and WGS84 representations produce equal coordinates. Existing Cambridge/v1 regression coverage remains in the deterministic suite.
+The deterministic fixture builds v1 and v2 from the same GTFS, snapshot date, and generated timestamp. Every emitted active physical StopPoint is decoded and compared by ID: the complete ID set, legacy semantic fields, route set, coordinates, locality, parent locality, modification time, and coordinate-method semantics compare equal. No stop is gained or lost. Complete service records, schedules, and principal-location semantics also compare equal. BNG and WGS84 representations produce equal coordinates. Existing Cambridge/v1 regression coverage remains in the deterministic suite.
 
 The v2 adapter continues to decode v1 and v2 physical/service shards. V2 sidecars are exposed for later runtime work; no current assessment path consumes them for grouping or destination presentation.
 
@@ -78,7 +78,7 @@ A dirty worktree must not be presented as tested. The review server currently in
 
 ## Validation performed
 
-Targeted Python controls cover the v2 CLI contract, WGS84/BNG/invalid coordinate handling, modification-time representations, locality/parent/district preservation, multiple active membership QA, source timestamp provenance, v1/v2 fixture parity, v2 sidecar validation, raw-source rejection, and duplicate sidecar identities.
+Targeted Python controls cover the v2 CLI contract, WGS84/BNG/invalid coordinate handling, modification-time representations, locality/parent/district preservation, multiple active membership QA, source timestamp provenance, complete v1/v2 physical-stop and service parity, v2 sidecar validation, raw-source rejection, and duplicate sidecar identities. The workflow contract tests also prove that manual v2 diagnostics force a fresh build while scheduled and production defaults remain v1.
 
 The full deterministic Alpha.15 suite is required on the final clean branch HEAD after the documentation-only closeout commit. No full national candidate, manual planner assessment, production workflow, publication, Pages deployment, or merge is part of this sprint.
 

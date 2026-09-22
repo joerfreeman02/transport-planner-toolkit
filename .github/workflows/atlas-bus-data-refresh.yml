@@ -88,7 +88,7 @@ jobs:
       - name: Decide whether a full refresh is required
         id: decision
         env:
-          FORCE_REFRESH: ${{ (github.event_name == 'workflow_dispatch' && (inputs.force_refresh || inputs.resume_checkpoint_run_id != '')) || (github.event_name == 'schedule') }}
+          FORCE_REFRESH: ${{ (github.event_name == 'workflow_dispatch' && (inputs.force_refresh || inputs.resume_checkpoint_run_id != '' || inputs.prepared_schema == 'v2')) || (github.event_name == 'schedule') }}
         run: node tools/atlas-bus-data/refresh-freshness.mjs --status last-known-good/atlas/data/status/manifest.json --bus last-known-good/atlas/data/bus/manifest.json --tnds last-known-good/atlas/data/bus-tnds/manifest.json --force-refresh "$FORCE_REFRESH" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       - name: Record freshness decision
         run: echo "${{ steps.decision.outputs.message }}"

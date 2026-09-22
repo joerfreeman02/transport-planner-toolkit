@@ -8,7 +8,7 @@
       <StopClassification><StopType>BCS</StopType><BusStopType>MKD</BusStopType></StopClassification>
       <StopAreaRef Status="active">490G00006381</StopAreaRef>
     </StopPoint>
-    <StopPoint Status="active">
+    <StopPoint Status="active" ModificationDateTime="2026-09-15T16:00:00+01:00">
       <AtcoCode>490006381S</AtcoCode><NaptanCode>oxgajw</NaptanCode>
       <Descriptor><CommonName>East View</CommonName><Indicator>Stop WE</Indicator><Bearing>SW</Bearing></Descriptor>
       <Place><NptgLocalityRef>E0014000</NptgLocalityRef><Location><Translation><Latitude>51.61310</Latitude><Longitude>-0.00176</Longitude></Translation></Location></Place>

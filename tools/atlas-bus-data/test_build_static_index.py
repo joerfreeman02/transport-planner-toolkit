@@ -226,12 +226,24 @@ class PreparedDataV2ParserTests(unittest.TestCase):
             v1_args = type("V1Args", (), {"naptan": FIXTURES / "naptan-v1.csv", "gtfs_dir": gtfs, "output": v1_output, "snapshot_date": "2026-09-01", "generated_at": "2026-09-01T00:00:00Z", "grid_size": 0.25, "service_shard_key_length": 5})()
             BUILDER.build(v1_args)
             v1_manifest = json.loads((v1_output / "manifest.json").read_text(encoding="utf-8"))
-            v1_stop = json.loads(gzip.open(v1_output / next(iter(v1_manifest["stopShards"].values())), "rt", encoding="utf-8").read())["stops"][0]
-            v2_stop = json.loads(gzip.open(output / next(iter(manifest["stopShards"].values())), "rt", encoding="utf-8").read())["stops"][0]
-            v1_stop_semantic = dict(zip(v1_manifest["stopFields"], v1_stop))
-            v2_stop_semantic = dict(zip(manifest["stopFields"], v2_stop))
-            for field in ("id", "name", "indicator", "direction", "latitude", "longitude", "locality", "parentLocality"):
-                self.assertEqual(v1_stop_semantic.get(field), v2_stop_semantic.get(field), field)
+            def read_stops(prepared_root, prepared_manifest):
+                records = {}
+                for relative in prepared_manifest["stopShards"].values():
+                    payload = json.loads(gzip.open(prepared_root / relative, "rt", encoding="utf-8").read())
+                    for record in payload["stops"]:
+                        stop = dict(zip(prepared_manifest["stopFields"], record))
+                        records[stop["id"]] = stop
+                return records
+
+            v1_stops = read_stops(v1_output, v1_manifest)
+            v2_stops = read_stops(output, manifest)
+            self.assertEqual(set(v1_stops), set(v2_stops), "complete active physical StopPoint ID set")
+            self.assertEqual(len(v1_stops), len(v2_stops))
+            legacy_stop_fields = ("id", "naptanCode", "name", "indicator", "direction", "latitude", "longitude", "stopType", "busStopType", "locality", "parentLocality", "areaCode", "modifiedAt", "routes")
+            for stop_id in sorted(v1_stops):
+                for field in legacy_stop_fields:
+                    self.assertEqual(v1_stops[stop_id].get(field), v2_stops[stop_id].get(field), f"{stop_id}:{field}")
+                self.assertEqual(set(v1_stops[stop_id].get("routes") or []), set(v2_stops[stop_id].get("routes") or []), f"{stop_id}:routes")
             v1_service_path = next(iter(v1_manifest["serviceShards"].values()))[0]
             v2_service_path = next(iter(manifest["serviceShards"].values()))[0]
             v1_services = json.loads(gzip.open(v1_output / v1_service_path, "rt", encoding="utf-8").read())["services"]

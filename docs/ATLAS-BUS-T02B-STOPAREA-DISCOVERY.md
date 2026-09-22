@@ -1,6 +1,6 @@
 # ATLAS BUS — BUS-T02B-0 StopArea Architecture Discovery
 
-Status: **Discovery complete; no production behaviour implemented**  
+Status: **Discovery complete; architecture decision approved; no production behaviour implemented**
 Base: `a0c7972a8fa908f80b18be242e4d76aefad42d96`  
 Branch: `codex/atlas-bus-t02b-stoparea-discovery`  
 Formal release: `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`  
@@ -35,11 +35,12 @@ refresh national data, publish reference data, deploy Pages, or merge to
    core selected stop only when its rounded ATLAS-calculated WGS84 distance is
    less than or equal to the requested radius. Group membership must not
    silently promote an out-of-radius StopPoint into core service evidence.
-6. The recommended target for Technical Director approval is **Model 2 — core
-   plus related context**: retain authoritative out-of-radius group members as
-   clearly labelled context, but do not let them contribute core timetable or
-   planner evidence automatically. This is a recommendation for approval, not
-   an implementation decision made by this sprint.
+6. The earlier discovery recommendation of **Model 2 — core plus related
+   context only** was considered but is superseded. The Technical Director has
+   approved **core-triggered authoritative StopArea completion**: each active
+   StopArea directly referenced by a genuinely in-radius CORE StopPoint
+   qualifies, and every active direct physical member is included in the
+   logical-stop assessment while retaining its actual distance and provenance.
 7. StopArea and NPTG locality identifiers are structurally independent at
    runtime but are both source-identity metadata. If NPTG-1 is likely to follow
    before the next national refresh, one carefully bounded prepared-data schema
@@ -322,22 +323,49 @@ to StopArea X; StopPoint B belongs to X and is 710 m away.
 | 2. Core plus related context | A is core; B is retained as authoritative related context and labelled out-of-radius; B does not automatically contribute core evidence | Preserves radius semantics while exposing the reason for the relationship; supports later mapping and review; controlled completeness analysis | Requires separate core/context status in outputs; UI/Word contracts must prevent context from appearing as assessed service; more schema and validation work |
 | 3. Logical-group expansion | A causes B to become selected despite 710 m | Maximizes group-level visibility and may improve apparent opposite-stop completeness | Changes the meaning of a 700 m assessment; promotes service evidence outside the requested radius; risks route inflation and boundary discontinuities; complicates planner, map, and Word semantics |
 
-### Recommendation for Technical Director decision
+### Final Technical Director decision — supersedes the discovery recommendation
 
-Recommend **Model 2** as the target architecture to approve, with these
-guardrails:
+The earlier Model 2 recommendation was **not approved**. The approved policy
+is **CORE-TRIGGERED AUTHORITATIVE STOPAREA COMPLETION**.
 
-- only the core member set contributes to current timetable, service-summary,
-  frequency, and planner rows;
-- related members carry exact distance, membership provenance, and an explicit
-  `outOfCoreRadius` status;
-- no related member is silently selected, queried as core evidence, or used to
-  infer a missing route;
-- the assessment UI and Word output must distinguish core from context;
-- a later change to include context in any planner-facing result requires a
-  separate Technical Director decision.
+The policy is deliberately two-phase:
 
-This is a recommendation, not a choice implemented by BUS-T02B-0.
+1. A physical StopPoint is CORE only when its rounded ATLAS-calculated WGS84
+   straight-line distance is less than or equal to the requested radius.
+2. For every CORE StopPoint, each directly referenced active authoritative
+   NaPTAN StopArea qualifies. The assessment population is then the union of
+   every active direct physical member of those qualified StopAreas.
+
+Completed members retain their actual distance, physical identity, membership
+provenance, and an explicit status such as
+`GROUP_COMPLETED_OUTSIDE_CORE_RADIUS`. They are not falsely marked as within
+the radius. They may contribute legitimate route, timetable, direction,
+frequency, operating-period, and planner-summary evidence when independently
+supported by authoritative timetable data.
+
+This decision avoids arbitrarily splitting a logical bus stop at the radius
+boundary while retaining a deterministic radius qualification gate. It allows
+professional opposite-direction completeness without arbitrary route inflation,
+because no group qualifies unless at least one direct member is genuinely
+within the radius and membership comes from authoritative structure.
+
+### Final boundary and recursion rules
+
+- East View / Normanshire at 700 m: WT is approximately 765 m and WE
+  approximately 794 m. Neither is CORE, so StopArea `490G00006381` does not
+  qualify and route 212 remains absent. No route-specific exception is valid.
+- A group-completed member never triggers another StopArea. The only permitted
+  graph is `CORE SET → directly referenced active StopAreas → active direct
+  members → STOP`.
+- If a CORE StopPoint has multiple active direct StopArea references, all such
+  groups qualify independently; expansion remains non-recursive.
+- Large and complex groups are not truncated or capped by an arbitrary member
+  count or distance limit. Candidate QA must measure member count,
+  member-to-member span, maximum completion distance, inactive/missing members,
+  malformed groups, and outlier geometry.
+
+This is the approved architecture for a later implementation sprint; it was
+not implemented by BUS-T02B-0.
 
 ## 8. Real control evidence
 
@@ -548,7 +576,8 @@ add tests for:
 18. deterministic provider ordering and stable shard output;
 19. unchanged timetable StopPoint identities;
 20. unchanged core-radius semantics at 699/700/701 m;
-21. Model 2 context never contributes core service evidence;
+21. core-triggered group-completed members retain completion status and may
+    contribute only independently supported authoritative service evidence;
 22. no route-specific, StopPoint-specific, site-specific, coordinate-specific,
     or locality-name-specific behaviour;
 23. unchanged route authorities and timetable authorities;
@@ -579,12 +608,30 @@ add tests for:
 
 ## 14. Proposed ADR status
 
-`docs/adr/ADR-012-PROPOSED-STOPAREA-AND-LOCALITY-SCHEMA.md` is a draft only.
-It is **PROPOSED**, not accepted. It records the metadata-envelope direction,
-the open radius-policy decision, and the requirement for Technical Director
-approval before any protected candidate-generation file changes.
+`docs/adr/ADR-012-STOPAREA-AND-LOCALITY-SCHEMA.md` is now **APPROVED**. It
+records core-triggered authoritative StopArea completion, the shared v2
+StopArea/NPTG metadata migration, the non-recursive boundary, and the full
+fresh-candidate requirement. It does not authorize implementation in this
+documentation-only assignment.
 
-## 15. Tooling adoption review
+## 15. Hosted-check clarification
+
+The earlier wording that a Bus-specific hosted deterministic check passed was
+incorrect and is superseded. Independent Technical Director verification
+observed **Drawing Generator CI, Run #68, success** on PR head
+`d4b693ae00c0c2a6dd4864ad9b3c3dcd3d131b6c`.
+
+No Bus-specific hosted deterministic check was observed. This PR is
+documentation-only, so no Bus runtime CI is required for this merge.
+
+## 16. Approved next direction
+
+The next proposed implementation sprint is **BUS-DATA-V2 FOUNDATION**. Its
+scope is the shared prepared-data metadata foundation for authoritative
+StopArea structure and NPTG locality structure, without initially changing
+planner-facing runtime behaviour. It must not begin as part of this assignment.
+
+## 17. Tooling adoption review
 
 Status only; no tooling changes:
 
@@ -602,4 +649,3 @@ Status only; no tooling changes:
 - [DfT NaPTAN user guide](https://www.gov.uk/government/publications/national-public-transport-access-node-schema/html-version-of-schema)
 - [Official NaPTAN/NPTG API Swagger](https://naptan.api.dft.gov.uk/swagger/index.html)
 - [TfL Unified API portal](https://api-portal.tfl.gov.uk/)
-

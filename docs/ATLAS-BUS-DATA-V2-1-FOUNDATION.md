@@ -82,6 +82,14 @@ The changed protected inputs are exactly:
 
 The other protected candidate-generation inputs are unchanged, including `atlas/config/atlas-release.json`. Formal release identity remains `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`.
 
+The existing clean-worktree review server exposes the exact executable commit
+as the development/test identity. For this reviewed branch it is:
+
+`BUS-TFL-COMPLETE · b97725a`
+
+The identity is injected only from the clean Git `HEAD`; a dirty worktree is
+not presented as a tested build.
+
 ## Validation performed
 
 - Python builder/parser tests: `8` passed.

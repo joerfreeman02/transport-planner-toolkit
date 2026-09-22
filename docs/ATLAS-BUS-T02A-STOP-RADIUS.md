@@ -1,0 +1,226 @@
+# ATLAS BUS — BUS-T02A Core Stop-Discovery Radius Contract
+
+Status: implementation complete; awaiting Technical Director manual review.
+
+Manual cycle: `BUS-T02`  
+Formal release: `2.0.0-alpha.15`  
+Release identity: `ATLAS-2.0.0-alpha.15-20260914`  
+Run #24 publication: `35352167115-c670698dbf709a953d15b3927ee677fb502d1b3a`
+
+Clean committed control/review head for this closeout: `f930cedbfadd04d2f7b7aca495de78a8f40fc5dd`  
+The production executable T02A correction remains in
+`src/atlas/adapters/tfl-bus-stop-adapter.mjs`; no production executable
+semantics were changed during this closeout.
+
+## Scope and contract
+
+Before BUS-T02A, TfL was used as a candidate-retrieval service with a
+provider-side radius. The adapter calculated ATLAS distance but could retain a
+valid provider-returned StopPoint when that calculated distance was outside the
+requested radius. Prepared and direct NaPTAN discovery already filtered on the
+ATLAS-calculated distance.
+
+The adopted core stop-selection contract is now common to TfL and NaPTAN:
+
+> Calculate WGS84 haversine straight-line distance from the confirmed
+> assessment point to each authoritative StopPoint coordinate. Retain the
+> StopPoint only when the rounded ATLAS distance in metres is less than or equal
+> to the requested discovery radius.
+
+The comparison is inclusive: `distanceMetres <= requestedRadiusMetres`.
+Distances are rounded to the nearest metre before the comparison. Provider
+radius filtering is only candidate retrieval; a provider response does not by
+itself establish core-radius membership. Routed walking/cycling distance is a
+separate downstream accessibility measurement and is not substituted for core
+stop selection.
+
+No StopArea expansion, opposite-stop inference, or logical stop-pair repair is
+part of BUS-T02A.
+
+## Code correction
+
+`src/atlas/adapters/tfl-bus-stop-adapter.mjs` now applies the local radius
+contract before inserting a StopPoint into the retained map. It also retains
+deterministic duplicate handling: the nearer duplicate wins, with a lexical
+serialized-record tie-breaker. A valid response whose every StopPoint is
+outside the radius is a successful zero-stop result, not a source failure.
+Malformed records and malformed-only responses retain their existing failure
+semantics.
+
+TfL provenance now reports `requestedRadiusMetres`,
+`providerReturnedCount`, `retainedWithinRadiusCount`,
+`excludedOutsideRadiusCount`, the WGS84 methodology, and the explicit inclusive
+radius contract. The review control in
+`tools/atlas-review/bus-t02a-radius-controls.mjs` records the provider-returned
+and retained populations separately.
+
+There are no route, site, locality, StopPoint-ID, or named-place conditions in
+the production correction. A source search of the changed adapter found no
+Normanshire, Waltham, Pipers, East View, or route-number special case.
+
+## Deterministic evidence
+
+The TfL tests cover 650 m retained, exactly 700 m retained, beyond-700 m
+excluded, mixed responses, response-order independence, deterministic duplicate
+selection, malformed handling, and a valid all-outside successful zero with
+accurate provenance. The NaPTAN tests retain the existing behaviour and now
+explicitly exercise an outside-radius national record. Existing discovery tests
+remain unchanged in behaviour.
+
+## Production-fidelity controls
+
+The controls used Run #24 configuration and the live authoritative source. The
+control tool does not write files or production data.
+
+### Normanshire Drive — exact actual control
+
+Address: 99 Normanshire Drive, Chingford Mount, Highams Park, London Borough
+of Waltham Forest, Greater London, E4 9HB  
+Confirmed point: `51.6165957, -0.0117893`  
+Mode: Full Assessment  
+Radius: 700 m  
+Clean control head: `f930cedbfadd04d2f7b7aca495de78a8f40fc5dd`  
+Production executable correction originally introduced at:
+`280472caab4eac67771a04e63b9278828103f3cf`
+
+Before BUS-T02A, the live TfL response returned 20 StopPoints and all 20 were
+retained. East View WT (`490006381N`) was calculated at approximately 765 m
+and contributed routes 212 and W16. The resulting route population was:
+
+`97, 158, 212, 215, 357, 385, 397, 444, 657, N26, W16`
+
+After BUS-T02A, TfL again returned 20 StopPoints. ATLAS retained 19 and
+excluded exactly one: East View WT (`490006381N`), calculated at 765 m. East
+View WE was not returned and was not added by ATLAS. The retained route
+population is:
+
+`97, 158, 215, 357, 385, 397, 444, 657, N26, W16`
+
+The consequences are limited to the corrected core stop set: route 212 is no
+longer present because no legitimate selected in-radius StopPoint serves it;
+it was not preserved artificially. Routes 215, 385, and 397 each retain both
+planner directions, with no unresolved timetable identities in the control.
+Route 444 retains both approved directions exactly:
+
+- Towards Chingford Station
+- Towards Turnpike Lane Bus Station
+
+W16 remains present with three planner rows; its selected-stop evidence is
+updated only because WT is no longer in the core population. The control
+reported 87 timetable requests after correction versus 89 before, consistent
+with removing the out-of-radius stop. The only new selection warning is the
+explicit one-stop radius-exclusion warning.
+
+### Waltham Cross
+
+Control point: `51.6857829, -0.0330001`  
+Mode: Full Assessment  
+Radius: 700 m
+
+Before and after, the prepared national control returned 16 stops and retained
+all 16, with zero national radius exclusions. The source-aware cross-boundary
+TfL check returned and retained six StopPoints:
+
+`490003378G`, `490003378H`, `490008103E`, `490008941E`, `490008103W`,
+`490008941W`
+
+The T02A check excluded zero of those six. The final merged population remained
+16 physical StopPoints. The six cross-boundary records retained both NaPTAN and
+TfL timetable authority, with BODS and TfL route authority; the other records
+retained their NaPTAN/BODS authority. A before/after comparison against the
+clean `d235df36a95889e70f67df3dcb3c9de2ddc299d2` baseline found no change in
+StopPoint identity, source authority, timetable authority, route authority, or
+timetable-request eligibility. The only after-run improvement is that the TfL
+radius provenance now explicitly reports the provider count and zero
+exclusions.
+
+The enhanced clean-head control recorded 22 TfL timetable request identities,
+zero TfL unresolved identities, zero failed requests, zero no-current-match
+requests, and zero unprocessed requests. Each former sparse Stop H identity
+remained individually matched:
+
+| Identity | Result |
+| --- | --- |
+| `217|490003378H` | MATCHED |
+| `279|490003378H` | MATCHED |
+| `317|490003378H` | MATCHED |
+| `327|490003378H` | MATCHED |
+| `491|490003378H` | MATCHED |
+| `N279|490003378H` | MATCHED |
+
+The earlier T02A control’s 16 unresolved identities were a live-source
+snapshot, not a stable national unresolved set. The clean-head rerun reported
+zero national unresolved identities and zero combined unresolved identities;
+all 22 TfL requests were matched at that capture. The historical 16 classify
+as follows: the six Stop H identities listed above were matched on clean
+recheck; the remaining ten were non-Stop-H cross-boundary TfL request
+identities (`217|490008103W`, `317|490008103W`, `327|490008103W`,
+`217|490008103E`, `317|490008103E`, `217|490008941E`, `317|490008941E`,
+`217|490008941W`, `317|490008941W`, `327|490008941W`) whose live request
+outcomes varied between captures. They were not national BODS/TNDS unresolved
+identities, and none represents a T02A radius or sparse-parser regression.
+No timetable parser change was made.
+
+### Pipers Lane national control
+
+Control point: `51.852700, -0.454343`  
+Mode: Full Assessment  
+Radius: 700 m
+
+Before and after, NaPTAN returned and retained 11 stops, with no radius
+population change. The route population remains `230, 231`; the same three
+planner rows remain (one route-230 row and two route-231 rows). This control
+does not alter its existing destination or grouping behaviour.
+
+## StopArea and logical-stop evidence
+
+BUS-T02A deliberately selects CORE STOP records only. It does not expand a
+logical StopArea and does not infer an opposite stop from names, bearings,
+route numbers, stop letters, or proximity.
+
+Read-only source-model discovery found:
+
+- The current official NaPTAN API exposes bulk/ATCO-area Access Nodes and NPTG
+  resources. The CSV Access Nodes response contains StopPoint records but no
+  StopArea membership field.
+- The official NaPTAN XML Access Nodes response contains StopArea references;
+  for example both East View N and S carry the logical StopArea reference
+  `490G00006381`. NaPTAN’s `StopsInStopArea` schema model provides the
+  StopArea-to-ATCOCode membership that a future implementation can use.
+- The Run #24 prepared Bus snapshot currently exposes stop fields such as
+  `id`, `name`, coordinates, area and routes, but not StopArea/StopsInStopArea
+  membership. It therefore cannot support a safe nationwide logical-group
+  expansion in this sprint.
+- TfL supports StopPoint hierarchy/parent relationships, but the current
+  TfL stop query intentionally uses `useStopPointHierarchy=false`; BUS-T02A
+  does not reinterpret that response as a logical-group expansion.
+
+BUS-T02B should be a separate approved data/model task. It should preserve
+authoritative StopArea identity and StopsInStopArea membership in the prepared
+snapshot, define a provider-neutral logical-group model, specify how core
+radius selection interacts with group membership at the boundary, and define
+deterministic deduplication and provenance. It must not add an out-of-radius
+StopPoint merely to restore a service direction.
+
+## Compatibility and exclusions
+
+The protected candidate-generation files and formal release metadata were not
+changed. The base candidate-generation compatibility fingerprint is:
+
+`093d047c87482aba3d5b90844608046ece18bd673f9228dab504030883af223`
+
+The branch fingerprint remains identical. No refresh, reference-data
+publication, Bus/TNDS publication, Pages deployment, version increment, or
+merge was performed.
+
+The remaining limitation is intentional: logical StopArea expansion and
+inferred stop pairing remain outside BUS-T02A and require BUS-T02B evidence and
+approval. Provider data, timetable availability, and date-specific source
+semantics can still produce explicit partial or unresolved evidence; the
+radius correction does not turn such evidence into fabricated service.
+
+## Review recommendation
+
+The implementation satisfies the BUS-T02A acceptance scope and is:
+
+**READY FOR TECHNICAL DIRECTOR MANUAL REVIEW**

@@ -54,6 +54,8 @@ export function createTflBusStopAdapter({
       const records = new Map();
       let invalidCount = 0;
       let duplicateCount = 0;
+      let validStopCount = 0;
+      let excludedOutsideRadiusCount = 0;
 
       for (const raw of response.data.stopPoints) {
         const id = String(raw?.id ?? raw?.naptanId ?? '').trim();
@@ -64,15 +66,16 @@ export function createTflBusStopAdapter({
           invalidCount += 1;
           continue;
         }
-        if (records.has(id)) {
-          duplicateCount += 1;
+        validStopCount += 1;
+        const distance = distanceMetres(site, { latitude, longitude });
+        if (distance > numericRadius) {
+          excludedOutsideRadiusCount += 1;
           continue;
         }
-        const distance = distanceMetres(site, { latitude, longitude });
         const routes = [...new Set((Array.isArray(raw.lines) ? raw.lines : [])
           .map(line => String(line?.name ?? line?.id ?? '').trim())
           .filter(Boolean))].sort((a, b) => a.localeCompare(b, 'en-GB', { numeric: true }));
-        records.set(id, {
+        const candidate = {
           id,
           naptanCode: String(raw?.naptanId ?? id).trim() || id,
           name,
@@ -86,13 +89,22 @@ export function createTflBusStopAdapter({
           routes,
           routeAuthorities: Object.fromEntries(routes.map(route => [route, ['TfL']])),
           distanceMetres: distance
-        });
+        };
+        const existing = records.get(id);
+        if (!existing) records.set(id, candidate);
+        else {
+          duplicateCount += 1;
+          const candidateKey = JSON.stringify(candidate);
+          const existingKey = JSON.stringify(existing);
+          if (candidate.distanceMetres < existing.distanceMetres || (candidate.distanceMetres === existing.distanceMetres && candidateKey < existingKey)) records.set(id, candidate);
+        }
       }
 
-      if (response.data.stopPoints.length && !records.size) return sourceFailure({ code: 'invalid_response', message: 'TfL returned stop records, but none contained the required identity, name and coordinates.', provenance: { ...provenance, endpoint, retrievedAt } });
+      if (response.data.stopPoints.length && !validStopCount) return sourceFailure({ code: 'invalid_response', message: 'TfL returned stop records, but none contained the required identity, name and coordinates.', provenance: { ...provenance, endpoint, retrievedAt } });
       if (invalidCount) warnings.push(`${invalidCount} incomplete TfL stop record(s) were excluded.`);
       if (duplicateCount) warnings.push(`${duplicateCount} duplicate TfL stop record(s) were de-duplicated by stop identifier.`);
-      if (!records.size) warnings.push('TfL returned no bus stops for the confirmed Site and radius.');
+      if (excludedOutsideRadiusCount) warnings.push(`${excludedOutsideRadiusCount} TfL StopPoint(s) were excluded because their ATLAS-calculated WGS84 distance exceeded the requested radius.`);
+      if (!records.size) warnings.push('TfL returned no bus stops within the confirmed ATLAS radius.');
       warnings.push('TfL did not provide a source dataset timestamp/version in this response.');
 
       const validUntil = new Date(clock().getTime() + 5 * 60 * 1000).toISOString();
@@ -116,7 +128,22 @@ export function createTflBusStopAdapter({
         data: stops,
         evidence,
         warnings,
-        provenance: { ...provenance, endpoint, retrievedAt, httpStatus: response.status, resultCount: stops.length, serviceDiscovery: 'available-from-stop-records', anonymousRequest: true, apiKeyEmbedded: false }
+        provenance: {
+          ...provenance,
+          endpoint,
+          retrievedAt,
+          httpStatus: response.status,
+          resultCount: stops.length,
+          requestedRadiusMetres: numericRadius,
+          providerReturnedCount: response.data.stopPoints.length,
+          retainedWithinRadiusCount: stops.length,
+          excludedOutsideRadiusCount,
+          distanceMethodology: 'WGS84 haversine straight-line distance calculated by ATLAS from the confirmed assessment point to each authoritative TfL StopPoint coordinate; rounded to the nearest metre.',
+          radiusContract: 'ATLAS retains only StopPoints whose calculated distance is less than or equal to the requested radius.',
+          serviceDiscovery: 'available-from-stop-records',
+          anonymousRequest: true,
+          apiKeyEmbedded: false
+        }
       });
     }});
   }

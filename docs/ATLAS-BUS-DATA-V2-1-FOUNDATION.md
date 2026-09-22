@@ -70,15 +70,15 @@ Formal release metadata remains unchanged:
 
 `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`
 
-The exact clean executable/test identity for the completed deterministic suite is:
+The exact clean executable/test identity for the V2-1B correction set is:
 
-`6d5fb47376ff9a9fc3cd74e909918a2aa2a4d213`
+`83faf70f92593c0b549492bb587ea84063265e96`
 
 A dirty worktree must not be presented as tested. The review server currently injects the historical label `BUS-TFL-COMPLETE · <short SHA>`; that label is not a valid semantic identity for this foundation and must be corrected before BUS-T03. No release metadata or review-server redesign is included here.
 
 ## Validation performed
 
-Targeted Python controls cover the v2 CLI contract, WGS84/BNG/invalid coordinate handling, modification-time representations, locality/parent/district preservation, multiple active membership QA, source timestamp provenance, complete v1/v2 physical-stop and service parity, v2 sidecar validation, raw-source rejection, and duplicate sidecar identities. The workflow contract tests also prove that manual v2 diagnostics force a fresh build while scheduled and production defaults remain v1.
+Targeted Python controls cover the v2 CLI contract, WGS84/BNG/invalid coordinate handling, modification-time representations, locality/parent/district preservation, multiple active membership QA, source timestamp provenance, complete v1/v2 physical-stop and service parity, v2 sidecar validation, raw-source rejection, and duplicate sidecar identities. The workflow contract tests also prove that manual v2 diagnostics force a fresh build while scheduled and production defaults remain v1. The final clean branch SHA and deterministic-suite result are recorded in the PR handover.
 
 The full deterministic Alpha.15 suite is required on the final clean branch HEAD after the documentation-only closeout commit. No full national candidate, manual planner assessment, production workflow, publication, Pages deployment, or merge is part of this sprint.
 

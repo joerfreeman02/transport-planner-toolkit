@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <NaPTAN xmlns="urn:gov:dft:naptan:2.1" SchemaVersion="2.1" CreationDateTime="2026-09-15T16:46:50+01:00">
   <StopPoints>
-    <StopPoint Status="active">
+    <StopPoint Status="active" ModificationDateTime="2026-09-15T16:00:00+01:00">
       <AtcoCode>490006381N</AtcoCode><NaptanCode>oxgajm</NaptanCode>
       <Descriptor><CommonName>East View</CommonName><Indicator>Stop WT</Indicator><Bearing>N</Bearing></Descriptor>
       <Place><NptgLocalityRef>E0014000</NptgLocalityRef><Location><Translation><Latitude>51.61285</Latitude><Longitude>-0.00249</Longitude></Translation></Location></Place>

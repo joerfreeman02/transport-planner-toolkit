@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<NaPTAN xmlns="urn:gov:dft:naptan:2.1" SchemaVersion="2.1">
+  <StopPoints>
+    <StopPoint Status="active" ModificationDateTime="2026-09-15T16:00:00+01:00">
+      <AtcoCode>999000001</AtcoCode><Descriptor><CommonName>Cambridge BNG Control</CommonName><Indicator>Stop A</Indicator><Bearing>N</Bearing></Descriptor>
+      <Place><NptgLocalityRef>E0010001</NptgLocalityRef><Location><Translation><Easting>544000</Easting><Northing>258000</Northing></Translation></Location></Place>
+      <StopClassification><StopType>BCS</StopType></StopClassification>
+    </StopPoint>
+    <StopPoint Status="active">
+      <AtcoCode>999000002</AtcoCode><Descriptor><CommonName>Invalid Coordinate</CommonName></Descriptor>
+      <Place><Location><Translation><Latitude>not-a-number</Latitude><Longitude>0</Longitude><Easting>invalid</Easting><Northing>invalid</Northing></Translation></Location></Place>
+      <StopClassification><StopType>BCS</StopType></StopClassification>
+    </StopPoint>
+  </StopPoints>
+  <StopAreas />
+</NaPTAN>

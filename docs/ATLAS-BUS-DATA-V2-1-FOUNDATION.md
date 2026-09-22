@@ -1,121 +1,87 @@
-# ATLAS BUS-DATA-V2-1 — Prepared Data V2 Foundation
+# ATLAS BUS-DATA-V2-1A — Prepared Data V2 Foundation Forensic Closeout
 
-Status: branch foundation only; runtime StopArea completion and NPTG runtime use remain separate sprints.
+Status: PR #52 update; documentation and bounded deterministic controls only. This is not a runtime StopArea completion, national refresh, publication, Pages deployment, or merge.
 
 ## Scope and safety boundary
 
-This change adds a versioned prepared-data v2 contract, streaming authoritative XML parsers, deterministic logical-group and locality sidecars, v2 adapter decoding, and bounded QA metadata. The existing v1 CSV/BODS path remains the default and its planner behaviour is unchanged.
+The v2 foundation adds a versioned prepared-data contract, streaming authoritative NaPTAN/NPTG XML parsing, deterministic logical-group and locality sidecars, v2 adapter decoding, candidate validation, and bounded QA metadata. Existing v1 remains the default prepared schema for scheduled and production refreshes.
 
-It does not implement runtime StopArea completion, recursive group traversal, NPTG runtime enrichment, grouping presentation, or national publication. No full national v2 build, Bus refresh, TNDS publication, Pages deployment, or merge was performed by this work.
+V2 is diagnostic-only in the workflow. A v2 request on `main` is permitted only with `measure_only=true`; it cannot enter the publication path. No full national v2 candidate was built for this sprint.
 
-The approved architecture remains ADR-012: a future core assessment may trigger bounded authoritative StopArea completion; recursion and speculative inference are excluded from this foundation.
+The approved architecture remains ADR-012. Runtime StopArea completion, recursive group traversal, NPTG runtime enrichment, grouping presentation, and national publication remain separate, bounded work.
 
 ## Source and parser contract
 
-The v2 source foundation can acquire and hash:
+The v2 path accepts official NaPTAN XML (schema 2.1/2.4 and namespace variants), official NPTG XML, and the existing BODS regional GTFS path. XML is parsed with `xml.etree.ElementTree.iterparse`; completed records are cleared and raw source files are never emitted into public data.
 
-- official NaPTAN XML (`dataFormat=xml`), including the observed schema versions 2.1 and 2.4 and namespace variation;
-- official NPTG XML (`/v1/nptg`), including locality parent and district references;
-- the existing BODS regional GTFS and TNDS acquisition paths.
+Coordinates prefer WGS84. When WGS84 is absent, v2 uses the established NaPTAN British National Grid conversion and records the conversion method. Invalid or incomplete coordinates remain explicitly invalid and are not inferred. StopPoint `ModificationDateTime` is retained from element text or XML attribute representation.
 
-The XML parser uses `xml.etree.ElementTree.iterparse` and clears completed StopPoint, StopArea, locality, and district records. It does not load the national XML document as one in-memory tree. Unknown roots, missing/unsupported schema versions, malformed XML, malformed required records, invalid coordinates, and invalid identifiers are rejected or quarantined with deterministic QA counters; they are never converted into inferred planner facts.
+Source provenance retains source creation metadata and content hashes. A parser timestamp is not substituted for source creation time: `checkedAt` belongs to refresh status, not to source metadata.
 
-The parser is namespace-agnostic by local element name but records the source namespace and schema version in provenance. The accepted v2 prepared manifest is `atlas-prepared-bus-data-v2`, version `2.0.0`.
+## Normalised records and QA
 
-## Normalised v2 records
+Physical StopPoint records retain v1 semantic fields and add plural `logicalGroupRefs`, `nptgLocalityCode`, `localityResolution`, status, modification time, coordinate method, and provenance. There is no scalar invented `stopAreaId`.
 
-Physical StopPoint records retain the existing v1 fields and add:
+Logical-group sidecars use `atlas-prepared-logical-groups-v1`. Active member IDs must resolve to physical StopPoints; missing members are exposed in QA and an active group with unresolved members is rejected by candidate validation. Membership QA counts StopPoint membership across active groups, including multiple active memberships.
 
-- `nptgLocalityCode`;
-- plural `logicalGroupRefs`, each with source, source ID, canonical ID, membership status, target existence, and provenance;
-- record status and provenance.
+Locality sidecars use `atlas-prepared-nptg-localities-v1`, preserve direct `parentLocality` relationships, and preserve `districtId` with its `districtName`. Parent cycles and missing references are reported, not silently flattened. V2 hydrates the legacy `locality` and `parentLocality` fields before the existing v1 service-building path runs; it does not perform runtime NPTG acquisition.
 
-There is no scalar `stopAreaId` field. No group or locality is invented when the source does not provide a reference.
+The v2 manifest reports active StopPoints, logical groups, localities, districts, stop/service/group/locality shard counts, and parser QA counters.
 
-Logical-group sidecars use `atlas-prepared-logical-groups-v1` and contain canonical ID, provider, source ID, name, type, status, parent group reference, coordinate, locality reference, sorted unique member StopPoint IDs, missing/inactive membership lists, geometry QA, and provenance.
+## CLI and workflow contract
 
-Locality sidecars use `atlas-prepared-nptg-localities-v1` and contain canonical ID, code, name, parent and higher-locality references, district reference, source locality type, coordinate, and provenance.
+The builder CLI has two explicit contracts:
 
-Physical stops, services, logical groups, and localities are emitted as deterministic gzip JSON shards. No raw source XML is copied into the prepared output and no monolithic national metadata blob is produced.
+- v1 requires legacy `--naptan` CSV input;
+- v2 requires `--naptan-xml` and `--nptg-xml` and rejects the legacy `--naptan` argument.
 
-## QA contract
+The workflow exposes `prepared_schema` with `v1` as the default and `v2` as an opt-in diagnostic choice. Scheduled and production paths remain v1. Publication and checkpoint-save gates remain unavailable to a v2 diagnostic run.
 
-NaPTAN QA records active/inactive groups, no/one/multiple group membership, inactive/deleted memberships, missing group targets, duplicate memberships, malformed records, parent groups, and unsupported structure counters. Group geometry QA records member count, maximum member-to-member span, maximum distance from the group coordinate, missing and inactive members, multiple-membership members, and coordinate outliers.
+## Controlled v1/v2 parity evidence
 
-NPTG QA records malformed records, missing parent localities, missing districts, locality cycles, and unsupported structure counters. Cycles are reported; parent chains are not silently flattened.
+The deterministic fixture builds v1 and v2 from the same GTFS, snapshot date, and generated timestamp. Physical semantic fields (`id`, name, indicator, direction, coordinates, locality and parent locality), service records, schedules, and principal-location semantics compare equal. BNG and WGS84 representations produce equal coordinates. Existing Cambridge/v1 regression coverage remains in the deterministic suite.
 
-## Fixtures and controls
+The v2 adapter continues to decode v1 and v2 physical/service shards. V2 sidecars are exposed for later runtime work; no current assessment path consumes them for grouping or destination presentation.
 
-Deterministic fixtures cover:
+## Candidate validation and checkpoint safety
 
-- East View, including two physical members and a GPBS group;
-- an ATCO-210 national pair and a 2.4 namespace/schema variant;
-- multiple group references;
-- inactive group/membership records;
-- parent group references;
-- NPTG parent and district references;
-- cyclic locality parents;
-- malformed root input.
+Candidate validation accepts both v1 and v2 bus manifests. For v2 it validates stop shard fields, physical StopPoint uniqueness, service-to-stop references, logical-group and locality sidecar schemas and identities, active member resolution, explicit unresolved-reference classification, district-name preservation, and absence of raw XML/CSV/ZIP leakage.
 
-The live source evidence used for the foundation was read-only official DfT evidence for ATCO areas 490 and 210 and NPTG. It was not used to run a national refresh. Observed controls include East View `490G00006381`, Market Oak Lane `210G9367`, Waltham Cross Bus Station `210G432`, and the complex `210G2249` group. Exact national output size is intentionally not claimed until a controlled full v2 candidate build is authorised; v1 Run #24 is a historical reference only (375,566 prepared stops, 1,371 published files, approximately 87.7 MB payload).
+The candidate-generation compatibility fingerprint includes:
 
-## Compatibility and runtime boundary
+- `tools/atlas-bus-data/build_static_index.py`;
+- `tools/atlas-bus-data/prepared_data_v2.py`;
+- `tools/atlas-bus-data/refresh_bus_data.py`;
+- the previously protected TNDS/domain inputs.
 
-The v1 adapter continues to accept `atlas-prepared-bus-data-v1`. It also decodes v2 physical StopPoint and service shards. v2-only `logicalGroupsForStops` and `localitiesForStops` methods are exposed for later runtime work; on v1 they return an explicit empty result with a warning that the sidecars are absent. No assessment path calls these methods in this sprint.
+Current branch fingerprint:
 
-The v2 service builder reuses the v1 physical StopPoint map and BODS service interpretation. It does not alter route discovery, national timetable evidence, calendar semantics, destination presentation, grouping, circular classification, or Word layout. Semantic parity must be rechecked by the controlled candidate build before runtime adoption.
+`37b9c781b18e05fee6948388be3e023a076c66f1b1108a8f6a2a603305fdf60b`
 
-## Compatibility fingerprint
-
-Starting candidate-generation fingerprint:
+The Run #24 fingerprint was:
 
 `093d047c87482aba3d5b90844608046ece18bd673f9228dab504030883af223`
 
-Final branch fingerprint after this foundation:
+The deterministic checkpoint test proves that the v2 parser is fingerprint-covered, changing it changes the aggregate fingerprint, and a checkpoint carrying the Run #24 fingerprint fails closed. Therefore the old Run #24 checkpoint cannot be reused as a v2 candidate. No checkpoint was restored, created, or used by this sprint.
 
-`fdd63a8be73c24f5aa697cf5ec6ddfacab0c0835f91029a3dc38710620daa0a0`
+## Development/test identity
 
-The changed protected inputs are exactly:
+Formal release metadata remains unchanged:
 
-- `tools/atlas-bus-data/build_static_index.py` — adds the opt-in v2 XML/sidecar build path while leaving the v1 default path intact;
-- `tools/atlas-bus-data/refresh_bus_data.py` — adds opt-in v2 NaPTAN XML/NPTG acquisition and hashing while leaving the v1 default refresh path intact.
+`2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`
 
-The other protected candidate-generation inputs are unchanged, including `atlas/config/atlas-release.json`. Formal release identity remains `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`.
-
-The existing clean-worktree review server exposes the exact executable commit
-as the development/test identity. For this reviewed branch it is:
-
-`BUS-TFL-COMPLETE · b97725a`
-
-The identity is injected only from the clean Git `HEAD`; a dirty worktree is
-not presented as a tested build.
+The exact engineering identity is the clean Git commit SHA recorded in the final PR handover and test output. A dirty worktree must not be presented as tested. The review server currently injects the historical label `BUS-TFL-COMPLETE · <short SHA>`; that label is not a valid semantic identity for this foundation and must be corrected before BUS-T03. No release metadata or review-server redesign is included here.
 
 ## Validation performed
 
-- Python builder/parser tests: `8` passed.
-- Python refresh/build contract tests: `28` passed.
-- Prepared-data adapter tests: `12` passed, including v1 compatibility, v2 physical/service decoding, and v2 sidecar access.
-- Full deterministic Alpha.15 suite: passed through the review-environment guard; the clean-worktree rerun is required after the documentation commit so the review server can bind the exact final commit SHA.
+Targeted Python controls cover the v2 CLI contract, WGS84/BNG/invalid coordinate handling, modification-time representations, locality/parent/district preservation, multiple active membership QA, source timestamp provenance, v1/v2 fixture parity, v2 sidecar validation, raw-source rejection, and duplicate sidecar identities.
 
-The full national candidate has not been regenerated in this sprint. A future controlled build must compare v1/v2 service semantics, shard references, record counts, QA counters, and memory behaviour before any runtime or production use.
+The full deterministic Alpha.15 suite is required on the final clean branch HEAD after the documentation-only closeout commit. No full national candidate, manual planner assessment, production workflow, publication, Pages deployment, or merge is part of this sprint.
 
-## Files in this foundation
+## Files and deferred work
 
-- `tools/atlas-bus-data/prepared_data_v2.py` — bounded XML parsing and normalisation;
-- `tools/atlas-bus-data/build_static_index.py` — opt-in v2 prepared build path plus unchanged v1 path;
-- `tools/atlas-bus-data/refresh_bus_data.py` — opt-in XML source acquisition and hashes;
-- `src/atlas/adapters/prepared-bus-data-adapter.mjs` — backward-compatible v1/v2 decoding;
-- `tests/fixtures/atlas-bus-data-v2/` — deterministic source-shape fixtures;
-- v2 parser tests are embedded in `tools/atlas-bus-data/test_build_static_index.py`, with adapter coverage in `tests/atlas/prepared-bus-data-adapter.test.mjs`.
+Key implementation files are `tools/atlas-bus-data/prepared_data_v2.py`, `tools/atlas-bus-data/build_static_index.py`, `tools/atlas-bus-data/refresh_bus_data.py`, `tools/atlas-bus-data/validate_candidate.py`, and `src/atlas/adapters/prepared-bus-data-adapter.mjs`. Deterministic source fixtures and Python/JS tests are included in the branch.
 
-## Deferred work
-
-The following require separate approval and bounded runtime sprints:
-
-1. core-triggered authoritative StopArea completion;
-2. canonical NaPTAN group selection and parent policy;
-3. NPTG locality runtime enrichment;
-4. grouping/destination presentation and UI changes;
-5. a controlled full national v2 candidate build and semantic parity report.
+Deferred work requires separate approval: controlled national-scale v1/v2 semantic parity, runtime StopArea completion, canonical group selection policy, NPTG runtime enrichment, presentation changes, and correction of the review-server development label.
 
 No refresh, publication, Pages deployment, or merge is authorised by this record.

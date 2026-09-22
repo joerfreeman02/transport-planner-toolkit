@@ -18,6 +18,14 @@ on:
         required: false
         default: ''
         type: string
+      prepared_schema:
+        description: 'Prepared-data schema. v2 is diagnostic-only and cannot publish.'
+        required: false
+        default: v1
+        type: choice
+        options:
+          - v1
+          - v2
   schedule:
     - cron: '37 5 * * 1'
 
@@ -48,6 +56,11 @@ jobs:
         if: inputs.resume_checkpoint_run_id != '' && github.ref != 'refs/heads/main'
         run: |
           echo '::error::Cross-run checkpoint resume is allowed only from refs/heads/main.'
+          exit 1
+      - name: Refuse v2 outside diagnostic-only execution
+        if: inputs.prepared_schema == 'v2' && github.ref == 'refs/heads/main' && inputs.measure_only != true
+        run: |
+          echo '::error::Prepared-data v2 is diagnostic-only; measure_only=true is required on main and publication is disabled.'
           exit 1
       - name: Record safe execution mode
         run: |
@@ -163,7 +176,7 @@ jobs:
           TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
           TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
           ATLAS_NODE: node
-        run: python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --previous-root last-known-good
+        run: python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --previous-root last-known-good --prepared-schema "${{ inputs.prepared_schema || 'v1' }}"
       - name: Validate fresh or restored candidate data
         run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site
       - name: Run deterministic ATLAS checks

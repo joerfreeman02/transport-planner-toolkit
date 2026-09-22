@@ -153,6 +153,14 @@ assert.equal((await restoreVerifiedCandidateCheckpoint({ candidateSite: candidat
 await fs.writeFile(path.join(candidate, 'atlas', 'data', 'bus-tnds', 'services', 'tnds.json'), 'tnds-fixture');
 
 const fingerprint = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: root });
+assert.ok(CANDIDATE_COMPATIBILITY_FILES.includes('tools/atlas-bus-data/prepared_data_v2.py'), 'v2 parser must be fingerprint-covered');
+assert.notEqual(fingerprint.sha256, '093d047c87482aba3d5b90844608046ece18bd673f9228dab504030883af223', 'Run #24 v1 fingerprint must not be treated as v2-compatible');
+await rewriteCheckpoint(value => ({ ...value, identity: { ...value.identity, candidateGenerationCompatibilityFingerprint: { ...value.identity.candidateGenerationCompatibilityFingerprint, sha256: '093d047c87482aba3d5b90844608046ece18bd673f9228dab504030883af223' } } }));
+const oldRun24Checkpoint = await restoreVerifiedCandidateCheckpoint({ candidateSite: candidate, cacheExactHit: 'true', cacheMatchedKey: producerCacheKey, requestedProducerRunId: producerRunId, currentRunId: producerRunId, currentCommitSha: producerSha, workflowName, repositoryRoot: root, now: '2026-09-18T10:10:00Z' });
+assert.equal(oldRun24Checkpoint.ok, false, 'Run #24 checkpoint fingerprint must fail closed for this v2 foundation');
+await fs.writeFile(checkpointFile, `${JSON.stringify(checkpoint, null, 2)}\n`);
+const parserChange = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: root, fileOverrides: { 'tools/atlas-bus-data/prepared_data_v2.py': Buffer.from('synthetic v2 parser change') } });
+assert.notEqual(parserChange.sha256, fingerprint.sha256, 'Changing the v2 parser must invalidate candidate compatibility');
 for (const relative of ['.github/workflows/atlas-bus-data-refresh.yml', 'tools/atlas-data-publication/publish-bank.mjs', 'tools/atlas-data-publication/publish-snapshot.mjs', 'tools/atlas-data-publication/wait-for-bank.mjs', 'tools/atlas-data-publication/validate-publication.mjs', 'tools/atlas-data-publication/candidate-checkpoint.mjs', 'tools/atlas-data-publication/publication.mjs', 'tools/atlas-data-publication/candidate-compatibility.mjs']) {
   const publicationOnly = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: root, fileOverrides: { [relative]: Buffer.from(`downstream correction ${relative}`) } });
   assert.deepEqual(publicationOnly, fingerprint, `${relative} correction must not invalidate candidate-generation compatibility`);

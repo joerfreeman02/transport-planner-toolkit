@@ -321,7 +321,8 @@ def candidate_metrics(site: Path) -> dict:
         if not (site / "atlas" / "data" / ("bus-tnds" if relative in tnds_paths else "bus") / relative).is_file():
             raise RefreshError(f"Prepared candidate references a missing file: {relative}")
     bods_regions = bus.get("sources", {}).get("bods", {}).get("regions", [])
-    return {
+    counts = bus.get("counts", {}) if bus.get("schema") == "atlas-prepared-bus-data-v2" else {}
+    metrics = {
         "naptanStopCount": bus.get("sources", {}).get("naptan", {}).get("stopCount", 0),
         "bodsRegionCount": len(bods_regions),
         "bodsServiceCount": sum(int(region.get("serviceCount", 0) or 0) for region in bods_regions),
@@ -333,6 +334,19 @@ def candidate_metrics(site: Path) -> dict:
         "tndsIgnoredRegistrationFileCounts": tnds.get("ignoredRegistrationFileCounts", {}),
         "tndsServiceCount": tnds["serviceCount"],
     }
+    if bus.get("schema") == "atlas-prepared-bus-data-v2":
+        metrics.update({
+            "activeStopPointCount": counts.get("activeStopPointCount", metrics["naptanStopCount"]),
+            "logicalGroupCount": counts.get("logicalGroupCount", 0),
+            "localityCount": counts.get("localityCount", 0),
+            "districtCount": counts.get("districtCount", 0),
+            "stopShardCount": counts.get("stopShardCount", len(bus.get("stopShards", {}))),
+            "serviceShardCount": counts.get("serviceShardCount", sum(len(value) for value in bus.get("serviceShards", {}).values())),
+            "logicalGroupShardCount": counts.get("logicalGroupShardCount", len(bus.get("groupShards", {}))),
+            "localityShardCount": counts.get("localityShardCount", len(bus.get("localityShards", {}))),
+            "v2Qa": bus.get("qa", {}),
+        })
+    return metrics
 
 
 def validate_candidate(site: Path, baseline: dict | None = None) -> dict:

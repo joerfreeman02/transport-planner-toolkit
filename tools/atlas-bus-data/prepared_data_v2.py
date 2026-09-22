@@ -56,12 +56,41 @@ def parse_float(value: str) -> float | None:
     return number if math.isfinite(number) else None
 
 
+def british_national_grid_to_wgs84(easting: float, northing: float) -> tuple[float, float]:
+    """Reuse the established ATLAS BNG conversion without changing its maths."""
+    try:
+        from build_static_index import british_national_grid_to_wgs84 as convert
+    except ImportError as error:
+        raise SourceParseError("The established British National Grid conversion is unavailable") from error
+    return convert(easting, northing)
+
+
 def parse_coordinate(element: ET.Element) -> dict | None:
     latitude = parse_float(child_text(element, "Latitude"))
     longitude = parse_float(child_text(element, "Longitude"))
-    if latitude is None or longitude is None or not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+    if latitude is not None and longitude is not None and -90 <= latitude <= 90 and -180 <= longitude <= 180:
+        return {"latitude": round(latitude, 7), "longitude": round(longitude, 7), "coordinateMethod": "NaPTAN WGS84"}
+    easting = parse_float(child_text(element, "Easting"))
+    northing = parse_float(child_text(element, "Northing"))
+    if easting is None or northing is None:
         return None
-    return {"latitude": round(latitude, 7), "longitude": round(longitude, 7), "coordinateMethod": "NaPTAN WGS84"}
+    try:
+        latitude, longitude = british_national_grid_to_wgs84(easting, northing)
+    except (SourceParseError, ValueError, OverflowError):
+        return None
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        return None
+    return {"latitude": round(latitude, 7), "longitude": round(longitude, 7), "coordinateMethod": "NaPTAN British National Grid converted to WGS84"}
+
+
+def record_modification_datetime(element: ET.Element) -> str | None:
+    for current in element.iter():
+        for key, value in current.attrib.items():
+            if local_name(key).lower() in {"modificationdatetime", "modifiedat"} and value.strip():
+                return value.strip()
+        if local_name(current.tag).lower() in {"modificationdatetime", "modifiedat"} and current.text and current.text.strip():
+            return current.text.strip()
+    return None
 
 
 def schema_version(root: ET.Element, source_name: str) -> str:
@@ -150,7 +179,8 @@ def _parse_stop_point(element: ET.Element, version: str) -> tuple[dict | None, s
         "locality": child_text(element, "NptgLocalityName", "LocalityName") or None,
         "parentLocality": child_text(element, "ParentLocalityName") or None,
         "areaCode": stop_id[:3] if stop_id[:3].isdigit() else None,
-        "modifiedAt": child_text(element, "ModificationDateTime") or None,
+        "modifiedAt": record_modification_datetime(element),
+        "localityResolution": "unresolved" if locality_code else "not-provided",
         "logicalGroupRefs": [unique_refs[key] for key in sorted(unique_refs)],
         "_duplicateLogicalGroupRefCount": len(refs) - len(unique_refs),
         "routes": set(),
@@ -272,7 +302,7 @@ def parse_naptan_xml(path: str | Path) -> NaptanParseResult:
                 if ref["status"] != "active":
                     groups[ref["id"]].setdefault("inactiveMembershipStopPointIds", []).append(stop["id"])
                 elif ref["id"] in active_group_ids:
-                    member_counts[ref["id"]] += 1
+                    member_counts[stop["id"]] += 1
     for group in groups.values():
         members = sorted(set(group["memberStopPointIds"]))
         group["memberStopPointIds"] = sorted(set(member for member in members if member in stop_ids))
@@ -365,6 +395,7 @@ def parse_nptg_xml(path: str | Path) -> NptgParseResult:
                         "parentLocalityId": (lambda value: f"nptg:{value}" if value else None)(child_text(element, "ParentNptgLocalityRef", "ParentLocalityRef") or None),
                         "higherLocalityId": (lambda value: f"nptg:{value}" if value else None)(child_text(element, "HigherLocalityRef") or None),
                         "districtId": (lambda value: f"nptg:{value}" if value else None)(child_text(element, "NptgDistrictRef", "DistrictRef") or None),
+                        "districtName": None,
                         "sourceType": child_text(element, "SourceLocalityType", "LocalityType") or None,
                         "coordinate": parse_coordinate(element),
                         "provenance": {"source": "NPTG", "schemaVersion": version, "recordId": code},
@@ -385,6 +416,9 @@ def parse_nptg_xml(path: str | Path) -> NptgParseResult:
             raise SourceParseError("NPTG XML was empty")
     except ET.ParseError as error:
         raise SourceParseError(f"NPTG XML was malformed: {error}") from error
+    for locality in localities.values():
+        district_id = locality.get("districtId")
+        locality["districtName"] = districts.get(district_id[5:], {}).get("name") if district_id else None
     missing_parent = sum(bool(item["parentLocalityId"]) and item["parentLocalityId"][5:] not in localities for item in localities.values())
     missing_district = sum(bool(item["districtId"]) and item["districtId"][5:] not in districts for item in localities.values())
     cycles = 0
@@ -400,6 +434,21 @@ def parse_nptg_xml(path: str | Path) -> NptgParseResult:
             issues.append({"kind": "cyclic_locality_parent", "id": code})
     qa = {**dict(sorted(counts.items())), "missingParentLocalityCount": missing_parent, "missingDistrictCount": missing_district, "cyclicLocalityCount": cycles, "unsupportedStructureCount": 0}
     return NptgParseResult(localities, districts, source_metadata(source, root, version), qa, issues)
+
+
+def hydrate_stop_localities(naptan: NaptanParseResult, nptg: NptgParseResult) -> None:
+    """Apply only explicit NPTG locality and direct-parent semantics to stops."""
+    for stop in naptan.stops.values():
+        code = stop.get("nptgLocalityCode")
+        locality = nptg.localities.get(code) if code else None
+        if not locality:
+            stop["localityResolution"] = "unresolved" if code else "not-provided"
+            continue
+        stop["locality"] = locality["name"]
+        parent_id = locality.get("parentLocalityId")
+        parent = nptg.localities.get(parent_id[5:]) if parent_id else None
+        stop["parentLocality"] = parent["name"] if parent else None
+        stop["localityResolution"] = "resolved"
 
 
 def normalise_for_json(value):

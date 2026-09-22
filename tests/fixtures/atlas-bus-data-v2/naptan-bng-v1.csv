@@ -1,0 +1,2 @@
+ATCOCode,NaptanCode,CommonName,Indicator,Bearing,Latitude,Longitude,Easting,Northing,StopType,BusStopType,LocalityName,ParentLocalityName,Status,ModificationDateTime
+999000001,,Cambridge BNG Control,Stop A,N,,,544000,258000,BCS,,Cambridge,,active,2026-09-15T16:00:00+01:00

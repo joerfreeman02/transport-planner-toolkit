@@ -276,10 +276,11 @@ def load_naptan_v2(path: Path, nptg_path: Path):
     the service builder still consumes the same physical-stop map and therefore
     cannot change route/timetable semantics merely by selecting v2.
     """
-    from prepared_data_v2 import parse_naptan_xml, parse_nptg_xml
+    from prepared_data_v2 import hydrate_stop_localities, parse_naptan_xml, parse_nptg_xml
 
     naptan = parse_naptan_xml(path)
     nptg = parse_nptg_xml(nptg_path)
+    hydrate_stop_localities(naptan, nptg)
     stops = {}
     aliases = {}
     excluded = 0
@@ -594,7 +595,7 @@ def build_v2(args: argparse.Namespace) -> dict:
             service_shards[area].append(relative)
 
     stop_groups: dict[str, list[dict]] = defaultdict(list)
-    stop_fields = ["id", "naptanCode", "name", "indicator", "direction", "latitude", "longitude", "stopType", "busStopType", "locality", "parentLocality", "nptgLocalityCode", "areaCode", "modifiedAt", "coordinateMethod", "routes", "logicalGroupRefs", "status", "provenance"]
+    stop_fields = ["id", "naptanCode", "name", "indicator", "direction", "latitude", "longitude", "stopType", "busStopType", "locality", "parentLocality", "nptgLocalityCode", "areaCode", "modifiedAt", "coordinateMethod", "routes", "logicalGroupRefs", "status", "provenance", "localityResolution"]
     for stop in stops.values():
         key = cell_key(stop["latitude"], stop["longitude"], args.grid_size)
         normalised = normalise_for_json({**stop, "routes": sorted(stop["routes"], key=lambda value: (len(value), value))})
@@ -641,12 +642,13 @@ def build_v2(args: argparse.Namespace) -> dict:
         "representativeDates": {day: value.isoformat() for day, value in dates.items()},
         "schemas": {"logicalGroups": GROUP_SCHEMA, "localities": LOCALITY_SCHEMA},
         "sources": {
-            "naptan": {"url": "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml", **naptan.metadata, "downloadedAt": generated_at, "stopCount": len(stops), "excludedRecordCount": excluded},
-            "nptg": {"url": "https://naptan.api.dft.gov.uk/v1/nptg", **nptg.metadata, "downloadedAt": generated_at, "localityCount": len(nptg.localities), "districtCount": len(nptg.districts)},
-            "bods": {"url": BODS_URL, "downloadedAt": generated_at, "sha256": combined_bods_hash, "regions": region_metadata},
+            "naptan": {"url": "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml", **naptan.metadata, "stopCount": len(stops), "excludedRecordCount": excluded},
+            "nptg": {"url": "https://naptan.api.dft.gov.uk/v1/nptg", **nptg.metadata, "localityCount": len(nptg.localities), "districtCount": len(nptg.districts)},
+            "bods": {"url": BODS_URL, "sha256": combined_bods_hash, "regions": region_metadata},
         },
         "qa": {"naptan": naptan.qa, "nptg": nptg.qa},
         "stopShards": stop_shards, "serviceShards": dict(sorted(service_shards.items())), "groupShards": group_shards, "localityShards": locality_shards,
+        "counts": {"activeStopPointCount": len(stops), "logicalGroupCount": len(naptan.groups), "localityCount": len(nptg.localities), "districtCount": len(nptg.districts), "stopShardCount": len(stop_shards), "serviceShardCount": sum(len(paths) for paths in service_shards.values()), "logicalGroupShardCount": len(group_shards), "localityShardCount": len(locality_shards)},
     }
     compact_json(output / "manifest.json", manifest)
     return {"output": str(output), "schema": V2_SCHEMA, "stops": len(stops), "groups": len(naptan.groups), "localities": len(nptg.localities), "stopShards": len(stop_shards), "groupShards": len(group_shards), "localityShards": len(locality_shards), "serviceAreas": len(service_shards), "regions": region_metadata}
@@ -654,7 +656,7 @@ def build_v2(args: argparse.Namespace) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--naptan", required=True)
+    parser.add_argument("--naptan", help="Legacy authoritative NaPTAN CSV input for prepared-data v1")
     parser.add_argument("--gtfs-dir", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--snapshot-date", required=True)
@@ -666,10 +668,16 @@ def main() -> None:
     parser.add_argument("--nptg-xml", help="Authoritative NPTG XML input for prepared-data v2")
     args = parser.parse_args()
     if args.schema == V2_SCHEMA:
+        if args.naptan:
+            parser.error("--naptan is valid only with the default v1 schema")
         if not args.naptan_xml or not args.nptg_xml:
             parser.error("prepared-data v2 requires --naptan-xml and --nptg-xml")
         print(json.dumps(build_v2(args), indent=2))
     else:
+        if not args.naptan:
+            parser.error("prepared-data v1 requires --naptan")
+        if args.naptan_xml or args.nptg_xml:
+            parser.error("--naptan-xml and --nptg-xml are valid only with --schema atlas-prepared-bus-data-v2")
         print(json.dumps(build(args), indent=2))
 
 

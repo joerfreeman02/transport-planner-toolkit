@@ -23,6 +23,7 @@ from types import SimpleNamespace
 
 from build_static_index import build as build_v1
 from refresh_bus_data import BODS_REGIONS, NAPTAN_URL, acquire_bods, download, sha256
+from refresh_state import transition
 
 MAX_SAMPLES = 20
 MAX_OUTLIERS = 20
@@ -276,13 +277,19 @@ def source_window(v2_manifest: dict, shadow_bods: dict) -> dict:
     return {"expectedBodsRegionHashes": expected, "shadowBodsRegionHashes": received, "unchangedRegions": sorted(set(expected) - set(changed)), "changedRegions": changed, "classification": "SAME_WINDOW" if not changed else "SOURCE_WINDOW_CHANGED"}
 
 
-def build_shadow_v1(candidate: Path, temp: Path, v2_manifest: dict, status: dict) -> tuple[Path, dict, dict, dict]:
+def build_shadow_v1(candidate: Path, temp: Path, v2_manifest: dict, status: dict, same_window_bods_dir: Path | None = None) -> tuple[Path, dict, dict, dict]:
     shadow_root = temp / "shadow-v1"
     staging = temp / "shadow-sources"
     staging.mkdir(parents=True, exist_ok=True)
     naptan = staging / "naptan.csv"
     naptan_source = download(NAPTAN_URL, naptan, label="shadow v1 NaPTAN CSV")
-    gtfs, bods = acquire_bods(staging)
+    if same_window_bods_dir:
+        gtfs = staging / "gtfs"
+        shutil.copytree(same_window_bods_dir, gtfs)
+        regions = [{"region": archive.stem, "sourceHash": sha256(archive), "bytes": archive.stat().st_size} for archive in sorted(gtfs.glob("*.zip"))]
+        bods = {"identity": "same-window diagnostic cache", "regions": regions, "sourceHash": hashlib.sha256("".join(f"{item['region']}:{item['sourceHash']}" for item in regions).encode("ascii")).hexdigest()}
+    else:
+        gtfs, bods = acquire_bods(staging)
     output = shadow_root
     args = SimpleNamespace(
         naptan=naptan, gtfs_dir=gtfs, output=output,
@@ -332,7 +339,7 @@ def compact_markdown(report: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, repository_root: Path | None = None, candidate_fingerprint: str | None = None) -> dict:
+def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, repository_root: Path | None = None, candidate_fingerprint: str | None = None, same_window_bods_dir: Path | None = None, structural_report: Path | None = None) -> dict:
     started = time.perf_counter()
     candidate_site = candidate_site.resolve()
     report_dir = report_dir.resolve()
@@ -342,7 +349,10 @@ def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, 
     v2_stops = load_stop_records(bus_root, v2_manifest)
     v2_services = load_service_records(bus_root, v2_manifest)
     with temporary_workspace("atlas-v2-diagnostic-") as temporary:
-        shadow_root, csv_source, shadow_bods, shadow_measurement = build_shadow_v1(candidate_site, temporary, v2_manifest, status)
+        if same_window_bods_dir:
+            shadow_root, csv_source, shadow_bods, shadow_measurement = build_shadow_v1(candidate_site, temporary, v2_manifest, status, same_window_bods_dir)
+        else:
+            shadow_root, csv_source, shadow_bods, shadow_measurement = build_shadow_v1(candidate_site, temporary, v2_manifest, status)
         v1_manifest = read_json(shadow_root / "manifest.json")
         v1_stops = load_stop_records(shadow_root, v1_manifest)
         v1_services = load_service_records(shadow_root, v1_manifest)
@@ -381,12 +391,12 @@ def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, 
         "generatedAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "candidateGenerationCompatibilityFingerprint": candidate_fingerprint,
         "candidate": {"busManifest": v2_manifest, "statusManifest": status},
-        "sources": {"naptanXml": status.get("sources", {}).get("naptan", {}), "naptanCsvShadow": csv_source, "nptgXml": status.get("sources", {}).get("nptg", {}), "bodsV2": v2_manifest.get("sources", {}).get("bods", {}), "bodsShadow": shadow_bods, "tnds": status.get("sources", {}).get("tnds", {})},
+        "sources": {"naptanXml": status.get("sources", {}).get("naptan", {}), "naptanCsvShadow": csv_source, "nptgXml": status.get("sources", {}).get("nptg", {}), "bodsV2": v2_manifest.get("sources", {}).get("bods", {}), "bodsShadow": shadow_bods, "tnds": status.get("sources", {}).get("tnds", {}), "sameWindowCache": str(same_window_bods_dir) if same_window_bods_dir else None},
         "sourceWindow": source_window_result,
         "physicalStopParity": stop_parity, "serviceParity": service_parity,
         "stopAreaEvidence": groups, "nptgEvidence": nptg, "controls": controls,
         "payload": {"shadowV1": shadow_measurement, "freshV2": fresh_measurement, "run24": run24_measurement, "v2VsShadowV1": delta(fresh_measurement, shadow_measurement), "v2VsRun24": delta(fresh_measurement, run24_measurement), "candidateCapacityMeasurement": candidate_measurement},
-        "timings": status.get("timings", {}), "sourceAnomalies": source_anomalies,
+        "timings": status.get("timings", {}), "sourceAnomalies": source_anomalies, "structuralScan": json.loads(structural_report.read_text(encoding="utf-8")) if structural_report and structural_report.is_file() else None,
         "limitations": ["Same-window service parity excludes BODS regions whose reacquired source hash changed.", "Run #24 comparison is operational/source-date qualified and is not a schema-regression claim.", "No runtime StopArea completion or planner-facing behaviour is exercised."],
         "diagnosticElapsedSeconds": round(time.perf_counter() - started, 3),
     }
@@ -394,6 +404,7 @@ def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, 
     write_json(report_dir / "atlas-v2-national-diagnostic.json", report)
     write_json(report_dir / "parity-mismatch-summary.json", {"physicalStopParity": stop_parity, "serviceParity": service_parity, "sourceWindow": source_window_result})
     (report_dir / "atlas-v2-national-diagnostic.md").write_text(compact_markdown(report), encoding="utf-8")
+    transition(candidate_site, "diagnostic_complete", {"report": "atlas-v2-national-diagnostic.json", "sameWindowBods": bool(same_window_bods_dir)})
     return report
 
 
@@ -404,8 +415,12 @@ def main() -> None:
     parser.add_argument("--report-dir", required=True)
     parser.add_argument("--repository-root")
     parser.add_argument("--candidate-fingerprint", required=True)
+    parser.add_argument("--same-window-bods-dir")
+    parser.add_argument("--structural-report")
     args = parser.parse_args()
-    report = run_diagnostic(Path(args.candidate_site), Path(args.previous_root), Path(args.report_dir), Path(args.repository_root).resolve() if args.repository_root else None, args.candidate_fingerprint)
+    same_window = Path(args.same_window_bods_dir).resolve() if args.same_window_bods_dir else None
+    structural = Path(args.structural_report).resolve() if args.structural_report else None
+    report = run_diagnostic(Path(args.candidate_site), Path(args.previous_root), Path(args.report_dir), Path(args.repository_root).resolve() if args.repository_root else None, args.candidate_fingerprint, same_window, structural)
     print(json.dumps({"status": report["status"], "reportDir": str(Path(args.report_dir).resolve()), "sourceWindow": report["sourceWindow"], "physicalStopParity": report["physicalStopParity"], "serviceParity": report["serviceParity"]}, indent=2))
 
 

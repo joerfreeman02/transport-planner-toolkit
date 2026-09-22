@@ -1,5 +1,27 @@
 # ATLAS BUS-DATA-V2-2 National Diagnostic
 
+## Authorized BUS-DATA-V2-2A continuation
+
+Technical Director authorization on 2026-09-22 permits the protected-file
+reference-foundation correction on this diagnostic branch. The correction keeps
+all valid multimodal NaPTAN source records in a separate reference layer,
+projects only active coordinate-valid Bus/Coach records into the runtime Bus
+view, and separates source StopArea membership from active runtime membership.
+Legitimate one-character NPTG district codes are retained; unresolved district
+references remain explicit diagnostic evidence.
+
+The Run #26 failure remains retained evidence: acquisition completed for NaPTAN,
+NPTG, all nine BODS feeds and all eight TNDS regions, then structural candidate
+validation failed on `0170SGP90856`. The continuation is Bus-only: it must not
+acquire TNDS archives, invoke the TNDS preparer, create a production
+checkpoint, publish, deploy Pages, or use Run #24 as a v2 checkpoint.
+
+The exact BODS ZIP bytes acquired for v2 are reused by the shadow-v1 comparison
+through a diagnostic-only cache. Artifacts contain compact hashes and reports,
+not raw XML, CSV or ZIP files. Refresh state is truthful and monotonic:
+`sanity_checked` → `structurally_validated` → `diagnostic_complete`; no state is
+treated as publication-eligible.
+
 Status: diagnostic-only branch record. This sprint does not publish Bus/TNDS
 data, alter active production configuration, deploy Pages, or implement the
 approved runtime StopArea-completion policy.

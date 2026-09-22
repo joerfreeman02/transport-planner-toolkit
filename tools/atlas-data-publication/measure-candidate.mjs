@@ -1,13 +1,17 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { measureCandidateDatasets } from './publication.mjs';
+import { measureCandidateDatasets, measurePublicationTree } from './publication.mjs';
 
 async function main() {
   const candidateIndex = process.argv.indexOf('--candidate-site');
   if (candidateIndex < 0 || !process.argv[candidateIndex + 1]) throw new Error('Missing --candidate-site');
   const outputIndex = process.argv.indexOf('--output');
-  const result = await measureCandidateDatasets(path.resolve(process.argv[candidateIndex + 1]));
+  const candidateSite = path.resolve(process.argv[candidateIndex + 1]);
+  const busOnly = process.argv.includes('--bus-only');
+  const result = busOnly
+    ? { diagnosticSchema: 'atlas-bus-only-capacity-diagnostic-v1', diagnosticOnly: true, productionEligible: false, bus: await measurePublicationTree(path.join(candidateSite, 'atlas', 'data', 'bus')), tnds: null }
+    : await measureCandidateDatasets(candidateSite);
   if (outputIndex >= 0 && process.argv[outputIndex + 1]) {
     const output = path.resolve(process.argv[outputIndex + 1]);
     await fs.mkdir(path.dirname(output), { recursive: true });

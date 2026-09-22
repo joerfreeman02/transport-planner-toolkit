@@ -7,7 +7,7 @@ import gzip
 import json
 from pathlib import Path
 
-from refresh_bus_data import RefreshError, TNDS_REGIONS, candidate_metrics, validate_tnds_region_coverage
+from refresh_bus_data import RefreshError, TNDS_REGIONS, bus_candidate_metrics, candidate_metrics, validate_tnds_region_coverage
 
 KNOWN_TNDS_QUARANTINE_REASONS = {"incomplete_runtime_sequence", "missing_timing_links"}
 BUS_SCHEMAS = {"atlas-prepared-bus-data-v1", "atlas-prepared-bus-data-v2"}
@@ -118,26 +118,44 @@ def validate_v2_sidecars(bus: Path, manifest: dict, stop_ids: set[str]) -> dict:
     return {"groups": groups, "localities": localities, "groupShardCount": len(group_paths), "localityShardCount": len(locality_paths)}
 
 
-def validate(site: Path) -> dict:
+def mark_structurally_validated(site: Path, metrics: dict) -> None:
+    status_path = site / "atlas" / "data" / "status" / "manifest.json"
+    try:
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise RefreshError("Candidate status manifest is missing or invalid") from error
+    if status.get("status") == "sanity_checked":
+        status["status"] = "structurally_validated"
+        status["structuralValidation"] = "passed"
+        status["structuralValidatedAt"] = status.get("candidateGeneratedAt")
+        status["preparedCounts"] = {**status.get("preparedCounts", {}), **metrics}
+        status_path.write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")
+
+
+def validate(site: Path, bus_only: bool = False) -> dict:
     data = site / "atlas" / "data"
     bus = data / "bus"
-    tnds = data / "bus-tnds"
     bus_manifest = read_json(bus / "manifest.json")
-    tnds_manifest = read_json(tnds / "manifest.json")
     bus_schema = bus_manifest.get("schema")
     if bus_schema not in BUS_SCHEMAS:
         raise RefreshError("Candidate NaPTAN/BODS manifest schema is invalid")
-    if tnds_manifest.get("schema") != "atlas-prepared-bus-tnds-v1":
-        raise RefreshError("Candidate TNDS manifest schema is invalid")
-    if "services" in tnds_manifest:
-        raise RefreshError("Candidate TNDS manifest contains obsolete inline services; expected five-character stop-prefix service shards")
-    if tnds_manifest.get("serviceShardKeyLength") != 5:
-        raise RefreshError("Candidate TNDS manifest must use five-character stop-prefix service shards")
-    service_shards = tnds_manifest.get("serviceShards")
-    if not isinstance(service_shards, dict) or not service_shards:
-        raise RefreshError("Candidate TNDS serviceShards are missing or malformed")
-    validate_tnds_region_coverage(tnds_manifest)
-    metrics = candidate_metrics(site)
+    tnds_manifest = None
+    if not bus_only:
+        tnds = data / "bus-tnds"
+        tnds_manifest = read_json(tnds / "manifest.json")
+        if tnds_manifest.get("schema") != "atlas-prepared-bus-tnds-v1":
+            raise RefreshError("Candidate TNDS manifest schema is invalid")
+        if "services" in tnds_manifest:
+            raise RefreshError("Candidate TNDS manifest contains obsolete inline services; expected five-character stop-prefix service shards")
+        if tnds_manifest.get("serviceShardKeyLength") != 5:
+            raise RefreshError("Candidate TNDS manifest must use five-character stop-prefix service shards")
+        service_shards = tnds_manifest.get("serviceShards")
+        if not isinstance(service_shards, dict) or not service_shards:
+            raise RefreshError("Candidate TNDS serviceShards are missing or malformed")
+        validate_tnds_region_coverage(tnds_manifest)
+    else:
+        service_shards = {}
+    metrics = bus_candidate_metrics(site) if bus_only else candidate_metrics(site)
     if metrics["naptanStopCount"] < 1000 or metrics["bodsServiceCount"] < 1000:
         raise RefreshError("Candidate is below the expected national stop/service scale")
     if metrics["bodsRegionCount"] < 8:
@@ -206,23 +224,26 @@ def validate(site: Path) -> dict:
                 if not any(str(stop_id).startswith(prefix) for stop_id in relevant_ids):
                     raise RefreshError(f"Candidate TNDS shard contains a service unrelated to prefix {prefix}: {relative}")
                 tnds_service_count += 1
-    if not tnds_service_count or int(tnds_manifest.get("serviceCount", 0) or 0) < 1:
+    if not bus_only and (not tnds_service_count or int(tnds_manifest.get("serviceCount", 0) or 0) < 1):
         raise RefreshError("Candidate contains no prepared TNDS services")
     forbidden = [path for path in data.rglob("*") if path.is_file() and path.suffix.lower() in {".csv", ".zip", ".xml"}]
     if forbidden:
         raise RefreshError(f"Raw source file leaked into public data: {forbidden[0].name}")
-    result = {**metrics, "serviceShardRecords": service_count, "tndsShardRecords": tnds_service_count, "stopIds": len(stop_ids)}
+    result = {**metrics, "serviceShardRecords": service_count, "tndsShardRecords": tnds_service_count, "stopIds": len(stop_ids), "busOnlyDiagnostic": bus_only}
     if v2_sidecars:
         result.update({"logicalGroupRecords": len(v2_sidecars["groups"]), "localityRecords": len(v2_sidecars["localities"])})
+    if bus_only:
+        mark_structurally_validated(site, result)
     return result
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--site-root", required=True)
+    parser.add_argument("--bus-only", action="store_true")
     args = parser.parse_args()
     try:
-        print(json.dumps(validate(Path(args.site_root).resolve()), indent=2))
+        print(json.dumps(validate(Path(args.site_root).resolve(), bus_only=args.bus_only), indent=2))
     except RefreshError as error:
         raise SystemExit(f"Candidate validation failed: {error}")
 

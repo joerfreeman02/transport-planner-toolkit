@@ -1,4 +1,5 @@
 import { isGreaterLondonPoint } from '../domain/geography.mjs';
+import { distanceMetres } from '../adapters/tfl-bus-stop-adapter.mjs';
 
 function normaliseRouteAuthorities(stop, authority = '') {
   const result = new Map();
@@ -116,6 +117,154 @@ async function enrichPreparedStopSidecars(result, referenceData, naptanAdapter, 
   };
 }
 
+function activeLogicalGroupRefs(stop) {
+  return (stop?.logicalGroupRefs ?? []).filter(ref => String(ref?.status ?? '').toLowerCase() === 'active' && String(ref?.id ?? '').trim());
+}
+
+function stopAreaGroupRef(group) {
+  return { id: group.id, sourceId: group.sourceId || String(group.id).replace(/^naptan:/, ''), status: 'active', targetExists: true };
+}
+
+function withStopAreaMetadata(stop, { groupIds = [], groups = [], memberIds = [], core = false, groupCompleted = false, status = null, logicalGroupRefs = null } = {}) {
+  const ids = [...new Set(groupIds.map(String).filter(Boolean))].sort();
+  const evidence = groups.filter(Boolean).sort((left, right) => String(left.id).localeCompare(String(right.id)));
+  const refs = ids.map(id => stopAreaGroupRef(evidence.find(group => String(group.id) === id) || { id }));
+  const firstGroup = evidence[0] || null;
+  return {
+    ...stop,
+    logicalGroupIds: ids,
+    logicalGroupRefs: logicalGroupRefs || (refs.length ? refs : (stop.logicalGroupRefs ?? [])),
+    logicalGroupEvidence: evidence,
+    logicalGroup: firstGroup || stop.logicalGroup || null,
+    logicalGroupId: firstGroup?.id || ids[0] || stop.logicalGroupId || null,
+    logicalGroupName: firstGroup?.name || stop.logicalGroupName || null,
+    logicalGroupMemberStopPointIds: [...new Set(memberIds.map(String).filter(Boolean))].sort(),
+    core,
+    groupCompleted,
+    stopAreaCompletionStatus: status || (groupCompleted ? 'GROUP_COMPLETED_OUTSIDE_CORE_RADIUS' : 'CORE')
+  };
+}
+
+async function completePreparedStopAreas(result, site, referenceData, naptanAdapter, options = {}) {
+  if (!result?.ok || !Array.isArray(result.data)) return result;
+  const coreStops = result.data.map(stop => ({
+    ...stop,
+    distanceMetres: Number.isFinite(Number(stop.distanceMetres)) ? Number(stop.distanceMetres) : distanceMetres(site, stop),
+    core: true,
+    groupCompleted: false,
+    stopAreaCompletionStatus: 'CORE'
+  }));
+  const resolver = referenceData?.resolveStopAreaStructure || (typeof naptanAdapter?.stopAreaStructureForStops === 'function'
+    ? (stops, resolverOptions) => naptanAdapter.stopAreaStructureForStops(stops, resolverOptions)
+    : null);
+  if (!resolver) {
+    return {
+      ...result,
+      data: coreStops,
+      warnings: [...new Set([...(result.warnings ?? []), 'StopArea physical structure completion was not available for this prepared dataset.'])],
+      provenance: { ...(result.provenance ?? {}), stopAreaCompletion: { algorithm: 'CORE_SET -> direct active StopAreas -> direct physical members', available: false, qualifiedGroupCount: 0, completedMemberCount: 0 } }
+    };
+  }
+  const structureResult = await resolver(coreStops, options);
+  const structure = structureResult?.structure ?? structureResult?.data ?? null;
+  const available = structureResult?.provenance?.stopAreaCompletionAvailable !== false;
+  if (!structureResult?.ok) {
+    return {
+      ...result,
+      ok: false,
+      code: structureResult.code || 'unavailable_source',
+      message: structureResult.message || 'StopArea physical structure could not be safely checked.',
+      data: null,
+      warnings: [...new Set([...(result.warnings ?? []), ...(structureResult.warnings ?? []), 'StopArea physical structure evidence was incomplete; no structural zero conclusion was made.'])],
+      provenance: { ...(result.provenance ?? {}), stopAreaCompletion: { algorithm: 'CORE_SET -> direct active StopAreas -> direct physical members', available, failed: true, ...(structureResult.provenance ?? {}) } }
+    };
+  }
+  if (!available) {
+    return {
+      ...result,
+      data: coreStops,
+      warnings: [...new Set([...(result.warnings ?? []), ...(structureResult.warnings ?? [])])],
+      provenance: { ...(result.provenance ?? {}), stopAreaCompletion: { algorithm: 'CORE_SET -> direct active StopAreas -> direct physical members', available: false, qualifiedGroupCount: 0, completedMemberCount: 0, ...(structureResult.provenance ?? {}) } }
+    };
+  }
+  const groups = Array.isArray(structure.groups) ? structure.groups : [];
+  const members = Array.isArray(structure.members) ? structure.members : [];
+  const byCoreId = new Map(coreStops.map(stop => [String(stop.id || stop.sourceId), stop]));
+  const groupById = new Map(groups.map(group => [String(group.id), group]));
+  const memberIdsByGroup = new Map(groups.map(group => [String(group.id), [...new Set((group.directMemberIds ?? group.memberStopPointIds ?? []).map(String).filter(Boolean))]]));
+  const qualifiedGroupsByStop = new Map();
+  for (const stop of coreStops) {
+    const ids = activeLogicalGroupRefs(stop).map(ref => String(ref.id));
+    qualifiedGroupsByStop.set(String(stop.id || stop.sourceId), ids.map(id => groupById.get(id)).filter(Boolean));
+  }
+  const allGroupIdsByMember = new Map();
+  for (const group of groups) for (const id of memberIdsByGroup.get(String(group.id)) ?? []) {
+    if (!allGroupIdsByMember.has(id)) allGroupIdsByMember.set(id, []);
+    allGroupIdsByMember.get(id).push(String(group.id));
+  }
+  const completed = [];
+  for (const member of members) {
+    const id = String(member.id || member.sourceId || '');
+    if (!id || byCoreId.has(id)) continue;
+    const groupIds = [...new Set([...(member.groupIds ?? []), ...(allGroupIdsByMember.get(id) ?? [])].map(String))].sort();
+    const memberGroups = groupIds.map(groupId => groupById.get(groupId)).filter(Boolean);
+    completed.push(withStopAreaMetadata({
+      ...member,
+      id,
+      sourceId: member.sourceId || id,
+      indicator: Object.prototype.hasOwnProperty.call(member, 'indicator') ? member.indicator : null,
+      direction: Object.prototype.hasOwnProperty.call(member, 'direction') ? member.direction : null,
+      routes: Array.isArray(member.routes) ? member.routes : [],
+      routeAuthorities: member.routeAuthorities && typeof member.routeAuthorities === 'object' ? member.routeAuthorities : {},
+      timetableAuthority: member.timetableAuthority || 'NaPTAN',
+      distanceMetres: distanceMetres(site, member)
+    }, {
+      groupIds,
+      groups: memberGroups,
+      memberIds: memberGroups.flatMap(group => memberIdsByGroup.get(String(group.id)) ?? []),
+      core: false,
+      groupCompleted: true,
+      status: 'GROUP_COMPLETED_OUTSIDE_CORE_RADIUS'
+    }));
+  }
+  const enrichedCore = coreStops.map(stop => {
+    const id = String(stop.id || stop.sourceId);
+    const stopGroups = qualifiedGroupsByStop.get(id) ?? [];
+    const groupIds = [...new Set([...activeLogicalGroupRefs(stop).map(ref => String(ref.id)), ...stopGroups.map(group => String(group.id))])];
+    return withStopAreaMetadata(stop, {
+      groupIds,
+      groups: stopGroups,
+      memberIds: stopGroups.flatMap(group => memberIdsByGroup.get(String(group.id)) ?? []),
+      core: true,
+      groupCompleted: false,
+      status: 'CORE',
+      logicalGroupRefs: stop.logicalGroupRefs
+    });
+  });
+  const data = [...enrichedCore, ...completed].sort((left, right) => Number(left.distanceMetres) - Number(right.distanceMetres) || String(left.id).localeCompare(String(right.id)));
+  const qaInvalid = structure.invalidMembers ?? [];
+  const qaUnresolved = structure.unresolvedGroups ?? [];
+  const completionProvenance = {
+    algorithm: 'CORE_SET -> directly referenced active StopAreas -> union of active direct physical members -> STOP',
+    noRecursion: true,
+    available: true,
+    qualifiedGroupCount: groups.length,
+    coreCount: coreStops.length,
+    completedMemberCount: completed.length,
+    invalidMemberCount: qaInvalid.length,
+    unresolvedGroupCount: qaUnresolved.length,
+    invalidMembers: qaInvalid,
+    unresolvedGroups: qaUnresolved,
+    ...(structureResult.provenance ?? {})
+  };
+  return {
+    ...result,
+    data,
+    warnings: [...new Set([...(result.warnings ?? []), ...(structureResult.warnings ?? [])])],
+    provenance: { ...(result.provenance ?? {}), stopAreaCompletion: completionProvenance }
+  };
+}
+
 export function createBusStopDiscovery({ tflAdapter, naptanAdapter, referenceData = null, londonCoverage = isGreaterLondonPoint, crossBoundaryTfL = false } = {}) {
   if (!tflAdapter?.nearbyStops || !naptanAdapter?.nearbyStops) throw new Error('TfL and NaPTAN bus-stop adapters are required.');
 
@@ -218,7 +367,10 @@ export function createBusStopDiscovery({ tflAdapter, naptanAdapter, referenceDat
         };
       }
     }
-    if (!insideLondon) result = await enrichPreparedStopSidecars(result, referenceData, naptanAdapter, { forceRefresh: options.forceRefresh });
+    if (!insideLondon) {
+      result = await enrichPreparedStopSidecars(result, referenceData, naptanAdapter, { forceRefresh: options.forceRefresh });
+      result = await completePreparedStopAreas(result, site, referenceData, naptanAdapter, { forceRefresh: options.forceRefresh });
+    }
     if (!result?.provenance) return result;
     return Object.freeze({
       ...result,

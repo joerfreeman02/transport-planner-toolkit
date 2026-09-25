@@ -89,9 +89,13 @@ test('prepared v2 decodes physical stops and exposes sidecars without changing v
     localityShardKeyLength: 3,
     stopFields: [...manifest.stopFields, 'nptgLocalityCode', 'logicalGroupRefs', 'status', 'provenance'],
     groupShards: { '210': 'groups/210.json.gz' },
+    referenceStopPointShardKeyLength: 3,
+    referenceStopPointShards: { '210': 'references/210.json.gz' },
     localityShards: { 'E00': 'localities/E00.json.gz' }
   };
-  const group = { id: 'naptan:210G432', sourceId: '210G432', name: 'Bus Station', memberStopPointIds: ['2100A'], status: 'active' };
+  const group = { id: 'naptan:210G432', sourceId: '210G432', name: 'Bus Station', memberStopPointIds: ['2100A', '2100B'], status: 'active' };
+  const referenceStop = { id: '2100A', name: 'High Street', latitude: 51.6859, longitude: -0.0331, status: 'active', transportMode: 'bus', busPreparedEligible: true, coordinateValid: true };
+  const referenceMember = { id: '2100B', name: 'High Street', latitude: 51.6862, longitude: -0.0331, status: 'active', transportMode: 'bus', busPreparedEligible: true, coordinateValid: true };
   const locality = { id: 'nptg:E0013720', code: 'E0013720', name: 'Waltham Cross', districtId: 'nptg:26' };
   const v2Stop = { ...stop, nptgLocalityCode: 'E0013720', logicalGroupRefs: [{ id: group.id, sourceId: group.sourceId, status: 'active', targetExists: true }], status: 'active', provenance: { source: 'NaPTAN' } };
   const v2Packed = v2Manifest.stopFields.map(field => v2Stop[field] ?? null);
@@ -100,7 +104,8 @@ test('prepared v2 decodes physical stops and exposes sidecars without changing v
     const value = pathname.endsWith('/manifest.json') ? v2Manifest
       : pathname.endsWith('/stops/g516_m1.json.gz') ? { schema: 'atlas-prepared-bus-data-v2', stops: [v2Packed] }
         : pathname.endsWith('/services/2100A-south-east.json.gz') ? { schema: 'atlas-prepared-bus-data-v2', services: [service] }
-          : pathname.endsWith('/groups/210.json.gz') ? { schema: 'atlas-prepared-logical-groups-v1', groups: [group] }
+            : pathname.endsWith('/groups/210.json.gz') ? { schema: 'atlas-prepared-logical-groups-v1', groups: [group] }
+            : pathname.endsWith('/references/210.json.gz') ? { schema: 'atlas-national-reference-stop-points-v1', stopPoints: [referenceStop, referenceMember] }
             : pathname.endsWith('/localities/E00.json.gz') ? { schema: 'atlas-prepared-nptg-localities-v1', localities: [locality] }
               : null;
     return Promise.resolve(value ? new Response(JSON.stringify(value), { status: 200 }) : new Response('', { status: 404 }));
@@ -112,6 +117,13 @@ test('prepared v2 decodes physical stops and exposes sidecars without changing v
   assert.equal((await adapter.servicesForStops([v2Stop])).ok, true);
   assert.deepEqual((await adapter.logicalGroupsForStops([v2Stop])).data, [group]);
   assert.deepEqual((await adapter.localitiesForStops([v2Stop])).data, [locality]);
+  const exactReferences = await adapter.referenceStopPointsByIds(['2100B']);
+  assert.deepEqual(exactReferences.data.map(record => record.id), ['2100B']);
+  assert.deepEqual(exactReferences.provenance.missingIds, []);
+  const structure = await adapter.stopAreaStructureForStops([v2Stop]);
+  assert.equal(structure.ok, true);
+  assert.deepEqual(structure.data.members.map(record => record.id), ['2100A', '2100B']);
+  assert.deepEqual(structure.data.members[1].groupIds, ['naptan:210G432']);
 });
 
 test('prepared v1 explicitly reports absent grouping and locality sidecars', async () => {

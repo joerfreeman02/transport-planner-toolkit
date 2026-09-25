@@ -321,5 +321,78 @@ export function createPreparedBusDataAdapter({
     return sourceSuccess({ data: localities, provenance: { source: STOP_SOURCE, localityAvailable: true, resultCount: localities.length, parentLocalityRecordsLoaded: [...loaded.values()].filter(locality => parentIds.has(String(locality.id))).length } });
   }
 
-  return Object.freeze({ id: 'prepared-national-bus-data-v1-v2-compatible', manifest, nearbyStops, servicesForStops, logicalGroupsForStops, localitiesForStops });
+  async function referenceStopPointsByIds(stopIds, { forceRefresh = false } = {}) {
+    const manifestResult = await manifest(forceRefresh);
+    if (!manifestResult.ok) return manifestResult;
+    const index = manifestResult.data;
+    const ids = [...new Set((stopIds ?? []).map(value => String(value ?? '').trim()).filter(Boolean))];
+    if (index.schema !== 'atlas-prepared-bus-data-v2' || !index.referenceStopPointShards) return sourceSuccess({ data: [], warnings: ['Prepared v1 data does not contain national reference StopPoint shards.'], provenance: { source: STOP_SOURCE, referenceStopPointsAvailable: false, requestedIds: ids } });
+    const shardKey = id => String(id).slice(0, Number(index.referenceStopPointShardKeyLength || 3));
+    const keys = [...new Set(ids.map(shardKey).filter(Boolean))];
+    const paths = keys.map(key => index.referenceStopPointShards?.[key]).filter(Boolean);
+    const missingShardIds = ids.filter(id => !index.referenceStopPointShards?.[shardKey(id)]);
+    const responses = await Promise.all(paths.map(path => loadJson(path, forceRefresh)));
+    if (responses.some(response => !response.ok) || responses.some(response => response.data?.schema !== 'atlas-national-reference-stop-points-v1' || !Array.isArray(response.data?.stopPoints))) return sourceFailure({ code: 'invalid_response', message: 'National reference StopPoint data could not be safely interpreted.', provenance: { source: STOP_SOURCE, referenceStopPointsAvailable: true, requestedIds: ids } });
+    const wanted = new Set(ids);
+    const records = responses.flatMap(response => response.data.stopPoints).filter(record => wanted.has(String(record?.id ?? '')));
+    const seen = new Set();
+    const data = [];
+    const malformedIds = [];
+    for (const record of records) {
+      const id = String(record?.id ?? '');
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      if (!Number.isFinite(Number(record.latitude)) || !Number.isFinite(Number(record.longitude)) || !Object.prototype.hasOwnProperty.call(record, 'status') || !Object.prototype.hasOwnProperty.call(record, 'busPreparedEligible')) malformedIds.push(id);
+      else data.push(record);
+    }
+    const found = new Set(data.map(record => String(record.id)));
+    const missingIds = [...new Set([...missingShardIds, ...ids.filter(id => !found.has(id) && !malformedIds.includes(id))])];
+    return sourceSuccess({ data: data.sort((a, b) => String(a.id).localeCompare(String(b.id))), warnings: malformedIds.length ? ['One or more requested reference StopPoints were malformed and were not completed.'] : [], provenance: { source: STOP_SOURCE, referenceStopPointsAvailable: true, requestedIds: ids, resultCount: data.length, missingIds, malformedIds } });
+  }
+
+  async function stopAreaStructureForStops(stops, { forceRefresh = false } = {}) {
+    const manifestResult = await manifest(forceRefresh);
+    if (!manifestResult.ok) return manifestResult;
+    const index = manifestResult.data;
+    if (index.schema !== 'atlas-prepared-bus-data-v2' || !index.referenceStopPointShards) return sourceSuccess({ data: { groups: [], members: [], invalidMembers: [], unresolvedGroups: [] }, warnings: ['Prepared v1 data does not contain StopArea completion sidecars.'], provenance: { source: STOP_SOURCE, stopAreaCompletionAvailable: false } });
+    const coreStops = stops ?? [];
+    const activeRefs = coreStops.flatMap(stop => (stop.logicalGroupRefs ?? []).filter(ref => String(ref?.status ?? '').toLowerCase() === 'active' && String(ref?.id ?? '').startsWith('naptan:')).map(ref => ({ ...ref, coreStopPointId: String(stop.id || stop.sourceId || '') })));
+    const refIds = [...new Set(activeRefs.map(ref => String(ref.id)))];
+    if (!refIds.length) return sourceSuccess({ data: { groups: [], members: [], invalidMembers: [], unresolvedGroups: [] }, provenance: { source: STOP_SOURCE, stopAreaCompletionAvailable: true, qualifiedGroupCount: 0, completedMemberCount: 0 } });
+    const groupsResult = await logicalGroupsForStops(coreStops, { forceRefresh });
+    if (!groupsResult.ok) return groupsResult;
+    const requestedGroups = new Map((groupsResult.data ?? []).map(group => [String(group.id), group]));
+    const groups = [];
+    const unresolvedGroups = [];
+    const groupMemberIds = new Set();
+    for (const groupId of refIds) {
+      const group = requestedGroups.get(groupId);
+      if (!group) { unresolvedGroups.push({ id: groupId, status: 'missing' }); continue; }
+      if (String(group.status ?? '').toLowerCase() !== 'active') { unresolvedGroups.push({ id: groupId, status: 'inactive', provenance: group.provenance ?? null }); continue; }
+      if (!Array.isArray(group.memberStopPointIds)) { unresolvedGroups.push({ id: groupId, status: 'malformed', provenance: group.provenance ?? null }); continue; }
+      const qualifiedBy = [...new Set(activeRefs.filter(ref => ref.id === groupId).map(ref => ref.coreStopPointId).filter(Boolean))];
+      const directMemberIds = [...new Set(group.memberStopPointIds.map(String).filter(Boolean))];
+      directMemberIds.forEach(id => groupMemberIds.add(id));
+      groups.push({ ...group, directMemberIds, qualifiedByCoreStopPointIds: qualifiedBy });
+    }
+    const referenceResult = await referenceStopPointsByIds([...groupMemberIds], { forceRefresh });
+    if (!referenceResult.ok) return referenceResult;
+    const references = new Map((referenceResult.data ?? []).map(record => [String(record.id), record]));
+    const memberGroups = new Map();
+    const invalidMembers = [];
+    for (const group of groups) for (const id of group.directMemberIds) {
+      const record = references.get(id);
+      if (!record) { invalidMembers.push({ id, groupId: group.id, status: 'missing' }); continue; }
+      const status = String(record.status ?? '').toLowerCase();
+      if (status !== 'active') { invalidMembers.push({ id, groupId: group.id, status: status || 'missing-status' }); continue; }
+      if (record.busPreparedEligible !== true || String(record.transportMode ?? '').toLowerCase() !== 'bus') { invalidMembers.push({ id, groupId: group.id, status: 'non-bus' }); continue; }
+      if (record.coordinateValid !== true || !Number.isFinite(Number(record.latitude)) || !Number.isFinite(Number(record.longitude))) { invalidMembers.push({ id, groupId: group.id, status: 'malformed-coordinate' }); continue; }
+      if (!memberGroups.has(id)) memberGroups.set(id, []);
+      memberGroups.get(id).push(group.id);
+    }
+    const members = [...memberGroups.entries()].map(([id, groupIds]) => ({ ...references.get(id), groupIds: [...new Set(groupIds)].sort() })).sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    return sourceSuccess({ data: { groups, members, invalidMembers, unresolvedGroups }, warnings: referenceResult.warnings ?? [], provenance: { source: STOP_SOURCE, stopAreaCompletionAvailable: true, qualifiedGroupCount: groups.length, completedMemberCount: members.length, invalidMemberCount: invalidMembers.length, unresolvedGroupCount: unresolvedGroups.length, referenceStopPointProvenance: referenceResult.provenance } });
+  }
+
+  return Object.freeze({ id: 'prepared-national-bus-data-v1-v2-compatible', manifest, nearbyStops, servicesForStops, logicalGroupsForStops, localitiesForStops, referenceStopPointsByIds, stopAreaStructureForStops });
 }

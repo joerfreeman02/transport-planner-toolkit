@@ -827,11 +827,23 @@ function localityKey(stop) {
   return normal(stop?.locality || stop?.parentLocality);
 }
 
+function plannerStopGroupIds(stop) {
+  return new Set([
+    ...(stop?.logicalGroupIds ?? []),
+    ...(stop?.logicalGroupId ? [stop.logicalGroupId] : []),
+    ...(stop?.logicalGroupRefs ?? []).filter(ref => String(ref?.status ?? 'active').toLowerCase() === 'active').map(ref => ref?.id)
+  ].map(String).filter(Boolean));
+}
+
 function hubCore(name) {
   return normal(name).replace(/\b(?:bus|coach|station|interchange|transport|stop|stand|bay)\b/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function sameLogicalStopGroup(anchor, candidate, maximumSeparationMetres) {
+  const anchorGroupIds = plannerStopGroupIds(anchor);
+  const candidateGroupIds = plannerStopGroupIds(candidate);
+  if ([...anchorGroupIds].some(id => candidateGroupIds.has(id))) return true;
+  if (anchorGroupIds.size || candidateGroupIds.size) return false;
   const separation = stopDistanceMetres(anchor, candidate);
   if (separation > maximumSeparationMetres) return false;
   const anchorName = normal(anchor.name);

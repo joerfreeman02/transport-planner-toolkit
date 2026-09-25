@@ -668,6 +668,19 @@ function renderAssessment(result) {
   }
   if (!result.stops.length) { const line = document.createElement('li'); line.textContent = 'No stop records were returned for this assessment.'; nptgList.append(line); }
   diagnostics.append(nptgList);
+  const stopAreaHeading = document.createElement('strong'); stopAreaHeading.textContent = 'StopArea physical structure'; diagnostics.append(stopAreaHeading);
+  const stopAreaList = document.createElement('ul');
+  const stopArea = stopProvenance.stopAreaCompletion || {};
+  const stopAreaSummary = document.createElement('li');
+  stopAreaSummary.textContent = `Algorithm: ${stopArea.algorithm || 'not supplied'}; qualified groups ${stopArea.qualifiedGroupCount ?? 0}; completed members ${stopArea.completedMemberCount ?? 0}; invalid members ${stopArea.invalidMemberCount ?? 0}; unresolved groups ${stopArea.unresolvedGroupCount ?? 0}; available ${stopArea.available === false ? 'no' : 'yes'}`;
+  stopAreaList.append(stopAreaSummary);
+  for (const stop of result.stops) {
+    const groups = (stop.logicalGroupIds ?? stop.logicalGroupRefs?.map(ref => ref.id || ref.sourceId) ?? []).filter(Boolean).join(', ') || 'none';
+    const line = document.createElement('li');
+    line.textContent = `${stop.id}: ${stop.stopAreaCompletionStatus || (stop.core ? 'CORE' : 'not supplied')}; distance ${Number.isFinite(Number(stop.distanceMetres)) ? `${Math.round(Number(stop.distanceMetres))} m` : 'not supplied'}; groups ${groups}`;
+    stopAreaList.append(line);
+  }
+  diagnostics.append(stopAreaList);
 }
 
 async function searchAddress(event) {

@@ -15,6 +15,7 @@ import shutil
 import sys
 import time
 import uuid
+import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -24,6 +25,7 @@ from types import SimpleNamespace
 from build_static_index import build as build_v1
 from refresh_bus_data import BODS_REGIONS, NAPTAN_URL, acquire_bods, download, sha256
 from refresh_state import transition
+from prepared_data_v2 import bearing_compass_point, child_text, local_name, stop_type_semantics
 
 MAX_SAMPLES = 20
 MAX_OUTLIERS = 20
@@ -110,6 +112,70 @@ def load_service_records(bus_root: Path, manifest: dict) -> dict[str, dict]:
     return records
 
 
+def coordinate_distance_metres(left: dict, right: dict) -> float | None:
+    try:
+        left_lat, left_lon = float(left["latitude"]), float(left["longitude"])
+        right_lat, right_lon = float(right["latitude"]), float(right["longitude"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    radius = 6371008.8
+    lat1, lat2 = math.radians(left_lat), math.radians(right_lat)
+    delta_lat = lat2 - lat1
+    delta_lon = math.radians(right_lon - left_lon)
+    haversine = math.sin(delta_lat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(delta_lon / 2) ** 2
+    return round(2 * radius * math.asin(math.sqrt(min(1, haversine))), 3)
+
+
+def load_authoritative_stop_evidence(source_snapshot: Path | None, identities: set[str]) -> dict[str, dict]:
+    """Extract compact evidence for selected StopPoints from frozen NaPTAN XML."""
+    if not source_snapshot or not identities:
+        return {}
+    path = source_snapshot / "sources" / "naptan.xml"
+    if not path.is_file():
+        return {}
+    evidence = {}
+    for _, element in ET.iterparse(path, events=("end",)):
+        if local_name(element.tag) != "StopPoint":
+            continue
+        identity = child_text(element, "AtcoCode", "ATCOCode", "StopPointCode")
+        if identity in identities:
+            latitude = child_text(element, "Latitude")
+            longitude = child_text(element, "Longitude")
+            stop_type = child_text(element, "StopType")
+            semantics = stop_type_semantics(stop_type)
+            evidence[identity] = {
+                "xmlRecordExists": True,
+                "xmlStatus": element.attrib.get("Status") or element.attrib.get("status") or "active",
+                "stopType": stop_type or None,
+                "busEligible": bool(semantics["busEligible"]),
+                "coordinate": {
+                    "latitude": float(latitude) if latitude else None,
+                    "longitude": float(longitude) if longitude else None,
+                    "valid": bool(latitude and longitude),
+                },
+                "modificationDate": element.attrib.get("ModificationDateTime") or element.attrib.get("modificationDateTime"),
+                "commonName": child_text(element, "CommonName", "Name") or None,
+                "localityRef": child_text(element, "NptgLocalityRef", "NPTGLocalityRef") or None,
+                "direction": bearing_compass_point(element) or None,
+            }
+        element.clear()
+    return evidence
+
+
+def classify_physical_field(field: str, mismatch_count: int) -> str:
+    if not mismatch_count:
+        return "no mismatch"
+    if field == "direction":
+        return "parser defect corrected; any residual values require source-backed review"
+    if field in {"latitude", "longitude", "coordinateMethod"}:
+        return "coordinate precision/conversion difference; coordinate deltas are reported"
+    if field in {"locality", "parentLocality"}:
+        return "NPTG enrichment difference; authoritative locality references are retained"
+    if field in {"name", "indicator", "modifiedAt"}:
+        return "source timing/export difference; XML and CSV values are retained in samples"
+    return "unresolved"
+
+
 def compare_stops(v1: dict[str, dict], v2: dict[str, dict]) -> dict:
     common = sorted(set(v1) & set(v2))
     v1_only = sorted(set(v1) - set(v2))
@@ -117,7 +183,21 @@ def compare_stops(v1: dict[str, dict], v2: dict[str, dict]) -> dict:
     mismatches = Counter()
     mismatch_by_area = Counter()
     samples = []
+    samples_by_field = defaultdict(list)
+    coordinate_deltas = []
     for identity in common:
+        if normalise(v1[identity].get("latitude")) != normalise(v2[identity].get("latitude")) or normalise(v1[identity].get("longitude")) != normalise(v2[identity].get("longitude")):
+            distance = coordinate_distance_metres(v1[identity], v2[identity])
+            if distance is not None:
+                left_method = str(v1[identity].get("coordinateMethod") or "")
+                right_method = str(v2[identity].get("coordinateMethod") or "")
+                if left_method != right_method and "British National Grid" in right_method:
+                    coordinate_classification = "BNG conversion fallback versus CSV WGS84"
+                elif distance <= 1:
+                    coordinate_classification = "source WGS84 precision/rounding difference"
+                else:
+                    coordinate_classification = "source WGS84 difference"
+                coordinate_deltas.append({"id": identity, "distanceMetres": distance, "classification": coordinate_classification, "v1": {"latitude": v1[identity].get("latitude"), "longitude": v1[identity].get("longitude"), "coordinateMethod": left_method}, "v2": {"latitude": v2[identity].get("latitude"), "longitude": v2[identity].get("longitude"), "coordinateMethod": right_method}})
         for field in LEGACY_STOP_FIELDS:
             left = v1[identity].get(field)
             right = v2[identity].get(field)
@@ -127,9 +207,13 @@ def compare_stops(v1: dict[str, dict], v2: dict[str, dict]) -> dict:
             if normalise(left) != normalise(right):
                 mismatches[field] += 1
                 mismatch_by_area[str(v1[identity].get("areaCode") or identity[:3])] += 1
+                sample = {"id": identity, "field": field, "v1": left, "v2": right, "classification": classify_physical_field(field, 1)}
                 if len(samples) < MAX_SAMPLES:
-                    samples.append({"id": identity, "field": field, "v1": left, "v2": right})
+                    samples.append(sample)
+                if len(samples_by_field[field]) < MAX_SAMPLES:
+                    samples_by_field[field].append(sample)
     parity = {field: round((len(common) - mismatches[field]) / len(common) * 100, 6) if common else 100 for field in LEGACY_STOP_FIELDS}
+    distances = [item["distanceMetres"] for item in coordinate_deltas]
     return {
         "v1ActiveStopPointCount": len(v1), "v2ActiveStopPointCount": len(v2), "commonIdCount": len(common),
         "v1OnlyCount": len(v1_only), "v2OnlyCount": len(v2_only),
@@ -139,6 +223,16 @@ def compare_stops(v1: dict[str, dict], v2: dict[str, dict]) -> dict:
         "routeSetMismatchCount": mismatches["routes"],
         "mismatchByAtcoArea": dict(mismatch_by_area.most_common(MAX_SAMPLES)),
         "mismatchSamples": samples,
+        "mismatchSamplesByField": {field: samples_by_field[field] for field in sorted(samples_by_field)},
+        "fieldClassifications": {field: classify_physical_field(field, mismatches[field]) for field in LEGACY_STOP_FIELDS},
+        "coordinateDeltaSummary": {
+            "mismatchStopCount": len(coordinate_deltas),
+            "distanceSampleCount": len(distances),
+            "maximumMetres": max(distances) if distances else None,
+            "medianMetres": percentile(distances, 0.5) if distances else None,
+            "p95Metres": percentile(distances, 0.95) if distances else None,
+            "samples": sorted(coordinate_deltas, key=lambda item: item["distanceMetres"], reverse=True)[:MAX_SAMPLES],
+        },
         "classification": {
             "v1Only": "authoritative CSV shadow has an active StopPoint absent from the v2 XML candidate; source-format/status difference or parser exclusion requires investigation",
             "v2Only": "authoritative XML candidate has an active StopPoint absent from the CSV shadow; source-format/status difference or parser exclusion requires investigation",
@@ -154,6 +248,14 @@ def canonical_service(service: dict) -> dict:
     return normalise(value)
 
 
+def principal_location_normalisation(left: list, right: list) -> str:
+    def cleaned(values):
+        return [str(value).strip().strip('"').strip("'").strip() for value in values or []]
+    if cleaned(left) == cleaned(right):
+        return "deterministic malformed-source quoting/whitespace normalisation"
+    return "unresolved principal-location content difference"
+
+
 def compare_services(v1: dict[str, dict], v2: dict[str, dict], comparable_regions: set[str]) -> dict:
     v1_scoped = {key: value for key, value in v1.items() if value.get("source", {}).get("region") in comparable_regions}
     v2_scoped = {key: value for key, value in v2.items() if value.get("source", {}).get("region") in comparable_regions}
@@ -162,14 +264,21 @@ def compare_services(v1: dict[str, dict], v2: dict[str, dict], comparable_region
     v2_only = sorted(set(v2_scoped) - set(v1_scoped))
     mismatches = Counter()
     samples = []
+    samples_by_field = defaultdict(list)
+    classifications = Counter()
     for identity in common:
         left = canonical_service(v1_scoped[identity])
         right = canonical_service(v2_scoped[identity])
         for field in SERVICE_FIELDS:
             if left[field] != right[field]:
                 mismatches[field] += 1
+                classification = principal_location_normalisation(left[field], right[field]) if field == "principalLocations" else "unresolved"
+                classifications[classification] += 1
+                sample = {"id": identity, "field": field, "v1": left[field], "v2": right[field], "classification": classification}
                 if len(samples) < MAX_SAMPLES:
-                    samples.append({"id": identity, "field": field, "v1": left[field], "v2": right[field]})
+                    samples.append(sample)
+                if len(samples_by_field[field]) < MAX_SAMPLES:
+                    samples_by_field[field].append(sample)
     return {
         "scopeRegions": sorted(comparable_regions), "uniqueV1ServiceCount": len(v1_scoped),
         "uniqueV2ServiceCount": len(v2_scoped), "commonServiceCount": len(common),
@@ -179,7 +288,36 @@ def compare_services(v1: dict[str, dict], v2: dict[str, dict], comparable_region
         "stopSchedulesMismatchCount": mismatches["stopSchedules"],
         "principalLocationsMismatchCount": mismatches["principalLocations"],
         "mismatchSamples": samples,
+        "mismatchSamplesByField": {field: samples_by_field[field] for field in sorted(samples_by_field)},
+        "mismatchClassifications": dict(sorted(classifications.items())),
     }
+
+
+def classify_v2_only_stops(v1: dict[str, dict], v2: dict[str, dict], source_snapshot: Path | None = None) -> list[dict]:
+    identities = sorted(set(v2) - set(v1))
+    authoritative = load_authoritative_stop_evidence(source_snapshot, set(identities))
+    results = []
+    for identity in identities:
+        candidate = v2[identity]
+        source = authoritative.get(identity, {"xmlRecordExists": False})
+        active = str(source.get("xmlStatus", "")).lower() == "active"
+        eligible = bool(source.get("busEligible"))
+        if source.get("xmlRecordExists") and active and eligible:
+            classification = "valid active Bus StopPoint in frozen authoritative XML; absent from the legacy CSV shadow is a source-export difference, not a v2 parser inclusion defect"
+        elif source.get("xmlRecordExists"):
+            classification = "authoritative XML record requires status or bus-eligibility review"
+        else:
+            classification = "unresolved: no matching authoritative XML record found"
+        results.append({
+            "id": identity,
+            "xml": source,
+            "candidate": {field: candidate.get(field) for field in ("id", "name", "indicator", "direction", "latitude", "longitude", "stopType", "busStopType", "locality", "parentLocality", "modifiedAt", "status", "busPreparedEligible")},
+            "legacyCsvShadow": {"present": False, "comparison": "v2-only by parity definition"},
+            "timingOrPublicationDrift": "possible only as an explanation for the CSV export omission; no parser/status defect is evidenced" if source.get("xmlRecordExists") else "not assessed",
+            "parserAssessment": "included correctly" if active and eligible else "requires review",
+            "classification": classification,
+        })
+    return results
 
 
 def percentile(values: list[float], fraction: float) -> float | None:
@@ -315,14 +453,17 @@ def compact_markdown(report: dict) -> str:
         "## Same-window parity",
         f"- Physical StopPoints: v1 `{parity['v1ActiveStopPointCount']}`, v2 `{parity['v2ActiveStopPointCount']}`, common `{parity['commonIdCount']}`, v1-only `{parity['v1OnlyCount']}`, v2-only `{parity['v2OnlyCount']}`.",
         f"- Route-set mismatches: `{parity['routeSetMismatchCount']}`; field mismatches: `{parity['mismatchCountsByField']}`.",
+        f"- Direction mismatches: `{parity['mismatchCountsByField'].get('direction', 0)}`; per-field samples are bounded in `mismatchSamplesByField`; coordinate deltas: `{parity['coordinateDeltaSummary']}`.",
+        f"- v2-only evidence: `{[item['id'] for item in report.get('v2OnlyStopEvidence', [])]}`; classifications and frozen XML evidence are retained in the JSON report.",
         f"- BODS services in comparable regions: v1 `{services['uniqueV1ServiceCount']}`, v2 `{services['uniqueV2ServiceCount']}`, common `{services['commonServiceCount']}`.",
-        f"- Service mismatches: `{services['mismatchCountsByField']}`; changed BODS regions: `{report['sourceWindow']['changedRegions']}`.",
+        f"- Service mismatches: `{services['mismatchCountsByField']}`; classifications: `{services['mismatchClassifications']}`; changed BODS regions: `{report['sourceWindow']['changedRegions']}`.",
         "",
         "## National structure",
         f"- StopAreas/groups: `{groups['totalGroupCount']}` total, `{groups['activeGroupCount']}` active, `{groups['inactiveGroupCount']}` inactive.",
         f"- Membership counts: `{groups['stopPointMembershipCounts']}`; missing targets `{groups['missingGroupTargetCount']}`, missing members `{groups['missingPhysicalMemberCount']}`.",
         f"- Geometry span metres: median `{groups['geometry']['medianMetres']}`, p95 `{groups['geometry']['p95Metres']}`, p99 `{groups['geometry']['p99Metres']}`, max `{groups['geometry']['maximumMetres']}`.",
         f"- NPTG: `{nptg['localityCount']}` localities, `{nptg['districtCount']}` districts, cycles `{nptg['cyclicHierarchyCount']}`, unresolved stop references `{nptg['unresolvedStopPointLocalityReferences']}`.",
+        f"- Runtime integrity: `{report.get('runtimeIntegrity')}`; source-anomaly summary: `{report.get('sourceAnomalySummary')}`.",
         "",
         "## Payload and capacity",
         f"- Shadow v1 Bus: `{payload['shadowV1']['onDiskBytes']}` on-disk bytes.",
@@ -339,7 +480,7 @@ def compact_markdown(report: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, repository_root: Path | None = None, candidate_fingerprint: str | None = None, same_window_bods_dir: Path | None = None, structural_report: Path | None = None) -> dict:
+def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, repository_root: Path | None = None, candidate_fingerprint: str | None = None, same_window_bods_dir: Path | None = None, structural_report: Path | None = None, source_snapshot: Path | None = None) -> dict:
     started = time.perf_counter()
     candidate_site = candidate_site.resolve()
     report_dir = report_dir.resolve()
@@ -359,6 +500,9 @@ def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, 
         source_window_result = source_window(v2_manifest, shadow_bods)
         parity_regions = set(source_window_result["unchangedRegions"])
         stop_parity = compare_stops(v1_stops, v2_stops)
+        sample_ids = {item["id"] for values in stop_parity.get("mismatchSamplesByField", {}).values() for item in values}
+        stop_parity["authoritativeSourceEvidenceByStop"] = load_authoritative_stop_evidence(source_snapshot, sample_ids)
+        v2_only_evidence = classify_v2_only_stops(v1_stops, v2_stops, source_snapshot)
         service_parity = compare_services(v1_services, v2_services, parity_regions)
         groups = group_analysis(bus_root, v2_manifest, v2_stops)
         nptg = nptg_analysis(bus_root, v2_manifest, v2_stops)
@@ -386,6 +530,16 @@ def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, 
         source_anomalies.append({"classification": "SOURCE_WINDOW_CHANGED", "regions": source_window_result["changedRegions"]})
     if groups["missingGroupTargetCount"] or groups["missingPhysicalMemberCount"]:
         source_anomalies.append({"classification": "SOURCE_ANOMALY_OR_UNRESOLVED_REFERENCE", "missingGroupTargetCount": groups["missingGroupTargetCount"], "missingPhysicalMemberCount": groups["missingPhysicalMemberCount"]})
+    structural_payload = json.loads(structural_report.read_text(encoding="utf-8")) if structural_report and structural_report.is_file() else None
+    runtime_integrity = structural_payload.get("runtimeIntegrity") if structural_payload else None
+    source_anomaly_summary = {
+        "nptg": nptg.get("sourceQa", {}),
+        "missingGroupTargetCount": groups["missingGroupTargetCount"],
+        "duplicateMembershipCount": groups["duplicateMembershipCount"],
+        "unknownOrUnsupportedStopTypeCount": int(v2_manifest.get("qa", {}).get("naptan", {}).get("unknownOrUnsupportedStopTypeCount", 0) or 0),
+        "unresolvedSourceMemberCount": int(v2_manifest.get("qa", {}).get("naptan", {}).get("unresolvedSourceMemberCount", 0) or 0),
+        "malformedRecordCount": groups["malformedRecordCount"],
+    }
     report = {
         "schema": "atlas-bus-v2-national-diagnostic-v1", "status": "completed_with_source_window_changes" if source_window_result["changedRegions"] else "completed",
         "generatedAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
@@ -393,16 +547,16 @@ def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, 
         "candidate": {"busManifest": v2_manifest, "statusManifest": status},
         "sources": {"naptanXml": status.get("sources", {}).get("naptan", {}), "naptanCsvShadow": csv_source, "nptgXml": status.get("sources", {}).get("nptg", {}), "bodsV2": v2_manifest.get("sources", {}).get("bods", {}), "bodsShadow": shadow_bods, "tnds": status.get("sources", {}).get("tnds", {}), "sameWindowCache": str(same_window_bods_dir) if same_window_bods_dir else None},
         "sourceWindow": source_window_result,
-        "physicalStopParity": stop_parity, "serviceParity": service_parity,
+        "physicalStopParity": stop_parity, "v2OnlyStopEvidence": v2_only_evidence, "serviceParity": service_parity,
         "stopAreaEvidence": groups, "nptgEvidence": nptg, "controls": controls,
         "payload": {"shadowV1": shadow_measurement, "freshV2": fresh_measurement, "run24": run24_measurement, "v2VsShadowV1": delta(fresh_measurement, shadow_measurement), "v2VsRun24": delta(fresh_measurement, run24_measurement), "candidateCapacityMeasurement": candidate_measurement},
-        "timings": status.get("timings", {}), "sourceAnomalies": source_anomalies, "structuralScan": json.loads(structural_report.read_text(encoding="utf-8")) if structural_report and structural_report.is_file() else None,
+        "timings": status.get("timings", {}), "sourceAnomalies": source_anomalies, "sourceAnomalySummary": source_anomaly_summary, "runtimeIntegrity": runtime_integrity, "structuralScan": structural_payload,
         "limitations": ["Same-window service parity excludes BODS regions whose reacquired source hash changed.", "Run #24 comparison is operational/source-date qualified and is not a schema-regression claim.", "No runtime StopArea completion or planner-facing behaviour is exercised."],
         "diagnosticElapsedSeconds": round(time.perf_counter() - started, 3),
     }
     report_dir.mkdir(parents=True, exist_ok=True)
     write_json(report_dir / "atlas-v2-national-diagnostic.json", report)
-    write_json(report_dir / "parity-mismatch-summary.json", {"physicalStopParity": stop_parity, "serviceParity": service_parity, "sourceWindow": source_window_result})
+    write_json(report_dir / "parity-mismatch-summary.json", {"physicalStopParity": stop_parity, "v2OnlyStopEvidence": v2_only_evidence, "serviceParity": service_parity, "sourceWindow": source_window_result})
     (report_dir / "atlas-v2-national-diagnostic.md").write_text(compact_markdown(report), encoding="utf-8")
     transition(candidate_site, "diagnostic_complete", {"report": "atlas-v2-national-diagnostic.json", "sameWindowBods": bool(same_window_bods_dir)})
     return report
@@ -417,10 +571,12 @@ def main() -> None:
     parser.add_argument("--candidate-fingerprint", required=True)
     parser.add_argument("--same-window-bods-dir")
     parser.add_argument("--structural-report")
+    parser.add_argument("--source-snapshot")
     args = parser.parse_args()
     same_window = Path(args.same_window_bods_dir).resolve() if args.same_window_bods_dir else None
     structural = Path(args.structural_report).resolve() if args.structural_report else None
-    report = run_diagnostic(Path(args.candidate_site), Path(args.previous_root), Path(args.report_dir), Path(args.repository_root).resolve() if args.repository_root else None, args.candidate_fingerprint, same_window, structural)
+    source_snapshot = Path(args.source_snapshot).resolve() if args.source_snapshot else None
+    report = run_diagnostic(Path(args.candidate_site), Path(args.previous_root), Path(args.report_dir), Path(args.repository_root).resolve() if args.repository_root else None, args.candidate_fingerprint, same_window, structural, source_snapshot)
     print(json.dumps({"status": report["status"], "reportDir": str(Path(args.report_dir).resolve()), "sourceWindow": report["sourceWindow"], "physicalStopParity": report["physicalStopParity"], "serviceParity": report["serviceParity"]}, indent=2))
 
 

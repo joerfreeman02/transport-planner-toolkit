@@ -68,6 +68,26 @@ def direct_child_text(element: ET.Element, *names: str) -> str:
     return ""
 
 
+def bearing_compass_point(element: ET.Element) -> str:
+    """Read the NaPTAN Bearing value without depending on one XML layout.
+
+    NaPTAN 2.4 places the value below ``Bearing/CompassPoint`` inside the
+    marked, unmarked, or hail-and-ride point.  The older fixture/schema form
+    represents ``Bearing`` as scalar text.  Both are authoritative source
+    representations; arbitrary descendant text is deliberately not accepted.
+    """
+    for bearing in element.iter():
+        if local_name(bearing.tag) != "Bearing":
+            continue
+        compass = direct_child_text(bearing, "CompassPoint")
+        if compass:
+            return compass
+        scalar = (bearing.text or "").strip()
+        if scalar:
+            return scalar
+    return ""
+
+
 def parse_float(value: str) -> float | None:
     try:
         number = float(value)
@@ -203,7 +223,7 @@ def _parse_stop_point(element: ET.Element, version: str) -> tuple[dict | None, s
         "naptanCode": child_text(element, "NaptanCode") or None,
         "name": name,
         "indicator": child_text(element, "Indicator") or None,
-        "direction": child_text(element, "Bearing") or None,
+        "direction": bearing_compass_point(element) or None,
         **(coordinate or {"latitude": None, "longitude": None, "coordinateMethod": None}),
         "stopType": stop_type,
         "busStopType": child_text(element, "BusStopType") or None,

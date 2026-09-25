@@ -81,6 +81,22 @@ class NationalDiagnosticTests(unittest.TestCase):
         service = {"id": "x", "source": {"region": "r"}, "stopSchedules": {"A": {"monday": [480]}}}
         self.assertEqual(diagnostic.compare_services({"x": service}, {"x": service}, {"r"})["commonServiceCount"], 1)
 
+    def test_mismatch_samples_are_bounded_per_field_and_coordinates_have_deltas(self):
+        left = {"A": {field: value for field, value in zip(STOP_FIELDS, stop("A", STOP_FIELDS, False))}}
+        right = {"A": {**left["A"], "name": "Changed", "indicator": "Other", "latitude": 51.6001, "longitude": -0.1001}}
+        result = diagnostic.compare_stops(left, right)
+        self.assertEqual(result["mismatchCountsByField"]["name"], 1)
+        self.assertEqual(len(result["mismatchSamplesByField"]["name"]), 1)
+        self.assertEqual(len(result["mismatchSamplesByField"]["indicator"]), 1)
+        self.assertGreater(result["coordinateDeltaSummary"]["maximumMetres"], 0)
+
+    def test_principal_location_normalisation_is_explicit(self):
+        left = {"x": {"id": "x", "source": {"region": "r"}, "principalLocations": ["Beggar's Bush "]}}
+        right = {"x": {"id": "x", "source": {"region": "r"}, "principalLocations": ['"Beggar\'s Bush"']}}
+        result = diagnostic.compare_services(left, right, {"r"})
+        self.assertEqual(result["principalLocationsMismatchCount"], 1)
+        self.assertEqual(result["mismatchClassifications"]["deterministic malformed-source quoting/whitespace normalisation"], 1)
+
     def test_duplicate_service_shards_are_canonicalised(self):
         with temporary_directory() as temp:
             root = Path(temp)

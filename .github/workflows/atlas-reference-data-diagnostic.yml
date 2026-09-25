@@ -106,7 +106,7 @@ jobs:
         continue-on-error: true
         run: |
           CANDIDATE_FINGERPRINT=$(node --input-type=module -e "import { computeCandidateGenerationCompatibilityFingerprint } from './tools/atlas-data-publication/candidate-compatibility.mjs'; console.log((await computeCandidateGenerationCompatibilityFingerprint({ rootDir: process.cwd() })).sha256)")
-          python tools/atlas-bus-data/national_v2_diagnostic.py --candidate-site pages-site --previous-root last-known-good --report-dir diagnostic-output --candidate-fingerprint "$CANDIDATE_FINGERPRINT" --same-window-bods-dir source-input/source-snapshot/sources/bods --structural-report diagnostic-output/structural-scan.json
+          python tools/atlas-bus-data/national_v2_diagnostic.py --candidate-site pages-site --previous-root last-known-good --report-dir diagnostic-output --candidate-fingerprint "$CANDIDATE_FINGERPRINT" --same-window-bods-dir source-input/source-snapshot/sources/bods --source-snapshot source-input/source-snapshot --structural-report diagnostic-output/structural-scan.json
       - name: Measure diagnostic candidate capacity
         id: capacity
         if: always()

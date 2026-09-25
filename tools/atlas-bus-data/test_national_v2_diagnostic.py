@@ -5,6 +5,7 @@ import gzip
 import json
 import shutil
 import uuid
+import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 import unittest
 from pathlib import Path
@@ -113,6 +114,26 @@ class NationalDiagnosticTests(unittest.TestCase):
         result = diagnostic.source_window(manifest, {"regions": [{"region": "r", "sourceHash": "new"}]})
         self.assertEqual(result["classification"], "SOURCE_WINDOW_CHANGED")
         self.assertEqual(diagnostic.percentile([1, 2, 3, 4], .5), 2.5)
+
+    def test_coordinate_forensics_preserve_conflicting_xml_coordinate_systems(self):
+        element = ET.fromstring(
+            "<StopPoint><Location><Easting>351013</Easting><Northing>328226</Northing></Location>"
+            "<StopClassification><OnStreet><Bus><Translation><Latitude>52.851592993</Latitude>"
+            "<Longitude>-2.727263070</Longitude></Translation></Bus></OnStreet></StopClassification></StopPoint>"
+        )
+        sources = diagnostic._xml_coordinate_evidence(element)
+        derived = sources["bng"]["derivedWgs84"]
+        rows = diagnostic.coordinate_forensic_rows([{
+            "id": "3500B001800", "distanceMetres": 276.793,
+            "v1": {"latitude": round(derived["latitude"], 7), "longitude": round(derived["longitude"], 7), "coordinateMethod": "NaPTAN British National Grid converted to WGS84"},
+            "v2": {"latitude": 52.851593, "longitude": -2.7272631, "coordinateMethod": "NaPTAN WGS84"},
+        }], {"3500B001800": {"commonName": "Sungrove Jct", "coordinateSources": sources}})
+        self.assertEqual(rows[0]["classification"], "authoritative source internal coordinate disagreement: legacy BNG conversion versus XML WGS84")
+        self.assertLess(rows[0]["v1ToXmlBngDerivedMetres"], 1)
+        self.assertGreater(rows[0]["xmlWgs84ToXmlBngDerivedMetres"], 250)
+
+    def test_physical_comparison_is_not_claimed_as_same_window(self):
+        self.assertEqual(diagnostic.PHYSICAL_COMPARISON_CLASSIFICATION, "LIVE_CSV_COMPARISON_NOT_SAME_SOURCE_WINDOW")
 
     def test_group_nptg_payload_and_report_generation_are_compact(self):
         with temporary_directory() as temp:

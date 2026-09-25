@@ -117,6 +117,48 @@ async function enrichPreparedStopSidecars(result, referenceData, naptanAdapter, 
   };
 }
 
+async function reconcilePreparedStopPoints(result, referenceData, naptanAdapter, options = {}) {
+  if (!result?.ok || !Array.isArray(result.data) || !result.data.length) return result;
+  const resolver = referenceData?.resolvePreparedStopPointsByIds || (typeof naptanAdapter?.preparedStopPointsByIds === 'function'
+    ? (stopIds, resolverOptions) => naptanAdapter.preparedStopPointsByIds(stopIds, resolverOptions)
+    : null);
+  if (!resolver) return result;
+  const stopIds = result.data.map(stop => String(stop.id || stop.sourceId || '')).filter(Boolean);
+  const preparedResult = await resolver(stopIds, options);
+  const physicalStops = preparedResult?.physicalStops ?? preparedResult?.data ?? [];
+  const preparedById = new Map(physicalStops.map(stop => [String(stop.id), stop]));
+  const data = result.data.map(stop => {
+    const prepared = preparedById.get(String(stop.id || stop.sourceId));
+    if (!prepared) return stop;
+    return {
+      ...stop,
+      logicalGroupRefs: prepared.logicalGroupRefs ?? stop.logicalGroupRefs ?? [],
+      nptgLocalityCode: prepared.nptgLocalityCode ?? stop.nptgLocalityCode ?? null,
+      status: prepared.status ?? stop.status ?? null,
+      transportMode: prepared.transportMode ?? stop.transportMode ?? 'bus',
+      administrativeAreaCode: prepared.administrativeAreaCode ?? stop.administrativeAreaCode ?? null,
+      coordinateMethod: prepared.coordinateMethod ?? stop.coordinateMethod ?? null,
+      preparedNaPTANProvenance: prepared.provenance ?? null
+    };
+  });
+  const available = preparedResult?.provenance?.preparedStopPointsAvailable !== false;
+  return {
+    ...result,
+    data,
+    warnings: [...new Set([...(result.warnings ?? []), ...(preparedResult?.warnings ?? [])])],
+    provenance: {
+      ...(result.provenance ?? {}),
+      preparedNaPTANStructural: {
+        available,
+        exactRequestedIds: stopIds,
+        exactMatchedIds: [...preparedById.keys()].sort(),
+        exactUnmatchedIds: stopIds.filter(id => !preparedById.has(id)).sort(),
+        ...(preparedResult?.provenance ?? {})
+      }
+    }
+  };
+}
+
 function activeLogicalGroupRefs(stop) {
   return (stop?.logicalGroupRefs ?? []).filter(ref => String(ref?.status ?? '').toLowerCase() === 'active' && String(ref?.id ?? '').trim());
 }
@@ -125,8 +167,8 @@ function stopAreaGroupRef(group) {
   return { id: group.id, sourceId: group.sourceId || String(group.id).replace(/^naptan:/, ''), status: 'active', targetExists: true };
 }
 
-function withStopAreaMetadata(stop, { groupIds = [], groups = [], memberIds = [], core = false, groupCompleted = false, status = null, logicalGroupRefs = null } = {}) {
-  const ids = [...new Set(groupIds.map(String).filter(Boolean))].sort();
+function withStopAreaMetadata(stop, { groupIds = [], logicalGroupIds = null, groups = [], memberIds = [], core = false, groupCompleted = false, status = null, logicalGroupRefs = null } = {}) {
+  const ids = [...new Set((logicalGroupIds ?? groupIds).map(String).filter(Boolean))].sort();
   const evidence = groups.filter(Boolean).sort((left, right) => String(left.id).localeCompare(String(right.id)));
   const refs = ids.map(id => stopAreaGroupRef(evidence.find(group => String(group.id) === id) || { id }));
   const firstGroup = evidence[0] || null;
@@ -220,11 +262,13 @@ async function completePreparedStopAreas(result, site, referenceData, naptanAdap
       distanceMetres: distanceMetres(site, member)
     }, {
       groupIds,
+      logicalGroupIds: [...new Set([...groupIds, ...activeLogicalGroupRefs(member).map(ref => String(ref.id))])],
       groups: memberGroups,
       memberIds: memberGroups.flatMap(group => memberIdsByGroup.get(String(group.id)) ?? []),
       core: false,
       groupCompleted: true,
-      status: 'GROUP_COMPLETED_OUTSIDE_CORE_RADIUS'
+      status: 'GROUP_COMPLETED_OUTSIDE_CORE_RADIUS',
+      logicalGroupRefs: member.logicalGroupRefs
     }));
   }
   const enrichedCore = coreStops.map(stop => {
@@ -367,7 +411,14 @@ export function createBusStopDiscovery({ tflAdapter, naptanAdapter, referenceDat
         };
       }
     }
-    if (!insideLondon) {
+    if (insideLondon) {
+      const hasPreparedStructure = Boolean(referenceData?.resolvePreparedStopPointsByIds || typeof naptanAdapter?.preparedStopPointsByIds === 'function');
+      if (hasPreparedStructure) {
+        result = await reconcilePreparedStopPoints(result, referenceData, naptanAdapter, { forceRefresh: options.forceRefresh });
+        result = await enrichPreparedStopSidecars(result, referenceData, naptanAdapter, { forceRefresh: options.forceRefresh });
+        if (result.provenance?.preparedNaPTANStructural?.available !== false) result = await completePreparedStopAreas(result, site, referenceData, naptanAdapter, { forceRefresh: options.forceRefresh });
+      }
+    } else {
       result = await enrichPreparedStopSidecars(result, referenceData, naptanAdapter, { forceRefresh: options.forceRefresh });
       result = await completePreparedStopAreas(result, site, referenceData, naptanAdapter, { forceRefresh: options.forceRefresh });
     }

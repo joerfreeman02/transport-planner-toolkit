@@ -868,12 +868,15 @@ export function selectNearestStopGroup(stops, { maximumSeparationMetres = 350 } 
   const anchor = [...candidates].sort((a, b) => Number(a.walking.distanceMetres) - Number(b.walking.distanceMetres) || text(a.id).localeCompare(text(b.id)))[0];
   const members = (stops ?? []).filter(stop => sameLogicalStopGroup(anchor, stop, maximumSeparationMetres))
     .sort((a, b) => (Number(a.walking?.distanceMetres) || Number.POSITIVE_INFINITY) - (Number(b.walking?.distanceMetres) || Number.POSITIVE_INFINITY) || text(a.id).localeCompare(text(b.id)));
+  const basis = plannerStopGroupIds(anchor).size
+    ? 'Nearest routed walking stop; associated physical StopPoints selected by exact shared authoritative StopArea ID. No StopArea centroid or inferred name/proximity membership was used.'
+    : 'Nearest routed walking stop; associated stop records selected by matching the authoritative stop CommonName, with a controlled interchange/locality fallback and spatial sanity check.';
   return Object.freeze({
     ok: true,
     anchor,
     stops: Object.freeze(members),
     groupName: text(anchor.name),
-    basis: 'Nearest routed walking stop; associated stop records selected by matching the authoritative stop CommonName, with a controlled interchange/locality fallback and spatial sanity check.'
+    basis
   });
 }
 

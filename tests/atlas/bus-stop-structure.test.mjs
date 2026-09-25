@@ -19,6 +19,7 @@ const core = {
 const memberB = {
   id: 'MEM-B', sourceId: 'MEM-B', name: 'Central Bus Station', indicator: 'B', direction: 'S',
   latitude: 51.7064, longitude: -0.1000, status: 'active', transportMode: 'bus', busPreparedEligible: true, coordinateValid: true,
+  logicalGroupRefs: [{ id: 'naptan:G1', sourceId: 'G1', status: 'active', targetExists: true }, { id: 'naptan:G9', sourceId: 'G9', status: 'active', targetExists: true }],
   provenance: { source: 'NaPTAN' }
 };
 const memberC = {
@@ -73,7 +74,9 @@ assert.equal(discovered.data.find(stop => stop.id === 'MEM-B').core, false);
 assert.ok(discovered.data.find(stop => stop.id === 'MEM-B').distanceMetres > 700);
 assert.deepEqual(discovered.data.find(stop => stop.id === 'CORE-A').logicalGroupIds, ['naptan:G1', 'naptan:G2', 'naptan:G3']);
 assert.equal(discovered.data.find(stop => stop.id === 'CORE-A').logicalGroupRefs.find(ref => ref.id === 'naptan:G3').targetExists, false);
-assert.deepEqual(discovered.data.find(stop => stop.id === 'MEM-B').logicalGroupIds, ['naptan:G1']);
+assert.deepEqual(discovered.data.find(stop => stop.id === 'MEM-B').logicalGroupIds, ['naptan:G1', 'naptan:G9']);
+assert.deepEqual(discovered.data.find(stop => stop.id === 'MEM-B').logicalGroupRefs.map(ref => ref.id), ['naptan:G1', 'naptan:G9']);
+assert.equal(discovered.data.some(stop => stop.id === 'SECONDARY-MEMBER'), false);
 assert.deepEqual(discovered.data.find(stop => stop.id === 'MEM-C').logicalGroupIds, ['naptan:G2']);
 assert.equal(discovered.data.find(stop => stop.id === 'CORE-A').nptgLocalityName, 'Example');
 assert.equal(discovered.data.find(stop => stop.id === 'CORE-A').parentLocality, 'District Centre');
@@ -85,7 +88,7 @@ assert.equal(discovered.data.some(stop => stop.id === 'INVALID-X'), false);
 const presented = groupStopsForPresentation(discovered.data);
 assert.deepEqual(presented.map(stop => stop.id), ['CORE-A', 'MEM-B', 'MEM-C']);
 assert.equal(new Set(presented.map(stop => stop.mapReference)).size, 3);
-assert.deepEqual(presented.map(stop => stop.logicalGroupIds), [['naptan:G1', 'naptan:G2', 'naptan:G3'], ['naptan:G1'], ['naptan:G2']]);
+assert.deepEqual(presented.map(stop => stop.logicalGroupIds), [['naptan:G1', 'naptan:G2', 'naptan:G3'], ['naptan:G1', 'naptan:G9'], ['naptan:G2']]);
 
 let timetableStopIds = [];
 const assessment = createBusAssessment({
@@ -107,6 +110,7 @@ assert.equal(assessed.stops.find(stop => stop.id === 'MEM-B').timetableMatch, tr
 const nearestSelection = await assessment.assess(site, { mode: 'nearest', radius: 700 });
 assert.equal(nearestSelection.ok, true);
 assert.deepEqual(nearestSelection.stops.map(stop => stop.id), ['CORE-A', 'MEM-B', 'MEM-C']);
+assert.match(nearestSelection.nearestGroup.basis, /exact shared authoritative StopArea ID/);
 
 const v1Adapter = {
   ...fixtureAdapter,
@@ -124,5 +128,33 @@ const v1Discovery = createBusStopDiscovery({
 const v1 = await v1Discovery.nearbyStops(site);
 assert.deepEqual(v1.data.map(stop => stop.id), ['CORE-A']);
 assert.equal(v1.data[0].stopAreaCompletionStatus, 'CORE');
+
+const londonCore = { id: 'LON-A', name: 'London Exact Stop', latitude: 51.5000, longitude: -0.1200, distanceMetres: 10, timetableAuthority: 'TfL', routes: ['1'], routeAuthorities: { '1': ['TfL'] } };
+const londonUnmatched = { id: 'LON-NEAR', name: 'London Exact Stop', latitude: 51.5001, longitude: -0.1201, distanceMetres: 20, timetableAuthority: 'TfL', routes: ['1'], routeAuthorities: { '1': ['TfL'] } };
+const londonGroup = { id: 'naptan:LON-G1', sourceId: 'LON-G1', name: 'London Exact Stop Area', status: 'active', memberStopPointIds: ['LON-A', 'LON-B'] };
+const londonMember = { id: 'LON-B', naptanCode: 'lon-b', name: 'London Exact Stop', indicator: 'B', direction: 'S', latitude: 51.5065, longitude: -0.1200, routes: ['2'], logicalGroupRefs: [{ id: londonGroup.id, sourceId: londonGroup.sourceId, status: 'active', targetExists: true }, { id: 'naptan:LON-G2', sourceId: 'LON-G2', status: 'active', targetExists: true }], status: 'active', transportMode: 'bus', timetableAuthority: null };
+const londonAdapter = {
+  id: 'prepared-london-fixture',
+  nearbyStops: async () => ({ ok: true, data: [], evidence: [], warnings: [], provenance: { source: 'NaPTAN' } }),
+  preparedStopPointsByIds: async ids => ({ ok: true, data: ids.filter(id => id === 'LON-A').map(() => ({ id: 'LON-A', logicalGroupRefs: [{ id: londonGroup.id, sourceId: londonGroup.sourceId, status: 'active', targetExists: true }], nptgLocalityCode: 'E001', status: 'active', transportMode: 'bus', provenance: { source: 'NaPTAN' } })), warnings: [], provenance: { preparedStopPointsAvailable: true, exactRequestedIds: ids, exactMatchedIds: ids.filter(id => id === 'LON-A') } }),
+  logicalGroupsForStops: async selected => ({ ok: true, data: selected.some(stop => (stop.logicalGroupRefs ?? []).some(ref => ref.id === londonGroup.id)) ? [londonGroup] : [], warnings: [], provenance: { groupingAvailable: true } }),
+  localitiesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { localityAvailable: false } }),
+  stopAreaStructureForStops: async selected => selected.some(stop => (stop.logicalGroupRefs ?? []).some(ref => ref.id === londonGroup.id))
+    ? ({ ok: true, data: { groups: [{ ...londonGroup, directMemberIds: londonGroup.memberStopPointIds, qualifiedByCoreStopPointIds: ['LON-A'] }], members: [{ ...londonMember, groupIds: [londonGroup.id] }], invalidMembers: [], unresolvedGroups: [] }, warnings: [], provenance: { stopAreaCompletionAvailable: true, qualifiedGroupCount: 1, completedMemberCount: 1 } })
+    : ({ ok: true, data: { groups: [], members: [], invalidMembers: [], unresolvedGroups: [] }, warnings: [], provenance: { stopAreaCompletionAvailable: true } })
+};
+const londonDiscovery = createBusStopDiscovery({
+  tflAdapter: { nearbyStops: async () => ({ ok: true, data: [londonCore, londonUnmatched], evidence: [], warnings: [], provenance: { source: 'TfL', tflStopSourceAvailable: true } }) },
+  naptanAdapter: londonAdapter,
+  referenceData: createAtlasReferenceData({ adapter: londonAdapter }),
+  londonCoverage: () => true
+});
+const london = await londonDiscovery.nearbyStops(site);
+assert.deepEqual(london.data.map(stop => stop.id), ['LON-A', 'LON-NEAR', 'LON-B']);
+assert.equal(london.data.find(stop => stop.id === 'LON-A').timetableAuthority, 'TfL');
+assert.deepEqual(london.data.find(stop => stop.id === 'LON-A').routeAuthorities, { '1': ['TfL'] });
+assert.deepEqual(london.data.find(stop => stop.id === 'LON-B').logicalGroupRefs.map(ref => ref.id), ['naptan:LON-G1', 'naptan:LON-G2']);
+assert.equal(london.data.find(stop => stop.id === 'LON-NEAR').logicalGroupRefs?.length ?? 0, 0);
+assert.equal(london.data.find(stop => stop.id === 'LON-NEAR').groupCompleted, false);
 
 console.log('PASS BUS-STOP-STRUCTURE - direct StopArea completion, exact union, no recursion, QA retention, timetable inclusion, nearest selection, identity, NPTG preservation, and V1 fallback.');

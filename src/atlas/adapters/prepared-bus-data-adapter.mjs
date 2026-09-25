@@ -32,6 +32,9 @@ export function nearbyGridCellKeys(site, radiusMetres, gridSize = 0.1) {
 
 function resolveUrl(baseUrl, relativePath) { return new URL(relativePath, baseUrl).toString(); }
 function sourceTimestamp(value) { const text = String(value ?? '').trim(); return text && !Number.isNaN(Date.parse(text)) ? text : null; }
+function decodePreparedRecords(records, fields = []) {
+  return (records ?? []).map(record => Array.isArray(record) ? Object.fromEntries(fields.map((field, index) => [field, record[index]])) : record).filter(record => record && typeof record === 'object');
+}
 
 const SERVICE_DAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 
@@ -334,7 +337,7 @@ export function createPreparedBusDataAdapter({
     const responses = await Promise.all(paths.map(path => loadJson(path, forceRefresh)));
     if (responses.some(response => !response.ok) || responses.some(response => response.data?.schema !== 'atlas-national-reference-stop-points-v1' || !Array.isArray(response.data?.stopPoints))) return sourceFailure({ code: 'invalid_response', message: 'National reference StopPoint data could not be safely interpreted.', provenance: { source: STOP_SOURCE, referenceStopPointsAvailable: true, requestedIds: ids } });
     const wanted = new Set(ids);
-    const records = responses.flatMap(response => response.data.stopPoints).filter(record => wanted.has(String(record?.id ?? '')));
+    const records = responses.flatMap(response => decodePreparedRecords(response.data.stopPoints, index.referenceStopFields)).filter(record => wanted.has(String(record?.id ?? '')));
     const seen = new Set();
     const data = [];
     const malformedIds = [];
@@ -348,6 +351,66 @@ export function createPreparedBusDataAdapter({
     const found = new Set(data.map(record => String(record.id)));
     const missingIds = [...new Set([...missingShardIds, ...ids.filter(id => !found.has(id) && !malformedIds.includes(id))])];
     return sourceSuccess({ data: data.sort((a, b) => String(a.id).localeCompare(String(b.id))), warnings: malformedIds.length ? ['One or more requested reference StopPoints were malformed and were not completed.'] : [], provenance: { source: STOP_SOURCE, referenceStopPointsAvailable: true, requestedIds: ids, resultCount: data.length, missingIds, malformedIds } });
+  }
+
+  async function preparedStopPointsByIds(stopIds, { forceRefresh = false } = {}) {
+    const manifestResult = await manifest(forceRefresh);
+    if (!manifestResult.ok) return manifestResult;
+    const index = manifestResult.data;
+    const ids = [...new Set((stopIds ?? []).map(value => String(value ?? '').trim()).filter(Boolean))];
+    if (index.schema !== 'atlas-prepared-bus-data-v2' || !index.stopShards) return sourceSuccess({ data: [], warnings: ['Prepared v1 data does not contain full V2 physical StopPoint shards.'], provenance: { source: STOP_SOURCE, preparedStopPointsAvailable: false, requestedIds: ids } });
+    const referenceResult = await referenceStopPointsByIds(ids, { forceRefresh });
+    if (!referenceResult.ok) return referenceResult;
+    const references = new Map((referenceResult.data ?? []).map(record => [String(record.id), record]));
+    const invalidReferenceIds = [];
+    const eligibleIds = [];
+    for (const id of ids) {
+      const reference = references.get(id);
+      if (!reference) continue;
+      const status = String(reference.status ?? '').toLowerCase();
+      if (status !== 'active' || reference.busPreparedEligible !== true || String(reference.transportMode ?? '').toLowerCase() !== 'bus' || reference.coordinateValid !== true || !Number.isFinite(Number(reference.latitude)) || !Number.isFinite(Number(reference.longitude))) {
+        invalidReferenceIds.push({ id, status: status || 'invalid-reference' });
+        continue;
+      }
+      eligibleIds.push(id);
+    }
+    const gridSize = Number(index.gridSize);
+    if (!Number.isFinite(gridSize) || gridSize <= 0) return sourceFailure({ code: 'invalid_response', message: 'Prepared physical StopPoint grid metadata was malformed.', provenance: { source: STOP_SOURCE, preparedStopPointsAvailable: true, requestedIds: ids } });
+    const shardKey = reference => gridCellKey(Math.floor(Number(reference.latitude) / gridSize), Math.floor(Number(reference.longitude) / gridSize));
+    const keys = [...new Set(eligibleIds.map(id => shardKey(references.get(id))).filter(Boolean))];
+    const paths = keys.map(key => index.stopShards?.[key]).filter(Boolean);
+    const missingShardIds = eligibleIds.filter(id => !index.stopShards?.[shardKey(references.get(id))]);
+    const responses = await Promise.all(paths.map(path => loadJson(path, forceRefresh)));
+    if (responses.some(response => !response.ok) || responses.some(response => response.data?.schema !== 'atlas-prepared-bus-data-v2' || !Array.isArray(response.data?.stops))) return sourceFailure({ code: 'invalid_response', message: 'Prepared physical StopPoint data could not be safely interpreted.', provenance: { source: STOP_SOURCE, preparedStopPointsAvailable: true, requestedIds: ids, stopShardRequests: paths.length } });
+    const wanted = new Set(eligibleIds);
+    const records = decodePreparedRecords(responses.flatMap(response => response.data.stops), index.stopFields).filter(record => wanted.has(String(record?.id ?? '')));
+    const data = [];
+    const malformedIds = [];
+    const seen = new Set();
+    for (const record of records) {
+      const id = String(record.id ?? '');
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      if (String(record.status ?? '').toLowerCase() !== 'active' || !Number.isFinite(Number(record.latitude)) || !Number.isFinite(Number(record.longitude))) malformedIds.push(id);
+      else data.push(record);
+    }
+    const hydrated = new Set(data.map(record => String(record.id)));
+    const unresolvedIds = [...new Set([...missingShardIds, ...eligibleIds.filter(id => !hydrated.has(id))])];
+    return sourceSuccess({
+      data: data.sort((a, b) => String(a.id).localeCompare(String(b.id))),
+      warnings: unresolvedIds.length || malformedIds.length || invalidReferenceIds.length ? ['One or more exact physical StopPoint references could not be fully hydrated.'] : [],
+      provenance: {
+        source: STOP_SOURCE,
+        preparedStopPointsAvailable: true,
+        requestedIds: ids,
+        hydratedIds: [...hydrated].sort(),
+        unresolvedIds,
+        malformedIds,
+        invalidReferenceIds,
+        stopShardRequests: paths.length,
+        referenceProvenance: referenceResult.provenance
+      }
+    });
   }
 
   async function stopAreaStructureForStops(stops, { forceRefresh = false } = {}) {
@@ -378,21 +441,31 @@ export function createPreparedBusDataAdapter({
     const referenceResult = await referenceStopPointsByIds([...groupMemberIds], { forceRefresh });
     if (!referenceResult.ok) return referenceResult;
     const references = new Map((referenceResult.data ?? []).map(record => [String(record.id), record]));
+    const candidateIds = [];
+    const malformedReferenceIds = new Set(referenceResult.provenance?.malformedIds ?? []);
     const memberGroups = new Map();
     const invalidMembers = [];
     for (const group of groups) for (const id of group.directMemberIds) {
       const record = references.get(id);
-      if (!record) { invalidMembers.push({ id, groupId: group.id, status: 'missing' }); continue; }
+      if (!record) { invalidMembers.push({ id, groupId: group.id, status: malformedReferenceIds.has(id) ? 'malformed-reference' : 'missing' }); continue; }
       const status = String(record.status ?? '').toLowerCase();
       if (status !== 'active') { invalidMembers.push({ id, groupId: group.id, status: status || 'missing-status' }); continue; }
       if (record.busPreparedEligible !== true || String(record.transportMode ?? '').toLowerCase() !== 'bus') { invalidMembers.push({ id, groupId: group.id, status: 'non-bus' }); continue; }
       if (record.coordinateValid !== true || !Number.isFinite(Number(record.latitude)) || !Number.isFinite(Number(record.longitude))) { invalidMembers.push({ id, groupId: group.id, status: 'malformed-coordinate' }); continue; }
+      if (!candidateIds.includes(id)) candidateIds.push(id);
       if (!memberGroups.has(id)) memberGroups.set(id, []);
       memberGroups.get(id).push(group.id);
     }
-    const members = [...memberGroups.entries()].map(([id, groupIds]) => ({ ...references.get(id), groupIds: [...new Set(groupIds)].sort() })).sort((a, b) => String(a.id).localeCompare(String(b.id)));
-    return sourceSuccess({ data: { groups, members, invalidMembers, unresolvedGroups }, warnings: referenceResult.warnings ?? [], provenance: { source: STOP_SOURCE, stopAreaCompletionAvailable: true, qualifiedGroupCount: groups.length, completedMemberCount: members.length, invalidMemberCount: invalidMembers.length, unresolvedGroupCount: unresolvedGroups.length, referenceStopPointProvenance: referenceResult.provenance } });
+    const hydratedResult = await preparedStopPointsByIds(candidateIds, { forceRefresh });
+    if (!hydratedResult.ok) return hydratedResult;
+    const hydrated = new Map((hydratedResult.data ?? []).map(record => [String(record.id), record]));
+    for (const id of candidateIds) if (!hydrated.has(id)) {
+      for (const groupId of memberGroups.get(id) ?? []) invalidMembers.push({ id, groupId, status: 'unresolved-full-stop-record' });
+      memberGroups.delete(id);
+    }
+    const members = [...memberGroups.entries()].map(([id, groupIds]) => ({ ...hydrated.get(id), groupIds: [...new Set(groupIds)].sort() })).sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    return sourceSuccess({ data: { groups, members, invalidMembers, unresolvedGroups }, warnings: [...new Set([...(referenceResult.warnings ?? []), ...(hydratedResult.warnings ?? [])])], provenance: { source: STOP_SOURCE, stopAreaCompletionAvailable: true, qualifiedGroupCount: groups.length, completedMemberCount: members.length, invalidMemberCount: invalidMembers.length, unresolvedGroupCount: unresolvedGroups.length, referenceStopPointProvenance: referenceResult.provenance, preparedStopPointProvenance: hydratedResult.provenance } });
   }
 
-  return Object.freeze({ id: 'prepared-national-bus-data-v1-v2-compatible', manifest, nearbyStops, servicesForStops, logicalGroupsForStops, localitiesForStops, referenceStopPointsByIds, stopAreaStructureForStops });
+  return Object.freeze({ id: 'prepared-national-bus-data-v1-v2-compatible', manifest, nearbyStops, servicesForStops, logicalGroupsForStops, localitiesForStops, referenceStopPointsByIds, preparedStopPointsByIds, stopAreaStructureForStops });
 }

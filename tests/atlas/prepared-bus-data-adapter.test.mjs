@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
 import { createPreparedBusDataAdapter, nearbyGridCellKeys, normalisePreparedService } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
+import { createAtlasReferenceData } from '../../src/atlas/reference-data/atlas-reference-data.mjs';
+import { createBusStopDiscovery } from '../../src/atlas/application/bus-stop-discovery.mjs';
 
 const tests = [];
 
@@ -87,22 +89,23 @@ test('prepared v2 decodes physical stops and exposes sidecars without changing v
     schema: 'atlas-prepared-bus-data-v2',
     groupShardKeyLength: 3,
     localityShardKeyLength: 3,
-    stopFields: [...manifest.stopFields, 'nptgLocalityCode', 'logicalGroupRefs', 'status', 'provenance'],
+    stopFields: [...manifest.stopFields, 'coordinateMethod', 'nptgLocalityCode', 'logicalGroupRefs', 'status', 'provenance', 'localityResolution', 'transportMode', 'administrativeAreaCode'],
     groupShards: { '210': 'groups/210.json.gz' },
     referenceStopPointShardKeyLength: 3,
     referenceStopPointShards: { '210': 'references/210.json.gz' },
     localityShards: { 'E00': 'localities/E00.json.gz' }
   };
   const group = { id: 'naptan:210G432', sourceId: '210G432', name: 'Bus Station', memberStopPointIds: ['2100A', '2100B'], status: 'active' };
-  const referenceStop = { id: '2100A', name: 'High Street', latitude: 51.6859, longitude: -0.0331, status: 'active', transportMode: 'bus', busPreparedEligible: true, coordinateValid: true };
-  const referenceMember = { id: '2100B', name: 'High Street', latitude: 51.6862, longitude: -0.0331, status: 'active', transportMode: 'bus', busPreparedEligible: true, coordinateValid: true };
+  const referenceStop = { id: '2100A', name: 'High Street', stopType: 'BUS', transportMode: 'bus', busPreparedEligible: true, coordinateValid: true, latitude: 51.6859, longitude: -0.0331, status: 'active' };
+  const referenceMember = { id: '2100B', name: 'High Street', stopType: 'BUS', transportMode: 'bus', busPreparedEligible: true, coordinateValid: true, latitude: 51.6862, longitude: -0.0331, status: 'active' };
+  const fullMember = { ...stop, id: '2100B', naptanCode: 'hrtfixture-b', name: 'High Street', indicator: 'B', direction: 'S', latitude: 51.6862, longitude: -0.0331, coordinateMethod: 'naptan', nptgLocalityCode: 'E0013720', logicalGroupRefs: [{ id: group.id, sourceId: group.sourceId, status: 'active', targetExists: true }, { id: 'naptan:210G999', sourceId: '210G999', status: 'active', targetExists: true }], status: 'active', provenance: { source: 'NaPTAN' }, localityResolution: 'resolved', transportMode: 'bus', administrativeAreaCode: 'E07000095', routes: ['20'], busStopType: 'regular' };
   const locality = { id: 'nptg:E0013720', code: 'E0013720', name: 'Waltham Cross', districtId: 'nptg:26' };
   const v2Stop = { ...stop, nptgLocalityCode: 'E0013720', logicalGroupRefs: [{ id: group.id, sourceId: group.sourceId, status: 'active', targetExists: true }], status: 'active', provenance: { source: 'NaPTAN' } };
   const v2Packed = v2Manifest.stopFields.map(field => v2Stop[field] ?? null);
   const v2Fetch = async url => {
     const pathname = new URL(url).pathname;
     const value = pathname.endsWith('/manifest.json') ? v2Manifest
-      : pathname.endsWith('/stops/g516_m1.json.gz') ? { schema: 'atlas-prepared-bus-data-v2', stops: [v2Packed] }
+      : pathname.endsWith('/stops/g516_m1.json.gz') ? { schema: 'atlas-prepared-bus-data-v2', stops: [v2Packed, v2Manifest.stopFields.map(field => fullMember[field] ?? null)] }
         : pathname.endsWith('/services/2100A-south-east.json.gz') ? { schema: 'atlas-prepared-bus-data-v2', services: [service] }
             : pathname.endsWith('/groups/210.json.gz') ? { schema: 'atlas-prepared-logical-groups-v1', groups: [group] }
             : pathname.endsWith('/references/210.json.gz') ? { schema: 'atlas-national-reference-stop-points-v1', stopPoints: [referenceStop, referenceMember] }
@@ -119,11 +122,34 @@ test('prepared v2 decodes physical stops and exposes sidecars without changing v
   assert.deepEqual((await adapter.localitiesForStops([v2Stop])).data, [locality]);
   const exactReferences = await adapter.referenceStopPointsByIds(['2100B']);
   assert.deepEqual(exactReferences.data.map(record => record.id), ['2100B']);
+  assert.equal(Object.hasOwn(exactReferences.data[0], 'indicator'), false);
   assert.deepEqual(exactReferences.provenance.missingIds, []);
+  const hydrated = await adapter.preparedStopPointsByIds(['2100B']);
+  assert.equal(hydrated.ok, true);
+  assert.equal(hydrated.data[0].naptanCode, 'hrtfixture-b');
+  assert.equal(hydrated.data[0].indicator, 'B');
+  assert.equal(hydrated.data[0].direction, 'S');
+  assert.deepEqual(hydrated.data[0].routes, ['20']);
+  assert.equal(hydrated.data[0].logicalGroupRefs.length, 2);
   const structure = await adapter.stopAreaStructureForStops([v2Stop]);
   assert.equal(structure.ok, true);
   assert.deepEqual(structure.data.members.map(record => record.id), ['2100A', '2100B']);
   assert.deepEqual(structure.data.members[1].groupIds, ['naptan:210G432']);
+  assert.equal(structure.data.members[1].naptanCode, 'hrtfixture-b');
+  assert.deepEqual(structure.data.members[1].logicalGroupRefs.map(ref => ref.id), ['naptan:210G432', 'naptan:210G999']);
+  const discovery = createBusStopDiscovery({
+    tflAdapter: { nearbyStops: async () => ({ ok: true, data: [], evidence: [], warnings: [], provenance: { source: 'TfL' } }) },
+    naptanAdapter: adapter,
+    referenceData: createAtlasReferenceData({ adapter }),
+    londonCoverage: () => false
+  });
+  const completed = await discovery.nearbyStops(site);
+  const completedMember = completed.data.find(record => record.id === '2100B');
+  assert.equal(completedMember.naptanCode, 'hrtfixture-b');
+  assert.equal(completedMember.indicator, 'B');
+  assert.equal(completedMember.direction, 'S');
+  assert.deepEqual(completedMember.routes, ['20']);
+  assert.deepEqual(completedMember.logicalGroupRefs.map(ref => ref.id), ['naptan:210G432', 'naptan:210G999']);
 });
 
 test('prepared v1 explicitly reports absent grouping and locality sidecars', async () => {

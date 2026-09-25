@@ -113,7 +113,7 @@ def validate_v2_sidecars(bus: Path, manifest: dict, stop_ids: set[str]) -> dict:
         if missing:
             raise RefreshError(f"Active logical-group member StopPoint is missing: {missing[0]}")
     for locality in localities.values():
-        if locality.get("districtId") and not isinstance(locality.get("districtName"), str):
+        if locality.get("districtId") and locality.get("districtName") is not None and not isinstance(locality.get("districtName"), str):
             raise RefreshError(f"Candidate locality district name is missing: {locality.get('id')}")
     return {"groups": groups, "localities": localities, "groupShardCount": len(group_paths), "localityShardCount": len(locality_paths)}
 

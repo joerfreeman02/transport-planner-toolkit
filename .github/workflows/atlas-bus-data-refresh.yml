@@ -26,6 +26,11 @@ on:
         options:
           - v1
           - v2
+      v2_source_snapshot_run_id:
+        description: Exact prior source workflow run ID for frozen diagnostic reuse.
+        required: false
+        default: ''
+        type: string
   schedule:
     - cron: '37 5 * * 1'
 
@@ -73,6 +78,7 @@ jobs:
   freshness:
     name: Check weekly Bus refresh freshness
     needs: main-guard
+    if: inputs.prepared_schema != 'v2'
     runs-on: ubuntu-latest
     outputs:
       refresh_required: ${{ steps.decision.outputs.refresh_required }}
@@ -96,7 +102,7 @@ jobs:
   build-validate:
     name: Build and validate Bus/TNDS candidate
     needs: [main-guard, freshness]
-    if: needs.freshness.outputs.refresh_required == 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    if: inputs.prepared_schema != 'v2' && needs.freshness.result == 'success' && needs.freshness.outputs.refresh_required == 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 180
     permissions:
@@ -324,7 +330,7 @@ jobs:
   deploy:
     name: Deploy validated Pages artifact
     needs: [main-guard, freshness, build-validate]
-    if: needs.freshness.outputs.refresh_required == 'true' && needs.build-validate.result == 'success' && github.ref == 'refs/heads/main' && inputs.measure_only != true
+    if: inputs.prepared_schema != 'v2' && needs.freshness.outputs.refresh_required == 'true' && needs.build-validate.result == 'success' && github.ref == 'refs/heads/main' && inputs.measure_only != true
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -337,7 +343,32 @@ jobs:
   freshness-no-op:
     name: Confirm already-fresh Bus data
     needs: [main-guard, freshness, build-validate]
-    if: always() && needs.main-guard.result == 'success' && needs.freshness.outputs.refresh_required == 'false' && github.ref == 'refs/heads/main'
+    if: always() && inputs.prepared_schema != 'v2' && needs.main-guard.result == 'success' && needs.freshness.outputs.refresh_required == 'false' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - run: echo "${{ needs.freshness.outputs.message }}"
+
+  reference-source:
+    name: Acquire or reuse exact v2 Bus source snapshot
+    needs: main-guard
+    if: inputs.prepared_schema == 'v2' && github.event_name == 'workflow_dispatch' && needs.main-guard.result == 'success'
+    uses: ./.github/workflows/atlas-reference-data-source.yml
+    with:
+      v2_source_snapshot_run_id: ${{ inputs.v2_source_snapshot_run_id }}
+    secrets: inherit
+    permissions:
+      actions: read
+      contents: read
+
+  reference-diagnostic:
+    name: Prepare and diagnose v2 Bus data
+    needs: [main-guard, reference-source]
+    if: inputs.prepared_schema == 'v2' && needs.main-guard.result == 'success' && needs.reference-source.result == 'success'
+    uses: ./.github/workflows/atlas-reference-data-diagnostic.yml
+    with:
+      source_snapshot_artifact: ${{ needs.reference-source.outputs.snapshot_artifact }}
+      source_snapshot_run_id: ${{ github.run_id }}
+    secrets: inherit
+    permissions:
+      actions: read
+      contents: read

@@ -131,3 +131,22 @@ fixtures; a national snapshot artifact was not claimed.
 Recommendation: Technical Director review only. This handover does not approve
 merge, production refresh, Prepared Data V2 publication, Pages deployment or
 manual planner acceptance.
+
+
+## BUS-DATA-V2-2C corrective acceptance rule
+
+An authoritative NPTG locality district reference is retained when its
+`districtId` is present even if the source contains no matching district
+definition. In that case `districtName` remains `null`; the hard candidate
+validator accepts the relationship, while the structural scanner emits a
+bounded `WARN` classified as a source anomaly. A defined district must retain
+a string `districtName`, and malformed runtime relationships remain
+fail-closed errors.
+
+The v2 workflow is diagnostic-only and chains the local reusable source and
+diagnostic workflows. The source job either acquires NaPTAN XML, NPTG XML and
+all nine BODS regional archives once or downloads one exact prior run artifact
+by run ID. Explicit cross-run reuse is marked
+`FROZEN_DIAGNOSTIC_EXPLICIT` with `currentSourceFreshnessClaimed: false`.
+Source manifests record workflow, run ID, repository commit SHA and acquisition
+timestamp; no TNDS archive is part of the snapshot or diagnostic artifact.

@@ -35,7 +35,10 @@ class StructuralScanTests(unittest.TestCase):
             result = scan(root)
             self.assertEqual(result["nptg"]["unresolvedByDistrict"], {"310": 1})
             self.assertTrue(result["runtimeIntegrity"]["failClosed"])
-            self.assertTrue(any(item["classification"] == "source_anomaly" for item in result["findings"]))
+            unresolved = [item for item in result["findings"] if item["category"] == "unresolved_district_reference"]
+            self.assertEqual(len(unresolved), 1)
+            self.assertEqual(unresolved[0]["severity"], "WARN")
+            self.assertEqual(unresolved[0]["classification"], "source_anomaly")
         finally:
             shutil.rmtree(root, ignore_errors=True)
 

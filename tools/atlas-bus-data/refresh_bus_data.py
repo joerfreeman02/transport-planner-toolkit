@@ -480,7 +480,7 @@ def run(args: argparse.Namespace) -> dict:
         if getattr(args, "source_snapshot_output", None) and not snapshot_root:
             if prepared_schema != "v2" or not bus_only:
                 raise RefreshError("--source-snapshot-output is supported only for the Bus-only prepared-data v2 path")
-            snapshot_manifest = snapshot_from_staging(staging, Path(args.source_snapshot_output).resolve(), xml_sources=xml_sources, bods=bods, producer_workflow=os.environ.get("GITHUB_WORKFLOW"), run_id=os.environ.get("GITHUB_RUN_ID"))
+            snapshot_manifest = snapshot_from_staging(staging, Path(args.source_snapshot_output).resolve(), xml_sources=xml_sources, bods=bods, producer_workflow=os.environ.get("GITHUB_WORKFLOW"), run_id=os.environ.get("GITHUB_RUN_ID"), repository_commit_sha=os.environ.get("GITHUB_SHA"))
         tnds_xml = None
         tnds = None
         if not bus_only:

@@ -42,6 +42,7 @@ await import('./legacy-isolation-guard.test.mjs');
 await import('./legacy-isolation.test.mjs');
 await import('./review-environment.test.mjs');
 await import('./automated-refresh-contract.test.mjs');
+await import('./reference-data-workflow-contract.test.mjs');
 await import('./refresh-freshness.test.mjs');
 await import('./atlas-data-publication.test.mjs');
 await import('./publication-wait.test.mjs');

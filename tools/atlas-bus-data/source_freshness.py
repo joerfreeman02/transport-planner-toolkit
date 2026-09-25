@@ -23,7 +23,7 @@ def probe_http(url: str, *, opener=urllib.request.urlopen) -> dict:
         with opener(request, timeout=30) as response:
             headers = response.headers
             values = {key.lower(): headers.get(key) for key in ("ETag", "Last-Modified", "Content-Length") if headers.get(key) is not None}
-            reliable = bool(values.get("etag") or values.get("last-modified") or values.get("content-length"))
+            reliable = bool(values.get("etag") or (values.get("last-modified") and values.get("content-length")))
             return {"method": "HTTP HEAD", "url": url, "checkedAt": _now(), "httpStatus": getattr(response, "status", None) or response.getcode(), "metadata": values, "reliable": reliable, "classification": "RELIABLE_METADATA" if reliable else "NO_RELIABLE_METADATA"}
     except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as error:
         return {"method": "HTTP HEAD", "url": url, "checkedAt": _now(), "reliable": False, "classification": "PROBE_UNAVAILABLE", "error": type(error).__name__}

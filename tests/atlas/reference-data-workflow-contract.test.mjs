@@ -1,0 +1,61 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const top = fs.readFileSync(path.join(root, '.github/workflows/atlas-bus-data-refresh.yml'), 'utf8');
+const source = fs.readFileSync(path.join(root, '.github/workflows/atlas-reference-data-source.yml'), 'utf8');
+const diagnostic = fs.readFileSync(path.join(root, '.github/workflows/atlas-reference-data-diagnostic.yml'), 'utf8');
+
+assert.match(top, /uses: \.\/\.github\/workflows\/atlas-reference-data-source\.yml/);
+assert.match(top, /uses: \.\/\.github\/workflows\/atlas-reference-data-diagnostic\.yml/);
+assert.match(top, /v2_source_snapshot_run_id:/);
+assert.match(top, /source_snapshot_artifact: \$\{\{ needs\.reference-source\.outputs\.snapshot_artifact \}\}/);
+assert.match(top, /source_snapshot_run_id: \$\{\{ github\.run_id \}\}/);
+assert.match(top, /secrets: inherit/);
+assert.match(top, /if: inputs\.prepared_schema != 'v2' && needs\.freshness\.result == 'success'/);
+
+assert.match(source, /workflow_call:/);
+assert.match(source, /v2_source_snapshot_run_id:/);
+assert.match(source, /snapshot_artifact: \$\{\{ steps\.snapshot-name\.outputs\.name \}\}/);
+assert.match(source, /snapshot_artifact_id: \$\{\{ steps\.upload\.outputs\.artifact-id \}\}/);
+assert.match(source, /value: \$\{\{ jobs\.acquire\.outputs\.snapshot_artifact \}\}/);
+assert.match(source, /value: \$\{\{ jobs\.acquire\.outputs\.snapshot_artifact_id \}\}/);
+assert.match(source, /run-id: \$\{\{ inputs\.v2_source_snapshot_run_id \}\}/);
+assert.match(source, /github-token: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
+assert.match(source, /--mark-frozen-reuse/);
+assert.match(source, /--acquire --output source-snapshot/);
+assert.match(source, /inputs\.v2_source_snapshot_run_id == ''/);
+assert.match(source, /actions: read/);
+
+assert.match(diagnostic, /workflow_call:/);
+assert.match(diagnostic, /source_snapshot_run_id:/);
+assert.match(diagnostic, /run-id: \$\{\{ inputs\.source_snapshot_run_id \}\}/);
+assert.match(diagnostic, /--acquisition-disabled/);
+assert.match(diagnostic, /Require a pristine Git checkout for deterministic ATLAS checks/);
+assert.match(diagnostic, /git status --porcelain/);
+assert.match(diagnostic, /RUNNER_TEMP\/atlas-deterministic-tests\.log/);
+assert.match(diagnostic, /TNDS_USERNAME: \$\{\{ secrets\.TNDS_USERNAME \}\}/);
+assert.match(diagnostic, /TNDS_PASSWORD: \$\{\{ secrets\.TNDS_PASSWORD \}\}/);
+assert.ok(diagnostic.indexOf('Run deterministic ATLAS checks from pristine checkout') < diagnostic.indexOf('Restore supplied source snapshot'));
+assert.ok(diagnostic.indexOf('Restore supplied source snapshot') < diagnostic.indexOf('Restore last-known-good diagnostic comparison state'));
+assert.match(diagnostic, /Stage and verify diagnostic release metadata/);
+assert.match(diagnostic, /cp atlas\/config\/atlas-release\.json pages-site\/atlas\/config\/atlas-release\.json/);
+assert.match(diagnostic, /json\.loads\(path\.read_text\(encoding='utf-8'\)\)/);
+assert.match(diagnostic, /version.*build.*must be non-empty/);
+assert.ok(diagnostic.indexOf('Stage and verify diagnostic release metadata') < diagnostic.indexOf('Prepare Bus v2 with acquisition disabled'));
+assert.match(diagnostic, /--previous-root last-known-good/);
+assert.match(diagnostic, /--acquisition-disabled/);
+assert.match(diagnostic, /steps\.prepare-v2\.outcome/);
+assert.match(diagnostic, /steps\.release-metadata\.outcome/);
+assert.match(diagnostic, /if: always\(\) &&/);
+assert.match(diagnostic, /Copy deterministic test log into evidence workspace/);
+assert.ok(diagnostic.indexOf('Restore last-known-good diagnostic comparison state') < diagnostic.indexOf('Run aggregate structural scan'));
+assert.ok(diagnostic.indexOf('Run aggregate structural scan') < diagnostic.indexOf('Run hard candidate validation'));
+assert.ok(diagnostic.indexOf('Run hard candidate validation') < diagnostic.indexOf('Probe TNDS metadata'));
+assert.ok(diagnostic.indexOf('Probe TNDS metadata') < diagnostic.indexOf('Run same-source-window parity'));
+assert.match(diagnostic, /verified-snapshot-manifest\.json/);
+assert.match(diagnostic, /atlas-reference-diagnostic-\$\{\{ github\.run_id \}\}/);
+
+console.log('PASS v2 source/diagnostic reusable-workflow contract: exact artifact provenance, output propagation, frozen reuse, acquisition gating, ordering and TNDS secret scope.');

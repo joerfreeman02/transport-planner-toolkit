@@ -1,0 +1,70 @@
+name: ATLAS reference data source
+
+on:
+  workflow_call:
+    inputs:
+      v2_source_snapshot_run_id:
+        description: Exact prior source workflow run ID for frozen diagnostic reuse
+        required: false
+        default: ''
+        type: string
+    outputs:
+      snapshot_artifact:
+        description: Name of the verified source snapshot artifact
+        value: ${{ jobs.acquire.outputs.snapshot_artifact }}
+      snapshot_artifact_id:
+        description: ID of the verified source snapshot artifact
+        value: ${{ jobs.acquire.outputs.snapshot_artifact_id }}
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  acquire:
+    name: Inspect freshness and acquire Bus source snapshot
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      snapshot_artifact: ${{ steps.snapshot-name.outputs.name }}
+      snapshot_artifact_id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Probe remote metadata without source transfer
+        if: inputs.v2_source_snapshot_run_id == ''
+        run: |
+          mkdir -p source-probe
+          python tools/atlas-bus-data/source_freshness.py --output source-probe/freshness.json
+      - name: Restore exact prior snapshot for explicit frozen diagnostic reuse
+        if: inputs.v2_source_snapshot_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: atlas-reference-source-snapshot-${{ inputs.v2_source_snapshot_run_id }}
+          run-id: ${{ inputs.v2_source_snapshot_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          path: prior-source
+      - name: Reuse exact verified snapshot without claiming current freshness
+        if: inputs.v2_source_snapshot_run_id != ''
+        run: python tools/atlas-bus-data/source_snapshot.py --mark-frozen-reuse prior-source/source-snapshot --source-run-id "${{ inputs.v2_source_snapshot_run_id }}" --output source-snapshot
+      - name: Acquire the authorised Bus source set once
+        if: inputs.v2_source_snapshot_run_id == ''
+        run: python tools/atlas-bus-data/source_snapshot.py --acquire --output source-snapshot
+      - name: Verify source snapshot provenance and hashes
+        run: python tools/atlas-bus-data/source_snapshot.py --verify source-snapshot
+      - name: Record exact snapshot artifact name
+        id: snapshot-name
+        run: echo "name=atlas-reference-source-snapshot-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
+      - name: Upload immutable source snapshot for preparation reuse
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.snapshot-name.outputs.name }}
+          path: |
+            source-snapshot
+            source-probe/freshness.json
+          if-no-files-found: error
+          retention-days: 14

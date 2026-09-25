@@ -78,6 +78,30 @@ class CandidateValidatorTests(unittest.TestCase):
         self.assertEqual(result['logicalGroupCount'], 1)
         self.assertEqual(result['districtCount'], 1)
 
+    def test_v2_unresolved_authoritative_district_reference_is_retained(self):
+        self._convert_candidate_to_v2()
+        locality_path = self.root / 'atlas/data/bus/localities/e.json.gz'
+        with gzip.open(locality_path, 'rt', encoding='utf-8') as stream:
+            payload = json.load(stream)
+        payload['localities'][0]['districtName'] = None
+        with gzip.open(locality_path, 'wt', encoding='utf-8') as stream:
+            json.dump(payload, stream)
+        result = validate(self.root)
+        self.assertEqual(result['localityRecords'], 1)
+        self.assertEqual(payload['localities'][0]['districtId'], 'nptg:D1')
+        self.assertIsNone(payload['localities'][0]['districtName'])
+
+    def test_v2_malformed_defined_district_name_fails_closed(self):
+        self._convert_candidate_to_v2()
+        locality_path = self.root / 'atlas/data/bus/localities/e.json.gz'
+        with gzip.open(locality_path, 'rt', encoding='utf-8') as stream:
+            payload = json.load(stream)
+        payload['localities'][0]['districtName'] = 42
+        with gzip.open(locality_path, 'wt', encoding='utf-8') as stream:
+            json.dump(payload, stream)
+        with self.assertRaisesRegex(RefreshError, 'district name is missing'):
+            validate(self.root)
+
     def test_v2_duplicate_sidecar_identity_fails_closed(self):
         self._convert_candidate_to_v2()
         duplicate = self.root / 'atlas/data/bus/groups/g2.json.gz'

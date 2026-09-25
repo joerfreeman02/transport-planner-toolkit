@@ -11,6 +11,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -144,11 +145,33 @@ class CircularIdentityTests(unittest.TestCase):
 
 
 class PreparedDataV2ParserTests(unittest.TestCase):
+    def test_bearing_compass_point_supports_authoritative_nested_and_legacy_scalar_forms(self):
+        nested = ET.fromstring(
+            '<StopPoint xmlns="http://www.naptan.org.uk/">'
+            '<AtcoCode>999000001</AtcoCode><Descriptor><CommonName>Nested</CommonName>'
+            '<Bearing><CompassPoint>SW</CompassPoint><Degrees>225</Degrees></Bearing></Descriptor>'
+            '<Place><Location><Translation><Latitude>51</Latitude><Longitude>-1</Longitude></Translation></Location></Place>'
+            '<StopClassification><StopType>BCT</StopType></StopClassification></StopPoint>'
+        )
+        legacy = ET.fromstring(
+            '<StopPoint><AtcoCode>999000002</AtcoCode><Descriptor><CommonName>Scalar</CommonName>'
+            '<Bearing>N</Bearing></Descriptor><Place><Location><Translation><Latitude>51</Latitude>'
+            '<Longitude>-1</Longitude></Translation></Location></Place><StopClassification>'
+            '<StopType>BCT</StopType></StopClassification></StopPoint>'
+        )
+        nested_result, nested_issue = V2._parse_stop_point(nested, "2.4")
+        legacy_result, legacy_issue = V2._parse_stop_point(legacy, "2.1")
+        self.assertIsNone(nested_issue)
+        self.assertIsNone(legacy_issue)
+        self.assertEqual(nested_result["direction"], "SW")
+        self.assertEqual(legacy_result["direction"], "N")
+
     def test_bng_fallback_and_modification_attribute_match_v1_semantics(self):
         v2 = V2.parse_naptan_xml(FIXTURES / "naptan-bng-2.1.xml")
         v1, _, excluded = BUILDER.load_naptan(FIXTURES / "naptan-bng-v1.csv")
         self.assertEqual(excluded, 0)
-        self.assertEqual(v2.qa["malformed_stop_point"], 1)
+        self.assertEqual(v2.qa["malformed_stop_point"], 0)
+        self.assertEqual(v2.qa["invalidOrMissingCoordinateCount"], 1)
         self.assertEqual(v2.stops["999000001"]["modifiedAt"], "2026-09-15T16:00:00+01:00")
         self.assertEqual(v2.stops["999000001"]["coordinateMethod"], "NaPTAN British National Grid converted to WGS84")
         self.assertEqual((v2.stops["999000001"]["latitude"], v2.stops["999000001"]["longitude"]), (v1["999000001"]["latitude"], v1["999000001"]["longitude"]))

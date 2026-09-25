@@ -22,6 +22,8 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from source_snapshot import materialise_for_preparation, snapshot_from_staging
+
 TNDS_REGIONS = ("EA", "EM", "NE", "NW", "SE", "SW", "WM", "Y")
 NAPTAN_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=csv"
 NAPTAN_XML_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"
@@ -349,10 +351,45 @@ def candidate_metrics(site: Path) -> dict:
     return metrics
 
 
-def validate_candidate(site: Path, baseline: dict | None = None) -> dict:
-    metrics = candidate_metrics(site)
+def bus_candidate_metrics(site: Path) -> dict:
+    """Validate and measure only the Bus v2 candidate; never requires TNDS."""
+    bus_manifest_path = site / "atlas" / "data" / "bus" / "manifest.json"
+    try:
+        bus = json.loads(bus_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise RefreshError("Prepared Bus v2 manifest is missing or invalid") from error
+    if bus.get("schema") != "atlas-prepared-bus-data-v2":
+        raise RefreshError("Bus-only diagnostic requires the prepared Bus v2 schema")
+    if not bus.get("stopShards") or not bus.get("serviceShards"):
+        raise RefreshError("Prepared Bus v2 candidate is empty")
+    roots = site / "atlas" / "data" / "bus"
+    paths = list(bus["stopShards"].values()) + [path for paths in bus["serviceShards"].values() for path in paths]
+    paths += list(bus.get("groupShards", {}).values()) + list(bus.get("localityShards", {}).values())
+    paths += list(bus.get("referenceStopPointShards", {}).values())
+    for relative in paths:
+        if not (roots / relative).is_file():
+            raise RefreshError(f"Prepared Bus v2 candidate references a missing file: {relative}")
+    counts = bus.get("counts", {})
+    return {
+        "naptanStopCount": bus.get("sources", {}).get("naptan", {}).get("stopCount", 0),
+        "bodsRegionCount": len(bus.get("sources", {}).get("bods", {}).get("regions", [])),
+        "bodsServiceCount": sum(int(region.get("serviceCount", 0) or 0) for region in bus.get("sources", {}).get("bods", {}).get("regions", [])),
+        "activeStopPointCount": counts.get("activeStopPointCount", 0),
+        "logicalGroupCount": counts.get("logicalGroupCount", 0),
+        "localityCount": counts.get("localityCount", 0),
+        "districtCount": counts.get("districtCount", 0),
+        "referenceStopPointCount": counts.get("referenceStopPointCount", 0),
+        "stopShardCount": counts.get("stopShardCount", 0),
+        "serviceShardCount": counts.get("serviceShardCount", 0),
+        "diagnosticOnly": True,
+    }
+
+
+def validate_candidate(site: Path, baseline: dict | None = None, bus_only: bool = False) -> dict:
+    metrics = bus_candidate_metrics(site) if bus_only else candidate_metrics(site)
     baseline = baseline or {}
-    for key in ("naptanStopCount", "bodsServiceCount", "tndsServiceCount"):
+    keys = ("naptanStopCount", "bodsServiceCount") if bus_only else ("naptanStopCount", "bodsServiceCount", "tndsServiceCount")
+    for key in keys:
         previous = int(baseline.get(key, 0) or 0)
         current = int(metrics.get(key, 0) or 0)
         if previous and current < previous * 0.5:
@@ -393,6 +430,22 @@ def source_outcome(source_hash: str, previous: dict | None) -> tuple[str, str | 
     return ("CHECKED_NO_CHANGE", None) if previous_hash == source_hash else ("UPDATED", None)
 
 
+def source_snapshot_status(manifest: dict) -> dict:
+    """Render snapshot provenance from the authoritative snapshot manifest."""
+    reuse = manifest.get("reuse") if isinstance(manifest.get("reuse"), dict) else {}
+    return {
+        "schema": manifest["schema"],
+        "snapshotId": manifest["snapshotId"],
+        "state": manifest["state"],
+        "reused": bool(reuse.get("reused", False)),
+        "reuseMode": manifest.get("reuseMode"),
+        "reuse": reuse,
+        "currentSourceFreshnessClaimed": manifest.get("currentSourceFreshnessClaimed"),
+        "diagnosticOnly": manifest["diagnosticOnly"],
+        "productionEligible": manifest["productionEligible"],
+    }
+
+
 def run(args: argparse.Namespace) -> dict:
     started = now_utc()
     site = Path(args.site_root).resolve()
@@ -405,20 +458,49 @@ def run(args: argparse.Namespace) -> dict:
     deployed_baseline = baseline_metrics(previous_root) if previous_root and previous_status else {}
     baseline = deployed_baseline if deployed_baseline else baseline_metrics(site)
     prepared_schema = getattr(args, "prepared_schema", "v1")
+    bus_only = bool(getattr(args, "bus_only_diagnostic", False))
+    if bus_only and prepared_schema != "v2":
+        raise RefreshError("Bus-only diagnostic requires prepared schema v2")
     if prepared_schema not in {"v1", "v2"}:
         raise RefreshError("prepared schema must be v1 or v2")
     staging = site.parent / f"atlas-bus-refresh-staging-{os.getpid()}"
     shutil.rmtree(staging, ignore_errors=True)
     staging.mkdir(parents=True)
     try:
-        if prepared_schema == "v2":
+        snapshot_root = Path(args.source_snapshot).resolve() if getattr(args, "source_snapshot", None) else None
+        if getattr(args, "acquisition_disabled", False) and not snapshot_root:
+            raise RefreshError("--acquisition-disabled requires --source-snapshot")
+        snapshot_manifest = None
+        if snapshot_root:
+            if prepared_schema != "v2" or not bus_only:
+                raise RefreshError("--source-snapshot is supported only for the Bus-only prepared-data v2 path")
+            naptan, nptg, gtfs, snapshot_manifest = materialise_for_preparation(snapshot_root, staging)
+            entries = {item["path"]: item for item in snapshot_manifest["sources"]}
+            naptan_entry = entries["sources/naptan.xml"]
+            nptg_entry = entries["sources/nptg.xml"]
+            naptan_source = {"identity": naptan_entry["sourceIdentity"], "sourceHash": naptan_entry["sha256"], "httpStatus": None, "contentType": "application/xml", "remoteMetadata": naptan_entry.get("remoteMetadata", {})}
+            xml_sources = {"naptan": naptan_source, "nptg": {"identity": nptg_entry["sourceIdentity"], "sourceHash": nptg_entry["sha256"], "httpStatus": None, "contentType": "application/xml", "remoteMetadata": nptg_entry.get("remoteMetadata", {})}}
+            bods_regions = []
+            for region in snapshot_manifest["regions"]:
+                entry = entries[f"sources/bods/{region}.zip"]
+                bods_regions.append({"region": region, "identity": entry["sourceIdentity"], "sourceHash": entry["sha256"], "sha256": entry["sha256"], "bytes": entry["bytes"], "remoteMetadata": entry.get("remoteMetadata", {}), "reused": True})
+            bods = {"identity": "verified source snapshot", "regions": bods_regions, "sourceHash": hashlib.sha256("".join(f"{item['region']}:{item['sourceHash']}" for item in bods_regions).encode("ascii")).hexdigest()}
+        elif prepared_schema == "v2":
             naptan, nptg, xml_sources = acquire_prepared_data_v2_sources(staging)
             naptan_source = xml_sources["naptan"]
+            gtfs, bods = acquire_bods(staging)
         else:
             naptan = staging / "naptan.csv"
             naptan_source = download(NAPTAN_URL, naptan, label="NaPTAN source")
-        gtfs, bods = acquire_bods(staging)
-        tnds_xml, tnds = acquire_tnds(staging, os.environ.get("TNDS_USERNAME", ""), os.environ.get("TNDS_PASSWORD", ""))
+            gtfs, bods = acquire_bods(staging)
+        if getattr(args, "source_snapshot_output", None) and not snapshot_root:
+            if prepared_schema != "v2" or not bus_only:
+                raise RefreshError("--source-snapshot-output is supported only for the Bus-only prepared-data v2 path")
+            snapshot_manifest = snapshot_from_staging(staging, Path(args.source_snapshot_output).resolve(), xml_sources=xml_sources, bods=bods, producer_workflow=os.environ.get("GITHUB_WORKFLOW"), run_id=os.environ.get("GITHUB_RUN_ID"), repository_commit_sha=os.environ.get("GITHUB_SHA"))
+        tnds_xml = None
+        tnds = None
+        if not bus_only:
+            tnds_xml, tnds = acquire_tnds(staging, os.environ.get("TNDS_USERNAME", ""), os.environ.get("TNDS_PASSWORD", ""))
         site_bus = site / "atlas" / "data" / "bus"
         site_tnds = site / "atlas" / "data" / "bus-tnds"
         site_bus.parent.mkdir(parents=True, exist_ok=True)
@@ -433,28 +515,40 @@ def run(args: argparse.Namespace) -> dict:
         for source in (("naptan", "nptg", "bods") if prepared_schema == "v2" else ("naptan", "bods")):
             prepared_manifest.get("sources", {}).get(source, {}).pop("downloadedAt", None)
         prepared_manifest_path.write_text(json.dumps(prepared_manifest, separators=(",", ":")) + "\n", encoding="utf-8")
-        node = os.environ.get("ATLAS_NODE", "node")
-        subprocess.run([node, str(Path(__file__).with_name("prepare_tnds.mjs")), "--input", str(tnds_xml), "--output", str(site_tnds), "--preparedAt", started], check=True)
-        counts = validate_candidate(site, baseline)
+        if bus_only:
+            diagnostic_cache = site / ".atlas-diagnostic-source-cache" / "gtfs"
+            shutil.rmtree(diagnostic_cache.parent, ignore_errors=True)
+            diagnostic_cache.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(gtfs, diagnostic_cache)
+        else:
+            node = os.environ.get("ATLAS_NODE", "node")
+            subprocess.run([node, str(Path(__file__).with_name("prepare_tnds.mjs")), "--input", str(tnds_xml), "--output", str(site_tnds), "--preparedAt", started], check=True)
+        counts = validate_candidate(site, baseline, bus_only=bus_only)
         naptan_hash = sha256(naptan)
         naptan_outcome, naptan_note = source_outcome(naptan_hash, previous_status.get("sources", {}).get("naptan"))
         bods_outcome, bods_note = source_outcome(bods["sourceHash"], previous_status.get("sources", {}).get("bods"))
-        tnds_outcome, tnds_note = source_outcome(tnds["sourceHash"], previous_status.get("sources", {}).get("tnds"))
         sources = {
             "naptan": {"identity": NAPTAN_XML_URL if prepared_schema == "v2" else NAPTAN_URL, "checkedAt": started, "httpStatus": naptan_source["httpStatus"], "contentType": naptan_source["contentType"], "sourceHash": naptan_hash, "outcome": naptan_outcome, "preparedCount": counts["naptanStopCount"], "format": "xml" if prepared_schema == "v2" else "csv"},
             "bods": {"identity": bods["identity"], "checkedAt": started, "sourceHash": bods["sourceHash"], "outcome": bods_outcome, "regionsChecked": bods["regions"], "preparedCount": {"regions": counts["bodsRegionCount"], "services": counts["bodsServiceCount"]}},
-            "tnds": {"identity": tnds["identity"], "checkedAt": started, "sourceHash": tnds["sourceHash"], "regionHashes": tnds["regionHashes"], "regionsChecked": tnds["regions"], "outcome": tnds_outcome, "preparedCount": counts["tndsServiceCount"], "processedRegions": counts["tndsProcessedRegions"], "regionServiceCounts": counts["tndsRegionServiceCounts"], "sourceFileCounts": counts["tndsSourceFileCounts"], "parsedFileCounts": counts["tndsParsedFileCounts"], "ignoredRegistrationFileCounts": counts["tndsIgnoredRegistrationFileCounts"], "transport": "legacy FTP; credentials supplied only to the runner"},
             "tfl": {"outcome": "LIVE", "description": "Live source — checked when a London assessment is run"}
         }
+        if not bus_only:
+            tnds_outcome, tnds_note = source_outcome(tnds["sourceHash"], previous_status.get("sources", {}).get("tnds"))
+            sources["tnds"] = {"identity": tnds["identity"], "checkedAt": started, "sourceHash": tnds["sourceHash"], "regionHashes": tnds["regionHashes"], "regionsChecked": tnds["regions"], "outcome": tnds_outcome, "preparedCount": counts["tndsServiceCount"], "processedRegions": counts["tndsProcessedRegions"], "regionServiceCounts": counts["tndsRegionServiceCounts"], "sourceFileCounts": counts["tndsSourceFileCounts"], "parsedFileCounts": counts["tndsParsedFileCounts"], "ignoredRegistrationFileCounts": counts["tndsIgnoredRegistrationFileCounts"], "transport": "legacy FTP; credentials supplied only to the runner"}
         if prepared_schema == "v2":
             nptg_hash = sha256(nptg)
             nptg_outcome, nptg_note = source_outcome(nptg_hash, previous_status.get("sources", {}).get("nptg"))
             sources["nptg"] = {"identity": NPTG_XML_URL, "checkedAt": started, "httpStatus": xml_sources["nptg"]["httpStatus"], "contentType": xml_sources["nptg"]["contentType"], "sourceHash": nptg_hash, "outcome": nptg_outcome, "format": "xml"}
             if nptg_note: sources["nptg"]["note"] = nptg_note
-        for source, note in (("naptan", naptan_note), ("bods", bods_note), ("tnds", tnds_note)):
+        if snapshot_manifest:
+            sources["sourceSnapshot"] = source_snapshot_status(snapshot_manifest)
+        notes = [("naptan", naptan_note), ("bods", bods_note)]
+        if not bus_only:
+            notes.append(("tnds", tnds_note))
+        for source, note in notes:
             if note: sources[source]["note"] = note
         release = load_release_metadata(site)
-        status = {"schema": "atlas-bus-refresh-status-v1", "status": "validated", "successfulRefreshAt": started, "version": release["version"], "build": release["build"], "repositoryCommit": os.environ.get("GITHUB_SHA"), "workflowRun": os.environ.get("GITHUB_RUN_ID"), "sources": sources, "preparedCounts": counts, "validation": "passed", "sanityThresholds": {"collapseMinimum": 0.5, "description": "Existing meaningful baselines must retain at least 50% of stop/service counts; BODS region count may not decrease."}}
+        status = {"schema": "atlas-bus-refresh-status-v1", "status": "sanity_checked" if bus_only else "validated", "candidateGeneratedAt": started, "version": release["version"], "build": release["build"], "repositoryCommit": os.environ.get("GITHUB_SHA"), "workflowRun": os.environ.get("GITHUB_RUN_ID"), "sources": sources, "preparedCounts": counts, "validation": "diagnostic_only" if bus_only else "passed", "diagnosticOnly": bus_only, "productionEligible": not bus_only, "sanityThresholds": {"collapseMinimum": 0.5, "description": "Existing meaningful baselines must retain at least 50% of stop/service counts; BODS region count may not decrease."}}
         status_path = site / "atlas" / "data" / "status" / "manifest.json"
         status_path.parent.mkdir(parents=True, exist_ok=True)
         status_path.write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")
@@ -468,6 +562,10 @@ def main() -> None:
     parser.add_argument("--site-root", required=True)
     parser.add_argument("--previous-root", help="Optional read-only copy of the last successful Pages deployment")
     parser.add_argument("--prepared-schema", choices=("v1", "v2"), default="v1", help="Prepared-data contract; v2 acquires XML NaPTAN and NPTG sources")
+    parser.add_argument("--bus-only-diagnostic", action="store_true", help="Acquire and validate only the Bus v2 diagnostic; never contact TNDS FTP")
+    parser.add_argument("--source-snapshot", help="Verified ACQUIRED / UNINTERPRETED source snapshot to prepare without acquisition")
+    parser.add_argument("--source-snapshot-output", help="Write the freshly acquired v2 Bus sources as a reusable snapshot")
+    parser.add_argument("--acquisition-disabled", action="store_true", help="Fail closed unless an explicit verified source snapshot is supplied")
     args = parser.parse_args()
     try:
         print(json.dumps(run(args), indent=2))

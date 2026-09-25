@@ -26,6 +26,18 @@ LOCALITY_SCHEMA = "atlas-prepared-nptg-localities-v1"
 SUPPORTED_SCHEMA_MAJOR = "2"
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$")
 
+STOP_TYPE_MODES = {
+    "BCT": "bus_coach", "BCS": "bus_coach", "BCQ": "bus_coach",
+    "BST": "bus_coach", "BCE": "bus_coach", "BCP": "bus_coach",
+    "RPL": "rail", "RPLY": "rail", "RLY": "rail", "RSE": "rail",
+    "PLT": "tram_metro", "MET": "tram_metro", "TMU": "tram_metro",
+    "FER": "ferry_water", "FTD": "ferry_water",
+    "AIR": "air", "GAT": "air",
+    "LPL": "other", "LCB": "other", "LSE": "other",
+    "TXR": "other", "STR": "other", "SDA": "other",
+}
+BUS_COACH_STOP_TYPES = frozenset(key for key, value in STOP_TYPE_MODES.items() if value == "bus_coach")
+
 
 class SourceParseError(ValueError):
     """Raised when an authoritative XML source cannot be interpreted safely."""
@@ -46,6 +58,34 @@ def child_text(element: ET.Element, *names: str) -> str:
 def child_texts(element: ET.Element, *names: str) -> list[str]:
     wanted = set(names)
     return [child.text.strip() for child in element.iter() if local_name(child.tag) in wanted and child.text and child.text.strip()]
+
+
+def direct_child_text(element: ET.Element, *names: str) -> str:
+    wanted = set(names)
+    for child in list(element):
+        if local_name(child.tag) in wanted and child.text and child.text.strip():
+            return child.text.strip()
+    return ""
+
+
+def bearing_compass_point(element: ET.Element) -> str:
+    """Read the NaPTAN Bearing value without depending on one XML layout.
+
+    NaPTAN 2.4 places the value below ``Bearing/CompassPoint`` inside the
+    marked, unmarked, or hail-and-ride point.  The older fixture/schema form
+    represents ``Bearing`` as scalar text.  Both are authoritative source
+    representations; arbitrary descendant text is deliberately not accepted.
+    """
+    for bearing in element.iter():
+        if local_name(bearing.tag) != "Bearing":
+            continue
+        compass = direct_child_text(bearing, "CompassPoint")
+        if compass:
+            return compass
+        scalar = (bearing.text or "").strip()
+        if scalar:
+            return scalar
+    return ""
 
 
 def parse_float(value: str) -> float | None:
@@ -119,6 +159,15 @@ def valid_id(value: str) -> bool:
     return bool(ID_RE.fullmatch(value))
 
 
+def valid_reference_id(value: str) -> bool:
+    return bool(re.fullmatch(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$", value or ""))
+
+
+def stop_type_semantics(stop_type: str) -> dict[str, object]:
+    code = (stop_type or "").strip().upper()
+    return {"mode": STOP_TYPE_MODES.get(code, "unknown"), "known": code in STOP_TYPE_MODES, "busEligible": code in BUS_COACH_STOP_TYPES}
+
+
 def status_of(element: ET.Element) -> str:
     value = (element.attrib.get("Status") or element.attrib.get("status") or child_text(element, "Status") or "active").strip().lower()
     return value or "active"
@@ -149,8 +198,11 @@ def _parse_stop_point(element: ET.Element, version: str) -> tuple[dict | None, s
     name = child_text(element, "CommonName", "Name")
     stop_type = child_text(element, "StopType")
     coordinate = parse_coordinate(element)
-    if not stop_id or not valid_id(stop_id) or not name or not stop_type or not stop_type.startswith("B") or coordinate is None:
-        return None, "malformed_stop_point"
+    if not stop_id or not valid_id(stop_id):
+        return None, "malformed_identity"
+    if not name or not stop_type:
+        return None, "malformed_required_source_field"
+    semantics = stop_type_semantics(stop_type)
     locality_code = child_text(element, "NptgLocalityRef", "NPTGLocalityRef") or None
     refs = []
     for ref in element.iter():
@@ -171,11 +223,17 @@ def _parse_stop_point(element: ET.Element, version: str) -> tuple[dict | None, s
         "naptanCode": child_text(element, "NaptanCode") or None,
         "name": name,
         "indicator": child_text(element, "Indicator") or None,
-        "direction": child_text(element, "Bearing") or None,
-        **coordinate,
+        "direction": bearing_compass_point(element) or None,
+        **(coordinate or {"latitude": None, "longitude": None, "coordinateMethod": None}),
         "stopType": stop_type,
         "busStopType": child_text(element, "BusStopType") or None,
+        "transportMode": semantics["mode"],
+        "knownTransportMode": semantics["known"],
+        "busPreparedEligible": semantics["busEligible"],
+        "sourceValidity": "valid",
+        "coordinateValid": coordinate is not None,
         "nptgLocalityCode": locality_code,
+        "administrativeAreaCode": child_text(element, "AdministrativeAreaRef") or None,
         "locality": child_text(element, "NptgLocalityName", "LocalityName") or None,
         "parentLocality": child_text(element, "ParentLocalityName") or None,
         "areaCode": stop_id[:3] if stop_id[:3].isdigit() else None,
@@ -190,9 +248,9 @@ def _parse_stop_point(element: ET.Element, version: str) -> tuple[dict | None, s
 
 
 def _parse_stop_area(element: ET.Element, version: str) -> tuple[dict | None, str | None]:
-    source_id = child_text(element, "StopAreaCode", "StopAreaId", "StopAreaRef")
-    name = child_text(element, "Name", "CommonName")
-    area_type = child_text(element, "StopAreaType")
+    source_id = direct_child_text(element, "StopAreaCode", "StopAreaId", "StopAreaRef") or child_text(element, "StopAreaCode", "StopAreaId", "StopAreaRef")
+    name = direct_child_text(element, "Name", "CommonName") or child_text(element, "Name", "CommonName")
+    area_type = direct_child_text(element, "StopAreaType")
     if not source_id or not valid_id(source_id) or not name:
         return None, "malformed_stop_area"
     parent = child_text(element, "ParentAreaRef", "ParentStopAreaRef") or None
@@ -216,7 +274,8 @@ def _parse_stop_area(element: ET.Element, version: str) -> tuple[dict | None, st
         "parentGroupId": f"naptan:{parent}" if parent else None,
         "coordinate": parse_coordinate(element),
         "localityRef": locality,
-        "memberStopPointIds": unique_members,
+        "sourceMemberStopPointIds": unique_members,
+        "memberStopPointIds": [],
         "provenance": {"source": "NaPTAN", "schemaVersion": version, "recordId": source_id},
     }, None
 
@@ -254,6 +313,13 @@ def parse_naptan_xml(path: str | Path) -> NaptanParseResult:
                 counts["stopPointRecords"] += 1
                 if record:
                     counts["duplicateMembershipCount"] += record.pop("_duplicateLogicalGroupRefCount", 0)
+                    mode = str(record.get("transportMode") or "unknown")
+                    counts["validSourceStopPointCount"] += 1
+                    counts[f"valid{mode.title().replace('_', '')}SourceStopPointCount"] += 1
+                    if mode == "unknown":
+                        counts["unknownOrUnsupportedStopTypeCount"] += 1
+                    if not record.get("coordinateValid"):
+                        counts["invalidOrMissingCoordinateCount"] += 1
                     if record["id"] in stops:
                         counts["duplicateStopPointIds"] += 1
                         issues.append({"kind": "duplicate_stop_point_id", "id": record["id"]})
@@ -298,31 +364,52 @@ def parse_naptan_xml(path: str | Path) -> NaptanParseResult:
             if ref["status"] != "active":
                 inactive_memberships += 1
             if ref["id"] in groups:
-                groups[ref["id"]].setdefault("memberStopPointIds", []).append(stop["id"])
+                groups[ref["id"]].setdefault("sourceMemberStopPointIds", []).append(stop["id"])
                 if ref["status"] != "active":
                     groups[ref["id"]].setdefault("inactiveMembershipStopPointIds", []).append(stop["id"])
                 elif ref["id"] in active_group_ids:
                     member_counts[stop["id"]] += 1
     for group in groups.values():
-        members = sorted(set(group["memberStopPointIds"]))
-        group["memberStopPointIds"] = sorted(set(member for member in members if member in stop_ids))
-        group["missingMemberStopPointIds"] = sorted(set(members) - stop_ids)
-        group["inactiveMemberStopPointIds"] = sorted(member for member in members if member in stops and stops[member]["status"] != "active")
+        members = sorted(set(group.get("sourceMemberStopPointIds", [])))
+        active_bus_members = sorted(member for member in members if member in stops and stops[member].get("status") in ("", "active") and stops[member].get("busPreparedEligible") is True and stops[member].get("coordinateValid") is True)
+        group["sourceMemberStopPointIds"] = members
+        group["memberStopPointIds"] = active_bus_members
+        group["activeBusMemberStopPointIds"] = active_bus_members
+        group["unresolvedSourceMemberStopPointIds"] = sorted(set(members) - stop_ids)
+        group["missingMemberStopPointIds"] = list(group["unresolvedSourceMemberStopPointIds"])
+        group["inactivePhysicalMemberStopPointIds"] = sorted(member for member in members if member in stops and stops[member].get("status") not in ("", "active"))
+        group["inactiveMemberStopPointIds"] = list(group["inactivePhysicalMemberStopPointIds"])
+        group["nonBusMemberStopPointIds"] = sorted(member for member in members if member in stops and stops[member].get("busPreparedEligible") is not True)
         group["inactiveMembershipStopPointIds"] = sorted(set(group.get("inactiveMembershipStopPointIds", [])))
         group["missingMemberStopPointIds"] = sorted(set(group.get("missingMemberStopPointIds", [])))
         group["qa"] = geometry_qa(group, stops, member_counts)
+    counts["validBusCoachSourceStopPointCount"] = sum(1 for stop in stops.values() if stop.get("busPreparedEligible") is True)
+    counts["validRailSourceStopPointCount"] = sum(1 for stop in stops.values() if stop.get("transportMode") == "rail")
+    counts["validTramMetroSourceStopPointCount"] = sum(1 for stop in stops.values() if stop.get("transportMode") == "tram_metro")
+    counts["validFerryWaterSourceStopPointCount"] = sum(1 for stop in stops.values() if stop.get("transportMode") == "ferry_water")
+    counts["validAirSourceStopPointCount"] = sum(1 for stop in stops.values() if stop.get("transportMode") == "air")
+    counts["validOtherSourceStopPointCount"] = sum(1 for stop in stops.values() if stop.get("transportMode") == "other")
+    counts["activeBusStopPointCount"] = sum(1 for stop in stops.values() if stop.get("busPreparedEligible") is True and stop.get("status") in ("", "active") and stop.get("coordinateValid") is True)
+    counts["inactiveBusStopPointCount"] = sum(1 for stop in stops.values() if stop.get("busPreparedEligible") is True and stop.get("status") not in ("", "active"))
     qa = {
         **dict(sorted(counts.items())),
         "activeGroupCount": sum(group["status"] == "active" for group in groups.values()),
         "inactiveGroupCount": sum(group["status"] != "active" for group in groups.values()),
         "inactiveMembershipCount": inactive_memberships,
+        "inactivePhysicalMemberCount": sum(len(group.get("inactivePhysicalMemberStopPointIds", [])) for group in groups.values()),
+        "nonBusMemberCount": sum(len(group.get("nonBusMemberStopPointIds", [])) for group in groups.values()),
+        "unresolvedSourceMemberCount": sum(len(group.get("unresolvedSourceMemberStopPointIds", [])) for group in groups.values()),
+        "activeBusRuntimeMembershipCount": sum(len(group.get("activeBusMemberStopPointIds", [])) for group in groups.values()),
         "missingGroupTargetCount": missing_targets,
         "duplicateMembershipCount": duplicate_memberships,
         "noGroupStopCount": sum(not stop["logicalGroupRefs"] for stop in stops.values()),
         "oneGroupStopCount": sum(len(stop["logicalGroupRefs"]) == 1 for stop in stops.values()),
         "multipleGroupStopCount": sum(len(stop["logicalGroupRefs"]) > 1 for stop in stops.values()),
         "parentGroupCount": sum(bool(group["parentGroupId"]) for group in groups.values()),
+        "malformedIdentityCount": sum(1 for issue in issues if issue["kind"] == "malformed_identity"),
+        "malformedRequiredSourceFieldCount": sum(1 for issue in issues if issue["kind"] == "malformed_required_source_field"),
         "malformedRecordCount": sum(1 for issue in issues if issue["kind"].startswith("malformed")),
+        "malformed_stop_point": sum(1 for issue in issues if issue["kind"].startswith("malformed")),
         "unsupportedStructureCount": 0,
     }
     return NaptanParseResult(stops, groups, source_metadata(source, root, version), qa, issues)
@@ -384,17 +471,19 @@ def parse_nptg_xml(path: str | Path) -> NptgParseResult:
                 continue
             kind = local_name(element.tag)
             if kind in {"NptgLocality", "Locality"}:
-                code = child_text(element, "NptgLocalityCode", "LocalityCode", "NptgLocalityRef")
-                name = child_text(element, "LocalityName", "Name", "Descriptor")
+                code = direct_child_text(element, "NptgLocalityCode", "LocalityCode", "NptgLocalityRef")
+                name = direct_child_text(element, "LocalityName", "Name") or child_text(element, "LocalityName")
                 if not code or not valid_id(code) or not name:
                     counts["malformedLocalityRecords"] += 1
                     issues.append({"kind": "malformed_locality", "id": code or None})
                 else:
                     localities[code] = {
                         "id": f"nptg:{code}", "code": code, "name": name,
-                        "parentLocalityId": (lambda value: f"nptg:{value}" if value else None)(child_text(element, "ParentNptgLocalityRef", "ParentLocalityRef") or None),
-                        "higherLocalityId": (lambda value: f"nptg:{value}" if value else None)(child_text(element, "HigherLocalityRef") or None),
-                        "districtId": (lambda value: f"nptg:{value}" if value else None)(child_text(element, "NptgDistrictRef", "DistrictRef") or None),
+                        "parentLocalityId": (lambda value: f"nptg:{value}" if value else None)(direct_child_text(element, "ParentNptgLocalityRef", "ParentLocalityRef") or None),
+                        "higherLocalityId": (lambda value: f"nptg:{value}" if value else None)(direct_child_text(element, "HigherLocalityRef") or None),
+                        "districtId": (lambda value: f"nptg:{value}" if value else None)(direct_child_text(element, "NptgDistrictRef", "DistrictRef") or None),
+                        "administrativeAreaId": direct_child_text(element, "AdministrativeAreaRef") or None,
+                        "qualifierNames": sorted(set(child_texts(element.find("{*}Descriptor") if element.find("{*}Descriptor") is not None else element, "QualifierName"))),
                         "districtName": None,
                         "sourceType": child_text(element, "SourceLocalityType", "LocalityType") or None,
                         "coordinate": parse_coordinate(element),
@@ -403,9 +492,9 @@ def parse_nptg_xml(path: str | Path) -> NptgParseResult:
                     counts["localityRecords"] += 1
                 element.clear()
             elif kind in {"NptgDistrict", "District"}:
-                code = child_text(element, "NptgDistrictCode", "DistrictCode", "NptgDistrictRef")
-                name = child_text(element, "DistrictName", "Name", "Descriptor")
-                if not code or not valid_id(code) or not name:
+                code = direct_child_text(element, "NptgDistrictCode", "DistrictCode", "NptgDistrictRef")
+                name = direct_child_text(element, "DistrictName", "Name") or child_text(element, "DistrictName")
+                if not code or not valid_reference_id(code) or not name:
                     counts["malformedDistrictRecords"] += 1
                     issues.append({"kind": "malformed_district", "id": code or None})
                 else:
@@ -432,7 +521,8 @@ def parse_nptg_xml(path: str | Path) -> NptgParseResult:
         if current in seen:
             cycles += 1
             issues.append({"kind": "cyclic_locality_parent", "id": code})
-    qa = {**dict(sorted(counts.items())), "missingParentLocalityCount": missing_parent, "missingDistrictCount": missing_district, "cyclicLocalityCount": cycles, "unsupportedStructureCount": 0}
+    missing_district_samples = [item["districtId"][5:] for item in localities.values() if item.get("districtId") and item["districtId"][5:] not in districts][:20]
+    qa = {**dict(sorted(counts.items())), "missingParentLocalityCount": missing_parent, "missingDistrictCount": missing_district, "missingDistrictSamples": missing_district_samples, "cyclicLocalityCount": cycles, "unsupportedStructureCount": 0, "districtIds": sorted(districts), "malformedDistrictSamples": [issue for issue in issues if issue["kind"] == "malformed_district"][:20], "districtReferencePolicy": "one-character district codes are valid; absent references remain unresolved source references"}
     return NptgParseResult(localities, districts, source_metadata(source, root, version), qa, issues)
 
 

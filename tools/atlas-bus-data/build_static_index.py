@@ -285,7 +285,7 @@ def load_naptan_v2(path: Path, nptg_path: Path):
     aliases = {}
     excluded = 0
     for stop_id, source in naptan.stops.items():
-        if source.get("status") not in ("", "active") or not str(source.get("stopType") or "").startswith("B"):
+        if source.get("status") not in ("", "active") or source.get("busPreparedEligible") is not True or source.get("coordinateValid") is not True:
             excluded += 1
             continue
         stop = {**source, "routes": set()}
@@ -595,7 +595,7 @@ def build_v2(args: argparse.Namespace) -> dict:
             service_shards[area].append(relative)
 
     stop_groups: dict[str, list[dict]] = defaultdict(list)
-    stop_fields = ["id", "naptanCode", "name", "indicator", "direction", "latitude", "longitude", "stopType", "busStopType", "locality", "parentLocality", "nptgLocalityCode", "areaCode", "modifiedAt", "coordinateMethod", "routes", "logicalGroupRefs", "status", "provenance", "localityResolution"]
+    stop_fields = ["id", "naptanCode", "name", "indicator", "direction", "latitude", "longitude", "stopType", "busStopType", "locality", "parentLocality", "nptgLocalityCode", "areaCode", "modifiedAt", "coordinateMethod", "routes", "logicalGroupRefs", "status", "provenance", "localityResolution", "transportMode", "administrativeAreaCode"]
     for stop in stops.values():
         key = cell_key(stop["latitude"], stop["longitude"], args.grid_size)
         normalised = normalise_for_json({**stop, "routes": sorted(stop["routes"], key=lambda value: (len(value), value))})
@@ -626,6 +626,16 @@ def build_v2(args: argparse.Namespace) -> dict:
         compact_json(output / relative, {"schema": LOCALITY_SCHEMA, "shardKey": key, "localities": sorted(records, key=lambda item: item["id"])})
         locality_shards[key] = relative
 
+    reference_groups: dict[str, list[dict]] = defaultdict(list)
+    for stop_id, source in sorted(naptan.stops.items()):
+        key = stop_id[:3] or "misc"
+        reference_groups[key].append(normalise_for_json({field: source.get(field) for field in ("id", "name", "stopType", "transportMode", "knownTransportMode", "busPreparedEligible", "sourceValidity", "coordinateValid", "latitude", "longitude", "coordinateMethod", "status", "nptgLocalityCode", "administrativeAreaCode", "modifiedAt", "provenance")}))
+    reference_shards = {}
+    for key, records in sorted(reference_groups.items()):
+        relative = f"reference/stop-points/{key}.json.gz"
+        compact_json(output / relative, {"schema": "atlas-national-reference-stop-points-v1", "shardKey": key, "stopPoints": sorted(records, key=lambda item: item["id"])})
+        reference_shards[key] = relative
+
     combined_bods_hash = hashlib.sha256("".join(item["sha256"] for item in region_metadata).encode("ascii")).hexdigest()
     generated_at = args.generated_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     try:
@@ -640,15 +650,16 @@ def build_v2(args: argparse.Namespace) -> dict:
         "gridSize": args.grid_size, "stopFields": stop_fields, "serviceShardKeyLength": args.service_shard_key_length,
         "groupShardKeyLength": 3, "localityShardKeyLength": 3,
         "representativeDates": {day: value.isoformat() for day, value in dates.items()},
-        "schemas": {"logicalGroups": GROUP_SCHEMA, "localities": LOCALITY_SCHEMA},
+        "schemas": {"logicalGroups": GROUP_SCHEMA, "localities": LOCALITY_SCHEMA, "referenceStopPoints": "atlas-national-reference-stop-points-v1"},
+        "referenceStopFields": ["id", "name", "stopType", "transportMode", "knownTransportMode", "busPreparedEligible", "sourceValidity", "coordinateValid", "latitude", "longitude", "coordinateMethod", "status", "nptgLocalityCode", "administrativeAreaCode", "modifiedAt", "provenance"],
         "sources": {
             "naptan": {"url": "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml", **naptan.metadata, "stopCount": len(stops), "excludedRecordCount": excluded},
             "nptg": {"url": "https://naptan.api.dft.gov.uk/v1/nptg", **nptg.metadata, "localityCount": len(nptg.localities), "districtCount": len(nptg.districts)},
             "bods": {"url": BODS_URL, "sha256": combined_bods_hash, "regions": region_metadata},
         },
         "qa": {"naptan": naptan.qa, "nptg": nptg.qa},
-        "stopShards": stop_shards, "serviceShards": dict(sorted(service_shards.items())), "groupShards": group_shards, "localityShards": locality_shards,
-        "counts": {"activeStopPointCount": len(stops), "logicalGroupCount": len(naptan.groups), "localityCount": len(nptg.localities), "districtCount": len(nptg.districts), "stopShardCount": len(stop_shards), "serviceShardCount": sum(len(paths) for paths in service_shards.values()), "logicalGroupShardCount": len(group_shards), "localityShardCount": len(locality_shards)},
+        "stopShards": stop_shards, "serviceShards": dict(sorted(service_shards.items())), "groupShards": group_shards, "localityShards": locality_shards, "referenceStopPointShards": reference_shards,
+        "counts": {"activeStopPointCount": len(stops), "logicalGroupCount": len(naptan.groups), "localityCount": len(nptg.localities), "districtCount": len(nptg.districts), "referenceStopPointCount": len(naptan.stops), "stopShardCount": len(stop_shards), "serviceShardCount": sum(len(paths) for paths in service_shards.values()), "logicalGroupShardCount": len(group_shards), "localityShardCount": len(locality_shards), "referenceStopPointShardCount": len(reference_shards)},
     }
     compact_json(output / "manifest.json", manifest)
     return {"output": str(output), "schema": V2_SCHEMA, "stops": len(stops), "groups": len(naptan.groups), "localities": len(nptg.localities), "stopShards": len(stop_shards), "groupShards": len(group_shards), "localityShards": len(locality_shards), "serviceAreas": len(service_shards), "regions": region_metadata}

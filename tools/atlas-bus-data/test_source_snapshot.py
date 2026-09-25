@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from source_freshness import probe_http, probe_tnds_metadata
-from source_snapshot import REGIONS, SNAPSHOT_STATE, SourceSnapshotError, build_manifest, load_and_verify, mark_frozen_reuse, materialise_for_preparation, reuse_snapshot_if_unchanged, write_manifest
+from source_snapshot import REGIONS, SNAPSHOT_SCHEMA, SNAPSHOT_STATE, SourceSnapshotError, build_manifest, load_and_verify, mark_frozen_reuse, materialise_for_preparation, reuse_snapshot_if_unchanged, snapshot_from_staging, write_manifest
 
 
 class Response:
@@ -57,6 +57,31 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(manifest["producer"]["runId"], "987")
         self.assertEqual(manifest["producer"]["repositoryCommitSha"], "abc123")
         self.assertEqual(manifest["producer"]["acquisitionTimestamp"], manifest["acquisitionTimestamp"])
+
+    def test_snapshot_from_staging_persists_incident_manifest_and_is_verifiable(self):
+        staging = self.root / "staging-input"
+        (staging / "gtfs").mkdir(parents=True)
+        (staging / "naptan.xml").write_text("<NaPTAN />", encoding="utf-8")
+        (staging / "nptg.xml").write_text("<NPTG />", encoding="utf-8")
+        for region in REGIONS:
+            (staging / "gtfs" / f"{region}.zip").write_bytes(f"fixture-{region}".encode())
+        destination = self.root / "acquired-snapshot"
+        producer = {"naptan": {"identity": "naptan-fixture"}, "nptg": {"identity": "nptg-fixture"}}
+        bods = {"regions": [{"region": region, "identity": f"bods-{region}"} for region in REGIONS]}
+        returned = snapshot_from_staging(staging, destination, xml_sources=producer, bods=bods, producer_workflow="ATLAS reference data source", run_id="123", repository_commit_sha="abc123")
+        manifest_path = destination / "manifest.json"
+        self.assertTrue(manifest_path.is_file())
+        self.assertEqual(returned["schema"], SNAPSHOT_SCHEMA)
+        self.assertEqual(returned["state"], SNAPSHOT_STATE)
+        self.assertEqual(returned["producer"]["workflow"], "ATLAS reference data source")
+        self.assertEqual(returned["producer"]["runId"], "123")
+        self.assertEqual(returned["producer"]["repositoryCommitSha"], "abc123")
+        self.assertFalse(returned["productionEligible"])
+        verified = load_and_verify(destination)
+        self.assertEqual(verified["snapshotId"], returned["snapshotId"])
+        self.assertTrue((destination / "sources/naptan.xml").is_file())
+        self.assertTrue((destination / "sources/nptg.xml").is_file())
+        self.assertEqual({item["path"] for item in verified["sources"]}, {"sources/naptan.xml", "sources/nptg.xml", *[f"sources/bods/{region}.zip" for region in REGIONS]})
 
     def test_corruption_fails_closed(self):
         (self.root / "sources/nptg.xml").write_text("changed", encoding="utf-8")

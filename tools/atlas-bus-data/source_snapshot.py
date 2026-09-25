@@ -138,7 +138,9 @@ def snapshot_from_staging(staging: Path, destination: Path, *, xml_sources: dict
         shutil.copy2(source, target)
         metadata = next((item for item in bods.get("regions", []) if item.get("region") == region), {})
         entries.append(_entry(destination, f"sources/bods/{region}.zip", identity=metadata.get("identity", f"https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/{region}/"), fmt="gtfs-zip", region=region, acquired_at=acquired_at, remote_metadata=metadata.get("remoteMetadata"), acquisition="fresh"))
-    return build_manifest(destination, source_entries=entries, producer_workflow=producer_workflow, run_id=run_id, repository_commit_sha=repository_commit_sha)
+    manifest = build_manifest(destination, source_entries=entries, producer_workflow=producer_workflow, run_id=run_id, repository_commit_sha=repository_commit_sha)
+    write_manifest(destination, manifest)
+    return manifest
 
 
 def materialise_for_preparation(root: Path, staging: Path) -> tuple[Path, Path, Path, dict]:

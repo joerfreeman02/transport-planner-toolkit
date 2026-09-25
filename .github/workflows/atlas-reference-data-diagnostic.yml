@@ -29,6 +29,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.x'
+      - name: Require a pristine Git checkout for deterministic ATLAS checks
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo '::error::The deterministic ATLAS suite requires a clean Git checkout before diagnostic workspaces are created.'
+            git status --short
+            exit 1
+          fi
+      - name: Run deterministic ATLAS checks from pristine checkout
+        id: deterministic-tests
+        continue-on-error: true
+        run: node tests/atlas/run-all.mjs > "$RUNNER_TEMP/atlas-deterministic-tests.log" 2>&1
       - name: Restore supplied source snapshot from exact producer run
         uses: actions/download-artifact@v4
         with:
@@ -59,11 +70,6 @@ jobs:
         if: always()
         continue-on-error: true
         run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site --bus-only
-      - name: Run deterministic ATLAS checks
-        id: deterministic-tests
-        if: always()
-        continue-on-error: true
-        run: node tests/atlas/run-all.mjs > diagnostic-output/deterministic-tests.log 2>&1
       - name: Probe TNDS metadata without archive transfer
         id: tnds-probe
         if: always()
@@ -84,6 +90,15 @@ jobs:
         if: always()
         continue-on-error: true
         run: mkdir -p pages-site/atlas/config && node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json --bus-only
+      - name: Copy deterministic test log into evidence workspace
+        if: always()
+        run: |
+          mkdir -p diagnostic-output
+          if [ -f "$RUNNER_TEMP/atlas-deterministic-tests.log" ]; then
+            cp "$RUNNER_TEMP/atlas-deterministic-tests.log" diagnostic-output/deterministic-tests.log
+          else
+            echo 'Deterministic test log was not produced because the pristine-checkout gate failed.' > diagnostic-output/deterministic-tests.log
+          fi
       - name: Upload evidence-safe diagnostic artifact
         if: always()
         uses: actions/upload-artifact@v4

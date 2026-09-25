@@ -800,7 +800,8 @@ function buildPlannerStopPresentation(stops = []) {
     const id = plannerStopId(stop);
     const groupId = plannerStopGroupId(stop);
     const group = groupId ? groups.get(groupId) : null;
-    return Object.freeze({ ...stop, plannerLabel: labels.get(id) || 'Stop A', plannerLabelIndex: ranked.findIndex(candidate => plannerStopId(candidate) === id), logicalGroupId: groupId || null, logicalGroupName: group?.name || plannerStopGroupName(stop) || null, logicalGroupMemberStopPointIds: Object.freeze(group?.ids || plannerStopGroupMembers(stop)), logicalGroupLabel: group?.label || null });
+    const reference = labels.get(id)?.replace(/^Stop\s+/i, '') || 'A';
+    return Object.freeze({ ...stop, mapReference: reference, mapReferenceIndex: ranked.findIndex(candidate => plannerStopId(candidate) === id), logicalGroupId: groupId || null, logicalGroupName: group?.name || plannerStopGroupName(stop) || null, logicalGroupMemberStopPointIds: Object.freeze(group?.ids || plannerStopGroupMembers(stop)), logicalGroupLabel: group?.label ? group.label.replace(/Stop\s+([A-Z]+)/g, '$1') : null });
   });
 }
 

@@ -54,7 +54,7 @@ function reviewQualification(reviewItems) {
 export function buildBusWordTables(result) {
   if (!result?.ok) throw new Error('A completed Bus assessment is required for Word export.');
   const stopRows = (result.stops ?? []).map(stop => [
-    stop.plannerLabel || stop.indicator || 'Stop',
+    stop.mapReference || '?',
     stop.name,
     stop.displayDirection,
     accessText(stop.walking),
@@ -86,7 +86,7 @@ export function buildBusWordTables(result) {
       ]);
     if (service.serviceNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.serviceNote}` });
     const next = services[index + 1];
-    if (hasPlannerSummary && service.routeGroupNote && (!next || next.routeGroupKey !== service.routeGroupKey)) serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeGroupNote}` });
+    if (hasPlannerSummary && service.routeGroupNote && (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey)) serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeGroupNote}` });
   });
   const qualification = reviewQualification(result.reviewItems);
   if (qualification) serviceRows.push({ kind: 'summary', text: qualification });
@@ -95,7 +95,7 @@ export function buildBusWordTables(result) {
   return [
     {
       caption: 'Table 3.2 - Bus Stop Summary',
-      headers: ['Stop label', 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop'],
+      headers: ['Map reference', 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop'],
       rows: stopRows,
       widths: [10, 22, 16, 20, 20, 22]
     },

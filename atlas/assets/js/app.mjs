@@ -94,13 +94,13 @@ async function refreshDataStatus() {
     $('tflDataState').textContent = sourceMessage(status.sources?.tfl?.outcome || 'LIVE');
     const age = Date.now() - new Date(status.successfulRefreshAt).getTime();
     if (Number.isFinite(age) && age > 8 * 24 * 60 * 60 * 1000) {
-      message.textContent = `Automatic data refresh may need attention. ATLAS is continuing to use the last validated dataset from ${formatTime(status.successfulRefreshAt)}.`;
+      message.textContent = `Bus data: Review needed — last validated data from ${formatTime(status.successfulRefreshAt)}.`;
       message.className = 'status-message warning';
     } else {
-      message.textContent = 'Bus data updates automatically. Refresh data status rereads this display only.';
+      message.textContent = 'Bus data: Current ✓';
       message.className = 'status-message success';
     }
-  } catch { message.textContent = 'Bus data status is temporarily unavailable.'; message.className = 'status-message warning'; }
+  } catch { message.textContent = 'Bus data: Status unavailable'; message.className = 'status-message warning'; }
 }
 
 async function updateBusData() {
@@ -149,6 +149,7 @@ function plannerFailure(kind, result) {
 }
 
 function plannerStopWarning(warning) {
+  if (/sidecar|prepared v1 data does not contain|logical stoparea|nptg locality/i.test(warning)) return '';
   if (/incomplete/i.test(warning)) return 'Some incomplete stop records were left out.';
   if (/duplicate/i.test(warning)) return 'Repeated stop records were counted once.';
   if (/no bus stops/i.test(warning)) return 'No bus stops were found within the selected distance.';
@@ -166,6 +167,26 @@ function providerLabel(result) {
 function assessmentMethod(site) {
   if (site?.assessmentPoint?.method === SITE_LOCATION_METHODS.GEOCODED_CANDIDATE && site.validation?.state === 'confirmed') return 'Confirmed from address';
   return METHOD_LABELS[site?.assessmentPoint?.method] || 'Selected by planner';
+}
+
+function moveResultsMap(showResults) {
+  const frame = $('siteMapFrame');
+  const target = showResults ? $('resultsMapHost') : $('siteMapHome');
+  if (!frame || !target || frame.parentElement === target) return;
+  target.append(frame);
+  setTimeout(() => map?.invalidateSize({ pan: false, animate: false }), 0);
+}
+
+function collapseSiteSetup(collapsed) {
+  ['siteSetupContent', 'locationSetupContent', 'confirmSetupContent'].forEach(id => { if ($(id)) $(id).hidden = collapsed; });
+  $('siteStageSummary').hidden = !collapsed;
+  if (collapsed) $('siteStageSummaryText').textContent = `${confirmedSite?.displayAddress || confirmedSite?.suppliedAddress || 'Assessment point'} · Assessment point confirmed`;
+}
+
+function collapseAssessmentSetup(collapsed) {
+  $('assessmentSetupContent').hidden = collapsed;
+  $('assessmentStageSummary').hidden = !collapsed;
+  if (collapsed) $('assessmentStageSummaryText').textContent = `${lastAssessmentMode === 'nearest' ? 'Nearest stop assessment' : 'Full assessment'} · ${selectedRadius()} m radius`;
 }
 
 function clearBusEvidence(message = 'Confirm the assessment point before checking nearby bus stops.') {
@@ -191,6 +212,9 @@ function clearBusEvidence(message = 'Confirm the assessment point before checkin
   $('assessmentWording').textContent = '';
   $('clearRoutes').hidden = true;
   selectedStopIds = new Set(); selectedServiceIds = new Set(); selectionInitialised = false;
+  collapseSiteSetup(false);
+  collapseAssessmentSetup(false);
+  moveResultsMap(false);
   taskStatus.reset();
   setCallout($('stopStatus'), hadEvidence ? 'The assessment point changed, so the earlier bus results were cleared. Confirm the new point before checking again.' : message, hadEvidence ? 'warning' : 'neutral');
 }
@@ -217,6 +241,8 @@ function clearStaleBusAssessment() {
   selectedStopIds = new Set();
   selectedServiceIds = new Set();
   selectionInitialised = false;
+  collapseAssessmentSetup(false);
+  moveResultsMap(false);
   taskStatus.reset();
   setCallout($('stopStatus'), 'The assessment radius changed. Build the Bus assessment again to update the evidence.', 'warning');
 }
@@ -263,7 +289,7 @@ function clearRouteLines() {
 
 async function showAccessRoute(stop, mode) {
   const label = mode === 'walk' ? 'walking' : 'cycling';
-  setCallout($('stopStatus'), `Checking the ${label} route to ${stop.plannerLabel || 'the selected stop'} — ${stop.name}…`, 'neutral');
+  setCallout($('stopStatus'), `Checking the ${label} route to map reference ${stop.mapReference || 'the selected stop'} — ${stop.name}…`, 'neutral');
   const result = await accessRouting.geometry(confirmedSite, stop, mode);
   if (!result.ok) {
     setCallout($('stopStatus'), `The ${label} route line is temporarily unavailable. The assessment results have not been changed.`, 'warning');
@@ -274,11 +300,11 @@ async function showAccessRoute(stop, mode) {
   routeLayers.push(layer);
   $('clearRoutes').hidden = false;
   map.fitBounds(layer.getBounds().pad(.2));
-  setCallout($('stopStatus'), `${mode === 'walk' ? 'Walking' : 'Cycling'} route shown for ${stop.plannerLabel || 'the selected stop'} — ${stop.name}.`, 'success');
+  setCallout($('stopStatus'), `${mode === 'walk' ? 'Walking' : 'Cycling'} route shown for map reference ${stop.mapReference || 'the selected stop'} — ${stop.name}.`, 'success');
 }
 
 function plannerStopLabel(stop) {
-  return stop?.plannerLabel || stop?.indicator || 'Stop';
+  return stop?.mapReference || '?';
 }
 
 function renderBusStopMarkers(stops) {
@@ -286,8 +312,8 @@ function renderBusStopMarkers(stops) {
   busStopMarkers = [];
   for (const stop of stops) {
     const marker = window.L.marker([stop.latitude, stop.longitude], {
-      title: `${plannerStopLabel(stop)} — ${stop.name}`,
-      icon: window.L.divIcon({ className: '', html: `<div class="bus-stop-marker" aria-hidden="true"><span>${plannerStopLabel(stop).replace(/^Stop\s+/i, '')}</span></div>`, iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -17] })
+      title: `Map reference ${plannerStopLabel(stop)} — ${stop.name}`,
+      icon: window.L.divIcon({ className: '', html: `<div class="bus-stop-marker" aria-label="Map reference ${plannerStopLabel(stop)}"><span>${plannerStopLabel(stop)}</span></div>`, iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -17] })
     }).addTo(map);
     marker.__atlasStopId = stopKey(stop);
     const popup = document.createElement('div');
@@ -489,6 +515,8 @@ function renderAssessment(result) {
   const detailRows = $('serviceDetailRows');
   const detailToggle = $('toggleDetailedEvidence');
   panel.hidden = false;
+  moveResultsMap(true);
+  collapseAssessmentSetup(true);
   rows.replaceChildren();
   serviceRows.replaceChildren();
   if (detailRows) detailRows.replaceChildren();
@@ -498,7 +526,7 @@ function renderAssessment(result) {
     const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedStopIds.has(stopKey(stop)); include.setAttribute('aria-label', `Include ${stop.name}`);
     include.addEventListener('change', () => { if (include.checked) selectedStopIds.add(stopKey(stop)); else selectedStopIds.delete(stopKey(stop)); renderAssessment(result); });
     appendCell(row, 'Include', include);
-    appendCell(row, 'Stop label', plannerStopLabel(stop));
+    appendCell(row, 'Map reference', plannerStopLabel(stop));
     const stopCell = document.createElement('span');
     const stopName = document.createElement('strong'); stopName.textContent = stop.name;
     const mapLink = document.createElement('a'); mapLink.href = googleMapsUrl(stop); mapLink.target = '_blank'; mapLink.rel = 'noopener noreferrer'; mapLink.textContent = 'Open in Google Maps';
@@ -507,8 +535,7 @@ function renderAssessment(result) {
     appendCell(row, 'Direction / indicator', stop.displayDirection);
     const walking = appendCell(row, 'Walking distance / time', formatAccess(stop.walking));
     if (stop.walking.status !== 'routed') walking.classList.add('route-unavailable');
-    appendCell(row, 'Routes serving stop', stop.routes?.length ? stop.routes.join(', ') : 'Timetable route match unavailable');
-    appendCell(row, 'Timetable evidence', stop.timetableEvidence || (stop.timetableMatch === false ? 'Timetable source unavailable' : 'Matched · timetable source'));
+    appendCell(row, 'Routes serving stop', stop.routes?.length ? stop.routes.join(', ') : 'Routes unavailable');
     row.addEventListener('click', event => {
       if (event.target.closest('input, a, button')) return;
       const marker = busStopMarkers.find(candidate => candidate.__atlasStopId === stopKey(stop));
@@ -517,7 +544,7 @@ function renderAssessment(result) {
     rows.append(row);
   }
   if (!result.stops.length) {
-    const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 7; cell.textContent = 'No authoritative bus stops were found within the selected discovery radius.'; row.append(cell); rows.append(row);
+    const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 6; cell.textContent = 'No authoritative bus stops were found within the selected discovery radius.'; row.append(cell); rows.append(row);
   }
   presentedServices.forEach((service, index) => {
     const row = document.createElement('tr');
@@ -544,7 +571,7 @@ function renderAssessment(result) {
       noteCell.append(label, service.serviceNote); noteRow.append(noteCell); serviceRows.append(noteRow);
     }
     const next = presentedServices[index + 1];
-    if (service.routeGroupNote && (!next || next.routeGroupKey !== service.routeGroupKey)) {
+    if (service.routeGroupNote && (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey)) {
       const noteRow = document.createElement('tr'); noteRow.className = 'service-note route-group-note';
       const noteCell = document.createElement('td'); noteCell.colSpan = 8;
       const label = document.createElement('strong'); label.textContent = 'Service note: ';
@@ -672,6 +699,7 @@ function confirmAssessmentPoint() {
     $('findStops').disabled = false;
     $('findNearestStops').disabled = false;
     $('refreshStops').disabled = false;
+    collapseSiteSetup(true);
     setCallout($('confirmationStatus'), `${assessmentMethod(confirmedSite)}. The assessment point is confirmed.`, 'success');
     setCallout($('stopStatus'), `Ready to check nearby bus stops. The ${selectedRadius()} m assessment radius is shown on the map.`, 'neutral');
   } catch {
@@ -793,6 +821,8 @@ $('chooseOnMap').addEventListener('click', () => {
 });
 $('coordinatesForm').addEventListener('submit', enterCoordinates);
 $('confirmAssessmentPoint').addEventListener('click', confirmAssessmentPoint);
+$('changeSite').addEventListener('click', clearSelection);
+$('changeAssessment').addEventListener('click', () => { clearStaleBusAssessment(); $('assessmentSetupContent').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
 $('radius').addEventListener('input', () => { radiusTouched = true; clearStaleBusAssessment(); syncRadiusCircle(); });
 $('findNearestStops').addEventListener('click', () => loadStops(false, 'nearest'));
 $('findStops').addEventListener('click', () => loadStops(false, 'full'));
@@ -804,6 +834,7 @@ $('selectAllRows').addEventListener('click', () => { selectedStopIds = new Set(c
 $('clearAllRows').addEventListener('click', () => { selectedStopIds = new Set(); selectedServiceIds = new Set(); selectionInitialised = true; renderAssessment(currentBusResult); });
 $('toggleDetailedEvidence').addEventListener('click', () => { detailedEvidenceVisible = !detailedEvidenceVisible; renderAssessment(currentBusResult); });
 $('refreshDataStatus').addEventListener('click', refreshDataStatus);
+$('viewDataDetails').addEventListener('click', () => { const details = $('dataStatusDetails'); details.open = !details.open; details.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); });
 const localMaintenance = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
 const updateButton = $('updateBusData');
 updateButton.hidden = !localMaintenance;

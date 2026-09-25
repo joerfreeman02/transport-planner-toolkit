@@ -90,9 +90,9 @@
         </div>
 
         <div class="steps">
-          <section class="step-card" aria-labelledby="find-site-step">
+          <section id="site-step-card" class="step-card" aria-labelledby="find-site-step">
             <div class="step-number">1</div>
-            <div class="step-content">
+            <div id="siteSetupContent" class="step-content">
               <h3 id="find-site-step">Find the site</h3>
               <p class="supporting">Search using an address, postcode, building name or site description. ATLAS will not choose a result for you.</p>
               <form id="addressForm" class="address-form">
@@ -103,17 +103,20 @@
               <div id="candidateList" class="candidate-list" aria-live="polite"></div>
               <button id="chooseOnMap" class="map-fallback" type="button">Can't find the site? Choose it on the map</button>
             </div>
+            <div id="siteStageSummary" class="stage-summary" hidden><strong id="siteStageSummaryText"></strong><button id="changeSite" class="secondary compact" type="button">Change site</button></div>
           </section>
 
-          <section class="step-card" aria-labelledby="check-location-step">
+          <section id="location-step-card" class="step-card" aria-labelledby="check-location-step">
             <div class="step-number">2</div>
-            <div class="step-content">
+            <div id="locationSetupContent" class="step-content">
               <h3 id="check-location-step">Check the location</h3>
               <p class="supporting">Check the marker is at the point you want ATLAS to assess. Drag it or click the map to move it if required.</p>
               <div class="site-selector-grid">
-                <div>
-                  <div id="siteMap" class="site-map" role="application" aria-label="Interactive map for choosing the assessment point" tabindex="0"></div>
-                  <p class="map-attribution-note">Map data © OpenStreetMap contributors.</p>
+                <div id="siteMapHome">
+                  <div id="siteMapFrame">
+                    <div id="siteMap" class="site-map" role="application" aria-label="Interactive map for choosing the assessment point" tabindex="0"></div>
+                    <p class="map-attribution-note">Map data © OpenStreetMap contributors.</p>
+                  </div>
                 </div>
                 <aside class="location-panel" aria-label="Selected assessment point">
                   <div id="mapStatus" class="callout neutral" role="status">Choose a possible match or click the map to place the assessment point.</div>
@@ -136,9 +139,9 @@
             </div>
           </section>
 
-          <section class="step-card" aria-labelledby="confirm-point-step">
+          <section id="confirm-point-step-card" class="step-card" aria-labelledby="confirm-point-step">
             <div class="step-number">3</div>
-            <div class="step-content">
+            <div id="confirmSetupContent" class="step-content">
               <h3 id="confirm-point-step">Confirm the assessment point</h3>
               <p class="supporting">Only confirm when the marker is at the access or frontage you want later ATLAS assessments to use.</p>
               <button id="confirmAssessmentPoint" class="primary" type="button" disabled>Confirm assessment point</button>
@@ -147,9 +150,9 @@
             </div>
           </section>
 
-          <section class="step-card" aria-labelledby="stops-step">
+          <section id="assessment-step-card" class="step-card" aria-labelledby="stops-step">
             <div class="step-number">4</div>
-            <div class="step-content">
+            <div id="assessmentSetupContent" class="step-content">
               <h3 id="stops-step">Build the Bus assessment</h3>
               <p class="supporting">Choose a full nearby-stop assessment or ask ATLAS for the nearest logical stop group. London starts at 400 m and other areas at 700 m; you can change the radius before searching.</p>
               <div class="stop-controls">
@@ -166,24 +169,26 @@
               <div id="assessmentScope" class="callout neutral" role="status" hidden></div>
               <div id="stopStatus" class="callout neutral" role="status">Confirm the assessment point before checking nearby bus stops.</div>
               <section class="data-status" aria-labelledby="data-status-heading">
-                <div class="data-status-heading"><div><p class="eyebrow">Bus data status</p><h3 id="data-status-heading">Bus Data Status</h3></div><div class="data-status-actions"><button id="updateBusData" class="secondary compact" type="button" hidden>Update Bus data</button><button id="refreshDataStatus" class="secondary compact" type="button">Refresh data status</button></div></div>
-                <p id="dataStatusMessage" role="status">Checking automated Bus data status…</p>
-                <dl><dt>Last successful automatic check</dt><dd id="preparedDataDate">Not supplied</dd><dt>NaPTAN</dt><dd id="naptanDataState">Not supplied</dd><dt>BODS</dt><dd id="bodsDataState">Not supplied</dd><dt>TNDS supplementary</dt><dd id="tndsDataDate">Not supplied</dd><dt>TfL</dt><dd id="tflDataState">Live source — checked when a London assessment is run</dd><dt>Next scheduled refresh</dt><dd>Friday</dd></dl>
+                <div class="planner-status-line"><p id="dataStatusMessage" role="status">Bus data: Checking current status…</p><button id="viewDataDetails" class="secondary compact" type="button">View data details</button></div>
+                <details id="dataStatusDetails"><summary>Data details</summary><div class="data-status-heading"><div><p class="eyebrow">Bus data status</p><h3 id="data-status-heading">Bus Data Status</h3></div><div class="data-status-actions"><button id="updateBusData" class="secondary compact" type="button" hidden>Update Bus data</button><button id="refreshDataStatus" class="secondary compact" type="button">Refresh data status</button></div></div>
+                <dl><dt>Last successful automatic check</dt><dd id="preparedDataDate">Not supplied</dd><dt>NaPTAN</dt><dd id="naptanDataState">Not supplied</dd><dt>BODS</dt><dd id="bodsDataState">Not supplied</dd><dt>TNDS supplementary</dt><dd id="tndsDataDate">Not supplied</dd><dt>TfL</dt><dd id="tflDataState">Live source — checked when a London assessment is run</dd><dt>Next scheduled refresh</dt><dd>Friday</dd></dl></details>
               </section>
             </div>
+            <div id="assessmentStageSummary" class="stage-summary" hidden><strong id="assessmentStageSummaryText"></strong><button id="changeAssessment" class="secondary compact" type="button">Change assessment</button></div>
           </section>
         </div>
 
         <section id="evidencePanel" class="evidence-panel" hidden aria-labelledby="evidence-heading">
           <div class="evidence-heading"><div><p class="eyebrow">Bus assessment</p><h3 id="evidence-heading">Stops and services near the assessment point</h3></div><div class="evidence-actions"><div id="evidenceSummary"></div><button id="exportBusWord" class="secondary compact" type="button" disabled>Export Word (.docx)</button></div></div>
+          <div id="resultsMapHost" class="results-map-host"><p class="supporting">Map references are navigation aids only; authoritative stop names and indicators remain in the tables.</p></div>
           <div class="check-summary" aria-label="Result source and status"><div><span>Source</span><strong id="resultSource">Authoritative source</strong></div><div><span>Checked</span><strong id="resultChecked"></strong></div><div><span>Status</span><strong id="resultFreshness"></strong></div></div>
           <section class="assessment-output" aria-labelledby="stop-summary-heading">
             <div class="output-heading"><div><p class="eyebrow">Table 3.2</p><h4 id="stop-summary-heading">Bus Stop Summary</h4></div><button id="clearRoutes" class="secondary compact" type="button" hidden>Clear route lines</button></div>
           <p class="supporting planner-label-note">The map, stop table, service summary and Word export use the same deterministic Stop A, Stop B, Stop C labels. Cycling access remains available in each stop’s map popup.</p>
           <div class="table-wrap">
             <table class="bus-stop-summary">
-              <colgroup><col class="col-include"><col class="col-stop-label"><col class="col-stop-name"><col class="col-direction"><col class="col-walk"><col class="col-routes"><col class="col-timetable-evidence"></colgroup>
-              <thead><tr><th>Include</th><th>Stop label</th><th>Stop name</th><th>Direction / indicator</th><th>Walking distance / time</th><th>Routes serving stop</th><th>Timetable evidence</th></tr></thead>
+              <colgroup><col class="col-include"><col class="col-stop-label"><col class="col-stop-name"><col class="col-direction"><col class="col-walk"><col class="col-routes"></colgroup>
+              <thead><tr><th>Include</th><th>Map reference</th><th>Stop name</th><th>Direction / indicator</th><th>Walking distance / time</th><th>Routes serving stop</th></tr></thead>
               <tbody id="evidenceRows"></tbody>
             </table>
           </div>
@@ -191,7 +196,7 @@
           <section class="assessment-output" aria-labelledby="service-summary-heading">
             <div class="output-heading"><div><p class="eyebrow">Table 3.3</p><h4 id="service-summary-heading">Bus Service Summary</h4></div><div class="selection-actions"><button id="recommendedSelection" class="secondary compact" type="button">Recommended selection</button><button id="selectAllRows" class="secondary compact" type="button">Select all</button><button id="clearAllRows" class="secondary compact" type="button">Clear all</button><button id="toggleDetailedEvidence" class="secondary compact" type="button">Show detailed evidence</button></div></div>
             <div class="table-wrap"><table class="bus-service-summary"><colgroup><col class="col-include"><col class="col-route"><col class="col-operator"><col class="col-direction"><col class="col-served-at"><col class="col-principal"><col class="col-frequency"><col class="col-operating-period"></colgroup><thead><tr><th>Include</th><th>Route</th><th>Operator</th><th>Direction / main service pattern</th><th>Stops</th><th>Principal locations</th><th>Typical frequency</th><th>Operating period at stop</th></tr></thead><tbody id="serviceRows"></tbody></table></div>
-            <p id="serviceSummaryMethodology" class="supporting planner-methodology">Frequency and operating periods are derived from scheduled departures at the closest timetable-evidenced served stop (the representative stop), marked “(timetable basis)”. Other served stops remain listed for completeness; detailed source evidence is available under Show detailed evidence.</p>
+            <p id="serviceSummaryMethodology" class="supporting planner-methodology">* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence. Detailed source evidence is available under Show detailed evidence.</p>
             <section id="serviceDetailPanel" class="service-detail-panel" hidden aria-labelledby="service-detail-heading"><h5 id="service-detail-heading">Detailed timetable evidence</h5><p class="supporting">Underlying source records are shown for inspection; the consolidated Table 3.3 remains the planner-facing summary.</p><div id="serviceDetailRows"></div></section>
           </section>
           <section class="assessment-wording" aria-labelledby="wording-heading"><p class="eyebrow">Controlled wording</p><h4 id="wording-heading">Assessment wording</h4><p id="assessmentWording"></p></section>

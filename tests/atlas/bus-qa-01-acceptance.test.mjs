@@ -63,9 +63,9 @@ const unavailableResult = await unavailable.assess({ latitude: 51.7, longitude: 
 assert.equal(unavailableResult.stops[0].timetableEvidence, 'Timetable source unavailable');
 
 const wordTables = buildBusWordTables(result);
-assert.deepEqual(wordTables[0].headers, ['Stop label', 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop']);
+assert.deepEqual(wordTables[0].headers, ['Map reference', 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop']);
 assert.deepEqual(wordTables[1].headers, ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']);
 assert.equal(wordTables[1].rows[0][2], 'Towards Town Terminal');
-assert.match(wordTables[1].rows[0][3], /Stop A/);
+assert.match(wordTables[1].rows[0][3], /Assessment Stop .*\[A\]\*/);
 assert.doesNotMatch(wordTables[0].headers.join(' '), /Timetable evidence|Include/);
 console.log('PASS BUS-QA-01 TNDS/BODS principal-location parity, representative-stop frequency, source status and Word exclusion regressions.');

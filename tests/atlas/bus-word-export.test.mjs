@@ -24,8 +24,8 @@ const result = {
 const tables = buildBusWordTables(result);
 assert.equal(tables.length, 2);
 assert.equal(tables[0].caption, 'Table 3.2 - Bus Stop Summary');
-assert.deepEqual(tables[0].headers, ['Stop label', 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop']);
-assert.equal(tables[0].rows[0][0], 'Stop');
+assert.deepEqual(tables[0].headers, ['Map reference', 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop']);
+assert.equal(tables[0].rows[0][0], '?');
 assert.equal(tables[0].rows[0][1], 'Balaam Street');
 assert.equal(tables[0].rows[0][2], 'Stop S (Eastbound)');
 assert.equal(tables[0].rows[0][5], '262, 473');

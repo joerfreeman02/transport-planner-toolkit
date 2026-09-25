@@ -82,6 +82,8 @@ main { max-width: 1600px; margin: 0 auto; padding: 42px 24px 80px; }
 .steps { display: grid; }
 .step-card { display: grid; grid-template-columns: 46px 1fr; gap: 19px; padding: 28px 30px; border-bottom: 1px solid var(--atlas-line); }
 .step-number { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; background: var(--atlas-blue); color: #fff; font-weight: 850; }
+.stage-summary { grid-column: 2; display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 40px; padding: 5px 0; color: var(--atlas-blue); }
+.stage-summary strong { font-size: .95rem; }
 .step-content h3 { margin: 2px 0 4px; color: var(--atlas-blue); }
 .supporting { margin: 0 0 18px; color: var(--atlas-muted); font-size: .9rem; }
 .address-form label, .stop-controls label { display: block; font-size: .78rem; font-weight: 800; color: #4d6174; }
@@ -154,6 +156,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .task-status[data-phase="partial"], .task-status[data-phase="unavailable"] { border-color: #d8b67c; background: #fff8eb; }
 
 .evidence-panel { padding: 27px 30px 32px; }
+.results-map-host { margin: 0 0 24px; padding: 16px; border: 1px solid var(--atlas-line); border-radius: 10px; background: #f8fbfd; }
+.results-map-host .supporting { margin-bottom: 10px; }
+.results-map-host #siteMapFrame { width: 100%; }
+.planner-status-line { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.planner-status-line p { margin: 0; font-weight: 800; color: var(--atlas-blue); }
+.data-status details { margin-top: 10px; }
 .evidence-heading { display: flex; justify-content: space-between; gap: 20px; align-items: start; }
 .evidence-heading h3 { margin: 3px 0 16px; color: var(--atlas-blue); font-size: 1.35rem; }
 .evidence-heading #evidenceSummary { font-size: .78rem; color: var(--atlas-muted); text-align: right; }
@@ -178,7 +186,6 @@ button.compact { padding: 7px 10px; font-size: .78rem; }
 .bus-stop-summary .col-direction { width: 11%; }
 .bus-stop-summary .col-walk { width: 16%; }
 .bus-stop-summary .col-routes { width: 21%; }
-.bus-stop-summary .col-timetable-evidence { width: 13%; }
 .bus-service-summary { min-width: 1320px; table-layout: fixed; }
 .bus-service-summary .col-include { width: 4%; }
 .bus-service-summary .col-route { width: 6%; }
@@ -240,6 +247,7 @@ footer { max-width: 1600px; margin: auto; padding: 0 24px 34px; color: var(--atl
   .creator-card { grid-template-columns: 1fr; }
   .creator-card img { width: 120px; height: 120px; }
   .step-card { grid-template-columns: 1fr; padding: 22px 18px; }
+  .stage-summary { grid-column: auto; }
   .field-row { display: grid; }
   .candidate { display: block; }
   .candidate button { margin-top: 10px; }

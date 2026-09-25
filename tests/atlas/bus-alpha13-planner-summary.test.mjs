@@ -28,7 +28,7 @@ const planner = buildPlannerBusServiceSummaries([
 assert.equal(planner.length, 3, 'main direction, genuine branch and opposite direction remain distinct');
 const main = planner.find(row => row.destination === 'Chingford');
 assert.ok(main);
-assert.equal(main.servedAtText, 'Waltham Cross Bus Station — G · 82 m (timetable basis)\nWaltham Cross Bus Station — H · 120 m');
+assert.equal(main.servedAtText, 'Waltham Cross Bus Station — G · 82 m*\nWaltham Cross Bus Station — H · 120 m');
 assert.deepEqual(main.departuresByDay.monday, [360, 360, 420, 480, 540, 600, 660], 'same representative-stop schedules are consolidated without cross-stop addition while a destination-distinguished short working remains represented');
 assert.deepEqual(main.typicalFrequencyLines, ['Mon-Fri: Every ~60 mins', 'Sat: 2 journeys/day', 'Sun: 1 journey/day']);
 assert.match(main.operatingPeriodLines.join(' '), /Sun: Departs approx\. 10:00/);
@@ -40,7 +40,7 @@ assert.equal(planner.filter(row => row.routeNumber === '657').length, 3);
 const word = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [main], serviceSummaries: [] });
 assert.deepEqual(word[1].headers, ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']);
 assert.equal(word[1].rows[0][3], main.servedAtText);
-assert.ok(word[1].rows.some(row => !Array.isArray(row) && /representative stop/.test(row.text)));
+assert.ok(word[1].rows.some(row => !Array.isArray(row) && /frequency and operating-period information/.test(row.text)));
 
 assert.equal(formatAtlasTaskStatus({ phase: 'finding-stops' }), 'Step 1 of 5 · Finding nearby stops');
 assert.equal(formatAtlasTaskStatus({ phase: 'routing-stops', completed: 2, total: 4 }), 'Step 2 of 5 · Routing stops — 2 of 4');
@@ -181,7 +181,7 @@ assert.equal(bridgedDirections.length, 2, 'an ambiguous direction record cannot 
 assert.ok(bridgedDirections.every(row => row.rawServiceSummaries.length < 3));
 
 const unresolvedRecord = plannerRecord({ routeNumber: 'U', destination: '', direction: '', directionFamily: '', pattern: ['A', 'B'], departures: [420], ids: 'u' });
-assert.deepEqual(buildPlannerBusServiceSummaries([unresolvedRecord], coherentStops), [], 'unresolved route identity is not presented as a normal planner row');
+assert.equal(buildPlannerBusServiceSummaries([unresolvedRecord], coherentStops)[0].destination, 'Destination requires review', 'unresolved route identity remains visible as a review row');
 assert.match(plannerSourceWarning(unresolvedRecord).join(' '), /Detailed Evidence/);
 
 const operatorRecords = buildPlannerBusServiceSummaries([
@@ -194,7 +194,8 @@ const internalNotes = buildPlannerBusServiceSummaries([plannerRecord({ routeNumb
 assert.doesNotMatch(internalNotes.serviceNote, /route metadata|limited service|no more than three/i, 'source diagnostics and redundant limited banners stay out of planner service notes');
 
 const separateRoutes = buildPlannerBusServiceSummaries(['13', '13A', '13B', '13C'].map(routeNumber => plannerRecord({ routeNumber, departures: [420], ids: routeNumber })), coherentStops);
-assert.deepEqual(separateRoutes.map(row => row.routeNumber), ['13', '13A', '13B', '13C'], 'related route labels remain separate route families');
+assert.equal(separateRoutes.length, 1, 'evidenced lettered route variants consolidate into one public family');
+assert.equal(separateRoutes[0].routeGroupNote, null, 'identical variant evidence does not create a spurious additional-variant note');
 
 const circularRows = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: 'C', destination: 'Town Centre', direction: 'Clockwise', pattern: ['A', 'B', 'C'], departures: [420], ids: 'clockwise', circular: true }),
@@ -225,7 +226,7 @@ assert.equal(builtSummary.departureEvidenceByDay.monday[0].minute, 678, 'raw sum
 const wordRows = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [route279[0]], serviceSummaries: [] })[1].rows;
 assert.equal(wordRows[0][2], route279[0].directionPatternText, 'Word consumes the same direction model as Browser');
 assert.equal(wordRows[0][5], route279[0].typicalFrequencyText, 'Word consumes the same frequency model as Browser');
-assert.equal(wordRows.filter(row => !Array.isArray(row) && row.text === 'Frequency and operating periods are derived from scheduled departures at the closest timetable-evidenced served stop (the representative stop), marked “(timetable basis)”. Other served stops remain listed for completeness. Additional source evidence remains available in the ATLAS assessment workspace.').length, 1, 'Word carries the shared planner methodology note once');
+assert.equal(wordRows.filter(row => !Array.isArray(row) && row.text === '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence. Additional source evidence remains available in the ATLAS assessment workspace.').length, 1, 'Word carries the shared planner methodology note once');
 const reviewWordRows = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [], serviceSummaries: [], reviewItems: [{ route: '279', stop: 'A', source: 'TfL', message: 'Review this timetable evidence.' }] })[1].rows;
 assert.equal(reviewWordRows.some(row => !Array.isArray(row) && /^Planner review required:/.test(row.text)), true, 'Word retains one concise material review qualification');
 assert.equal(reviewWordRows.some(row => !Array.isArray(row) && /Review this timetable evidence|Stop A/.test(row.text)), false, 'Word keeps raw review diagnostics out of the document');

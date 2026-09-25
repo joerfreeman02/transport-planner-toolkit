@@ -12,15 +12,15 @@ const rawStops = [
   { id: 'B', name: 'Waltham Cross Bus Station', indicator: 'B', distanceMetres: 50, walking: { status: 'routed', distanceMetres: 200 } }
 ];
 const presented = groupStopsForPresentation(rawStops);
-assert.deepEqual(Object.fromEntries(presented.map(stop => [stop.id, stop.plannerLabel])), { A: 'Stop A', B: 'Stop B', C: 'Stop C' });
-assert.deepEqual(Object.fromEntries(groupStopsForPresentation([...rawStops].reverse()).map(stop => [stop.id, stop.plannerLabel])), { A: 'Stop A', B: 'Stop B', C: 'Stop C' });
+assert.deepEqual(Object.fromEntries(presented.map(stop => [stop.id, stop.mapReference])), { A: 'A', B: 'B', C: 'C' });
+assert.deepEqual(Object.fromEntries(groupStopsForPresentation([...rawStops].reverse()).map(stop => [stop.id, stop.mapReference])), { A: 'A', B: 'B', C: 'C' });
 
 const grouped = groupStopsForPresentation([
   { ...rawStops[0], id: 'G1', logicalGroupId: 'group-1', logicalGroupName: 'Waltham Cross Bus Station' },
   { ...rawStops[1], id: 'G2', logicalGroupId: 'group-1', logicalGroupName: 'Waltham Cross Bus Station' }
 ]);
 assert.ok(grouped.every(stop => stop.logicalGroupLabel?.includes('Waltham Cross Bus Station')));
-assert.match(grouped[0].logicalGroupLabel, /Stop A and Stop B/);
+assert.match(grouped[0].logicalGroupLabel, /A and B/);
 
 const service = {
   id: 'golden-rule-service', routeNumber: '310', operator: 'Example Buses', origin: 'Hertford',
@@ -34,11 +34,19 @@ const row = buildPlannerBusServiceSummaries([service], presented)[0];
 assert.equal(row.destination, 'Waltham Cross');
 assert.equal(row.rawDestination, 'Waltham Cross Bus Station');
 assert.match(row.directionPatternText, /Towards Waltham Cross/);
-assert.match(row.servedAtText, /Stop A/);
-assert.match(row.servedAtText, /Stop B/);
+assert.match(row.servedAtText, /Waltham Cross Bus Station — A .*\[A\]\*/);
+assert.match(row.servedAtText, /Waltham Cross Bus Station — B .*\[B\]/);
 const wordStopRows = buildBusWordTables({ ok: true, stops: presented, plannerServiceSummaries: [row], serviceSummaries: [] })[0].rows;
-assert.deepEqual(wordStopRows.find(stopRow => stopRow[1] === 'Waltham Cross Bus Station' && stopRow[0] === 'Stop A').slice(0, 2), ['Stop A', 'Waltham Cross Bus Station']);
+assert.deepEqual(wordStopRows.find(stopRow => stopRow[1] === 'Waltham Cross Bus Station' && stopRow[0] === 'A').slice(0, 2), ['A', 'Waltham Cross Bus Station']);
 assert.equal(buildBusWordTables({ ok: true, stops: presented, plannerServiceSummaries: [row], serviceSummaries: [] })[1].rows[0][3], row.servedAtText);
+
+const familyRows = buildPlannerBusServiceSummaries([
+  { ...service, id: '13', routeNumber: '13', serviceLineageId: 'public-13', sourceRouteIds: ['public-13'] },
+  { ...service, id: '13A', routeNumber: '13A', serviceLineageId: 'public-13', sourceRouteIds: ['public-13'], destination: 'Waltham Cross Bus Station' },
+  { ...service, id: 'N13', routeNumber: 'N13', serviceLineageId: 'night-13', sourceRouteIds: ['night-13'] }
+], presented);
+assert.equal(familyRows.filter(candidate => ['13', '13A'].includes(candidate.routeNumber)).length, 1, 'lettered route variants consolidate only with shared service evidence');
+assert.equal(familyRows.filter(candidate => candidate.routeNumber === 'N13').length, 1, 'night route remains a separate public family');
 
 const unsupported = buildPlannerBusServiceSummaries([{ ...service, id: 'unsupported', destination: 'Unknown Stand', destinationLocality: '', routePatternStops: [{ id: 'HERTFORD', name: 'Hertford' }, { id: 'B', name: 'Unknown Stand' }] }], presented)[0];
 assert.equal(unsupported.destination, 'Unknown Stand', 'unsupported locality evidence does not rewrite the source destination');

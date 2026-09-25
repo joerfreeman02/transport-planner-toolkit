@@ -75,7 +75,7 @@ assert.equal(variantRows[0].plannerServiceGroup.sourceServiceCount, 2);
 
 const multiStopRows = rows([record({ id: 'multi-stop', routeNumber: '66', stopIds: ['A', 'B'], basis: 'A' })]);
 assert.equal(multiStopRows[0].frequencyBasisStopId, 'A');
-assert.match(multiStopRows[0].servedAtText, /Stop A .*timetable basis/);
+assert.match(multiStopRows[0].servedAtText, /Stop A .*\*/);
 assert.match(multiStopRows[0].servedAtText, /Stop B/);
 assert.deepEqual(multiStopRows[0].stopIds, ['A', 'B']);
 assert.equal(multiStopRows[0].plannerServiceGroup.timetableBasis.stopId, 'A');
@@ -377,6 +377,7 @@ const markerlessOpposites = rows([
 assert.equal(markerlessOpposites.length, 2, 'reverse endpoint and pattern evidence keeps directions separate without markers');
 
 const unresolved = rows([record({ id: 'unresolved', routeNumber: 'Q', direction: '', destination: 'Destination not resolved', origin: 'Unknown', pattern: [] })]);
-assert.equal(unresolved.length, 0, 'unresolved route identity is not promoted to a planner row');
+assert.equal(unresolved.length, 1, 'a distinct unresolved public service remains visible as one review row');
+assert.equal(unresolved[0].destination, 'Destination requires review');
 
 console.log('PASS Alpha.15 adversarial PlannerServiceGroup coverage: operators, variants, served stops, timetable basis, physical journeys, calendars, circular controls, corridors and unresolved identities.');

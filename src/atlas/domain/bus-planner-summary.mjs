@@ -9,7 +9,7 @@ import {
 } from './bus-service-assessment.mjs';
 import { calendarProfileLabel, deriveCalendarProfileId } from './service-calendar.mjs';
 
-export const PLANNER_METHODOLOGY_NOTE = 'Frequency and operating periods are derived from scheduled departures at the closest timetable-evidenced served stop (the representative stop), marked “(timetable basis)”. Other served stops remain listed for completeness. Additional source evidence remains available in the ATLAS assessment workspace.';
+export const PLANNER_METHODOLOGY_NOTE = '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence. Additional source evidence remains available in the ATLAS assessment workspace.';
 
 const UNKNOWN_CALENDAR_PROFILE = 'unresolved';
 const CALENDAR_PROFILE_ORDER = Object.freeze(['ordinary', 'school-day', 'term-time', 'non-school-day', 'holiday', 'other-resolved', UNKNOWN_CALENDAR_PROFILE]);
@@ -530,6 +530,44 @@ function routeGroupKey(service) {
   return normal(service?.routeNumber).replace(/\s+/g, '');
 }
 
+function publicRouteNumberStem(service) {
+  const route = text(service?.routeNumber).toUpperCase().replace(/\s+/g, '');
+  if (/^N\d/.test(route)) return '';
+  const match = route.match(/^(\d+)([A-Z]+)?$/);
+  return match ? match[1] : '';
+}
+
+function publicRouteFamilyCandidate(first, second) {
+  const left = publicRouteNumberStem(first), right = publicRouteNumberStem(second);
+  if (!left || left !== right || routeGroupKey(first) === routeGroupKey(second)) return false;
+  if (!operatorFamilyCompatible(first, second) || !compatibleDirection(first, second)) return false;
+  return sameServiceLineage(first, second)
+    || provenPatternRelationship(first, second)
+    || sharedStopIds(first, second).size >= 2
+    || sharedPatternValues(first, second).size >= 2
+    || sharedCorridorNames(first, second).size > 0;
+}
+
+function publicRouteFamilyBuckets(services = []) {
+  const records = [...(services ?? [])];
+  const parent = records.map((_, index) => index);
+  const find = index => parent[index] === index ? index : (parent[index] = find(parent[index]));
+  const join = (left, right) => { const a = find(left), b = find(right); if (a !== b) parent[b] = a; };
+  for (let left = 0; left < records.length; left += 1) for (let right = left + 1; right < records.length; right += 1) {
+    if (publicRouteFamilyCandidate(records[left], records[right])) join(left, right);
+  }
+  const buckets = new Map();
+  records.forEach((service, index) => {
+    const root = find(index);
+    const key = publicRouteNumberStem(service) && records.some((candidate, candidateIndex) => find(candidateIndex) === root && candidateIndex !== index)
+      ? `family:${publicRouteNumberStem(service)}`
+      : `route:${routeGroupKey(service)}`;
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(service);
+  });
+  return buckets;
+}
+
 function closedPhysicalShape(service) {
   const pattern = explicitPattern(service);
   const names = orderedPatternNames(service).map(normal).filter(Boolean);
@@ -913,7 +951,7 @@ function resolvedPlannerDestination(service) {
 export function plannerSourceWarning(service) {
   const route = text(service?.routeNumber) || 'Unknown route';
   const warnings = [];
-  if (!resolvedPlannerDestination(service)) warnings.push(`Route ${route} — one timetable pattern could not be assigned a complete route identity. The scheduled evidence is retained under Detailed Evidence and is not presented as a separate planner service.`);
+  if (!resolvedPlannerDestination(service)) warnings.push(`Route ${route} — one timetable pattern could not be assigned a complete route identity. It is retained as a concise review item and under Detailed Evidence.`);
   if (!text(service?.operator) || /not supplied/i.test(text(service?.operator))) warnings.push(`Route ${route} — operator identity was not deterministically supplied for one timetable pattern. The source evidence is retained under Detailed Evidence.`);
   return warnings;
 }
@@ -924,13 +962,12 @@ function principalText(main) {
 }
 
 function plannerStopLabel(stop, { basis = false } = {}) {
-  const plannerLabel = text(stop?.plannerLabel);
-  if (plannerLabel) return `${plannerLabel}${basis ? ' (timetable basis)' : ''}`;
   const name = text(stop?.name) || stopId(stop) || 'Selected stop';
   const indicator = text(stop?.indicator);
   const distance = stop?.walking?.status === 'routed' ? Number(stop.walking.distanceMetres) : Number(stop?.distanceMetres);
   const suffix = Number.isFinite(distance) ? ` · ${Math.round(distance).toLocaleString('en-GB')} m` : '';
-  return `${name}${indicator ? ` — ${indicator}` : ''}${suffix}${basis ? ' (timetable basis)' : ''}`;
+  const reference = text(stop?.mapReference);
+  return `${name}${indicator ? ` — ${indicator}` : ''}${suffix}${reference ? ` [${reference}]` : ''}${basis ? '*' : ''}`;
 }
 
 function publicDirectionIdentity(component, main) {
@@ -962,7 +999,7 @@ function buildPlannerServiceGroup(component, stops, main, representative) {
     id: stopId(stop),
     name: text(stop?.name) || null,
     indicator: text(stop?.indicator) || null,
-    plannerLabel: text(stop?.plannerLabel) || null,
+    mapReference: text(stop?.mapReference) || null,
     logicalGroupLabel: text(stop?.logicalGroupLabel) || null,
     distanceMetres: Number.isFinite(Number(stop?.distanceMetres)) ? Number(stop.distanceMetres) : null,
     walkingDistanceMetres: stop?.walking?.status === 'routed' && Number.isFinite(Number(stop.walking.distanceMetres)) ? Number(stop.walking.distanceMetres) : null,
@@ -1005,16 +1042,11 @@ function buildPlannerServiceGroup(component, stops, main, representative) {
 }
 
 export function buildPlannerServiceGroups(serviceSummaries = [], stops = []) {
-  const grouped = new Map();
-  for (const service of serviceSummaries ?? []) {
-    const key = routeGroupKey(service);
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push(service);
-  }
-  return [...grouped.entries()].flatMap(([routeKey, services]) => connectedServiceComponents(services).map(component => {
+  const grouped = publicRouteFamilyBuckets(serviceSummaries);
+  return [...grouped.entries()].flatMap(([publicRouteFamilyKey, services]) => connectedServiceComponents(services).map(component => {
     const representative = selectRepresentativeStop(component, stops);
     const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
-    return buildPlannerServiceGroup(component, stops, main, representative);
+    return Object.freeze({ ...buildPlannerServiceGroup(component, stops, main, representative), publicRouteFamilyKey });
   }));
 }
 
@@ -1024,7 +1056,7 @@ function profileLines(lines, profileLabel) {
   return lines.map(line => line.replace(/^([^:]+):\s*/, `$1 (${label}): `));
 }
 
-function buildPlannerRow(component, stops, componentIndex, routeFamilyServices = component) {
+function buildPlannerRow(component, stops, componentIndex, routeFamilyServices = component, publicRouteFamilyKey = null) {
   const representative = selectRepresentativeStop(component, stops);
   const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
   const plannerServiceGroup = buildPlannerServiceGroup(component, stops, main, representative);
@@ -1120,6 +1152,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     frequencyEvidence: Object.freeze(displayResult.frequencyEvidence),
     serviceNote: unique(notes).join(' '),
     routeGroupKey: routeGroupKey(main),
+    publicRouteFamilyKey: publicRouteFamilyKey || routeGroupKey(main),
     stopIds: Object.freeze(servedStopIds.length ? servedStopIds : (representative.id ? [representative.id] : unique(component.flatMap(service => service.stopIds ?? [])))),
     sourceRecordIds: Object.freeze(ids),
     variantCount: component.length,
@@ -1143,7 +1176,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
 
 function attachRouteNotes(rows) {
   const groups = new Map();
-  rows.forEach((row, index) => { if (!groups.has(row.routeGroupKey)) groups.set(row.routeGroupKey, []); groups.get(row.routeGroupKey).push({ row, index }); });
+  rows.forEach((row, index) => { const key = row.publicRouteFamilyKey || row.routeGroupKey; if (!groups.has(key)) groups.set(key, []); groups.get(key).push({ row, index }); });
   const notesFor = row => unique(text(row.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean));
   const sharedTaxonomy = new Set(['School days only.', 'Term-time service.', 'Non-school days only.', 'Circular service.']);
   const updates = new Map();
@@ -1180,12 +1213,16 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
   const componentIndexes = new Map();
   for (const serviceGroup of serviceGroups) {
     const component = serviceGroup.services;
-    const routeKey = routeGroupKey(component[0]);
+    const routeKey = serviceGroup.publicRouteFamilyKey || routeGroupKey(component[0]);
     const index = componentIndexes.get(routeKey) ?? 0;
     componentIndexes.set(routeKey, index + 1);
-    const routeFamilyServices = plannerRecords.filter(service => routeGroupKey(service) === routeKey);
-    const row = buildPlannerRow(component, stops, index, routeFamilyServices);
+    const routeFamilyServices = serviceGroups.filter(group => group.publicRouteFamilyKey === routeKey).flatMap(group => group.services);
+    const row = buildPlannerRow(component, stops, index, routeFamilyServices, routeKey);
     if (resolvedPlannerDestination(row)) rows.push(row);
+    else {
+      const representedByResolvedRow = routeFamilyServices.some(service => service !== component[0] && resolvedPlannerDestination(service));
+      if (!representedByResolvedRow) rows.push(Object.freeze({ ...row, destination: 'Destination requires review', directionPatternText: 'Destination requires review', unresolvedPublicIdentity: true, serviceNote: unique([row.serviceNote, 'Destination requires review before formal use.']).join(' ') }));
+    }
   }
   const sorted = rows.sort((first, second) => text(first.routeNumber).localeCompare(text(second.routeNumber), undefined, { numeric: true })
     || text(first.operator).localeCompare(text(second.operator))

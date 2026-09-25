@@ -1,6 +1,5 @@
 import { hasScheduledEvidence } from './scheduled-evidence.mjs';
 import { calendarProfileLabel, calendarQualificationNotes } from './service-calendar.mjs';
-import { buildPlannerStopPresentation } from './bus-stop-presentation.mjs';
 
 const DAY_ORDER = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 const DAY_LABELS = Object.freeze({ monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday' });
@@ -757,6 +756,52 @@ export function displayStopDirection(stop = {}) {
   if (directionCompass) return directionCompass;
   if (direction) return /^towards\b/i.test(direction) ? direction : `Towards ${direction}`;
   return 'Direction not supplied';
+}
+
+function plannerStopId(stop) { return text(stop?.id || stop?.sourceId); }
+function plannerStopWalkingRank(stop) { return stop?.walking?.status === 'routed' && Number.isFinite(Number(stop.walking.distanceMetres)) ? Number(stop.walking.distanceMetres) : Number.POSITIVE_INFINITY; }
+function plannerStopStraightLineRank(stop) { return Number.isFinite(Number(stop?.distanceMetres)) ? Number(stop.distanceMetres) : Number.POSITIVE_INFINITY; }
+function plannerStopAlphaLabel(index) {
+  let value = Number(index) + 1;
+  let result = '';
+  while (value > 0) { const remainder = (value - 1) % 26; result = String.fromCharCode(65 + remainder) + result; value = Math.floor((value - 1) / 26); }
+  return `Stop ${result}`;
+}
+function plannerStopGroupId(stop) { return text(stop?.logicalGroupId || stop?.logicalGroup?.id || stop?.logicalGroupRefs?.[0]?.id); }
+function plannerStopGroupName(stop) { return text(stop?.logicalGroupName || stop?.logicalGroup?.name || stop?.logicalGroup?.commonName); }
+function plannerStopGroupMembers(stop) {
+  const ids = stop?.logicalGroupMemberStopPointIds || stop?.logicalGroup?.memberStopPointIds || [];
+  return [...new Set((Array.isArray(ids) ? ids : []).map(text).filter(Boolean))].sort();
+}
+function plannerStopGroupLabel(name, labels) {
+  if (!name || !labels.length) return null;
+  const suffix = labels.length === 1 ? labels[0] : labels.length === 2 ? `${labels[0]} and ${labels[1]}` : `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`;
+  return `${name} — ${suffix}`;
+}
+function buildPlannerStopPresentation(stops = []) {
+  const source = [...(stops ?? [])];
+  const ranked = [...source].sort((first, second) => plannerStopWalkingRank(first) - plannerStopWalkingRank(second) || plannerStopStraightLineRank(first) - plannerStopStraightLineRank(second) || text(first?.name).localeCompare(text(second?.name)) || plannerStopId(first).localeCompare(plannerStopId(second)));
+  const labels = new Map(ranked.map((stop, index) => [plannerStopId(stop), plannerStopAlphaLabel(index)]));
+  const groups = new Map();
+  for (const stop of source) {
+    const id = plannerStopGroupId(stop);
+    if (!id) continue;
+    if (!groups.has(id)) groups.set(id, { name: plannerStopGroupName(stop), ids: [] });
+    const group = groups.get(id);
+    if (!group.name) group.name = plannerStopGroupName(stop);
+    group.ids.push(plannerStopId(stop), ...plannerStopGroupMembers(stop));
+  }
+  for (const group of groups.values()) {
+    group.ids = [...new Set(group.ids)].filter(Boolean);
+    group.labels = group.ids.map(id => labels.get(id)).filter(Boolean).sort((first, second) => first.localeCompare(second, undefined, { numeric: true }));
+    group.label = plannerStopGroupLabel(group.name, group.labels);
+  }
+  return source.map(stop => {
+    const id = plannerStopId(stop);
+    const groupId = plannerStopGroupId(stop);
+    const group = groupId ? groups.get(groupId) : null;
+    return Object.freeze({ ...stop, plannerLabel: labels.get(id) || 'Stop A', plannerLabelIndex: ranked.findIndex(candidate => plannerStopId(candidate) === id), logicalGroupId: groupId || null, logicalGroupName: group?.name || plannerStopGroupName(stop) || null, logicalGroupMemberStopPointIds: Object.freeze(group?.ids || plannerStopGroupMembers(stop)), logicalGroupLabel: group?.label || null });
+  });
 }
 
 export function groupStopsForPresentation(stops) {

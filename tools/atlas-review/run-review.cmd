@@ -18,7 +18,13 @@ if not defined ATLAS_NODE (
   exit /b 1
 )
 
-if /i "%~1"=="stop" (
+if /i "%~1"=="v2" (
+  if /i "%~2"=="stop" (
+    "%ATLAS_NODE%" "%~dp0v2-review.mjs" --stop
+  ) else (
+    "%ATLAS_NODE%" "%~dp0v2-review.mjs"
+  )
+) else if /i "%~1"=="stop" (
   "%ATLAS_NODE%" "%~dp0review-server.mjs" --stop
 ) else (
   "%ATLAS_NODE%" "%~dp0review-server.mjs"

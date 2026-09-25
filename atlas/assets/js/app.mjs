@@ -3,6 +3,8 @@ import { SITE_LOCATION_METHODS } from '../../../src/atlas/domain/site.mjs';
 import { isGreaterLondonPoint } from '../../../src/atlas/domain/geography.mjs';
 import { createJsonCache } from '../../../src/atlas/infrastructure/cache.mjs';
 import { createAtlasDataSourceResolver } from '../../../src/atlas/infrastructure/atlas-data-sources.mjs';
+import { atlasDataSources } from '../../../atlas/config/atlas-data-sources.mjs';
+import { createAtlasReferenceData } from '../../../src/atlas/reference-data/atlas-reference-data.mjs';
 import { createNominatimGeocodingAdapter } from '../../../src/atlas/adapters/nominatim-geocoding-adapter.mjs';
 import { createTflBusStopAdapter } from '../../../src/atlas/adapters/tfl-bus-stop-adapter.mjs';
 import { createPreparedBusDataAdapter } from '../../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
@@ -29,17 +31,23 @@ const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha13
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tflRequestScheduler = createTflRequestScheduler({ onEvent: event => taskStatus.update(event) });
 const tfl = createTflBusStopAdapter({ cache, requestScheduler: tflRequestScheduler });
-const atlasData = createAtlasDataSourceResolver();
+const isV2Review = new URL(window.location.href).searchParams.get('review') === 'v2';
+const v2DataBaseUrl = isV2Review ? `${window.location.origin}/__atlas-review/v2-data/` : null;
+const atlasData = createAtlasDataSourceResolver(isV2Review ? {
+  ...atlasDataSources,
+  datasets: { ...atlasDataSources.datasets, bus: { ...atlasDataSources.datasets.bus, baseUrl: `${v2DataBaseUrl}bus/` } }
+} : atlasDataSources);
 const preparedBusData = createPreparedBusDataAdapter({
   baseUrl: atlasData.baseUrl('bus'),
-  tndsBaseUrl: atlasData.baseUrl('tnds'),
+  tndsBaseUrl: isV2Review ? null : atlasData.baseUrl('tnds'),
   busFileUrl: relativePath => atlasData.fileUrl('bus', relativePath),
   tndsFileUrl: relativePath => atlasData.fileUrl('tnds', relativePath)
 });
+const referenceData = createAtlasReferenceData({ adapter: preparedBusData });
 const tflTimetable = createTflBusTimetableAdapter({ cache, requestScheduler: tflRequestScheduler });
 const authoritativeTimetable = createAuthoritativeBusTimetableAdapter({ tflAdapter: tflTimetable, nationalAdapter: preparedBusData, londonSupplementAdapter: preparedBusData });
 const accessRouting = createOsrmAccessRoutingAdapter();
-const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: preparedBusData, crossBoundaryTfL: true });
+const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: preparedBusData, referenceData, crossBoundaryTfL: true });
 const busAssessment = createBusAssessment({ stopDiscovery: busStops, timetableData: authoritativeTimetable, accessRouting });
 const selector = createSiteSelector();
 const views = ['report-builder', 'modules', 'projects', 'about'];
@@ -82,7 +90,7 @@ function selectedResult() {
 async function refreshDataStatus() {
   const message = $('dataStatusMessage');
   try {
-    const response = await fetch('data/status/manifest.json', { cache: 'no-store' });
+    const response = await fetch(isV2Review ? `${v2DataBaseUrl}status/manifest.json` : 'data/status/manifest.json', { cache: 'no-store' });
     if (!response.ok) throw new Error('status unavailable');
     const status = await response.json();
     $('preparedDataDate').textContent = formatTime(status.successfulRefreshAt);
@@ -636,6 +644,7 @@ function renderAssessment(result) {
   const diagnostics = $('diagnostics');
   diagnostics.replaceChildren();
   const diagnosticLines = [
+    `Review dataset: ${isV2Review ? 'Prepared Data V2 / frozen NPTG diagnostic review' : 'Default local V1 review'}`,
     `Stop source reference: ${stopProvenance.endpoint || 'not supplied'}`,
     `Timetable source reference: ${timetableProvenance.endpoint || 'not supplied'}`,
     `Prepared dataset time: ${timetableProvenance.dataPreparedAt || stopProvenance.dataPreparedAt || 'not supplied'}`,
@@ -648,6 +657,17 @@ function renderAssessment(result) {
     `Embedded API key: ${stopProvenance.apiKeyEmbedded || timetableProvenance.apiKeyEmbedded ? 'yes' : 'no'}`
   ];
   diagnosticLines.forEach(value => { const line = document.createElement('p'); line.textContent = value; diagnostics.append(line); });
+  const nptgHeading = document.createElement('strong'); nptgHeading.textContent = 'NPTG locality evidence'; diagnostics.append(nptgHeading);
+  const nptgList = document.createElement('ul');
+  for (const stop of result.stops) {
+    const locality = stop.nptgLocalityEvidence || stop.nptgLocality;
+    const refs = (stop.logicalGroupRefs ?? []).map(ref => ref.id || ref.sourceId).filter(Boolean).join(', ') || 'none';
+    const line = document.createElement('li');
+    line.textContent = `${stop.id}: locality ${stop.nptgLocalityCode || 'not supplied'} — ${stop.nptgLocalityName || 'unresolved'}; parent ${stop.parentLocalityId || 'not supplied'} — ${stop.parentLocality || 'unresolved'}; district ${stop.districtId || 'not supplied'} — ${stop.districtName || 'unresolved'}; resolution ${stop.localityResolution || (locality ? 'resolved' : 'not-supplied')}; logical refs ${refs}; source ${stop.referenceDataProvenance?.source || locality?.provenance?.source || 'not supplied'}`;
+    nptgList.append(line);
+  }
+  if (!result.stops.length) { const line = document.createElement('li'); line.textContent = 'No stop records were returned for this assessment.'; nptgList.append(line); }
+  diagnostics.append(nptgList);
 }
 
 async function searchAddress(event) {

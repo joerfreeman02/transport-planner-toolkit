@@ -12,7 +12,7 @@ assert.match(app, /progressElement:\s*\$\('taskStatusProgress'\)/);
 assert.match(app, /countElement:\s*\$\('taskStatusProgressText'\)/);
 assert.match(html, /<th>Include<\/th>/);
 assert.match(html, /<th>Map reference<\/th>/);
-assert.match(html, /same deterministic Stop A, Stop B, Stop C labels/);
+assert.match(html, /same deterministic map references A, B, C/);
 assert.doesNotMatch(html, /<th>Timetable evidence<\/th>/);
 assert.match(html, /<th>Typical frequency<\/th>/);
 assert.match(html, /<th>Operating period(?: at stop)?<\/th>/);

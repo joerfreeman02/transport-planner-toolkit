@@ -52,17 +52,27 @@ function settledSource(settled, source) {
   return settled.status === 'fulfilled' ? (settled.value ?? unavailableSourceResult(source)) : unavailableSourceResult(source, settled.reason);
 }
 
-async function enrichPreparedStopSidecars(result, naptanAdapter, options = {}) {
+async function enrichPreparedStopSidecars(result, referenceData, naptanAdapter, options = {}) {
   if (!result?.ok || !Array.isArray(result.data) || !result.data.length) return result;
-  const groupRequest = typeof naptanAdapter?.logicalGroupsForStops === 'function'
-    ? naptanAdapter.logicalGroupsForStops(result.data, options)
-    : Promise.resolve({ ok: true, data: [], provenance: { groupingAvailable: false } });
-  const localityRequest = typeof naptanAdapter?.localitiesForStops === 'function'
-    ? naptanAdapter.localitiesForStops(result.data, options)
-    : Promise.resolve({ ok: true, data: [], provenance: { localityAvailable: false } });
-  const [groupsSettled, localitiesSettled] = await Promise.allSettled([groupRequest, localityRequest]);
-  const groupsResult = groupsSettled.status === 'fulfilled' ? groupsSettled.value : { ok: false, warnings: ['Logical stop grouping evidence could not be checked.'] };
-  const localitiesResult = localitiesSettled.status === 'fulfilled' ? localitiesSettled.value : { ok: false, warnings: ['NPTG locality evidence could not be checked.'] };
+  const references = referenceData?.resolveStopReferences
+    ? await referenceData.resolveStopReferences(result.data, options)
+    : await (async () => {
+      const groupRequest = typeof naptanAdapter?.logicalGroupsForStops === 'function' ? naptanAdapter.logicalGroupsForStops(result.data, options) : Promise.resolve({ ok: true, data: [], provenance: { groupingAvailable: false } });
+      const localityRequest = typeof naptanAdapter?.localitiesForStops === 'function' ? naptanAdapter.localitiesForStops(result.data, options) : Promise.resolve({ ok: true, data: [], provenance: { localityAvailable: false } });
+      const [groupsSettled, localitiesSettled] = await Promise.allSettled([groupRequest, localityRequest]);
+      return {
+        ok: groupsSettled.status === 'fulfilled' && localitiesSettled.status === 'fulfilled',
+        logicalGroups: groupsSettled.status === 'fulfilled' ? groupsSettled.value.data ?? [] : [],
+        localities: localitiesSettled.status === 'fulfilled' ? localitiesSettled.value.data ?? [] : [],
+        warnings: [
+          ...(groupsSettled.status === 'fulfilled' ? groupsSettled.value.warnings ?? [] : ['Logical stop grouping evidence could not be checked.']),
+          ...(localitiesSettled.status === 'fulfilled' ? localitiesSettled.value.warnings ?? [] : ['NPTG locality evidence could not be checked.'])
+        ],
+        provenance: { logicalGroups: groupsSettled.status === 'fulfilled' ? groupsSettled.value.provenance ?? {} : {}, nptg: localitiesSettled.status === 'fulfilled' ? localitiesSettled.value.provenance ?? {} : {} }
+      };
+    })();
+  const groupsResult = { ok: references.ok, data: references.logicalGroups ?? [], warnings: references.warnings ?? [], provenance: references.provenance?.logicalGroups ?? {} };
+  const localitiesResult = { ok: references.ok, data: references.localities ?? [], warnings: references.warnings ?? [], provenance: references.provenance?.nptg ?? {} };
   const groups = new Map((groupsResult.data ?? []).map(group => [String(group.id), group]));
   const localities = new Map((localitiesResult.data ?? []).flatMap(locality => [
     [String(locality.id ?? ''), locality],
@@ -71,16 +81,25 @@ async function enrichPreparedStopSidecars(result, naptanAdapter, options = {}) {
   const data = result.data.map(stop => {
     const group = (stop.logicalGroupRefs ?? []).map(ref => groups.get(String(ref.id))).find(Boolean);
     const locality = localities.get(`nptg:${stop.nptgLocalityCode}`) || localities.get(String(stop.nptgLocalityCode ?? ''));
+    const logicalGroupEvidence = (stop.logicalGroupRefs ?? []).map(ref => groups.get(String(ref.id))).filter(Boolean);
     return {
       ...stop,
       logicalGroup: group || stop.logicalGroup || null,
       logicalGroupId: group?.id || stop.logicalGroupId || null,
       logicalGroupName: group?.name || stop.logicalGroupName || null,
       logicalGroupMemberStopPointIds: group?.memberStopPointIds || stop.logicalGroupMemberStopPointIds || [],
+      logicalGroupEvidence,
       nptgLocality: locality || stop.nptgLocality || null,
+      nptgLocalityEvidence: locality || stop.nptgLocality || null,
+      nptgLocalityCode: stop.nptgLocalityCode || locality?.code || null,
       nptgLocalityName: locality?.name || stop.nptgLocalityName || null,
       locality: stop.locality || locality?.name || null,
-      parentLocality: stop.parentLocality || locality?.parentLocalityName || locality?.districtName || null
+      parentLocality: stop.parentLocality || locality?.parentLocalityName || locality?.parentLocality?.name || null,
+      parentLocalityId: locality?.parentLocalityId || locality?.parentLocality?.id || stop.parentLocalityId || null,
+      districtId: locality?.districtId || stop.districtId || null,
+      districtName: locality?.districtName || stop.districtName || null,
+      referenceDataProvenance: locality?.provenance || stop.referenceDataProvenance || null,
+      localityResolution: locality ? 'resolved' : (stop.nptgLocalityCode ? 'unresolved' : 'not-supplied')
     };
   });
   const warnings = [...new Set([...(result.warnings ?? []), ...(groupsResult.warnings ?? []), ...(localitiesResult.warnings ?? [])])];
@@ -90,13 +109,14 @@ async function enrichPreparedStopSidecars(result, naptanAdapter, options = {}) {
     warnings,
     provenance: {
       ...(result.provenance ?? {}),
+      referenceData: references.provenance ?? {},
       logicalGroupingAvailable: groupsResult.provenance?.groupingAvailable ?? groupsResult.ok,
       localityEvidenceAvailable: localitiesResult.provenance?.localityAvailable ?? localitiesResult.ok
     }
   };
 }
 
-export function createBusStopDiscovery({ tflAdapter, naptanAdapter, londonCoverage = isGreaterLondonPoint, crossBoundaryTfL = false } = {}) {
+export function createBusStopDiscovery({ tflAdapter, naptanAdapter, referenceData = null, londonCoverage = isGreaterLondonPoint, crossBoundaryTfL = false } = {}) {
   if (!tflAdapter?.nearbyStops || !naptanAdapter?.nearbyStops) throw new Error('TfL and NaPTAN bus-stop adapters are required.');
 
   async function nearbyStops(site, options = {}) {
@@ -198,7 +218,7 @@ export function createBusStopDiscovery({ tflAdapter, naptanAdapter, londonCovera
         };
       }
     }
-    if (!insideLondon) result = await enrichPreparedStopSidecars(result, naptanAdapter, { forceRefresh: options.forceRefresh });
+    if (!insideLondon) result = await enrichPreparedStopSidecars(result, referenceData, naptanAdapter, { forceRefresh: options.forceRefresh });
     if (!result?.provenance) return result;
     return Object.freeze({
       ...result,

@@ -12,6 +12,7 @@ const APP_VERSION = '2.0.0-alpha.15';
 const UPDATE_BUS_DATA_PATH = path.join('tools', 'atlas-bus-data', 'UPDATE ATLAS BUS DATA.bat');
 const STATUS_PATH = '/__atlas-review/status';
 const STOP_PATH = '/__atlas-review/stop';
+const V2_DATA_PATH = '/__atlas-review/v2-data/';
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
 const ALLOWED_ROOTS = Object.freeze(['assets', 'atlas', 'config', 'data', 'modules', 'src']);
 const MIME_TYPES = Object.freeze({
@@ -144,7 +145,20 @@ async function resolveStaticFile(rootDir, pathname) {
   return details.isFile() ? { file: candidateReal, size: details.size } : null;
 }
 
-function createRequestHandler({ rootDir, rootId, stopToken, closeServer, updaterLauncher = launchBusUpdater }) {
+async function resolveExternalDataFile(dataRoot, pathname) {
+  if (!dataRoot || !pathname.startsWith(V2_DATA_PATH)) return null;
+  const relative = pathname.slice(V2_DATA_PATH.length);
+  if (!relative || relative.split('/').some(part => !part || part === '.' || part === '..' || part.startsWith('.'))) return null;
+  const resolvedRoot = await realpath(dataRoot);
+  const candidate = path.resolve(resolvedRoot, ...relative.split('/'));
+  let candidateReal;
+  try { candidateReal = await realpath(candidate); } catch { return null; }
+  if (candidateReal !== resolvedRoot && !candidateReal.startsWith(`${resolvedRoot}${path.sep}`)) return null;
+  const details = await stat(candidateReal);
+  return details.isFile() ? { file: candidateReal, size: details.size } : null;
+}
+
+function createRequestHandler({ rootDir, rootId, v2DataRoot = null, v2RootId = null, stopToken, closeServer, updaterLauncher = launchBusUpdater }) {
   return async (request, response) => {
     const method = request.method || 'GET';
     let pathname;
@@ -153,7 +167,7 @@ function createRequestHandler({ rootDir, rootId, stopToken, closeServer, updater
 
     if (pathname === STATUS_PATH && method === 'GET') {
       response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-      return response.end(JSON.stringify({ appId: APP_ID, version: APP_VERSION, rootId }));
+      return response.end(JSON.stringify({ appId: APP_ID, version: APP_VERSION, rootId, v2RootId }));
     }
     if (pathname === STOP_PATH && method === 'POST') {
       if (!safeTokenMatch(stopToken, request.headers['x-atlas-review-token'])) return plainResponse(response, 403, 'ATLAS review stop request was not recognised.');
@@ -174,7 +188,7 @@ function createRequestHandler({ rootDir, rootId, stopToken, closeServer, updater
     if (!['GET', 'HEAD'].includes(method)) return plainResponse(response, 405, 'This ATLAS review action is not available.');
 
     let resolved;
-    try { resolved = await resolveStaticFile(rootDir, pathname); }
+    try { resolved = await resolveExternalDataFile(v2DataRoot, pathname) || await resolveStaticFile(rootDir, pathname); }
     catch { return plainResponse(response, 500, 'ATLAS could not open this review file. Please try again.'); }
     if (!resolved) return plainResponse(response, 404, 'ATLAS review page not found.');
     if (resolved.redirect) {
@@ -226,15 +240,17 @@ export async function startReviewServer({
   preferredPort = 8769,
   maximumPort = 8789,
   stateFile = reviewStateFile(rootDir),
+  v2DataRoot = null,
   openBrowser = true,
   updaterLauncher = launchBusUpdater
 } = {}) {
   const resolvedRoot = path.resolve(rootDir);
+  const resolvedV2DataRoot = v2DataRoot ? path.resolve(v2DataRoot) : null;
   if (!existsSync(path.join(resolvedRoot, 'atlas', 'index.html'))) throw new Error('ATLAS application files were not found.');
   const rootId = rootIdentifier(resolvedRoot);
   const existing = await readState(stateFile);
-  if (await probeReview(existing, rootId)) {
-    const url = `http://127.0.0.1:${existing.port}/atlas/#modules`;
+  if (await probeReview(existing, rootId) && (!resolvedV2DataRoot || existing.v2RootId === rootIdentifier(resolvedV2DataRoot))) {
+    const url = `http://127.0.0.1:${existing.port}/atlas/${resolvedV2DataRoot ? '?review=v2' : ''}#modules`;
     if (openBrowser) openDefaultBrowser(url);
     return { reused: true, port: existing.port, url, stateFile, closed: Promise.resolve() };
   }
@@ -245,10 +261,11 @@ export async function startReviewServer({
   let resolveClosed;
   const closed = new Promise(resolve => { resolveClosed = resolve; });
   const closeServer = () => { if (server?.listening) server.close(); else resolveClosed(); };
-  server = createServer(createRequestHandler({ rootDir: resolvedRoot, rootId, stopToken, closeServer, updaterLauncher }));
+  const v2RootId = resolvedV2DataRoot ? rootIdentifier(resolvedV2DataRoot) : null;
+  server = createServer(createRequestHandler({ rootDir: resolvedRoot, rootId, v2DataRoot: resolvedV2DataRoot, v2RootId, stopToken, closeServer, updaterLauncher }));
   const port = await listen(server, preferredPort, maximumPort);
-  const url = `http://127.0.0.1:${port}/atlas/#modules`;
-  await writeState(stateFile, { appId: APP_ID, version: APP_VERSION, rootId, port, processId: process.pid, stopToken, startedAt: new Date().toISOString() });
+  const url = `http://127.0.0.1:${port}/atlas/${resolvedV2DataRoot ? '?review=v2' : ''}#modules`;
+  await writeState(stateFile, { appId: APP_ID, version: APP_VERSION, rootId, v2RootId, port, processId: process.pid, stopToken, startedAt: new Date().toISOString() });
 
   server.on('close', async () => {
     const current = await readState(stateFile);

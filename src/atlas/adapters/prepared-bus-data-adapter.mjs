@@ -294,13 +294,31 @@ export function createPreparedBusDataAdapter({
     if (!manifestResult.ok) return manifestResult;
     const index = manifestResult.data;
     if (index.schema !== 'atlas-prepared-bus-data-v2') return sourceSuccess({ data: [], warnings: ['Prepared v1 data does not contain NPTG locality sidecars.'], provenance: { source: STOP_SOURCE, localityAvailable: false } });
-    const keys = [...new Set((stops ?? []).map(stop => String(stop.nptgLocalityCode ?? '').slice(0, Number(index.localityShardKeyLength || 3))).filter(Boolean))];
+    const shardKey = code => String(code ?? '').slice(0, Number(index.localityShardKeyLength || 3));
+    const keys = [...new Set((stops ?? []).map(stop => shardKey(stop.nptgLocalityCode)).filter(Boolean))];
     const paths = keys.map(key => index.localityShards?.[key]).filter(Boolean);
     const responses = await Promise.all(paths.map(path => loadJson(path, forceRefresh)));
     if (responses.some(response => !response.ok) || responses.some(response => response.data?.schema !== 'atlas-prepared-nptg-localities-v1' || !Array.isArray(response.data?.localities))) return sourceFailure({ code: 'invalid_response', message: 'NPTG locality data could not be safely interpreted.', provenance: { source: STOP_SOURCE, localityAvailable: true } });
     const wanted = new Set((stops ?? []).map(stop => `nptg:${stop.nptgLocalityCode}`).filter(id => id !== 'nptg:'));
-    const localities = responses.flatMap(response => response.data.localities).filter(locality => wanted.has(locality.id)).sort((a, b) => a.id.localeCompare(b.id));
-    return sourceSuccess({ data: localities, provenance: { source: STOP_SOURCE, localityAvailable: true, resultCount: localities.length } });
+    const direct = responses.flatMap(response => response.data.localities).filter(locality => wanted.has(locality.id));
+    const parentIds = new Set(direct.map(locality => String(locality.parentLocalityId ?? '')).filter(Boolean));
+    const loaded = new Map(responses.flatMap(response => response.data.localities).map(locality => [String(locality.id), locality]));
+    const parentKeys = [...new Set([...parentIds].map(id => shardKey(id.replace(/^nptg:/, ''))).filter(key => key && !keys.includes(key)))];
+    const parentPaths = parentKeys.map(key => index.localityShards?.[key]).filter(Boolean);
+    if (parentPaths.length) {
+      const parentResponses = await Promise.all(parentPaths.map(path => loadJson(path, forceRefresh)));
+      if (parentResponses.some(response => !response.ok) || parentResponses.some(response => response.data?.schema !== 'atlas-prepared-nptg-localities-v1' || !Array.isArray(response.data?.localities))) return sourceFailure({ code: 'invalid_response', message: 'NPTG parent-locality data could not be safely interpreted.', provenance: { source: STOP_SOURCE, localityAvailable: true } });
+      for (const locality of parentResponses.flatMap(response => response.data.localities)) loaded.set(String(locality.id), locality);
+    }
+    const localities = direct.map(locality => {
+      const parent = loaded.get(String(locality.parentLocalityId ?? '')) || null;
+      return {
+        ...locality,
+        ...(parent || locality.parentLocalityName ? { parentLocalityName: parent?.name || locality.parentLocalityName || null } : {}),
+        ...(parent ? { parentLocality: parent } : {})
+      };
+    }).sort((a, b) => a.id.localeCompare(b.id));
+    return sourceSuccess({ data: localities, provenance: { source: STOP_SOURCE, localityAvailable: true, resultCount: localities.length, parentLocalityRecordsLoaded: [...loaded.values()].filter(locality => parentIds.has(String(locality.id))).length } });
   }
 
   return Object.freeze({ id: 'prepared-national-bus-data-v1-v2-compatible', manifest, nearbyStops, servicesForStops, logicalGroupsForStops, localitiesForStops });

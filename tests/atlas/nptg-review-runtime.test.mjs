@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { createAtlasReferenceData } from '../../src/atlas/reference-data/atlas-reference-data.mjs';
 import { createBusStopDiscovery } from '../../src/atlas/application/bus-stop-discovery.mjs';
+import { buildServiceSummaries } from '../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildPlannerBusServiceSummaries } from '../../src/atlas/domain/bus-planner-summary.mjs';
 
 const stops = [
   { id: '2100A', name: 'Stop A', logicalGroupRefs: [{ id: 'naptan:210G1' }, { id: 'naptan:210G2' }], nptgLocalityCode: 'E001', routes: ['10'], timetableAuthority: 'NaPTAN' },
@@ -41,4 +43,14 @@ assert.equal(result.data[1].districtName, null);
 assert.deepEqual(result.data.map(stop => stop.routes), [['10'], ['10']]);
 assert.equal(result.provenance.referenceData.referenceDataSchema, 'atlas-reference-data-v1');
 assert.equal(result.provenance.referenceData.provider, 'prepared-fixture');
+
+const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const service = { id: 'service-10', routeNumber: '10', operator: 'Example Operator', origin: 'Town', destination: 'City', direction: 'N', circular: false, stopSchedules: Object.fromEntries(stops.map((stop, index) => [stop.id, Object.fromEntries(days.map(day => [day, [480 + index * 60]]))])) };
+const semantic = rows => rows.map(row => ({ routeNumber: row.routeNumber, operator: row.operator, stopIds: row.stopIds, frequencyByDay: row.frequencyByDay, operatingPeriods: row.operatingPeriods, calendarProfileId: row.calendarProfileId, publicRouteFamilyKey: row.publicRouteFamilyKey, circular: row.circular }));
+const v1Rows = buildPlannerBusServiceSummaries(buildServiceSummaries(stops, [service]), stops);
+const v2Rows = buildPlannerBusServiceSummaries(buildServiceSummaries(result.data, [service]), result.data);
+assert.deepEqual(semantic(v2Rows), semantic(v1Rows));
+assert.equal(v2Rows[0].operator, 'Example Operator');
+assert.equal(v2Rows[0].publicRouteFamilyKey, v1Rows[0].publicRouteFamilyKey);
+assert.equal(v2Rows[0].circular, false);
 console.log('PASS NPTG review runtime - provider-neutral evidence, hierarchy, unresolved locality, plural refs and physical StopPoint identity are deterministic.');

@@ -23,6 +23,9 @@ try {
   const app = await readFile(new URL('../../atlas/assets/js/app.mjs', import.meta.url), 'utf8');
   assert.match(app, /searchParams\.get\('review'\) === 'v2'/);
   assert.match(review.url, /review=v2/);
+  const launcher = await readFile(new URL('../../tools/atlas-review/v2-review.mjs', import.meta.url), 'utf8');
+  assert.match(launcher, /--acquisition-disabled/);
+  assert.doesNotMatch(launcher, /workflow\s+run|pages\s+deploy|publish/i);
 } finally {
   await review.close();
   await rm(temporary, { recursive: true, force: true });

@@ -102,7 +102,7 @@ export async function resolveCandidateTimestamp(candidateSite) {
     readJson(candidateSite, TNDS_MANIFEST_RELATIVE_PATH),
     readJson(candidateSite, STATUS_MANIFEST_RELATIVE_PATH)
   ]);
-  if (bus.schema !== 'atlas-prepared-bus-data-v1') throw new Error('Bus candidate manifest schema is invalid.');
+  if (!['atlas-prepared-bus-data-v1', 'atlas-prepared-bus-data-v2'].includes(bus.schema)) throw new Error('Bus candidate manifest schema is invalid.');
   if (tnds.schema !== 'atlas-prepared-bus-tnds-v1') throw new Error('TNDS candidate manifest schema is invalid.');
   if (status.schema !== 'atlas-bus-refresh-status-v1' || status.status !== 'validated' || status.validation !== 'passed') throw new Error('Candidate status manifest does not prove successful validation.');
   const busAt = normaliseCandidateTimestamp(bus.generatedAt, 'Bus candidate generatedAt');

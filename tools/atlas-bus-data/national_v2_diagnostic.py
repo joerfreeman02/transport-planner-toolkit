@@ -510,6 +510,15 @@ def source_window(v2_manifest: dict, shadow_bods: dict) -> dict:
     return {"expectedBodsRegionHashes": expected, "shadowBodsRegionHashes": received, "unchangedRegions": sorted(set(expected) - set(changed)), "changedRegions": changed, "classification": "SAME_WINDOW" if not changed else "SOURCE_WINDOW_CHANGED"}
 
 
+def candidate_bods_service_count(v2_manifest: dict) -> int:
+    return sum(int(region.get("serviceCount", 0) or 0) for region in v2_manifest.get("sources", {}).get("bods", {}).get("regions", []))
+
+
+def candidate_bods_source_hash(v2_manifest: dict) -> str | None:
+    bods = v2_manifest.get("sources", {}).get("bods", {})
+    return bods.get("sourceHash") or bods.get("sha256")
+
+
 def build_shadow_v1(candidate: Path, temp: Path, v2_manifest: dict, status: dict, same_window_bods_dir: Path | None = None) -> tuple[Path, dict, dict, dict]:
     shadow_root = temp / "shadow-v1"
     staging = temp / "shadow-sources"
@@ -666,7 +675,7 @@ def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, 
         "sourceHashes": {
             "naptanXml": status.get("sources", {}).get("naptan", {}).get("sourceHash"),
             "nptgXml": status.get("sources", {}).get("nptg", {}).get("sourceHash"),
-            "bods": v2_manifest.get("sources", {}).get("bods", {}).get("sourceHash"),
+            "bods": candidate_bods_source_hash(v2_manifest),
         },
     }
     acceptance_gates = {
@@ -692,7 +701,7 @@ def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, 
             "unresolvedRowCount": sum(row["classification"] == "unresolved" for row in stop_parity["coordinateDeltaSummary"]["forensicRows"]),
         },
         "sourceAnomaliesClassified": {"satisfied": bool(source_anomaly_summary), "summary": source_anomaly_summary},
-        "baselineSanity": {"satisfied": True, "evidence": {"activeStopPointCount": v2_manifest.get("counts", {}).get("activeStopPointCount"), "serviceCount": v2_manifest.get("sources", {}).get("bods", {}).get("preparedCount", {}).get("services")}},
+        "baselineSanity": {"satisfied": True, "evidence": {"activeStopPointCount": v2_manifest.get("counts", {}).get("activeStopPointCount"), "serviceCount": candidate_bods_service_count(v2_manifest)}},
         "capacity": {"satisfied": bool(fresh_measurement.get("allFilesBelowGitBlobCeiling")), "allFilesBelowGitBlobCeiling": fresh_measurement.get("allFilesBelowGitBlobCeiling"), "fileCount": fresh_measurement.get("fileCount"), "onDiskBytes": fresh_measurement.get("onDiskBytes")},
         "deterministicRegression": {"satisfied": True, "evidence": "workflow deterministic ATLAS suite completed before diagnostic"},
         "physicalComparisonTruthful": {"satisfied": stop_parity["comparisonClassification"] == PHYSICAL_COMPARISON_CLASSIFICATION, "classification": stop_parity["comparisonClassification"]},

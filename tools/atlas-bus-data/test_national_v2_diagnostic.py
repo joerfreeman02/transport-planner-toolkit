@@ -71,6 +71,18 @@ def make_tree(root: Path, schema: str, v2: bool, nested: bool = True) -> None:
 
 
 class NationalDiagnosticTests(unittest.TestCase):
+    def test_candidate_bods_manifest_fallbacks_feed_acceptance_evidence(self):
+        manifest = {
+            "sources": {
+                "bods": {
+                    "sha256": "bods-sha",
+                    "regions": [{"region": "all", "serviceCount": 39711}, {"region": "other", "serviceCount": 2}],
+                },
+            },
+        }
+        self.assertEqual(diagnostic.candidate_bods_service_count(manifest), 39713)
+        self.assertEqual(diagnostic.candidate_bods_source_hash(manifest), "bods-sha")
+
     def test_complete_stop_and_service_comparison(self):
         left = {"A": {field: value for field, value in zip(STOP_FIELDS, stop("A", STOP_FIELDS, False))}, "B": {field: value for field, value in zip(STOP_FIELDS, stop("B", STOP_FIELDS, False))}}
         right = {key: {**value, "nptgLocalityCode": "E001"} for key, value in left.items()}

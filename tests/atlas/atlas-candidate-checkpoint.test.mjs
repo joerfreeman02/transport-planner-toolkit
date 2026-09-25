@@ -67,6 +67,9 @@ const tndsMeasurement = await measurePublicationTree(path.join(candidate, 'atlas
 await fs.writeFile(path.join(candidate, 'atlas', 'config', 'atlas-candidate-measurement.json'), JSON.stringify({ diagnosticSchema: 'atlas-publication-capacity-diagnostic-v3', bus: { sha256: busMeasurement.sha256, fitsSafeLimit: true }, tnds: { sha256: tndsMeasurement.sha256, proposedPublication: { allRootsFitSafeLimit: true } } }));
 
 assert.equal(await resolveCandidateTimestamp(candidate), generatedAt);
+await fs.writeFile(path.join(candidate, 'atlas', 'data', 'bus', 'manifest.json'), JSON.stringify({ schema: 'atlas-prepared-bus-data-v2', generatedAt, serviceShards: { fixture: ['services/bus.json'] } }));
+assert.equal(await resolveCandidateTimestamp(candidate), generatedAt, 'v2 Bus candidates must participate in checkpoint timestamp validation');
+await fs.writeFile(path.join(candidate, 'atlas', 'data', 'bus', 'manifest.json'), JSON.stringify({ schema: 'atlas-prepared-bus-data-v1', generatedAt, refreshAfterDays: 8, serviceShards: { fixture: ['services/bus.json'] } }));
 const statusPath = path.join(candidate, 'atlas', 'data', 'status', 'manifest.json');
 await fs.writeFile(statusPath, JSON.stringify({ schema: 'atlas-bus-refresh-status-v1', status: 'validated', validation: 'passed', successfulRefreshAt: '' }));
 await assert.rejects(() => resolveCandidateTimestamp(candidate), /successfulRefreshAt/);

@@ -176,6 +176,25 @@ class PreparedDataV2ParserTests(unittest.TestCase):
         self.assertEqual(v2.stops["999000001"]["coordinateMethod"], "NaPTAN British National Grid converted to WGS84")
         self.assertEqual((v2.stops["999000001"]["latitude"], v2.stops["999000001"]["longitude"]), (v1["999000001"]["latitude"], v1["999000001"]["longitude"]))
 
+    def test_material_coordinate_conflict_is_bounded_qa_and_wgs84_remains_selected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "conflict.xml"
+            source.write_text(
+                '<NaPTAN SchemaVersion="2.4"><StopPoint><AtcoCode>999000010</AtcoCode>'
+                '<Descriptor><CommonName>Conflict stop</CommonName></Descriptor>'
+                '<Place><Location><Translation><Latitude>51.600</Latitude><Longitude>-0.2000</Longitude>'
+                '<Easting>530000</Easting><Northing>180000</Northing></Translation></Location></Place>'
+                '<StopClassification><StopType>BCT</StopType></StopClassification></StopPoint></NaPTAN>',
+                encoding="utf-8",
+            )
+            result = V2.parse_naptan_xml(source)
+            self.assertEqual(result.qa["materialCoordinateConflictThresholdMetres"], 25.0)
+            self.assertEqual(result.qa["materialCoordinateConflictCount"], 1)
+            self.assertEqual(len(result.qa["materialCoordinateConflictSamples"]), 1)
+            self.assertEqual(result.qa["materialCoordinateConflictSamples"][0]["id"], "999000010")
+            self.assertEqual(result.stops["999000010"]["coordinateMethod"], "NaPTAN WGS84")
+            self.assertNotIn("_coordinateConflict", result.stops["999000010"])
+
     def test_cli_schema_contract_does_not_require_legacy_naptan_for_v2(self):
         python = sys.executable
         builder = str(BUILDER_PATH)
@@ -210,7 +229,7 @@ class PreparedDataV2ParserTests(unittest.TestCase):
             V2.parse_naptan_xml(FIXTURES / "malformed-root.xml")
 
     def test_v2_builder_emits_bounded_sidecars_and_reuses_service_semantics(self):
-        with tempfile.TemporaryDirectory(dir=Path(__file__).parents[2]) as temporary:
+        with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             gtfs = root / "gtfs"
             gtfs.mkdir()

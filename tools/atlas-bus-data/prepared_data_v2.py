@@ -25,6 +25,8 @@ GROUP_SCHEMA = "atlas-prepared-logical-groups-v1"
 LOCALITY_SCHEMA = "atlas-prepared-nptg-localities-v1"
 SUPPORTED_SCHEMA_MAJOR = "2"
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$")
+MATERIAL_COORDINATE_CONFLICT_THRESHOLD_METRES = 25.0
+MAX_COORDINATE_CONFLICT_SAMPLES = 20
 
 STOP_TYPE_MODES = {
     "BCT": "bus_coach", "BCS": "bus_coach", "BCQ": "bus_coach",
@@ -105,22 +107,53 @@ def british_national_grid_to_wgs84(easting: float, northing: float) -> tuple[flo
     return convert(easting, northing)
 
 
-def parse_coordinate(element: ET.Element) -> dict | None:
+def _valid_wgs84(latitude: float | None, longitude: float | None) -> bool:
+    return latitude is not None and longitude is not None and -90 <= latitude <= 90 and -180 <= longitude <= 180
+
+
+def _coordinate_distance_metres(first: dict, second: dict) -> float:
+    lat1, lon1 = math.radians(first["latitude"]), math.radians(first["longitude"])
+    lat2, lon2 = math.radians(second["latitude"]), math.radians(second["longitude"])
+    dlat, dlon = lat2 - lat1, lon2 - lon1
+    value = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    return 6371008.8 * 2 * math.asin(math.sqrt(value))
+
+
+def parse_coordinate_details(element: ET.Element) -> tuple[dict | None, dict | None]:
     latitude = parse_float(child_text(element, "Latitude"))
     longitude = parse_float(child_text(element, "Longitude"))
-    if latitude is not None and longitude is not None and -90 <= latitude <= 90 and -180 <= longitude <= 180:
-        return {"latitude": round(latitude, 7), "longitude": round(longitude, 7), "coordinateMethod": "NaPTAN WGS84"}
+    supplied = {"latitude": round(latitude, 7), "longitude": round(longitude, 7), "coordinateMethod": "NaPTAN WGS84"} if _valid_wgs84(latitude, longitude) else None
     easting = parse_float(child_text(element, "Easting"))
     northing = parse_float(child_text(element, "Northing"))
     if easting is None or northing is None:
-        return None
+        return supplied, None
     try:
-        latitude, longitude = british_national_grid_to_wgs84(easting, northing)
+        converted_latitude, converted_longitude = british_national_grid_to_wgs84(easting, northing)
     except (SourceParseError, ValueError, OverflowError):
-        return None
-    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
-        return None
-    return {"latitude": round(latitude, 7), "longitude": round(longitude, 7), "coordinateMethod": "NaPTAN British National Grid converted to WGS84"}
+        return supplied, None
+    if not _valid_wgs84(converted_latitude, converted_longitude):
+        return supplied, None
+    converted = {"latitude": round(converted_latitude, 7), "longitude": round(converted_longitude, 7), "coordinateMethod": "NaPTAN British National Grid converted to WGS84"}
+    selected = supplied or converted
+    conflict = None
+    if supplied is not None:
+        distance = _coordinate_distance_metres(supplied, converted)
+        if distance > MATERIAL_COORDINATE_CONFLICT_THRESHOLD_METRES:
+            conflict = {
+                "distanceMetres": round(distance, 3),
+                "thresholdMetres": MATERIAL_COORDINATE_CONFLICT_THRESHOLD_METRES,
+                "selectedMethod": selected["coordinateMethod"],
+                "wgs84": {"latitude": supplied["latitude"], "longitude": supplied["longitude"]},
+                "bngConvertedWgs84": {"latitude": converted["latitude"], "longitude": converted["longitude"]},
+                "easting": easting,
+                "northing": northing,
+            }
+    return selected, conflict
+
+
+def parse_coordinate(element: ET.Element) -> dict | None:
+    coordinate, _ = parse_coordinate_details(element)
+    return coordinate
 
 
 def record_modification_datetime(element: ET.Element) -> str | None:
@@ -197,7 +230,7 @@ def _parse_stop_point(element: ET.Element, version: str) -> tuple[dict | None, s
     stop_id = child_text(element, "AtcoCode", "ATCOCode", "StopPointCode")
     name = child_text(element, "CommonName", "Name")
     stop_type = child_text(element, "StopType")
-    coordinate = parse_coordinate(element)
+    coordinate, coordinate_conflict = parse_coordinate_details(element)
     if not stop_id or not valid_id(stop_id):
         return None, "malformed_identity"
     if not name or not stop_type:
@@ -241,6 +274,7 @@ def _parse_stop_point(element: ET.Element, version: str) -> tuple[dict | None, s
         "localityResolution": "unresolved" if locality_code else "not-provided",
         "logicalGroupRefs": [unique_refs[key] for key in sorted(unique_refs)],
         "_duplicateLogicalGroupRefCount": len(refs) - len(unique_refs),
+        "_coordinateConflict": {"id": stop_id, "name": name, **coordinate_conflict} if coordinate_conflict else None,
         "routes": set(),
         "status": status_of(element),
         "provenance": {"source": "NaPTAN", "schemaVersion": version, "recordId": stop_id},
@@ -295,6 +329,7 @@ def parse_naptan_xml(path: str | Path) -> NaptanParseResult:
     groups: dict[str, dict] = {}
     issues: list[dict] = []
     counts = Counter()
+    coordinate_conflict_samples: list[dict] = []
     try:
         events = ET.iterparse(source, events=("start", "end"))
         root = None
@@ -313,6 +348,11 @@ def parse_naptan_xml(path: str | Path) -> NaptanParseResult:
                 counts["stopPointRecords"] += 1
                 if record:
                     counts["duplicateMembershipCount"] += record.pop("_duplicateLogicalGroupRefCount", 0)
+                    coordinate_conflict = record.pop("_coordinateConflict", None)
+                    if coordinate_conflict:
+                        counts["materialCoordinateConflictCount"] += 1
+                        if len(coordinate_conflict_samples) < MAX_COORDINATE_CONFLICT_SAMPLES:
+                            coordinate_conflict_samples.append(coordinate_conflict)
                     mode = str(record.get("transportMode") or "unknown")
                     counts["validSourceStopPointCount"] += 1
                     counts[f"valid{mode.title().replace('_', '')}SourceStopPointCount"] += 1
@@ -411,6 +451,9 @@ def parse_naptan_xml(path: str | Path) -> NaptanParseResult:
         "malformedRecordCount": sum(1 for issue in issues if issue["kind"].startswith("malformed")),
         "malformed_stop_point": sum(1 for issue in issues if issue["kind"].startswith("malformed")),
         "unsupportedStructureCount": 0,
+        "materialCoordinateConflictThresholdMetres": MATERIAL_COORDINATE_CONFLICT_THRESHOLD_METRES,
+        "materialCoordinateConflictCount": counts.get("materialCoordinateConflictCount", 0),
+        "materialCoordinateConflictSamples": coordinate_conflict_samples,
     }
     return NaptanParseResult(stops, groups, source_metadata(source, root, version), qa, issues)
 

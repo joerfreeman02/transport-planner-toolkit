@@ -19,13 +19,21 @@ on:
         default: ''
         type: string
       prepared_schema:
-        description: 'Prepared-data schema. v2 is diagnostic-only and cannot publish.'
+        description: 'Prepared-data schema. v2 defaults to diagnostic mode.'
         required: false
         default: v1
         type: choice
         options:
           - v1
           - v2
+      v2_execution_mode:
+        description: 'v2 execution mode; production-candidate uses the complete Bus/TNDS candidate path.'
+        required: false
+        default: diagnostic
+        type: choice
+        options:
+          - diagnostic
+          - production-candidate
       v2_source_snapshot_run_id:
         description: Exact prior source workflow run ID for frozen diagnostic reuse.
         required: false
@@ -62,8 +70,8 @@ jobs:
         run: |
           echo '::error::Cross-run checkpoint resume is allowed only from refs/heads/main.'
           exit 1
-      - name: Refuse v2 outside diagnostic-only execution
-        if: inputs.prepared_schema == 'v2' && github.ref == 'refs/heads/main' && inputs.measure_only != true
+      - name: Refuse v2 outside enabled production-candidate execution
+        if: (inputs.prepared_schema || vars.ATLAS_PRODUCTION_PREPARED_SCHEMA || 'v1') == 'v2' && github.ref == 'refs/heads/main' && inputs.measure_only != true && ((inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic') != 'production-candidate' || vars.ATLAS_ENABLE_V2_PRODUCTION != 'true')
         run: |
           echo '::error::Prepared-data v2 is diagnostic-only; measure_only=true is required on main and publication is disabled.'
           exit 1
@@ -78,7 +86,7 @@ jobs:
   freshness:
     name: Check weekly Bus refresh freshness
     needs: main-guard
-    if: inputs.prepared_schema != 'v2'
+    if: (inputs.prepared_schema || vars.ATLAS_PRODUCTION_PREPARED_SCHEMA || 'v1') != 'v2'
     runs-on: ubuntu-latest
     outputs:
       refresh_required: ${{ steps.decision.outputs.refresh_required }}
@@ -94,15 +102,15 @@ jobs:
       - name: Decide whether a full refresh is required
         id: decision
         env:
-          FORCE_REFRESH: ${{ (github.event_name == 'workflow_dispatch' && (inputs.force_refresh || inputs.resume_checkpoint_run_id != '' || inputs.prepared_schema == 'v2')) || (github.event_name == 'schedule') }}
+          FORCE_REFRESH: ${{ (github.event_name == 'workflow_dispatch' && (inputs.force_refresh || inputs.resume_checkpoint_run_id != '' || inputs.prepared_schema == 'v2' || (inputs.prepared_schema || vars.ATLAS_PRODUCTION_PREPARED_SCHEMA || 'v1') == 'v2')) || (github.event_name == 'schedule') }}
         run: node tools/atlas-bus-data/refresh-freshness.mjs --status last-known-good/atlas/data/status/manifest.json --bus last-known-good/atlas/data/bus/manifest.json --tnds last-known-good/atlas/data/bus-tnds/manifest.json --force-refresh "$FORCE_REFRESH" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       - name: Record freshness decision
         run: echo "${{ steps.decision.outputs.message }}"
 
   build-validate:
     name: Build and validate Bus/TNDS candidate
-    needs: [main-guard, freshness]
-    if: inputs.prepared_schema != 'v2' && needs.freshness.result == 'success' && needs.freshness.outputs.refresh_required == 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    needs: [main-guard, freshness, reference-source]
+    if: always() && needs.main-guard.result == 'success' && (((inputs.prepared_schema || vars.ATLAS_PRODUCTION_PREPARED_SCHEMA || 'v1') != 'v2' && needs.freshness.result == 'success' && needs.freshness.outputs.refresh_required == 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')) || ((inputs.prepared_schema || vars.ATLAS_PRODUCTION_PREPARED_SCHEMA || 'v1') == 'v2' && (inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic') == 'production-candidate' && needs.reference-source.result == 'success' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')))
     runs-on: ubuntu-latest
     timeout-minutes: 180
     permissions:
@@ -111,6 +119,8 @@ jobs:
       id-token: write
     env:
       ATLAS_DIAGNOSTIC_ONLY: ${{ inputs.measure_only || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') }}
+      ATLAS_PREPARED_SCHEMA: ${{ inputs.prepared_schema || vars.ATLAS_PRODUCTION_PREPARED_SCHEMA || 'v1' }}
+      ATLAS_V2_EXECUTION_MODE: ${{ inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic' }}
       ATLAS_CHECKPOINT_PRODUCER_RUN_ID: ${{ inputs.resume_checkpoint_run_id || github.run_id }}
       ATLAS_CURRENT_CANDIDATE_CACHE_KEY: atlas-verified-candidate-checkpoint-v2-${{ github.run_id }}
       ATLAS_CANDIDATE_CACHE_KEY: atlas-verified-candidate-checkpoint-v2-${{ inputs.resume_checkpoint_run_id || github.run_id }}
@@ -127,6 +137,15 @@ jobs:
           rm -rf pages-site
           mkdir pages-site
           rsync -a --exclude='.git' --exclude='pages-site' --exclude='atlas/data/bus' --exclude='atlas/data/bus-tnds' ./ pages-site/
+      - name: Restore exact verified v2 source snapshot for production candidate
+        if: env.ATLAS_PREPARED_SCHEMA == 'v2' && env.ATLAS_V2_EXECUTION_MODE == 'production-candidate'
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.reference-source.outputs.snapshot_artifact }}
+          path: source-input
+      - name: Verify v2 source snapshot before full preparation
+        if: env.ATLAS_PREPARED_SCHEMA == 'v2' && env.ATLAS_V2_EXECUTION_MODE == 'production-candidate'
+        run: python tools/atlas-bus-data/source_snapshot.py --verify source-input/source-snapshot > source-input/verified-manifest.json
       - name: Require publication targets only for production
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
         run: |
@@ -179,30 +198,47 @@ jobs:
       - name: Acquire and build validated Bus/TNDS candidate
         if: github.ref != 'refs/heads/main' || inputs.measure_only == true || steps.checkpoint-restore.outputs.valid != 'true'
         env:
-          TNDS_USERNAME: ${{ inputs.prepared_schema != 'v2' && secrets.TNDS_USERNAME || '' }}
-          TNDS_PASSWORD: ${{ inputs.prepared_schema != 'v2' && secrets.TNDS_PASSWORD || '' }}
+          TNDS_USERNAME: ${{ (inputs.prepared_schema || vars.ATLAS_PRODUCTION_PREPARED_SCHEMA || 'v1') != 'v2' && secrets.TNDS_USERNAME || (inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic') == 'production-candidate' && secrets.TNDS_USERNAME || '' }}
+          TNDS_PASSWORD: ${{ (inputs.prepared_schema || vars.ATLAS_PRODUCTION_PREPARED_SCHEMA || 'v1') != 'v2' && secrets.TNDS_PASSWORD || (inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic') == 'production-candidate' && secrets.TNDS_PASSWORD || '' }}
           ATLAS_NODE: node
-        run: python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --previous-root last-known-good --prepared-schema "${{ inputs.prepared_schema || 'v1' }}" ${{ inputs.prepared_schema == 'v2' && '--bus-only-diagnostic' || '' }}
+        run: |
+          if [[ "$ATLAS_PREPARED_SCHEMA" == "v2" && "$ATLAS_V2_EXECUTION_MODE" == "production-candidate" ]]; then
+            python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --previous-root last-known-good --prepared-schema v2 --source-snapshot source-input/source-snapshot --acquisition-disabled
+          elif [[ "$ATLAS_PREPARED_SCHEMA" == "v2" ]]; then
+            python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --previous-root last-known-good --prepared-schema v2 --bus-only-diagnostic
+          else
+            python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --previous-root last-known-good --prepared-schema v1
+          fi
       - name: Validate fresh or restored candidate data
         id: candidate-validation
-        continue-on-error: ${{ inputs.prepared_schema == 'v2' }}
-        run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site ${{ inputs.prepared_schema == 'v2' && '--bus-only' || '' }}
+        continue-on-error: ${{ env.ATLAS_PREPARED_SCHEMA == 'v2' && env.ATLAS_V2_EXECUTION_MODE == 'diagnostic' }}
+        run: |
+          if [[ "$ATLAS_PREPARED_SCHEMA" == "v2" && "$ATLAS_V2_EXECUTION_MODE" == "diagnostic" ]]; then
+            python tools/atlas-bus-data/validate_candidate.py --site-root pages-site --bus-only
+          else
+            python tools/atlas-bus-data/validate_candidate.py --site-root pages-site
+          fi
       - name: Run deterministic ATLAS checks
         if: always()
         run: node tests/atlas/run-all.mjs
       - name: Measure candidate publication capacity
-        run: node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json ${{ inputs.prepared_schema == 'v2' && '--bus-only' || '' }}
+        run: |
+          if [[ "$ATLAS_PREPARED_SCHEMA" == "v2" && "$ATLAS_V2_EXECUTION_MODE" == "diagnostic" ]]; then
+            node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json --bus-only
+          else
+            node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json
+          fi
       - name: Write diagnostic source-cache manifest
-        if: inputs.prepared_schema == 'v2' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
+        if: inputs.prepared_schema == 'v2' && (inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic') == 'diagnostic' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
         run: |
           CANDIDATE_FINGERPRINT=$(node --input-type=module -e "import { computeCandidateGenerationCompatibilityFingerprint } from './tools/atlas-data-publication/candidate-compatibility.mjs'; console.log((await computeCandidateGenerationCompatibilityFingerprint({ rootDir: process.cwd() })).sha256)")
           python tools/atlas-bus-data/diagnostic_bus_cache.py --site-root pages-site --repository-sha "${{ github.sha }}" --fingerprint "$CANDIDATE_FINGERPRINT"
       - name: Run aggregate v2 structural scan
-        if: always() && inputs.prepared_schema == 'v2' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
+        if: always() && inputs.prepared_schema == 'v2' && (inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic') == 'diagnostic' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
         continue-on-error: true
         run: mkdir -p diagnostic-output && python tools/atlas-bus-data/structural_scan.py --site-root pages-site --output diagnostic-output/structural-scan.json
       - name: Probe TNDS metadata without archive transfer
-        if: always() && inputs.prepared_schema == 'v2' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
+        if: always() && inputs.prepared_schema == 'v2' && (inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic') == 'diagnostic' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
         continue-on-error: true
         env:
           TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
@@ -210,7 +246,7 @@ jobs:
         run: mkdir -p diagnostic-output && python tools/atlas-bus-data/tnds_capability_probe.py --output diagnostic-output/tnds-capability-probe.json
       - name: Run national v2 diagnostic and same-window shadow parity
         id: v2-diagnostic
-        if: always() && inputs.prepared_schema == 'v2' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
+        if: always() && inputs.prepared_schema == 'v2' && (inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic') == 'diagnostic' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
         continue-on-error: true
         run: |
           mkdir -p diagnostic-output
@@ -221,7 +257,7 @@ jobs:
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
           exit "$EXIT_CODE"
       - name: Assemble compact v2 diagnostic artifact
-        if: always() && inputs.prepared_schema == 'v2' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
+        if: always() && inputs.prepared_schema == 'v2' && (inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic') == 'diagnostic' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
         run: |
           rm -rf diagnostic-artifact
           mkdir -p diagnostic-artifact
@@ -234,14 +270,35 @@ jobs:
             exit 1
           fi
       - name: Upload v2 national diagnostic artifact
-        if: always() && inputs.prepared_schema == 'v2' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
+        if: always() && inputs.prepared_schema == 'v2' && (inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic') == 'diagnostic' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
         uses: actions/upload-artifact@v4
         with:
           name: atlas-v2-national-diagnostic-${{ github.run_id }}
           path: diagnostic-artifact
           if-no-files-found: warn
+      - name: Assemble production-candidate evidence artifact
+        if: always() && env.ATLAS_PREPARED_SCHEMA == 'v2' && env.ATLAS_V2_EXECUTION_MODE == 'production-candidate'
+        run: |
+          rm -rf production-candidate-artifact
+          mkdir -p production-candidate-artifact
+          cp -f pages-site/atlas/data/bus/manifest.json production-candidate-artifact/v2-bus-manifest.json 2>/dev/null || true
+          cp -f pages-site/atlas/data/bus-tnds/manifest.json production-candidate-artifact/v2-tnds-manifest.json 2>/dev/null || true
+          cp -f pages-site/atlas/data/status/manifest.json production-candidate-artifact/v2-refresh-status.json 2>/dev/null || true
+          cp -f pages-site/atlas/config/atlas-candidate-measurement.json production-candidate-artifact/atlas-candidate-measurement.json 2>/dev/null || true
+          cp -f source-input/verified-manifest.json production-candidate-artifact/verified-source-manifest.json 2>/dev/null || true
+          if find production-candidate-artifact -type f \( -name '*.xml' -o -name '*.csv' -o -name '*.zip' \) | grep -q .; then
+            echo 'Raw authoritative source material must not enter the production-candidate evidence artifact.'
+            exit 1
+          fi
+      - name: Upload production-candidate evidence artifact
+        if: always() && env.ATLAS_PREPARED_SCHEMA == 'v2' && env.ATLAS_V2_EXECUTION_MODE == 'production-candidate'
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-v2-production-candidate-${{ github.run_id }}
+          path: production-candidate-artifact
+          if-no-files-found: warn
       - name: Fail v2 diagnostic after evidence collection when hard validation failed
-        if: always() && inputs.prepared_schema == 'v2' && steps.candidate-validation.outcome == 'failure'
+        if: always() && inputs.prepared_schema == 'v2' && (inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic') == 'diagnostic' && steps.candidate-validation.outcome == 'failure'
         run: |
           echo 'The v2 hard validator failed; aggregate evidence was collected and the candidate remains non-publishable.'
           exit 1
@@ -330,7 +387,7 @@ jobs:
   deploy:
     name: Deploy validated Pages artifact
     needs: [main-guard, freshness, build-validate]
-    if: inputs.prepared_schema != 'v2' && needs.freshness.outputs.refresh_required == 'true' && needs.build-validate.result == 'success' && github.ref == 'refs/heads/main' && inputs.measure_only != true
+    if: (((inputs.prepared_schema || vars.ATLAS_PRODUCTION_PREPARED_SCHEMA || 'v1') != 'v2') || ((inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic') == 'production-candidate' && vars.ATLAS_ENABLE_V2_PRODUCTION == 'true')) && needs.freshness.outputs.refresh_required == 'true' && needs.build-validate.result == 'success' && github.ref == 'refs/heads/main' && inputs.measure_only != true
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -343,7 +400,7 @@ jobs:
   freshness-no-op:
     name: Confirm already-fresh Bus data
     needs: [main-guard, freshness, build-validate]
-    if: always() && inputs.prepared_schema != 'v2' && needs.main-guard.result == 'success' && needs.freshness.outputs.refresh_required == 'false' && github.ref == 'refs/heads/main'
+    if: always() && (inputs.prepared_schema || vars.ATLAS_PRODUCTION_PREPARED_SCHEMA || 'v1') != 'v2' && needs.main-guard.result == 'success' && needs.freshness.outputs.refresh_required == 'false' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - run: echo "${{ needs.freshness.outputs.message }}"
@@ -351,7 +408,7 @@ jobs:
   reference-source:
     name: Acquire or reuse exact v2 Bus source snapshot
     needs: main-guard
-    if: inputs.prepared_schema == 'v2' && github.event_name == 'workflow_dispatch' && needs.main-guard.result == 'success'
+    if: (inputs.prepared_schema || vars.ATLAS_PRODUCTION_PREPARED_SCHEMA || 'v1') == 'v2' && (github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') && needs.main-guard.result == 'success'
     uses: ./.github/workflows/atlas-reference-data-source.yml
     with:
       v2_source_snapshot_run_id: ${{ inputs.v2_source_snapshot_run_id }}
@@ -363,7 +420,7 @@ jobs:
   reference-diagnostic:
     name: Prepare and diagnose v2 Bus data
     needs: [main-guard, reference-source]
-    if: inputs.prepared_schema == 'v2' && needs.main-guard.result == 'success' && needs.reference-source.result == 'success'
+    if: (inputs.prepared_schema || vars.ATLAS_PRODUCTION_PREPARED_SCHEMA || 'v1') == 'v2' && (inputs.v2_execution_mode || vars.ATLAS_V2_EXECUTION_MODE || 'diagnostic') == 'diagnostic' && needs.main-guard.result == 'success' && needs.reference-source.result == 'success'
     uses: ./.github/workflows/atlas-reference-data-diagnostic.yml
     with:
       source_snapshot_artifact: ${{ needs.reference-source.outputs.snapshot_artifact }}

@@ -472,8 +472,8 @@ def run(args: argparse.Namespace) -> dict:
             raise RefreshError("--acquisition-disabled requires --source-snapshot")
         snapshot_manifest = None
         if snapshot_root:
-            if prepared_schema != "v2" or not bus_only:
-                raise RefreshError("--source-snapshot is supported only for the Bus-only prepared-data v2 path")
+            if prepared_schema != "v2":
+                raise RefreshError("--source-snapshot is supported only for prepared-data v2")
             naptan, nptg, gtfs, snapshot_manifest = materialise_for_preparation(snapshot_root, staging)
             entries = {item["path"]: item for item in snapshot_manifest["sources"]}
             naptan_entry = entries["sources/naptan.xml"]
@@ -494,8 +494,8 @@ def run(args: argparse.Namespace) -> dict:
             naptan_source = download(NAPTAN_URL, naptan, label="NaPTAN source")
             gtfs, bods = acquire_bods(staging)
         if getattr(args, "source_snapshot_output", None) and not snapshot_root:
-            if prepared_schema != "v2" or not bus_only:
-                raise RefreshError("--source-snapshot-output is supported only for the Bus-only prepared-data v2 path")
+            if prepared_schema != "v2":
+                raise RefreshError("--source-snapshot-output is supported only for prepared-data v2")
             snapshot_manifest = snapshot_from_staging(staging, Path(args.source_snapshot_output).resolve(), xml_sources=xml_sources, bods=bods, producer_workflow=os.environ.get("GITHUB_WORKFLOW"), run_id=os.environ.get("GITHUB_RUN_ID"), repository_commit_sha=os.environ.get("GITHUB_SHA"))
         tnds_xml = None
         tnds = None

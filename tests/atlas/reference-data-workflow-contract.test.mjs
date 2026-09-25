@@ -14,7 +14,9 @@ assert.match(top, /v2_source_snapshot_run_id:/);
 assert.match(top, /source_snapshot_artifact: \$\{\{ needs\.reference-source\.outputs\.snapshot_artifact \}\}/);
 assert.match(top, /source_snapshot_run_id: \$\{\{ github\.run_id \}\}/);
 assert.match(top, /secrets: inherit/);
-assert.match(top, /if: inputs\.prepared_schema != 'v2' && needs\.freshness\.result == 'success'/);
+assert.match(top, /if: \(inputs\.prepared_schema \|\| vars\.ATLAS_PRODUCTION_PREPARED_SCHEMA \|\| 'v1'\) != 'v2'/);
+assert.match(top, /needs: \[main-guard, freshness, reference-source\]/);
+assert.match(top, /Verify v2 source snapshot before full preparation/);
 
 assert.match(source, /workflow_call:/);
 assert.match(source, /v2_source_snapshot_run_id:/);

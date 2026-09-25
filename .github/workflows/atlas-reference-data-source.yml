@@ -1,0 +1,63 @@
+name: ATLAS reference data source
+
+on:
+  workflow_dispatch:
+    inputs:
+      prior_snapshot_artifact:
+        description: Optional prior verified source snapshot artifact
+        required: false
+        default: ''
+        type: string
+  workflow_call:
+    inputs:
+      prior_snapshot_artifact:
+        required: false
+        default: ''
+        type: string
+    outputs:
+      snapshot_artifact:
+        description: Name of the verified source snapshot artifact
+        value: atlas-reference-source-snapshot-${{ github.run_id }}
+
+permissions:
+  contents: read
+
+jobs:
+  acquire:
+    name: Inspect freshness and acquire Bus source snapshot
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Probe remote metadata without source transfer
+        run: |
+          mkdir -p source-probe
+          python tools/atlas-bus-data/source_freshness.py --output source-probe/freshness.json
+      - name: Restore prior snapshot for metadata-compatible reuse
+        if: inputs.prior_snapshot_artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.prior_snapshot_artifact }}
+          path: prior-source
+      - name: Reuse prior snapshot when every discriminator is reliable and unchanged
+        id: reuse
+        if: inputs.prior_snapshot_artifact != ''
+        continue-on-error: true
+        run: python tools/atlas-bus-data/source_snapshot.py --reuse-from prior-source/source-snapshot --freshness source-probe/freshness.json --output source-snapshot
+      - name: Acquire the authorised Bus source set once
+        if: steps.reuse.outputs.reused != 'true'
+        run: python tools/atlas-bus-data/source_snapshot.py --acquire --output source-snapshot
+      - name: Verify source snapshot provenance and hashes
+        run: python tools/atlas-bus-data/source_snapshot.py --verify source-snapshot
+      - name: Upload immutable source snapshot for preparation reuse
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-reference-source-snapshot-${{ github.run_id }}
+          path: |
+            source-snapshot
+            source-probe/freshness.json
+          if-no-files-found: error
+          retention-days: 14

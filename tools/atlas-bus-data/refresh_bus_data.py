@@ -22,6 +22,8 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from source_snapshot import materialise_for_preparation, snapshot_from_staging
+
 TNDS_REGIONS = ("EA", "EM", "NE", "NW", "SE", "SW", "WM", "Y")
 NAPTAN_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=csv"
 NAPTAN_XML_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"
@@ -449,13 +451,36 @@ def run(args: argparse.Namespace) -> dict:
     shutil.rmtree(staging, ignore_errors=True)
     staging.mkdir(parents=True)
     try:
-        if prepared_schema == "v2":
+        snapshot_root = Path(args.source_snapshot).resolve() if getattr(args, "source_snapshot", None) else None
+        if getattr(args, "acquisition_disabled", False) and not snapshot_root:
+            raise RefreshError("--acquisition-disabled requires --source-snapshot")
+        snapshot_manifest = None
+        if snapshot_root:
+            if prepared_schema != "v2" or not bus_only:
+                raise RefreshError("--source-snapshot is supported only for the Bus-only prepared-data v2 path")
+            naptan, nptg, gtfs, snapshot_manifest = materialise_for_preparation(snapshot_root, staging)
+            entries = {item["path"]: item for item in snapshot_manifest["sources"]}
+            naptan_entry = entries["sources/naptan.xml"]
+            nptg_entry = entries["sources/nptg.xml"]
+            naptan_source = {"identity": naptan_entry["sourceIdentity"], "sourceHash": naptan_entry["sha256"], "httpStatus": None, "contentType": "application/xml", "remoteMetadata": naptan_entry.get("remoteMetadata", {})}
+            xml_sources = {"naptan": naptan_source, "nptg": {"identity": nptg_entry["sourceIdentity"], "sourceHash": nptg_entry["sha256"], "httpStatus": None, "contentType": "application/xml", "remoteMetadata": nptg_entry.get("remoteMetadata", {})}}
+            bods_regions = []
+            for region in snapshot_manifest["regions"]:
+                entry = entries[f"sources/bods/{region}.zip"]
+                bods_regions.append({"region": region, "identity": entry["sourceIdentity"], "sourceHash": entry["sha256"], "sha256": entry["sha256"], "bytes": entry["bytes"], "remoteMetadata": entry.get("remoteMetadata", {}), "reused": True})
+            bods = {"identity": "verified source snapshot", "regions": bods_regions, "sourceHash": hashlib.sha256("".join(f"{item['region']}:{item['sourceHash']}" for item in bods_regions).encode("ascii")).hexdigest()}
+        elif prepared_schema == "v2":
             naptan, nptg, xml_sources = acquire_prepared_data_v2_sources(staging)
             naptan_source = xml_sources["naptan"]
+            gtfs, bods = acquire_bods(staging)
         else:
             naptan = staging / "naptan.csv"
             naptan_source = download(NAPTAN_URL, naptan, label="NaPTAN source")
-        gtfs, bods = acquire_bods(staging)
+            gtfs, bods = acquire_bods(staging)
+        if getattr(args, "source_snapshot_output", None) and not snapshot_root:
+            if prepared_schema != "v2" or not bus_only:
+                raise RefreshError("--source-snapshot-output is supported only for the Bus-only prepared-data v2 path")
+            snapshot_manifest = snapshot_from_staging(staging, Path(args.source_snapshot_output).resolve(), xml_sources=xml_sources, bods=bods, producer_workflow=os.environ.get("GITHUB_WORKFLOW"), run_id=os.environ.get("GITHUB_RUN_ID"))
         tnds_xml = None
         tnds = None
         if not bus_only:
@@ -499,6 +524,8 @@ def run(args: argparse.Namespace) -> dict:
             nptg_outcome, nptg_note = source_outcome(nptg_hash, previous_status.get("sources", {}).get("nptg"))
             sources["nptg"] = {"identity": NPTG_XML_URL, "checkedAt": started, "httpStatus": xml_sources["nptg"]["httpStatus"], "contentType": xml_sources["nptg"]["contentType"], "sourceHash": nptg_hash, "outcome": nptg_outcome, "format": "xml"}
             if nptg_note: sources["nptg"]["note"] = nptg_note
+        if snapshot_manifest:
+            sources["sourceSnapshot"] = {"schema": snapshot_manifest["schema"], "snapshotId": snapshot_manifest["snapshotId"], "state": snapshot_manifest["state"], "reused": bool(snapshot_root), "productionEligible": False}
         notes = [("naptan", naptan_note), ("bods", bods_note)]
         if not bus_only:
             notes.append(("tnds", tnds_note))
@@ -520,6 +547,9 @@ def main() -> None:
     parser.add_argument("--previous-root", help="Optional read-only copy of the last successful Pages deployment")
     parser.add_argument("--prepared-schema", choices=("v1", "v2"), default="v1", help="Prepared-data contract; v2 acquires XML NaPTAN and NPTG sources")
     parser.add_argument("--bus-only-diagnostic", action="store_true", help="Acquire and validate only the Bus v2 diagnostic; never contact TNDS FTP")
+    parser.add_argument("--source-snapshot", help="Verified ACQUIRED / UNINTERPRETED source snapshot to prepare without acquisition")
+    parser.add_argument("--source-snapshot-output", help="Write the freshly acquired v2 Bus sources as a reusable snapshot")
+    parser.add_argument("--acquisition-disabled", action="store_true", help="Fail closed unless an explicit verified source snapshot is supplied")
     args = parser.parse_args()
     try:
         print(json.dumps(run(args), indent=2))

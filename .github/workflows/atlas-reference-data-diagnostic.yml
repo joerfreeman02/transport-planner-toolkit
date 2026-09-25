@@ -1,0 +1,88 @@
+name: ATLAS reference data prepare and diagnostic
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_snapshot_artifact:
+        description: Existing verified source snapshot artifact name
+        required: true
+        type: string
+      measure_only:
+        description: Diagnostic-only execution; publication is permanently disabled
+        required: false
+        default: true
+        type: boolean
+  workflow_call:
+    inputs:
+      source_snapshot_artifact:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-diagnose:
+    name: Prepare from explicit source snapshot and diagnose
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Restore supplied source snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.source_snapshot_artifact }}
+          path: source-input
+      - name: Verify snapshot before interpretation
+        run: python tools/atlas-bus-data/source_snapshot.py --verify source-input/source-snapshot
+      - name: Restore last-known-good diagnostic comparison state
+        run: node tools/atlas-data-publication/fetch-last-known-good.mjs 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/' last-known-good
+      - name: Prepare Bus v2 with acquisition disabled
+        run: |
+          mkdir -p pages-site
+          python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --prepared-schema v2 --bus-only-diagnostic --source-snapshot source-input/source-snapshot --acquisition-disabled
+      - name: Run hard candidate validation (fail closed)
+        id: hard-validator
+        continue-on-error: true
+        run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site --bus-only
+      - name: Run aggregate diagnostics before final conclusion
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p diagnostic-output
+          python tools/atlas-bus-data/structural_scan.py --site-root pages-site --output diagnostic-output/structural-scan.json
+      - name: Probe TNDS metadata without archive transfer
+        if: always()
+        continue-on-error: true
+        run: python tools/atlas-bus-data/tnds_capability_probe.py --output diagnostic-output/tnds-capability-probe.json
+      - name: Run same-source-window parity and capacity diagnostics
+        if: always()
+        continue-on-error: true
+        run: |
+          CANDIDATE_FINGERPRINT=$(node --input-type=module -e "import { computeCandidateGenerationCompatibilityFingerprint } from './tools/atlas-data-publication/candidate-compatibility.mjs'; console.log((await computeCandidateGenerationCompatibilityFingerprint({ rootDir: process.cwd() })).sha256)")
+          python tools/atlas-bus-data/national_v2_diagnostic.py --candidate-site pages-site --previous-root last-known-good --report-dir diagnostic-output --candidate-fingerprint "$CANDIDATE_FINGERPRINT" --same-window-bods-dir source-input/source-snapshot/sources/bods --structural-report diagnostic-output/structural-scan.json
+      - name: Measure diagnostic candidate capacity
+        if: always()
+        continue-on-error: true
+        run: mkdir -p pages-site/atlas/config && node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json --bus-only
+      - name: Upload evidence-safe diagnostic artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-reference-diagnostic-${{ github.run_id }}
+          path: |
+            diagnostic-output
+            pages-site/atlas/data/bus/manifest.json
+            pages-site/atlas/data/status/manifest.json
+          if-no-files-found: warn
+      - name: Preserve fail-closed validator conclusion
+        if: steps.hard-validator.outcome == 'failure'
+        run: |
+          echo 'The hard validator failed; evidence was uploaded and this diagnostic remains non-publishable.'
+          exit 1

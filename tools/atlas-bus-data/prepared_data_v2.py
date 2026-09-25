@@ -502,7 +502,7 @@ def parse_nptg_xml(path: str | Path) -> NptgParseResult:
             cycles += 1
             issues.append({"kind": "cyclic_locality_parent", "id": code})
     missing_district_samples = [item["districtId"][5:] for item in localities.values() if item.get("districtId") and item["districtId"][5:] not in districts][:20]
-    qa = {**dict(sorted(counts.items())), "missingParentLocalityCount": missing_parent, "missingDistrictCount": missing_district, "missingDistrictSamples": missing_district_samples, "cyclicLocalityCount": cycles, "unsupportedStructureCount": 0, "districtReferencePolicy": "one-character district codes are valid; absent references remain unresolved source references"}
+    qa = {**dict(sorted(counts.items())), "missingParentLocalityCount": missing_parent, "missingDistrictCount": missing_district, "missingDistrictSamples": missing_district_samples, "cyclicLocalityCount": cycles, "unsupportedStructureCount": 0, "districtIds": sorted(districts), "malformedDistrictSamples": [issue for issue in issues if issue["kind"] == "malformed_district"][:20], "districtReferencePolicy": "one-character district codes are valid; absent references remain unresolved source references"}
     return NptgParseResult(localities, districts, source_metadata(source, root, version), qa, issues)
 
 

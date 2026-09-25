@@ -178,8 +178,11 @@ jobs:
           ATLAS_NODE: node
         run: python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --previous-root last-known-good --prepared-schema "${{ inputs.prepared_schema || 'v1' }}" ${{ inputs.prepared_schema == 'v2' && '--bus-only-diagnostic' || '' }}
       - name: Validate fresh or restored candidate data
+        id: candidate-validation
+        continue-on-error: ${{ inputs.prepared_schema == 'v2' }}
         run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site ${{ inputs.prepared_schema == 'v2' && '--bus-only' || '' }}
       - name: Run deterministic ATLAS checks
+        if: always()
         run: node tests/atlas/run-all.mjs
       - name: Measure candidate publication capacity
         run: node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json ${{ inputs.prepared_schema == 'v2' && '--bus-only' || '' }}
@@ -189,10 +192,11 @@ jobs:
           CANDIDATE_FINGERPRINT=$(node --input-type=module -e "import { computeCandidateGenerationCompatibilityFingerprint } from './tools/atlas-data-publication/candidate-compatibility.mjs'; console.log((await computeCandidateGenerationCompatibilityFingerprint({ rootDir: process.cwd() })).sha256)")
           python tools/atlas-bus-data/diagnostic_bus_cache.py --site-root pages-site --repository-sha "${{ github.sha }}" --fingerprint "$CANDIDATE_FINGERPRINT"
       - name: Run aggregate v2 structural scan
-        if: inputs.prepared_schema == 'v2' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
+        if: always() && inputs.prepared_schema == 'v2' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
+        continue-on-error: true
         run: mkdir -p diagnostic-output && python tools/atlas-bus-data/structural_scan.py --site-root pages-site --output diagnostic-output/structural-scan.json
       - name: Probe TNDS metadata without archive transfer
-        if: inputs.prepared_schema == 'v2' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
+        if: always() && inputs.prepared_schema == 'v2' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
         continue-on-error: true
         env:
           TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
@@ -200,7 +204,8 @@ jobs:
         run: mkdir -p diagnostic-output && python tools/atlas-bus-data/tnds_capability_probe.py --output diagnostic-output/tnds-capability-probe.json
       - name: Run national v2 diagnostic and same-window shadow parity
         id: v2-diagnostic
-        if: inputs.prepared_schema == 'v2' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
+        if: always() && inputs.prepared_schema == 'v2' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
+        continue-on-error: true
         run: |
           mkdir -p diagnostic-output
           CANDIDATE_FINGERPRINT=$(node --input-type=module -e "import { computeCandidateGenerationCompatibilityFingerprint } from './tools/atlas-data-publication/candidate-compatibility.mjs'; console.log((await computeCandidateGenerationCompatibilityFingerprint({ rootDir: process.cwd() })).sha256)")
@@ -229,6 +234,11 @@ jobs:
           name: atlas-v2-national-diagnostic-${{ github.run_id }}
           path: diagnostic-artifact
           if-no-files-found: warn
+      - name: Fail v2 diagnostic after evidence collection when hard validation failed
+        if: always() && inputs.prepared_schema == 'v2' && steps.candidate-validation.outcome == 'failure'
+        run: |
+          echo 'The v2 hard validator failed; aggregate evidence was collected and the candidate remains non-publishable.'
+          exit 1
       - name: Enforce candidate publication capacity gates
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
         run: node tools/atlas-data-publication/candidate-checkpoint.mjs --capacity-only --candidate-site pages-site

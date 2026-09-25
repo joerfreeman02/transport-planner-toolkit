@@ -852,6 +852,30 @@ function plannerDestination(service) {
     : '';
 }
 
+function destinationLocalityCandidates(service) {
+  const endpoint = Array.isArray(service?.routePatternStops) ? service.routePatternStops.at(-1) : null;
+  return unique([
+    service?.destinationLocality,
+    service?.destinationLocalityName,
+    service?.destinationQualifier,
+    service?.destinationLocalityEvidence?.name,
+    service?.destinationLocalityEvidence?.locality,
+    endpoint?.locality,
+    endpoint?.localityName,
+    endpoint?.nptgLocalityName,
+    endpoint?.nptgLocality?.name
+  ]).filter(candidate => !/^(?:unknown|not supplied|not resolved|unspecified|various)$/i.test(candidate));
+}
+
+function plannerDestinationDecision(service) {
+  const raw = plannerDestination(service);
+  const locality = destinationLocalityCandidates(service).find(candidate => normal(candidate) !== normal(raw));
+  if (raw && locality && /\b(?:bus|coach)?\s*(?:station|stand|bay|platform|stop|interchange)\b/i.test(raw)) {
+    return Object.freeze({ raw, chosen: locality, simplified: true, reason: 'Destination stand or stop wording was simplified using supplied locality evidence.', evidence: locality });
+  }
+  return Object.freeze({ raw, chosen: raw, simplified: false, reason: raw ? 'The supplied destination wording was retained.' : 'No resolved destination was supplied.', evidence: locality || null });
+}
+
 function destinationNames(values) {
   const names = unique(values).filter(Boolean);
   const normalised = names.map(name => ({ name, key: normal(name), words: normal(name).split(' ').filter(Boolean) }));
@@ -900,6 +924,8 @@ function principalText(main) {
 }
 
 function plannerStopLabel(stop, { basis = false } = {}) {
+  const plannerLabel = text(stop?.plannerLabel);
+  if (plannerLabel) return `${plannerLabel}${basis ? ' (timetable basis)' : ''}`;
   const name = text(stop?.name) || stopId(stop) || 'Selected stop';
   const indicator = text(stop?.indicator);
   const distance = stop?.walking?.status === 'routed' ? Number(stop.walking.distanceMetres) : Number(stop?.distanceMetres);
@@ -936,6 +962,8 @@ function buildPlannerServiceGroup(component, stops, main, representative) {
     id: stopId(stop),
     name: text(stop?.name) || null,
     indicator: text(stop?.indicator) || null,
+    plannerLabel: text(stop?.plannerLabel) || null,
+    logicalGroupLabel: text(stop?.logicalGroupLabel) || null,
     distanceMetres: Number.isFinite(Number(stop?.distanceMetres)) ? Number(stop.distanceMetres) : null,
     walkingDistanceMetres: stop?.walking?.status === 'routed' && Number.isFinite(Number(stop.walking.distanceMetres)) ? Number(stop.walking.distanceMetres) : null,
     timetableBasis: stopId(stop) === basisId,
@@ -950,7 +978,7 @@ function buildPlannerServiceGroup(component, stops, main, representative) {
     serviceIdentity: `${routeGroupKey(main)}|${publicDirectionIdentity(component, main)}|${endpointIdentity}`,
     routeNumber: text(main?.routeNumber) || 'Not supplied',
     publicDirection: publicDirectionIdentity(component, main),
-    principalDestination: plannerDestination(main) || null,
+    principalDestination: plannerDestinationDecision(main).chosen || null,
     principalOrigin: text(main?.origin) || null,
     operatorNames: Object.freeze(operatorNames),
     rawOperatorNames: Object.freeze(rawOperatorNames),
@@ -1000,6 +1028,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const representative = selectRepresentativeStop(component, stops);
   const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
   const plannerServiceGroup = buildPlannerServiceGroup(component, stops, main, representative);
+  const destinationDecision = plannerDestinationDecision(main);
   const rowCircular = resolveCircularPresentation(component, routeFamilyServices);
   const canonical = canonicalDeparturePopulation(component, representative.id, main);
   const profileIds = orderedCalendarProfiles([
@@ -1053,7 +1082,9 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     routeNumber: text(main.routeNumber) || 'Not supplied',
     operator: plannerServiceGroup.operatorNames.join(' · ') || 'Operator not supplied in the timetable',
     origin: text(main.origin) || 'Origin not supplied',
-    destination: text(main.destination) || 'Destination not supplied',
+    destination: destinationDecision.chosen || text(main.destination) || 'Destination not resolved',
+    rawDestination: destinationDecision.raw || text(main.destination) || null,
+    destinationDecision,
     direction: text(main.direction),
     stopDirection: text(main.stopDirection) || null,
     circular: rowCircular,
@@ -1062,7 +1093,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     calendarProfileIds: Object.freeze(profileIds),
     calendarProfileLabels: Object.freeze(profileIds.map(calendarProfileDisplayLabel)),
     directionFamily: directionKey(main),
-    directionPatternText: directionPatternText({ ...main, circular: rowCircular }),
+    directionPatternText: directionPatternText({ ...main, destination: destinationDecision.chosen, destinationLocality: null, circular: rowCircular }),
     servedAtStopId: representative.id,
     servedAtText: servedAtLines.join('\n') || servedAtText(representative),
     servedAtStops: Object.freeze(servedAtLines),

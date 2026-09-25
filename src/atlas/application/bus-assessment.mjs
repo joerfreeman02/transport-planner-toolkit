@@ -202,7 +202,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
       accessRouting.matrix(site, discoveredStops, 'walk'),
       accessRouting.matrix(site, discoveredStops, 'cycle')
     ]);
-    const enriched = discoveredStops.map((stop, index) => Object.freeze({ ...stop, walking: routingFor(walkingResult, index), cycling: routingFor(cyclingResult, index) }));
+    const enriched = groupStopsForPresentation(discoveredStops.map((stop, index) => ({ ...stop, walking: routingFor(walkingResult, index), cycling: routingFor(cyclingResult, index) })));
     onProgress({ phase: 'routing-stops', completed: enriched.length, total: discoveredStops.length });
     return { ...discovered, enriched, walkingResult, cyclingResult };
   }

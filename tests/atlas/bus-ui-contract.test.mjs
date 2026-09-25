@@ -11,6 +11,8 @@ assert.equal((html.match(/data-task-stage=/g) ?? []).length, 5);
 assert.match(app, /progressElement:\s*\$\('taskStatusProgress'\)/);
 assert.match(app, /countElement:\s*\$\('taskStatusProgressText'\)/);
 assert.match(html, /<th>Include<\/th>/);
+assert.match(html, /<th>Stop label<\/th>/);
+assert.match(html, /same deterministic Stop A, Stop B, Stop C labels/);
 assert.match(html, /<th>Timetable evidence<\/th>/);
 assert.match(html, /<th>Typical frequency<\/th>/);
 assert.match(html, /<th>Operating period(?: at stop)?<\/th>/);
@@ -37,6 +39,8 @@ assert.match(app, /Try a different search, or choose the assessment point on the
 assert.doesNotMatch(app, /Your description is still recorded/);
 assert.match(app, /buildServicePresentation/);
 assert.match(app, /buildPlannerBusServiceSummaries/);
+assert.match(app, /plannerStopLabel/);
+assert.match(app, /bus-stop-marker/);
 assert.match(app, /__ATLAS_BUS_UI__/);
 assert.match(app, /__atlas-review\/update-bus-data/);
 assert.doesNotMatch(app, /Traveline (username|password)/i);

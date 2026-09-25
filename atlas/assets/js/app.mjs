@@ -263,7 +263,7 @@ function clearRouteLines() {
 
 async function showAccessRoute(stop, mode) {
   const label = mode === 'walk' ? 'walking' : 'cycling';
-  setCallout($('stopStatus'), `Checking the ${label} route to ${stop.name}…`, 'neutral');
+  setCallout($('stopStatus'), `Checking the ${label} route to ${stop.plannerLabel || 'the selected stop'} — ${stop.name}…`, 'neutral');
   const result = await accessRouting.geometry(confirmedSite, stop, mode);
   if (!result.ok) {
     setCallout($('stopStatus'), `The ${label} route line is temporarily unavailable. The assessment results have not been changed.`, 'warning');
@@ -274,7 +274,11 @@ async function showAccessRoute(stop, mode) {
   routeLayers.push(layer);
   $('clearRoutes').hidden = false;
   map.fitBounds(layer.getBounds().pad(.2));
-  setCallout($('stopStatus'), `${mode === 'walk' ? 'Walking' : 'Cycling'} route shown for ${stop.name}.`, 'success');
+  setCallout($('stopStatus'), `${mode === 'walk' ? 'Walking' : 'Cycling'} route shown for ${stop.plannerLabel || 'the selected stop'} — ${stop.name}.`, 'success');
+}
+
+function plannerStopLabel(stop) {
+  return stop?.plannerLabel || stop?.indicator || 'Stop';
 }
 
 function renderBusStopMarkers(stops) {
@@ -282,15 +286,16 @@ function renderBusStopMarkers(stops) {
   busStopMarkers = [];
   for (const stop of stops) {
     const marker = window.L.marker([stop.latitude, stop.longitude], {
-      title: `${stop.name}${stop.indicator ? ` — ${stop.indicator}` : ''}`,
-      icon: window.L.divIcon({ className: '', html: '<div class="bus-stop-marker" aria-hidden="true"><span></span></div>', iconSize: [22, 22], iconAnchor: [11, 11], popupAnchor: [0, -10] })
+      title: `${plannerStopLabel(stop)} — ${stop.name}`,
+      icon: window.L.divIcon({ className: '', html: `<div class="bus-stop-marker" aria-hidden="true"><span>${plannerStopLabel(stop).replace(/^Stop\s+/i, '')}</span></div>`, iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -17] })
     }).addTo(map);
+    marker.__atlasStopId = stopKey(stop);
     const popup = document.createElement('div');
     popup.className = 'bus-stop-popup';
     const name = document.createElement('strong');
-    name.textContent = stop.name;
+    name.textContent = `${plannerStopLabel(stop)} — ${stop.name}`;
     const detail = document.createElement('p');
-    detail.textContent = [stop.indicator, stop.direction].filter(Boolean).join(' · ') || 'Direction not provided';
+    detail.textContent = [stop.logicalGroupLabel, stop.indicator, stop.direction].filter(Boolean).join(' · ') || 'Direction not provided';
     const services = document.createElement('p');
     services.textContent = stop.routes?.length ? `Routes: ${stop.routes.join(', ')}` : 'Routes not available from this source check';
     const access = document.createElement('p');
@@ -489,21 +494,26 @@ function renderAssessment(result) {
   if (detailRows) detailRows.replaceChildren();
   for (const stop of result.stops) {
     const row = document.createElement('tr');
+    row.dataset.stopId = stopKey(stop);
     const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedStopIds.has(stopKey(stop)); include.setAttribute('aria-label', `Include ${stop.name}`);
     include.addEventListener('change', () => { if (include.checked) selectedStopIds.add(stopKey(stop)); else selectedStopIds.delete(stopKey(stop)); renderAssessment(result); });
     appendCell(row, 'Include', include);
+    appendCell(row, 'Stop label', plannerStopLabel(stop));
     const stopCell = document.createElement('span');
     const stopName = document.createElement('strong'); stopName.textContent = stop.name;
     const mapLink = document.createElement('a'); mapLink.href = googleMapsUrl(stop); mapLink.target = '_blank'; mapLink.rel = 'noopener noreferrer'; mapLink.textContent = 'Open in Google Maps';
     stopCell.append(stopName, document.createElement('br'), mapLink);
     appendCell(row, 'Stop name', stopCell);
-    appendCell(row, 'Direction', stop.displayDirection);
+    appendCell(row, 'Direction / indicator', stop.displayDirection);
     const walking = appendCell(row, 'Walking distance / time', formatAccess(stop.walking));
-    const cycling = appendCell(row, 'Cycling distance / time', formatAccess(stop.cycling));
     if (stop.walking.status !== 'routed') walking.classList.add('route-unavailable');
-    if (stop.cycling.status !== 'routed') cycling.classList.add('route-unavailable');
     appendCell(row, 'Routes serving stop', stop.routes?.length ? stop.routes.join(', ') : 'Timetable route match unavailable');
     appendCell(row, 'Timetable evidence', stop.timetableEvidence || (stop.timetableMatch === false ? 'Timetable source unavailable' : 'Matched · timetable source'));
+    row.addEventListener('click', event => {
+      if (event.target.closest('input, a, button')) return;
+      const marker = busStopMarkers.find(candidate => candidate.__atlasStopId === stopKey(stop));
+      if (marker) { marker.openPopup(); map.panTo(marker.getLatLng()); }
+    });
     rows.append(row);
   }
   if (!result.stops.length) {
@@ -518,7 +528,7 @@ function renderAssessment(result) {
     appendCell(row, 'Route', service.routeNumber);
     appendCell(row, 'Operator', service.operator);
     appendCell(row, 'Direction / main service pattern', service.directionPatternText || formatServiceOriginDestination(service));
-    appendCell(row, 'Served at', service.servedAtText || service.frequencyBasisStopName || 'Representative stop not supplied');
+    appendCell(row, 'Stops', service.servedAtText || service.frequencyBasisStopName || 'Representative stop not supplied');
     appendCell(row, 'Principal locations', service.principalLocationsText || service.presentation?.principalLocationsText || 'See route origin / destination');
     const frequencies = document.createElement('ul'); frequencies.className = 'period-lines';
     (service.typicalFrequencyLines || String(service.typicalFrequencyText || 'Frequency unavailable').split('\n')).forEach(line => { const item = document.createElement('li'); item.textContent = line; frequencies.append(item); });

@@ -24,10 +24,11 @@ const result = {
 const tables = buildBusWordTables(result);
 assert.equal(tables.length, 2);
 assert.equal(tables[0].caption, 'Table 3.2 - Bus Stop Summary');
-assert.deepEqual(tables[0].headers, ['Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop']);
-assert.equal(tables[0].rows[0][0], 'Balaam Street');
-assert.equal(tables[0].rows[0][1], 'Stop S (Eastbound)');
-assert.equal(tables[0].rows[0][4], '262, 473');
+assert.deepEqual(tables[0].headers, ['Stop label', 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop']);
+assert.equal(tables[0].rows[0][0], 'Stop');
+assert.equal(tables[0].rows[0][1], 'Balaam Street');
+assert.equal(tables[0].rows[0][2], 'Stop S (Eastbound)');
+assert.equal(tables[0].rows[0][5], '262, 473');
 assert.equal(tables[1].caption, 'Table 3.3 - Bus Service Summary');
 assert.deepEqual(tables[1].headers, ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period']);
 assert.match(tables[1].rows[0][2], /Here East, Hackney Wick – Royal Crest Avenue, Silvertown/);
@@ -38,7 +39,7 @@ assert.equal(busWordFilename({ displayAddress: '100 High Street, Plaistow' }), '
 assert.equal(busWordFilename({ latitude: 51.7, longitude: -0.1 }), 'ATLAS Bus Assessment.docx');
 const filtered = buildBusWordTables({ ...result, stops: [result.stops[1]], serviceSummaries: [] });
 assert.equal(filtered[0].rows.length, 1);
-assert.equal(filtered[0].rows[0][1], 'Stop T (Westbound)');
+assert.equal(filtered[0].rows[0][2], 'Stop T (Westbound)');
 assert.equal(filtered[1].rows.length, 0);
 const reviewItems = [
   { code: 'unresolved-timetable-request', route: '397', stop: '490TEST003', source: 'timetable source', message: 'Raw timetable request diagnostic.' },

@@ -1,5 +1,6 @@
 import { hasScheduledEvidence } from './scheduled-evidence.mjs';
 import { calendarProfileLabel, calendarQualificationNotes } from './service-calendar.mjs';
+import { buildPlannerStopPresentation } from './bus-stop-presentation.mjs';
 
 const DAY_ORDER = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 const DAY_LABELS = Object.freeze({ monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday' });
@@ -407,6 +408,8 @@ export function buildServiceSummaries(stops, serviceRecords) {
       operator: text(first.operator) || 'Operator not supplied in the timetable',
       origin: text(first.origin) || 'Origin not supplied',
       destination: text(first.destination) || 'Destination not supplied',
+      destinationLocality: text(first.destinationLocality || first.destinationLocalityName || first.destinationQualifier) || null,
+      destinationLocalityEvidence: first.destinationLocalityEvidence ?? null,
       direction: text(first.direction),
       stopDirection: serviceStopDirection(frequencyStop),
       stopDirectionEvidenceId: frequencyBasisStopId,
@@ -757,11 +760,12 @@ export function displayStopDirection(stop = {}) {
 }
 
 export function groupStopsForPresentation(stops) {
-  return (stops ?? []).map(stop => Object.freeze({
+  const presented = (stops ?? []).map(stop => ({
     ...stop,
     presentationKey: text(stop.id || stop.sourceId),
     displayDirection: displayStopDirection(stop)
   }));
+  return buildPlannerStopPresentation(presented);
 }
 
 function stopDistanceMetres(first, second) {

@@ -54,6 +54,7 @@ function reviewQualification(reviewItems) {
 export function buildBusWordTables(result) {
   if (!result?.ok) throw new Error('A completed Bus assessment is required for Word export.');
   const stopRows = (result.stops ?? []).map(stop => [
+    stop.plannerLabel || stop.indicator || 'Stop',
     stop.name,
     stop.displayDirection,
     accessText(stop.walking),
@@ -94,9 +95,9 @@ export function buildBusWordTables(result) {
   return [
     {
       caption: 'Table 3.2 - Bus Stop Summary',
-      headers: ['Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop'],
+      headers: ['Stop label', 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop'],
       rows: stopRows,
-      widths: [22, 16, 20, 20, 22]
+      widths: [10, 22, 16, 20, 20, 22]
     },
     {
       caption: 'Table 3.3 - Bus Service Summary',

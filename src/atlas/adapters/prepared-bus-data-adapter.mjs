@@ -50,6 +50,8 @@ export function normalisePreparedService(service = {}) {
     operator: String(service.operator ?? '').trim(),
     origin: String(service.origin ?? '').trim(),
     destination: String(service.destination ?? '').trim(),
+    destinationLocality: String(service.destinationLocality ?? service.destinationLocalityName ?? service.destinationQualifier ?? '').trim(),
+    destinationLocalityEvidence: service.destinationLocalityEvidence ?? null,
     direction: String(service.direction ?? '').trim(),
     principalLocations: Array.isArray(service.principalLocations) ? service.principalLocations : [],
     routePatternStopIds: Array.isArray(service.routePatternStopIds) ? service.routePatternStopIds.map(String) : [],

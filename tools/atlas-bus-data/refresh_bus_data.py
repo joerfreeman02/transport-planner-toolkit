@@ -430,6 +430,22 @@ def source_outcome(source_hash: str, previous: dict | None) -> tuple[str, str | 
     return ("CHECKED_NO_CHANGE", None) if previous_hash == source_hash else ("UPDATED", None)
 
 
+def source_snapshot_status(manifest: dict) -> dict:
+    """Render snapshot provenance from the authoritative snapshot manifest."""
+    reuse = manifest.get("reuse") if isinstance(manifest.get("reuse"), dict) else {}
+    return {
+        "schema": manifest["schema"],
+        "snapshotId": manifest["snapshotId"],
+        "state": manifest["state"],
+        "reused": bool(reuse.get("reused", False)),
+        "reuseMode": manifest.get("reuseMode"),
+        "reuse": reuse,
+        "currentSourceFreshnessClaimed": manifest.get("currentSourceFreshnessClaimed"),
+        "diagnosticOnly": manifest["diagnosticOnly"],
+        "productionEligible": manifest["productionEligible"],
+    }
+
+
 def run(args: argparse.Namespace) -> dict:
     started = now_utc()
     site = Path(args.site_root).resolve()
@@ -525,7 +541,7 @@ def run(args: argparse.Namespace) -> dict:
             sources["nptg"] = {"identity": NPTG_XML_URL, "checkedAt": started, "httpStatus": xml_sources["nptg"]["httpStatus"], "contentType": xml_sources["nptg"]["contentType"], "sourceHash": nptg_hash, "outcome": nptg_outcome, "format": "xml"}
             if nptg_note: sources["nptg"]["note"] = nptg_note
         if snapshot_manifest:
-            sources["sourceSnapshot"] = {"schema": snapshot_manifest["schema"], "snapshotId": snapshot_manifest["snapshotId"], "state": snapshot_manifest["state"], "reused": bool(snapshot_root), "productionEligible": False}
+            sources["sourceSnapshot"] = source_snapshot_status(snapshot_manifest)
         notes = [("naptan", naptan_note), ("bods", bods_note)]
         if not bus_only:
             notes.append(("tnds", tnds_note))

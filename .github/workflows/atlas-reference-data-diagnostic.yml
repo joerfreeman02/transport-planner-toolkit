@@ -49,15 +49,37 @@ jobs:
           repository: ${{ github.repository }}
           path: source-input
       - name: Verify snapshot before interpretation
+        id: verify-snapshot
         run: |
           python tools/atlas-bus-data/source_snapshot.py --verify source-input/source-snapshot > source-input/verified-manifest.json
           cp source-input/source-snapshot/manifest.json source-input/verified-snapshot-manifest.json
       - name: Restore last-known-good diagnostic comparison state
+        id: restore-last-known-good
         run: node tools/atlas-data-publication/fetch-last-known-good.mjs 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/' last-known-good
-      - name: Prepare Bus v2 with acquisition disabled
+      - name: Stage and verify diagnostic release metadata
+        id: release-metadata
         run: |
-          mkdir -p pages-site
-          python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --prepared-schema v2 --bus-only-diagnostic --source-snapshot source-input/source-snapshot --acquisition-disabled
+          rm -rf pages-site
+          mkdir -p pages-site/atlas/config
+          cp atlas/config/atlas-release.json pages-site/atlas/config/atlas-release.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('pages-site/atlas/config/atlas-release.json')
+          try:
+              metadata = json.loads(path.read_text(encoding='utf-8'))
+          except (OSError, json.JSONDecodeError) as error:
+              raise SystemExit(f'Release metadata preflight failed: {path}') from error
+          if not str(metadata.get('version', '')).strip() or not str(metadata.get('build', '')).strip():
+              raise SystemExit(f'Release metadata preflight failed: version/build must be non-empty: {path}')
+          print(f'Release metadata preflight passed: {path}')
+          PY
+      - name: Prepare Bus v2 with acquisition disabled
+        id: prepare-v2
+        if: always() && steps.release-metadata.outcome == 'success'
+        run: |
+          python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --previous-root last-known-good --prepared-schema v2 --bus-only-diagnostic --source-snapshot source-input/source-snapshot --acquisition-disabled
       - name: Run aggregate structural scan
         id: structural-scan
         if: always()
@@ -113,7 +135,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       - name: Preserve fail-closed conclusions
-        if: steps.hard-validator.outcome == 'failure' || steps.structural-scan.outcome == 'failure' || steps.deterministic-tests.outcome == 'failure' || steps.tnds-probe.outcome == 'failure' || steps.national-diagnostic.outcome == 'failure' || steps.capacity.outcome == 'failure'
+        if: always() && (steps.verify-snapshot.outcome != 'success' || steps.release-metadata.outcome != 'success' || steps.prepare-v2.outcome != 'success' || steps.structural-scan.outcome != 'success' || steps.hard-validator.outcome != 'success' || steps.deterministic-tests.outcome != 'success' || steps.tnds-probe.outcome != 'success' || steps.national-diagnostic.outcome != 'success' || steps.capacity.outcome != 'success')
         run: |
-          echo 'A required diagnostic conclusion failed; evidence was uploaded and this run remains non-publishable.'
+          echo 'A required diagnostic conclusion failed, including preparation or a downstream gate; evidence was uploaded and this run remains non-publishable.'
           exit 1

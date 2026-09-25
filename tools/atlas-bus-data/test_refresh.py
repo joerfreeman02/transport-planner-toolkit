@@ -5,7 +5,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from refresh_bus_data import BODS_DOWNLOAD_ROOT, BODS_REGIONS, NAPTAN_XML_URL, NPTG_XML_URL, RefreshError, TNDS_REGIONS, acquire_bods, acquire_prepared_data_v2_sources, acquire_tnds, source_outcome, tnds_region_from_filename, validate_candidate
+from refresh_bus_data import BODS_DOWNLOAD_ROOT, BODS_REGIONS, NAPTAN_XML_URL, NPTG_XML_URL, RefreshError, TNDS_REGIONS, acquire_bods, acquire_prepared_data_v2_sources, acquire_tnds, source_outcome, source_snapshot_status, tnds_region_from_filename, validate_candidate
 
 
 class IncompleteFtp:
@@ -275,6 +275,32 @@ class RefreshTests(unittest.TestCase):
         self.assertEqual(source_outcome('hash-a', None), ('UPDATED', 'INITIAL AUTOMATED BASELINE'))
         self.assertEqual(source_outcome('hash-a', {'sourceHash': 'hash-a'}), ('CHECKED_NO_CHANGE', None))
         self.assertEqual(source_outcome('hash-b', {'sourceHash': 'hash-a'}), ('UPDATED', None))
+
+    def test_source_snapshot_status_uses_manifest_reuse_provenance(self):
+        manifest = {
+            'schema': 'atlas-bus-source-snapshot-v1',
+            'snapshotId': 'snapshot-id',
+            'state': 'ACQUIRED / UNINTERPRETED',
+            'reuseMode': 'FRESH_ACQUISITION',
+            'currentSourceFreshnessClaimed': True,
+            'reuse': {'reused': False, 'source': 'fresh acquisition'},
+            'diagnosticOnly': True,
+            'productionEligible': False,
+        }
+        status = source_snapshot_status(manifest)
+        self.assertFalse(status['reused'])
+        self.assertEqual(status['reuseMode'], 'FRESH_ACQUISITION')
+        self.assertTrue(status['currentSourceFreshnessClaimed'])
+        self.assertEqual(status['snapshotId'], 'snapshot-id')
+        self.assertFalse(status['productionEligible'])
+
+        manifest['reuseMode'] = 'FROZEN_DIAGNOSTIC_EXPLICIT'
+        manifest['currentSourceFreshnessClaimed'] = False
+        manifest['reuse'] = {'reused': True, 'sourceRunId': '36112119760'}
+        frozen_status = source_snapshot_status(manifest)
+        self.assertTrue(frozen_status['reused'])
+        self.assertEqual(frozen_status['reuse']['sourceRunId'], '36112119760')
+        self.assertFalse(frozen_status['currentSourceFreshnessClaimed'])
 
     def test_status_shape_cannot_contain_credentials(self):
         status = {'sources': {'tnds': {'sourceHash': 'safe-hash', 'regionsChecked': list(TNDS_REGIONS)}}}

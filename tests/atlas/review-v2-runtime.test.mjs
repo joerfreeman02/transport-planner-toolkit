@@ -22,6 +22,24 @@ try {
   assert.match(defaultConfig, /"nptg": null/);
   const app = await readFile(new URL('../../atlas/assets/js/app.mjs', import.meta.url), 'utf8');
   assert.match(app, /searchParams\.get\('review'\) === 'v2'/);
+  assert.match(app, /querySelectorAll\('body \[data-atlas-test-build\]'\)/, 'Build identity updates must not include the body metadata marker.');
+  const requiredAssets = [
+    '/atlas/',
+    '/atlas/assets/css/atlas-shell.css',
+    '/assets/vendor/leaflet/leaflet.css',
+    '/assets/vendor/leaflet/leaflet.js',
+    '/atlas/assets/js/app.mjs',
+    '/src/atlas/application/site-selector.mjs',
+    '/src/atlas/domain/site.mjs',
+    '/__atlas-review/v2-data/bus/manifest.json'
+  ];
+  for (const asset of requiredAssets) {
+    const response = await fetch(`${base}${asset}`);
+    assert.equal(response.status, 200, asset);
+  }
+  const atlasHtml = await (await fetch(`${base}/atlas/?review=v2`)).text();
+  assert.match(atlasHtml, /<main id="main">[\s\S]*data-view-panel="modules"/);
+  assert.match(atlasHtml, /id="addressForm"/);
   assert.match(review.url, /review=v2/);
   const launcher = await readFile(new URL('../../tools/atlas-review/v2-review.mjs', import.meta.url), 'utf8');
   assert.match(launcher, /--acquisition-disabled/);

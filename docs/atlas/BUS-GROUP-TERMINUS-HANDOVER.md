@@ -144,15 +144,17 @@ this sprint.
 ## GitHub tooling adoption review
 
 This sprint made no GitHub governance or third-party tooling changes. The
-recommended follow-up is for the repository owner to review Dependabot security
-updates (optionally grouped), Codecov coverage reporting after a baseline is
-set, and OpenSSF Scorecard as a GitHub Action/check. Sentry is not applicable
-to this domain-only change; it may be reconsidered for browser-runtime
-failures with a privacy review. Renovate and Dependabot should not both be
-introduced without one clear dependency-automation owner. Main-branch
-protection was not changed; any future policy should be decided by the
-repository owner and may require PR review, required status checks, and the
-organisation's preferred history/signing rules.
+existing `.github/dependabot.yml` configuration is retained: weekly grouped
+npm and GitHub Actions updates, with no automerge. Codecov and OpenSSF
+Scorecard are not configured; the recommended follow-up is a repository-owner
+decision on coverage reporting after a baseline and Scorecard as a
+GitHub Action/check. Sentry is not applicable to this domain-only change; it
+may be reconsidered for browser-runtime failures with a privacy review.
+Renovate is not configured and should not be introduced alongside Dependabot
+without one clear dependency-automation owner. Main-branch protection was not
+changed; the prior repository review found it not enabled, so any future policy
+should be decided by the repository owner and may require PR review, required
+status checks, and the organisation's preferred history/signing rules.
 
 Validation command:
 

@@ -32,7 +32,7 @@ FIXTURES = Path(__file__).parents[2] / "tests" / "fixtures" / "atlas-bus-data-v2
 
 class CircularIdentityTests(unittest.TestCase):
     def test_endpoint_evidence_keeps_exact_identity_and_source_metadata(self):
-        aliases = {"ATCO-1": "ATCO-1", "naptan-code-1": "ATCO-1"}
+        identifiers = {"atco": {"ATCO-1": "ATCO-1", "atco-1": "ATCO-1"}, "naptan": {"naptan-code-1": "ATCO-1"}}
         stop = {
             "id": "ATCO-1", "naptanCode": "naptan-code-1", "name": "Bus Station",
             "indicator": "Stop C", "stopType": "BCS", "busStopType": "MKD",
@@ -55,9 +55,9 @@ class CircularIdentityTests(unittest.TestCase):
             {"route_short_name": "13", "route_long_name": "Hertford - Waltham Cross", "route_desc": "Fixture route"},
             "east_anglia",
         )
-        self.assertEqual(BUILDER.resolve_exact_gtfs_stop("ATCO-1", {"stop_code": "wrong"}, aliases), ("ATCO-1", "gtfs-stop-id-equals-atco-code"))
-        self.assertEqual(BUILDER.resolve_exact_gtfs_stop("unknown", {"stop_code": "naptan-code-1"}, aliases), ("ATCO-1", "gtfs-stop-code-equals-naptan-code"))
-        self.assertEqual(BUILDER.resolve_exact_gtfs_stop("unknown", {"stop_code": "unknown"}, aliases), (None, "unresolved"))
+        self.assertEqual(BUILDER.resolve_exact_gtfs_stop("ATCO-1", {"stop_code": "wrong"}, identifiers), ("ATCO-1", "gtfs-stop-id-equals-atco-code"))
+        self.assertEqual(BUILDER.resolve_exact_gtfs_stop("unknown", {"stop_code": "naptan-code-1"}, identifiers), ("ATCO-1", "gtfs-stop-code-equals-naptan-code"))
+        self.assertEqual(BUILDER.resolve_exact_gtfs_stop("unknown", {"stop_code": "unknown"}, identifiers), (None, "unresolved"))
         self.assertEqual(evidence["rawGtfsStopId"], "ATCO-1")
         self.assertEqual(evidence["rawGtfsStopCode"], "naptan-code-1")
         self.assertEqual(evidence["rawGtfsStopName"], "Bus Station")
@@ -92,7 +92,7 @@ class CircularIdentityTests(unittest.TestCase):
             {"stop_sequence": "1", "stop_id": first_gtfs, "departure_time": "08:00:00"},
             {"stop_sequence": "2", "stop_id": last_gtfs, "departure_time": "08:10:00"},
         ]
-        aliases = {}
+        identifiers = {"atco": {}, "naptan": {}}
         naptan_stops = {}
         if include_intermediate:
             gtfs_stops[middle_gtfs] = {"stop_name": "Intermediate stop"}
@@ -101,7 +101,7 @@ class CircularIdentityTests(unittest.TestCase):
                 {"stop_sequence": "2", "stop_id": middle_gtfs, "departure_time": "08:05:00"},
                 {"stop_sequence": "3", "stop_id": last_gtfs, "departure_time": "08:10:00"},
             ]
-            aliases[middle_gtfs] = f"{route_id}-middle-id"
+            identifiers["atco"][middle_gtfs] = f"{route_id}-middle-id"
             naptan_stops[f"{route_id}-middle-id"] = {
                 "id": f"{route_id}-middle-id", "name": "Intermediate stop", "locality": "Middle", "routes": set()
             }
@@ -110,7 +110,7 @@ class CircularIdentityTests(unittest.TestCase):
             (last_gtfs, last_id, last_name, last_locality),
         ):
             if stop_id:
-                aliases[gtfs_id] = stop_id
+                identifiers["atco"][gtfs_id] = stop_id
                 naptan_stops[stop_id] = {"id": stop_id, "name": name, "locality": locality, "routes": set()}
         services = {}
         BUILDER.process_trip(
@@ -123,10 +123,38 @@ class CircularIdentityTests(unittest.TestCase):
             {"weekday": {"start_date": "20260901", "end_date": "20260930"}},
             {},
             naptan_stops,
-            aliases,
+            identifiers,
             services,
         )
         return next(iter(services.values()))
+
+    def test_identifier_namespace_collision_cannot_mislabel_a_naptan_match(self):
+        identifiers = {
+            "atco": {"ATCO-A": "ATCO-A", "atco-a": "ATCO-A"},
+            "naptan": {"shared-code": "NAPTAN-B"},
+        }
+        self.assertEqual(BUILDER.resolve_exact_gtfs_stop("not-an-atco", {"stop_code": "shared-code"}, identifiers), ("NAPTAN-B", "gtfs-stop-code-equals-naptan-code"))
+        self.assertEqual(BUILDER.resolve_exact_gtfs_stop("shared-code", {"stop_code": "not-used"}, {"atco": {"shared-code": "ATCO-A"}, "naptan": {"shared-code": "NAPTAN-B"}}), ("ATCO-A", "gtfs-stop-id-equals-atco-code"))
+
+    def test_repeated_endpoint_preserves_unique_headsign_provenance_deterministically(self):
+        rows = [
+            {"stop_sequence": "1", "stop_id": "first", "departure_time": "08:00:00"},
+            {"stop_sequence": "2", "stop_id": "last", "departure_time": "08:10:00"},
+        ]
+        gtfs_stops = {"first": {"stop_name": "Bus Station"}, "last": {"stop_name": "The Talbot"}}
+        naptan_stops = {
+            "FIRST": {"id": "FIRST", "name": "Bus Station", "locality": "Waltham Cross", "routes": set()},
+            "LAST": {"id": "LAST", "name": "The Talbot", "locality": "North Weald", "routes": set()},
+        }
+        identifiers = {"atco": {"first": "FIRST", "last": "LAST"}, "naptan": {}}
+        routes = {"r1": {"route_short_name": "13", "route_long_name": "Fixture route", "route_type": "3", "agency_id": "agency"}}
+        services = {}
+        for trip_id, headsign in (("trip-b", "Waltham Cross Bus Station"), ("trip-a", "The Talbot")):
+            BUILDER.process_trip("fixture", rows, {"route_id": "r1", "direction_id": "0", "service_id": "weekday", "trip_id": trip_id, "active_days": ["monday"], "trip_headsign": headsign}, {"agency": "Fixture operator"}, routes, gtfs_stops, {"weekday": {"start_date": "20260901", "end_date": "20260930"}}, {}, naptan_stops, identifiers, services)
+        evidence = services["fixture:r1:0:7f3e56c7c1b3"]["endpointEvidence"]["destination"] if "fixture:r1:0:7f3e56c7c1b3" in services else next(iter(services.values()))["endpointEvidence"]["destination"]
+        item = evidence["LAST"]
+        self.assertEqual(item["provenance"]["tripHeadsigns"], ["The Talbot", "Waltham Cross Bus Station"])
+        self.assertEqual([identity["tripHeadsign"] for identity in item["provenance"]["sourceIdentities"]], ["The Talbot", "Waltham Cross Bus Station"])
 
     def test_route_310_distinct_bus_station_endpoints_are_not_circular(self):
         record = self.build_record(

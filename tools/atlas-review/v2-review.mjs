@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { reviewStateDirectory, startReviewServer, stopReviewServer } from './review-server.mjs';
+import { computeCandidateGenerationCompatibilityFingerprint } from '../atlas-data-publication/candidate-compatibility.mjs';
+import { buildPreparedCacheMarker, preparedCacheMarkerMatches } from './v2-review-cache.mjs';
 
 const REVIEW_RUN_ID = '36125621080';
 const SNAPSHOT_ARTIFACT = 'atlas-reference-source-snapshot-36125621080';
@@ -74,10 +76,18 @@ async function ensurePrepared(snapshotReport) {
   const markerPath = path.join(preparedRoot, 'nptg1-review.json');
   const statusPath = path.join(preparedRoot, 'atlas', 'data', 'status', 'manifest.json');
   const busManifestPath = path.join(preparedRoot, 'atlas', 'data', 'bus', 'manifest.json');
+  const generatorFingerprint = await computeCandidateGenerationCompatibilityFingerprint({ rootDir: repoRoot });
   if (existsSync(busManifestPath) && existsSync(statusPath) && existsSync(markerPath)) {
     try {
       const marker = JSON.parse(await readFile(markerPath, 'utf8'));
-      if (marker.snapshotId === SNAPSHOT_ID && marker.runId === REVIEW_RUN_ID) return marker;
+      const manifest = JSON.parse(await readFile(busManifestPath, 'utf8'));
+      if (preparedCacheMarkerMatches(marker, {
+        sourceRunId: REVIEW_RUN_ID,
+        sourceSnapshotId: SNAPSHOT_ID,
+        preparedSchema: manifest.schema,
+        preparedDataVersion: manifest.version,
+        generatorFingerprint
+      })) return marker;
     } catch {}
   }
   const staging = path.join(cacheRoot, `prepared-staging-${process.pid}`);
@@ -89,7 +99,7 @@ async function ensurePrepared(snapshotReport) {
   run(py, ['tools/atlas-bus-data/validate_candidate.py', '--site-root', staging, '--bus-only'], { stdio: 'inherit' });
   if (!existsSync(path.join(staging, 'atlas', 'data', 'status', 'manifest.json'))) throw new Error('The prepared V2 review data did not contain a status manifest.');
   const manifest = JSON.parse(await readFile(path.join(staging, 'atlas', 'data', 'bus', 'manifest.json'), 'utf8'));
-  const marker = { runId: REVIEW_RUN_ID, snapshotId: SNAPSHOT_ID, snapshotReport, preparedSchema: manifest.schema, counts: manifest.counts || null, generatedAt: manifest.generatedAt };
+  const marker = buildPreparedCacheMarker({ runId: REVIEW_RUN_ID, snapshotId: SNAPSHOT_ID, snapshotReport, manifest, generatorFingerprint });
   await writeFile(path.join(staging, 'nptg1-review.json'), `${JSON.stringify(marker, null, 2)}\n`, 'utf8');
   await rm(preparedRoot, { recursive: true, force: true });
   await rename(staging, preparedRoot);

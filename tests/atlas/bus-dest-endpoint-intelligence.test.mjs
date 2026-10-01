@@ -179,6 +179,20 @@ assert.equal(persistedDecision.chosenDisplayName, 'Waltham Cross Bus Station');
 assert.deepEqual(persistedDecision.evidence.preparedEvidenceEndpointStopPointIds, ['WALTHAM']);
 assert.equal(persistedDecision.evidence.endpointEvidenceById.WALTHAM.preparedEvidence.rawGtfsStopCode, 'WALTHAM-CODE');
 
+const aggregatedProvenance = await resolvePlannerEndpointDecisions([service('aggregated-provenance', 'Bus Station', 'WALTHAM', {
+  endpointEvidence: { destination: { WALTHAM: {
+    ...persistedEvidence.endpointEvidence.destination.WALTHAM,
+    provenance: {
+      tripHeadsign: 'The Talbot',
+      tripHeadsigns: ['The Talbot', 'Waltham Cross Bus Station'],
+      sourceIdentities: [{ routeId: 'r1', tripId: 'trip-a' }, { routeId: 'r1', tripId: 'trip-b' }]
+    }
+  } } }
+})], noRuntimeReference);
+assert.equal(aggregatedProvenance.services[0].destinationEndpointDecision.chosenDisplayName, 'Waltham Cross Bus Station');
+assert.equal(aggregatedProvenance.services[0].destinationEndpointDecision.evidenceSource, 'prepared-exact-endpoint');
+assert.equal(aggregatedProvenance.services[0].destinationEndpointDecision.conflict, false);
+
 const persistedConflict = await resolvePlannerEndpointDecisions([service('persisted-conflict', 'Bus Station', 'WALTHAM', {
   endpointEvidence: { destination: { WALTHAM: { ...persistedEvidence.endpointEvidence.destination.WALTHAM, nptgLocalityCode: 'E-CHESH', nptgLocalityName: 'Cheshunt' } } }
 })], referenceData);

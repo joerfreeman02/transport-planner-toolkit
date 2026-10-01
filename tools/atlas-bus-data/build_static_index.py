@@ -220,9 +220,9 @@ def representative_dates(snapshot: date) -> dict[str, date]:
     return {day: monday + timedelta(days=index) for index, day in enumerate(DAYS)}
 
 
-def load_naptan(path: Path) -> tuple[dict[str, dict], dict[str, str], int]:
+def load_naptan(path: Path) -> tuple[dict[str, dict], dict[str, dict[str, str]], int]:
     stops: dict[str, dict] = {}
-    aliases: dict[str, str] = {}
+    identifiers = {"atco": {}, "naptan": {}}
     excluded = 0
     with path.open("r", encoding="utf-8-sig", newline="") as stream:
         for row in csv.DictReader(stream):
@@ -262,10 +262,11 @@ def load_naptan(path: Path) -> tuple[dict[str, dict], dict[str, str], int]:
                 "routes": set(),
             }
             stops[stop_id] = stop
-            aliases[stop_id] = stop_id
+            identifiers["atco"][stop_id] = stop_id
+            identifiers["atco"][stop_id.lower()] = stop_id
             if naptan_code:
-                aliases[naptan_code.lower()] = stop_id
-    return stops, aliases, excluded
+                identifiers["naptan"][naptan_code.lower()] = stop_id
+    return stops, identifiers, excluded
 
 
 def load_naptan_v2(path: Path, nptg_path: Path):
@@ -282,7 +283,7 @@ def load_naptan_v2(path: Path, nptg_path: Path):
     nptg = parse_nptg_xml(nptg_path)
     hydrate_stop_localities(naptan, nptg)
     stops = {}
-    aliases = {}
+    identifiers = {"atco": {}, "naptan": {}}
     excluded = 0
     for stop_id, source in naptan.stops.items():
         if source.get("status") not in ("", "active") or source.get("busPreparedEligible") is not True or source.get("coordinateValid") is not True:
@@ -290,22 +291,22 @@ def load_naptan_v2(path: Path, nptg_path: Path):
             continue
         stop = {**source, "routes": set()}
         stops[stop_id] = stop
-        aliases[stop_id] = stop_id
-        aliases[stop_id.lower()] = stop_id
+        identifiers["atco"][stop_id] = stop_id
+        identifiers["atco"][stop_id.lower()] = stop_id
         if source.get("naptanCode"):
-            aliases[str(source["naptanCode"]).lower()] = stop_id
-    return stops, aliases, excluded, naptan, nptg
+            identifiers["naptan"][str(source["naptanCode"]).lower()] = stop_id
+    return stops, identifiers, excluded, naptan, nptg
 
 
-def resolve_exact_gtfs_stop(gtfs_id: str, details: dict, aliases: dict[str, str]) -> tuple[str | None, str]:
+def resolve_exact_gtfs_stop(gtfs_id: str, details: dict, identifiers: dict[str, dict[str, str]]) -> tuple[str | None, str]:
     """Resolve only the two permitted deterministic GTFS/NaPTAN identities."""
     if gtfs_id:
-        resolved = aliases.get(gtfs_id) or aliases.get(gtfs_id.lower())
+        resolved = identifiers.get("atco", {}).get(gtfs_id) or identifiers.get("atco", {}).get(gtfs_id.lower())
         if resolved:
             return resolved, "gtfs-stop-id-equals-atco-code"
     stop_code = clean(details.get("stop_code"))
     if stop_code:
-        resolved = aliases.get(stop_code.lower())
+        resolved = identifiers.get("naptan", {}).get(stop_code.lower())
         if resolved:
             return resolved, "gtfs-stop-code-equals-naptan-code"
     return None, "unresolved"
@@ -325,7 +326,7 @@ def endpoint_evidence(calls: list[dict], position: int, groups: dict[str, dict],
             })
     locality = stop.get("nptgLocality") or {}
     parent = stop.get("parentLocalityEvidence") or {}
-    return {
+    evidence = {
         "rawGtfsStopId": call.get("gtfs_stop_id") or None,
         "rawGtfsStopCode": call.get("gtfs_stop_code") or None,
         "rawGtfsStopName": call.get("gtfs_stop_name") or None,
@@ -356,6 +357,66 @@ def endpoint_evidence(calls: list[dict], position: int, groups: dict[str, dict],
             "tripHeadsign": clean(trip.get("trip_headsign")),
         }
     }
+    evidence["provenance"]["sourceIdentities"] = [_provenance_identity(evidence["provenance"])]
+    return evidence
+
+
+def _sorted_unique(values: list[str]) -> list[str]:
+    return sorted({clean(value) for value in values if clean(value)})
+
+
+def _provenance_identity(provenance: dict) -> dict:
+    return {key: clean(provenance.get(key)) or None for key in (
+        "source", "region", "routeId", "routeShortName", "routeLongName", "routeDescription", "tripHeadsign"
+    )}
+
+
+def merge_endpoint_evidence(existing: dict | None, incoming: dict) -> dict:
+    """Merge repeated source evidence without allowing file order to choose a value."""
+    if not existing:
+        return incoming
+    merged = {**existing, **incoming}
+    match_methods = _sorted_unique([
+        existing.get("exactMatchMethod"), incoming.get("exactMatchMethod"),
+        *(existing.get("exactMatchMethods") or []), *(incoming.get("exactMatchMethods") or [])
+    ])
+    if match_methods:
+        merged["exactMatchMethod"] = match_methods[0]
+        if len(match_methods) > 1:
+            merged["exactMatchMethods"] = match_methods
+        else:
+            merged.pop("exactMatchMethods", None)
+    for field in ("rawGtfsStopId", "rawGtfsStopCode", "rawGtfsStopName"):
+        plural = f"{field}s"
+        values = _sorted_unique([
+            existing.get(field), incoming.get(field),
+            *(existing.get(plural) or []), *(incoming.get(plural) or [])
+        ])
+        if values:
+            merged[field] = values[0]
+            if len(values) > 1:
+                merged[plural] = values
+            else:
+                merged.pop(plural, None)
+
+    first = existing.get("provenance") or {}
+    second = incoming.get("provenance") or {}
+    provenance = {**first, **second}
+    for field, plural in (("tripHeadsign", "tripHeadsigns"), ("routeLongName", "routeLongNames"), ("routeDescription", "routeDescriptions")):
+        values = _sorted_unique([first.get(field), second.get(field), *(first.get(plural) or []), *(second.get(plural) or [])])
+        if values:
+            provenance[field] = values[0]
+            if len(values) > 1:
+                provenance[plural] = values
+            else:
+                provenance.pop(plural, None)
+    identities = []
+    for item in [*(first.get("sourceIdentities") or []), _provenance_identity(first), *(second.get("sourceIdentities") or []), _provenance_identity(second)]:
+        if any(item.values()) and item not in identities:
+            identities.append(item)
+    provenance["sourceIdentities"] = sorted(identities, key=lambda item: tuple(item.get(key) or "" for key in ("region", "routeId", "routeShortName", "routeLongName", "routeDescription", "tripHeadsign")))
+    merged["provenance"] = provenance
+    return merged
 
 
 def endpoint_evidence_key(evidence: dict) -> str:
@@ -366,7 +427,8 @@ def add_endpoint_evidence(record: dict, side: str, evidence: dict) -> None:
     key = endpoint_evidence_key(evidence)
     if not key or key == "raw:":
         return
-    record.setdefault("endpointEvidence", {}).setdefault(side, {})[key] = evidence
+    entries = record.setdefault("endpointEvidence", {}).setdefault(side, {})
+    entries[key] = merge_endpoint_evidence(entries.get(key), evidence)
 
 
 def active_days(calendar: dict, exceptions: dict[str, dict[date, int]], dates: dict[str, date]) -> list[str]:

@@ -102,10 +102,53 @@ function mergeEndpointEvidence(first = {}, second = {}) {
   for (const side of ['origin', 'destination']) {
     for (const source of [first?.[side], second?.[side]]) {
       if (!source || typeof source !== 'object') continue;
-      for (const [key, value] of Object.entries(source)) if (value && typeof value === 'object') output[side][key] = value;
+      for (const [key, value] of Object.entries(source)) {
+        if (!value || typeof value !== 'object') continue;
+        output[side][key] = mergeEndpointEvidenceValue(output[side][key], value);
+      }
     }
   }
   return output;
+}
+
+function sortedUniqueText(values) { return unique(values).sort((a, b) => a.localeCompare(b)); }
+
+function mergeEndpointEvidenceValue(first, second) {
+  if (!first) return second;
+  const merged = { ...first, ...second };
+  const matchMethods = sortedUniqueText([first.exactMatchMethod, second.exactMatchMethod, ...(first.exactMatchMethods ?? []), ...(second.exactMatchMethods ?? [])]);
+  if (matchMethods.length) {
+    merged.exactMatchMethod = matchMethods[0];
+    if (matchMethods.length > 1) merged.exactMatchMethods = matchMethods;
+    else delete merged.exactMatchMethods;
+  }
+  for (const field of ['rawGtfsStopId', 'rawGtfsStopCode', 'rawGtfsStopName']) {
+    const plural = `${field}s`;
+    const values = sortedUniqueText([first[field], second[field], ...(first[plural] ?? []), ...(second[plural] ?? [])]);
+    if (values.length) {
+      merged[field] = values[0];
+      if (values.length > 1) merged[plural] = values;
+      else delete merged[plural];
+    }
+  }
+  const firstProvenance = first.provenance ?? {};
+  const secondProvenance = second.provenance ?? {};
+  const provenance = { ...firstProvenance, ...secondProvenance };
+  for (const [field, plural] of [['tripHeadsign', 'tripHeadsigns'], ['routeLongName', 'routeLongNames'], ['routeDescription', 'routeDescriptions']]) {
+    const values = sortedUniqueText([firstProvenance[field], secondProvenance[field], ...(firstProvenance[plural] ?? []), ...(secondProvenance[plural] ?? [])]);
+    if (values.length) {
+      provenance[field] = values[0];
+      if (values.length > 1) provenance[plural] = values;
+      else delete provenance[plural];
+    }
+  }
+  const identities = [...(firstProvenance.sourceIdentities ?? []), ...(secondProvenance.sourceIdentities ?? [])]
+    .filter(item => item && typeof item === 'object')
+    .filter((item, index, values) => values.findIndex(candidate => JSON.stringify(candidate) === JSON.stringify(item)) === index)
+    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  if (identities.length) provenance.sourceIdentities = identities;
+  merged.provenance = provenance;
+  return merged;
 }
 
 function deduplicateServiceRecords(records = []) {

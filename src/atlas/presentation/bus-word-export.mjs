@@ -85,6 +85,9 @@ export function buildBusWordTables(result) {
         (service.operatingPeriodLines ?? []).join('\n')
       ]);
     if (service.serviceNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.serviceNote}` });
+    if (hasPlannerSummary && service.routeVariantNote && service.routeVariantNote !== service.routeGroupNote) {
+      serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeVariantNote}` });
+    }
     const next = services[index + 1];
     if (hasPlannerSummary && service.routeGroupNote && (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey)) serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeGroupNote}` });
   });

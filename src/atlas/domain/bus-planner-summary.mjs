@@ -909,6 +909,12 @@ function noteAppliesToCanonicalPopulation(note, schedules) {
   return true;
 }
 
+function materialServiceNotesForComponent(component, fallbackSchedules = {}) {
+  return unique(component.flatMap(service => materialServiceNotesForService(service)
+    .filter(note => noteAppliesToCanonicalPopulation(note,
+      hasCalendarMetadata(service) ? (service?.departuresByDay ?? service?.stopSchedules ?? {}) : fallbackSchedules))));
+}
+
 function preparedEndpointDisplay(service, side = 'destination') {
   const evidence = service?.endpointEvidence?.[side];
   const first = evidence && typeof evidence === 'object' ? Object.values(evidence)[0] : null;
@@ -1000,17 +1006,59 @@ function originVariantNames(sourceServices, group) {
     .filter(name => !headlineOrigins.has(normal(name)));
 }
 
-function variantNote(component, main) {
+function variantCalendarQualification(service) {
+  const raw = text(service?.serviceNote);
+  const profile = calendarProfileFromService(service);
+  if (profile === 'school-day' || /school[- ]?days?|schooldays?/i.test(raw)) return 'school days only';
+  if (profile === 'term-time' || /term[- ]time|term[- ]only/i.test(raw)) return 'term time only';
+  if (profile === 'non-school-day' || /non[- ]school/i.test(raw)) return 'non-school days only';
+  if (profile === 'holiday' || /holiday/i.test(raw)) return 'holidays only';
+  return '';
+}
+
+function variantNote(component, main, groupingDecision) {
   const endpoints = unique(component.map(service => text(service.origin) + ' → ' + text(service.destination)));
   const patterns = unique(component.map(service => explicitPattern(service).map(text).join('>')).filter(Boolean));
   const journeyIdentitySets = component.map(service => new Set(DAY_ORDER.flatMap(day => (service.departureEvidenceByDay?.[day] ?? []).map(item => departureIdentity(item)).filter(Boolean))));
   const sharedJourneyIdentity = journeyIdentitySets.length > 1 && journeyIdentitySets.every(set => set.size) && [...journeyIdentitySets[0]].some(identity => journeyIdentitySets.every(set => set.has(identity)));
-  const alternatives = alternateDestinations(component, main);
-  const hasVariant = component.length > 1 && ((endpoints.length > 1 && !sharedJourneyIdentity) || patterns.length > 1 || component.some(service => Number(service.patternVariantCount) > 1));
+  const hasVariant = component.length > 1 && ((endpoints.length > 1 && !sharedJourneyIdentity)
+    || patterns.length > 1
+    || component.some(service => Number(service.patternVariantCount) > 1)
+    || (groupingDecision?.calendarVariantRecordIds?.length ?? 0) > 0);
   if (!hasVariant) return null;
-  if (alternatives.length === 1) return `Additional variants and short workings operate, including journeys towards ${alternatives[0]}.`;
-  if (alternatives.length > 1) return `Additional variants and short workings operate, including journeys towards ${alternatives.slice(0, -1).join(', ')} and ${alternatives.at(-1)}.`;
-  return 'Additional short workings and timetable variants operate.';
+  const principalDestinationValue = normal(plannerDestination(main));
+  const duplicateIds = new Set(groupingDecision?.deduplicatedSourceRecordIds ?? []);
+  const shortIds = new Set(groupingDecision?.shortWorkingRecordIds ?? []);
+  const branchIds = new Set(groupingDecision?.branchVariantRecordIds ?? []);
+  const calendarIds = new Set(groupingDecision?.calendarVariantRecordIds ?? []);
+  const candidates = component
+    .filter(service => service !== main)
+    .filter(service => !duplicateIds.has(serviceIdForPlanner(service)))
+    .map(service => {
+      const id = serviceIdForPlanner(service);
+      const destination = plannerDestination(service);
+      const kind = shortIds.has(id) ? 'short working' : branchIds.has(id) ? 'route variant' : calendarIds.has(id) ? 'calendar variant' : 'variant';
+      const qualification = variantCalendarQualification(service);
+      return { route: text(service.routeNumber) || 'Route not supplied', destination, kind, qualification };
+    })
+    .filter(item => item.destination && (normal(item.destination) !== principalDestinationValue || item.qualification));
+  const grouped = new Map();
+  for (const item of candidates) {
+    const key = `${item.kind}|${normal(item.destination)}|${normal(item.qualification)}`;
+    const current = grouped.get(key) ?? { ...item, routes: [] };
+    if (!current.routes.includes(item.route)) current.routes.push(item.route);
+    grouped.set(key, current);
+  }
+  const notes = [...grouped.values()].map(item => {
+    const route = item.routes.length > 1 ? item.routes.join(' / ') : item.routes[0];
+    const prefix = item.kind === 'short working' ? 'Additional short workings' : item.kind === 'route variant' ? 'Additional route variants' : 'Additional variants';
+    return `${route} – ${prefix} towards ${item.destination}${item.qualification ? ` (${item.qualification})` : ''}.`;
+  });
+  return notes.length ? notes.join(' ') : 'Additional short workings and timetable variants operate.';
+}
+
+function serviceIdForPlanner(service) {
+  return text(service?.id || service?.sourceRecordId);
 }
 
 function resolvedPlannerDestination(service) {
@@ -1187,14 +1235,12 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   if (mixedProfileOutput) profileNotes.push('Calendar profiles vary; each frequency line is labelled.');
   if (unresolvedNeedsQualification) profileNotes.push('Some calendar applicability is not confirmed; detailed evidence is retained for review.');
   if (plannerServiceGroup.terminusDecision?.note) profileNotes.push(plannerServiceGroup.terminusDecision.note);
-  const notes = unique(component.flatMap(materialServiceNotesForService))
-    .filter(note => noteAppliesToCanonicalPopulation(note, displayResult.schedules))
-    .filter(note => !(mixedProfileOutput && hasCalendarTaxonomyNote(note)));
+  const notes = materialServiceNotesForComponent(component, displayResult.schedules);
   notes.push(...profileNotes);
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
   const groupingDecision = Object.freeze({
     ...plannerServiceGroup.publicServiceGroupingDecision,
-    deduplicatedSourceRecordIds: Object.freeze(ids.filter(id => id !== text(main.id) && id !== text(main.sourceRecordId)))
+    deduplicatedSourceRecordIds: Object.freeze(plannerServiceGroup.publicServiceGroupingDecision.deduplicatedSourceRecordIds ?? [])
   });
   const principalLocations = unique(main.principalLocations ?? []);
   const profileSchedules = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).schedules])));
@@ -1264,7 +1310,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     operatorRawNames: plannerServiceGroup.rawOperatorNames,
     operatorIdentities: plannerServiceGroup.operatorIdentities,
     sourceSelection: canonical.eligible.length ? 'representative-stop scheduled evidence' : 'representative-stop summary fallback',
-    routeVariantNote: variantNote(component, main),
+    routeVariantNote: variantNote(component, main, groupingDecision),
     alternateDestinationNames: Object.freeze(alternateDestinations(component, main)),
     materialAlternateDestinations: groupingDecision.materialDestinationEvidence,
     publicServiceGroupingDecision: groupingDecision,
@@ -1284,7 +1330,13 @@ function attachRouteNotes(rows) {
   for (const group of groups.values()) {
     const rowNotes = group.map(({ row }) => notesFor(row));
     const shared = [...sharedTaxonomy].filter(note => rowNotes.length > 1 && rowNotes.every(notes => notes.includes(note)));
-    const hasVariant = group.some(({ row }) => row.routeVariantNote);
+    const hasVariant = group.some(({ row }) => row.routeVariantNote)
+      || group.some(({ row }) => {
+        const sources = (row.rawServiceSummaries ?? []).flatMap(service => service.sourceRecordIds ?? [service.id]);
+        return sources.length > 1
+          && new Set(sources.map(text).filter(Boolean)).size > 1
+          && ((row.alternateDestinationNames ?? []).length > 0 || (row.materialAlternateDestinations ?? []).length > 1);
+      });
     const routeNotes = [...shared];
     if (hasVariant) {
       const headlineDestinations = new Set(group.map(({ row }) => normal(plannerDestination(row))));

@@ -23,8 +23,12 @@ export function isUnspecifiedOperator(value) {
 }
 
 export function sourceProvider(service = {}) {
-  const explicit = text(service.provider || service.timetableSource || service.source?.provider || service.sourceFile || service.source?.sourceFile);
+  const explicit = text(service.provider || service.source?.provider || service.source?.sourceProvider || service.sourceFile || service.source?.sourceFile);
   if (explicit) return explicit;
+  const timetable = text(service.timetableSource);
+  if (/^tfl\b/i.test(timetable)) return 'TfL';
+  if (/^bods\b/i.test(timetable)) return 'BODS';
+  if (/^tnds\b/i.test(timetable)) return 'TNDS';
   const provenance = normal(service.source?.provenance);
   if (provenance.includes('bods')) return 'BODS';
   if (provenance.includes('tnds')) return 'TNDS';
@@ -38,15 +42,62 @@ export function sourceAuthorityRank(service = {}) {
   return provider ? 1 : 0;
 }
 
+const ACCEPTED_EXACT_MATCH_METHOD = /^(?:gtfs-stop-id-equals-atco-code|gtfs-stop-code-equals-naptan-code|exact(?:-|$)|tfl(?:-|$))/i;
+
+function preparedEndpointIsResolved(entry = {}) {
+  const methods = unique([entry.exactMatchMethod, ...(entry.exactMatchMethods ?? [])]);
+  return Boolean(text(entry.resolvedStopPointId) && methods.some(method => ACCEPTED_EXACT_MATCH_METHOD.test(method)));
+}
+
+function decisionEndpointIsResolved(decision = {}) {
+  if (!decision || decision.conflict || decision.unresolved || decision.partialExactCoverage) return false;
+  const ids = unique([decision.primaryEndpointStopPointId, decision.endpointStopPointId, ...(decision.endpointStopPointIds ?? [])]);
+  if (!ids.length) return false;
+  const type = normal(decision.decisionType);
+  const source = normal(decision.evidenceSource);
+  return decision.exact === true || decision.exactEvidence === true
+    || /exact endpoint resolved|prepared exact endpoint|runtime exact endpoint|exact endpoint/.test(`${type} ${source}`);
+}
+
+function tflOrderedEndpointIsResolved(service, side) {
+  if (sourceAuthorityRank(service) !== 3) return false;
+  const ids = unique([service?.[`${side}StopPointId`], ...(service?.[`${side}StopPointIds`] ?? [])]);
+  const routePattern = pattern(service);
+  const endpointId = side === 'origin' ? routePattern[0] : routePattern.at(-1);
+  const endpoint = Array.isArray(service?.routePatternStops)
+    ? (side === 'origin' ? service.routePatternStops[0] : service.routePatternStops.at(-1))
+    : null;
+  return Boolean(endpointId && ids.includes(endpointId) && endpoint && (
+    endpoint.nptgLocalityCode || endpoint.nptgLocalityName || endpoint.stopArea || endpoint.logicalGroupRefs?.length || endpoint.exactEvidence
+  ));
+}
+
+/**
+ * The only authoritative gate for BUS-GROUP exact endpoint/place logic.
+ * Evidence containers are audit material; they become exact only when they
+ * carry a resolved identity and an accepted exact-match contract.
+ */
+export function hasResolvedExactEndpointEvidence(service = {}, side = 'destination') {
+  const decision = service?.[`${side}EndpointDecision`] || {};
+  if (decisionEndpointIsResolved(decision)) return true;
+  const entries = endpointEvidenceEntries(service, side);
+  if (entries.length && entries.every(preparedEndpointIsResolved)) return true;
+  return tflOrderedEndpointIsResolved(service, side);
+}
+
 export function endpointPlaceKeys(service = {}, side = 'destination') {
   const decision = service?.[`${side}EndpointDecision`] || {};
   const evidence = decision.evidence || decision.exactEvidence || {};
   const preparedEntries = endpointEvidenceEntries(service, side);
-  const exact = Boolean(preparedEntries.length || decision.exactEvidence || decision.exact || evidence.endpoint || evidence.endpointEvidenceSet?.length
-    || /^exact-|prepared-exact|runtime-and-prepared/.test(text(decision.decisionType) + ' ' + text(decision.evidenceSource)));
+  const resolvedPreparedEntries = preparedEntries.filter(preparedEndpointIsResolved);
+  const exact = hasResolvedExactEndpointEvidence(service, side);
   if (!exact) return [];
   const keys = [];
   const add = (prefix, values) => unique(values).forEach(value => keys.push(`${prefix}:${value}`));
+  const orderedPattern = pattern(service);
+  const patternEndpoint = Array.isArray(service?.routePatternStops)
+    ? (side === 'origin' ? service.routePatternStops[0] : service.routePatternStops.at(-1))
+    : null;
   const stopAreas = [
     decision.stopArea?.id,
     ...(decision.stopAreas ?? []).map(area => area?.id),
@@ -54,24 +105,30 @@ export function endpointPlaceKeys(service = {}, side = 'destination') {
     ...(evidence.stopAreas ?? []).map(area => area?.id),
     ...(decision.endpointLogicalGroupIds ?? []),
     ...(evidence.endpointLogicalGroupIds ?? []),
-    ...preparedEntries.flatMap(entry => [
+    ...resolvedPreparedEntries.flatMap(entry => [
       ...(entry.stopAreas ?? []).map(area => area?.id),
       ...(entry.logicalGroupRefs ?? []).map(ref => ref?.id)
-    ])
+    ]),
+    patternEndpoint?.stopArea?.id,
+    ...(patternEndpoint?.logicalGroupRefs ?? []).map(ref => ref?.id),
+    ...(patternEndpoint?.logicalGroupIds ?? [])
   ].filter(Boolean);
   add('stop-area', stopAreas.map(value => normal(value)));
   add('place', [decision.endpointLogicalPlaceId, evidence.endpointLogicalPlaceId, decision.logicalPlaceId, evidence.logicalPlaceId,
-    ...preparedEntries.map(entry => entry.nptgLocalityName)].map(normal));
+    ...resolvedPreparedEntries.map(entry => entry.nptgLocalityName), patternEndpoint?.nptgLocalityName, patternEndpoint?.localityName].map(normal));
   add('stop-point', [
     decision.primaryEndpointStopPointId,
     decision.endpointStopPointId,
     ...(decision.endpointStopPointIds ?? []),
     evidence.endpointStopPointId,
     ...(evidence.endpointStopPointIds ?? []),
-    ...preparedEntries.map(entry => entry.resolvedStopPointId || entry.id)
+    ...resolvedPreparedEntries.map(entry => entry.resolvedStopPointId),
+    service?.[`${side}StopPointId`],
+    ...(service?.[`${side}StopPointIds`] ?? []),
+    orderedPattern[side === 'origin' ? 0 : -1]
   ].map(normal));
   add('place-name', [decision.chosenDisplayName, decision.chosen, evidence.stopArea?.name, ...(evidence.stopAreas ?? []).map(area => area?.name),
-    ...preparedEntries.flatMap(entry => [entry.naptanCommonName, ...(entry.stopAreas ?? []).map(area => area?.name)])].map(normal));
+    ...resolvedPreparedEntries.flatMap(entry => [entry.naptanCommonName, ...(entry.stopAreas ?? []).map(area => area?.name)])].map(normal));
   return unique(keys);
 }
 
@@ -95,23 +152,20 @@ function endpointDisplay(service, side) {
 function endpointStopIds(service, side) {
   const decision = service?.[`${side}EndpointDecision`] || {};
   const preparedEntries = endpointEvidenceEntries(service, side);
+  const resolved = hasResolvedExactEndpointEvidence(service, side);
   return unique([
-    service?.[`${side}StopPointId`],
-    ...(service?.[`${side}StopPointIds`] ?? []),
-    decision.primaryEndpointStopPointId,
-    decision.endpointStopPointId,
-    ...(decision.endpointStopPointIds ?? []),
-    ...preparedEntries.map(entry => entry.resolvedStopPointId || entry.id)
+    ...(resolved ? [service?.[`${side}StopPointId`], ...(service?.[`${side}StopPointIds`] ?? [])] : []),
+    ...(resolved ? [decision.primaryEndpointStopPointId, decision.endpointStopPointId, ...(decision.endpointStopPointIds ?? [])] : []),
+    ...preparedEntries.filter(preparedEndpointIsResolved).map(entry => entry.resolvedStopPointId)
   ]);
 }
 
 function endpointIsExact(service, side) {
-  const decision = service?.[`${side}EndpointDecision`] || {};
-  return Boolean(endpointEvidenceEntries(service, side).length || decision.exactEvidence || decision.exact || decision.evidence?.endpointEvidenceSet?.length
-    || /^exact-|prepared-exact|runtime-and-prepared/.test(text(decision.decisionType) + ' ' + text(decision.evidenceSource)));
+  return hasResolvedExactEndpointEvidence(service, side);
 }
 
 function endpointIsAssessed(service, side) {
+  if (!endpointIsExact(service, side)) return false;
   const assessed = new Set(unique(service?.assessedStops ?? service?.stopIds ?? []));
   return endpointStopIds(service, side).some(id => assessed.has(id));
 }
@@ -170,6 +224,26 @@ function sourceRecordIds(services) { return unique(services.flatMap(service => s
 function lineageIds(service) { return unique([service.serviceLineageId, ...(service.sourceRouteIds ?? []), service.routeId, service.source?.routeId]); }
 function calendarIds(service) { return unique([service.calendarProfileId, ...(service.calendarEvidence ?? []).map(item => item?.calendarProfileId)]); }
 
+function sameExactEndpointEvidence(first, second) {
+  const left = ['origin', 'destination'].map(side => endpointPlaceKeys(first, side)[0]);
+  const right = ['origin', 'destination'].map(side => endpointPlaceKeys(second, side)[0]);
+  return left.every(Boolean) && right.every(Boolean) && left.some((value, index) => value === right[index]);
+}
+
+function sharedPatternEvidence(first, second) {
+  const left = pattern(first), right = pattern(second);
+  if (!left.length || !right.length) return false;
+  if (left.join('|') === right.join('|') || strictSubsequenceServices(first, second) || strictSubsequenceServices(second, first)) return true;
+  const rightSet = new Set(right);
+  return left.filter(value => rightSet.has(value)).length >= 2;
+}
+
+function sameCalendarProfile(first, second) {
+  const left = calendarIds(first), right = calendarIds(second);
+  if (!left.length && !right.length) return true;
+  return left.length === right.length && left.every(value => right.includes(value));
+}
+
 function principalDestination(service) {
   return endpointDisplay(service, 'destination') || text(service.destination);
 }
@@ -193,13 +267,32 @@ export function makePublicServiceGroupingDecision({
   const mainPattern = pattern(principal);
   const shortWorkingRecords = records.filter(service => service !== principal
     && (strictSubsequenceServices(service, principal) || containedEndpointShortWorking(service, principal)));
+  const calendarVariantRecords = records.filter(service => service !== principal && !sameCalendarProfile(service, principal));
   const destinations = destinationValues(records);
   const mainDestination = principal ? principalDestination(principal) : '';
   const alternateDestinations = destinations.filter(value => value !== mainDestination);
-  const branchRecords = records.filter(service => service !== principal && !shortWorkingRecords.includes(service)
-    && (endpointIdentity(service, 'origin') !== endpointIdentity(principal, 'origin')
-      || endpointIdentity(service, 'destination') !== endpointIdentity(principal, 'destination')
-      || text(service.routeNumber).toUpperCase() !== text(principal?.routeNumber).toUpperCase()));
+  const duplicateRecords = records.filter(service => service !== principal
+    && !shortWorkingRecords.includes(service)
+    && !calendarVariantRecords.includes(service)
+    && text(service.routeNumber).toUpperCase() === text(principal?.routeNumber).toUpperCase()
+    && sameExactEndpointEvidence(service, principal)
+    && (sameCalendarProfile(service, principal) || calendarIds(service).length === 0)
+    && (sharedPatternEvidence(service, principal)
+      || sourceAuthorityRank(service) !== sourceAuthorityRank(principal)));
+  const branchRecords = records.filter(service => service !== principal
+    && !shortWorkingRecords.includes(service)
+    && !calendarVariantRecords.includes(service)
+    && !duplicateRecords.includes(service));
+  const variantDestinationEvidence = records
+    .filter(service => service !== principal && !duplicateRecords.includes(service))
+    .map(service => Object.freeze({
+      routeNumber: text(service.routeNumber) || null,
+      destination: principalDestination(service) || null,
+      kind: shortWorkingRecords.includes(service) ? 'short-working' : branchRecords.includes(service) ? 'branch-variant' : calendarVariantRecords.includes(service) ? 'calendar-variant' : 'variant',
+      calendarProfiles: Object.freeze(calendarIds(service)),
+      sourceRecordIds: Object.freeze(sourceRecordIds([service])),
+      sourceAuthority: sourceAuthorityRank(service)
+    }));
   const patternEvidence = records.map(service => Object.freeze({
     sourceRecordId: serviceId(service) || null,
     orderedRoutePatternStopIds: Object.freeze(pattern(service)),
@@ -238,11 +331,13 @@ export function makePublicServiceGroupingDecision({
     }),
     shortWorkingRecordIds: Object.freeze(shortWorkingRecords.map(serviceId).filter(Boolean)),
     branchVariantRecordIds: Object.freeze(branchRecords.map(serviceId).filter(Boolean)),
+    calendarVariantRecordIds: Object.freeze(calendarVariantRecords.map(serviceId).filter(Boolean)),
+    variantDestinationEvidence: Object.freeze(variantDestinationEvidence),
     alternateDestinations: Object.freeze(alternateDestinations),
     materialDestinationEvidence: Object.freeze(destinationValues(records)),
     calendarProfiles: Object.freeze(unique(records.flatMap(calendarIds))),
     ambiguousRecordIds: Object.freeze(ambiguousServices.map(serviceId).filter(Boolean)),
-    deduplicatedSourceRecordIds: Object.freeze([]),
+    deduplicatedSourceRecordIds: Object.freeze(sourceRecordIds(duplicateRecords)),
     retainedAmbiguousRecordIds: Object.freeze(ambiguousServices.map(serviceId).filter(Boolean))
   });
 }
@@ -288,6 +383,85 @@ function patternPositionProof(service, side, stopsById, assessedKeys) {
   return { terminal: terminalMatches, through: internalMatches && !terminalMatches };
 }
 
+function serviceRelevantStops(services, assessedStops) {
+  const relevantIds = new Set(services.flatMap(service => [
+    ...(service.assessedStops ?? []),
+    ...(service.stopIds ?? []),
+    ...pattern(service)
+  ]).map(normal));
+  return (assessedStops ?? []).filter(stop => relevantIds.has(normal(stop.id || stop.sourceId)));
+}
+
+function serviceEndpointCandidates(service, side, relevantStops) {
+  if (!endpointIsExact(service, side)) return [];
+  const endpointKeys = new Set(endpointPlaceKeys(service, side));
+  const endpointIds = new Set(endpointStopIds(service, side).map(normal));
+  const candidates = new Map();
+  for (const stop of relevantStops) {
+    const stopIdValue = normal(stop.id || stop.sourceId);
+    const stopKeys = stopPlaceKeys(stop);
+    const sharedArea = stopKeys.find(key => endpointKeys.has(key) && /^(?:stop-area|place):/.test(key));
+    const key = sharedArea || (endpointIds.has(stopIdValue) ? `stop-point:${stopIdValue}` : null);
+    if (!key) continue;
+    const current = candidates.get(key) ?? { key, stops: [], sides: [] };
+    current.stops.push(stop);
+    if (!current.sides.includes(side)) current.sides.push(side);
+    candidates.set(key, current);
+  }
+  return [...candidates.values()];
+}
+
+function mergeTerminusCandidates(services, principal, assessedStops) {
+  const relevantStops = serviceRelevantStops(services, assessedStops);
+  const merged = new Map();
+  for (const side of ['origin', 'destination']) {
+    for (const candidate of serviceEndpointCandidates(principal, side, relevantStops)) {
+      const current = merged.get(candidate.key) ?? { ...candidate, sides: [] };
+      current.stops = [...new Map([...current.stops, ...candidate.stops].map(stop => [text(stop.id || stop.sourceId), stop])).values()];
+      for (const candidateSide of candidate.sides) if (!current.sides.includes(candidateSide)) current.sides.push(candidateSide);
+      merged.set(candidate.key, current);
+    }
+  }
+  return { relevantStops, candidates: [...merged.values()] };
+}
+
+function candidateAssessmentDistance(candidate) {
+  const distances = candidate.stops.map(stop => stop?.walking?.status === 'routed'
+    ? Number(stop.walking.distanceMetres)
+    : Number(stop?.distanceMetres)).filter(Number.isFinite);
+  return distances.length ? Math.min(...distances) : null;
+}
+
+function nearestRelevantStops(stops) {
+  if (!stops.length) return [];
+  const scored = stops.map(stop => ({ stop, distance: stop?.walking?.status === 'routed' ? Number(stop.walking.distanceMetres) : Number(stop?.distanceMetres) }));
+  const finite = scored.map(item => item.distance).filter(Number.isFinite);
+  if (!finite.length) return [stops[0]];
+  const nearest = Math.min(...finite);
+  return scored.filter(item => item.distance === nearest).map(item => item.stop);
+}
+
+function terminusUnresolvedDecision(reason, assessedStops, principal, candidates = []) {
+  return Object.freeze({
+    type: 'TerminusDecision',
+    status: 'unresolved-review',
+    presentation: 'none',
+    proven: false,
+    assessedPlace: null,
+    terminalSides: Object.freeze([]),
+    terminalStopPointIds: Object.freeze([]),
+    arrivalEvidence: Object.freeze([]),
+    departureEvidence: Object.freeze([]),
+    reason,
+    note: null,
+    evidence: Object.freeze({
+      principalSourceRecordId: serviceId(principal) || null,
+      serviceRelevantAssessedStopPointIds: Object.freeze(serviceRelevantStops([principal], assessedStops).map(stop => text(stop.id || stop.sourceId)).filter(Boolean)),
+      candidatePlaceKeys: Object.freeze(candidates.map(candidate => candidate.key))
+    })
+  });
+}
+
 export function makeTerminusDecision({ services = [], principal = services[0] || null, assessedStops = [], publicPlace = null } = {}) {
   if (services.some(service => service?.circular) || principal?.circular) return Object.freeze({
     type: 'TerminusDecision',
@@ -304,17 +478,40 @@ export function makeTerminusDecision({ services = [], principal = services[0] ||
     evidence: Object.freeze({ circularClassificationDeferred: true, principalSourceRecordId: serviceId(principal) || null })
   });
   const stopsById = new Map((assessedStops ?? []).map(stop => [text(stop.id || stop.sourceId), stop]).filter(([id]) => id));
-  const placeCounts = new Map();
-  for (const stop of assessedStops ?? []) {
-    for (const key of stopPlaceKeys(stop).filter(value => /^stop-area:/.test(value))) placeCounts.set(key, (placeCounts.get(key) ?? 0) + 1);
+  const { relevantStops, candidates: allCandidates } = mergeTerminusCandidates(services, principal, assessedStops);
+  const anchorStops = nearestRelevantStops(relevantStops);
+  const anchorIds = new Set(anchorStops.map(stop => text(stop.id || stop.sourceId)));
+  const anchorKeys = new Set(anchorStops.flatMap(stopPlaceKeys));
+  const candidates = allCandidates.filter(candidate => candidate.stops.some(stop => anchorIds.has(text(stop.id || stop.sourceId))) || anchorKeys.has(candidate.key));
+  let candidate = candidates[0] || null;
+  if (candidates.length > 1) {
+    const ranked = candidates.map(item => ({ item, distance: candidateAssessmentDistance(item) }))
+      .sort((left, right) => (left.distance ?? Number.POSITIVE_INFINITY) - (right.distance ?? Number.POSITIVE_INFINITY) || left.item.key.localeCompare(right.item.key));
+    const best = ranked[0];
+    const second = ranked[1];
+    if (best.distance === null || second.distance === null || best.distance === second.distance) return terminusUnresolvedDecision(
+      'More than one service-relevant assessed StopArea/place remained plausible; terminus suppression was not applied.',
+      assessedStops,
+      principal,
+      candidates
+    );
+    candidate = best.item;
   }
-  if (!placeCounts.size) for (const stop of assessedStops ?? []) {
-    for (const key of stopPlaceKeys(stop).filter(value => /^place:/.test(value))) placeCounts.set(key, (placeCounts.get(key) ?? 0) + 1);
-  }
-  const targetPlaceKey = [...placeCounts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] || null;
-  const targetStops = targetPlaceKey
-    ? (assessedStops ?? []).filter(stop => stopPlaceKeys(stop).includes(targetPlaceKey))
-    : (assessedStops ?? []).slice(0, 1);
+  const targetStops = candidate?.stops ?? anchorStops;
+  if (!targetStops.length) return Object.freeze({
+    type: 'TerminusDecision',
+    status: 'not-assessed-endpoint',
+    presentation: 'none',
+    proven: false,
+    assessedPlace: text(publicPlace) || null,
+    terminalSides: Object.freeze([]),
+    terminalStopPointIds: Object.freeze([]),
+    arrivalEvidence: Object.freeze([]),
+    departureEvidence: Object.freeze([]),
+    reason: 'The public service did not serve an assessed physical stop from which a terminal place could be established.',
+    note: null,
+    evidence: Object.freeze({ principalSourceRecordId: serviceId(principal) || null, serviceRelevantAssessedStopPointIds: Object.freeze([]), candidatePlaceKeys: Object.freeze([]) })
+  });
   const assessedKeys = new Set(targetStops.flatMap(stop => [`stop-point:${normal(stop.id || stop.sourceId)}`, ...stopPlaceKeys(stop)]));
   const sides = {};
   for (const side of ['origin', 'destination']) {
@@ -342,7 +539,7 @@ export function makeTerminusDecision({ services = [], principal = services[0] ||
     status = 'unresolved-review';
     reason = 'The assessed place matched endpoint evidence, but ordered endpoint proof was incomplete; arrival suppression was not applied.';
   }
-  const place = text(publicPlace || provenSides.map(side => endpointDisplay(principal, side)).find(Boolean) || assessedPlace(assessedStops, firstPlace));
+  const place = text(publicPlace || provenSides.map(side => endpointDisplay(principal, side)).find(Boolean) || assessedPlace(targetStops, firstPlace));
   return Object.freeze({
     type: 'TerminusDecision',
     status,
@@ -364,6 +561,8 @@ export function makeTerminusDecision({ services = [], principal = services[0] ||
         endpointStopPointIds: Object.freeze(evidence.stopIds)
       })]))),
       assessedStopPointIds: Object.freeze(targetStops.map(stop => text(stop.id || stop.sourceId)).filter(Boolean)),
+      serviceRelevantAssessedStopPointIds: Object.freeze(relevantStops.map(stop => text(stop.id || stop.sourceId)).filter(Boolean)),
+      candidatePlaceKeys: Object.freeze(candidates.map(item => item.key)),
       assessedPlaceKeys: Object.freeze([...assessedKeys])
     })
   });

@@ -49,6 +49,8 @@ function rows(records, selectedStops = stops) { return buildPlannerBusServiceSum
 // keeps the national source underneath a TfL-authoritative public row.
 const n279Tfl = record({ id: 'tfl-n279', routeNumber: 'N279', operator: 'Arriva London North', provider: 'TfL', origin: 'Waltham Cross', destination: 'Charing Cross (Trafalgar Square)', originStopPointId: 'W-A', destinationStopPointId: 'CC', pattern: ['W-A', 'M', 'CC'], direction: 'outbound' });
 const n279National = record({ id: 'tnds-n279', routeNumber: 'N279', operator: 'Operator not supplied in the timetable', provider: 'TNDS', origin: 'Bus Station', destination: 'Trafalgar Square / Charing Cross Stn', originStopPointId: 'W-C', destinationStopPointId: 'CC', pattern: ['W-C', 'M', 'CC'], direction: 'outbound' });
+n279Tfl.originEndpointDecision = endpoint('Waltham Cross Bus Station', 'W-A', 'area:WALTHAM', 'Waltham Cross');
+n279Tfl.destinationEndpointDecision = endpoint('Charing Cross (Trafalgar Square)', 'CC', 'area:CHARING-CROSS', 'Charing Cross');
 n279National.originEndpointDecision = endpoint('Waltham Cross Bus Station', 'W-C', 'area:WALTHAM', 'Bus Station');
 n279National.destinationEndpointDecision = endpoint('Charing Cross (Trafalgar Square)', 'CC', 'area:CHARING-CROSS', 'Trafalgar Square / Charing Cross Stn');
 const n279Rows = rows([n279National, n279Tfl]);

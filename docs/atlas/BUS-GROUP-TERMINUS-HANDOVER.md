@@ -7,7 +7,7 @@ on top of the accepted Alpha.15 planner implementation.
 
 | Item | Value |
 |---|---|
-| Accepted starting SHA | `06dbb19e9545d19c24879cf72227e209dcb96cf5` |
+| Accepted starting SHA | `b9b474aec2762161e1332f2a73a44e80574be1d9` |
 | Working branch | `codex/atlas-bus-group-terminus` |
 | Production release | `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914` |
 | Data policy | No source acquisition, publication, or deployment performed |
@@ -16,6 +16,77 @@ on top of the accepted Alpha.15 planner implementation.
 The production release identity is unchanged. The frozen snapshot is diagnostic
 only (`FROZEN_DIAGNOSTIC_EXPLICIT`, non-production eligible) and is not promoted
 or treated as current data.
+
+## BUS-GROUP-1A corrective hardening
+
+The corrective implementation remains deliberately bounded to the accepted
+BUS-GROUP / PlannerServiceGroup / TerminusDecision architecture. It does not
+change Alpha.15, circular semantics, BUS-DEST ownership, the main branch, or
+publication/deployment state.
+
+### Exactness and authority
+
+`hasResolvedExactEndpointEvidence(service, side)` is now the authoritative
+BUS-GROUP gate. An evidence container, raw GTFS ID, source-retained text,
+`exactMatchMethod: unresolved`, conflict, or unresolved BUS-DEST decision is
+not exact. Exactness requires a resolved StopPoint identity plus an accepted
+exact-match method, an accepted exact BUS-DEST decision, or the existing
+authoritative TfL ordered-pattern contract. Unresolved evidence remains
+auditable but cannot prove place equivalence, deduplication, terminus status,
+or arrival suppression.
+
+Provider authority is selected from explicit provider/source fields before
+presentation text. Therefore `source.provider = TfL` remains TfL authority for
+`TfL + BODS supplementary`; genuine BODS or TNDS fallback remains national
+authority and is not promoted to TfL. The deterministic authority order is
+TfL > BODS/TNDS national > other/unknown.
+
+### Audit and calendar semantics
+
+`PublicServiceGroupingDecision` now retains separate structured collections for
+`groupedSourceRecordIds`, `deduplicatedSourceRecordIds`,
+`shortWorkingRecordIds`, `branchVariantRecordIds`,
+`calendarVariantRecordIds`, `variantDestinationEvidence`, and retained
+ambiguous records. A branch sharing only feed lineage is not a duplicate:
+duplicate evidence requires exact endpoint overlap plus shared ordered-pattern
+evidence or an explicit source-authority-copy relationship. The national N279
+copy remains capable of appearing in `deduplicatedSourceRecordIds`; route 66
+short-working evidence does not get that label merely because it is not the
+principal record.
+
+Mixed calendar notes are evaluated against the originating service/profile
+when explicit calendar evidence exists, while unqualified legacy text keeps
+the existing consolidated-population safety filter. School-day, term-time,
+non-school-day, holiday, weekday/weekend, and limited-service qualifications
+remain visible when material. The structured `routeVariantNote` retains
+route-number → destination → qualification → source-record relationships;
+legacy `routeGroupNote` wording remains compatible where no relationship would
+be lost, and Word also emits the attributed variant note for parity.
+
+### Service-relevant terminus and fail-safe ambiguity
+
+Terminus selection no longer chooses the globally most common assessed
+StopArea/place. It first restricts evidence to physical stops served by the
+current service/group and exact endpoint/pattern evidence, then resolves the
+service-relevant assessed place. If more than one plausible service-relevant
+place remains equally supported, `TerminusDecision` is
+`unresolved-review`, presentation is `none`, and arrival suppression is not
+applied. Circular state remains unchanged and final circular interpretation is
+reserved for BUS-CIRC.
+
+### Generic fictional controls
+
+`tests/atlas/bus-group-stop-1a-hardening.test.mjs` uses fictional route Q1,
+fictional Alpha/Beta/Gamma locations, fictional StopAreas, and a fictional
+operator. It proves unresolved-vs-resolved endpoint handling, authority
+precedence, duplicate/short/branch/calendar audit separation, route-attributed
+calendar notes, a smaller service-relevant terminus beating an unrelated
+larger StopArea, and equal-distance ambiguity with no suppression. No
+production logic contains Waltham, Hertford, Harlow, Loughton, Hammond Street,
+North Weald, Charing Cross, Turnpike Lane, route-number, operator, or local
+StopPoint/StopArea exceptions.
+
+The new control is included in `tests/atlas/run-all.mjs`.
 
 ## Runtime architecture
 
@@ -91,13 +162,15 @@ forced into terminal wording.
 
 ## Tests and controls
 
-The added deterministic test is
-`tests/atlas/bus-group-terminus.test.mjs`. It covers TfL plus national-source
+The added deterministic tests are
+`tests/atlas/bus-group-terminus.test.mjs` and
+`tests/atlas/bus-group-stop-1a-hardening.test.mjs`. They cover TfL plus national-source
 same-public-service grouping, exact endpoint-place equivalence, `13`/`13A` and
 `279`/`N279` separation, short workings, divergent branches, operator/source
 authority, alternate destinations, calendar safety, physical-journey identity,
 linear terminus arrival suppression, through-service, uncertain endpoints,
-circular preservation, and Browser/Word parity.
+circular preservation, fictional generalisation, ambiguity fail-safe, and
+Browser/Word parity.
 
 The accepted canonical frozen control remains:
 
@@ -129,6 +202,43 @@ The principal replay controls are:
 - Source IDs, alternate destinations, branch/short-working classifications,
   endpoint StopPoint/StopArea evidence, and the canonical departure evidence
   remain on the planner row for audit and review.
+
+The corrected canonical replay used only the existing prepared frozen cache
+for run `36125621080` and snapshot
+`8e2982017598eb0f37153f03eb42bab596d70d1217cd08f0678944719fe666c9`:
+
+| Measure | Corrected replay |
+|---|---:|
+| Physical stops | 16 |
+| Distinct routes | 21 |
+| Route×StopPoint pairs | 86 |
+| Raw prepared service records | 97 |
+| Planner rows | 21 |
+
+The corrected replay retained the requested route controls: 310, 15, 217,
+279, N279 and 491 remained separate public routes with proven Waltham Cross
+terminus decisions; 279 and N279 did not collapse; 13/13A/13B/13C retained
+their actual source-supported destinations; 242 retained Welham Green Railway
+Station and Brookfield Centre; 279 retained Manor House Station; 16/16C
+remained outside terminal suppression as circular controls; and route-variant
+notes retained route numbers and destinations. The canonical replay produced
+19 `proven-terminus` rows and two `not-assessed-endpoint` rows; no unresolved
+terminus ambiguity was silently suppressed.
+
+### Non-Waltham frozen-source controls
+
+These controls used the same already-prepared national snapshot and the same
+700 m Full Assessment path. No fresh acquisition was made.
+
+| Control | Site and purpose | Stops | Raw service records | Planner rows / routes | Terminus and variants | Ambiguity / retained information |
+|---|---|---:|---:|---:|---|---|
+| Cambridge | Cambridge city centre, `52.2053, 0.1218`; dense multi-operator interchange and ordinary/variant coverage | 62 | 244 | 50 / 40 | 35 proven termini; 30 rows with variant notes, including route 1 short/route variants and route 3 variants | 0 unresolved-review rows; route/destination relationships and service-relevant termini retained |
+| Birmingham | Birmingham city centre, `52.4796, -1.9026`; different region/operator mix with termini and short/route variants | 101 | 201 | 82 / 56 | 36 proven termini; 38 rows with variant notes, including routes 2, 4A, 5, 6, 9 and 10 | 0 unresolved-review rows; planner information retained without Waltham-specific rules |
+
+The controls demonstrate the same generic domain rules outside Waltham. A
+missing/unsupported endpoint remains `not-assessed-endpoint` rather than being
+invented as a terminus; it is not an ambiguity claim and does not trigger
+suppression.
 
 Browser and Word continue to consume the same planner rows, service notes,
 grouping decisions, terminus decisions, and source evidence. No live source or

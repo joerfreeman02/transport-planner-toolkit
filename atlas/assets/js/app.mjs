@@ -617,7 +617,16 @@ function renderAssessment(result) {
             .map(locality => `${locality.name || 'name not supplied'}${locality.code ? ` [${locality.code}]` : ''}`).join('; ') || 'none resolved';
           const stopAreas = (evidence.stopAreas ?? [])
             .map(area => `${area.name || 'name not supplied'}${area.id ? ` [${area.id}]` : ''}`).join('; ') || 'none resolved';
-          return [`${side[0].toUpperCase() + side.slice(1)} — raw: ${decision.rawEndpointText || 'not supplied'} · primary endpoint ID: ${decision.primaryEndpointStopPointId || 'none'} · requested IDs: ${requested} · hydrated IDs: ${hydrated} · unresolved IDs: ${unresolved} · physical stops: ${physicalStops} · NPTG localities: ${localities} · StopAreas: ${stopAreas} · planner endpoint/place: ${decision.chosenDisplayName || 'Destination requires review'} · decision type: ${decision.decisionType || 'not supplied'} · partial coverage: ${decision.partialExactCoverage ? 'yes' : 'no'} · conflict: ${decision.conflict ? 'yes' : 'no'} · reason: ${decision.reason}`];
+          const preparedEvidence = Object.values(evidence.endpointEvidenceById ?? {})
+            .map(item => item?.preparedEvidence)
+            .find(Boolean);
+          const preparedSummary = preparedEvidence
+            ? `Source evidence — ${decision.evidenceSource || 'not supplied'} · GTFS stop_id: ${preparedEvidence.rawGtfsStopId || 'not supplied'} · stop_code: ${preparedEvidence.rawGtfsStopCode || 'not supplied'} · stop_name: ${preparedEvidence.rawGtfsStopName || 'not supplied'} · exact match: ${preparedEvidence.exactMatchMethod || 'not supplied'} · NaPTAN: ${preparedEvidence.resolvedStopPointId || 'not supplied'} / ${preparedEvidence.naptanCode || 'code not supplied'} · indicator: ${preparedEvidence.indicator || 'not supplied'} · stop type: ${preparedEvidence.stopType || 'not supplied'} · NPTG parent: ${preparedEvidence.parentLocalityName || preparedEvidence.parentLocalityId || 'none supplied'} · headsign: ${preparedEvidence.provenance?.tripHeadsign || 'not supplied'} · route long name: ${preparedEvidence.provenance?.routeLongName || 'not supplied'} · route description: ${preparedEvidence.provenance?.routeDescription || 'not supplied'} · source: ${preparedEvidence.provenance?.source || 'not supplied'}`
+            : `Source evidence — ${decision.evidenceSource || 'not supplied'} · no persisted prepared endpoint record`;
+          return [
+            `${side[0].toUpperCase() + side.slice(1)} — raw: ${decision.rawEndpointText || 'not supplied'} · primary endpoint ID: ${decision.primaryEndpointStopPointId || 'none'} · requested IDs: ${requested} · hydrated IDs: ${hydrated} · unresolved IDs: ${unresolved} · physical stops: ${physicalStops} · NPTG localities: ${localities} · StopAreas: ${stopAreas} · planner endpoint/place: ${decision.chosenDisplayName || 'Destination requires review'} · decision type: ${decision.decisionType || 'not supplied'} · partial coverage: ${decision.partialExactCoverage ? 'yes' : 'no'} · conflict: ${decision.conflict ? 'yes' : 'no'} · reason: ${decision.reason}`,
+            preparedSummary,
+          ];
         });
         detail.textContent = [`Pattern: ${pattern} · Stops: ${stopIds} · Source: ${service.timetableSource || service.source?.provider || 'timetable source'}`, ...endpointLines].join('\n');
         article.append(heading, detail);

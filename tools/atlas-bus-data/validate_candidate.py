@@ -13,6 +13,7 @@ KNOWN_TNDS_QUARANTINE_REASONS = {"incomplete_runtime_sequence", "missing_timing_
 BUS_SCHEMAS = {"atlas-prepared-bus-data-v1", "atlas-prepared-bus-data-v2"}
 V2_GROUP_SCHEMA = "atlas-prepared-logical-groups-v1"
 V2_LOCALITY_SCHEMA = "atlas-prepared-nptg-localities-v1"
+ENDPOINT_MATCH_METHODS = {"gtfs-stop-id-equals-atco-code", "gtfs-stop-code-equals-naptan-code", "unresolved"}
 
 
 def read_json(path: Path):
@@ -118,6 +119,31 @@ def validate_v2_sidecars(bus: Path, manifest: dict, stop_ids: set[str]) -> dict:
     return {"groups": groups, "localities": localities, "groupShardCount": len(group_paths), "localityShardCount": len(locality_paths)}
 
 
+def validate_endpoint_evidence(service: dict, relative: str, stop_ids: set[str]) -> None:
+    evidence = service.get("endpointEvidence")
+    if not isinstance(evidence, dict) or set(evidence) != {"origin", "destination"}:
+        raise RefreshError(f"Candidate V2 service endpointEvidence is missing or malformed: {relative}")
+    for side in ("origin", "destination"):
+        entries = evidence.get(side)
+        if not isinstance(entries, dict):
+            raise RefreshError(f"Candidate V2 {side} endpointEvidence is malformed: {relative}")
+        for key, item in entries.items():
+            if not isinstance(key, str) or not key or not isinstance(item, dict):
+                raise RefreshError(f"Candidate V2 endpoint evidence identity is malformed: {relative}")
+            method = item.get("exactMatchMethod")
+            resolved = item.get("resolvedStopPointId")
+            if method not in ENDPOINT_MATCH_METHODS:
+                raise RefreshError(f"Candidate V2 endpoint evidence match method is not exact or explicit unresolved: {relative}")
+            if resolved and str(resolved) not in stop_ids:
+                raise RefreshError(f"Candidate V2 endpoint evidence resolves to a missing StopPoint: {resolved}")
+            if resolved and key != str(resolved):
+                raise RefreshError(f"Candidate V2 endpoint evidence is not keyed by resolved StopPoint ID: {relative}")
+            if not resolved and not key.startswith("raw:"):
+                raise RefreshError(f"Candidate V2 unresolved endpoint evidence is not keyed by raw identity: {relative}")
+            if item.get("stopAreas") is not None and not isinstance(item.get("stopAreas"), list):
+                raise RefreshError(f"Candidate V2 endpoint StopArea evidence is malformed: {relative}")
+
+
 def mark_structurally_validated(site: Path, metrics: dict) -> None:
     status_path = site / "atlas" / "data" / "status" / "manifest.json"
     try:
@@ -200,6 +226,8 @@ def validate(site: Path, bus_only: bool = False) -> dict:
                 raise RefreshError(f"Candidate service shard is empty or malformed: {relative}")
             for service in payload["services"]:
                 service_count += 1
+                if bus_schema == "atlas-prepared-bus-data-v2":
+                    validate_endpoint_evidence(service, relative, stop_ids)
                 for stop_id in service.get("stopSchedules", {}):
                     if str(stop_id) not in stop_ids:
                         raise RefreshError(f"Service-to-stop reference is missing from NaPTAN shards: {stop_id}")

@@ -297,6 +297,78 @@ def load_naptan_v2(path: Path, nptg_path: Path):
     return stops, aliases, excluded, naptan, nptg
 
 
+def resolve_exact_gtfs_stop(gtfs_id: str, details: dict, aliases: dict[str, str]) -> tuple[str | None, str]:
+    """Resolve only the two permitted deterministic GTFS/NaPTAN identities."""
+    if gtfs_id:
+        resolved = aliases.get(gtfs_id) or aliases.get(gtfs_id.lower())
+        if resolved:
+            return resolved, "gtfs-stop-id-equals-atco-code"
+    stop_code = clean(details.get("stop_code"))
+    if stop_code:
+        resolved = aliases.get(stop_code.lower())
+        if resolved:
+            return resolved, "gtfs-stop-code-equals-naptan-code"
+    return None, "unresolved"
+
+
+def endpoint_evidence(calls: list[dict], position: int, groups: dict[str, dict], trip: dict, route: dict, region: str) -> dict:
+    call = calls[position]
+    stop = call.get("resolved_stop") or {}
+    group_evidence = []
+    for ref in stop.get("logicalGroupRefs", []):
+        group = groups.get(clean(ref.get("id")))
+        if group and group.get("status") == "active" and ref.get("status") == "active":
+            group_evidence.append({
+                "id": group.get("id"), "name": group.get("name"), "type": group.get("type"),
+                "status": group.get("status"), "parentGroupId": group.get("parentGroupId"),
+                "provenance": group.get("provenance")
+            })
+    locality = stop.get("nptgLocality") or {}
+    parent = stop.get("parentLocalityEvidence") or {}
+    return {
+        "rawGtfsStopId": call.get("gtfs_stop_id") or None,
+        "rawGtfsStopCode": call.get("gtfs_stop_code") or None,
+        "rawGtfsStopName": call.get("gtfs_stop_name") or None,
+        "exactMatchMethod": call.get("match_method") or "unresolved",
+        "resolvedStopPointId": stop.get("id") or None,
+        "naptanCode": stop.get("naptanCode"),
+        "naptanCommonName": stop.get("name") or None,
+        "indicator": stop.get("indicator"),
+        "stopType": stop.get("stopType"),
+        "busStopType": stop.get("busStopType"),
+        "status": stop.get("status"),
+        "transportMode": stop.get("transportMode"),
+        "busPreparedEligible": stop.get("busPreparedEligible"),
+        "nptgLocalityCode": stop.get("nptgLocalityCode"),
+        "nptgLocalityName": locality.get("name") or stop.get("locality"),
+        "parentLocalityId": stop.get("parentLocalityId") or parent.get("id"),
+        "parentLocalityName": parent.get("name") or stop.get("parentLocality"),
+        "logicalGroupRefs": stop.get("logicalGroupRefs", []),
+        "stopAreas": group_evidence,
+        "provenance": {
+            "source": "BODS GTFS joined to NaPTAN/NPTG frozen snapshot",
+            "region": region,
+            "routeId": clean(trip.get("route_id")),
+            "tripId": clean(trip.get("trip_id")),
+            "routeShortName": clean(route.get("route_short_name")),
+            "routeLongName": clean(route.get("route_long_name")),
+            "routeDescription": clean(route.get("route_desc")),
+            "tripHeadsign": clean(trip.get("trip_headsign")),
+        }
+    }
+
+
+def endpoint_evidence_key(evidence: dict) -> str:
+    return clean(evidence.get("resolvedStopPointId")) or f"raw:{clean(evidence.get('rawGtfsStopId')) or clean(evidence.get('rawGtfsStopCode'))}"
+
+
+def add_endpoint_evidence(record: dict, side: str, evidence: dict) -> None:
+    key = endpoint_evidence_key(evidence)
+    if not key or key == "raw:":
+        return
+    record.setdefault("endpointEvidence", {}).setdefault(side, {})[key] = evidence
+
+
 def active_days(calendar: dict, exceptions: dict[str, dict[date, int]], dates: dict[str, date]) -> list[str]:
     result = []
     start = parse_date(calendar.get("start_date", "")) if calendar else None
@@ -364,7 +436,8 @@ def load_gtfs_metadata(archive: zipfile.ZipFile, dates: dict[str, date]):
     return agencies, routes, gtfs_stops, calendars, exceptions, trips
 
 
-def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, routes: dict, gtfs_stops: dict, calendars: dict, exceptions: dict, naptan_stops: dict, aliases: dict, services: dict) -> None:
+def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, routes: dict, gtfs_stops: dict, calendars: dict, exceptions: dict, naptan_stops: dict, aliases: dict, services: dict, logical_groups: dict | None = None) -> None:
+    logical_groups = logical_groups or {}
     route = routes.get(clean(trip.get("route_id")), {})
     route_number = clean(route.get("route_short_name")) or clean(route.get("route_long_name"))
     if clean(route.get("route_type")) not in ("3", "700", "") or not route_number:
@@ -374,7 +447,7 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
     for row in sorted(rows, key=lambda value: int(value.get("stop_sequence", 0) or 0)):
         gtfs_id = clean(row.get("stop_id"))
         details = gtfs_stops.get(gtfs_id, {})
-        alias = aliases.get(gtfs_id) or aliases.get(clean(details.get("stop_code")).lower())
+        alias, match_method = resolve_exact_gtfs_stop(gtfs_id, details, aliases)
         stop = naptan_stops.get(alias) if alias else None
         departure = parse_minutes(clean(row.get("departure_time")) or clean(row.get("arrival_time")))
         calls.append({
@@ -382,6 +455,11 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             "locality": (stop or {}).get("locality") or (stop or {}).get("parentLocality") or "",
             "stop_id": alias,
             "departure": departure,
+            "gtfs_stop_id": gtfs_id,
+            "gtfs_stop_code": clean(details.get("stop_code")),
+            "gtfs_stop_name": clean(details.get("stop_name")),
+            "resolved_stop": stop,
+            "match_method": match_method,
         })
         if stop and departure is not None:
             matched.append((stop, departure))
@@ -412,8 +490,19 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             "qualifications": set(),
             "stopSchedules": {},
             "source": {"region": region, "routeId": clean(trip.get("route_id"))},
+            "endpointEvidence": {"origin": {}, "destination": {}},
         }
         services[service_id] = record
+    add_endpoint_evidence(record, "origin", endpoint_evidence(calls, 0, logical_groups, trip, route, region))
+    add_endpoint_evidence(record, "destination", endpoint_evidence(calls, -1, logical_groups, trip, route, region))
+    record["source"].update({
+        "routeShortName": route_number,
+        "routeLongName": clean(route.get("route_long_name")) or None,
+        "routeDescription": clean(route.get("route_desc")) or None,
+        "tripHeadsign": clean(trip.get("trip_headsign")) or None,
+        "orderedPatternEndpoints": [calls[0].get("stop_id") or calls[0].get("gtfs_stop_id"), calls[-1].get("stop_id") or calls[-1].get("gtfs_stop_id")],
+        "provenance": "BODS GTFS frozen-source preparation"
+    })
     calendar = calendars.get(clean(trip.get("service_id")), {})
     start = parse_date(calendar.get("start_date", ""))
     end = parse_date(calendar.get("end_date", ""))
@@ -437,7 +526,7 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             schedule[day].append(departure)
 
 
-def process_region(path: Path, dates: dict[str, date], naptan_stops: dict, aliases: dict, shard_key_length: int) -> tuple[str, dict[str, list[dict]], dict]:
+def process_region(path: Path, dates: dict[str, date], naptan_stops: dict, aliases: dict, shard_key_length: int, logical_groups: dict | None = None) -> tuple[str, dict[str, list[dict]], dict]:
     region = path.stem.replace("-", "_")
     services: dict[str, dict] = {}
     with zipfile.ZipFile(path) as archive:
@@ -459,13 +548,13 @@ def process_region(path: Path, dates: dict[str, date], naptan_stops: dict, alias
                 completed.add(current_id)
                 trip = trips.get(current_id)
                 if trip:
-                    process_trip(region, current_rows, trip, agencies, routes, gtfs_stops, calendars, exceptions, naptan_stops, aliases, services)
+                    process_trip(region, current_rows, trip, agencies, routes, gtfs_stops, calendars, exceptions, naptan_stops, aliases, services, logical_groups)
                 current_id, current_rows = trip_id, []
             current_rows.append(row)
         if current_id:
             trip = trips.get(current_id)
             if trip:
-                process_trip(region, current_rows, trip, agencies, routes, gtfs_stops, calendars, exceptions, naptan_stops, aliases, services)
+                process_trip(region, current_rows, trip, agencies, routes, gtfs_stops, calendars, exceptions, naptan_stops, aliases, services, logical_groups)
         feed_info = next(gtfs_rows(archive, "feed_info.txt"), {}) if "feed_info.txt" in archive.namelist() else {}
 
     route_groups: dict[tuple, list[dict]] = defaultdict(list)
@@ -587,7 +676,7 @@ def build_v2(args: argparse.Namespace) -> dict:
     service_shards: dict[str, list[str]] = defaultdict(list)
     region_metadata = []
     for gtfs_path in gtfs_paths:
-        region, by_area, metadata = process_region(gtfs_path, dates, stops, aliases, args.service_shard_key_length)
+        region, by_area, metadata = process_region(gtfs_path, dates, stops, aliases, args.service_shard_key_length, naptan.groups)
         region_metadata.append({"region": region, **metadata})
         for area, records in sorted(by_area.items()):
             relative = f"services/{area}-{region}.json.gz"
@@ -595,7 +684,7 @@ def build_v2(args: argparse.Namespace) -> dict:
             service_shards[area].append(relative)
 
     stop_groups: dict[str, list[dict]] = defaultdict(list)
-    stop_fields = ["id", "naptanCode", "name", "indicator", "direction", "latitude", "longitude", "stopType", "busStopType", "locality", "parentLocality", "nptgLocalityCode", "areaCode", "modifiedAt", "coordinateMethod", "routes", "logicalGroupRefs", "status", "provenance", "localityResolution", "transportMode", "administrativeAreaCode"]
+    stop_fields = ["id", "naptanCode", "name", "indicator", "direction", "latitude", "longitude", "stopType", "busStopType", "locality", "parentLocality", "parentLocalityId", "nptgLocalityCode", "nptgLocality", "parentLocalityEvidence", "areaCode", "modifiedAt", "coordinateMethod", "routes", "logicalGroupRefs", "status", "provenance", "localityResolution", "transportMode", "administrativeAreaCode"]
     for stop in stops.values():
         key = cell_key(stop["latitude"], stop["longitude"], args.grid_size)
         normalised = normalise_for_json({**stop, "routes": sorted(stop["routes"], key=lambda value: (len(value), value))})
@@ -629,7 +718,7 @@ def build_v2(args: argparse.Namespace) -> dict:
     reference_groups: dict[str, list[dict]] = defaultdict(list)
     for stop_id, source in sorted(naptan.stops.items()):
         key = stop_id[:3] or "misc"
-        reference_groups[key].append(normalise_for_json({field: source.get(field) for field in ("id", "name", "stopType", "transportMode", "knownTransportMode", "busPreparedEligible", "sourceValidity", "coordinateValid", "latitude", "longitude", "coordinateMethod", "status", "nptgLocalityCode", "administrativeAreaCode", "modifiedAt", "provenance")}))
+        reference_groups[key].append(normalise_for_json({field: source.get(field) for field in ("id", "name", "naptanCode", "indicator", "stopType", "busStopType", "transportMode", "knownTransportMode", "busPreparedEligible", "sourceValidity", "coordinateValid", "latitude", "longitude", "coordinateMethod", "status", "nptgLocalityCode", "administrativeAreaCode", "modifiedAt", "provenance")}))
     reference_shards = {}
     for key, records in sorted(reference_groups.items()):
         relative = f"reference/stop-points/{key}.json.gz"
@@ -651,7 +740,7 @@ def build_v2(args: argparse.Namespace) -> dict:
         "groupShardKeyLength": 3, "localityShardKeyLength": 3,
         "representativeDates": {day: value.isoformat() for day, value in dates.items()},
         "schemas": {"logicalGroups": GROUP_SCHEMA, "localities": LOCALITY_SCHEMA, "referenceStopPoints": "atlas-national-reference-stop-points-v1"},
-        "referenceStopFields": ["id", "name", "stopType", "transportMode", "knownTransportMode", "busPreparedEligible", "sourceValidity", "coordinateValid", "latitude", "longitude", "coordinateMethod", "status", "nptgLocalityCode", "administrativeAreaCode", "modifiedAt", "provenance"],
+        "referenceStopFields": ["id", "name", "naptanCode", "indicator", "stopType", "busStopType", "transportMode", "knownTransportMode", "busPreparedEligible", "sourceValidity", "coordinateValid", "latitude", "longitude", "coordinateMethod", "status", "nptgLocalityCode", "administrativeAreaCode", "modifiedAt", "provenance"],
         "sources": {
             "naptan": {"url": "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml", **naptan.metadata, "stopCount": len(stops), "excludedRecordCount": excluded},
             "nptg": {"url": "https://naptan.api.dft.gov.uk/v1/nptg", **nptg.metadata, "localityCount": len(nptg.localities), "districtCount": len(nptg.districts)},

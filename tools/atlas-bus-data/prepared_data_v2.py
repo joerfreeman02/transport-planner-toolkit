@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Iterable
 
 V2_SCHEMA = "atlas-prepared-bus-data-v2"
-V2_VERSION = "2.0.0"
+V2_VERSION = "2.1.0"
 GROUP_SCHEMA = "atlas-prepared-logical-groups-v1"
 LOCALITY_SCHEMA = "atlas-prepared-nptg-localities-v1"
 SUPPORTED_SCHEMA_MAJOR = "2"
@@ -535,9 +535,12 @@ def hydrate_stop_localities(naptan: NaptanParseResult, nptg: NptgParseResult) ->
             stop["localityResolution"] = "unresolved" if code else "not-provided"
             continue
         stop["locality"] = locality["name"]
+        stop["nptgLocality"] = {"id": locality["id"], "code": locality["code"], "name": locality["name"], "provenance": locality.get("provenance")}
         parent_id = locality.get("parentLocalityId")
         parent = nptg.localities.get(parent_id[5:]) if parent_id else None
+        stop["parentLocalityId"] = parent.get("id") if parent else parent_id
         stop["parentLocality"] = parent["name"] if parent else None
+        stop["parentLocalityEvidence"] = {"id": parent.get("id"), "code": parent.get("code"), "name": parent.get("name"), "provenance": parent.get("provenance")} if parent else None
         stop["localityResolution"] = "resolved"
 
 

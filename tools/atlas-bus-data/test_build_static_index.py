@@ -31,6 +31,44 @@ FIXTURES = Path(__file__).parents[2] / "tests" / "fixtures" / "atlas-bus-data-v2
 
 
 class CircularIdentityTests(unittest.TestCase):
+    def test_endpoint_evidence_keeps_exact_identity_and_source_metadata(self):
+        aliases = {"ATCO-1": "ATCO-1", "naptan-code-1": "ATCO-1"}
+        stop = {
+            "id": "ATCO-1", "naptanCode": "naptan-code-1", "name": "Bus Station",
+            "indicator": "Stop C", "stopType": "BCS", "busStopType": "MKD",
+            "status": "active", "transportMode": "bus", "busPreparedEligible": True,
+            "nptgLocalityCode": "E-WAL", "nptgLocality": {"code": "E-WAL", "name": "Waltham Cross"},
+            "parentLocalityId": "nptg:E-WAL-P", "parentLocalityEvidence": {"id": "nptg:E-WAL-P", "name": "Broxbourne"},
+            "logicalGroupRefs": [{"id": "naptan:GA", "status": "active"}],
+        }
+        evidence = BUILDER.endpoint_evidence(
+            [{
+                "gtfs_stop_id": "ATCO-1", "gtfs_stop_code": "naptan-code-1", "gtfs_stop_name": "Bus Station",
+                "match_method": "gtfs-stop-id-equals-atco-code", "resolved_stop": stop,
+            }, {
+                "gtfs_stop_id": "ATCO-2", "gtfs_stop_code": "naptan-code-2", "gtfs_stop_name": "Town End",
+                "match_method": "unresolved", "resolved_stop": None,
+            }],
+            0,
+            {"naptan:GA": {"id": "naptan:GA", "name": "Bus Station", "type": "GBCS", "status": "active", "provenance": {"source": "NaPTAN"}}},
+            {"route_id": "r1", "trip_id": "t1", "trip_headsign": "Waltham Cross"},
+            {"route_short_name": "13", "route_long_name": "Hertford - Waltham Cross", "route_desc": "Fixture route"},
+            "east_anglia",
+        )
+        self.assertEqual(BUILDER.resolve_exact_gtfs_stop("ATCO-1", {"stop_code": "wrong"}, aliases), ("ATCO-1", "gtfs-stop-id-equals-atco-code"))
+        self.assertEqual(BUILDER.resolve_exact_gtfs_stop("unknown", {"stop_code": "naptan-code-1"}, aliases), ("ATCO-1", "gtfs-stop-code-equals-naptan-code"))
+        self.assertEqual(BUILDER.resolve_exact_gtfs_stop("unknown", {"stop_code": "unknown"}, aliases), (None, "unresolved"))
+        self.assertEqual(evidence["rawGtfsStopId"], "ATCO-1")
+        self.assertEqual(evidence["rawGtfsStopCode"], "naptan-code-1")
+        self.assertEqual(evidence["rawGtfsStopName"], "Bus Station")
+        self.assertEqual(evidence["nptgLocalityCode"], "E-WAL")
+        self.assertEqual(evidence["nptgLocalityName"], "Waltham Cross")
+        self.assertEqual(evidence["parentLocalityName"], "Broxbourne")
+        self.assertEqual(evidence["stopAreas"][0]["id"], "naptan:GA")
+        self.assertEqual(evidence["provenance"]["tripHeadsign"], "Waltham Cross")
+        self.assertEqual(evidence["provenance"]["routeLongName"], "Hertford - Waltham Cross")
+        self.assertEqual(evidence["provenance"]["routeDescription"], "Fixture route")
+
     def build_record(
         self,
         *,
@@ -271,7 +309,17 @@ class PreparedDataV2ParserTests(unittest.TestCase):
             v2_service_path = next(iter(manifest["serviceShards"].values()))[0]
             v1_services = json.loads(gzip.open(v1_output / v1_service_path, "rt", encoding="utf-8").read())["services"]
             v2_services = json.loads(gzip.open(output / v2_service_path, "rt", encoding="utf-8").read())["services"]
-            self.assertEqual(v1_services, v2_services)
+            self.assertEqual(manifest["version"], "2.1.0")
+            self.assertIn("endpointEvidence", v2_services[0])
+            for legacy, enriched in zip(v1_services, v2_services):
+                for field, value in legacy.items():
+                    if field == "endpointEvidence":
+                        continue
+                    if field == "source":
+                        self.assertEqual(value, {key: enriched["source"].get(key) for key in value}, "legacy source provenance remains stable")
+                    else:
+                        self.assertEqual(value, enriched.get(field), f"legacy service field remains stable: {field}")
+                self.assertEqual(set(enriched["endpointEvidence"]), {"origin", "destination"})
 
 
 if __name__ == "__main__":

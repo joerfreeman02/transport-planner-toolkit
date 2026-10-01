@@ -161,6 +161,31 @@ const tfl = await resolvePlannerEndpointDecisions([service('tfl', 'Waltham Cross
 assert.equal(tfl.services[0].destinationEndpointDecision.chosenDisplayName, 'Waltham Cross Bus Station');
 assert.equal(tfl.services[0].destinationEndpointDecision.rawEndpointText, 'Waltham Cross Bus Station');
 
+const persistedEvidence = {
+  endpointEvidence: {
+    origin: { ORIGIN: { resolvedStopPointId: 'ORIGIN', rawGtfsStopId: 'gtfs-origin', rawGtfsStopCode: 'ORIGIN-CODE', rawGtfsStopName: 'Hertford Bus Station', naptanCommonName: 'Hertford Bus Station', nptgLocalityCode: 'E-HERT', nptgLocalityName: 'Hertford', parentLocalityId: 'nptg:E-HERT-P', parentLocalityName: 'East Hertfordshire', exactMatchMethod: 'gtfs-stop-id-equals-atco-code', stopAreas: [{ id: 'naptan:GA', name: 'Hertford Bus Station' }] } },
+    destination: { WALTHAM: { resolvedStopPointId: 'WALTHAM', rawGtfsStopId: 'gtfs-destination', rawGtfsStopCode: 'WALTHAM-CODE', rawGtfsStopName: 'Bus Station', naptanCommonName: 'Waltham Cross Stop A', nptgLocalityCode: 'E-WAL', nptgLocalityName: 'Waltham Cross', parentLocalityId: 'nptg:E-WAL-P', parentLocalityName: 'Broxbourne', exactMatchMethod: 'gtfs-stop-code-equals-naptan-code', stopAreas: [{ id: 'naptan:GW', name: 'Waltham Cross Bus Station' }] } }
+  }
+};
+const noRuntimeReference = {
+  resolvePreparedStopPointsByIds: async () => ({ ok: true, physicalStops: [], warnings: [], provenance: { unavailable: true } }),
+  resolveStopReferences: async () => ({ ok: true, logicalGroups: [], localities: [], warnings: [], provenance: {} }),
+  resolveStopAreaStructure: async () => ({ ok: true, structure: { groups: [], members: [] }, warnings: [], provenance: {} })
+};
+const persisted = await resolvePlannerEndpointDecisions([service('persisted', 'Bus Station', 'WALTHAM', persistedEvidence)], noRuntimeReference);
+const persistedDecision = persisted.services[0].destinationEndpointDecision;
+assert.equal(persistedDecision.evidenceSource, 'prepared-exact-endpoint');
+assert.equal(persistedDecision.chosenDisplayName, 'Waltham Cross Bus Station');
+assert.deepEqual(persistedDecision.evidence.preparedEvidenceEndpointStopPointIds, ['WALTHAM']);
+assert.equal(persistedDecision.evidence.endpointEvidenceById.WALTHAM.preparedEvidence.rawGtfsStopCode, 'WALTHAM-CODE');
+
+const persistedConflict = await resolvePlannerEndpointDecisions([service('persisted-conflict', 'Bus Station', 'WALTHAM', {
+  endpointEvidence: { destination: { WALTHAM: { ...persistedEvidence.endpointEvidence.destination.WALTHAM, nptgLocalityCode: 'E-CHESH', nptgLocalityName: 'Cheshunt' } } }
+})], referenceData);
+assert.equal(persistedConflict.services[0].destinationEndpointDecision.evidenceSource, 'runtime-prepared-conflict');
+assert.equal(persistedConflict.services[0].destinationEndpointDecision.conflict, true);
+assert.equal(persistedConflict.services[0].destinationEndpointDecision.decisionType, 'conflict-review');
+
 const before = buildPlannerBusServiceSummaries(sourceServices, stops);
 const after = buildPlannerBusServiceSummaries(resolved.services, stops);
 assert.equal(after.length, before.length, 'endpoint enrichment does not change planner row count');

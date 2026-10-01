@@ -92,8 +92,20 @@ function mergeRecordSchedules(first, second) {
     sourceWarnings: unique([...(first.sourceWarnings ?? []), ...(second.sourceWarnings ?? [])]),
     scheduleIntegrityWarnings: unique([...(first.scheduleIntegrityWarnings ?? []), ...(second.scheduleIntegrityWarnings ?? [])]),
     originStopPointIds: unique([first.originStopPointId, ...(first.originStopPointIds ?? []), second.originStopPointId, ...(second.originStopPointIds ?? [])]),
-    destinationStopPointIds: unique([first.destinationStopPointId, ...(first.destinationStopPointIds ?? []), second.destinationStopPointId, ...(second.destinationStopPointIds ?? [])])
+    destinationStopPointIds: unique([first.destinationStopPointId, ...(first.destinationStopPointIds ?? []), second.destinationStopPointId, ...(second.destinationStopPointIds ?? [])]),
+    endpointEvidence: mergeEndpointEvidence(first.endpointEvidence, second.endpointEvidence)
   };
+}
+
+function mergeEndpointEvidence(first = {}, second = {}) {
+  const output = { origin: {}, destination: {} };
+  for (const side of ['origin', 'destination']) {
+    for (const source of [first?.[side], second?.[side]]) {
+      if (!source || typeof source !== 'object') continue;
+      for (const [key, value] of Object.entries(source)) if (value && typeof value === 'object') output[side][key] = value;
+    }
+  }
+  return output;
 }
 
 function deduplicateServiceRecords(records = []) {
@@ -403,6 +415,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
       : null;
     const integrityWarnings = unique(records.flatMap(record => record.scheduleIntegrityWarnings ?? []));
     if (integrityWarnings.length) notes.push(`Schedule integrity note: ${integrityWarnings.join(' ')}`);
+    const endpointEvidence = records.reduce((merged, record) => mergeEndpointEvidence(merged, record.endpointEvidence), { origin: {}, destination: {} });
     return Object.freeze({
       id: identity,
       routeNumber: text(first.routeNumber) || 'Not supplied',
@@ -413,6 +426,12 @@ export function buildServiceSummaries(stops, serviceRecords) {
       destinationStopPointId: text(first.destinationStopPointId || first.destinationStopPointIds?.[0]) || null,
       originStopPointIds: Object.freeze(unique(records.flatMap(record => [record.originStopPointId, ...(record.originStopPointIds ?? [])]))),
       destinationStopPointIds: Object.freeze(unique(records.flatMap(record => [record.destinationStopPointId, ...(record.destinationStopPointIds ?? [])]))),
+      endpointEvidence: Object.freeze({
+        origin: Object.freeze(endpointEvidence.origin),
+        destination: Object.freeze(endpointEvidence.destination)
+      }),
+      originEndpointEvidence: Object.freeze(endpointEvidence.origin),
+      destinationEndpointEvidence: Object.freeze(endpointEvidence.destination),
       destinationLocality: text(first.destinationLocality || first.destinationLocalityName || first.destinationQualifier) || null,
       destinationLocalityEvidence: first.destinationLocalityEvidence ?? null,
       direction: text(first.direction),

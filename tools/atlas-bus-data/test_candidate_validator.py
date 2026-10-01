@@ -17,7 +17,7 @@ class CandidateValidatorTests(unittest.TestCase):
         bus.mkdir(parents=True)
         tnds.mkdir(parents=True)
         stop = ['STOP-1', None, 'Example', None, None, 51.0, -0.1, 'B', None, None, None, None, None, None, []]
-        service = {'id': 'service-1', 'stopSchedules': {'STOP-1': {'monday': [600]}}, 'routeNumber': '231'}
+        service = {'id': 'service-1', 'stopSchedules': {'STOP-1': {'monday': [600]}}, 'routeNumber': '231', 'endpointEvidence': {'origin': {'raw:STOP-1': {'rawGtfsStopId': 'STOP-1', 'exactMatchMethod': 'unresolved', 'resolvedStopPointId': None, 'stopAreas': []}}, 'destination': {'raw:STOP-1': {'rawGtfsStopId': 'STOP-1', 'exactMatchMethod': 'unresolved', 'resolvedStopPointId': None, 'stopAreas': []}}}}
         for relative, payload in [('stops/g1.json.gz', {'schema': 'atlas-prepared-bus-data-v1', 'stops': [stop]}), ('services/a.json.gz', {'schema': 'atlas-prepared-bus-data-v1', 'services': [service]})]:
             target = bus / relative
             target.parent.mkdir(parents=True, exist_ok=True)

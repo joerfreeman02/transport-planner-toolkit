@@ -337,6 +337,8 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         operator: text(route?.operator ?? response?.operator),
         origin: identity?.origin ?? '',
         destination: identity?.destination ?? '',
+        originStopPointId: pattern.stations[0]?.id || null,
+        destinationStopPointId: pattern.stations.at(-1)?.id || null,
         direction,
         principalLocations: derivePrincipalLocations(pattern.stations),
         routePatternStopIds: [
@@ -350,7 +352,7 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         calendarEvidence: profileTiming.calendarEvidence,
         calendarProfileId: profileTiming.calendarProfileId,
         frequencyBasisStopId: stopPointId,
-        source: { provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId, calendarProfileId: profileTiming.calendarProfileId, routeMetadata: identity ? 'matched' : 'incomplete' },
+        source: { provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId, calendarProfileId: profileTiming.calendarProfileId, routeMetadata: identity ? 'matched' : 'incomplete', endpointIdentity: 'StationInterval exact ordered endpoints' },
         timetableSource: 'TfL',
         serviceNotes: calendarQualificationNotes(profileTiming.calendarEvidence),
         sourceWarnings: profileTiming.calendarEvidence.filter(calendar => !calendar.resolved).map(calendar => `TfL timetable period "${calendar.sourceCalendarLabel}" could not be safely mapped to operating days; no unverified days were fabricated.`),

@@ -186,7 +186,7 @@ function parseService({ source, serviceBlock, serviceBlocks, patternById, journe
     const profile = patternById.get(patternId);
     if (!profile) return null;
     const calls = profile.status === 'valid' ? patternCalls(profile, stops) : [];
-    return { patternId, status: profile.status, reasonCode: profile.reasonCode || null, direction: text(profile.direction), origin: text(profile.origin), destination: text(profile.destination), routePatternStopIds: [...profile.stopIds], routePatternStops: calls.map(call => ({ id: call.id, name: call.name })).filter(call => call.id || call.name), calls, principalLocations: calls.length ? derivePrincipalLocations(calls) : [], operatingProfile: profile.operatingProfile || '' };
+    return { patternId, status: profile.status, reasonCode: profile.reasonCode || null, direction: text(profile.direction), origin: text(profile.origin), destination: text(profile.destination), originStopPointId: calls[0]?.id || null, destinationStopPointId: calls.at(-1)?.id || null, routePatternStopIds: [...profile.stopIds], routePatternStops: calls.map(call => ({ id: call.id, name: call.name })).filter(call => call.id || call.name), calls, principalLocations: calls.length ? derivePrincipalLocations(calls) : [], operatingProfile: profile.operatingProfile || '' };
   }).filter(Boolean);
   const validVariants = patternVariants.filter(variant => variant.status === 'valid');
   const serviceOrigin = first(serviceBlock, 'Origin') || first(serviceBlock, 'StandardService');
@@ -244,6 +244,8 @@ function parseService({ source, serviceBlock, serviceBlocks, patternById, journe
       principalLocations: [...variant.principalLocations],
       routePatternStopIds: [...variant.routePatternStopIds],
       routePatternStops: [...(variant.routePatternStops ?? [])],
+      originStopPointId: variant.originStopPointId || null,
+      destinationStopPointId: variant.destinationStopPointId || null,
       patternVariants: [variant],
       description: first(serviceBlock, 'Description'),
       validFrom: first(blocks(serviceBlock, 'OperatingPeriod')[0] || blocks(source, 'OperatingPeriod')[0] || '', 'StartDate') || null,

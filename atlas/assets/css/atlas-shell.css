@@ -204,7 +204,7 @@ button.compact { padding: 7px 10px; font-size: .78rem; }
 .service-detail-panel h5 { margin: 0 0 6px; font-size: 1rem; }
 .service-detail { padding: 9px 0; border-top: 1px solid var(--atlas-line); }
 .service-detail:first-child { border-top: 0; }
-.service-detail p { margin: 4px 0 0; color: var(--atlas-muted); font-size: .9em; }
+.service-detail p { margin: 4px 0 0; color: var(--atlas-muted); font-size: .9em; white-space: pre-line; }
 .service-note td { border-top: 0; background: #fff8e8; color: #614200; padding-top: 8px; padding-bottom: 9px; }
 .assessment-wording { margin-top: 24px; padding: 16px 18px; border-left: 4px solid var(--atlas-lime); background: #f4f8fd; }
 .planner-methodology { margin: 9px 0 0; }

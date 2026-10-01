@@ -10,6 +10,7 @@ import { DEFAULT_TFL_REQUEST_LIMIT } from '../adapters/tfl-request-scheduler.mjs
 import { deriveTimetableConclusion, hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
 import { buildStopTimetableSourcePresentation } from '../domain/bus-source-presentation.mjs';
 import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
+import { resolvePlannerEndpointDecisions } from '../domain/planner-endpoint-decision.mjs';
 
 export const TFL_REQUEST_WINDOW_LIMIT = DEFAULT_TFL_REQUEST_LIMIT;
 export const TFL_ASSESSMENT_FIXED_REQUESTS = 2;
@@ -169,6 +170,11 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     add({ code: 'service-source-evidence', route: service.routeNumber, stop: service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0], source: service.timetableSource || service.source?.provider || 'timetable source', message: String(warning) });
   }
   for (const service of serviceSummaries) if (!service.routeNumber || !service.destination || /not supplied|not resolved/i.test(service.destination)) add({ code: 'planner-route-identity', route: service.routeNumber, stop: service.frequencyBasisStopId, source: service.frequencyEvidenceSource || 'timetable source', message: 'The timetable pattern did not provide a complete planner-facing destination; review Detailed Evidence before using the row.' });
+  for (const service of serviceSummaries) for (const side of ['origin', 'destination']) {
+    const decision = service[`${side}EndpointDecision`];
+    if (!decision || (!decision.unresolved && !decision.conflict)) continue;
+    add({ code: 'planner-endpoint-resolution', route: service.routeNumber, stop: decision.endpointStopPointId || service.frequencyBasisStopId, source: decision.provider || service.frequencyEvidenceSource || 'timetable source', message: `${side[0].toUpperCase() + side.slice(1)} endpoint decision requires review: ${decision.reason}` });
+  }
   if (!stopCoverageComplete) add({ code: 'stop-source-coverage', stop: selectedStops[0]?.id, source: 'NaPTAN', message: 'Stop-source coverage was incomplete; the returned stop set does not establish an authoritative zero-stop conclusion.' });
   if (!routingComplete) for (const stop of selectedStops.filter(item => item.walking?.status !== 'routed' || item.cycling?.status !== 'routed')) add({ code: 'access-routing', stop: stop.id, source: 'OSRM', message: 'Walking or cycling access could not be routed for this stop; review access distances before formal use.' });
   if (servicesResult && !servicesResult.ok && !Number(provenance.unprocessedRequests || 0) && !Number(provenance.failedRequests || 0)) add({ code: 'timetable-source-unavailable', stop: selectedStops[0]?.id, source: provenance.source || 'timetable source', message: 'The timetable source did not return a usable result for this assessment; review the source response before formal use.' });
@@ -181,7 +187,7 @@ function partialDetail(reviewItems) {
   return `${count} evidence item${count === 1 ? '' : 's'} ${count === 1 ? 'needs' : 'need'} review`;
 }
 
-export function createBusAssessment({ stopDiscovery, timetableData, accessRouting } = {}) {
+export function createBusAssessment({ stopDiscovery, timetableData, accessRouting, referenceData = null } = {}) {
   if (!stopDiscovery?.nearbyStops || !timetableData?.servicesForStops || !accessRouting?.matrix) throw new Error('Stop discovery, timetable data and access routing are required.');
 
   async function discoverStops(site, radius, forceRefresh, cachedDiscovery = null) {
@@ -302,9 +308,11 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     }
     onProgress({ phase: 'reconciling-evidence' });
     const serviceSummaries = buildServiceSummaries(selectedStops, services);
+    const endpointResolution = await resolvePlannerEndpointDecisions(serviceSummaries, referenceData, { forceRefresh });
+    const resolvedServiceSummaries = endpointResolution.services;
     onProgress({ phase: 'preparing-assessment' });
-    const plannerServiceSummaries = buildPlannerBusServiceSummaries(serviceSummaries, selectedStops);
-    const plannerSourceWarnings = [...new Set(serviceSummaries.flatMap(service => [...(service.sourceWarnings ?? []), ...plannerSourceWarning(service)]))];
+    const plannerServiceSummaries = buildPlannerBusServiceSummaries(resolvedServiceSummaries, selectedStops);
+    const plannerSourceWarnings = [...new Set(resolvedServiceSummaries.flatMap(service => [...(service.sourceWarnings ?? []), ...plannerSourceWarning(service), ...(service.endpointResolutionWarnings ?? [])]))];
     const routesByStop = new Map(selectedStops.map(stop => [stopKey(stop), new Set()]));
     for (const service of services) for (const [id, schedule] of Object.entries(service.stopSchedules ?? {})) if (routesByStop.has(id) && service.routeNumber && hasScheduledEvidence(schedule)) routesByStop.get(id).add(String(service.routeNumber));
     selectedStops = selectedStops.map(stop => {
@@ -321,11 +329,11 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     ].map(String)).size;
     const timetablesComplete = Boolean(servicesResult?.ok) && nationalEvidenceComplete && Number(servicesResult?.provenance?.unprocessedRequests || 0) === 0 && Math.max(Number(servicesResult?.provenance?.unresolvedRequests || 0), unresolvedIdentityCount) === 0;
     const status = stopCoverageComplete && timetablesComplete && serviceSummaries.length && routingComplete ? 'complete' : 'partial';
-    const reviewItems = buildReviewItems({ selectedStops, services, serviceSummaries, servicesResult, prepared, stopCoverageComplete, routingComplete });
+    const reviewItems = buildReviewItems({ selectedStops, services, serviceSummaries: resolvedServiceSummaries, servicesResult, prepared, stopCoverageComplete, routingComplete });
     const selectedIds = new Set(selectedStops.map(stopKey));
     const routes = new Set(enrichedDiscoveredStops.flatMap(stop => stop.routes ?? []));
     onProgress({ phase: status === 'complete' ? 'complete' : 'partial', detail: status === 'complete' ? 'Complete' : partialDetail(reviewItems) });
-    return Object.freeze({ ok: true, status, assessmentMode, discoveredStopCount: enrichedDiscoveredStops.length, scope: { stopCount: enrichedDiscoveredStops.length, routeCount: routes.size, pairCount: routePairs(enrichedDiscoveredStops).size }, nearestGroup, stops: Object.freeze(selectedStops), services: Object.freeze(services), serviceSummaries: Object.freeze(serviceSummaries), plannerServiceSummaries: Object.freeze(plannerServiceSummaries), wording: buildControlledBusWording(plannerServiceSummaries, { nearestGroupName: nearestGroup?.name ?? null }), warnings: Object.freeze(warnings), reviewItems: Object.freeze(reviewItems), provenance: Object.freeze({ stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres }, timetables: servicesResult?.provenance ?? {}, walking: prepared.walkingResult?.provenance ?? {}, cycling: prepared.cyclingResult?.provenance ?? {} }), evidence: Object.freeze((prepared.stopsResult.evidence ?? []).filter(item => assessmentMode === 'full' || selectedIds.has(item?.subject?.id))) });
+    return Object.freeze({ ok: true, status, assessmentMode, discoveredStopCount: enrichedDiscoveredStops.length, scope: { stopCount: enrichedDiscoveredStops.length, routeCount: routes.size, pairCount: routePairs(enrichedDiscoveredStops).size }, nearestGroup, stops: Object.freeze(selectedStops), services: Object.freeze(services), serviceSummaries: Object.freeze(resolvedServiceSummaries), plannerServiceSummaries: Object.freeze(plannerServiceSummaries), endpointResolution: Object.freeze(endpointResolution), wording: buildControlledBusWording(plannerServiceSummaries, { nearestGroupName: nearestGroup?.name ?? null }), warnings: Object.freeze(warnings), reviewItems: Object.freeze(reviewItems), provenance: Object.freeze({ stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres }, timetables: servicesResult?.provenance ?? {}, endpoints: endpointResolution.provenance ?? {}, walking: prepared.walkingResult?.provenance ?? {}, cycling: prepared.cyclingResult?.provenance ?? {} }), evidence: Object.freeze((prepared.stopsResult.evidence ?? []).filter(item => assessmentMode === 'full' || selectedIds.has(item?.subject?.id))) });
   }
 
   async function inspectScope(site, { radius = 700, forceRefresh = false } = {}) {

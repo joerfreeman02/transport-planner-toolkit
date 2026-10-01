@@ -48,7 +48,7 @@ const tflTimetable = createTflBusTimetableAdapter({ cache, requestScheduler: tfl
 const authoritativeTimetable = createAuthoritativeBusTimetableAdapter({ tflAdapter: tflTimetable, nationalAdapter: preparedBusData, londonSupplementAdapter: preparedBusData });
 const accessRouting = createOsrmAccessRoutingAdapter();
 const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: preparedBusData, referenceData, crossBoundaryTfL: true });
-const busAssessment = createBusAssessment({ stopDiscovery: busStops, timetableData: authoritativeTimetable, accessRouting });
+const busAssessment = createBusAssessment({ stopDiscovery: busStops, timetableData: authoritativeTimetable, accessRouting, referenceData });
 const selector = createSiteSelector();
 const views = ['report-builder', 'modules', 'projects', 'about'];
 const METHOD_LABELS = Object.freeze({
@@ -601,7 +601,18 @@ function renderAssessment(result) {
         const detail = document.createElement('p');
         const stopIds = Object.keys(service.stopSchedules ?? {}).join(', ') || 'no selected StopPoint';
         const pattern = service.source?.patternVariantId || service.source?.patternId || service.source?.intervalId || service.id || 'pattern identity not supplied';
-        detail.textContent = `Pattern: ${pattern} · Stops: ${stopIds} · Source: ${service.timetableSource || service.source?.provider || 'timetable source'}`;
+        const planner = (result.serviceSummaries ?? []).find(summary => (summary.sourceRecordIds ?? []).includes(service.id))
+          || (result.plannerServiceSummaries ?? []).find(summary => (summary.sourceRecordIds ?? []).includes(service.id));
+        const endpointLines = ['origin', 'destination'].flatMap(side => {
+          const decision = planner?.[`${side}EndpointDecision`];
+          if (!decision) return [];
+          const exact = decision.endpointStopPointId || 'not available';
+          const locality = decision.nptgLocalityName || 'not resolved';
+          const parent = decision.parentLocalityName || 'not resolved';
+          const stopArea = decision.stopArea?.name || 'not resolved';
+          return [`${side[0].toUpperCase() + side.slice(1)} — raw: ${decision.rawEndpointText || 'not supplied'} · exact StopPoint: ${exact} · stop: ${decision.endpointStopName || 'not resolved'} · NPTG locality: ${locality} · parent locality: ${parent} · StopArea: ${stopArea} · planner destination/place: ${decision.chosenDisplayName || 'Destination requires review'} · decision: ${decision.reason}`];
+        });
+        detail.textContent = [`Pattern: ${pattern} · Stops: ${stopIds} · Source: ${service.timetableSource || service.source?.provider || 'timetable source'}`, ...endpointLines].join('\n');
         article.append(heading, detail);
         detailRows.append(article);
       }

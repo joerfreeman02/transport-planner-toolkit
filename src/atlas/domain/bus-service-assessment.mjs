@@ -90,7 +90,9 @@ function mergeRecordSchedules(first, second) {
     calendarEvidence: [...new Map(calendarEvidence.map(item => [JSON.stringify(item), item])).values()],
     serviceNotes: unique([...(first.serviceNotes ?? []), ...(second.serviceNotes ?? [])]),
     sourceWarnings: unique([...(first.sourceWarnings ?? []), ...(second.sourceWarnings ?? [])]),
-    scheduleIntegrityWarnings: unique([...(first.scheduleIntegrityWarnings ?? []), ...(second.scheduleIntegrityWarnings ?? [])])
+    scheduleIntegrityWarnings: unique([...(first.scheduleIntegrityWarnings ?? []), ...(second.scheduleIntegrityWarnings ?? [])]),
+    originStopPointIds: unique([first.originStopPointId, ...(first.originStopPointIds ?? []), second.originStopPointId, ...(second.originStopPointIds ?? [])]),
+    destinationStopPointIds: unique([first.destinationStopPointId, ...(first.destinationStopPointIds ?? []), second.destinationStopPointId, ...(second.destinationStopPointIds ?? [])])
   };
 }
 
@@ -407,6 +409,10 @@ export function buildServiceSummaries(stops, serviceRecords) {
       operator: text(first.operator) || 'Operator not supplied in the timetable',
       origin: text(first.origin) || 'Origin not supplied',
       destination: text(first.destination) || 'Destination not supplied',
+      originStopPointId: text(first.originStopPointId || first.originStopPointIds?.[0]) || null,
+      destinationStopPointId: text(first.destinationStopPointId || first.destinationStopPointIds?.[0]) || null,
+      originStopPointIds: Object.freeze(unique(records.flatMap(record => [record.originStopPointId, ...(record.originStopPointIds ?? [])]))),
+      destinationStopPointIds: Object.freeze(unique(records.flatMap(record => [record.destinationStopPointId, ...(record.destinationStopPointIds ?? [])]))),
       destinationLocality: text(first.destinationLocality || first.destinationLocalityName || first.destinationQualifier) || null,
       destinationLocalityEvidence: first.destinationLocalityEvidence ?? null,
       direction: text(first.direction),
@@ -435,6 +441,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
       assessedStops: Object.freeze(assessedStops.map(stop => text(stop.id || stop.sourceId))),
       stopContext,
       frequencyEvidenceSource: unique(records.map(record => record.timetableSource || record.source?.provider)).join(' + ') || null,
+      provider: unique(records.map(record => record.timetableSource || record.source?.provider)).join(' + ') || null,
       frequencyRepresentativeDay,
       frequencyEvidence: Object.freeze(frequencyEvidence),
       sourceWarnings: Object.freeze(sourceWarnings),

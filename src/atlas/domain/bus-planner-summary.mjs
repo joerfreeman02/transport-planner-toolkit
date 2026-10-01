@@ -906,12 +906,34 @@ function destinationLocalityCandidates(service) {
 }
 
 function plannerDestinationDecision(service) {
+  const resolved = service?.destinationEndpointDecision;
+  if (resolved?.chosenDisplayName || resolved?.chosen) return resolved;
   const raw = plannerDestination(service);
   const locality = destinationLocalityCandidates(service).find(candidate => normal(candidate) !== normal(raw));
   if (raw && locality && /\b(?:bus|coach)?\s*(?:station|stand|bay|platform|stop|interchange)\b/i.test(raw)) {
-    return Object.freeze({ raw, chosen: locality, simplified: true, reason: 'Destination stand or stop wording was simplified using supplied locality evidence.', evidence: locality });
+    // Compatibility for direct, pre-BUS-DEST domain callers. Production
+    // assessment records carry destinationEndpointDecision from the exact-ID
+    // resolver above and therefore never use locality-only evidence.
+    return Object.freeze({ raw, rawEndpointText: raw, chosen: locality, chosenDisplayName: locality, simplified: true, decisionType: 'legacy-locality-fallback', reason: 'Destination stand or stop wording was simplified using supplied locality evidence.', evidence: locality });
   }
-  return Object.freeze({ raw, chosen: raw, simplified: false, reason: raw ? 'The supplied destination wording was retained.' : 'No resolved destination was supplied.', evidence: locality || null });
+  return Object.freeze({ raw, rawEndpointText: raw, chosen: raw, chosenDisplayName: raw, simplified: false, decisionType: raw ? 'source-retained' : 'unresolved', reason: raw ? 'The supplied destination wording was retained.' : 'No resolved destination was supplied.', evidence: locality || null });
+}
+
+function serviceEndpointDecision(service, side) {
+  if (side === 'destination') return plannerDestinationDecision(service);
+  const resolved = service?.originEndpointDecision;
+  if (resolved?.chosenDisplayName || resolved?.chosen) return resolved;
+  const raw = text(service?.origin);
+  return Object.freeze({
+    raw,
+    rawEndpointText: raw,
+    chosen: raw,
+    chosenDisplayName: raw,
+    decisionType: raw ? 'source-retained' : 'unresolved',
+    reason: raw ? 'The supplied origin wording was retained.' : 'No resolved origin was supplied.',
+    unresolved: !raw,
+    conflict: false
+  });
 }
 
 function destinationNames(values) {
@@ -1011,12 +1033,16 @@ function buildPlannerServiceGroup(component, stops, main, representative) {
   const operatorNames = operatorDisplayNames(component);
   const endpointEvidence = unique(component.map(service => `${text(service.origin)} → ${text(service.destination)}`)).sort();
   const endpointIdentity = endpointEvidence.map(value => normal(value)).join('~');
+  const originDecision = serviceEndpointDecision(main, 'origin');
+  const destinationDecision = serviceEndpointDecision(main, 'destination');
   return Object.freeze({
     serviceIdentity: `${routeGroupKey(main)}|${publicDirectionIdentity(component, main)}|${endpointIdentity}`,
     routeNumber: text(main?.routeNumber) || 'Not supplied',
     publicDirection: publicDirectionIdentity(component, main),
-    principalDestination: plannerDestinationDecision(main).chosen || null,
-    principalOrigin: text(main?.origin) || null,
+    principalDestination: destinationDecision.chosen || null,
+    principalOrigin: originDecision.chosen || text(main?.origin) || null,
+    originEndpointDecision: originDecision,
+    destinationEndpointDecision: destinationDecision,
     operatorNames: Object.freeze(operatorNames),
     rawOperatorNames: Object.freeze(rawOperatorNames),
     operatorIdentities: Object.freeze(unique(rawOperatorNames.map(operatorIdentityKey))),
@@ -1060,7 +1086,8 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const representative = selectRepresentativeStop(component, stops);
   const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
   const plannerServiceGroup = buildPlannerServiceGroup(component, stops, main, representative);
-  const destinationDecision = plannerDestinationDecision(main);
+  const destinationDecision = serviceEndpointDecision(main, 'destination');
+  const originDecision = serviceEndpointDecision(main, 'origin');
   const rowCircular = resolveCircularPresentation(component, routeFamilyServices);
   const canonical = canonicalDeparturePopulation(component, representative.id, main);
   const profileIds = orderedCalendarProfiles([
@@ -1116,6 +1143,8 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     origin: text(main.origin) || 'Origin not supplied',
     destination: destinationDecision.chosen || text(main.destination) || 'Destination not resolved',
     rawDestination: destinationDecision.raw || text(main.destination) || null,
+    rawOrigin: originDecision.raw || text(main.origin) || null,
+    originEndpointDecision: originDecision,
     destinationDecision,
     direction: text(main.direction),
     stopDirection: text(main.stopDirection) || null,

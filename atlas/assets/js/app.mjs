@@ -606,11 +606,18 @@ function renderAssessment(result) {
         const endpointLines = ['origin', 'destination'].flatMap(side => {
           const decision = planner?.[`${side}EndpointDecision`];
           if (!decision) return [];
-          const exact = decision.endpointStopPointId || 'not available';
-          const locality = decision.nptgLocalityName || 'not resolved';
-          const parent = decision.parentLocalityName || 'not resolved';
-          const stopArea = decision.stopArea?.name || 'not resolved';
-          return [`${side[0].toUpperCase() + side.slice(1)} — raw: ${decision.rawEndpointText || 'not supplied'} · exact StopPoint: ${exact} · stop: ${decision.endpointStopName || 'not resolved'} · NPTG locality: ${locality} · parent locality: ${parent} · StopArea: ${stopArea} · planner destination/place: ${decision.chosenDisplayName || 'Destination requires review'} · decision: ${decision.reason}`];
+          const evidence = decision.evidence || {};
+          const requested = (decision.requestedEndpointStopPointIds ?? []).join(', ') || 'none';
+          const hydrated = (decision.hydratedEndpointStopPointIds ?? []).join(', ') || 'none';
+          const unresolved = (decision.unresolvedEndpointStopPointIds ?? []).join(', ') || 'none';
+          const physicalStops = (evidence.endpointEvidenceSet ?? [])
+            .filter(item => item.hydrated && item.physicalStop)
+            .map(item => `${item.endpointStopPointId}: ${item.physicalStop.name || 'name not supplied'}`).join('; ') || 'none resolved';
+          const localities = (evidence.localities ?? [])
+            .map(locality => `${locality.name || 'name not supplied'}${locality.code ? ` [${locality.code}]` : ''}`).join('; ') || 'none resolved';
+          const stopAreas = (evidence.stopAreas ?? [])
+            .map(area => `${area.name || 'name not supplied'}${area.id ? ` [${area.id}]` : ''}`).join('; ') || 'none resolved';
+          return [`${side[0].toUpperCase() + side.slice(1)} — raw: ${decision.rawEndpointText || 'not supplied'} · primary endpoint ID: ${decision.primaryEndpointStopPointId || 'none'} · requested IDs: ${requested} · hydrated IDs: ${hydrated} · unresolved IDs: ${unresolved} · physical stops: ${physicalStops} · NPTG localities: ${localities} · StopAreas: ${stopAreas} · planner endpoint/place: ${decision.chosenDisplayName || 'Destination requires review'} · decision type: ${decision.decisionType || 'not supplied'} · partial coverage: ${decision.partialExactCoverage ? 'yes' : 'no'} · conflict: ${decision.conflict ? 'yes' : 'no'} · reason: ${decision.reason}`];
         });
         detail.textContent = [`Pattern: ${pattern} · Stops: ${stopIds} · Source: ${service.timetableSource || service.source?.provider || 'timetable source'}`, ...endpointLines].join('\n');
         article.append(heading, detail);

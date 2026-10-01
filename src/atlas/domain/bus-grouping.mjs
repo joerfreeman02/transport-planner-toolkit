@@ -10,6 +10,12 @@ function text(value) { return String(value ?? '').trim(); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
 function unique(values) { return [...new Set((values ?? []).map(text).filter(Boolean))]; }
 
+function endpointEvidenceEntries(service = {}, side = 'destination') {
+  const evidence = service?.endpointEvidence?.[side];
+  if (!evidence || typeof evidence !== 'object') return [];
+  return Object.entries(evidence).map(([id, value]) => ({ id, ...(value && typeof value === 'object' ? value : {}) }));
+}
+
 const UNSPECIFIED_OPERATOR = /^(?:operator|operator name)\s+not supplied(?: in the timetable)?$|^unknown(?: operator)?$/i;
 
 export function isUnspecifiedOperator(value) {
@@ -17,7 +23,12 @@ export function isUnspecifiedOperator(value) {
 }
 
 export function sourceProvider(service = {}) {
-  return text(service.provider || service.timetableSource || service.source?.provider || service.sourceFile || service.source?.sourceFile);
+  const explicit = text(service.provider || service.timetableSource || service.source?.provider || service.sourceFile || service.source?.sourceFile);
+  if (explicit) return explicit;
+  const provenance = normal(service.source?.provenance);
+  if (provenance.includes('bods')) return 'BODS';
+  if (provenance.includes('tnds')) return 'TNDS';
+  return '';
 }
 
 export function sourceAuthorityRank(service = {}) {
@@ -30,7 +41,8 @@ export function sourceAuthorityRank(service = {}) {
 export function endpointPlaceKeys(service = {}, side = 'destination') {
   const decision = service?.[`${side}EndpointDecision`] || {};
   const evidence = decision.evidence || decision.exactEvidence || {};
-  const exact = Boolean(decision.exactEvidence || decision.exact || evidence.endpoint || evidence.endpointEvidenceSet?.length
+  const preparedEntries = endpointEvidenceEntries(service, side);
+  const exact = Boolean(preparedEntries.length || decision.exactEvidence || decision.exact || evidence.endpoint || evidence.endpointEvidenceSet?.length
     || /^exact-|prepared-exact|runtime-and-prepared/.test(text(decision.decisionType) + ' ' + text(decision.evidenceSource)));
   if (!exact) return [];
   const keys = [];
@@ -41,18 +53,25 @@ export function endpointPlaceKeys(service = {}, side = 'destination') {
     evidence.stopArea?.id,
     ...(evidence.stopAreas ?? []).map(area => area?.id),
     ...(decision.endpointLogicalGroupIds ?? []),
-    ...(evidence.endpointLogicalGroupIds ?? [])
+    ...(evidence.endpointLogicalGroupIds ?? []),
+    ...preparedEntries.flatMap(entry => [
+      ...(entry.stopAreas ?? []).map(area => area?.id),
+      ...(entry.logicalGroupRefs ?? []).map(ref => ref?.id)
+    ])
   ].filter(Boolean);
   add('stop-area', stopAreas.map(value => normal(value)));
-  add('place', [decision.endpointLogicalPlaceId, evidence.endpointLogicalPlaceId, decision.logicalPlaceId, evidence.logicalPlaceId].map(normal));
+  add('place', [decision.endpointLogicalPlaceId, evidence.endpointLogicalPlaceId, decision.logicalPlaceId, evidence.logicalPlaceId,
+    ...preparedEntries.map(entry => entry.nptgLocalityName)].map(normal));
   add('stop-point', [
     decision.primaryEndpointStopPointId,
     decision.endpointStopPointId,
     ...(decision.endpointStopPointIds ?? []),
     evidence.endpointStopPointId,
-    ...(evidence.endpointStopPointIds ?? [])
+    ...(evidence.endpointStopPointIds ?? []),
+    ...preparedEntries.map(entry => entry.resolvedStopPointId || entry.id)
   ].map(normal));
-  add('place-name', [decision.chosenDisplayName, decision.chosen, evidence.stopArea?.name, ...(evidence.stopAreas ?? []).map(area => area?.name)].map(normal));
+  add('place-name', [decision.chosenDisplayName, decision.chosen, evidence.stopArea?.name, ...(evidence.stopAreas ?? []).map(area => area?.name),
+    ...preparedEntries.flatMap(entry => [entry.naptanCommonName, ...(entry.stopAreas ?? []).map(area => area?.name)])].map(normal));
   return unique(keys);
 }
 
@@ -65,27 +84,66 @@ export function endpointIdentity(service = {}, side = 'destination') {
 
 function endpointDisplay(service, side) {
   const decision = service?.[`${side}EndpointDecision`];
-  return text(decision?.chosenDisplayName || decision?.chosen || service?.[side]);
+  if (text(decision?.chosenDisplayName || decision?.chosen)) return text(decision.chosenDisplayName || decision.chosen);
+  const evidence = endpointEvidenceEntries(service, side)[0];
+  const name = text(evidence?.naptanCommonName || evidence?.stopAreas?.[0]?.name);
+  const locality = text(evidence?.nptgLocalityName);
+  if (name && locality && /^(?:bus|coach) station$/i.test(name)) return `${locality} ${name}`;
+  return name || text(service?.[side]);
 }
 
 function endpointStopIds(service, side) {
   const decision = service?.[`${side}EndpointDecision`] || {};
+  const preparedEntries = endpointEvidenceEntries(service, side);
   return unique([
     service?.[`${side}StopPointId`],
     ...(service?.[`${side}StopPointIds`] ?? []),
     decision.primaryEndpointStopPointId,
     decision.endpointStopPointId,
-    ...(decision.endpointStopPointIds ?? [])
+    ...(decision.endpointStopPointIds ?? []),
+    ...preparedEntries.map(entry => entry.resolvedStopPointId || entry.id)
   ]);
 }
 
 function endpointIsExact(service, side) {
   const decision = service?.[`${side}EndpointDecision`] || {};
-  return Boolean(decision.exactEvidence || decision.exact || decision.evidence?.endpointEvidenceSet?.length
+  return Boolean(endpointEvidenceEntries(service, side).length || decision.exactEvidence || decision.exact || decision.evidence?.endpointEvidenceSet?.length
     || /^exact-|prepared-exact|runtime-and-prepared/.test(text(decision.decisionType) + ' ' + text(decision.evidenceSource)));
 }
 
-function pattern(service) { return unique(service?.routePatternStopIds ?? []); }
+function endpointIsAssessed(service, side) {
+  const assessed = new Set(unique(service?.assessedStops ?? service?.stopIds ?? []));
+  return endpointStopIds(service, side).some(id => assessed.has(id));
+}
+
+function sharedDirectionMarker(first, second) {
+  const left = text(first?.directionFamily || first?.direction || first?.stopDirection).toLowerCase();
+  const right = text(second?.directionFamily || second?.direction || second?.stopDirection).toLowerCase();
+  return left && right && left === right;
+}
+
+function containedEndpointShortWorking(shorterService, longerService) {
+  if (text(shorterService?.routeNumber).toUpperCase() !== text(longerService?.routeNumber).toUpperCase()) return false;
+  if (!sharedDirectionMarker(shorterService, longerService)) return false;
+  if (!lineageIds(shorterService).some(value => lineageIds(longerService).map(normal).includes(normal(value)))) return false;
+  for (const side of ['origin', 'destination']) {
+    const other = side === 'origin' ? 'destination' : 'origin';
+    if (endpointIdentity(shorterService, side) !== endpointIdentity(longerService, side)) continue;
+    if (endpointIdentity(shorterService, other) === endpointIdentity(longerService, other)) continue;
+    if (!endpointIsAssessed(shorterService, other) && endpointIsAssessed(longerService, other)) return true;
+  }
+  return false;
+}
+
+export function assessedEndpointSupport(service = {}) {
+  return Number(endpointIsAssessed(service, 'origin')) + Number(endpointIsAssessed(service, 'destination'));
+}
+
+function pattern(service) {
+  const explicit = unique(service?.routePatternStopIds ?? []);
+  if (explicit.length) return explicit;
+  return unique(service?.orderedPatternEndpoints ?? service?.source?.orderedPatternEndpoints ?? []);
+}
 function patternNames(service) { return unique((service?.routePatternStops ?? service?.routePatternStopNames ?? []).map(stop => typeof stop === 'string' ? stop : stop?.name || stop?.commonName)); }
 
 function strictSubsequenceServices(shorterService, longerService) {
@@ -133,7 +191,8 @@ export function makePublicServiceGroupingDecision({
 } = {}) {
   const records = [...services];
   const mainPattern = pattern(principal);
-  const shortWorkingRecords = records.filter(service => service !== principal && strictSubsequenceServices(service, principal));
+  const shortWorkingRecords = records.filter(service => service !== principal
+    && (strictSubsequenceServices(service, principal) || containedEndpointShortWorking(service, principal)));
   const destinations = destinationValues(records);
   const mainDestination = principal ? principalDestination(principal) : '';
   const alternateDestinations = destinations.filter(value => value !== mainDestination);
@@ -230,10 +289,27 @@ function patternPositionProof(service, side, stopsById, assessedKeys) {
 }
 
 export function makeTerminusDecision({ services = [], principal = services[0] || null, assessedStops = [], publicPlace = null } = {}) {
+  if (services.some(service => service?.circular) || principal?.circular) return Object.freeze({
+    type: 'TerminusDecision',
+    status: 'not-assessed-endpoint',
+    presentation: 'none',
+    proven: false,
+    assessedPlace: text(publicPlace || assessedPlace(assessedStops, null)) || null,
+    terminalSides: Object.freeze([]),
+    terminalStopPointIds: Object.freeze([]),
+    arrivalEvidence: Object.freeze([]),
+    departureEvidence: Object.freeze([]),
+    reason: 'Circular classification is preserved and final circular semantics remain deferred; terminus suppression was not applied.',
+    note: null,
+    evidence: Object.freeze({ circularClassificationDeferred: true, principalSourceRecordId: serviceId(principal) || null })
+  });
   const stopsById = new Map((assessedStops ?? []).map(stop => [text(stop.id || stop.sourceId), stop]).filter(([id]) => id));
   const placeCounts = new Map();
   for (const stop of assessedStops ?? []) {
-    for (const key of stopPlaceKeys(stop).filter(value => /^(?:stop-area|place):/.test(value))) placeCounts.set(key, (placeCounts.get(key) ?? 0) + 1);
+    for (const key of stopPlaceKeys(stop).filter(value => /^stop-area:/.test(value))) placeCounts.set(key, (placeCounts.get(key) ?? 0) + 1);
+  }
+  if (!placeCounts.size) for (const stop of assessedStops ?? []) {
+    for (const key of stopPlaceKeys(stop).filter(value => /^place:/.test(value))) placeCounts.set(key, (placeCounts.get(key) ?? 0) + 1);
   }
   const targetPlaceKey = [...placeCounts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] || null;
   const targetStops = targetPlaceKey
@@ -249,7 +325,6 @@ export function makeTerminusDecision({ services = [], principal = services[0] ||
   const provenSides = Object.entries(sides).filter(([, evidence]) => evidence.matched && evidence.proof).map(([side]) => side);
   const through = Object.values(sides).some(evidence => evidence.through);
   const firstPlace = sides.origin.place || sides.destination.place;
-  const place = text(publicPlace || assessedPlace(assessedStops, firstPlace));
   const exactEndpointEvidence = ['origin', 'destination'].some(side => endpointIsExact(principal, side));
   let status = 'not-assessed-endpoint';
   let presentation = 'none';
@@ -267,6 +342,7 @@ export function makeTerminusDecision({ services = [], principal = services[0] ||
     status = 'unresolved-review';
     reason = 'The assessed place matched endpoint evidence, but ordered endpoint proof was incomplete; arrival suppression was not applied.';
   }
+  const place = text(publicPlace || provenSides.map(side => endpointDisplay(principal, side)).find(Boolean) || assessedPlace(assessedStops, firstPlace));
   return Object.freeze({
     type: 'TerminusDecision',
     status,

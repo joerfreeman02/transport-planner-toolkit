@@ -107,12 +107,52 @@ The accepted canonical frozen control remains:
 | Distinct routes | 21 |
 | Route×StopPoint pairs | 86 |
 | Planner rows before BUS-GROUP | 39 |
+| Planner rows after BUS-GROUP + TERMINUS | 21 |
+
+The final offline replay of the frozen diagnostic cache measured the same `16`
+physical stops, `21` distinct routes, and `86` route×StopPoint pairs, then
+reduced the accepted `39` pre-group planner rows to `21` public planner rows.
+The reduction is grouping and terminal-presentation work only; it is not a
+claim that any source timetable was refreshed.
+
+The principal replay controls are:
+
+- `310`, `15`, `217`, `491`, `242`, `279`, and `66` retain proven Waltham
+  Cross terminal evidence; arrival-only terminal duplicates are suppressed only
+  where a departing proof exists.
+- `66` retains Hammond Street short-working evidence; `242` retains Welham
+  Green Railway Station and Brookfield Centre; `279` retains Manor House
+  Station; and the route-specific calendar notes remain visible.
+- `13`, `13A`, `13B`, and `13C` remain distinct public route rows. `279` and
+  `N279` remain distinct. `16` and `16C` retain circular presentation and are
+  not forced through terminal suppression.
+- Source IDs, alternate destinations, branch/short-working classifications,
+  endpoint StopPoint/StopArea evidence, and the canonical departure evidence
+  remain on the planner row for audit and review.
+
+Browser and Word continue to consume the same planner rows, service notes,
+grouping decisions, terminus decisions, and source evidence. No live source or
+TNDS acquisition was made for this replay; the existing frozen diagnostic cache
+was read offline only.
 
 The repository also contains the network-free Alpha.15 production fixture used
 by the existing acceptance suite (`12` planner rows for that smaller fixture).
 It is not the 39-row frozen run and must not be presented as a replacement for
 the canonical diagnostic control. No new canonical publication was produced by
 this sprint.
+
+## GitHub tooling adoption review
+
+This sprint made no GitHub governance or third-party tooling changes. The
+recommended follow-up is for the repository owner to review Dependabot security
+updates (optionally grouped), Codecov coverage reporting after a baseline is
+set, and OpenSSF Scorecard as a GitHub Action/check. Sentry is not applicable
+to this domain-only change; it may be reconsidered for browser-runtime
+failures with a privacy review. Renovate and Dependabot should not both be
+introduced without one clear dependency-automation owner. Main-branch
+protection was not changed; any future policy should be decided by the
+repository owner and may require PR review, required status checks, and the
+organisation's preferred history/signing rules.
 
 Validation command:
 
@@ -138,4 +178,3 @@ with the working implementation.
   proven-terminus row exists, and that through-service/circular rows remain.
 - Any future refresh, publication, deployment, or release-version change is a
   separate controlled decision and is outside this sprint.
-

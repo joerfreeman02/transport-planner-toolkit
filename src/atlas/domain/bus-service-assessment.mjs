@@ -387,9 +387,15 @@ function representativeStop(stops, records) {
   })[0] || null;
 }
 
+function orderedPatternEndpoints(record) {
+  return (record?.routePatternStopIds?.length ? record.routePatternStopIds : record?.source?.orderedPatternEndpoints ?? record?.orderedPatternEndpoints ?? [])
+    .map(text)
+    .filter(Boolean);
+}
+
 function representativeRecord(records, stopIds) {
   return [...records].sort((a, b) => {
-    const patternDifference = (b.routePatternStopIds?.length ?? 0) - (a.routePatternStopIds?.length ?? 0);
+    const patternDifference = orderedPatternEndpoints(b).length - orderedPatternEndpoints(a).length;
     if (patternDifference) return patternDifference;
     const locationDifference = (b.principalLocations?.length ?? 0) - (a.principalLocations?.length ?? 0);
     if (locationDifference) return locationDifference;
@@ -459,6 +465,10 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const integrityWarnings = unique(records.flatMap(record => record.scheduleIntegrityWarnings ?? []));
     if (integrityWarnings.length) notes.push(`Schedule integrity note: ${integrityWarnings.join(' ')}`);
     const endpointEvidence = records.reduce((merged, record) => mergeEndpointEvidence(merged, record.endpointEvidence), { origin: {}, destination: {} });
+    const principalPattern = orderedPatternEndpoints(first);
+    const source = first.source && typeof first.source === 'object'
+      ? Object.freeze({ ...first.source, orderedPatternEndpoints: Object.freeze(principalPattern) })
+      : null;
     return Object.freeze({
       id: identity,
       routeNumber: text(first.routeNumber) || 'Not supplied',
@@ -484,12 +494,14 @@ export function buildServiceSummaries(stops, serviceRecords) {
       calendarProfileId: text(first.calendarProfileId || first.source?.calendarProfileId) || null,
       calendarProfileLabel: calendarProfileLabel(first.calendarProfileId || first.source?.calendarProfileId),
       sourceRouteIds: Object.freeze(unique(records.map(record => record.source?.routeId || record.routeId))),
+      source,
+      orderedPatternEndpoints: Object.freeze(principalPattern),
       principalLocations,
       routePatternStops: Object.freeze([...(first.routePatternStops ?? [])]),
       calendarEvidence: Object.freeze(calendarEvidence),
       directionFamily: directionGroupKey(first),
       routePatternStopIds: Object.freeze([...(first.routePatternStopIds ?? [])]),
-      routePatternExtent: Math.max(0, ...records.map(record => Array.isArray(record.routePatternStopIds) ? record.routePatternStopIds.length : 0)),
+      routePatternExtent: Math.max(0, ...records.map(record => orderedPatternEndpoints(record).length)),
       recordActivity: Math.max(0, ...records.map(record => recordActivity(record, stopIds))),
       operatingPeriods: periods,
       operatingPeriodLines: formatOperatingPeriod(periods),

@@ -147,6 +147,7 @@ const allUnresolvedDecision = allUnresolved.services[0].destinationEndpointDecis
 assert.equal(allUnresolvedDecision.rawEndpointText, 'Temp Bus Station');
 assert.deepEqual(allUnresolvedDecision.hydratedEndpointStopPointIds, []);
 assert.deepEqual(allUnresolvedDecision.unresolvedEndpointStopPointIds, ['MISSING_A', 'MISSING_B']);
+assert.equal(allUnresolvedDecision.partialExactCoverage, false);
 assert.equal(allUnresolvedDecision.decisionType, 'unresolved-source-retained');
 assert.equal(allUnresolvedDecision.unresolved, true);
 

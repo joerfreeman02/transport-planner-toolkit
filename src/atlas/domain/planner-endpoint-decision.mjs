@@ -327,7 +327,7 @@ function endpointEvidenceForRecord(record, side, hydratedById, localitiesById, g
     nptgLocalityName: primary?.nptgLocalityName || null,
     parentLocalityId: primary?.parentLocalityId || null,
     parentLocalityName: primary?.parentLocalityName || null,
-    partialExactCoverage: Boolean(ids.length && unresolvedIds.length),
+    partialExactCoverage: Boolean(hydratedIds.length && unresolvedIds.length),
     primaryHydrated: Boolean(primary?.hydrated),
     primaryUnresolvedWithSecondaryHydrated: Boolean(primaryId && !primary?.hydrated && hydratedIds.length),
     materialConflict: conflict,

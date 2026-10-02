@@ -739,7 +739,9 @@ OpenSSF Scorecard, Sentry, and Renovate remain unconfigured; and main-branch
 protection is unchanged. This is ready for final Product Owner acceptance
 testing, not a claim of production acceptance.
 
-Two Alpha.13 calendar-safety expectations were narrowed to the accepted 1F
-semantics: explicit unresolved evidence still produces an honest review
-qualification, while a missing supplementary assertion is not invented as an
-unresolved profile. No Alpha.13 production behaviour was changed.
+Two Alpha.13 calendar-safety expectations and one Alpha.14 presentation
+expectation were narrowed to the accepted 1F semantics: explicit unresolved
+evidence still produces an honest review qualification, while a missing
+supplementary assertion is not invented as an unresolved profile, and the
+human Additional services wording is now the expected planner presentation.
+No Alpha.13 or Alpha.14 production behaviour was changed.

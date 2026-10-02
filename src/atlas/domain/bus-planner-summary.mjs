@@ -2037,12 +2037,43 @@ function attachRouteNotes(rows) {
       if (attributedVariantNotes.length) routeNotes.push(...attributedVariantNotes);
       else routeNotes.push('Additional short workings and timetable variants operate.');
     }
+    const mergedAdditionalServiceEntries = [];
+    const mergedShortWorkingEntries = [];
+    const mergedQualifications = [];
+    const mergeEntry = (target, entry) => {
+      const route = text(entry?.routeNumber);
+      const location = text(entry?.location);
+      const locations = unique(entry?.locations ?? []);
+      const signature = `${route}|${location}|${locations.join('|')}`;
+      if (route && (location || locations.length) && !target.some(existing => existing.__signature === signature)) target.push({ ...entry, __signature: signature });
+    };
+    group.forEach(({ row }) => {
+      (row.plannerNotes?.additionalServiceEntries ?? []).forEach(entry => mergeEntry(mergedAdditionalServiceEntries, entry));
+      (row.plannerNotes?.shortWorkingEntries ?? []).forEach(entry => mergeEntry(mergedShortWorkingEntries, entry));
+      text(row.plannerNotes?.serviceQualification).split(';').map(text).filter(Boolean).forEach(qualification => {
+        if (!mergedQualifications.some(existing => normal(existing) === normal(qualification))) mergedQualifications.push(qualification);
+      });
+    });
+    const mergedPlannerNotes = position => {
+      if (position !== group.length - 1) return null;
+      const row = group.at(-1).row;
+      const additionalEntries = mergedAdditionalServiceEntries.map(({ __signature, ...entry }) => entry);
+      const shortEntries = mergedShortWorkingEntries.map(({ __signature, ...entry }) => entry);
+      return Object.freeze({
+        ...row.plannerNotes,
+        additionalServices: additionalEntries.length ? plannerAdditionalSentence(additionalEntries) : row.plannerNotes?.additionalServices || null,
+        additionalServiceEntries: Object.freeze(additionalEntries),
+        shortWorkings: shortEntries.length ? plannerShortWorkingSentence(shortEntries) : row.plannerNotes?.shortWorkings || null,
+        shortWorkingEntries: Object.freeze(shortEntries),
+        serviceQualification: mergedQualifications.length ? mergedQualifications.join('; ') : row.plannerNotes?.serviceQualification || null
+      });
+    };
     group.forEach(({ row, index }, position) => {
       const remainingNotes = notesFor(row).filter(note => !shared.includes(note)
         && !/^Circular service\.$/i.test(note)
         && !(row.plannerNotes?.serviceQualification && structuredQualification(note)
           && /operating days could not be fully confirmed/i.test(note)));
-      const plannerNotes = position === group.length - 1 && legacyAdditionalServices.length
+      const plannerNotes = mergedPlannerNotes(position) || (position === group.length - 1 && legacyAdditionalServices.length
         ? Object.freeze({
           ...row.plannerNotes,
           additionalServices: unique([
@@ -2050,7 +2081,7 @@ function attachRouteNotes(rows) {
             ...legacyAdditionalServices
           ]).join('; ')
         })
-        : row.plannerNotes;
+        : row.plannerNotes);
       updates.set(index, { serviceNote: remainingNotes.join(' '), plannerNotes, routeGroupNote: position === group.length - 1 ? routeNotes.join(' ') || null : null });
     });
   }

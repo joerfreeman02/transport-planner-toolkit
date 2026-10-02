@@ -92,8 +92,9 @@ for (const route of ['16', '16C']) {
   assert.equal(row.plannerNotes.circularService, null);
 }
 const row16c = walthamRows.find(candidate => candidate.routeNumber === '16C');
-assert.ok(row16c.plannerNotes.additionalServices);
-assert.equal(row16c.plannerNotes.shortWorkings, null, 'the incomplete same-destination evidence has one planner category');
+assert.equal(row16c.plannerNotes.additionalServices, null, 'contained 16C variants are not duplicated as Additional services');
+assert.match(row16c.plannerNotes.shortWorkings, /Maple Gate/);
+assert.match(row16c.plannerNotes.shortWorkings, /Maynard Court/);
 
 const pipers230 = {
   id: 'south_east:118723:0:b7eada5524c4',
@@ -112,14 +113,27 @@ assert.match(pipersDecision.reason, /complete ordered StopPoint\/StopArea patter
 const propagatedPattern = ['490000001A', 'gtfs:east_anglia:missing-stop', '490000001A'];
 const preparedService = normalisePreparedService({
   id: 'bods:pattern', routeNumber: '16', operator: 'Fixture', origin: 'A', destination: 'A',
-  routePatternStopIds: propagatedPattern,
+  routePatternStopIds: ['490000001A', '490000001A'],
+  circularPatternStopIds: propagatedPattern,
   stopSchedules: { '490000001A': { monday: [420] } }
 });
-assert.deepEqual(preparedService.routePatternStopIds, propagatedPattern);
+assert.deepEqual(preparedService.routePatternStopIds, ['490000001A', '490000001A']);
+assert.deepEqual(preparedService.circularPatternStopIds, propagatedPattern);
 const assessed = buildServiceSummaries([{ id: '490000001A', name: 'A', indicator: 'A' }], [preparedService]);
-assert.deepEqual(assessed[0].routePatternStopIds, propagatedPattern);
+assert.deepEqual(assessed[0].routePatternStopIds, ['490000001A', '490000001A']);
+assert.deepEqual(assessed[0].circularPatternStopIds, propagatedPattern);
 const plannerGroup = buildPlannerServiceGroups(assessed, [{ id: '490000001A', name: 'A', indicator: 'A', walking: { status: 'routed', distanceMetres: 10 } }])[0];
-assert.deepEqual(plannerGroup.patternEvidence[0].stopIds, propagatedPattern);
+assert.deepEqual(plannerGroup.patternEvidence[0].stopIds, ['490000001A', '490000001A']);
+
+const dedicatedCircularDecision = resolveCircularServiceDecision([{
+  id: 'bods:dedicated-loop', routeNumber: 'DEDICATED', circular: true, origin: '210021703430', destination: '210021703430',
+  routePatternStopIds: ['210021703430', '210021703430'],
+  circularPatternStopIds: ['210021703430', '1500WABYGRNM', '210021703430'],
+  principalLocations: ['Waltham Cross Railway Station', 'Queensway']
+}]);
+assert.equal(dedicatedCircularDecision.classification, 'circular');
+assert.match(dedicatedCircularDecision.plannerWording, /Waltham Cross Railway Station and Queensway/);
+assert.doesNotMatch(dedicatedCircularDecision.plannerWording, /210021703430|1500WABYGRNM/);
 
 const wordingRow = buildPlannerBusServiceSummaries([{
   id: 'word-loop', routeNumber: 'WORD', operator: 'Example', origin: 'A', destination: 'A', direction: 'Clockwise',

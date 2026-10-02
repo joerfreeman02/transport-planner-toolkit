@@ -557,7 +557,11 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             "direction": clean(trip.get("trip_headsign")) or (f"towards {last_name}" if last_name else ""),
             "circular": circular,
             "principalLocations": principal_locations(calls),
-            "routePatternStopIds": route_pattern_stop_ids,
+            # Keep the complete ordered BODS call sequence available to the
+            # circular-service assessor without changing the historical
+            # GROUP-facing routePatternStopIds contract.  Before CIRC, BODS
+            # records exposed only endpoint evidence through source metadata.
+            "circularPatternStopIds": route_pattern_stop_ids,
             "validFrom": None,
             "validTo": None,
             "qualifications": set(),

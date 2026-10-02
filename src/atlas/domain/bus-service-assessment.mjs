@@ -466,6 +466,10 @@ export function buildServiceSummaries(stops, serviceRecords) {
     if (integrityWarnings.length) notes.push(`Schedule integrity note: ${integrityWarnings.join(' ')}`);
     const endpointEvidence = records.reduce((merged, record) => mergeEndpointEvidence(merged, record.endpointEvidence), { origin: {}, destination: {} });
     const principalPattern = orderedPatternEndpoints(first);
+    const circularPatternSource = [...records].sort((left, right) => {
+      const lengthDifference = (right.circularPatternStopIds?.length ?? 0) - (left.circularPatternStopIds?.length ?? 0);
+      return lengthDifference || text(left.id).localeCompare(text(right.id));
+    })[0] ?? first;
     const source = first.source && typeof first.source === 'object'
       ? Object.freeze({ ...first.source, orderedPatternEndpoints: Object.freeze(principalPattern) })
       : null;
@@ -498,6 +502,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
       orderedPatternEndpoints: Object.freeze(principalPattern),
       principalLocations,
       routePatternStops: Object.freeze([...(first.routePatternStops ?? [])]),
+      circularPatternStopIds: Object.freeze([...(circularPatternSource.circularPatternStopIds ?? [])].map(text).filter(Boolean)),
       calendarEvidence: Object.freeze(calendarEvidence),
       directionFamily: directionGroupKey(first),
       routePatternStopIds: Object.freeze([...(first.routePatternStopIds ?? [])]),

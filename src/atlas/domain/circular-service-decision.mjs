@@ -73,14 +73,18 @@ function stopName(stop) {
 }
 
 function orderedStopPoints(service) {
-  const explicit = Array.isArray(service?.routePatternStops) && service.routePatternStops.length
-    ? service.routePatternStops
+  const explicit = Array.isArray(service?.circularPatternStops) && service.circularPatternStops.length
+    ? service.circularPatternStops
+    : Array.isArray(service?.routePatternStops) && service.routePatternStops.length
+      ? service.routePatternStops
     : Array.isArray(service?.orderedPatternStops) && service.orderedPatternStops.length
       ? service.orderedPatternStops
       : null;
   if (explicit) return explicit.map(stop => typeof stop === 'string' ? { id: stop, name: stop } : { ...stop });
-  const ids = service?.routePatternStopIds?.length
-    ? service.routePatternStopIds
+  const ids = service?.circularPatternStopIds?.length
+    ? service.circularPatternStopIds
+    : service?.routePatternStopIds?.length
+      ? service.routePatternStopIds
     : service?.orderedPatternEndpoints?.length
       ? service.orderedPatternEndpoints
       : service?.source?.orderedPatternEndpoints;
@@ -294,17 +298,33 @@ function principalFor(services, explicit) {
   })[0] ?? null;
 }
 
-function viaNames(stops, principalLocations = []) {
+function viaNames(stops, principalLocations = [], endpointDecisions = []) {
+  const endpointNames = new Set(endpointDecisions.flatMap(endpoint => [
+    endpoint?.chosen,
+    endpoint?.chosenDisplayName,
+    endpoint?.chosenPlaceName,
+    endpoint?.endpointLogicalPlaceName,
+    endpoint?.nptgLocalityName
+  ]).map(value => normal(value)).filter(Boolean));
   const names = unique([
-    ...stops.slice(1, -1).map(stop => stopName(stop)),
-    ...principalLocations
-  ]);
+    ...principalLocations,
+    ...stops.slice(1, -1).map(stop => stopName(stop))
+  ]).filter(name => !technicalStopIdentifier(name) && !endpointNames.has(normal(name)));
   return names.slice(0, 3);
+}
+
+function technicalStopIdentifier(value) {
+  const candidate = text(value);
+  return !candidate
+    || /^gtfs:/i.test(candidate)
+    || /^\d{5,}$/u.test(candidate)
+    || /^\d{3,}[A-Z0-9]+$/iu.test(candidate)
+    || /^[A-Z]{2,}\d{3,}[A-Z0-9]*$/iu.test(candidate);
 }
 
 function plannerWording(route, decision) {
   if (decision.classification !== 'circular') return null;
-  const via = viaNames(decision.orderedStopPoints, decision.principalLocations);
+  const via = viaNames(decision.orderedStopPoints, decision.principalLocations, [decision.originDecision, decision.destinationDecision]);
   const orientation = decision.orientation ? ` ${decision.orientation}` : '';
   const viaText = via.length ? ` via ${via.length === 1 ? via[0] : `${via.slice(0, -1).join(', ')} and ${via.at(-1)}`}` : '';
   return `Route ${route || 'the service'} operates${orientation} as a circular service${viaText}.`;

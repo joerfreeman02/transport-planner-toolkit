@@ -184,9 +184,10 @@ class CircularIdentityTests(unittest.TestCase):
             services,
         )
         record = next(iter(services.values()))
-        self.assertEqual(record["routePatternStopIds"], ["490000001A", "gtfs:frozen_region:missing-gtfs", "490000001A"])
+        self.assertNotIn("routePatternStopIds", record)
+        self.assertEqual(record["circularPatternStopIds"], ["490000001A", "gtfs:frozen_region:missing-gtfs", "490000001A"])
         self.assertEqual(record["source"]["orderedPatternEndpoints"], ["490000001A", "490000001A"])
-        self.assertEqual(record["routePatternStopIds"][0], record["routePatternStopIds"][-1])
+        self.assertEqual(record["circularPatternStopIds"][0], record["circularPatternStopIds"][-1])
 
     def test_route_310_distinct_bus_station_endpoints_are_not_circular(self):
         record = self.build_record(
@@ -371,7 +372,7 @@ class PreparedDataV2ParserTests(unittest.TestCase):
             v2_services = json.loads(gzip.open(output / v2_service_path, "rt", encoding="utf-8").read())["services"]
             self.assertEqual(manifest["version"], "2.1.0")
             self.assertIn("endpointEvidence", v2_services[0])
-            self.assertEqual(v2_services[0]["routePatternStopIds"], ["490006381N", "490006381S"])
+            self.assertEqual(v2_services[0]["circularPatternStopIds"], ["490006381N", "490006381S"])
             for legacy, enriched in zip(v1_services, v2_services):
                 for field, value in legacy.items():
                     if field == "endpointEvidence":

@@ -116,6 +116,7 @@ const compactService = service => {
     stopIds: service.stopIds,
     assessedStops: service.assessedStops,
     routePatternStopIds: service.routePatternStopIds,
+    circularPatternStopIds: service.circularPatternStopIds,
     routePatternStops: (service.routePatternStops || []).map(stop => ({ id: stop.id, name: stop.name, commonName: stop.commonName, locality: stop.locality, localityName: stop.localityName, nptgLocalityName: stop.nptgLocalityName, stopArea: stop.stopArea, logicalGroupRefs: stop.logicalGroupRefs })),
     routePatternExtent: service.routePatternExtent,
     orderedPatternEndpoints: service.orderedPatternEndpoints,

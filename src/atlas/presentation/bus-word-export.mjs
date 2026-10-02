@@ -99,9 +99,10 @@ export function buildBusWordTables(result) {
         principalLocationsText(service),
         service.typicalFrequencyText || 'Frequency unavailable',
         (service.operatingPeriodLines ?? []).join('\n')
-      ]);
+    ]);
     const duplicateTerminusNote = service.plannerNotes?.terminus && /\broute terminus\b/i.test(text(service.serviceNote));
-    if (service.serviceNote && !duplicateTerminusNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.serviceNote}` });
+    const structuredQualificationNote = /^(?:runs? on school days only|operates? during term time only|term[- ]time service|runs? on non-school days only|non-school days only|operates? on holidays only|operating days could not be fully confirmed)(?:;.*)?\.?$/i.test(text(service.serviceNote));
+    if (service.serviceNote && !duplicateTerminusNote && !structuredQualificationNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.serviceNote}` });
     const plannerAnnotations = hasPlannerSummary ? plannerAnnotationRows(service) : [];
     const next = services[index + 1];
     if (hasPlannerSummary && (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey)) {

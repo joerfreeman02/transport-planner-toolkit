@@ -1048,9 +1048,9 @@ function originVariantNames(sourceServices, group) {
 function variantCalendarQualification(service) {
   const raw = text(service?.serviceNote);
   const profile = calendarProfileFromService(service);
-  if (profile === 'school-day' || /school[- ]?days?|schooldays?/i.test(raw)) return 'school days only';
-  if (profile === 'term-time' || /term[- ]time|term[- ]only/i.test(raw)) return 'term time only';
   if (profile === 'non-school-day' || /non[- ]school/i.test(raw)) return 'non-school days only';
+  if (profile === 'school-day' || /\bschool[- ]?days?\b|\bschooldays?\b/i.test(raw)) return 'school days only';
+  if (profile === 'term-time' || /term[- ]time|term[- ]only/i.test(raw)) return 'term time only';
   if (profile === 'holiday' || /holiday/i.test(raw)) return 'holidays only';
   return '';
 }
@@ -1799,9 +1799,9 @@ function humanQualification(value) {
   if (/operating days could not be fully confirmed|calendar applicability is not confirmed|unresolved calendar/i.test(raw)) return 'Operating days could not be fully confirmed; check the timetable before use';
   const route = raw.match(/^Route\s+([^–-]+?)\s*[–-]\s*(.+)$/i);
   const qualifier = route ? route[2] : raw;
-  if (/school days only|school-day/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates on school days only` : 'Runs on school days only';
-  if (/term[- ]time|term[- ]only/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates during term time only` : 'Operates during term time only';
   if (/non[- ]school/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates on non-school days only` : 'Runs on non-school days only';
+  if (/\bschool days only\b|\bschool-day\b/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates on school days only` : 'Runs on school days only';
+  if (/term[- ]time|term[- ]only/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates during term time only` : 'Operates during term time only';
   if (/holiday/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates on holidays only` : 'Operates on holidays only';
   return raw;
 }
@@ -1930,7 +1930,8 @@ function plannerAnnotationTaxonomy(row) {
 
   const rowQualification = materialServiceNote(row?.serviceNote);
   if (rowQualification && /school|term(?:[- ]time|[- ]only)|non-school|circular|holiday|calendar|operating days could not be fully confirmed/i.test(rowQualification)
-    && !(row?.circular && /circular service/i.test(rowQualification))) addUnique(qualifications, rowQualification);
+    && !(row?.circular && /circular service/i.test(rowQualification))
+    && !qualifications.some(existing => normal(existing).includes(normal(rowQualification)))) addUnique(qualifications, rowQualification);
   const shortLocation = value => text(value).replace(/^[^–-]+[–-]\s*/u, '');
   const compactShortWorkings = shortWorkings.filter(candidate => !shortWorkings.some(other => other !== candidate
     && normal(shortLocation(other)).includes(normal(shortLocation(candidate)))));
@@ -2039,7 +2040,8 @@ function attachRouteNotes(rows) {
     group.forEach(({ row, index }, position) => {
       const remainingNotes = notesFor(row).filter(note => !shared.includes(note)
         && !/^Circular service\.$/i.test(note)
-        && !(row.plannerNotes?.serviceQualification && structuredQualification(note)));
+        && !(row.plannerNotes?.serviceQualification && structuredQualification(note)
+          && !/^Non-school days only\.$/i.test(note)));
       const plannerNotes = position === group.length - 1 && legacyAdditionalServices.length
         ? Object.freeze({
           ...row.plannerNotes,

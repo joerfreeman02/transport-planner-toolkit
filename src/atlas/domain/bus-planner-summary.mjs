@@ -1877,6 +1877,9 @@ function plannerAnnotationTaxonomy(row) {
       const location = origin || destination;
       shortWorkingEntries.push(Object.freeze({ routeNumber: route, location }));
       addUnique(shortWorkings, `${route} – ${location}`);
+    } else if (variant.kind === 'short-working' && destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
+      shortWorkingEntries.push(Object.freeze({ routeNumber: route, location: destination }));
+      addUnique(shortWorkings, `${route} – ${destination}`);
     } else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
       addAdditionalEntry(route, [destination]);
     }

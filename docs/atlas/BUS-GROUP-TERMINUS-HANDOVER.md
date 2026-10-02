@@ -746,3 +746,31 @@ while a missing supplementary assertion is not invented as an unresolved
 profile; human Additional services wording is now expected; and contained
 same-route destinations are expected under Short workings. No Alpha.13,
 Alpha.14, or Alpha.15 production behaviour was changed.
+
+## BUS-GROUP-1G — final human planner wording closeout
+
+Starting from `2037cc9cf067ebcb48ce66f4f5fa8c421b6bd816`, the shared
+`plannerAdditionalSentence()` function now renders structured Additional
+service entries as deterministic planner prose. It keeps each child route
+attributable, joins locations as natural English, and uses the semantic
+variant kind already present in the grouping decision for same-route branch
+wording. No grouping, calendar, terminus, operator, frequency, route-family,
+or circular intelligence was changed.
+
+The frozen Waltham runtime now presents:
+
+- `13`: `Route 13A also serves St Margaret's Hospital and Waltham Abbey
+  (Princesfield Rd); route 13B also serves Railway Station and Waltham Abbey
+  (Princesfield Rd); route 13C operates to Two Brewers`.
+- `15A`: `Route 15A also serves Katherines`.
+- `242`: `Route 242 provides connections to Brookfield Centre and Welham
+  Green Railway Station`.
+- `279`: `Some route 279 journeys also serve Manor House Station`.
+- `A1`: `Some route A1 journeys also serve Highbridge Rdbt`.
+- `66`: `Some route 66 journeys operate to Hammond Street (Smiths Lane)`.
+
+Browser and Word consume the same final `plannerNotes.additionalServices`
+string. Browser semantic styling and the protected Word renderer remain
+unchanged. Focused BUS-GROUP-1G wording/parity tests and the complete
+`tests/atlas/run-all.mjs` suite pass. No acquisition, national rebuild,
+publication, deployment, merge, BUS-CIRC, or Alpha.16 work occurred.

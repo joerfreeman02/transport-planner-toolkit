@@ -37,7 +37,7 @@ const family = rowFor('13');
 assert.ok(family, 'the mixed runtime retains the proven 13 family');
 assert.equal(family.routeFamilyLabel, '13 / 13A / 13B / 13C');
 assert.deepEqual(family.principalLocations, family.routeFamilyMembers.find(member => member.routeNumber === '13').principalLocations, 'the family headline keeps principal 13 locations only');
-assert.match(family.plannerNotes.additionalServices, /13A – .*; 13B – .*; 13C –/);
+assert.match(family.plannerNotes.additionalServices, /Route 13A also serves .*; route 13B also serves .*; route 13C operates to/);
 assert.equal(family.typicalFrequencyLines.some(line => /^(?:13A|13B|13C):/.test(line)), false);
 
 const mixedDecision = rowFor('217').publicServiceGroupingDecision;
@@ -47,7 +47,7 @@ assert.ok(mixedDecision.publicServiceEquivalenceEvidence.some(evidence => eviden
 const word = buildBusWordTables({ ok: true, stops: fixture.stops, plannerServiceSummaries: rows, serviceSummaries: [] });
 const wordText = word.flatMap(table => table.rows ?? []).map(row => Array.isArray(row) ? row.join(' ') : String(row?.text ?? '')).join(' ');
 assert.match(wordText, /Presentation note: Where an assessed stop is the route terminus, ATLAS shows the useful departing direction only/);
-assert.match(wordText, /Additional services: 13A –/);
+assert.match(wordText, /Additional services: Route 13A also serves/);
 assert.doesNotMatch(wordText, /Operator not supplied/);
 
 console.log('PASS BUS-GROUP-1E captured mixed TfL+BODS runtime, public-family principal presentation, terminus suppression, and Browser/Word handover controls.');

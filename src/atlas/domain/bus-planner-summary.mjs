@@ -1758,22 +1758,36 @@ function plannerServiceDestinationKeys(service) {
   return endpointLocationKeys(looksLikeDecision ? service : (service?.destinationEndpointDecision ?? service?.destinationDecision ?? {}));
 }
 
+function plannerNaturalList(values = []) {
+  const items = values.map(text).filter(Boolean);
+  if (items.length <= 1) return items[0] ?? '';
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+}
+
 function plannerAdditionalSentence(entries = []) {
   const grouped = new Map();
   for (const entry of entries) {
     const route = text(entry?.routeNumber);
     const locations = unique(entry?.locations ?? []);
     if (!route || !locations.length) continue;
-    const current = grouped.get(route) ?? [];
-    for (const location of locations) if (!current.some(existing => normal(existing) === normal(location))) current.push(location);
+    const current = grouped.get(route) ?? { locations: [], variantKinds: new Set() };
+    for (const location of locations) if (!current.locations.some(existing => normal(existing) === normal(location))) current.locations.push(location);
+    if (text(entry?.variantKind)) current.variantKinds.add(text(entry.variantKind));
     grouped.set(route, current);
   }
-  const multipleEntries = grouped.size > 1 || [...grouped.values()].some(locations => locations.length > 1);
-  return [...grouped.entries()].map(([route, locations], index) => {
-    const placeText = locations.length > 1 ? locations.join(', ') : locations[0];
-    if (multipleEntries) return `${route} – ${placeText}`;
-    const verb = locations.length > 1 ? 'provides connections to' : 'serves';
-    return `Route ${route} – ${verb} ${placeText}`;
+  const multipleEntries = grouped.size > 1;
+  return [...grouped.entries()].map(([route, entry], index) => {
+    const { locations, variantKinds } = entry;
+    const placeText = plannerNaturalList(locations);
+    if (variantKinds.has('branch-variant') && locations.length === 1) {
+      return `Some route ${route} journeys also serve ${placeText}`;
+    }
+    const verb = locations.length > 1
+      ? (multipleEntries ? 'also serves' : 'provides connections to')
+      : (multipleEntries ? 'operates to' : 'also serves');
+    const routeLabel = index === 0 ? 'Route' : 'route';
+    return `${routeLabel} ${route} ${verb} ${placeText}`;
   }).join('; ');
 }
 
@@ -1819,13 +1833,17 @@ function plannerAnnotationTaxonomy(row) {
     const clean = text(value);
     if (clean && !target.some(existing => normal(existing) === normal(clean))) target.push(clean);
   };
-  const addAdditionalEntry = (route, locations) => {
+  const addAdditionalEntry = (route, locations, variantKind = null) => {
     const cleanLocations = unique(locations);
     if (!text(route) || !cleanLocations.length) return;
     const exists = additionalServiceEntries.some(entry => entry.routeNumber === text(route)
       && entry.locations.length === cleanLocations.length
       && entry.locations.every((location, index) => normal(location) === normal(cleanLocations[index])));
-    if (!exists) additionalServiceEntries.push(Object.freeze({ routeNumber: text(route), locations: Object.freeze(cleanLocations) }));
+    if (!exists) additionalServiceEntries.push(Object.freeze({
+      routeNumber: text(route),
+      locations: Object.freeze(cleanLocations),
+      variantKind: text(variantKind) || null
+    }));
     addUnique(additionalServices, `${text(route)} – ${cleanLocations.join(', ')}`);
   };
   const services = row?.rawServiceSummaries?.length ? [...row.rawServiceSummaries] : [];
@@ -1881,7 +1899,7 @@ function plannerAnnotationTaxonomy(row) {
       shortWorkingEntries.push(Object.freeze({ routeNumber: route, location: destination }));
       addUnique(shortWorkings, `${route} – ${destination}`);
     } else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
-      addAdditionalEntry(route, [destination]);
+      addAdditionalEntry(route, [destination], variant.kind);
     }
     const qualification = variantCalendarQualification(service);
     if (qualification) addUnique(qualifications, `${route} – ${qualification}`);
@@ -1926,7 +1944,7 @@ function plannerAnnotationTaxonomy(row) {
         : plannerServiceDestinationKeys(matchingService);
       const sameMainPlace = sameStructuredPlannerPlace(mainDestinationKeys, candidateKeys);
       if (!sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
-        addAdditionalEntry(row.routeNumber, [destination]);
+        addAdditionalEntry(row.routeNumber, [destination], matchingVariant?.kind);
       }
     }
   }

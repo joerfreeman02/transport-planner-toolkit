@@ -299,7 +299,7 @@ assert.ok(review25c, '25C principal production direction is present');
 assert.ok(review25c.rawServiceSummaries.some(service => service.destination === 'Maple Gate'));
 assert.ok(review25c.rawServiceSummaries.some(service => service.destination === 'Maynard Court'));
 const review25cRouteNotes = review25cRows.map(row => row.routeGroupNote || '').filter(Boolean).join(' ');
-assert.equal(review25cRouteNotes, 'Additional services: 25C – Temp Bus Station, Maple Gate, Maynard Court. Short workings: Some route 25C journeys operate to Maple Gate and Maynard Court.');
+assert.equal(review25cRouteNotes, 'Additional services: Route 25C provides connections to Temp Bus Station, Maple Gate and Maynard Court. Short workings: Some route 25C journeys operate to Maple Gate and Maynard Court.');
 assert.equal(review25c.destination, 'Bus Station');
 assert.equal(review25c.servedAtStopId, 'REP-A');
 assert.ok(!review25c.departuresByDay.monday.some(minute => [900, 960].includes(minute)), 'nearby-stop departures cannot inflate the representative-stop headline');

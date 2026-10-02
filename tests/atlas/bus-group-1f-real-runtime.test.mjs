@@ -92,7 +92,7 @@ assert.doesNotMatch(row279.plannerNotes.additionalServices, /Stamford Hill \(Roo
 assert.equal(row279.publicServiceGroupingDecision.variantDestinationEvidence.find(variant => /Manor House/.test(variant.destination))?.kind, 'branch-variant');
 assert.equal(rowFor('N279').plannerNotes.additionalServices, null);
 assert.equal(rowFor('317').plannerNotes.additionalServices, null);
-assert.match(rowFor('13').plannerNotes.additionalServices, /13A – St Margaret's Hospital, Waltham Abbey \(Princesfield Rd\); 13B – Railway Station, Waltham Abbey \(Princesfield Rd\); 13C – Two Brewers/);
+assert.match(rowFor('13').plannerNotes.additionalServices, /Route 13A also serves St Margaret's Hospital and Waltham Abbey \(Princesfield Rd\); route 13B also serves Railway Station and Waltham Abbey \(Princesfield Rd\); route 13C operates to Two Brewers/);
 assert.equal(rowFor('13').principalLocations.join('|'), rowFor('13').routeFamilyMembers.find(member => member.routeNumber === '13').principalLocations.join('|'));
 assert.ok(rowFor('242') && rowFor('310'));
 assert.equal(rowsFor('217').length, 1);
@@ -112,7 +112,7 @@ assert.ok(wordNotes[0].startsWith('Presentation note: Where an assessed stop is 
 assert.equal(wordNotes.filter(note => note.startsWith('Presentation note:')).length, 1);
 assert.equal(wordNotes.at(-1).startsWith('Presentation note:'), false);
 assert.match(wordText, /Short workings: Some route 66 journeys operate to Hammond Street \(Smiths Lane\)\./);
-assert.match(wordText, /Additional services: 13A – St Margaret's Hospital, Waltham Abbey \(Princesfield Rd\)/);
+assert.match(wordText, /Additional services: Route 13A also serves St Margaret's Hospital and Waltham Abbey \(Princesfield Rd\)/);
 assert.match(wordText, /Route terminus: Waltham Cross Bus Station\./);
 assert.doesNotMatch(wordText, /66 – Hammond Street/);
 assert.doesNotMatch(wordText, /Calendar not confirmed|calendar applicability is not confirmed/i);

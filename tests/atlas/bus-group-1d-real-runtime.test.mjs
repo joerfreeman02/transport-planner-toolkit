@@ -28,7 +28,7 @@ assert.equal(fixture.metadata.tndsConsulted, false);
 const family = rows.find(row => row.routeNumber === '13');
 assert.ok(family, '13 family is one presentation row');
 assert.equal(family.routeFamilyLabel, '13 / 13A / 13B / 13C');
-for (const destination of ["13A – St Margaret's Hospital, Waltham Abbey (Princesfield Rd)", '13B – Railway Station, Waltham Abbey (Princesfield Rd)', '13C – Two Brewers']) {
+for (const destination of ["Route 13A also serves St Margaret's Hospital and Waltham Abbey (Princesfield Rd)", 'route 13B also serves Railway Station and Waltham Abbey (Princesfield Rd)', 'route 13C operates to Two Brewers']) {
   assert.match(family.plannerNotes.additionalServices, new RegExp(destination.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 }
 assert.equal(family.typicalFrequencyLines.some(line => /^(?:13A|13B|13C):/.test(line)), false);
@@ -53,8 +53,8 @@ for (const route of ['15', '66', '242', 'A1']) {
   assert.match(`${row.routeGroupNote ?? ''} ${row.plannerNotes?.terminus ?? ''} ${row.plannerNotes?.additionalServices ?? ''}`, /Terminus:|Additional variants|Additional services|Waltham Cross/);
 }
 
-assert.match(wordNotes, /Additional services: 13A – St Margaret's Hospital/);
-assert.match(wordNotes, /13B – Railway Station/);
+assert.match(wordNotes, /Additional services: Route 13A also serves St Margaret's Hospital/);
+assert.match(wordNotes, /route 13B also serves Railway Station/);
 assert.match(wordNotes, /Circular service: Circular service\./);
 assert.doesNotMatch(wordNotes, /Service qualification: Circular service/);
 assert.doesNotMatch(wordNotes, /Review note: Additional variants and short workings/);

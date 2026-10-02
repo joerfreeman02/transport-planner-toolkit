@@ -45,7 +45,7 @@ const word = buildBusWordTables({ ok: true, stops: waltham.stops, plannerService
 const wordText = word.flatMap(table => table.rows ?? []).map(row => Array.isArray(row) ? row.join(' ') : String(row?.text ?? '')).join(' ');
 assert.match(wordText, /\b13\b/);
 assert.doesNotMatch(wordText, /13 \/ 13A \/ 13B \/ 13C/);
-assert.match(wordText, /13A – /);
+assert.match(wordText, /Route 13A (?:also serves|operates to)/);
 assert.match(wordText, /Smiths Lane/);
 assert.doesNotMatch(wordText, /66[^.]*Waltham Cross Bus Station/);
 

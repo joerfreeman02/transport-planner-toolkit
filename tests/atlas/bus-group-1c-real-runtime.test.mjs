@@ -21,7 +21,9 @@ const family13 = rows.find(row => row.routeNumber === '13');
 assert.ok(family13);
 assert.equal(family13.typicalFrequencyLines.some(line => /^(?:13A|13B|13C):/.test(line)), false, 'family headline frequency is principal-only');
 assert.equal(family13.routeFamilyLabel, '13 / 13A / 13B / 13C');
-assert.match(family13.plannerNotes.additionalServices, /13A –|13B –|13C –/);
+assert.match(family13.plannerNotes.additionalServices, /Route 13A also serves/);
+assert.match(family13.plannerNotes.additionalServices, /route 13B also serves/);
+assert.match(family13.plannerNotes.additionalServices, /route 13C operates to/);
 assert.doesNotMatch(`${family13.serviceNote} ${family13.routeGroupNote}`, /Route family .*member destinations|member destinations, calendars, frequencies/i);
 
 const row66 = routeRows('66').find(row => row.plannerNotes?.shortWorkings) ?? routeRows('66')[0];
@@ -44,7 +46,7 @@ assert.match(plannerSourceWarning({ routeNumber: '42', destination: 'Gamma', ope
 
 const word = buildBusWordTables({ ok: true, stops: waltham.stops, plannerServiceSummaries: rows, serviceSummaries: [] });
 const wordText = word.flatMap(table => table.rows ?? []).map(row => Array.isArray(row) ? row.join(' ') : String(row?.text ?? '')).join(' ');
-assert.match(wordText, /Additional services: 13A –/);
+assert.match(wordText, /Additional services: Route 13A also serves/);
 assert.match(wordText, /Hammond Street \(Smiths Lane\)/);
 assert.doesNotMatch(wordText, /Route family .*member destinations|Service note: Route family/i);
 

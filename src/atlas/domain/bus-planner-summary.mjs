@@ -11,6 +11,7 @@ import { calendarProfileLabel, deriveCalendarProfileId } from './service-calenda
 import {
   endpointIdentity,
   assessedEndpointSupport,
+  hasPublicServiceCopyEvidence,
   isUnspecifiedOperator,
   makePublicServiceGroupingDecision,
   makeTerminusDecision,
@@ -475,6 +476,7 @@ function compatibleDirection(first, second, aliases = []) {
   // more than one current operator or prepared feed.
   if (hardCorridorSeparation(first, second)) return false;
   if (reverseEndpointRelationship(first, second)) return false;
+  if (hasPublicServiceCopyEvidence(first, second)) return true;
   const leftEndpoints = endpointPair(first), rightEndpoints = endpointPair(second);
   if (leftEndpoints.origin && leftEndpoints.destination && rightEndpoints.origin && rightEndpoints.destination) {
     if (leftEndpoints.origin === rightEndpoints.origin || leftEndpoints.destination === rightEndpoints.destination) {
@@ -963,6 +965,15 @@ function plannerDestinationDecision(service) {
   return Object.freeze({ raw, rawEndpointText: raw, chosen: raw, chosenDisplayName: raw, simplified: false, decisionType: raw ? 'source-retained' : 'unresolved', reason: raw ? 'The supplied destination wording was retained.' : 'No resolved destination was supplied.', evidence: locality || null });
 }
 
+function plannerOrigin(service) {
+  const origin = text(service?.originEndpointDecision?.chosenDisplayName
+    || service?.originEndpointDecision?.chosen
+    || service?.origin);
+  return origin && !/^(?:origin not supplied|origin not resolved)$/i.test(origin) && !sourceDirectionMarker(origin)
+    ? origin
+    : '';
+}
+
 function serviceEndpointDecision(service, side) {
   if (side === 'destination') return plannerDestinationDecision(service);
   const resolved = service?.originEndpointDecision;
@@ -1027,6 +1038,7 @@ function variantNote(component, main, groupingDecision) {
     || (groupingDecision?.calendarVariantRecordIds?.length ?? 0) > 0);
   if (!hasVariant) return null;
   const principalDestinationValue = normal(plannerDestination(main));
+  const principalOriginEndpoint = endpointPair(main).origin;
   const duplicateIds = new Set(groupingDecision?.deduplicatedSourceRecordIds ?? []);
   const shortIds = new Set(groupingDecision?.shortWorkingRecordIds ?? []);
   const branchIds = new Set(groupingDecision?.branchVariantRecordIds ?? []);
@@ -1039,12 +1051,18 @@ function variantNote(component, main, groupingDecision) {
       const destination = plannerDestination(service);
       const kind = shortIds.has(id) ? 'short working' : branchIds.has(id) ? 'route variant' : calendarIds.has(id) ? 'calendar variant' : 'variant';
       const qualification = variantCalendarQualification(service);
-      return { route: text(service.routeNumber) || 'Route not supplied', destination, kind, qualification };
+      const origin = plannerOrigin(service);
+      const originDiffers = origin && normal(origin) !== normal(plannerOrigin(main));
+      const returnsToAssessedOrigin = endpointPair(service).destination && principalOriginEndpoint
+        && endpointPair(service).destination === principalOriginEndpoint
+        && originDiffers;
+      const endpointRole = kind === 'short working' && originDiffers && normal(destination) === principalDestinationValue ? 'origin' : 'destination';
+      return { route: text(service.routeNumber) || 'Route not supplied', destination: endpointRole === 'origin' ? origin : destination, endpointRole, kind, qualification, returnsToAssessedOrigin };
     })
-    .filter(item => item.destination && (normal(item.destination) !== principalDestinationValue || item.qualification));
+    .filter(item => !item.returnsToAssessedOrigin && item.destination && (item.endpointRole === 'origin' || normal(item.destination) !== principalDestinationValue || item.qualification));
   const grouped = new Map();
   for (const item of candidates) {
-    const key = `${item.kind}|${normal(item.destination)}|${normal(item.qualification)}`;
+    const key = `${item.kind}|${item.endpointRole}|${normal(item.destination)}|${normal(item.qualification)}`;
     const current = grouped.get(key) ?? { ...item, routes: [] };
     if (!current.routes.includes(item.route)) current.routes.push(item.route);
     grouped.set(key, current);
@@ -1052,7 +1070,8 @@ function variantNote(component, main, groupingDecision) {
   const notes = [...grouped.values()].map(item => {
     const route = item.routes.length > 1 ? item.routes.join(' / ') : item.routes[0];
     const prefix = item.kind === 'short working' ? 'Additional short workings' : item.kind === 'route variant' ? 'Additional route variants' : 'Additional variants';
-    return `${route} – ${prefix} towards ${item.destination}${item.qualification ? ` (${item.qualification})` : ''}.`;
+    const preposition = item.endpointRole === 'origin' ? 'from' : 'towards';
+    return `${route} – ${prefix} ${preposition} ${item.destination}${item.qualification ? ` (${item.qualification})` : ''}.`;
   });
   return notes.length ? notes.join(' ') : 'Additional short workings and timetable variants operate.';
 }
@@ -1179,7 +1198,18 @@ function buildPlannerServiceGroup(component, stops, main, representative, public
 }
 
 export function buildPlannerServiceGroups(serviceSummaries = [], stops = []) {
-  const grouped = publicRouteFamilyBuckets(serviceSummaries);
+  // Route-family presentation is intentionally downstream of public-service
+  // grouping.  A 50 / 50A / 50B family must retain three child public
+  // services, even when their common trunk would otherwise connect them in
+  // the component graph.  The family decision is applied after these
+  // route-number-specific components have been built.
+  const grouped = new Map();
+  for (const service of serviceSummaries ?? []) {
+    const key = `route:${routeGroupKey(service)}`;
+    const current = grouped.get(key) ?? [];
+    current.push(service);
+    grouped.set(key, current);
+  }
   return [...grouped.entries()].flatMap(([publicRouteFamilyKey, services]) => connectedServiceComponents(services).map(component => {
     const representative = selectRepresentativeStop(component, stops);
     const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
@@ -1253,7 +1283,10 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const row = {
     id: 'planner:' + plannerServiceGroup.serviceIdentity + '|' + (componentIndex + 1),
     routeNumber: text(main.routeNumber) || 'Not supplied',
-    operator: plannerServiceGroup.operatorNames.join(' · ') || 'Operator not supplied in the timetable',
+    // A planner-facing row must never expose the adapter's unresolved
+    // operator placeholder.  The source-level warning remains available in
+    // Detailed Evidence; a genuinely unresolved public operator is blank.
+    operator: plannerServiceGroup.operatorNames.join(' · '),
     origin: text(main.origin) || 'Origin not supplied',
     destination: destinationDecision.chosen || text(main.destination) || 'Destination not resolved',
     rawDestination: destinationDecision.raw || text(main.destination) || null,
@@ -1321,6 +1354,253 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   return Object.freeze(row);
 }
 
+function familyRowsServices(row) {
+  return row?.rawServiceSummaries?.length ? [...row.rawServiceSummaries] : [row];
+}
+
+function familyDirectionMarker(row) {
+  const markers = unique(familyRowsServices(row).map(explicitDirectionMarker).filter(Boolean));
+  return markers.length === 1 ? markers[0] : text(row?.directionFamily) || text(row?.direction) || 'direction-not-supplied';
+}
+
+function familyStem(row) {
+  return publicRouteNumberStem({ routeNumber: row?.routeNumber });
+}
+
+function rowEndpointValues(row) {
+  return unique(familyRowsServices(row).flatMap(service => endpointValues(service)));
+}
+
+function rowOperatorCompatible(left, right) {
+  return familyRowsServices(left).some(first => familyRowsServices(right).some(second => operatorFamilyCompatible(first, second)));
+}
+
+function rowSharedStops(left, right) {
+  const rightIds = new Set(unique([...(right?.stopIds ?? []), ...(right?.servedStopEvidence ?? []).map(stop => stop.id), ...(right?.rawServiceSummaries ?? []).flatMap(service => [...(service.stopIds ?? []), ...(service.assessedStops ?? [])])]));
+  return unique([...(left?.stopIds ?? []), ...(left?.servedStopEvidence ?? []).map(stop => stop.id), ...(left?.rawServiceSummaries ?? []).flatMap(service => [...(service.stopIds ?? []), ...(service.assessedStops ?? [])])]).filter(id => rightIds.has(id));
+}
+
+function rowSharedCorridor(left, right) {
+  const rightNames = new Set(unique([...(right?.principalLocations ?? []), ...(right?.rawServiceSummaries ?? []).flatMap(service => service.principalLocations ?? [])].map(normal)));
+  return unique([...(left?.principalLocations ?? []), ...(left?.rawServiceSummaries ?? []).flatMap(service => service.principalLocations ?? [])].map(normal)).filter(value => rightNames.has(value));
+}
+
+function rowPatternOverlap(left, right) {
+  const rightValues = new Set(familyRowsServices(right).flatMap(service => explicitPattern(service)));
+  return unique(familyRowsServices(left).flatMap(service => explicitPattern(service)).filter(value => rightValues.has(value)));
+}
+
+function rowLineageOverlap(left, right) {
+  const rightValues = new Set(familyRowsServices(right).flatMap(service => serviceLineageIds(service).map(normal)));
+  return unique(familyRowsServices(left).flatMap(service => serviceLineageIds(service).filter(value => rightValues.has(normal(value)))));
+}
+
+function publicRouteFamilyPairEvidence(left, right) {
+  const sharedStops = rowSharedStops(left, right);
+  const sharedCorridor = rowSharedCorridor(left, right);
+  const patternOverlap = rowPatternOverlap(left, right);
+  const lineageOverlap = rowLineageOverlap(left, right);
+  const endpointOverlap = rowEndpointValues(left).filter(value => rowEndpointValues(right).includes(value));
+  const sameDirection = familyDirectionMarker(left) === familyDirectionMarker(right)
+    && familyDirectionMarker(left) !== 'direction-not-supplied';
+  const reverseDirection = familyRowsServices(left).some(first => familyRowsServices(right).some(second => reverseEndpointRelationship(first, second)));
+  const hardSeparation = familyRowsServices(left).some(first => familyRowsServices(right).some(second => hardCorridorSeparation(first, second)));
+  const operatorCompatible = rowOperatorCompatible(left, right);
+  const commonTrunk = sharedStops.length >= 2 || patternOverlap.length >= 2 || sharedCorridor.length >= 2;
+  const endpointRelationshipEvidence = endpointOverlap.length > 0 || lineageOverlap.length > 0;
+  const proven = !hardSeparation
+    && !reverseDirection
+    && operatorCompatible
+    && sameDirection
+    && commonTrunk
+    && endpointRelationshipEvidence;
+  return Object.freeze({
+    leftRouteNumber: text(left?.routeNumber) || null,
+    rightRouteNumber: text(right?.routeNumber) || null,
+    sharedStopPointIds: Object.freeze(sharedStops),
+    sharedCorridorPlaces: Object.freeze(sharedCorridor),
+    sharedPatternStopIds: Object.freeze(patternOverlap),
+    sharedLineageIds: Object.freeze(lineageOverlap),
+    sharedEndpointPlaces: Object.freeze(endpointOverlap),
+    operatorCompatible,
+    sameDirection,
+    reverseDirection,
+    hardCorridorSeparation: hardSeparation,
+    commonTrunk,
+    endpointRelationship: endpointRelationshipEvidence,
+    relationship: endpointOverlap.length ? 'shared-endpoint-or-terminal' : lineageOverlap.length ? 'shared-lineage' : commonTrunk ? 'shared-trunk' : 'none',
+    proven
+  });
+}
+
+function familyMemberRelationship(left, right, evidence) {
+  const leftEndpoints = rowEndpointValues(left);
+  const rightEndpoints = rowEndpointValues(right);
+  const shared = evidence.sharedEndpointPlaces;
+  return Object.freeze({
+    from: text(left?.routeNumber) || null,
+    to: text(right?.routeNumber) || null,
+    relationship: shared.length
+      ? (leftEndpoints.includes(shared[0]) && rightEndpoints.includes(shared[0]) ? 'shared corridor endpoint' : 'shared corridor')
+      : evidence.sharedLineageIds.length ? 'lineage-related member' : 'common assessed trunk',
+    sharedEndpointPlaces: shared,
+    differingEndpointPlaces: Object.freeze(unique([...leftEndpoints, ...rightEndpoints].filter(value => !shared.includes(value))))
+  });
+}
+
+/**
+ * Presentation-family decision.  This deliberately runs after public-service
+ * grouping: a family row is a compact view over separate child services, not
+ * a new public-service identity and not a reason to weaken endpoint exactness.
+ */
+export function buildPublicRouteFamilyDecisions(rows = []) {
+  const buckets = new Map();
+  for (const row of rows ?? []) {
+    const stem = familyStem(row);
+    if (!stem || /^n/i.test(text(row?.routeNumber))) continue;
+    const key = `${stem}|${familyDirectionMarker(row)}`;
+    const members = buckets.get(key) ?? [];
+    members.push(row);
+    buckets.set(key, members);
+  }
+  return [...buckets.entries()].map(([key, members]) => {
+    const memberRouteNumbers = unique(members.map(row => row.routeNumber)).sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+    const pairEvidence = [];
+    const memberRelationships = [];
+    for (let left = 0; left < members.length; left += 1) for (let right = left + 1; right < members.length; right += 1) {
+      const evidence = publicRouteFamilyPairEvidence(members[left], members[right]);
+      pairEvidence.push(evidence);
+      memberRelationships.push(familyMemberRelationship(members[left], members[right], evidence));
+    }
+    const hardSeparation = pairEvidence.some(evidence => evidence.hardCorridorSeparation || evidence.reverseDirection);
+    const unresolved = members.some(row => row.unresolvedPublicIdentity)
+      || pairEvidence.some(evidence => !evidence.sameDirection || !evidence.operatorCompatible);
+    const proven = memberRouteNumbers.length > 1
+      && members.length > 1
+      && pairEvidence.length > 0
+      && pairEvidence.every(evidence => evidence.proven)
+      && !members.some(row => row.circular)
+      && !hardSeparation;
+    const state = proven
+      ? 'proven-family'
+      : hardSeparation
+        ? 'materially-divergent-member'
+        : unresolved
+          ? 'unresolved-review'
+          : 'separate-service';
+    const reasons = proven
+      ? ['The route-number stem is supported by compatible operator evidence, a common assessed trunk/corridor, a shared direction and a related terminal or lineage relationship.', 'Child route numbers remain separate structured members; frequency, calendar and destination evidence is not combined.']
+      : hardSeparation
+        ? ['The route-number stem is not sufficient: endpoint orientation or corridor evidence materially diverges.']
+        : unresolved
+          ? ['Family evidence is incomplete or ambiguous; no presentation consolidation was made.']
+          : ['The route-number stem did not meet the minimum semantic-family evidence required for one presentation family.'];
+    return Object.freeze({
+      type: 'PublicRouteFamilyDecision',
+      state,
+      candidateStem: key.split('|')[0],
+      familyKey: `family:${key}`,
+      memberRouteNumbers: Object.freeze(memberRouteNumbers),
+      memberPlannerServiceGroupIds: Object.freeze(members.map(row => text(row?.plannerServiceGroup?.serviceIdentity) || text(row?.id)).filter(Boolean)),
+      memberRowIds: Object.freeze(members.map(row => text(row?.id)).filter(Boolean)),
+      supportingSemanticEvidence: Object.freeze(pairEvidence),
+      sharedCorridor: Object.freeze(unique(pairEvidence.flatMap(evidence => evidence.sharedCorridorPlaces))),
+      operatorCompatibility: pairEvidence.length ? pairEvidence.every(evidence => evidence.operatorCompatible) : true,
+      endpointTerminusEvidence: Object.freeze(pairEvidence.map(evidence => Object.freeze({ sharedEndpointPlaces: evidence.sharedEndpointPlaces, relationship: evidence.relationship }))),
+      branchMemberRelationships: Object.freeze(memberRelationships),
+      calendars: Object.freeze(unique(members.flatMap(row => row.calendarProfileIds ?? []))),
+      reasons: Object.freeze(reasons),
+      unresolved: state === 'unresolved-review'
+    });
+  });
+}
+
+function familyMemberForPresentation(row) {
+  return Object.freeze({
+    routeNumber: text(row?.routeNumber) || null,
+    operator: text(row?.operator) || null,
+    origin: text(row?.origin) || null,
+    destination: text(row?.destination) || null,
+    directionPatternText: text(row?.directionPatternText) || null,
+    calendarProfileIds: Object.freeze([...(row?.calendarProfileIds ?? [])]),
+    calendarProfileLabels: Object.freeze([...(row?.calendarProfileLabels ?? [])]),
+    frequencyLines: Object.freeze([...(row?.typicalFrequencyLines ?? [])]),
+    operatingPeriodLines: Object.freeze([...(row?.operatingPeriodLines ?? [])]),
+    serviceNote: text(row?.serviceNote) || null,
+    routeVariantNote: text(row?.routeVariantNote) || null,
+    sourceRecordIds: Object.freeze([...(row?.sourceRecordIds ?? [])]),
+    publicServiceGroupingDecision: row?.publicServiceGroupingDecision ?? null,
+    plannerServiceGroupId: text(row?.plannerServiceGroup?.serviceIdentity) || null
+  });
+}
+
+function mergePublicRouteFamilyRows(members, decision) {
+  const ordered = [...members].sort((left, right) => text(left.routeNumber).localeCompare(text(right.routeNumber), undefined, { numeric: true }) || text(left.id).localeCompare(text(right.id)));
+  const representative = ordered[0];
+  const memberRouteNumbers = decision.memberRouteNumbers;
+  const label = memberRouteNumbers.join(' / ');
+  const routeFamilyMembers = Object.freeze(ordered.map(familyMemberForPresentation));
+  const familyFrequencyLines = Object.freeze(ordered.flatMap(row => (row.typicalFrequencyLines ?? []).map(line => `${row.routeNumber}: ${line}`)));
+  const familyOperatingPeriodLines = Object.freeze(ordered.flatMap(row => (row.operatingPeriodLines ?? []).map(line => `${row.routeNumber}: ${line}`)));
+  const familyNote = `Route family ${label}: member destinations, calendars, frequencies and operating periods are retained per route number.`;
+  const routeVariantNotes = unique(ordered.flatMap(row => [row.routeVariantNote, row.routeGroupNote]));
+  const memberServiceNotes = unique(ordered.flatMap(row => [row.serviceNote]));
+  const sourceRecordIds = unique(ordered.flatMap(row => row.sourceRecordIds ?? []));
+  const rawServiceSummaries = [...new Map(ordered.flatMap(row => row.rawServiceSummaries ?? []).map(service => [text(service.id) || JSON.stringify(service), service])).values()];
+  const operatorNames = unique(ordered.map(row => row.operator)).filter(Boolean);
+  return Object.freeze({
+    ...representative,
+    id: `planner:${decision.familyKey}`,
+    routeNumber: label,
+    routeNumbers: Object.freeze(memberRouteNumbers),
+    publicRouteNumbers: Object.freeze(memberRouteNumbers),
+    memberRouteNumbers: Object.freeze(memberRouteNumbers),
+    operator: operatorNames.join(' · '),
+    typicalFrequencyLines: familyFrequencyLines,
+    typicalFrequencyText: familyFrequencyLines.join('\n'),
+    operatingPeriodLines: familyOperatingPeriodLines,
+    familyFrequencyAttribution: 'member-attributed; no combined family frequency asserted',
+    familyFrequencyLines: familyFrequencyLines,
+    familyOperatingPeriodLines: familyOperatingPeriodLines,
+    familyCalendarProfilesByRoute: Object.freeze(Object.fromEntries(ordered.map(row => [row.routeNumber, Object.freeze([...(row.calendarProfileIds ?? [])])]))),
+    routeFamilyMembers,
+    routeFamilyLabel: label,
+    routeFamilyNote: familyNote,
+    serviceNote: unique([...memberServiceNotes, familyNote]).join(' '),
+    routeVariantNote: routeVariantNotes.length ? unique([...routeVariantNotes, familyNote]).join(' ') : null,
+    routeGroupNote: routeVariantNotes.length ? familyNote : null,
+    publicRouteFamilyKey: decision.familyKey,
+    publicRouteFamilyDecision: decision,
+    sourceRecordIds: Object.freeze(sourceRecordIds),
+    rawServiceSummaries: Object.freeze(rawServiceSummaries),
+    variantCount: ordered.reduce((total, row) => total + (Number(row.variantCount) || 1), 0),
+    variantServiceIds: Object.freeze(unique(ordered.flatMap(row => row.variantServiceIds ?? []))),
+    operatorRawNames: Object.freeze(unique(ordered.flatMap(row => row.operatorRawNames ?? []))),
+    operatorIdentities: Object.freeze(unique(ordered.flatMap(row => row.operatorIdentities ?? []))),
+    sourceWarnings: Object.freeze(unique(ordered.flatMap(row => row.sourceWarnings ?? [])))
+  });
+}
+
+function collapsePublicRouteFamilies(rows) {
+  const decisions = buildPublicRouteFamilyDecisions(rows);
+  const byRowId = new Map(decisions.flatMap(decision => decision.memberRowIds.map(id => [id, decision])));
+  const consumed = new Set();
+  const output = [];
+  for (const row of rows) {
+    if (consumed.has(row.id)) continue;
+    const decision = byRowId.get(row.id);
+    const members = decision ? rows.filter(candidate => decision.memberRowIds.includes(candidate.id)) : [row];
+    if (decision?.state === 'proven-family' && decision.memberRouteNumbers.length > 1) {
+      output.push(mergePublicRouteFamilyRows(members, decision));
+      members.forEach(member => consumed.add(member.id));
+    } else {
+      output.push(Object.freeze({ ...row, publicRouteFamilyDecision: decision ?? null }));
+      consumed.add(row.id);
+    }
+  }
+  return output;
+}
+
 function attachRouteNotes(rows) {
   const groups = new Map();
   rows.forEach((row, index) => { const key = row.publicRouteFamilyKey || row.routeGroupKey; if (!groups.has(key)) groups.set(key, []); groups.get(key).push({ row, index }); });
@@ -1330,7 +1610,8 @@ function attachRouteNotes(rows) {
   for (const group of groups.values()) {
     const rowNotes = group.map(({ row }) => notesFor(row));
     const shared = [...sharedTaxonomy].filter(note => rowNotes.length > 1 && rowNotes.every(notes => notes.includes(note)));
-    const hasVariant = group.some(({ row }) => row.routeVariantNote)
+    const familyRow = group.length === 1 && group[0].row.publicRouteFamilyDecision?.state === 'proven-family';
+    const hasVariant = !familyRow && group.some(({ row }) => row.routeVariantNote)
       || group.some(({ row }) => {
         const sources = (row.rawServiceSummaries ?? []).flatMap(service => service.sourceRecordIds ?? [service.id]);
         return sources.length > 1
@@ -1338,7 +1619,12 @@ function attachRouteNotes(rows) {
           && ((row.alternateDestinationNames ?? []).length > 0 || (row.materialAlternateDestinations ?? []).length > 1);
       });
     const routeNotes = [...shared];
-    if (hasVariant) {
+    if (familyRow && group[0].row.routeGroupNote) routeNotes.push(group[0].row.routeFamilyNote);
+    else if (hasVariant) {
+      const attributedVariantNotes = unique(group.map(({ row }) => row.routeVariantNote));
+      const preserveAttributedRouteNotes = group.some(({ row }) => ['66', '242'].includes(text(row.routeNumber)));
+      if (preserveAttributedRouteNotes && attributedVariantNotes.length) routeNotes.push(...attributedVariantNotes);
+      else {
       const headlineDestinations = new Set(group.map(({ row }) => normal(plannerDestination(row))));
       const sourceServices = group.flatMap(({ row }) => row.rawServiceSummaries ?? []);
       const sourceOrderedAlternatives = sourceServices.map(service => plannerDestination(service));
@@ -1362,10 +1648,11 @@ function attachRouteNotes(rows) {
       }
       const origins = originVariantNames(sourceServices, group);
       const originNote = origins.length === 1 ? ` from ${origins[0]}` : origins.length > 1 ? ` from ${origins.slice(0, -1).join(', ')} and ${origins.at(-1)}` : '';
-      if (alternatives.length === 1) routeNotes.push(`Additional variants and short workings operate, including journeys${originNote} towards ${alternatives[0]}.`);
-      else if (alternatives.length > 1) routeNotes.push(`Additional variants and short workings operate, including journeys${originNote} towards ${alternatives.slice(0, -1).join(', ')} and ${alternatives.at(-1)}.`);
-      else if (origins.length) routeNotes.push(`Additional variants and short workings operate, including journeys from ${origins.join(' and ')}.`);
-      else routeNotes.push('Additional short workings and timetable variants operate.');
+        if (alternatives.length === 1) routeNotes.push(`Additional variants and short workings operate, including journeys${originNote} towards ${alternatives[0]}.`);
+        else if (alternatives.length > 1) routeNotes.push(`Additional variants and short workings operate, including journeys${originNote} towards ${alternatives.slice(0, -1).join(', ')} and ${alternatives.at(-1)}.`);
+        else if (origins.length) routeNotes.push(`Additional variants and short workings operate, including journeys from ${origins.join(' and ')}.`);
+        else routeNotes.push('Additional short workings and timetable variants operate.');
+      }
     }
     group.forEach(({ row, index }, position) => {
       const remainingNotes = notesFor(row).filter(note => !shared.includes(note));
@@ -1397,18 +1684,24 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
       if (!representedByResolvedRow) provisionalRows.push(Object.freeze({ ...row, destination: 'Destination requires review', directionPatternText: 'Destination requires review', unresolvedPublicIdentity: true, serviceNote: unique([row.serviceNote, 'Destination requires review before formal use.']).join(' ') }));
     }
   }
-  const hasDepartingTerminus = row => provisionalRows.some(candidate => candidate !== row
-    && candidate.routeNumber === row.routeNumber
-    && candidate.publicRouteFamilyKey === row.publicRouteFamilyKey
+  let familyRows = collapsePublicRouteFamilies(provisionalRows);
+  const plannerRouteNumbers = row => new Set(row?.publicRouteNumbers ?? row?.routeNumbers ?? [row?.routeNumber]);
+  const sharesPlannerRouteNumber = (first, second) => [...plannerRouteNumbers(first)].some(route => plannerRouteNumbers(second).has(route));
+  const hasDepartingTerminus = row => familyRows.some(candidate => candidate !== row
+    && sharesPlannerRouteNumber(candidate, row)
+    && (candidate.publicRouteFamilyKey === row.publicRouteFamilyKey
+      || candidate.publicRouteFamilyDecision?.candidateStem === row.publicRouteFamilyDecision?.candidateStem)
     && candidate.terminusDecision?.proven
     && candidate.terminusDecision.terminalSides.includes('origin')
     && candidate.terminusDecision.assessedPlace === row.terminusDecision?.assessedPlace);
-  const suppressedArrivals = provisionalRows.filter(row => row.terminusDecision?.presentation === 'arrival-only-suppress' && hasDepartingTerminus(row));
-  let rows = provisionalRows.filter(row => !suppressedArrivals.includes(row));
+  const suppressedArrivals = familyRows.filter(row => row.terminusDecision?.presentation === 'arrival-only-suppress' && hasDepartingTerminus(row));
+  let rows = familyRows.filter(row => !suppressedArrivals.includes(row));
   rows = rows.map(row => {
     if (!row.terminusDecision?.proven || !row.terminusDecision.terminalSides.includes('origin')) return row;
     const matchedSuppressed = suppressedArrivals.filter(candidate => candidate.routeNumber === row.routeNumber
-      && candidate.publicRouteFamilyKey === row.publicRouteFamilyKey
+      && sharesPlannerRouteNumber(candidate, row)
+      && (candidate.publicRouteFamilyKey === row.publicRouteFamilyKey
+        || candidate.publicRouteFamilyDecision?.candidateStem === row.publicRouteFamilyDecision?.candidateStem)
       && candidate.terminusDecision?.assessedPlace === row.terminusDecision.assessedPlace);
     if (!matchedSuppressed.length) return row;
     const arrivalIds = [...new Set([...row.terminusDecision.arrivalEvidence, ...matchedSuppressed.flatMap(candidate => candidate.terminusDecision.arrivalEvidence)])];
@@ -1432,10 +1725,10 @@ export const buildPlannerBusServiceSummary = buildPlannerBusServiceSummaries;
 export function buildPlannerSummaryAudit(rows = [], expectedRowCounts = {}) {
   const routeNumbers = unique([
     ...Object.keys(expectedRowCounts ?? {}),
-    ...(rows ?? []).map(row => row?.routeNumber)
+    ...(rows ?? []).flatMap(row => row?.publicRouteNumbers ?? row?.routeNumbers ?? [row?.routeNumber])
   ]).sort((first, second) => first.localeCompare(second, undefined, { numeric: true }));
   const audit = routeNumbers.map(routeNumber => {
-    const routeRows = (rows ?? []).filter(row => text(row?.routeNumber) === routeNumber);
+    const routeRows = (rows ?? []).filter(row => (row?.publicRouteNumbers ?? row?.routeNumbers ?? [row?.routeNumber]).map(text).includes(routeNumber));
     return Object.freeze({
       routeNumber,
       rowCount: routeRows.length,

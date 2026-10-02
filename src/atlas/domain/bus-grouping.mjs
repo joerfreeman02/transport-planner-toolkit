@@ -244,6 +244,48 @@ function sameCalendarProfile(first, second) {
   return left.length === right.length && left.every(value => right.includes(value));
 }
 
+function sharedScheduledPatternEvidence(first, second) {
+  const left = pattern(first);
+  const right = pattern(second);
+  const rightSet = new Set(right);
+  const sharedPatternStops = left.filter(value => rightSet.has(value));
+  const leftStops = unique([...(first?.stopIds ?? []), ...(first?.assessedStops ?? [])]);
+  const rightStops = new Set(unique([...(second?.stopIds ?? []), ...(second?.assessedStops ?? [])]));
+  const sharedAssessedStops = leftStops.filter(value => rightStops.has(value));
+  return {
+    sharedPatternStops,
+    sharedAssessedStops,
+    orderedPatternMatch: sharedPatternEvidence(first, second)
+      || strictSubsequenceServices(first, second)
+      || strictSubsequenceServices(second, first)
+  };
+}
+
+/**
+ * National supplementary records may not carry independently exact far-end
+ * endpoint evidence.  That is deliberately not allowed to weaken
+ * `hasResolvedExactEndpointEvidence`; it is a separate, source-reconcile
+ * decision based on route identity, direction and shared scheduled corridor
+ * evidence.  The named authoritative operator can therefore win without
+ * inventing a national endpoint identity.
+ */
+export function hasPublicServiceCopyEvidence(first = {}, second = {}) {
+  if (text(first.routeNumber).toUpperCase() !== text(second.routeNumber).toUpperCase()) return false;
+  const authorityPair = [sourceAuthorityRank(first), sourceAuthorityRank(second)].sort((left, right) => right - left);
+  if (authorityPair[0] !== 3 || authorityPair[1] !== 2) return false;
+  if (!sharedDirectionMarker(first, second)) return false;
+  if (endpointIdentity(first, 'origin') && endpointIdentity(second, 'origin')
+    && endpointIdentity(first, 'destination') && endpointIdentity(second, 'destination')
+    && endpointIdentity(first, 'origin') === endpointIdentity(second, 'destination')
+    && endpointIdentity(first, 'destination') === endpointIdentity(second, 'origin')) return false;
+  const evidence = sharedScheduledPatternEvidence(first, second);
+  const sharedStops = new Set([...evidence.sharedPatternStops, ...evidence.sharedAssessedStops]);
+  if (sharedStops.size < 2 && !evidence.orderedPatternMatch) return false;
+  return sameCalendarProfile(first, second)
+    || evidence.orderedPatternMatch
+    || evidence.sharedAssessedStops.length >= 2;
+}
+
 function principalDestination(service) {
   return endpointDisplay(service, 'destination') || text(service.destination);
 }
@@ -275,9 +317,10 @@ export function makePublicServiceGroupingDecision({
     && !shortWorkingRecords.includes(service)
     && !calendarVariantRecords.includes(service)
     && text(service.routeNumber).toUpperCase() === text(principal?.routeNumber).toUpperCase()
-    && sameExactEndpointEvidence(service, principal)
+    && (sameExactEndpointEvidence(service, principal) || hasPublicServiceCopyEvidence(service, principal))
     && (sameCalendarProfile(service, principal) || calendarIds(service).length === 0)
     && (sharedPatternEvidence(service, principal)
+      || hasPublicServiceCopyEvidence(service, principal)
       || sourceAuthorityRank(service) !== sourceAuthorityRank(principal)));
   const branchRecords = records.filter(service => service !== principal
     && !shortWorkingRecords.includes(service)
@@ -335,6 +378,16 @@ export function makePublicServiceGroupingDecision({
     variantDestinationEvidence: Object.freeze(variantDestinationEvidence),
     alternateDestinations: Object.freeze(alternateDestinations),
     materialDestinationEvidence: Object.freeze(destinationValues(records)),
+    publicServiceEquivalenceEvidence: Object.freeze(records
+      .filter(service => service !== principal && hasPublicServiceCopyEvidence(service, principal))
+      .map(service => Object.freeze({
+        sourceRecordIds: Object.freeze(sourceRecordIds([service])),
+        exactEndpointEvidence: Object.freeze({
+          origin: hasResolvedExactEndpointEvidence(service, 'origin'),
+          destination: hasResolvedExactEndpointEvidence(service, 'destination')
+        }),
+        equivalenceBasis: 'authoritative/supplementary route-direction and shared scheduled corridor evidence; exact far endpoint not required'
+      }))),
     calendarProfiles: Object.freeze(unique(records.flatMap(calendarIds))),
     ambiguousRecordIds: Object.freeze(ambiguousServices.map(serviceId).filter(Boolean)),
     deduplicatedSourceRecordIds: Object.freeze(sourceRecordIds(duplicateRecords)),

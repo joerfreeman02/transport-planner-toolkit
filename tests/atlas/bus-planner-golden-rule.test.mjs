@@ -45,7 +45,8 @@ const familyRows = buildPlannerBusServiceSummaries([
   { ...service, id: '13A', routeNumber: '13A', serviceLineageId: 'public-13', sourceRouteIds: ['public-13'], destination: 'Waltham Cross Bus Station' },
   { ...service, id: 'N13', routeNumber: 'N13', serviceLineageId: 'night-13', sourceRouteIds: ['night-13'] }
 ], presented);
-assert.equal(familyRows.filter(candidate => ['13', '13A'].includes(candidate.routeNumber)).length, 1, 'lettered route variants consolidate only with shared service evidence');
+assert.equal(familyRows.filter(candidate => candidate.routeNumber === '13 / 13A').length, 1, 'lettered route variants consolidate only with shared service evidence');
+assert.deepEqual(familyRows.find(candidate => candidate.routeNumber === '13 / 13A').routeFamilyMembers.map(member => member.routeNumber), ['13', '13A']);
 assert.equal(familyRows.filter(candidate => candidate.routeNumber === 'N13').length, 1, 'night route remains a separate public family');
 
 const unsupported = buildPlannerBusServiceSummaries([{ ...service, id: 'unsupported', destination: 'Unknown Stand', destinationLocality: '', routePatternStops: [{ id: 'HERTFORD', name: 'Hertford' }, { id: 'B', name: 'Unknown Stand' }] }], presented)[0];

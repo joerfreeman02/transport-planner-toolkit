@@ -41,6 +41,7 @@ await import('./alpha15-production-fidelity.test.mjs');
 await import('./alpha15-planner-service-group.test.mjs');
 await import('./bus-group-terminus.test.mjs');
 await import('./bus-group-stop-1a-hardening.test.mjs');
+await import('./bus-group-1b-semantic-family.test.mjs');
 await import('./alpha12-source-completeness.test.mjs');
 await import('./alpha12-evidence-integrity-audit.test.mjs');
 await import('./alpha12-source-presentation.test.mjs');

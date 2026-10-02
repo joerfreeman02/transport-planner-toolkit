@@ -312,7 +312,15 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     const resolvedServiceSummaries = endpointResolution.services;
     onProgress({ phase: 'preparing-assessment' });
     const plannerServiceSummaries = buildPlannerBusServiceSummaries(resolvedServiceSummaries, selectedStops);
-    const plannerSourceWarnings = [...new Set(resolvedServiceSummaries.flatMap(service => [...(service.sourceWarnings ?? []), ...plannerSourceWarning(service), ...(service.endpointResolutionWarnings ?? [])]))];
+    // Source diagnostics remain attached to their evidence records, but
+    // planner-facing operator/identity warnings are evaluated after public
+    // service reconciliation.  This prevents an unresolved national copy
+    // from warning against a row whose named authoritative operator already
+    // won the public-service decision.
+    const plannerSourceWarnings = [...new Set([
+      ...resolvedServiceSummaries.flatMap(service => [...(service.sourceWarnings ?? []), ...(service.endpointResolutionWarnings ?? [])]),
+      ...plannerServiceSummaries.flatMap(service => plannerSourceWarning(service))
+    ])];
     const routesByStop = new Map(selectedStops.map(stop => [stopKey(stop), new Set()]));
     for (const service of services) for (const [id, schedule] of Object.entries(service.stopSchedules ?? {})) if (routesByStop.has(id) && service.routeNumber && hasScheduledEvidence(schedule)) routesByStop.get(id).add(String(service.routeNumber));
     selectedStops = selectedStops.map(stop => {

@@ -88,6 +88,9 @@ export function buildBusWordTables(result) {
     if (hasPlannerSummary && service.routeVariantNote && service.routeVariantNote !== service.routeGroupNote) {
       serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeVariantNote}` });
     }
+    if (hasPlannerSummary && service.routeFamilyNote && service.routeFamilyNote !== service.routeGroupNote && service.routeFamilyNote !== service.routeVariantNote) {
+      serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeFamilyNote}` });
+    }
     const next = services[index + 1];
     if (hasPlannerSummary && service.routeGroupNote && (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey)) serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeGroupNote}` });
   });

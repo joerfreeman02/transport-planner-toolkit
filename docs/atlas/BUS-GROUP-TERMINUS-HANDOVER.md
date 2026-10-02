@@ -7,7 +7,7 @@ on top of the accepted Alpha.15 planner implementation.
 
 | Item | Value |
 |---|---|
-| Accepted starting SHA | `b9b474aec2762161e1332f2a73a44e80574be1d9` |
+| Accepted starting SHA | `8a013d4127d8198e1f6222941a56fca5ce26b564` |
 | Working branch | `codex/atlas-bus-group-terminus` |
 | Production release | `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914` |
 | Data policy | No source acquisition, publication, or deployment performed |
@@ -87,6 +87,69 @@ North Weald, Charing Cross, Turnpike Lane, route-number, operator, or local
 StopPoint/StopArea exceptions.
 
 The new control is included in `tests/atlas/run-all.mjs`.
+
+## BUS-GROUP-1B semantic-family presentation
+
+BUS-GROUP-1B adds a second, explicitly presentation-level decision after
+public-service grouping: `PublicRouteFamilyDecision`. It is not a replacement
+for `PublicServiceGroupingDecision`, and it never relaxes the strict
+`hasResolvedExactEndpointEvidence` gate used for place identity, deduplication,
+terminus proof, or arrival suppression.
+
+The family decision records the candidate numeric stem, member route numbers,
+member planner-service identities, supporting common-trunk/corridor evidence,
+operator compatibility, endpoint/terminal relationships, branch/member
+relationships, calendars, reasons, and one of `proven-family`,
+`separate-service`, `materially-divergent-member`, or `unresolved-review`.
+There is no numerical confidence field. Route-family presentation is applied
+only after route-number-specific public-service components have been formed, so
+13 / 13A / 13B / 13C (and any other proven family) remains a row over distinct
+child services rather than an unsafe public-service merge.
+
+Proven family rows use a concise route label such as `13 / 13A / 13B / 13C`.
+Each child remains in `routeFamilyMembers` with its own destination, operator,
+calendar profile, frequency lines, operating-period lines, notes, and source
+IDs. Family frequency is explicitly member-attributed; no combined rate is
+asserted. Browser and Word consume the same family row and structured member
+evidence.
+
+National supplementary copies have a separate `hasPublicServiceCopyEvidence`
+path. It may reconcile a TfL-authoritative row with a national copy using route,
+direction, shared scheduled corridor, and source-authority evidence even when
+the supplementary copy lacks independently exact far-end endpoint evidence.
+That evidence is retained in `publicServiceEquivalenceEvidence`; exact endpoint
+place identity remains strict. Named operator identity wins planner display,
+while a genuinely unknown planner operator is blank and the unresolved detail
+remains auditable.
+
+The frozen Waltham regression projection is
+`tests/atlas/fixtures/bus-group-1b-waltham-regression.mjs`. It is a compact,
+network-free, source-traceable projection of frozen V2 run `36125621080` and
+snapshot `8e2982017598eb0f37153f03eb42bab596d70d1217cd08f0678944719fe666c9`.
+It controls 16 physical stops, 21 route numbers and 86 route×StopPoint pairs;
+the current replay exposed 40 route-specific public-service groups before
+terminus/family presentation and 17 final planner rows, including two proven
+family presentations. The earlier accepted 1A control remains separately
+recorded above; these are observed 1B before/after values, not targets.
+
+The 1B controls cover true 50 / 50A / 50B common-trunk family evidence, false
+42 / 42A same-stem separation, 70 / N70 separation, authoritative plus
+supplementary source-copy reconciliation, genuine branch separation, calendar
+and member-attributed frequency preservation, terminus arrival suppression,
+the Waltham 13-family, 66, 242, 279/N279, 310 and 16/16C controls, and
+Browser/Word parity.
+
+The same frozen V2 prepared cache was replayed for the retained regional
+controls. `before` is the route-specific public-service-group count before
+terminus/family presentation; `after` is the final planner-row count.
+
+| Frozen control | Stops | Raw services | Before | After | Proven families | Unresolved family decisions | Planner operator placeholders |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Cambridge | 62 | 244 | 81 | 50 | 4 | 4 | 0 |
+| Birmingham | 101 | 201 | 114 | 82 | 4 | 7 | 0 |
+
+No national dataset was acquired or rebuilt for either replay; both used the
+existing frozen prepared cache only.
 
 ## Runtime architecture
 
@@ -196,8 +259,9 @@ The principal replay controls are:
 - `66` retains Hammond Street short-working evidence; `242` retains Welham
   Green Railway Station and Brookfield Centre; `279` retains Manor House
   Station; and the route-specific calendar notes remain visible.
-- `13`, `13A`, `13B`, and `13C` remain distinct public route rows. `279` and
-  `N279` remain distinct. `16` and `16C` retain circular presentation and are
+- `13`, `13A`, `13B`, and `13C` retain distinct child-service evidence under a
+  concise proven-family presentation row. `279` and `N279` remain distinct.
+  `16` and `16C` retain circular presentation and are
   not forced through terminal suppression.
 - Source IDs, alternate destinations, branch/short-working classifications,
   endpoint StopPoint/StopArea evidence, and the canonical departure evidence

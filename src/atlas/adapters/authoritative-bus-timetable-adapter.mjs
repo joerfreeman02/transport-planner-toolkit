@@ -54,6 +54,13 @@ function chunks(values, size) {
 function isTnds(service) { return /^tnds:/i.test(text(service?.id)) || /TNDS|Traveline National Dataset/i.test(text(service?.timetableSource || service?.source?.provider || service?.source?.schema || service?.source?.type)); }
 function isBods(service) { return !isTnds(service); }
 
+function annotateNationalSource(service) {
+  const provider = isTnds(service) ? 'TNDS' : 'BODS';
+  const existingProvider = text(service?.provider || service?.timetableSource || service?.source?.provider);
+  if (existingProvider) return service;
+  return { ...service, provider, timetableSource: provider, source: { ...(service.source ?? {}), provider } };
+}
+
 function matchNationalRequest(lineId, stopPointId, nationalServices) {
   const candidates = (nationalServices ?? []).filter(service => normal(service.routeNumber) === normal(lineId) && hasScheduledEvidenceAt(service, stopPointId));
   for (const type of ['BODS', 'TNDS']) {
@@ -207,7 +214,11 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     const national = nationalEvidenceRequired || insideLondon
       ? await (insideLondon ? londonSupplementAdapter : nationalAdapter).servicesForStops(nationalStops.length ? nationalStops : stops, options)
       : sourceSuccess({ data: [], warnings: [], provenance: { source: 'National timetable authority not required for the selected TfL-only scope', authority: 'not-required', nationalEvidenceRequired: false, nationalEvidenceNotRequired: true, nationalSourceAvailable: true, timetableConclusion: 'NO_CURRENT_MATCH', tflTimetableAttempted: false, nationalTimetableAttempted: false, nationalSupplementaryAttempted: false, nationalTimetableStopIds: [], nationalTimetableProviders: [] } });
-    const nationalServices = national.ok ? national.data ?? [] : [];
+    // Some compact prepared V2 service shards carry source identity only in
+    // adapter provenance. Reattach that identity to each in-scope record so
+    // the BUS-GROUP authority gate can distinguish national evidence from a
+    // genuinely unresolved source without altering prepared-data contracts.
+    const nationalServices = national.ok ? (national.data ?? []).map(annotateNationalSource) : [];
     const bods = nationalServices.filter(isBods);
     const requests = stagedRequests(tflStops, { insideLondon });
     const stageSize = Math.max(1, Number(requestLimit) || 20);

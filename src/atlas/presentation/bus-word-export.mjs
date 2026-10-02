@@ -1,5 +1,5 @@
 import { buildServicePresentation, formatServiceOriginDestination } from '../domain/bus-service-assessment.mjs';
-import { PLANNER_METHODOLOGY_NOTE } from '../domain/bus-planner-summary.mjs';
+import { PLANNER_METHODOLOGY_NOTE, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../domain/bus-planner-summary.mjs';
 import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
 
 function text(value) { return String(value ?? '').trim(); }
@@ -110,6 +110,9 @@ export function buildBusWordTables(result) {
   });
   const qualification = reviewQualification(result.reviewItems);
   if (qualification) serviceRows.push({ kind: 'summary', text: qualification });
+  if (hasPlannerSummary && services.some(service => service.plannerNotes?.terminus)) {
+    serviceRows.push({ kind: 'summary', text: `Presentation note: ${PLANNER_TERMINUS_PRESENTATION_NOTE}` });
+  }
   if (hasPlannerSummary) serviceRows.push({ kind: 'summary', text: PLANNER_METHODOLOGY_NOTE });
 
   return [

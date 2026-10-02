@@ -16,7 +16,7 @@ import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-
 import { createBusAssessment, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/atlas/application/bus-assessment.mjs';
 import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
 import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-task-status.mjs';
-import { buildPlannerBusServiceSummaries } from '../../../src/atlas/domain/bus-planner-summary.mjs';
+import { buildPlannerBusServiceSummaries, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
@@ -179,6 +179,10 @@ function plannerAnnotationEntries(service) {
     notes.circularService ? ['Circular service', notes.circularService] : null,
     notes.reviewNote ? ['Review note', notes.reviewNote] : null
   ].filter(Boolean);
+}
+
+function plannerAnnotationClass(label) {
+  return String(label ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'review-note';
 }
 
 function providerLabel(result) {
@@ -597,8 +601,9 @@ function renderAssessment(result) {
       const annotations = plannerAnnotationEntries(service);
       if (annotations.length) {
         for (const [labelText, value] of annotations) {
-          const noteRow = document.createElement('tr'); noteRow.className = 'service-note route-group-note';
+          const noteRow = document.createElement('tr'); noteRow.className = `service-note route-group-note semantic-annotation annotation-${plannerAnnotationClass(labelText)}`;
           const noteCell = document.createElement('td'); noteCell.colSpan = 8;
+          noteCell.setAttribute('role', 'note');
           const label = document.createElement('strong'); label.textContent = `${labelText}: `;
           noteCell.append(label, value); noteRow.append(noteCell); serviceRows.append(noteRow);
         }
@@ -610,6 +615,12 @@ function renderAssessment(result) {
       }
     }
   });
+  if (presentedServices.some(service => service.plannerNotes?.terminus)) {
+    const noteRow = document.createElement('tr'); noteRow.className = 'service-note semantic-annotation annotation-terminus-presentation';
+    const noteCell = document.createElement('td'); noteCell.colSpan = 8; noteCell.setAttribute('role', 'note');
+    const label = document.createElement('strong'); label.textContent = 'Presentation note: ';
+    noteCell.append(label, PLANNER_TERMINUS_PRESENTATION_NOTE); noteRow.append(noteCell); serviceRows.append(noteRow);
+  }
   if (!presentedServices.length) {
     const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 8; cell.textContent = 'No matched timetable summary is available. Review Sources and checks before using the stop information.'; row.append(cell); serviceRows.append(row);
   }

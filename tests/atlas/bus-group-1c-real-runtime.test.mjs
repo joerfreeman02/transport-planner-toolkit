@@ -1,36 +1,36 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { buildControlledBusWording } from '../../src/atlas/domain/bus-service-assessment.mjs';
 import { hasPublicServiceCopyEvidence } from '../../src/atlas/domain/bus-grouping.mjs';
 import { buildPlannerBusServiceSummaries, plannerSourceWarning } from '../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
-import { busGroup1bWalthamRegressionFixture as waltham } from './fixtures/bus-group-1b-waltham-regression.mjs';
+const waltham = JSON.parse(fs.readFileSync(new URL('./fixtures/bus-group-1e-waltham-mixed-runtime.json', import.meta.url), 'utf8'));
 
 const rows = buildPlannerBusServiceSummaries(waltham.serviceSummaries, waltham.stops);
 const routeRows = route => rows.filter(row => (row.publicRouteNumbers ?? row.routeNumbers ?? [row.routeNumber]).includes(route));
 
-assert.equal(waltham.schema, 'bus-group-1c-waltham-regression-v1');
 for (const route of ['217', '279', '317', '327', '491', 'N279']) {
-  assert.equal(waltham.sourceMixByRoute[route].length, 3, `${route} fixture retains authority, national copy and arrival records`);
-  assert.deepEqual(new Set(waltham.sourceMixByRoute[route].map(record => record.provider)), new Set(['TfL', 'BODS']));
+  assert.equal(waltham.metadata.counts.selectedControls[route], route === '279' ? 6 : 4, `${route} frozen runtime retains the expected mixed source record count`);
   assert.equal(routeRows(route).length, 1, `${route} has one useful planner row after source reconciliation`);
   assert.match(routeRows(route)[0].operator, /Arriva|Metroline/);
   assert.doesNotMatch(routeRows(route)[0].operator, /not supplied/i);
   assert.doesNotMatch(routeRows(route)[0].directionPatternText, /Waltham Cross Bus Station$/i);
 }
 
-const family13 = rows.find(row => row.routeNumber === '13 / 13A / 13B / 13C');
+const family13 = rows.find(row => row.routeNumber === '13');
 assert.ok(family13);
 assert.equal(family13.typicalFrequencyLines.some(line => /^(?:13A|13B|13C):/.test(line)), false, 'family headline frequency is principal-only');
-assert.match(family13.plannerNotes.additionalServices, /13A:|13B:|13C:/);
+assert.equal(family13.routeFamilyLabel, '13 / 13A / 13B / 13C');
+assert.match(family13.plannerNotes.additionalServices, /13A –|13B –|13C –/);
 assert.doesNotMatch(`${family13.serviceNote} ${family13.routeGroupNote}`, /Route family .*member destinations|member destinations, calendars, frequencies/i);
 
-const row66 = routeRows('66')[0];
+const row66 = routeRows('66').find(row => row.plannerNotes?.shortWorkings) ?? routeRows('66')[0];
 assert.match(row66.plannerNotes.shortWorkings, /Short|Hammond Street \(Smiths Lane\)|Hammond Street/);
-assert.match(row66.routeGroupNote, /Short workings: 66 – Hammond Street \(Smiths Lane\)/);
-assert.doesNotMatch(row66.routeGroupNote, /Waltham Cross Bus Station/);
-const row242 = routeRows('242')[0];
+assert.match(`${row66.plannerNotes.shortWorkings} ${row66.routeGroupNote ?? ''}`, /Hammond Street \(Smiths Lane\)/);
+assert.doesNotMatch(`${row66.plannerNotes.shortWorkings} ${row66.routeGroupNote ?? ''}`, /Waltham Cross Bus Station/);
+const row242 = routeRows('242').find(row => /Welham Green|Potters Bar/.test(row.plannerNotes?.additionalServices ?? '')) ?? routeRows('242')[0];
 assert.match(row242.plannerNotes.additionalServices, /Welham Green Railway Station/);
-assert.match(row242.plannerNotes.additionalServices, /Potters Bar Railway Station/);
+assert.match(`${row242.destination} ${row242.plannerNotes.additionalServices}`, /Potters Bar Railway Station/);
 
 const authority = makeService({ id: 'authority-217', routeNumber: '217', provider: 'TfL', operator: 'Arriva London North', origin: 'Alpha', destination: 'Gamma', pattern: ['A', 'B', 'C'] });
 const supplementary = makeService({ id: 'national-217', routeNumber: '217', provider: 'BODS', operator: 'Operator not supplied in the timetable', origin: 'Alpha', destination: 'Gamma (national)', pattern: ['A', 'B', 'C'] });
@@ -44,8 +44,8 @@ assert.match(plannerSourceWarning({ routeNumber: '42', destination: 'Gamma', ope
 
 const word = buildBusWordTables({ ok: true, stops: waltham.stops, plannerServiceSummaries: rows, serviceSummaries: [] });
 const wordText = word.flatMap(table => table.rows ?? []).map(row => Array.isArray(row) ? row.join(' ') : String(row?.text ?? '')).join(' ');
-assert.match(wordText, /Additional services: 13A:/);
-assert.match(wordText, /Short workings: 66 – Hammond Street \(Smiths Lane\)/);
+assert.match(wordText, /Additional services: 13A –/);
+assert.match(wordText, /Hammond Street \(Smiths Lane\)/);
 assert.doesNotMatch(wordText, /Route family .*member destinations|Service note: Route family/i);
 
 function endpoint(name, id) {

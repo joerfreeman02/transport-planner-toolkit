@@ -157,6 +157,40 @@ function endpointDisplay(service, side) {
   return name || text(service?.[side]);
 }
 
+function sourceEndpointPair(service) {
+  return ['origin', 'destination'].map(side => normal(endpointDisplay(service, side)));
+}
+
+function sameSourceEndpointPair(first, second) {
+  const left = sourceEndpointPair(first), right = sourceEndpointPair(second);
+  return left.every(Boolean) && right.every(Boolean) && left.every((value, index) => value === right[index]);
+}
+
+function endpointStopIdsForComparison(service, side) {
+  const decision = service?.[`${side}EndpointDecision`] || {};
+  const patternStops = pattern(service);
+  return unique([
+    service?.[`${side}StopPointId`],
+    ...(service?.[`${side}StopPointIds`] ?? []),
+    decision.primaryEndpointStopPointId,
+    decision.endpointStopPointId,
+    ...(decision.endpointStopPointIds ?? []),
+    patternStops[side === 'origin' ? 0 : -1]
+  ]);
+}
+
+function sharedEndpointStopEvidence(first, second) {
+  return ['origin', 'destination'].some(side => {
+    const right = new Set(endpointStopIdsForComparison(second, side));
+    return endpointStopIdsForComparison(first, side).some(id => right.has(id));
+  });
+}
+
+function sharedAssessedStopCount(first, second) {
+  const right = new Set(unique([...(second?.stopIds ?? []), ...(second?.assessedStops ?? [])]));
+  return unique([...(first?.stopIds ?? []), ...(first?.assessedStops ?? [])]).filter(id => right.has(id)).length;
+}
+
 function endpointStopIds(service, side) {
   const decision = service?.[`${side}EndpointDecision`] || {};
   const preparedEntries = endpointEvidenceEntries(service, side);
@@ -302,6 +336,12 @@ function directedEndpointPair(service) {
 
 function sameDirectedCorridor(first, second, evidence) {
   const left = directedEndpointPair(first), right = directedEndpointPair(second);
+  if (sameSourceEndpointPair(first, second)) return true;
+  // A shared exact source StopPoint at the same directed endpoint plus one
+  // shared assessed StopPoint is sufficient cross-feed corridor evidence.
+  // The BUS-DEST exactness gate is unchanged: this is only a reconciliation
+  // signal, never an exact endpoint decision.
+  if (sharedEndpointStopEvidence(first, second) && sharedAssessedStopCount(first, second) >= 1) return true;
   if (left && right && left.origin === right.origin && left.destination === right.destination) return true;
   if (evidence.sharedAssessedStops.length < 2) return false;
   return evidence.orderedPatternMatch
@@ -328,25 +368,31 @@ export function hasPublicServiceCopyEvidence(first = {}, second = {}) {
   const evidence = sharedScheduledPatternEvidence(first, second);
   const sharedStops = new Set([...evidence.sharedPatternStops, ...evidence.sharedAssessedStops]);
   const exactEndpointEvidence = sameExactEndpointEvidence(first, second);
+  const sourceEndpointEvidence = sameSourceEndpointPair(first, second);
+  const sharedEndpointEvidence = sharedEndpointStopEvidence(first, second);
   const departureOverlap = scheduledDepartureOverlap(first, second);
   const independentCorridorEvidence = Number(evidence.orderedPatternMatch)
     + Number(evidence.orderedLocalCorridorMatch)
     + Number(evidence.sharedPatternStops.length >= 2)
     + Number(evidence.sharedAssessedStops.length >= 2)
+    + Number(sharedEndpointEvidence && evidence.sharedAssessedStops.length >= 1)
     + Number(departureOverlap)
-    + Number(exactEndpointEvidence);
+    + Number(exactEndpointEvidence)
+    + Number(sourceEndpointEvidence)
+    + Number(sharedEndpointEvidence);
   if (sharedStops.size < 2) {
     // A single common assessed StopPoint is not enough by itself, but it is
     // not an automatic rejection when two independent structured signals
     // corroborate the same public direction (for example exact endpoint
     // evidence plus timetable overlap or an ordered local corridor).
-    if (evidence.sharedAssessedStops.length !== 1 || independentCorridorEvidence < 2) return false;
+    if (!(sharedEndpointEvidence && sharedStops.size >= 1) && (evidence.sharedAssessedStops.length !== 1 || independentCorridorEvidence < 2)) return false;
   }
   if (!(sharedDirectionMarker(first, second) || sameDirectedCorridor(first, second, evidence))) return false;
   return independentCorridorEvidence >= 2
     && (sameCalendarProfile(first, second)
       || evidence.orderedPatternMatch
-      || evidence.sharedAssessedStops.length >= 2);
+      || evidence.sharedAssessedStops.length >= 2
+      || sharedEndpointEvidence);
 }
 
 function principalDestination(service) {
@@ -397,7 +443,12 @@ export function makePublicServiceGroupingDecision({
       kind: shortWorkingRecords.includes(service) ? 'short-working' : branchRecords.includes(service) ? 'branch-variant' : calendarVariantRecords.includes(service) ? 'calendar-variant' : 'variant',
       calendarProfiles: Object.freeze(calendarIds(service)),
       sourceRecordIds: Object.freeze(sourceRecordIds([service])),
-      sourceAuthority: sourceAuthorityRank(service)
+      sourceAuthority: sourceAuthorityRank(service),
+      endpointPlaceKeys: Object.freeze(endpointPlaceKeys(service, 'destination')),
+      endpointStopPointIds: Object.freeze(unique([
+        service.destinationStopPointId,
+        ...(service.destinationStopPointIds ?? [])
+      ]))
     }));
   const patternEvidence = records.map(service => Object.freeze({
     sourceRecordId: serviceId(service) || null,
@@ -449,6 +500,8 @@ export function makePublicServiceGroupingDecision({
           origin: hasResolvedExactEndpointEvidence(service, 'origin'),
           destination: hasResolvedExactEndpointEvidence(service, 'destination')
         }),
+        sourceEndpointEvidence: sameSourceEndpointPair(service, principal),
+        sharedEndpointStopEvidence: sharedEndpointStopEvidence(service, principal),
         equivalenceBasis: 'authoritative/supplementary route-direction and shared scheduled corridor evidence; exact far endpoint not required'
       }))),
     calendarProfiles: Object.freeze(unique(records.flatMap(calendarIds))),
@@ -530,8 +583,8 @@ function serviceEndpointCandidates(service, side, relevantStops) {
 function mergeTerminusCandidates(services, principal, assessedStops) {
   const relevantStops = serviceRelevantStops(services, assessedStops);
   const merged = new Map();
-  for (const side of ['origin', 'destination']) {
-    for (const candidate of serviceEndpointCandidates(principal, side, relevantStops)) {
+  for (const service of services) for (const side of ['origin', 'destination']) {
+    for (const candidate of serviceEndpointCandidates(service, side, relevantStops)) {
       const current = merged.get(candidate.key) ?? { ...candidate, sides: [] };
       current.stops = [...new Map([...current.stops, ...candidate.stops].map(stop => [text(stop.id || stop.sourceId), stop])).values()];
       for (const candidateSide of candidate.sides) if (!current.sides.includes(candidateSide)) current.sides.push(candidateSide);
@@ -539,6 +592,11 @@ function mergeTerminusCandidates(services, principal, assessedStops) {
     }
   }
   return { relevantStops, candidates: [...merged.values()] };
+}
+
+function terminusEvidenceScore(service) {
+  const exactEndpoints = ['origin', 'destination'].filter(side => endpointIsExact(service, side)).length;
+  return [exactEndpoints, pattern(service).length];
 }
 
 function candidateAssessmentDistance(candidate) {
@@ -594,7 +652,11 @@ export function makeTerminusDecision({ services = [], principal = services[0] ||
     evidence: Object.freeze({ circularClassificationDeferred: true, principalSourceRecordId: serviceId(principal) || null })
   });
   const stopsById = new Map((assessedStops ?? []).map(stop => [text(stop.id || stop.sourceId), stop]).filter(([id]) => id));
-  const { relevantStops, candidates: allCandidates } = mergeTerminusCandidates(services, principal, assessedStops);
+  const terminusPrincipal = [...services].sort((left, right) => {
+    const leftScore = terminusEvidenceScore(left), rightScore = terminusEvidenceScore(right);
+    return rightScore[0] - leftScore[0] || rightScore[1] - leftScore[1];
+  })[0] || principal;
+  const { relevantStops, candidates: allCandidates } = mergeTerminusCandidates(services, terminusPrincipal, assessedStops);
   const anchorStops = nearestRelevantStops(relevantStops);
   const anchorIds = new Set(anchorStops.map(stop => text(stop.id || stop.sourceId)));
   const anchorKeys = new Set(anchorStops.flatMap(stopPlaceKeys));
@@ -608,7 +670,7 @@ export function makeTerminusDecision({ services = [], principal = services[0] ||
     if (best.distance === null || second.distance === null || best.distance === second.distance) return terminusUnresolvedDecision(
       'More than one service-relevant assessed StopArea/place remained plausible; terminus suppression was not applied.',
       assessedStops,
-      principal,
+      terminusPrincipal,
       candidates
     );
     candidate = best.item;
@@ -626,19 +688,19 @@ export function makeTerminusDecision({ services = [], principal = services[0] ||
     departureEvidence: Object.freeze([]),
     reason: 'The public service did not serve an assessed physical stop from which a terminal place could be established.',
     note: null,
-    evidence: Object.freeze({ principalSourceRecordId: serviceId(principal) || null, serviceRelevantAssessedStopPointIds: Object.freeze([]), candidatePlaceKeys: Object.freeze([]) })
+    evidence: Object.freeze({ principalSourceRecordId: serviceId(terminusPrincipal) || null, serviceRelevantAssessedStopPointIds: Object.freeze([]), candidatePlaceKeys: Object.freeze([]) })
   });
   const assessedKeys = new Set(targetStops.flatMap(stop => [`stop-point:${normal(stop.id || stop.sourceId)}`, ...stopPlaceKeys(stop)]));
   const sides = {};
   for (const side of ['origin', 'destination']) {
-    const matched = endpointMatchesAssessed(principal, side, stopsById, assessedKeys);
-    const proof = patternPositionProof(principal, side, stopsById, assessedKeys);
+    const matched = endpointMatchesAssessed(terminusPrincipal, side, stopsById, assessedKeys);
+    const proof = patternPositionProof(terminusPrincipal, side, stopsById, assessedKeys);
     sides[side] = { ...matched, proof: proof.terminal, through: proof.through };
   }
   const provenSides = Object.entries(sides).filter(([, evidence]) => evidence.matched && evidence.proof).map(([side]) => side);
   const through = Object.values(sides).some(evidence => evidence.through);
   const firstPlace = sides.origin.place || sides.destination.place;
-  const exactEndpointEvidence = ['origin', 'destination'].some(side => endpointIsExact(principal, side));
+  const exactEndpointEvidence = ['origin', 'destination'].some(side => endpointIsExact(terminusPrincipal, side));
   let status = 'not-assessed-endpoint';
   let presentation = 'none';
   let reason = 'The assessed place was not established as an ordered endpoint of the principal public pattern.';
@@ -655,7 +717,7 @@ export function makeTerminusDecision({ services = [], principal = services[0] ||
     status = 'unresolved-review';
     reason = 'The assessed place matched endpoint evidence, but ordered endpoint proof was incomplete; arrival suppression was not applied.';
   }
-  const place = text(publicPlace || provenSides.map(side => endpointDisplay(principal, side)).find(Boolean) || assessedPlace(targetStops, firstPlace));
+  const place = text(publicPlace || provenSides.map(side => endpointDisplay(terminusPrincipal, side)).find(Boolean) || assessedPlace(targetStops, firstPlace));
   return Object.freeze({
     type: 'TerminusDecision',
     status,

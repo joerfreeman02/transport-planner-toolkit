@@ -555,3 +555,98 @@ service/Service qualification; confirm Waltham arrivals are suppressed only
 when a departing terminus is proven; and compare Browser Table 3.3 with Word
 Table 3.3. Technical Director/Product Owner review is recommended before any
 future source refresh or publication decision.
+
+## BUS-GROUP-1E final mixed-source closeout
+
+BUS-GROUP-1E starts from `d41b4378a6801b691509e28a7dfd8530e0a1f657` on
+`codex/atlas-bus-group-terminus`. The final mixed-source fixture is
+`tests/atlas/fixtures/bus-group-1e-waltham-mixed-runtime.json`; its capture
+utility is `tests/atlas/bus-group-1e-capture-runtime.mjs`. It was captured at
+the normal review-assessment boundary after prepared national discovery,
+cross-boundary TfL StopPoint/timetable overlay, service-summary construction,
+and BUS-DEST endpoint resolution, but before BUS-GROUP, terminus suppression,
+and planner-family presentation.
+
+The capture uses the frozen national run `36125621080`, snapshot
+`8e2982017598eb0f37153f03eb42bab596d70d1217cd08f0678944719fe666c9`, the
+Waltham control `51.6857829,-0.0330001`, and radius 700 m. It contains 16
+physical stops, 21 route numbers, 86 route×StopPoint pairs, 119 raw services,
+and 79 resolved service summaries. TfL and BODS records are both genuinely
+present for every target route; source counts are `217: 4`, `279: 6`,
+`317: 4`, `327: 4`, `491: 4`, and `N279: 4`. TfL made 22 successful timetable
+requests plus one route-metadata request during the one bounded diagnostic
+capture; no national data was acquired or rebuilt.
+
+The mixed-runtime defect was source-shape, not a missing route rule: prepared
+national records did not carry the per-record provider/timetable metadata used
+by authority precedence, and TfL and BODS used different direction markers and
+endpoint hydration shapes. The corrective overlay now annotates national
+records at the authoritative timetable boundary, while BUS-GROUP reconciles
+only on structured route-direction, source-endpoint/physical-endpoint,
+assessed-stop, ordered-corridor, calendar, and timetable evidence. It does
+not use fuzzy destination text or route-number-only merging. Exact BUS-DEST
+gates and decision outputs are unchanged; the added source-endpoint evidence
+is consumed only by public-copy reconciliation.
+
+The final mixed Waltham projection has one useful departing row for each of
+217, 279, 317, 327, 491, and N279. The named operators are Arriva London
+North for 217/279/N279 and Metroline Travel for 317/327/491. `279` and `N279`
+remain separate public identities; 279 retains Rookwood Road/Stamford Hill
+evidence and N279 retains Trafalgar Square/Charing Cross evidence. Waltham
+arrival records remain in the grouping/source decision and are not shown as
+duplicate planner rows: a proven assessed terminus presents the useful
+departing direction only. No resolved planner row exposes an operator-warning
+placeholder, while raw source warnings remain available in the captured
+service records and detailed evidence.
+
+Family presentation is now principal-led. A proven family selects its principal
+from endpoint support, pattern extent, ordinary-calendar evidence, timetable
+population, activity, and location coverage; it does not assume the unsuffixed
+route is principal. The Waltham 13 family therefore presents main route `13`,
+principal 13 direction/locations/frequency/period, and keeps `13A`, `13B`, and
+`13C` in route inventory. Additional services are calculated as each child's
+planner-significant material location evidence minus the principal's
+structured endpoint/place/StopArea/StopPoint evidence, with exact identity
+keys preferred to text fallback. Raw complete stop sequences are never used as
+the annotation list. The captured 13 annotations are:
+
+`13A – St Margaret's Hospital, Waltham Abbey (Princesfield Rd)`;
+`13B – Railway Station, Waltham Abbey (Princesfield Rd)`; and
+`13C – Two Brewers`.
+
+The same rule keeps 15/15A as a semantic family only where evidence proves it,
+retains the useful 66 Hammond Street short working, 242 Brookfield Centre and
+Welham Green evidence, 251 Hammond Street, A1 Highbridge Rdbt, and 310
+Hertford. Terminus explanation is a single global Browser/Word presentation
+note: `Routes terminating at an assessed stop are shown in the useful
+departing direction only; arriving journeys terminating at that stop are not
+listed separately.` Browser annotations use restrained semantic classes for
+terminus, additional services, short workings, qualifications, circular
+service, and review notes; each note retains text, `role="note"`, and visible
+labels, so meaning is not conveyed by colour alone. Word Table 3.3 emits the
+same annotation text and the global terminus note once.
+
+The Transport Statement route inventory expands family rows to individual
+public route numbers. The mixed Waltham result is 17 final planner rows with
+no unresolved family presentation rows. The frozen Cambridge and Birmingham
+replays remain 48 and 80 final rows respectively (40 and 56 route numbers,
+two proven families each, zero unresolved rows) from the existing V2 cache;
+they were not refreshed or rebuilt for this closeout.
+
+Focused acceptance is `tests/atlas/bus-group-1e-real-runtime.test.mjs`, with
+the 1B/1C/1D, BUS-GROUP terminus, BUS-DEST, calendar, golden-rule, and Word
+controls also passing. `tests/atlas/run-all.mjs` reaches the 1E control and all
+tests before the legacy-isolation guard pass; the guard requires elevated
+child-process permission to create its temporary Git repository on this host
+(`spawnSync git EPERM` in sandbox mode). This is an environment restriction,
+not a product assertion failure, and the suite was rerun with the required
+elevated permission before handover.
+
+The only changed file outside the sprint's BUS-GROUP/domain-presentation/test
+scope is `tests/atlas/bus-alpha13-planner-summary.test.mjs`: one synthetic
+family fixture now supplies explicit principal activity evidence because the
+new evidence-led rule correctly refuses to choose a principal on a perfect
+tie. This documents a superseded test assumption; no production Alpha.13
+behaviour was changed. There was no NaPTAN, NPTG, BODS, or TNDS acquisition;
+no national rebuild, publication, deployment, merge, or production refresh;
+and no BUS-CIRC or Alpha.16 work.

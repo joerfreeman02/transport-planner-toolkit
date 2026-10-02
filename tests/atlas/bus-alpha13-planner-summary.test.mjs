@@ -193,7 +193,7 @@ assert.equal(operatorRecords.length, 1, 'an unresolved operator duplicate does n
 const internalNotes = buildPlannerBusServiceSummaries([plannerRecord({ routeNumber: 'N', departures: [420], ids: 'notes', serviceNote: 'TfL route metadata did not establish full route identity. Limited service: no more than three scheduled journeys on any represented day.' })], coherentStops)[0];
 assert.doesNotMatch(internalNotes.serviceNote, /route metadata|limited service|no more than three/i, 'source diagnostics and redundant limited banners stay out of planner service notes');
 
-const separateRoutes = buildPlannerBusServiceSummaries(['13', '13A', '13B', '13C'].map(routeNumber => plannerRecord({ routeNumber, departures: [420], ids: routeNumber })), coherentStops);
+const separateRoutes = buildPlannerBusServiceSummaries(['13', '13A', '13B', '13C'].map(routeNumber => plannerRecord({ routeNumber, departures: [420], ids: routeNumber, ...(routeNumber === '13' ? { recordActivity: 20 } : {}) })), coherentStops);
 assert.equal(separateRoutes.length, 1, 'evidenced lettered route variants consolidate into one public family');
 assert.equal(separateRoutes[0].routeGroupNote, null, 'identical variant evidence does not create a spurious additional-variant note');
 

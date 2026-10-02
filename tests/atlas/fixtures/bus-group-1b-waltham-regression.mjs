@@ -43,7 +43,8 @@ function service({
   principalLocations = ['Waltham Cross'],
   serviceNote = '',
   originDisplayName = origin,
-  destinationDisplayName = destination
+  destinationDisplayName = destination,
+  recordActivity = 10
 } = {}) {
   const departureEvidenceByDay = Object.fromEntries(DAYS.map(day => [day, (departures[day] ?? []).map((minute, index) => ({
     minute,
@@ -77,7 +78,7 @@ function service({
     circular,
     departuresByDay: departures,
     departureEvidenceByDay,
-    recordActivity: 10,
+    recordActivity,
     frequencyBasisStopId: stopIds[0],
     stopIds,
     assessedStops: stopIds,
@@ -94,10 +95,10 @@ const N = '210021703425';
 const E = '1500IM358';
 
 const services = [
-  service({ id: 'w-13', routeNumber: '13', operator: 'Central Connect', origin: 'Bus Station', destination: 'The Talbot', directionFamily: 'gtfs:0', stopIds: [W, W2], pattern: [W, W2, E] }),
-  service({ id: 'w-13a', routeNumber: '13A', operator: 'Central Connect', origin: 'Bus Station', destination: "St Margaret's Hospital", directionFamily: 'gtfs:0', stopIds: [W, W2], pattern: [W, W2, '1500IM352'] }),
-  service({ id: 'w-13b', routeNumber: '13B', operator: 'Central Connect', origin: 'Bus Station', destination: 'Princesfield Rd', directionFamily: 'gtfs:0', stopIds: [W, W2], pattern: [W, W2, '1500IM397'] }),
-  service({ id: 'w-13c', routeNumber: '13C', operator: 'Central Connect', origin: 'Bus Station', destination: 'Two Brewers', directionFamily: 'gtfs:0', stopIds: [W, W2], pattern: [W, W2, '1500IM1037'] }),
+  service({ id: 'w-13', routeNumber: '13', operator: 'Central Connect', origin: 'Bus Station', destination: 'The Talbot', directionFamily: 'gtfs:0', stopIds: [W, W2], pattern: [W, W2, E], recordActivity: 20 }),
+  service({ id: 'w-13a', routeNumber: '13A', operator: 'Central Connect', origin: 'Bus Station', destination: "St Margaret's Hospital", destinationStopPointId: '1500IM352', directionFamily: 'gtfs:0', stopIds: [W, W2], pattern: [W, W2, '1500IM352'] }),
+  service({ id: 'w-13b', routeNumber: '13B', operator: 'Central Connect', origin: 'Bus Station', destination: 'Princesfield Rd', destinationStopPointId: '1500IM397', directionFamily: 'gtfs:0', stopIds: [W, W2], pattern: [W, W2, '1500IM397'] }),
+  service({ id: 'w-13c', routeNumber: '13C', operator: 'Central Connect', origin: 'Bus Station', destination: 'Two Brewers', destinationStopPointId: '1500IM1037', directionFamily: 'gtfs:0', stopIds: [W, W2], pattern: [W, W2, '1500IM1037'] }),
   service({ id: 'w-14', routeNumber: '14', operator: 'Central Connect', origin: 'Bus Station', destination: 'Princesfield Rd', directionFamily: 'gtfs:0' }),
   service({ id: 'w-15', routeNumber: '15', operator: 'Central Connect', origin: 'Bus Station', destination: 'Temp Bus Station', directionFamily: 'gtfs:0' }),
   service({ id: 'w-15a', routeNumber: '15A', operator: 'Central Connect', origin: 'Bus Station', destination: 'Temp Bus Station', directionFamily: 'gtfs:0' }),
@@ -133,7 +134,7 @@ function frozenSourceMix(routeNumber, operator, destination, stopIds = [N, W2], 
       operator: 'Operator not supplied in the timetable', provider: 'BODS',
       origin: 'Bus Station', destination: `${destination} (national timetable)`,
       direction: `towards ${destination}`, directionFamily: 'gtfs:0', stopIds, pattern,
-      exactEndpoints: false, sourceRouteIds: [`bods-line-${routeNumber}`]
+      exactEndpoints: true, sourceRouteIds: [`bods-line-${routeNumber}`]
     }),
     service({
       id: `w-${routeNumber}-bods-arrival`, routeNumber,

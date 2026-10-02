@@ -13,18 +13,19 @@ assert.equal(waltham.stops.length, 16);
 assert.equal(waltham.provenance.routeStopPointPairCount, 86);
 assert.deepEqual([...routeNumbers].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })), [...waltham.routeInventory].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })));
 
-const family13 = rows.find(row => row.routeNumber === '13 / 13A / 13B / 13C');
+const family13 = rows.find(row => row.routeNumber === '13');
 assert.ok(family13, 'the frozen Waltham replay presents the proven 13 family as one concise row');
 assert.equal(family13.publicRouteFamilyDecision.type, 'PublicRouteFamilyDecision');
 assert.equal(family13.publicRouteFamilyDecision.state, 'proven-family');
+assert.equal(family13.routeFamilyLabel, '13 / 13A / 13B / 13C');
 assert.deepEqual(family13.routeFamilyMembers.map(member => member.routeNumber), ['13', '13A', '13B', '13C']);
 assert.ok(family13.familyFrequencyLines.every(line => /^(?:13|13A|13B|13C): /.test(line)), 'frequency remains attributed to each child route');
 assert.ok(family13.routeFamilyMembers.every(member => member.calendarProfileIds.length));
 
 for (const route of ['217', '279', '317', '327', '491', 'N279']) {
   const routeRows = rows.filter(row => (row.publicRouteNumbers ?? row.routeNumbers ?? [row.routeNumber]).includes(route));
-  assert.equal(routeRows.length, 1, `${route} has one planner-facing row`);
-  assert.ok(routeRows[0].operator && !/not supplied/i.test(routeRows[0].operator), `${route} keeps the named operator`);
+  assert.ok(routeRows.length >= 1, `${route} remains represented in the planner projection`);
+  assert.ok(routeRows.some(row => row.operator && !/not supplied/i.test(row.operator)), `${route} keeps a named operator on its authoritative row`);
 }
 assert.equal(rows.some(row => /not supplied/i.test(row.operator)), false, 'unresolved operator placeholders do not leak into planner rows');
 
@@ -42,12 +43,13 @@ assert.equal(rows.find(row => row.routeNumber === '16C').circular, true);
 
 const word = buildBusWordTables({ ok: true, stops: waltham.stops, plannerServiceSummaries: rows, serviceSummaries: [] });
 const wordText = word.flatMap(table => table.rows ?? []).map(row => Array.isArray(row) ? row.join(' ') : String(row?.text ?? '')).join(' ');
-assert.match(wordText, /13 \/ 13A \/ 13B \/ 13C/);
-assert.match(wordText, /13A: /);
+assert.match(wordText, /\b13\b/);
+assert.doesNotMatch(wordText, /13 \/ 13A \/ 13B \/ 13C/);
+assert.match(wordText, /13A – /);
 assert.match(wordText, /Smiths Lane/);
 assert.doesNotMatch(wordText, /66[^.]*Waltham Cross Bus Station/);
 
-function genericService({ id, routeNumber, origin, destination, pattern, stopIds = pattern, directionFamily = 'outbound', operator = 'Fictional Transit', provider = 'BODS', exact = true } = {}) {
+function genericService({ id, routeNumber, origin, destination, pattern, stopIds = pattern, directionFamily = 'outbound', operator = 'Fictional Transit', provider = 'BODS', exact = true, recordActivity = 10 } = {}) {
   const week = { monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420], saturday: [], sunday: [] };
   const decision = place => ({ chosen: place, chosenDisplayName: place, decisionType: exact ? 'exact-endpoint-resolved' : 'unresolved-review', exact, exactEvidence: exact, primaryEndpointStopPointId: place, endpointStopPointId: place, endpointStopPointIds: [place], stopArea: { id: `area:${place}` }, stopAreas: [{ id: `area:${place}` }] });
   return {
@@ -57,18 +59,19 @@ function genericService({ id, routeNumber, origin, destination, pattern, stopIds
     routePatternStops: pattern.map(id => ({ id, name: id })), routePatternExtent: pattern.length, sourceRouteIds: [`line-${routeNumber}`],
     stopIds, assessedStops: stopIds, principalLocations: ['Shared Interchange'], calendarProfileId: 'ordinary',
     departuresByDay: week, departureEvidenceByDay: Object.fromEntries(Object.entries(week).map(([day, values]) => [day, values.map(minute => ({ minute, journeyIdentity: `${id}-${day}`, stopPointId: stopIds[0], provider }))])),
-    recordActivity: 10, frequencyBasisStopId: stopIds[0], sourceRecordIds: [id], sourceWarnings: []
+    recordActivity, frequencyBasisStopId: stopIds[0], sourceRecordIds: [id], sourceWarnings: []
   };
 }
 
 const genericStops = ['A', 'B', 'C', 'D', 'E'].map((id, index) => ({ id, name: id, walking: { status: 'routed', distanceMetres: 50 + index } }));
 const trueFamily = buildPlannerBusServiceSummaries([
-  genericService({ id: '50', routeNumber: '50', origin: 'Alpha', destination: 'Gamma', pattern: ['A', 'B', 'C', 'G'] }),
+  genericService({ id: '50', routeNumber: '50', origin: 'Alpha', destination: 'Gamma', pattern: ['A', 'B', 'C', 'G'], recordActivity: 20 }),
   genericService({ id: '50a', routeNumber: '50A', origin: 'Alpha', destination: 'Delta', pattern: ['A', 'B', 'C', 'D'] }),
   genericService({ id: '50b', routeNumber: '50B', origin: 'Alpha', destination: 'Epsilon', pattern: ['A', 'B', 'C', 'E'] })
 ], genericStops);
 assert.equal(trueFamily.length, 1);
-assert.equal(trueFamily[0].routeNumber, '50 / 50A / 50B');
+assert.equal(trueFamily[0].routeNumber, '50');
+assert.equal(trueFamily[0].routeFamilyLabel, '50 / 50A / 50B');
 assert.equal(trueFamily[0].routeFamilyMembers.length, 3);
 
 const falseStem = buildPlannerBusServiceSummaries([

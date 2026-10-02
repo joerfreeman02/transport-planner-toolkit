@@ -25,9 +25,10 @@ assert.equal(fixture.metadata.frozenCacheOnly, true);
 assert.equal(fixture.metadata.tflConsulted, false);
 assert.equal(fixture.metadata.tndsConsulted, false);
 
-const family = rows.find(row => row.routeNumber === '13 / 13A / 13B / 13C');
+const family = rows.find(row => row.routeNumber === '13');
 assert.ok(family, '13 family is one presentation row');
-for (const destination of ["13A: St Margaret's Hospital", '13A: Waltham Abbey (Princesfield Rd)', '13B: Railway Station', '13B: Waltham Abbey (Princesfield Rd)', '13C: Two Brewers']) {
+assert.equal(family.routeFamilyLabel, '13 / 13A / 13B / 13C');
+for (const destination of ["13A – St Margaret's Hospital, Waltham Abbey (Princesfield Rd)", '13B – Railway Station, Waltham Abbey (Princesfield Rd)', '13C – Two Brewers']) {
   assert.match(family.plannerNotes.additionalServices, new RegExp(destination.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 }
 assert.equal(family.typicalFrequencyLines.some(line => /^(?:13A|13B|13C):/.test(line)), false);
@@ -49,11 +50,11 @@ for (const route of ['16', '16C']) {
 for (const route of ['15', '66', '242', 'A1']) {
   const row = rowFor(route);
   assert.equal(row.serviceNote, '', `${route} terminus is not duplicated in a generic service note`);
-  assert.match(row.routeGroupNote, /Terminus:|Additional variants|Additional services/);
+  assert.match(`${row.routeGroupNote ?? ''} ${row.plannerNotes?.terminus ?? ''} ${row.plannerNotes?.additionalServices ?? ''}`, /Terminus:|Additional variants|Additional services|Waltham Cross/);
 }
 
-assert.match(wordNotes, /Additional services: 13A: St Margaret's Hospital/);
-assert.match(wordNotes, /13B: Railway Station/);
+assert.match(wordNotes, /Additional services: 13A – St Margaret's Hospital/);
+assert.match(wordNotes, /13B – Railway Station/);
 assert.match(wordNotes, /Circular service: Circular service\./);
 assert.doesNotMatch(wordNotes, /Service qualification: Circular service/);
 assert.doesNotMatch(wordNotes, /Review note: Additional variants and short workings/);

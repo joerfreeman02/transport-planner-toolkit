@@ -19,6 +19,7 @@ import {
 } from './bus-grouping.mjs';
 
 export const PLANNER_METHODOLOGY_NOTE = '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence. Additional source evidence remains available in the ATLAS assessment workspace.';
+export const PLANNER_TERMINUS_PRESENTATION_NOTE = 'Routes terminating at an assessed stop are shown in the useful departing direction only; arriving journeys terminating at that stop are not listed separately.';
 
 const UNKNOWN_CALENDAR_PROFILE = 'unresolved';
 const CALENDAR_PROFILE_ORDER = Object.freeze(['ordinary', 'school-day', 'term-time', 'non-school-day', 'holiday', 'other-resolved', UNKNOWN_CALENDAR_PROFILE]);
@@ -1367,6 +1368,49 @@ function familyStem(row) {
   return publicRouteNumberStem({ routeNumber: row?.routeNumber });
 }
 
+function familyPrincipalScore(row) {
+  const profileIds = row?.calendarProfileIds ?? [];
+  const departurePopulation = Object.values(row?.canonicalDeparturePopulationAll ?? {}).flat().length;
+  return Object.freeze({
+    routeNumber: text(row?.routeNumber),
+    endpointSupport: assessedEndpointSupport(row),
+    patternExtent: Number(row?.routePatternExtent) || 0,
+    ordinaryCalendar: Number(profileIds.includes('ordinary')),
+    timetablePopulation: departurePopulation,
+    activity: Number(row?.recordActivity) || 0,
+    principalLocationCount: row?.principalLocations?.length ?? 0
+  });
+}
+
+function compareFamilyPrincipalEvidence(left, right) {
+  const leftScore = familyPrincipalScore(left), rightScore = familyPrincipalScore(right);
+  return rightScore.endpointSupport - leftScore.endpointSupport
+    || rightScore.patternExtent - leftScore.patternExtent
+    || rightScore.ordinaryCalendar - leftScore.ordinaryCalendar
+    || rightScore.timetablePopulation - leftScore.timetablePopulation
+    || rightScore.activity - leftScore.activity
+    || rightScore.principalLocationCount - leftScore.principalLocationCount
+    || leftScore.routeNumber.localeCompare(rightScore.routeNumber, undefined, { numeric: true });
+}
+
+function selectFamilyPrincipal(members) {
+  const ordered = [...members].sort(compareFamilyPrincipalEvidence);
+  const first = ordered[0] || null;
+  const second = ordered[1] || null;
+  const firstScore = first ? familyPrincipalScore(first) : null;
+  const secondScore = second ? familyPrincipalScore(second) : null;
+  const evidenceDifference = firstScore && secondScore
+    ? ['endpointSupport', 'patternExtent', 'ordinaryCalendar', 'timetablePopulation', 'activity', 'principalLocationCount']
+      .some(field => firstScore[field] !== secondScore[field])
+    : Boolean(first);
+  return Object.freeze({
+    principal: first,
+    clear: evidenceDifference,
+    principalRouteNumber: firstScore?.routeNumber || null,
+    evidence: Object.freeze(ordered.map(row => Object.freeze(familyPrincipalScore(row))))
+  });
+}
+
 function rowEndpointValues(row) {
   return unique(familyRowsServices(row).flatMap(service => endpointValues(service)));
 }
@@ -1475,12 +1519,14 @@ export function buildPublicRouteFamilyDecisions(rows = []) {
     const hardSeparation = pairEvidence.some(evidence => evidence.hardCorridorSeparation || evidence.reverseDirection);
     const unresolved = members.some(row => row.unresolvedPublicIdentity)
       || pairEvidence.some(evidence => !evidence.sameDirection || !evidence.operatorCompatible);
+    const principalSelection = selectFamilyPrincipal(members);
     const proven = memberRouteNumbers.length > 1
       && members.length > 1
       && pairEvidence.length > 0
       && pairEvidence.every(evidence => evidence.proven)
       && !members.some(row => row.circular)
-      && !hardSeparation;
+      && !hardSeparation
+      && principalSelection.clear;
     const state = proven
       ? 'proven-family'
       : hardSeparation
@@ -1492,9 +1538,11 @@ export function buildPublicRouteFamilyDecisions(rows = []) {
       ? ['The route-number stem is supported by compatible operator evidence, a common assessed trunk/corridor, a shared direction and a related terminal or lineage relationship.', 'Child route numbers remain separate structured members; frequency, calendar and destination evidence is not combined.']
       : hardSeparation
         ? ['The route-number stem is not sufficient: endpoint orientation or corridor evidence materially diverges.']
-        : unresolved
-          ? ['Family evidence is incomplete or ambiguous; no presentation consolidation was made.']
-          : ['The route-number stem did not meet the minimum semantic-family evidence required for one presentation family.'];
+      : unresolved
+        ? ['Family evidence is incomplete or ambiguous; no presentation consolidation was made.']
+        : !principalSelection.clear
+          ? ['The family relationship is evidenced, but no principal member was deterministically supported; no presentation consolidation was made.']
+        : ['The route-number stem did not meet the minimum semantic-family evidence required for one presentation family.'];
     return Object.freeze({
       type: 'PublicRouteFamilyDecision',
       state,
@@ -1508,6 +1556,9 @@ export function buildPublicRouteFamilyDecisions(rows = []) {
       operatorCompatibility: pairEvidence.length ? pairEvidence.every(evidence => evidence.operatorCompatible) : true,
       endpointTerminusEvidence: Object.freeze(pairEvidence.map(evidence => Object.freeze({ sharedEndpointPlaces: evidence.sharedEndpointPlaces, relationship: evidence.relationship }))),
       branchMemberRelationships: Object.freeze(memberRelationships),
+      principalRouteNumber: principalSelection.principalRouteNumber,
+      principalMemberRowId: text(principalSelection.principal?.id) || null,
+      principalSelectionEvidence: principalSelection.evidence,
       calendars: Object.freeze(unique(members.flatMap(row => row.calendarProfileIds ?? []))),
       reasons: Object.freeze(reasons),
       unresolved: state === 'unresolved-review'
@@ -1521,6 +1572,13 @@ function familyMemberForPresentation(row) {
     operator: text(row?.operator) || null,
     origin: text(row?.origin) || null,
     destination: text(row?.destination) || null,
+    principalLocations: Object.freeze([...(row?.principalLocations ?? [])]),
+    principalLocationsText: text(row?.principalLocationsText) || null,
+    destinationEndpointDecision: row?.destinationDecision ?? row?.destinationEndpointDecision ?? null,
+    originEndpointDecision: row?.originEndpointDecision ?? null,
+    destinationLocality: text(row?.destinationLocality || row?.destinationLocalityName) || null,
+    routePatternExtent: Number(row?.routePatternExtent) || 0,
+    recordActivity: Number(row?.recordActivity) || 0,
     directionPatternText: text(row?.directionPatternText) || null,
     calendarProfileIds: Object.freeze([...(row?.calendarProfileIds ?? [])]),
     calendarProfileLabels: Object.freeze([...(row?.calendarProfileLabels ?? [])]),
@@ -1539,8 +1597,12 @@ function familyMemberForPresentation(row) {
 }
 
 function mergePublicRouteFamilyRows(members, decision) {
-  const ordered = [...members].sort((left, right) => text(left.routeNumber).localeCompare(text(right.routeNumber), undefined, { numeric: true }) || text(left.id).localeCompare(text(right.id)));
-  const representative = ordered[0];
+  const principal = members.find(member => text(member.id) === text(decision.principalMemberRowId)) || members.find(member => text(member.routeNumber) === text(decision.principalRouteNumber));
+  const ordered = [principal, ...members
+    .filter(member => member !== principal)
+    .sort((left, right) => text(left.routeNumber).localeCompare(text(right.routeNumber), undefined, { numeric: true }) || text(left.id).localeCompare(text(right.id)))]
+    .filter(Boolean);
+  const representative = principal || ordered[0];
   const memberRouteNumbers = decision.memberRouteNumbers;
   const label = memberRouteNumbers.join(' / ');
   const routeFamilyMembers = Object.freeze(ordered.map(familyMemberForPresentation));
@@ -1559,11 +1621,13 @@ function mergePublicRouteFamilyRows(members, decision) {
   return Object.freeze({
     ...representative,
     id: `planner:${decision.familyKey}`,
-    routeNumber: label,
+    routeNumber: text(representative.routeNumber) || label,
     routeNumbers: Object.freeze(memberRouteNumbers),
     publicRouteNumbers: Object.freeze(memberRouteNumbers),
     memberRouteNumbers: Object.freeze(memberRouteNumbers),
-    operator: operatorNames.join(' · '),
+    // The normal family row is the selected principal public service.  Child
+    // operators remain in routeFamilyMembers and source evidence.
+    operator: text(representative.operator) || operatorNames.join(' · '),
     typicalFrequencyLines: representative.typicalFrequencyLines,
     typicalFrequencyText: representative.typicalFrequencyText,
     operatingPeriodLines: representative.operatingPeriodLines,
@@ -1609,10 +1673,60 @@ function collapsePublicRouteFamilies(rows) {
   return output;
 }
 
+function endpointLocationKeys(decision = {}) {
+  return unique([
+    decision.stopArea?.id,
+    ...(decision.stopAreas ?? []).map(area => area?.id),
+    ...(decision.endpointLogicalGroupIds ?? []),
+    decision.endpointLogicalPlaceId,
+    decision.nptgLocalityCode,
+    decision.nptgLocalityName,
+    decision.endpointStopPointId,
+    ...(decision.endpointStopPointIds ?? [])
+  ]).map(normal).filter(Boolean);
+}
+
+function familyLocationItems(member) {
+  const destinationDecision = member?.destinationEndpointDecision ?? {};
+  const endpointLabels = unique([
+    destinationDecision.chosenDisplayName,
+    destinationDecision.chosen,
+    destinationDecision.rawEndpointText,
+    member?.destination
+  ]).map(normal).filter(Boolean);
+  const endpointKeys = endpointLocationKeys(destinationDecision);
+  const variantIdentities = (member?.variantDestinationEvidence ?? []).map(variant => ({
+    label: normal(variant.destination),
+    keys: unique([...(variant.endpointPlaceKeys ?? []), ...(variant.endpointStopPointIds ?? [])]).map(normal).filter(Boolean)
+  }));
+  const labels = unique([
+    ...(member?.materialDestinationEvidence ?? []),
+    ...(member?.materialAlternateDestinations ?? []),
+    ...(member?.alternateDestinationNames ?? []),
+    ...(member?.variantDestinationEvidence ?? []).map(variant => variant.destination),
+    member?.destination,
+    ...(member?.principalLocations ?? [])
+  ]);
+  return labels.map(label => Object.freeze({
+    label,
+    identityKeys: Object.freeze(endpointLabels.includes(normal(label))
+      ? endpointKeys
+      : variantIdentities.find(variant => variant.label === normal(label))?.keys ?? []),
+    textKey: normal(label)
+  }));
+}
+
+function sameFamilyLocation(left, right) {
+  if (left.identityKeys.length && right.identityKeys.length) return left.identityKeys.some(key => right.identityKeys.includes(key));
+  if (left.identityKeys.length || right.identityKeys.length) return false;
+  return left.textKey === right.textKey;
+}
+
 function plannerAnnotationTaxonomy(row) {
   const additionalServices = [];
   const shortWorkings = [];
   const qualifications = [];
+  const additionalServiceEntries = [];
   const mainDestination = normal(plannerDestination(row));
   const mainOrigin = normal(plannerOrigin(row) || row?.origin);
   const assessedTerminus = normal(row?.terminusDecision?.assessedPlace);
@@ -1630,21 +1744,18 @@ function plannerAnnotationTaxonomy(row) {
 
   if (familyRow) {
     const members = [...(row.routeFamilyMembers ?? [])];
-    const principal = members[0];
-    const principalDestination = normal(principal?.destination || row.destination);
-    for (const member of members.slice(1)) {
+    const principal = members.find(member => text(member.routeNumber) === text(row.publicRouteFamilyDecision?.principalRouteNumber)) || members[0];
+    const principalLocations = familyLocationItems(principal);
+    for (const member of members.filter(candidate => candidate !== principal)) {
       const memberRoute = text(member.routeNumber || row.routeNumber);
-      const destinations = unique([
-        member.destination,
-        ...(member.materialDestinationEvidence ?? []),
-        ...(member.materialAlternateDestinations ?? []),
-        ...(member.alternateDestinationNames ?? []),
-        ...(member.variantDestinationEvidence ?? []).map(variant => variant.destination)
-      ]);
-      for (const destination of destinations) {
-        if (destination && normal(destination) !== principalDestination && normal(destination) !== assessedTerminus) {
-          addUnique(additionalServices, `${memberRoute}: ${destination}`);
-        }
+      const uniqueLocations = familyLocationItems(member)
+        .filter(location => location.textKey && location.textKey !== assessedTerminus)
+        .filter(location => !principalLocations.some(principalLocation => sameFamilyLocation(location, principalLocation)))
+        .map(location => location.label);
+      if (uniqueLocations.length) {
+        const entry = `${memberRoute} – ${uniqueLocations.join(', ')}`;
+        additionalServiceEntries.push(Object.freeze({ routeNumber: memberRoute, locations: Object.freeze(uniqueLocations) }));
+        addUnique(additionalServices, entry);
       }
       const profiles = (member.calendarProfileLabels ?? []).filter(label => label
         && !/^standard days$/i.test(label)
@@ -1715,6 +1826,7 @@ function plannerAnnotationTaxonomy(row) {
     terminus: row?.terminusDecision?.proven && row.terminusDecision.terminalSides?.includes('origin')
       ? text(row.terminusDecision.assessedPlace) || null : null,
     additionalServices: additionalServices.length ? additionalServices.join('; ') : null,
+    additionalServiceEntries: Object.freeze(additionalServiceEntries),
     shortWorkings: compactShortWorkings.length ? compactShortWorkings.join('; ') : null,
     serviceQualification: qualifications.length ? qualifications.join('; ') : null,
     circularService: row?.circular ? 'Circular service.' : null,

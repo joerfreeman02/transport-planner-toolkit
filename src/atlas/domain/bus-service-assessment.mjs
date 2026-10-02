@@ -516,6 +516,18 @@ export function buildServiceSummaries(stops, serviceRecords) {
       stopContext,
       frequencyEvidenceSource: unique(records.map(record => record.timetableSource || record.source?.provider)).join(' + ') || null,
       provider: unique(records.map(record => record.timetableSource || record.source?.provider)).join(' + ') || null,
+      sourceProviders: Object.freeze(unique(records.flatMap(record => [
+        record.provider,
+        record.timetableSource,
+        record.source?.provider,
+        record.source?.supplementaryProvider
+      ]))),
+      sourceAuthorities: Object.freeze(unique(records.flatMap(record => [
+        record.provider,
+        record.timetableSource,
+        record.source?.provider,
+        record.source?.supplementaryProvider
+      ]))),
       frequencyRepresentativeDay,
       frequencyEvidence: Object.freeze(frequencyEvidence),
       sourceWarnings: Object.freeze(sourceWarnings),
@@ -964,7 +976,7 @@ export function selectNearestStopGroup(stops, { maximumSeparationMetres = 350 } 
 export function buildControlledBusWording(serviceSummaries, { nearestGroupName = null } = {}) {
   const services = serviceSummaries ?? [];
   if (!services.length) return 'No bus-service summary wording is available for the confirmed assessment point.';
-  const routes = unique(services.map(service => service.routeNumber));
+  const routes = unique(services.flatMap(service => service.publicRouteNumbers ?? service.routeNumbers ?? [service.routeNumber]));
   const locations = unique(services.flatMap(service => service.principalLocations)).slice(0, 8);
   const routeWords = routes.length === 1 ? `bus route ${routes[0]}` : `bus routes ${routes.join(', ')}`;
   const nearestLead = nearestGroupName ? `The nearest assessed bus stop group is ${nearestGroupName}. ` : '';

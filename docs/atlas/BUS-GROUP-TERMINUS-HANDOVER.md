@@ -354,3 +354,56 @@ with the working implementation.
   proven-terminus row exists, and that through-service/circular rows remain.
 - Any future refresh, publication, deployment, or release-version change is a
   separate controlled decision and is outside this sprint.
+
+## BUS-GROUP-1C corrective closeout
+
+The Product Owner did not accept the preceding 1B manual review build. The
+rejection was specific to the real Waltham runtime: the 13 family row was too
+verbose, the London routes `217`, `279`, `317`, `327`, `491`, and `N279` could
+appear as multiple national/authoritative/arrival rows, the top-level source
+panel could still expose a placeholder-operator warning, route `66` presented
+its short-working evidence from the wrong planner perspective, and the
+Transport Statement used family slash labels instead of an individual route
+inventory.
+
+The root cause was a presentation boundary error combined with source-local
+identity. Source summaries were being treated as if their provider, endpoint
+wording, or feed-local direction marker defined a separate public row. The
+runtime now keeps source records and exact endpoint evidence separate from the
+public-service decision. TfL/national equivalence requires the same route plus
+multiple independent signals: authority pairing, directed corridor/endpoint
+orientation, shared assessed stops, ordered pattern or timetable evidence, and
+calendar compatibility. Reverse Waltham-bound arrivals are not merged into an
+outbound public service; they are suppressed only when a proven departing
+terminus row exists.
+
+The committed regression projection in
+`tests/atlas/fixtures/bus-group-1b-waltham-regression.mjs` is now tagged
+`bus-group-1c-waltham-regression-v1`. It records the frozen V2 source mix for
+each affected route: named TfL authority, supplementary national copy,
+national Waltham-bound arrival/terminating representation, placeholder
+operator, differing endpoint wording, shared assessed stops, and route
+patterns. It is a compact deterministic projection, not a copy of the
+prepared national cache. The source trace remains the existing frozen run
+`36125621080` / snapshot
+`8e2982017598eb0f37153f03eb42bab596d70d1217cd08f0678944719fe666c9`.
+
+Planner output now uses the structured note taxonomy `Terminus`, `Additional
+services`, `Short workings`, `Service qualification`, `Circular service`, and
+`Review note`. The old production exception for routes `66` and `242` was
+removed. Family rows show the representative member's frequency and operating
+period only; member destinations and qualifications are concise annotations,
+while the full member/source evidence remains in the technical decision.
+Route `66` is presented from the assessed-site perspective as
+`Short workings: 66 – Hammond Street (Smiths Lane)`. Route `242` retains
+`Welham Green Railway Station` and `Potters Bar Railway Station` as additional
+services. Browser Table 3.3 and Word Table 3.3 use the same planner row and
+taxonomy. Controlled wording expands family rows to individual route numbers.
+
+The 1C focused controls cover the six-route real-runtime source mix, one-row
+reconciliation, arrival suppression, named-operator precedence, 13-family
+compactness, 66/242 annotations, authority/supplementary copy evidence,
+different-route rejection, individual route inventory, operator-warning
+taxonomy, and Browser/Word parity. Cambridge and Birmingham remain frozen
+cache controls; no national source was acquired, refreshed, rebuilt, or
+published during 1C.

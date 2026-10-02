@@ -168,6 +168,19 @@ function plannerStopWarning(warning) {
   return warning.replace(/TfL/g, 'Transport for London');
 }
 
+function plannerAnnotationEntries(service) {
+  const notes = service?.plannerNotes ?? {};
+  const sentence = value => String(value ?? '').trim().replace(/[.]+$/u, '');
+  return [
+    notes.terminus ? ['Terminus', `${sentence(notes.terminus)}.`] : null,
+    notes.additionalServices ? ['Additional services', `${sentence(notes.additionalServices)}.`] : null,
+    notes.shortWorkings ? ['Short workings', `${sentence(notes.shortWorkings)}.`] : null,
+    notes.serviceQualification ? ['Service qualification', `${sentence(notes.serviceQualification)}.`] : null,
+    notes.circularService ? ['Circular service', notes.circularService] : null,
+    notes.reviewNote ? ['Review note', notes.reviewNote] : null
+  ].filter(Boolean);
+}
+
 function providerLabel(result) {
   return buildStopDiscoverySourceLabel(result?.provenance);
 }
@@ -579,11 +592,21 @@ function renderAssessment(result) {
       noteCell.append(label, service.serviceNote); noteRow.append(noteCell); serviceRows.append(noteRow);
     }
     const next = presentedServices[index + 1];
-    if (service.routeGroupNote && (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey)) {
-      const noteRow = document.createElement('tr'); noteRow.className = 'service-note route-group-note';
-      const noteCell = document.createElement('td'); noteCell.colSpan = 8;
-      const label = document.createElement('strong'); label.textContent = 'Service note: ';
-      noteCell.append(label, service.routeGroupNote); noteRow.append(noteCell); serviceRows.append(noteRow);
+    if (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey) {
+      const annotations = plannerAnnotationEntries(service);
+      if (annotations.length) {
+        for (const [labelText, value] of annotations) {
+          const noteRow = document.createElement('tr'); noteRow.className = 'service-note route-group-note';
+          const noteCell = document.createElement('td'); noteCell.colSpan = 8;
+          const label = document.createElement('strong'); label.textContent = `${labelText}: `;
+          noteCell.append(label, value); noteRow.append(noteCell); serviceRows.append(noteRow);
+        }
+      } else if (service.routeGroupNote) {
+        const noteRow = document.createElement('tr'); noteRow.className = 'service-note route-group-note';
+        const noteCell = document.createElement('td'); noteCell.colSpan = 8;
+        const label = document.createElement('strong'); label.textContent = 'Service note: ';
+        noteCell.append(label, service.routeGroupNote); noteRow.append(noteCell); serviceRows.append(noteRow);
+      }
     }
   });
   if (!presentedServices.length) {

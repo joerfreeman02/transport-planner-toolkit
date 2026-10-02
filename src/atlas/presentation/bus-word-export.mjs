@@ -15,6 +15,19 @@ function principalLocationsText(service) {
   return text(service?.principalLocationsText || service?.presentation?.principalLocationsText);
 }
 
+function plannerAnnotationRows(service) {
+  const notes = service?.plannerNotes ?? {};
+  const sentence = value => text(value).replace(/[.]+$/u, '');
+  return [
+    notes.terminus ? `Terminus: ${sentence(notes.terminus)}.` : null,
+    notes.additionalServices ? `Additional services: ${sentence(notes.additionalServices)}.` : null,
+    notes.shortWorkings ? `Short workings: ${sentence(notes.shortWorkings)}.` : null,
+    notes.serviceQualification ? `Service qualification: ${sentence(notes.serviceQualification)}.` : null,
+    notes.circularService ? `Circular service: ${notes.circularService}` : null,
+    notes.reviewNote ? `Review note: ${notes.reviewNote}` : null
+  ].filter(Boolean);
+}
+
 function reviewQualification(reviewItems) {
   const items = Array.isArray(reviewItems) ? reviewItems.filter(Boolean) : [];
   if (!items.length) return null;
@@ -85,14 +98,17 @@ export function buildBusWordTables(result) {
         (service.operatingPeriodLines ?? []).join('\n')
       ]);
     if (service.serviceNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.serviceNote}` });
-    if (hasPlannerSummary && service.routeVariantNote && service.routeVariantNote !== service.routeGroupNote) {
-      serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeVariantNote}` });
-    }
-    if (hasPlannerSummary && service.routeFamilyNote && service.routeFamilyNote !== service.routeGroupNote && service.routeFamilyNote !== service.routeVariantNote) {
-      serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeFamilyNote}` });
-    }
+    const plannerAnnotations = hasPlannerSummary ? plannerAnnotationRows(service) : [];
     const next = services[index + 1];
-    if (hasPlannerSummary && service.routeGroupNote && (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey)) serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeGroupNote}` });
+    if (hasPlannerSummary && (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey)) {
+      if (plannerAnnotations.length) {
+        plannerAnnotations.forEach(textValue => serviceRows.push({ kind: 'summary', text: textValue }));
+        if (/^Additional variants and short workings operate,/i.test(text(service.routeGroupNote))) {
+          serviceRows.push({ kind: 'summary', text: `Review note: ${service.routeGroupNote}` });
+        }
+      }
+      else if (service.routeGroupNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeGroupNote}` });
+    }
   });
   const qualification = reviewQualification(result.reviewItems);
   if (qualification) serviceRows.push({ kind: 'summary', text: qualification });

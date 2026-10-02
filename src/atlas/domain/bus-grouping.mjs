@@ -36,10 +36,18 @@ export function sourceProvider(service = {}) {
 }
 
 export function sourceAuthorityRank(service = {}) {
-  const provider = normal(sourceProvider(service));
-  if (/^(?:tfl|transport for london)$/.test(provider) || provider.includes('transport for london')) return 3;
-  if (/^(?:bods|tnds|national|national bus)/.test(provider)) return 2;
-  return provider ? 1 : 0;
+  const values = value => Array.isArray(value) ? value : value ? [value] : [];
+  const providers = unique([
+    sourceProvider(service),
+    ...values(service?.sourceProviders),
+    ...values(service?.sourceAuthorities),
+    service?.timetableSource,
+    service?.source?.provider,
+    service?.source?.supplementaryProvider
+  ]).map(normal);
+  if (providers.some(provider => /^(?:tfl|transport for london)$/.test(provider) || provider.includes('transport for london'))) return 3;
+  if (providers.some(provider => /^(?:bods|tnds|national|national bus)/.test(provider))) return 2;
+  return providers.some(Boolean) ? 1 : 0;
 }
 
 const ACCEPTED_EXACT_MATCH_METHOD = /^(?:gtfs-stop-id-equals-atco-code|gtfs-stop-code-equals-naptan-code|exact(?:-|$)|tfl(?:-|$))/i;
@@ -261,6 +269,30 @@ function sharedScheduledPatternEvidence(first, second) {
   };
 }
 
+function scheduledDepartureOverlap(first, second) {
+  const left = new Set(Object.values(first?.departureEvidenceByDay ?? {})
+    .flatMap(items => (items ?? []).map(item => `${item?.stopPointId ?? ''}|${item?.minute ?? item?.time ?? ''}`))
+    .filter(value => !/^\|$/.test(value)));
+  return Object.values(second?.departureEvidenceByDay ?? {})
+    .flatMap(items => (items ?? []).map(item => `${item?.stopPointId ?? ''}|${item?.minute ?? item?.time ?? ''}`))
+    .some(value => left.has(value));
+}
+
+function directedEndpointPair(service) {
+  const origin = endpointIdentity(service, 'origin');
+  const destination = endpointIdentity(service, 'destination');
+  return origin && destination ? { origin, destination } : null;
+}
+
+function sameDirectedCorridor(first, second, evidence) {
+  const left = directedEndpointPair(first), right = directedEndpointPair(second);
+  if (left && right && left.origin === right.origin && left.destination === right.destination) return true;
+  if (evidence.sharedAssessedStops.length < 2) return false;
+  return evidence.orderedPatternMatch
+    || evidence.sharedPatternStops.length >= 2
+    || scheduledDepartureOverlap(first, second);
+}
+
 /**
  * National supplementary records may not carry independently exact far-end
  * endpoint evidence.  That is deliberately not allowed to weaken
@@ -273,17 +305,22 @@ export function hasPublicServiceCopyEvidence(first = {}, second = {}) {
   if (text(first.routeNumber).toUpperCase() !== text(second.routeNumber).toUpperCase()) return false;
   const authorityPair = [sourceAuthorityRank(first), sourceAuthorityRank(second)].sort((left, right) => right - left);
   if (authorityPair[0] !== 3 || authorityPair[1] !== 2) return false;
-  if (!sharedDirectionMarker(first, second)) return false;
   if (endpointIdentity(first, 'origin') && endpointIdentity(second, 'origin')
     && endpointIdentity(first, 'destination') && endpointIdentity(second, 'destination')
     && endpointIdentity(first, 'origin') === endpointIdentity(second, 'destination')
     && endpointIdentity(first, 'destination') === endpointIdentity(second, 'origin')) return false;
   const evidence = sharedScheduledPatternEvidence(first, second);
   const sharedStops = new Set([...evidence.sharedPatternStops, ...evidence.sharedAssessedStops]);
-  if (sharedStops.size < 2 && !evidence.orderedPatternMatch) return false;
-  return sameCalendarProfile(first, second)
-    || evidence.orderedPatternMatch
-    || evidence.sharedAssessedStops.length >= 2;
+  if (sharedStops.size < 2) return false;
+  if (!(sharedDirectionMarker(first, second) || sameDirectedCorridor(first, second, evidence))) return false;
+  const independentCorridorEvidence = Number(evidence.orderedPatternMatch)
+    + Number(evidence.sharedPatternStops.length >= 2)
+    + Number(evidence.sharedAssessedStops.length >= 2)
+    + Number(scheduledDepartureOverlap(first, second));
+  return independentCorridorEvidence >= 2
+    && (sameCalendarProfile(first, second)
+      || evidence.orderedPatternMatch
+      || evidence.sharedAssessedStops.length >= 2);
 }
 
 function principalDestination(service) {

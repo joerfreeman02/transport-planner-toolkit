@@ -19,7 +19,7 @@ function plannerAnnotationRows(service) {
   const notes = service?.plannerNotes ?? {};
   const sentence = value => text(value).replace(/[.]+$/u, '');
   return [
-    notes.terminus ? `Terminus: ${sentence(notes.terminus)}.` : null,
+    notes.terminus ? `Route terminus: ${sentence(notes.terminus)}.` : null,
     notes.additionalServices ? `Additional services: ${sentence(notes.additionalServices)}.` : null,
     notes.shortWorkings ? `Short workings: ${sentence(notes.shortWorkings)}.` : null,
     notes.serviceQualification ? `Service qualification: ${sentence(notes.serviceQualification)}.` : null,
@@ -78,6 +78,9 @@ export function buildBusWordTables(result) {
   const hasPlannerSummary = Array.isArray(result.plannerServiceSummaries);
   const services = hasPlannerSummary ? result.plannerServiceSummaries : buildServicePresentation(result.serviceSummaries ?? []);
   const serviceRows = [];
+  if (hasPlannerSummary && services.some(service => service.plannerNotes?.terminus)) {
+    serviceRows.push({ kind: 'summary', semantic: 'terminus-presentation', text: `Presentation note: ${PLANNER_TERMINUS_PRESENTATION_NOTE}` });
+  }
   services.forEach((service, index) => {
     serviceRows.push(hasPlannerSummary
       ? [
@@ -110,9 +113,6 @@ export function buildBusWordTables(result) {
   });
   const qualification = reviewQualification(result.reviewItems);
   if (qualification) serviceRows.push({ kind: 'summary', text: qualification });
-  if (hasPlannerSummary && services.some(service => service.plannerNotes?.terminus)) {
-    serviceRows.push({ kind: 'summary', text: `Presentation note: ${PLANNER_TERMINUS_PRESENTATION_NOTE}` });
-  }
   if (hasPlannerSummary) serviceRows.push({ kind: 'summary', text: PLANNER_METHODOLOGY_NOTE });
 
   return [

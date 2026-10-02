@@ -650,3 +650,91 @@ tie. This documents a superseded test assumption; no production Alpha.13
 behaviour was changed. There was no NaPTAN, NPTG, BODS, or TNDS acquisition;
 no national rebuild, publication, deployment, merge, or production refresh;
 and no BUS-CIRC or Alpha.16 work.
+
+## BUS-GROUP-1F final calendar / terminus closeout
+
+This closeout started from `1248423f160c75f9073d99016396cbdf208d6cb9` on
+`codex/atlas-bus-group-terminus`. The final commit and origin/local parity are
+recorded in the handover accompanying this document; production remains
+`2.0.0-alpha.15`.
+
+The false TfL calendar result came from treating a supplementary BODS/TNDS
+record with no calendar assertion (`calendarProfileId: null` and empty
+`calendarEvidence`) as an explicit unresolved calendar. That unresolved value
+was then combined with authoritative ordinary TfL evidence. The corrected
+rule distinguishes absence from an explicit unresolved assertion: resolved
+authoritative TfL evidence remains canonical; missing supplementary metadata
+cannot downgrade it; compatible resolved supplementary evidence may
+corroborate it; and conflicting resolved evidence remains represented as a
+reviewable calendar variation rather than being silently discarded. National-
+only records without explicit taxonomy retain their accepted behaviour.
+
+The mixed Waltham runtime now keeps resolved ordinary TfL evidence for 217,
+279, 317, 327, 491, and N279. Those public rows no longer say `Calendar not
+confirmed`, emit the old generic calendar service note, or duplicate the
+qualification. Genuine controls remain human-readable: `Runs on school days
+only.`, `Operates during term time only.`, `Runs on non-school days only.`,
+and `Operating days could not be fully confirmed; check the timetable before
+use.` where appropriate.
+
+For 66 and 251, the prior mixed-runtime projection exposed both the useful
+departing direction and an arriving Waltham-bound public row because the
+grouping principal was not the source carrying the assessed endpoint proof.
+The actual `TerminusDecision` now selects the supported endpoint evidence:
+both routes are proven assessed termini, retain auditable arrival evidence,
+and present one useful departing row. Route 66 presents Loughton Station with
+`Some route 66 journeys operate to Hammond Street (Smiths Lane)`; route 251
+presents the useful Waltham Abbey direction with its Hammond Street short
+working. Through-route and uncertain-terminus controls continue to retain
+both directions.
+
+Planner annotations are generated as shared semantic domain data and consumed
+by Browser and Word. The visible labels are `Route terminus`, `Additional
+services`, `Short workings`, and `Service qualification`; the prose explains
+the route number and the useful connection, for example `Some route 66
+journeys operate to Hammond Street (Smiths Lane)`. Word uses the same strings
+as Browser and adds only restrained visual binding: a merged annotation row,
+left indent, bold semantic label, subtle shading/border, and compact spacing
+directly below the principal service row.
+
+Additional services use structured StopPoint, StopArea, logical-place, NPTG,
+and accepted endpoint identity before any text fallback. Thus Rookwood Road /
+Stamford Hill (Rookwood Road), Little Park Gardens / Enfield Town (Little
+Park Gardens), and Trafalgar Square / Charing Cross (Trafalgar Square) are not
+reported as duplicate planner places. The captured 279 Manor House evidence
+is not contained in the principal ordered TfL pattern (`490000142G` is absent),
+so it remains a genuine branch-variant Additional service rather than being
+misclassified as a short working. The 13 family remains principal-led: main
+route 13 is shown, while 13A/13B/13C retain their genuinely unique useful
+locations. 242 retains Brookfield Centre/Welham Green evidence and 310 retains
+Hertford evidence.
+
+The approved global note is emitted exactly once, before the first service in
+both outputs:
+
+`Where an assessed stop is the route terminus, ATLAS shows the useful
+departing direction only; arriving journeys terminating at that stop are not
+listed separately.`
+
+In Browser it is immediately beneath the Table 3.3 heading and before the
+service rows. In Word it is the first Table 3.3 semantic summary row, before
+the first service; it is not repeated at the bottom or after each route.
+
+The mixed Waltham projection is 17 final planner rows, including the six
+target one-row routes and the accepted 13/242/310 controls. Frozen Cambridge
+remains 48 rows / 40 route numbers / two proven families / zero unresolved
+rows. Frozen Birmingham remains 80 rows / 56 route numbers / two proven
+families / zero unresolved rows. These controls used the existing prepared V2
+cache only. Focused 1F, 1E, 1D, BUS-GROUP terminus, BUS-DEST, calendar,
+golden-rule, Alpha.13 planner-summary, and Word checks pass; the full
+`tests/atlas/run-all.mjs` suite passes from a clean committed checkout.
+
+No NaPTAN, NPTG, BODS, or TNDS acquisition occurred. No national rebuild,
+refresh, publication, deployment, switch, merge, BUS-CIRC work, or Alpha.16
+work occurred. The changed files are limited to BUS-GROUP calendar/grouping
+domain logic, planner-summary and Word/Browser presentation, BUS-GROUP tests,
+and this handover documentation. The GitHub tooling review is unchanged:
+Dependabot remains weekly grouped npm/Actions without automerge; Codecov,
+OpenSSF Scorecard, Sentry, and Renovate remain unconfigured; and main-branch
+protection is unchanged. This is ready for final Product Owner acceptance
+testing, not a claim of production acceptance.

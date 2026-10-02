@@ -90,7 +90,7 @@ const school13 = record({ id: 'school-13', routeNumber: '13C', calendarProfileId
 const term13 = record({ id: 'term-13', routeNumber: '13', calendarProfileId: 'term-time', serviceNote: 'Route 13 operates in term-time only.', sourceRouteIds: ['family-13'] });
 const calendarRows = rows([school13, term13]);
 assert.ok(calendarRows.some(row => /school days/i.test(`${row.serviceNote} ${row.routeGroupNote || ''}`)));
-assert.ok(calendarRows.some(row => /term-time/i.test(`${row.serviceNote} ${row.routeGroupNote || ''}`)));
+assert.ok(calendarRows.some(row => /term time/i.test(`${row.serviceNote} ${row.routeGroupNote || ''}`)));
 const sameMinute = rows([record({ id: 'journey-a', routeNumber: '242', departureEvidenceByDay: { monday: [{ minute: 500, journeyIdentity: 'A', provider: 'TfL' }], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] } }), record({ id: 'journey-b', routeNumber: '242', departureEvidenceByDay: { monday: [{ minute: 500, journeyIdentity: 'B', provider: 'TfL' }], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] } })]);
 assert.equal(sameMinute[0].canonicalDeparturePopulation.monday.length, 2, 'same-minute journeys with different identities are not deduplicated');
 const duplicateJourney = rows([record({ id: 'journey-tfl', routeNumber: '217', departureEvidenceByDay: { monday: [{ minute: 500, journeyIdentity: 'J', provider: 'TfL' }], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] } }), record({ id: 'journey-national', routeNumber: '217', operator: 'Operator not supplied in the timetable', provider: 'TNDS', departureEvidenceByDay: { monday: [{ minute: 500, journeyIdentity: 'J', provider: 'TNDS' }], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] } })]);
@@ -129,7 +129,7 @@ const wordRow = buildBusWordTables({ ok: true, stops, plannerServiceSummaries: t
 assert.equal(wordRow[1], tenRows[0].operator);
 assert.match(wordRow[2], /Hertford Bus Station/);
 const wordNotes = buildBusWordTables({ ok: true, stops, plannerServiceSummaries: tenRows, serviceSummaries: [] })[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
-assert.match(wordNotes, /Terminus: Waltham Cross Bus Station/);
+assert.match(wordNotes, /Route terminus: Waltham Cross Bus Station/);
 assert.ok(tenRows[0].plannerServiceGroup.destinationEndpointDecision, 'BUS-DEST endpoint decision remains under the planner group');
 assert.ok(buildPlannerServiceGroups([tenIn], stops)[0].publicServiceGroupingDecision, 'grouping decision is a domain object before presentation');
 

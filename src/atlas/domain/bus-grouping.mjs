@@ -297,7 +297,10 @@ function sharedPatternEvidence(first, second) {
 
 function sameCalendarProfile(first, second) {
   const left = calendarIds(first), right = calendarIds(second);
-  if (!left.length && !right.length) return true;
+  // A source that makes no calendar assertion is compatible with an
+  // authoritative resolved profile; it is not evidence of a conflict or an
+  // unresolved calendar. Only two explicit, differing assertions vary.
+  if (!left.length || !right.length) return true;
   return left.length === right.length && left.every(value => right.includes(value));
 }
 
@@ -654,7 +657,16 @@ export function makeTerminusDecision({ services = [], principal = services[0] ||
   const stopsById = new Map((assessedStops ?? []).map(stop => [text(stop.id || stop.sourceId), stop]).filter(([id]) => id));
   const terminusPrincipal = [...services].sort((left, right) => {
     const leftScore = terminusEvidenceScore(left), rightScore = terminusEvidenceScore(right);
-    return rightScore[0] - leftScore[0] || rightScore[1] - leftScore[1];
+    // Equivalent source patterns can use different endpoint stands. Prefer
+    // the exact record whose endpoint is actually in the assessed-stop
+    // evidence before applying the stable pattern tie-break. This keeps the
+    // BUS-DEST exactness gate unchanged while preventing an arbitrary source
+    // copy from masking a proven assessed terminus.
+    const principalHasExactEvidence = terminusEvidenceScore(principal)[0] > 0;
+    return Number(principalHasExactEvidence && right === principal) - Number(principalHasExactEvidence && left === principal)
+      || assessedEndpointSupport(right) - assessedEndpointSupport(left)
+      || rightScore[0] - leftScore[0]
+      || rightScore[1] - leftScore[1];
   })[0] || principal;
   const { relevantStops, candidates: allCandidates } = mergeTerminusCandidates(services, terminusPrincipal, assessedStops);
   const anchorStops = nearestRelevantStops(relevantStops);

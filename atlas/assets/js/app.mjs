@@ -172,7 +172,7 @@ function plannerAnnotationEntries(service) {
   const notes = service?.plannerNotes ?? {};
   const sentence = value => String(value ?? '').trim().replace(/[.]+$/u, '');
   return [
-    notes.terminus ? ['Terminus', `${sentence(notes.terminus)}.`] : null,
+    notes.terminus ? ['Route terminus', `${sentence(notes.terminus)}.`] : null,
     notes.additionalServices ? ['Additional services', `${sentence(notes.additionalServices)}.`] : null,
     notes.shortWorkings ? ['Short workings', `${sentence(notes.shortWorkings)}.`] : null,
     notes.serviceQualification ? ['Service qualification', `${sentence(notes.serviceQualification)}.`] : null,
@@ -182,6 +182,7 @@ function plannerAnnotationEntries(service) {
 }
 
 function plannerAnnotationClass(label) {
+  if (/^route terminus$/i.test(String(label ?? '').trim())) return 'terminus';
   return String(label ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'review-note';
 }
 
@@ -571,6 +572,12 @@ function renderAssessment(result) {
   if (!result.stops.length) {
     const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 6; cell.textContent = 'No authoritative bus stops were found within the selected discovery radius.'; row.append(cell); rows.append(row);
   }
+  if (presentedServices.some(service => service.plannerNotes?.terminus)) {
+    const noteRow = document.createElement('tr'); noteRow.className = 'service-note semantic-annotation annotation-terminus-presentation';
+    const noteCell = document.createElement('td'); noteCell.colSpan = 8; noteCell.setAttribute('role', 'note');
+    const label = document.createElement('strong'); label.textContent = 'Presentation note: ';
+    noteCell.append(label, PLANNER_TERMINUS_PRESENTATION_NOTE); noteRow.append(noteCell); serviceRows.append(noteRow);
+  }
   presentedServices.forEach((service, index) => {
     const row = document.createElement('tr');
     const supported = service.stopIds?.some(id => selectedStopIds.has(String(id)));
@@ -615,12 +622,6 @@ function renderAssessment(result) {
       }
     }
   });
-  if (presentedServices.some(service => service.plannerNotes?.terminus)) {
-    const noteRow = document.createElement('tr'); noteRow.className = 'service-note semantic-annotation annotation-terminus-presentation';
-    const noteCell = document.createElement('td'); noteCell.colSpan = 8; noteCell.setAttribute('role', 'note');
-    const label = document.createElement('strong'); label.textContent = 'Presentation note: ';
-    noteCell.append(label, PLANNER_TERMINUS_PRESENTATION_NOTE); noteRow.append(noteCell); serviceRows.append(noteRow);
-  }
   if (!presentedServices.length) {
     const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 8; cell.textContent = 'No matched timetable summary is available. Review Sources and checks before using the stop information.'; row.append(cell); serviceRows.append(row);
   }

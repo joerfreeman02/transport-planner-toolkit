@@ -19,7 +19,7 @@ import {
 } from './bus-grouping.mjs';
 
 export const PLANNER_METHODOLOGY_NOTE = '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence. Additional source evidence remains available in the ATLAS assessment workspace.';
-export const PLANNER_TERMINUS_PRESENTATION_NOTE = 'Routes terminating at an assessed stop are shown in the useful departing direction only; arriving journeys terminating at that stop are not listed separately.';
+export const PLANNER_TERMINUS_PRESENTATION_NOTE = 'Where an assessed stop is the route terminus, ATLAS shows the useful departing direction only; arriving journeys terminating at that stop are not listed separately.';
 
 const UNKNOWN_CALENDAR_PROFILE = 'unresolved';
 const CALENDAR_PROFILE_ORDER = Object.freeze(['ordinary', 'school-day', 'term-time', 'non-school-day', 'holiday', 'other-resolved', UNKNOWN_CALENDAR_PROFILE]);
@@ -45,8 +45,13 @@ function calendarProfileFromService(service) {
   if (explicit) return explicit;
   const evidence = service?.calendarEvidence ?? service?.operatingCalendarEvidence ?? [];
   const profiles = unique((Array.isArray(evidence) ? evidence : [evidence]).map(item => {
+    if (!item || typeof item !== 'object') return '';
     const itemProfile = text(item?.calendarProfileId).toLowerCase();
     if (itemProfile) return itemProfile;
+    const hasCalendarAssertion = Boolean(item?.resolved !== undefined || item?.calendarResolved !== undefined
+      || item?.resolutionStatus || item?.daysOfWeek?.length || item?.days?.length
+      || item?.schoolDayOnly || item?.termTimeOnly || item?.nonSchoolDayOnly || item?.holidayOnly);
+    if (!hasCalendarAssertion) return '';
     return deriveCalendarProfileId({
       resolved: Boolean(item?.resolved ?? item?.calendarResolved ?? item?.daysOfWeek?.length ?? item?.days?.length),
       schoolDayOnly: Boolean(item?.schoolDayOnly),
@@ -55,24 +60,33 @@ function calendarProfileFromService(service) {
       holidayOnly: Boolean(item?.holidayOnly)
     });
   }));
-  return profiles.length === 1 ? profiles[0] : UNKNOWN_CALENDAR_PROFILE;
+  return profiles.length === 1 ? profiles[0] : profiles.length > 1 ? UNKNOWN_CALENDAR_PROFILE : null;
 }
 
 function calendarProfileFromEntry(service, item) {
-  return text(item?.calendarProfileId).toLowerCase() || calendarProfileFromService(service);
+  const explicit = text(item?.calendarProfileId).toLowerCase();
+  if (explicit) return explicit;
+  const hasCalendarAssertion = Boolean(item?.resolved !== undefined || item?.calendarResolved !== undefined
+    || item?.resolutionStatus || item?.daysOfWeek?.length || item?.days?.length
+    || item?.schoolDayOnly || item?.termTimeOnly || item?.nonSchoolDayOnly || item?.holidayOnly);
+  return hasCalendarAssertion ? deriveCalendarProfileId({
+    resolved: Boolean(item?.resolved ?? item?.calendarResolved ?? item?.daysOfWeek?.length ?? item?.days?.length),
+    schoolDayOnly: Boolean(item?.schoolDayOnly), termTimeOnly: Boolean(item?.termTimeOnly),
+    nonSchoolDayOnly: Boolean(item?.nonSchoolDayOnly), holidayOnly: Boolean(item?.holidayOnly)
+  }) : calendarProfileFromService(service);
 }
 
 function hasCalendarMetadata(service) {
   const explicit = text(service?.calendarProfileId || service?.source?.calendarProfileId);
   if (explicit) return true;
   const evidence = service?.calendarEvidence ?? service?.operatingCalendarEvidence ?? [];
-  if ((Array.isArray(evidence) ? evidence : [evidence]).length > 0) return true;
+  if ((Array.isArray(evidence) ? evidence : [evidence]).some(item => calendarProfileFromEntry({}, item))) return true;
   return DAY_ORDER.some(day => (service?.departureEvidenceByDay?.[day] ?? []).some(item => text(item?.calendarProfileId)));
 }
 
 function calendarProfileIdsForEntry(entry) {
   const profiles = unique(entry?.calendarProfileIds ?? [entry?.calendarProfileId]).map(value => text(value).toLowerCase()).filter(Boolean);
-  return profiles.length ? profiles : [UNKNOWN_CALENDAR_PROFILE];
+  return profiles;
 }
 
 function orderedCalendarProfiles(values) {
@@ -754,7 +768,15 @@ function physicalDepartureKey(entry) {
 }
 
 function calendarPartition(entries, profileId, ordinaryEntries, hasOrdinaryProfile) {
-  const candidates = entries.filter(entry => calendarProfileIdsForEntry(entry).includes(profileId));
+  const candidates = entries.filter(entry => {
+    const profiles = calendarProfileIdsForEntry(entry);
+    // Missing supplementary taxonomy can corroborate an authoritative
+    // ordinary calendar, but must not be relabelled as restricted or
+    // unresolved calendar evidence.
+    return profiles.includes(profileId)
+      || (profileId === 'ordinary' && profiles.length === 0)
+      || (profileId === null && profiles.length === 0);
+  });
   const ordinaryPhysicalJourneys = hasOrdinaryProfile && profileId !== 'ordinary'
     ? new Set(ordinaryEntries.map(physicalDepartureKey).filter(Boolean))
     : new Set();
@@ -775,7 +797,10 @@ function profileFrequencyEvidence(component, representativeId, profileId) {
 
 function profileEligibleServices(component, representativeId, profileId) {
   return component.filter(service => serviceAtRepresentative(service, representativeId)
-    && serviceDepartureEntries(service, representativeId).some(entry => calendarProfileIdsForEntry(entry).includes(profileId)));
+    && serviceDepartureEntries(service, representativeId).some(entry => {
+      const profiles = calendarProfileIdsForEntry(entry);
+      return profiles.includes(profileId) || ((profileId === 'ordinary' || profileId === null) && profiles.length === 0);
+    }));
 }
 
 function calculateProfileResult(component, representativeId, profileId, partition) {
@@ -881,6 +906,7 @@ function servedAtText(representative) {
 function materialServiceNote(note) {
   const value = text(note);
   if (!value) return null;
+  if (/operating days could not be fully confirmed|calendar applicability is not confirmed|unresolved calendar/i.test(value)) return 'Operating days could not be fully confirmed; check the timetable before use.';
   if (/school[- ]?days?.*non[- ]school|non[- ]school.*school[- ]?days?/i.test(value)) return 'Timetable varies between school and non-school days.';
   if (/non[- ]school|school holidays?/i.test(value)) return 'Non-school days only.';
   if (/school[- ]?days?(?:[- ]only)?|schooldays?/i.test(value)) return 'School days only.';
@@ -1244,8 +1270,8 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     calculateProfileResult(component, representative.id, profileId, calendarPartition(canonical.entries, profileId, ordinaryEntries, hasOrdinaryProfile))
   ]));
   const effectiveProfileIds = profileIds.filter(profileId => profileResults.get(profileId).entries.length);
-  const displayProfileId = effectiveProfileIds.includes('ordinary') ? 'ordinary' : effectiveProfileIds[0] ?? profileIds[0] ?? UNKNOWN_CALENDAR_PROFILE;
-  const displayResult = profileResults.get(displayProfileId) ?? calculateProfileResult(component, representative.id, displayProfileId, { entries: [], schedules: emptySchedule() });
+  const displayProfileId = effectiveProfileIds.includes('ordinary') ? 'ordinary' : effectiveProfileIds[0] ?? profileIds[0] ?? null;
+  const displayResult = profileResults.get(displayProfileId) ?? calculateProfileResult(component, representative.id, displayProfileId, calendarPartition(canonical.entries, displayProfileId, ordinaryEntries, hasOrdinaryProfile));
   const mixedProfileOutput = effectiveProfileIds.length > 1;
   const outputProfileIds = mixedProfileOutput ? effectiveProfileIds : [displayProfileId];
   const unresolvedNeedsQualification = profileIds.includes(UNKNOWN_CALENDAR_PROFILE)
@@ -1265,7 +1291,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const calendarProfile = calendarProfileLabel(calendarProfileId);
   const profileNotes = [];
   if (mixedProfileOutput) profileNotes.push('Calendar profiles vary; each frequency line is labelled.');
-  if (unresolvedNeedsQualification) profileNotes.push('Some calendar applicability is not confirmed; detailed evidence is retained for review.');
+  if (unresolvedNeedsQualification) profileNotes.push('Operating days could not be fully confirmed; check the timetable before use.');
   const notes = materialServiceNotesForComponent(component, displayResult.schedules);
   notes.push(...profileNotes);
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
@@ -1722,17 +1748,85 @@ function sameFamilyLocation(left, right) {
   return left.textKey === right.textKey;
 }
 
+function sameStructuredPlannerPlace(leftKeys = [], rightKeys = []) {
+  const left = new Set(leftKeys.map(normal).filter(Boolean));
+  return rightKeys.some(key => left.has(normal(key)));
+}
+
+function plannerServiceDestinationKeys(service) {
+  const looksLikeDecision = service && (service.endpointStopPointId || service.primaryEndpointStopPointId || service.stopArea || service.chosenDisplayName || service.chosen);
+  return endpointLocationKeys(looksLikeDecision ? service : (service?.destinationEndpointDecision ?? service?.destinationDecision ?? {}));
+}
+
+function plannerAdditionalSentence(entries = []) {
+  const grouped = new Map();
+  for (const entry of entries) {
+    const route = text(entry?.routeNumber);
+    const locations = unique(entry?.locations ?? []);
+    if (!route || !locations.length) continue;
+    const current = grouped.get(route) ?? [];
+    for (const location of locations) if (!current.some(existing => normal(existing) === normal(location))) current.push(location);
+    grouped.set(route, current);
+  }
+  const multipleEntries = grouped.size > 1 || [...grouped.values()].some(locations => locations.length > 1);
+  return [...grouped.entries()].map(([route, locations], index) => {
+    const placeText = locations.length > 1 ? locations.join(', ') : locations[0];
+    if (multipleEntries) return `${route} – ${placeText}`;
+    const verb = locations.length > 1 ? 'provides connections to' : 'serves';
+    return `Route ${route} – ${verb} ${placeText}`;
+  }).join('; ');
+}
+
+function plannerShortWorkingSentence(entries = []) {
+  const grouped = new Map();
+  for (const entry of entries) {
+    const route = text(entry?.routeNumber);
+    const location = text(entry?.location);
+    if (!route || !location) continue;
+    const current = grouped.get(route) ?? [];
+    if (!current.some(existing => normal(existing) === normal(location))) current.push(location);
+    grouped.set(route, current);
+  }
+  return [...grouped.entries()].map(([route, locations]) => {
+    const placeText = locations.length > 1 ? `${locations.slice(0, -1).join(', ')} and ${locations.at(-1)}` : locations[0];
+    return `Some route ${route} journeys operate to ${placeText}`;
+  }).join('; ');
+}
+
+function humanQualification(value) {
+  const raw = text(value).replace(/[.]+$/u, '');
+  if (!raw) return '';
+  if (/operating days could not be fully confirmed|calendar applicability is not confirmed|unresolved calendar/i.test(raw)) return 'Operating days could not be fully confirmed; check the timetable before use';
+  const route = raw.match(/^Route\s+([^–-]+?)\s*[–-]\s*(.+)$/i);
+  const qualifier = route ? route[2] : raw;
+  if (/school days only|school-day/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates on school days only` : 'Runs on school days only';
+  if (/term[- ]time|term[- ]only/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates during term time only` : 'Operates during term time only';
+  if (/non[- ]school/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates on non-school days only` : 'Runs on non-school days only';
+  if (/holiday/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates on holidays only` : 'Operates on holidays only';
+  return raw;
+}
+
 function plannerAnnotationTaxonomy(row) {
   const additionalServices = [];
   const shortWorkings = [];
   const qualifications = [];
   const additionalServiceEntries = [];
+  const shortWorkingEntries = [];
   const mainDestination = normal(plannerDestination(row));
   const mainOrigin = normal(plannerOrigin(row) || row?.origin);
   const assessedTerminus = normal(row?.terminusDecision?.assessedPlace);
   const addUnique = (target, value) => {
     const clean = text(value);
     if (clean && !target.some(existing => normal(existing) === normal(clean))) target.push(clean);
+  };
+  const addAdditionalEntry = (route, locations) => {
+    const cleanLocations = unique(locations);
+    if (!text(route) || !cleanLocations.length) return;
+    const exists = additionalServiceEntries.some(entry => entry.routeNumber === text(route)
+      && entry.locations.length === cleanLocations.length
+      && entry.locations.every((location, index) => normal(location) === normal(cleanLocations[index])));
+    if (!exists) additionalServiceEntries.push(Object.freeze({ routeNumber: text(route), locations: Object.freeze(cleanLocations) }));
+    addUnique(additionalServices, `${text(route)} – ${cleanLocations.join(', ')}`);
   };
   const services = row?.rawServiceSummaries?.length ? [...row.rawServiceSummaries] : [];
   const duplicateIds = new Set(row?.publicServiceGroupingDecision?.deduplicatedSourceRecordIds ?? []);
@@ -1754,8 +1848,7 @@ function plannerAnnotationTaxonomy(row) {
         .map(location => location.label);
       if (uniqueLocations.length) {
         const entry = `${memberRoute} – ${uniqueLocations.join(', ')}`;
-        additionalServiceEntries.push(Object.freeze({ routeNumber: memberRoute, locations: Object.freeze(uniqueLocations) }));
-        addUnique(additionalServices, entry);
+        addAdditionalEntry(memberRoute, uniqueLocations);
       }
       const profiles = (member.calendarProfileLabels ?? []).filter(label => label
         && !/^standard days$/i.test(label)
@@ -1766,6 +1859,7 @@ function plannerAnnotationTaxonomy(row) {
   }
 
   const decisionVariants = samePhysicalJourney ? [] : (row?.publicServiceGroupingDecision?.variantDestinationEvidence ?? []);
+  const mainDestinationKeys = plannerServiceDestinationKeys(row?.destinationDecision ?? row?.destinationEndpointDecision);
   for (const variant of decisionVariants) {
     const idSet = new Set(variant.sourceRecordIds ?? []);
     if ([...idSet].some(id => principalSourceIds.has(id))) continue;
@@ -1776,11 +1870,15 @@ function plannerAnnotationTaxonomy(row) {
     const origin = text(plannerOrigin(service));
     const route = text(variant.routeNumber || service?.routeNumber || row.routeNumber);
     if (!destination && !origin) continue;
+    const variantKeys = unique([...(variant.endpointPlaceKeys ?? []), ...(variant.endpointStopPointIds ?? []), ...plannerServiceDestinationKeys(service)]);
+    const sameMainPlace = destination && sameStructuredPlannerPlace(mainDestinationKeys, variantKeys);
     if ((variant.kind === 'short-working' && origin && normal(origin) !== mainOrigin)
       || (origin && normal(destination) === mainDestination && normal(origin) !== mainOrigin)) {
-      addUnique(shortWorkings, `${route} – ${origin || destination}`);
-    } else if (destination && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
-      addUnique(additionalServices, `${route} – ${destination}`);
+      const location = origin || destination;
+      shortWorkingEntries.push(Object.freeze({ routeNumber: route, location }));
+      addUnique(shortWorkings, `${route} – ${location}`);
+    } else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
+      addAdditionalEntry(route, [destination]);
     }
     const qualification = variantCalendarQualification(service);
     if (qualification) addUnique(qualifications, `${route} – ${qualification}`);
@@ -1795,8 +1893,16 @@ function plannerAnnotationTaxonomy(row) {
       const origin = plannerOrigin(service);
       if (!destination && !origin) continue;
       const originDiffers = origin && normal(origin) !== mainOrigin;
-      if (originDiffers && destination && normal(destination) === mainDestination) addUnique(shortWorkings, `${service.routeNumber || row.routeNumber} – ${origin}`);
-      else if (destination && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) addUnique(additionalServices, `${service.routeNumber || row.routeNumber} – ${destination}`);
+      const route = service.routeNumber || row.routeNumber;
+      const serviceKeys = plannerServiceDestinationKeys(service);
+      const sameMainPlace = destination && sameStructuredPlannerPlace(mainDestinationKeys, serviceKeys);
+      if (originDiffers && destination && (normal(destination) === mainDestination || sameMainPlace)) {
+        shortWorkingEntries.push(Object.freeze({ routeNumber: route, location: origin }));
+        addUnique(shortWorkings, `${route} – ${origin}`);
+      }
+      else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
+        addAdditionalEntry(route, [destination]);
+      }
       const qualification = variantCalendarQualification(service);
       if (qualification) addUnique(qualifications, `${service.routeNumber || row.routeNumber} – ${qualification}`);
     }
@@ -1810,14 +1916,20 @@ function plannerAnnotationTaxonomy(row) {
       ...(row.alternateDestinationNames ?? []),
       ...services.map(service => plannerDestination(service))
     ])) {
-      if (normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
-        addUnique(additionalServices, `${row.routeNumber} – ${destination}`);
+      const matchingVariant = decisionVariants.find(variant => normal(variant.destination) === normal(destination));
+      const matchingService = services.find(service => normal(plannerDestination(service)) === normal(destination));
+      const candidateKeys = matchingVariant
+        ? unique([...(matchingVariant.endpointPlaceKeys ?? []), ...(matchingVariant.endpointStopPointIds ?? [])])
+        : plannerServiceDestinationKeys(matchingService);
+      const sameMainPlace = sameStructuredPlannerPlace(mainDestinationKeys, candidateKeys);
+      if (!sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
+        addAdditionalEntry(row.routeNumber, [destination]);
       }
     }
   }
 
   const rowQualification = materialServiceNote(row?.serviceNote);
-  if (rowQualification && /school|term(?:[- ]time|[- ]only)|non-school|circular|holiday|calendar/i.test(rowQualification)
+  if (rowQualification && /school|term(?:[- ]time|[- ]only)|non-school|circular|holiday|calendar|operating days could not be fully confirmed/i.test(rowQualification)
     && !(row?.circular && /circular service/i.test(rowQualification))) addUnique(qualifications, rowQualification);
   const shortLocation = value => text(value).replace(/^[^–-]+[–-]\s*/u, '');
   const compactShortWorkings = shortWorkings.filter(candidate => !shortWorkings.some(other => other !== candidate
@@ -1825,9 +1937,9 @@ function plannerAnnotationTaxonomy(row) {
   const notes = Object.freeze({
     terminus: row?.terminusDecision?.proven && row.terminusDecision.terminalSides?.includes('origin')
       ? text(row.terminusDecision.assessedPlace) || null : null,
-    additionalServices: additionalServices.length ? additionalServices.join('; ') : null,
+    additionalServices: additionalServiceEntries.length ? plannerAdditionalSentence(additionalServiceEntries) : (additionalServices.length ? additionalServices.join('; ') : null),
     additionalServiceEntries: Object.freeze(additionalServiceEntries),
-    shortWorkings: compactShortWorkings.length ? compactShortWorkings.join('; ') : null,
+    shortWorkings: shortWorkingEntries.length ? plannerShortWorkingSentence(shortWorkingEntries) : (compactShortWorkings.length ? compactShortWorkings.join('; ') : null),
     serviceQualification: qualifications.length ? qualifications.join('; ') : null,
     circularService: row?.circular ? 'Circular service.' : null,
     reviewNote: row?.unresolvedPublicIdentity ? 'Destination requires review before formal use.' : null
@@ -1837,11 +1949,14 @@ function plannerAnnotationTaxonomy(row) {
 
 function formattedPlannerAnnotations(notes = {}) {
   const sentence = value => text(value).replace(/[.]+$/u, '');
+  const qualificationText = notes.serviceQualification && /operating days could not be fully confirmed/i.test(notes.serviceQualification)
+    ? humanQualification(notes.serviceQualification)
+    : notes.serviceQualification?.split(';').map(humanQualification).filter(Boolean).join('; ');
   return [
-    notes.terminus ? `Terminus: ${sentence(notes.terminus)}.` : null,
+    notes.terminus ? `Route terminus: ${sentence(notes.terminus)}.` : null,
     notes.additionalServices ? `Additional services: ${sentence(notes.additionalServices)}.` : null,
     notes.shortWorkings ? `Short workings: ${sentence(notes.shortWorkings)}.` : null,
-    notes.serviceQualification ? `Service qualification: ${sentence(notes.serviceQualification)}.` : null,
+    qualificationText ? `Service qualification: ${sentence(qualificationText)}.` : null,
     notes.circularService ? `Circular service: ${notes.circularService.replace(/\.$/, '')}.` : null,
     notes.reviewNote ? `Review note: ${notes.reviewNote}` : null
   ].filter(Boolean);
@@ -1887,6 +2002,7 @@ function attachRouteNotes(rows) {
   const groups = new Map();
   prepared.forEach((row, index) => { const key = row.publicRouteFamilyKey || row.routeGroupKey; if (!groups.has(key)) groups.set(key, []); groups.get(key).push({ row, index }); });
   const notesFor = row => unique(text(row.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean));
+  const structuredQualification = note => /school[- ]?days?|term[- ]time|non[- ]school|holiday|operating days could not be fully confirmed/i.test(text(note));
   const sharedTaxonomy = new Set(['School days only.', 'Term-time service.', 'Non-school days only.', 'Circular service.']);
   const updates = new Map();
   for (const group of groups.values()) {
@@ -1909,8 +2025,10 @@ function attachRouteNotes(rows) {
     const hasShortWorkingTaxonomy = group.some(({ row }) => row.plannerNotes?.shortWorkings);
     let legacyAdditionalServices = [];
     if (detailedAdditional && !hasShortWorkingTaxonomy && !familyRow) {
-      routeNotes.push(legacyVariantCompatibilityNote(group));
-      legacyAdditionalServices = legacyVariantDestinations(group).alternatives.map(destination => `${group.at(-1).row.routeNumber} – ${destination}`);
+      // The structured planner annotation is now the public wording. Keep
+      // the legacy compatibility field available to callers, but do not add
+      // raw destination lists or the generic "additional variants" banner.
+      routeNotes.push(...taxonomyNotes.filter(note => !shared.some(sharedNote => normal(note).includes(normal(sharedNote)))));
     }
     else if (taxonomyNotes.length) routeNotes.push(...taxonomyNotes.filter(note => !shared.some(sharedNote => normal(note).includes(normal(sharedNote)))));
     else if (hasVariant) {
@@ -1919,7 +2037,9 @@ function attachRouteNotes(rows) {
       else routeNotes.push('Additional short workings and timetable variants operate.');
     }
     group.forEach(({ row, index }, position) => {
-      const remainingNotes = notesFor(row).filter(note => !shared.includes(note) && !/^Circular service\.$/i.test(note));
+      const remainingNotes = notesFor(row).filter(note => !shared.includes(note)
+        && !/^Circular service\.$/i.test(note)
+        && !(row.plannerNotes?.serviceQualification && structuredQualification(note)));
       const plannerNotes = position === group.length - 1 && legacyAdditionalServices.length
         ? Object.freeze({
           ...row.plannerNotes,

@@ -597,7 +597,7 @@ function renderAssessment(result) {
     appendCell(row, 'Operating period at stop', periods);
     serviceRows.append(row);
     const duplicateTerminusNote = service.plannerNotes?.terminus && /\broute terminus\b/i.test(String(service.serviceNote || ''));
-    const structuredQualificationNote = /^(?:runs? on school days only|operates? during term time only|term[- ]time service|runs? on non-school days only|non-school days only|operates? on holidays only|operating days could not be fully confirmed)(?:;.*)?\.?$/i.test(String(service.serviceNote || '').trim());
+    const structuredQualificationNote = /^(?:school[- ]day(?:s)?(?:[- ]only)?(?: service)?|runs? on school days only|operates? during term time only|term[- ]time service|runs? on non-school days only|non-school days only|operates? on holidays only|operating days could not be fully confirmed)(?:;.*)?\.?$/i.test(String(service.serviceNote || '').trim());
     if (service.serviceNote && !duplicateTerminusNote && !structuredQualificationNote) {
       const noteRow = document.createElement('tr'); noteRow.className = 'service-note';
       const noteCell = document.createElement('td'); noteCell.colSpan = 8;

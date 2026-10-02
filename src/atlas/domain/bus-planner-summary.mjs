@@ -2041,7 +2041,7 @@ function attachRouteNotes(rows) {
       const remainingNotes = notesFor(row).filter(note => !shared.includes(note)
         && !/^Circular service\.$/i.test(note)
         && !(row.plannerNotes?.serviceQualification && structuredQualification(note)
-          && !/^Non-school days only\.$/i.test(note)));
+          && /operating days could not be fully confirmed/i.test(note)));
       const plannerNotes = position === group.length - 1 && legacyAdditionalServices.length
         ? Object.freeze({
           ...row.plannerNotes,

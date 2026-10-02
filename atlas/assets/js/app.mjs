@@ -585,7 +585,8 @@ function renderAssessment(result) {
     service.operatingPeriodLines.forEach(line => { const item = document.createElement('li'); item.textContent = line; periods.append(item); });
     appendCell(row, 'Operating period at stop', periods);
     serviceRows.append(row);
-    if (service.serviceNote) {
+    const duplicateTerminusNote = service.plannerNotes?.terminus && /\broute terminus\b/i.test(String(service.serviceNote || ''));
+    if (service.serviceNote && !duplicateTerminusNote) {
       const noteRow = document.createElement('tr'); noteRow.className = 'service-note';
       const noteCell = document.createElement('td'); noteCell.colSpan = 8;
       const label = document.createElement('strong'); label.textContent = 'Service note: ';

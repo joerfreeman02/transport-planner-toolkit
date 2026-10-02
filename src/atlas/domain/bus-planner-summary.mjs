@@ -1529,6 +1529,10 @@ function familyMemberForPresentation(row) {
     serviceNote: text(row?.serviceNote) || null,
     routeVariantNote: text(row?.routeVariantNote) || null,
     sourceRecordIds: Object.freeze([...(row?.sourceRecordIds ?? [])]),
+    alternateDestinationNames: Object.freeze([...(row?.alternateDestinationNames ?? [])]),
+    materialAlternateDestinations: Object.freeze([...(row?.materialAlternateDestinations ?? [])]),
+    materialDestinationEvidence: Object.freeze([...(row?.publicServiceGroupingDecision?.materialDestinationEvidence ?? [])]),
+    variantDestinationEvidence: Object.freeze((row?.publicServiceGroupingDecision?.variantDestinationEvidence ?? []).map(variant => Object.freeze({ ...variant }))),
     publicServiceGroupingDecision: row?.publicServiceGroupingDecision ?? null,
     plannerServiceGroupId: text(row?.plannerServiceGroup?.serviceIdentity) || null
   });
@@ -1629,8 +1633,19 @@ function plannerAnnotationTaxonomy(row) {
     const principal = members[0];
     const principalDestination = normal(principal?.destination || row.destination);
     for (const member of members.slice(1)) {
-      const destination = text(member.destination);
-      if (destination && normal(destination) !== principalDestination) addUnique(additionalServices, `${member.routeNumber}: ${destination}`);
+      const memberRoute = text(member.routeNumber || row.routeNumber);
+      const destinations = unique([
+        member.destination,
+        ...(member.materialDestinationEvidence ?? []),
+        ...(member.materialAlternateDestinations ?? []),
+        ...(member.alternateDestinationNames ?? []),
+        ...(member.variantDestinationEvidence ?? []).map(variant => variant.destination)
+      ]);
+      for (const destination of destinations) {
+        if (destination && normal(destination) !== principalDestination && normal(destination) !== assessedTerminus) {
+          addUnique(additionalServices, `${memberRoute}: ${destination}`);
+        }
+      }
       const profiles = (member.calendarProfileLabels ?? []).filter(label => label
         && !/^standard days$/i.test(label)
         && !/^calendar not confirmed$/i.test(label)
@@ -1674,10 +1689,25 @@ function plannerAnnotationTaxonomy(row) {
       const qualification = variantCalendarQualification(service);
       if (qualification) addUnique(qualifications, `${service.routeNumber || row.routeNumber} – ${qualification}`);
     }
+    // Preserve material alternate destinations even when the source-record
+    // identity filter above correctly suppresses a duplicate service record.
+    // The structured annotation is the single planner-facing display; the
+    // legacy routeGroupNote remains only as an audit/backward-compatibility
+    // field for older callers.
+    for (const destination of unique([
+      ...(row.materialAlternateDestinations ?? []),
+      ...(row.alternateDestinationNames ?? []),
+      ...services.map(service => plannerDestination(service))
+    ])) {
+      if (normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
+        addUnique(additionalServices, `${row.routeNumber} – ${destination}`);
+      }
+    }
   }
 
   const rowQualification = materialServiceNote(row?.serviceNote);
-  if (rowQualification && /school|term(?:[- ]time|[- ]only)|non-school|circular|holiday|calendar/i.test(rowQualification)) addUnique(qualifications, rowQualification);
+  if (rowQualification && /school|term(?:[- ]time|[- ]only)|non-school|circular|holiday|calendar/i.test(rowQualification)
+    && !(row?.circular && /circular service/i.test(rowQualification))) addUnique(qualifications, rowQualification);
   const shortLocation = value => text(value).replace(/^[^–-]+[–-]\s*/u, '');
   const compactShortWorkings = shortWorkings.filter(candidate => !shortWorkings.some(other => other !== candidate
     && normal(shortLocation(other)).includes(normal(shortLocation(candidate)))));
@@ -1705,7 +1735,7 @@ function formattedPlannerAnnotations(notes = {}) {
   ].filter(Boolean);
 }
 
-function legacyVariantCompatibilityNote(group) {
+function legacyVariantDestinations(group) {
   const headlineDestinations = new Set(group.map(({ row }) => normal(plannerDestination(row))));
   const sourceServices = group.flatMap(({ row }) => row.rawServiceSummaries ?? []);
   const alternatives = destinationNames([
@@ -1728,7 +1758,11 @@ function legacyVariantCompatibilityNote(group) {
     const index = alternatives.indexOf(hubAlternative);
     if (index > 0) alternatives.unshift(...alternatives.splice(index, 1));
   }
-  const origins = originVariantNames(sourceServices, group);
+  return { alternatives, origins: originVariantNames(sourceServices, group) };
+}
+
+function legacyVariantCompatibilityNote(group) {
+  const { alternatives, origins } = legacyVariantDestinations(group);
   const originNote = origins.length === 1 ? ` from ${origins[0]}` : origins.length > 1 ? ` from ${origins.slice(0, -1).join(', ')} and ${origins.at(-1)}` : '';
   if (alternatives.length === 1) return `Additional variants and short workings operate, including journeys${originNote} towards ${alternatives[0]}.`;
   if (alternatives.length > 1) return `Additional variants and short workings operate, including journeys${originNote} towards ${alternatives.slice(0, -1).join(', ')} and ${alternatives.at(-1)}.`;
@@ -1761,7 +1795,11 @@ function attachRouteNotes(rows) {
     const taxonomyNotes = unique(group.flatMap(({ row }) => formattedPlannerAnnotations(row.plannerNotes)));
     const detailedAdditional = group.some(({ row }) => Boolean(row.plannerNotes?.additionalServices));
     const hasShortWorkingTaxonomy = group.some(({ row }) => row.plannerNotes?.shortWorkings);
-    if (detailedAdditional && !hasShortWorkingTaxonomy && !familyRow) routeNotes.push(legacyVariantCompatibilityNote(group));
+    let legacyAdditionalServices = [];
+    if (detailedAdditional && !hasShortWorkingTaxonomy && !familyRow) {
+      routeNotes.push(legacyVariantCompatibilityNote(group));
+      legacyAdditionalServices = legacyVariantDestinations(group).alternatives.map(destination => `${group.at(-1).row.routeNumber} – ${destination}`);
+    }
     else if (taxonomyNotes.length) routeNotes.push(...taxonomyNotes.filter(note => !shared.some(sharedNote => normal(note).includes(normal(sharedNote)))));
     else if (hasVariant) {
       const attributedVariantNotes = unique(group.map(({ row }) => row.routeVariantNote));
@@ -1770,7 +1808,16 @@ function attachRouteNotes(rows) {
     }
     group.forEach(({ row, index }, position) => {
       const remainingNotes = notesFor(row).filter(note => !shared.includes(note) && !/^Circular service\.$/i.test(note));
-      updates.set(index, { serviceNote: remainingNotes.join(' '), routeGroupNote: position === group.length - 1 ? routeNotes.join(' ') || null : null });
+      const plannerNotes = position === group.length - 1 && legacyAdditionalServices.length
+        ? Object.freeze({
+          ...row.plannerNotes,
+          additionalServices: unique([
+            ...(text(row.plannerNotes?.additionalServices).split(';').map(text).filter(Boolean)),
+            ...legacyAdditionalServices
+          ]).join('; ')
+        })
+        : row.plannerNotes;
+      updates.set(index, { serviceNote: remainingNotes.join(' '), plannerNotes, routeGroupNote: position === group.length - 1 ? routeNotes.join(' ') || null : null });
     });
   }
   return prepared.map((row, index) => Object.freeze({ ...row, ...(updates.get(index) ?? { routeGroupNote: null }) }));
@@ -1824,7 +1871,7 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
       arrivalEvidence: Object.freeze(arrivalIds),
       suppressedArrivalSourceRecordIds: Object.freeze(matchedSuppressed.flatMap(candidate => candidate.sourceRecordIds))
     });
-    return Object.freeze({ ...row, terminusDecision, serviceNote: unique([row.serviceNote, terminusDecision.note]).join(' ') });
+    return Object.freeze({ ...row, terminusDecision });
   });
   const sorted = rows.sort((first, second) => text(first.routeNumber).localeCompare(text(second.routeNumber), undefined, { numeric: true })
     || text(first.operator).localeCompare(text(second.operator))

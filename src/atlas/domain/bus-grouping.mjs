@@ -208,6 +208,21 @@ function pattern(service) {
 }
 function patternNames(service) { return unique((service?.routePatternStops ?? service?.routePatternStopNames ?? []).map(stop => typeof stop === 'string' ? stop : stop?.name || stop?.commonName)); }
 
+function orderedLocalCorridorEvidence(first, second) {
+  const left = patternNames(first).map(normal).filter(Boolean);
+  const right = patternNames(second).map(normal).filter(Boolean);
+  if (!left.length || !right.length) return false;
+  let cursor = 0;
+  let matches = 0;
+  for (const name of left) {
+    const found = right.indexOf(name, cursor);
+    if (found < 0) continue;
+    matches += 1;
+    cursor = found + 1;
+  }
+  return matches >= 2;
+}
+
 function strictSubsequenceServices(shorterService, longerService) {
   const shorter = pattern(shorterService), longer = pattern(longerService);
   if (!shorter.length || shorter.length >= longer.length) return false;
@@ -265,7 +280,8 @@ function sharedScheduledPatternEvidence(first, second) {
     sharedAssessedStops,
     orderedPatternMatch: sharedPatternEvidence(first, second)
       || strictSubsequenceServices(first, second)
-      || strictSubsequenceServices(second, first)
+      || strictSubsequenceServices(second, first),
+    orderedLocalCorridorMatch: orderedLocalCorridorEvidence(first, second)
   };
 }
 
@@ -311,12 +327,22 @@ export function hasPublicServiceCopyEvidence(first = {}, second = {}) {
     && endpointIdentity(first, 'destination') === endpointIdentity(second, 'origin')) return false;
   const evidence = sharedScheduledPatternEvidence(first, second);
   const sharedStops = new Set([...evidence.sharedPatternStops, ...evidence.sharedAssessedStops]);
-  if (sharedStops.size < 2) return false;
-  if (!(sharedDirectionMarker(first, second) || sameDirectedCorridor(first, second, evidence))) return false;
+  const exactEndpointEvidence = sameExactEndpointEvidence(first, second);
+  const departureOverlap = scheduledDepartureOverlap(first, second);
   const independentCorridorEvidence = Number(evidence.orderedPatternMatch)
+    + Number(evidence.orderedLocalCorridorMatch)
     + Number(evidence.sharedPatternStops.length >= 2)
     + Number(evidence.sharedAssessedStops.length >= 2)
-    + Number(scheduledDepartureOverlap(first, second));
+    + Number(departureOverlap)
+    + Number(exactEndpointEvidence);
+  if (sharedStops.size < 2) {
+    // A single common assessed StopPoint is not enough by itself, but it is
+    // not an automatic rejection when two independent structured signals
+    // corroborate the same public direction (for example exact endpoint
+    // evidence plus timetable overlap or an ordered local corridor).
+    if (evidence.sharedAssessedStops.length !== 1 || independentCorridorEvidence < 2) return false;
+  }
+  if (!(sharedDirectionMarker(first, second) || sameDirectedCorridor(first, second, evidence))) return false;
   return independentCorridorEvidence >= 2
     && (sameCalendarProfile(first, second)
       || evidence.orderedPatternMatch

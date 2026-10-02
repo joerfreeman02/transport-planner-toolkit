@@ -97,15 +97,13 @@ export function buildBusWordTables(result) {
         service.typicalFrequencyText || 'Frequency unavailable',
         (service.operatingPeriodLines ?? []).join('\n')
       ]);
-    if (service.serviceNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.serviceNote}` });
+    const duplicateTerminusNote = service.plannerNotes?.terminus && /\broute terminus\b/i.test(text(service.serviceNote));
+    if (service.serviceNote && !duplicateTerminusNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.serviceNote}` });
     const plannerAnnotations = hasPlannerSummary ? plannerAnnotationRows(service) : [];
     const next = services[index + 1];
     if (hasPlannerSummary && (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey)) {
       if (plannerAnnotations.length) {
         plannerAnnotations.forEach(textValue => serviceRows.push({ kind: 'summary', text: textValue }));
-        if (/^Additional variants and short workings operate,/i.test(text(service.routeGroupNote))) {
-          serviceRows.push({ kind: 'summary', text: `Review note: ${service.routeGroupNote}` });
-        }
       }
       else if (service.routeGroupNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeGroupNote}` });
     }

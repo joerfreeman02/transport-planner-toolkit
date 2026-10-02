@@ -106,7 +106,9 @@ tenIn.originEndpointDecision = endpoint('Waltham Cross Bus Station', 'W-A', 'are
 const tenRows = rows([tenOut, tenIn]);
 assert.equal(tenRows.length, 1, 'proven terminal removes the arrival-only redundant row');
 assert.equal(tenRows[0].direction, 'inbound');
-assert.match(tenRows[0].serviceNote, /Waltham Cross Bus Station is the route terminus/);
+// BUS-GROUP-1D supersedes the former generic service-note terminus banner:
+// the proven fact is now emitted once through plannerNotes.terminus.
+assert.equal(tenRows[0].plannerNotes.terminus, 'Waltham Cross Bus Station');
 assert.ok(tenRows[0].terminusDecision.arrivalEvidence.includes('310-outbound'), 'suppressed arrival remains auditable');
 assert.deepEqual(tenRows[0].terminusDecision.terminalStopPointIds, ['W-A']);
 const through = record({ id: 'through', routeNumber: '491', origin: 'North', destination: 'South', originStopPointId: 'H', destinationStopPointId: 'L', pattern: ['H', 'W-A', 'M', 'L'], direction: 'southbound' });
@@ -127,7 +129,7 @@ const wordRow = buildBusWordTables({ ok: true, stops, plannerServiceSummaries: t
 assert.equal(wordRow[1], tenRows[0].operator);
 assert.match(wordRow[2], /Hertford Bus Station/);
 const wordNotes = buildBusWordTables({ ok: true, stops, plannerServiceSummaries: tenRows, serviceSummaries: [] })[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
-assert.match(wordNotes, /Waltham Cross Bus Station is the route terminus/);
+assert.match(wordNotes, /Terminus: Waltham Cross Bus Station/);
 assert.ok(tenRows[0].plannerServiceGroup.destinationEndpointDecision, 'BUS-DEST endpoint decision remains under the planner group');
 assert.ok(buildPlannerServiceGroups([tenIn], stops)[0].publicServiceGroupingDecision, 'grouping decision is a domain object before presentation');
 

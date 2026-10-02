@@ -140,10 +140,20 @@ for (const label of ['G', 'H']) {
     calendarRecord({ routeNumber: label, id: `${label}-unresolved`, profile: label === 'G' ? 'unresolved' : undefined, departures: weekdayAt(510) })
   ]);
   assert.equal(rows.length, 1, `${label}: unresolved calendar record remains in the route row`);
-  assert.match(rows[0].typicalFrequencyText, /Standard days: Mon-Fri: 1 journey\/day/);
-  assert.match(rows[0].typicalFrequencyText, /Calendar not confirmed(?: \(additional\))?: Mon-Fri: 1 journey\/day/);
-  assert.match(rows[0].serviceNote, /calendar applicability is not confirmed/i);
-  assertNoUnconditionalCombinedFrequency(rows[0], `${label}: unresolved evidence cannot inflate resolved service`);
+  if (label === 'G') {
+    assert.match(rows[0].typicalFrequencyText, /Standard days: Mon-Fri: 1 journey\/day/);
+    assert.match(rows[0].typicalFrequencyText, /Calendar not confirmed(?: \(additional\))?: Mon-Fri: 1 journey\/day/);
+    // BUS-GROUP-1F replaces the former software-facing wording with the
+    // approved human qualification while retaining the same unresolved state.
+    assert.match(`${rows[0].serviceNote} ${rows[0].routeGroupNote}`, /Operating days could not be fully confirmed; check the timetable before use\./i);
+  } else {
+    // BUS-GROUP-1F treats an absent supplementary calendar assertion as
+    // compatible with the authoritative ordinary profile, not unresolved.
+    assert.deepEqual(rows[0].calendarProfileIds, ['ordinary']);
+    assert.equal(rows[0].typicalFrequencyText, 'Mon-Fri: 2 journeys/day\nSat-Sun: No scheduled service');
+    assert.doesNotMatch(`${rows[0].serviceNote} ${rows[0].routeGroupNote}`, /Calendar not confirmed|Operating days could not be fully confirmed/i);
+  }
+  if (label === 'G') assertNoUnconditionalCombinedFrequency(rows[0], `${label}: unresolved evidence cannot inflate resolved service`);
 }
 
 // I. A physical journey repeated in two calendar records is deduplicated but retains both profiles.
@@ -189,8 +199,8 @@ for (let first = 0; first < profiles.length; first += 1) {
     ]);
     assert.equal(rows.length, 1, `matrix ${first}/${second}: one route-direction row`);
     assert.equal(rows[0].rawServiceSummaries.length, 2, `matrix ${first}/${second}: both source records retained`);
-    assertNoUnconditionalCombinedFrequency(rows[0], `matrix ${first}/${second}: no unconditional combined frequency`);
-    const expectedProfileCount = new Set([profiles[first] ?? 'unresolved', profiles[second] ?? 'unresolved']).size;
+    if (profiles[first] !== undefined && profiles[second] !== undefined) assertNoUnconditionalCombinedFrequency(rows[0], `matrix ${first}/${second}: no unconditional combined frequency`);
+    const expectedProfileCount = new Set([profiles[first], profiles[second]].filter(profile => profile !== undefined)).size;
     assert.equal(rows[0].calendarProfileIds.length, expectedProfileCount, `matrix ${first}/${second}: profile taxonomy retained`);
     matrixCases += 1;
   }

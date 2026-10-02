@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { buildPlannerBusServiceSummaries } from '../../src/atlas/domain/bus-planner-summary.mjs';
+import { buildPlannerBusServiceSummaries, buildPlannerServiceGroups } from '../../src/atlas/domain/bus-planner-summary.mjs';
+import { buildServiceSummaries } from '../../src/atlas/domain/bus-service-assessment.mjs';
+import { normalisePreparedService } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
 import {
   inspectCircularPattern,
@@ -24,6 +26,23 @@ const differentStands = inspectCircularPattern({
 assert.equal(differentStands.classification, 'circular');
 assert.equal(differentStands.loopClosureEvidence.samePhysicalStopPoint, false);
 assert.equal(differentStands.loopClosureEvidence.sameAuthoritativeStopArea, true);
+
+const endpointEvidenceLoop = inspectCircularPattern({
+  routeNumber: 'ENDPOINT-EVIDENCE',
+  routePatternStopIds: ['A-1', 'MID', 'A-2'],
+  originEndpointDecision: {
+    endpointStopPointIds: ['A-1'], exactEvidence: true, unresolved: false, conflict: false,
+    stopArea: { id: 'naptan:AREA-A', name: 'Shared interchange' }
+  },
+  destinationEndpointDecision: {
+    endpointStopPointIds: ['A-2'], exactEvidence: true, unresolved: false, conflict: false,
+    stopArea: { id: 'naptan:AREA-A', name: 'Shared interchange' }
+  }
+});
+assert.equal(endpointEvidenceLoop.classification, 'circular');
+assert.equal(endpointEvidenceLoop.loopClosureEvidence.samePhysicalStopPoint, false);
+assert.equal(endpointEvidenceLoop.loopClosureEvidence.sameAuthoritativeStopArea, true);
+assert.equal(endpointEvidenceLoop.loopClosureEvidence.firstStopAreaId, 'naptan:AREA-A');
 
 const reverse = inspectCircularPattern({ routeNumber: 'REV', routePatternStops: [stop('A'), stop('B'), stop('C')] });
 const reverseBack = inspectCircularPattern({ routeNumber: 'REV', routePatternStops: [stop('C'), stop('B'), stop('A')] });
@@ -89,6 +108,18 @@ const pipers230 = {
 const pipersDecision = inspectCircularPattern(pipers230);
 assert.equal(pipersDecision.classification, 'unresolved-review');
 assert.match(pipersDecision.reason, /complete ordered StopPoint\/StopArea pattern/i);
+
+const propagatedPattern = ['490000001A', 'gtfs:east_anglia:missing-stop', '490000001A'];
+const preparedService = normalisePreparedService({
+  id: 'bods:pattern', routeNumber: '16', operator: 'Fixture', origin: 'A', destination: 'A',
+  routePatternStopIds: propagatedPattern,
+  stopSchedules: { '490000001A': { monday: [420] } }
+});
+assert.deepEqual(preparedService.routePatternStopIds, propagatedPattern);
+const assessed = buildServiceSummaries([{ id: '490000001A', name: 'A', indicator: 'A' }], [preparedService]);
+assert.deepEqual(assessed[0].routePatternStopIds, propagatedPattern);
+const plannerGroup = buildPlannerServiceGroups(assessed, [{ id: '490000001A', name: 'A', indicator: 'A', walking: { status: 'routed', distanceMetres: 10 } }])[0];
+assert.deepEqual(plannerGroup.patternEvidence[0].stopIds, propagatedPattern);
 
 const wordingRow = buildPlannerBusServiceSummaries([{
   id: 'word-loop', routeNumber: 'WORD', operator: 'Example', origin: 'A', destination: 'A', direction: 'Clockwise',

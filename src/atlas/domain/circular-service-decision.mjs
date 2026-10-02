@@ -130,17 +130,40 @@ function occurrenceEvidence(stops) {
     .map(([key, positions]) => Object.freeze({ key, positions: Object.freeze(positions) })));
 }
 
-function endpointClosure(stops) {
+function authoritativeEndpointPlace(service, side, stop) {
+  const decision = destinationDecision(service, side);
+  if (!decision || decision.exactEvidence !== true || decision.unresolved === true || decision.conflict === true) return null;
+  const endpointId = stopPointId(stop);
+  const endpointIds = unique([
+    ...(decision.endpointStopPointIds ?? []),
+    decision.endpointStopPointId,
+    decision.primaryEndpointStopPointId,
+    ...(decision.hydratedEndpointStopPointIds ?? [])
+  ]);
+  if (endpointId && endpointIds.length && !endpointIds.includes(endpointId)) return null;
+  return firstValue(
+    decision.stopArea?.id,
+    ...(decision.stopAreas ?? []).map(area => area?.id),
+    ...(decision.endpointLogicalGroupIds ?? []),
+    decision.endpointLogicalGroupId,
+    ...(decision.evidence?.stopAreas ?? []).map(area => area?.id),
+    decision.evidence?.stopArea?.id
+  );
+}
+
+function endpointClosure(stops, service = {}) {
   const first = stops[0] ?? null;
   const last = stops.at(-1) ?? null;
   const samePhysicalStopPoint = Boolean(first && last && pointKey(first) && pointKey(first) === pointKey(last));
-  const sameAuthoritativeStopArea = Boolean(first && last && exactPlaceKey(first) && exactPlaceKey(first) === exactPlaceKey(last));
+  const firstStopAreaId = stopAreaId(first) || authoritativeEndpointPlace(service, 'origin', first);
+  const lastStopAreaId = stopAreaId(last) || authoritativeEndpointPlace(service, 'destination', last);
+  const sameAuthoritativeStopArea = Boolean(firstStopAreaId && lastStopAreaId && firstStopAreaId === lastStopAreaId);
   const sameLogicalPlace = sameAuthoritativeStopArea;
   return Object.freeze({
     firstStopPointId: stopPointId(first),
     lastStopPointId: stopPointId(last),
-    firstStopAreaId: stopAreaId(first),
-    lastStopAreaId: stopAreaId(last),
+    firstStopAreaId,
+    lastStopAreaId,
     samePhysicalStopPoint,
     sameAuthoritativeStopArea,
     sameLogicalPlace,
@@ -210,8 +233,8 @@ function orientationEvidence(service, closed) {
   return Object.freeze({ orientation, basis: orientation ? 'authoritative-direction-metadata' : null });
 }
 
-function classifyPattern(stops, sourceAssertion) {
-  const closure = endpointClosure(stops);
+function classifyPattern(stops, sourceAssertion, service = {}) {
+  const closure = endpointClosure(stops, service);
   const keys = orderedKeys(stops);
   const occurrences = occurrenceEvidence(stops);
   const internalRepeat = occurrences.some(item => item.positions.some(position => position > 0 && position < stops.length - 1));
@@ -291,8 +314,8 @@ export function inspectCircularPattern(service = {}) {
   const rawStops = orderedStopPoints(service);
   const stops = freezeStops(rawStops);
   const sourceAssertion = sourceCircularAssertion(service);
-  const result = classifyPattern(stops, sourceAssertion);
-  const closure = endpointClosure(stops);
+  const result = classifyPattern(stops, sourceAssertion, service);
+  const closure = endpointClosure(stops, service);
   const orientation = orientationEvidence(service, result.classification === 'circular');
   return Object.freeze({
     type: 'CircularServiceDecision',

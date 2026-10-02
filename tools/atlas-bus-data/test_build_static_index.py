@@ -156,6 +156,38 @@ class CircularIdentityTests(unittest.TestCase):
         self.assertEqual(item["provenance"]["tripHeadsigns"], ["The Talbot", "Waltham Cross Bus Station"])
         self.assertEqual([identity["tripHeadsign"] for identity in item["provenance"]["sourceIdentities"]], ["The Talbot", "Waltham Cross Bus Station"])
 
+    def test_route_pattern_preserves_stop_sequence_repeats_and_traceable_unmatched_calls(self):
+        rows = [
+            {"stop_sequence": "3", "stop_id": "first", "departure_time": "08:20:00"},
+            {"stop_sequence": "1", "stop_id": "first", "departure_time": "08:00:00"},
+            {"stop_sequence": "2", "stop_id": "missing-gtfs", "departure_time": "08:10:00"},
+        ]
+        gtfs_stops = {
+            "first": {"stop_name": "Loop origin"},
+            "missing-gtfs": {"stop_name": "Unmatched call"},
+        }
+        naptan_stops = {
+            "490000001A": {"id": "490000001A", "name": "Loop origin", "locality": "Fixture", "routes": set()}
+        }
+        services = {}
+        BUILDER.process_trip(
+            "frozen_region",
+            rows,
+            {"route_id": "loop", "direction_id": "0", "service_id": "weekday", "trip_id": "trip-loop", "active_days": ["monday"], "trip_headsign": "Loop origin"},
+            {"agency": "Fixture operator"},
+            {"loop": {"route_short_name": "LOOP", "route_type": "3", "agency_id": "agency"}},
+            gtfs_stops,
+            {"weekday": {"start_date": "20260901", "end_date": "20260930"}},
+            {},
+            naptan_stops,
+            {"atco": {"first": "490000001A"}, "naptan": {}},
+            services,
+        )
+        record = next(iter(services.values()))
+        self.assertEqual(record["routePatternStopIds"], ["490000001A", "gtfs:frozen_region:missing-gtfs", "490000001A"])
+        self.assertEqual(record["source"]["orderedPatternEndpoints"], ["490000001A", "490000001A"])
+        self.assertEqual(record["routePatternStopIds"][0], record["routePatternStopIds"][-1])
+
     def test_route_310_distinct_bus_station_endpoints_are_not_circular(self):
         record = self.build_record(
             route_id="310",
@@ -339,6 +371,7 @@ class PreparedDataV2ParserTests(unittest.TestCase):
             v2_services = json.loads(gzip.open(output / v2_service_path, "rt", encoding="utf-8").read())["services"]
             self.assertEqual(manifest["version"], "2.1.0")
             self.assertIn("endpointEvidence", v2_services[0])
+            self.assertEqual(v2_services[0]["routePatternStopIds"], ["490006381N", "490006381S"])
             for legacy, enriched in zip(v1_services, v2_services):
                 for field, value in legacy.items():
                     if field == "endpointEvidence":

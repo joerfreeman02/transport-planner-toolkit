@@ -474,6 +474,15 @@ def principal_locations(calls: list[dict], maximum: int = 7) -> list[str]:
     return selected[:maximum]
 
 
+def route_pattern_stop_identity(region: str, call: dict, position: int) -> str:
+    """Return a deterministic public pattern identity without losing unmatched calls."""
+    resolved = clean(call.get("stop_id"))
+    if resolved:
+        return resolved
+    gtfs_id = clean(call.get("gtfs_stop_id"))
+    return f"gtfs:{region}:{gtfs_id}" if gtfs_id else f"gtfs:{region}:unresolved:{position}"
+
+
 def load_gtfs_metadata(archive: zipfile.ZipFile, dates: dict[str, date]):
     agencies = {clean(row.get("agency_id")): clean(row.get("agency_name")) for row in gtfs_rows(archive, "agency.txt")}
     routes = {clean(row.get("route_id")): row for row in gtfs_rows(archive, "routes.txt")}
@@ -527,7 +536,8 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             matched.append((stop, departure))
     if not matched or len(calls) < 2:
         return
-    sequence = ">".join(clean(row.get("stop_id")) for row in sorted(rows, key=lambda value: int(value.get("stop_sequence", 0) or 0)))
+    route_pattern_stop_ids = [route_pattern_stop_identity(region, call, position) for position, call in enumerate(calls)]
+    sequence = ">".join(route_pattern_stop_ids)
     signature = hashlib.sha1(f"{trip.get('route_id')}|{trip.get('direction_id')}|{sequence}".encode("utf-8")).hexdigest()[:12]
     service_id = f"{region}:{clean(trip.get('route_id'))}:{clean(trip.get('direction_id')) or 'x'}:{signature}"
     agency = clean(agencies.get(clean(route.get("agency_id")))) or "Operator not supplied in the timetable"
@@ -547,6 +557,7 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             "direction": clean(trip.get("trip_headsign")) or (f"towards {last_name}" if last_name else ""),
             "circular": circular,
             "principalLocations": principal_locations(calls),
+            "routePatternStopIds": route_pattern_stop_ids,
             "validFrom": None,
             "validTo": None,
             "qualifications": set(),
@@ -562,7 +573,7 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
         "routeLongName": clean(route.get("route_long_name")) or None,
         "routeDescription": clean(route.get("route_desc")) or None,
         "tripHeadsign": clean(trip.get("trip_headsign")) or None,
-        "orderedPatternEndpoints": [calls[0].get("stop_id") or calls[0].get("gtfs_stop_id"), calls[-1].get("stop_id") or calls[-1].get("gtfs_stop_id")],
+        "orderedPatternEndpoints": [route_pattern_stop_ids[0], route_pattern_stop_ids[-1]],
         "provenance": "BODS GTFS frozen-source preparation"
     })
     calendar = calendars.get(clean(trip.get("service_id")), {})

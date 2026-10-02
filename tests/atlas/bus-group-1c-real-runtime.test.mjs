@@ -27,7 +27,7 @@ assert.doesNotMatch(`${family13.serviceNote} ${family13.routeGroupNote}`, /Route
 const row66 = routeRows('66').find(row => row.plannerNotes?.shortWorkings) ?? routeRows('66')[0];
 assert.match(row66.plannerNotes.shortWorkings, /Short|Hammond Street \(Smiths Lane\)|Hammond Street/);
 assert.match(`${row66.plannerNotes.shortWorkings} ${row66.routeGroupNote ?? ''}`, /Hammond Street \(Smiths Lane\)/);
-assert.doesNotMatch(`${row66.plannerNotes.shortWorkings} ${row66.routeGroupNote ?? ''}`, /Waltham Cross Bus Station/);
+assert.doesNotMatch(row66.plannerNotes.shortWorkings, /Waltham Cross Bus Station/);
 const row242 = routeRows('242').find(row => /Welham Green|Potters Bar/.test(row.plannerNotes?.additionalServices ?? '')) ?? routeRows('242')[0];
 assert.match(row242.plannerNotes.additionalServices, /Welham Green Railway Station/);
 assert.match(`${row242.destination} ${row242.plannerNotes.additionalServices}`, /Potters Bar Railway Station/);

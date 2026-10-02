@@ -102,7 +102,8 @@ assert.equal(rowsFor('327').length, 1);
 assert.equal(rowsFor('491').length, 1);
 assert.equal(rowsFor('N279').length, 1);
 assert.equal(rows.filter(row => row.routeNumber === '16' || row.routeNumber === '16C').length, 2);
-assert.ok(rows.filter(row => row.routeNumber === '16' || row.routeNumber === '16C').every(row => row.circular === true));
+assert.ok(rows.filter(row => row.routeNumber === '16' || row.routeNumber === '16C').every(row => row.circular === false));
+assert.ok(rows.filter(row => row.routeNumber === '16' || row.routeNumber === '16C').every(row => row.circularServiceDecision?.classification === 'unresolved-review'));
 
 const word = buildBusWordTables({ ok: true, stops: fixture.stops, plannerServiceSummaries: rows, serviceSummaries: [] });
 const wordServiceRows = word.find(table => table.caption.startsWith('Table 3.3')).rows;

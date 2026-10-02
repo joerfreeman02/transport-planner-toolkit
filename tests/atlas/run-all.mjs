@@ -47,6 +47,7 @@ await import('./bus-group-1d-real-runtime.test.mjs');
 await import('./bus-group-1e-real-runtime.test.mjs');
 await import('./bus-group-1f-real-runtime.test.mjs');
 await import('./bus-group-1g-wording.test.mjs');
+await import('./bus-circ.test.mjs');
 await import('./alpha12-source-completeness.test.mjs');
 await import('./alpha12-evidence-integrity-audit.test.mjs');
 await import('./alpha12-source-presentation.test.mjs');

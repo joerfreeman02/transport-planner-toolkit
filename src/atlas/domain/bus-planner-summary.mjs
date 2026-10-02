@@ -17,6 +17,11 @@ import {
   makeTerminusDecision,
   sourceAuthorityRank
 } from './bus-grouping.mjs';
+import {
+  circularClassificationIsProven,
+  plannerCircularWording,
+  resolveCircularServiceDecision
+} from './circular-service-decision.mjs';
 
 export const PLANNER_METHODOLOGY_NOTE = '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence. Additional source evidence remains available in the ATLAS assessment workspace.';
 export const PLANNER_TERMINUS_PRESENTATION_NOTE = 'Where an assessed stop is the route terminus, ATLAS shows the useful departing direction only; arriving journeys terminating at that stop are not listed separately.';
@@ -911,7 +916,9 @@ function materialServiceNote(note) {
   if (/non[- ]school|school holidays?/i.test(value)) return 'Non-school days only.';
   if (/school[- ]?days?(?:[- ]only)?|schooldays?/i.test(value)) return 'School days only.';
   if (/term[- ]time|term[- ]only/i.test(value)) return 'Term-time service.';
-  if (/circular service/i.test(value)) return 'Circular service.';
+  // A source circular assertion is BUS-CIRC evidence only.  It must not leak
+  // into planner prose unless the ordered-pattern decision proves a loop.
+  if (/circular service/i.test(value)) return null;
   if (/^Includes scheduled short workings or route variants/i.test(value)) return null;
   if (/^\d+ scheduled variants are retained/i.test(value)) return null;
   if (/^(?:Schedule integrity note:|TfL supplied|ATLAS retained|source (?:evidence|processing)|representative stop.*(?:evidence|frequency)|(?:frequency|operating[- ]period).*evidence|timetable evidence.*(?:derived|retained)|full tfl route origin|the timetable did not supply|tfl route metadata|the scheduled evidence is retained|limited service:\s*no more than three scheduled journeys)/i.test(value)) return null;
@@ -1152,7 +1159,7 @@ function publicDirectionIdentity(component, main) {
  * feed, stop, calendar and pattern evidence as members of one group rather
  * than treating any one source record as the row identity.
  */
-function buildPlannerServiceGroup(component, stops, main, representative, publicRouteFamilyKey = null) {
+function buildPlannerServiceGroup(component, stops, main, representative, publicRouteFamilyKey = null, circularServices = component) {
   const byId = new Map((stops ?? []).map(stop => [stopId(stop), stop]).filter(([id]) => id));
   const ids = candidateStopIds(component);
   const evidenceIds = ids.filter(id => component.some(service => hasTimetableEvidenceAt(service, id)));
@@ -1186,10 +1193,12 @@ function buildPlannerServiceGroup(component, stops, main, representative, public
     publicRouteFamilyKey,
     ambiguousServices: component.ambiguousServices ?? []
   });
+  const circularServiceDecision = resolveCircularServiceDecision(circularServices, { principal: main, component });
   const terminusDecision = makeTerminusDecision({
     services: component,
     principal: main,
-    assessedStops: stops
+    assessedStops: stops,
+    circularDecision: circularServiceDecision
   });
   return Object.freeze({
     serviceIdentity: `${routeGroupKey(main)}|${publicDirectionIdentity(component, main)}|${endpointIdentity}`,
@@ -1214,6 +1223,7 @@ function buildPlannerServiceGroup(component, stops, main, representative, public
     sourceServiceCount: component.length,
     alternateDestinations: Object.freeze(alternateDestinations(component, main)),
     publicServiceGroupingDecision: groupingDecision,
+    circularServiceDecision,
     terminusDecision,
     endpointEvidence: Object.freeze(endpointEvidence),
     calendarEvidence: Object.freeze(component.flatMap(service => service.calendarEvidence ?? [])),
@@ -1241,7 +1251,7 @@ export function buildPlannerServiceGroups(serviceSummaries = [], stops = []) {
   return [...grouped.entries()].flatMap(([publicRouteFamilyKey, services]) => connectedServiceComponents(services).map(component => {
     const representative = selectRepresentativeStop(component, stops);
     const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
-    return Object.freeze({ ...buildPlannerServiceGroup(component, stops, main, representative, publicRouteFamilyKey), publicRouteFamilyKey });
+    return Object.freeze({ ...buildPlannerServiceGroup(component, stops, main, representative, publicRouteFamilyKey, services), publicRouteFamilyKey });
   }));
 }
 
@@ -1257,7 +1267,9 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const plannerServiceGroup = serviceGroupOverride || buildPlannerServiceGroup(component, stops, main, representative, publicRouteFamilyKey);
   const destinationDecision = serviceEndpointDecision(main, 'destination');
   const originDecision = serviceEndpointDecision(main, 'origin');
-  const rowCircular = resolveCircularPresentation(component, routeFamilyServices);
+  const circularServiceDecision = plannerServiceGroup.circularServiceDecision
+    || resolveCircularServiceDecision(component, { principal: main, component });
+  const rowCircular = circularClassificationIsProven(circularServiceDecision);
   const canonical = canonicalDeparturePopulation(component, representative.id, main);
   const profileIds = orderedCalendarProfiles([
     ...component.map(calendarProfileFromService),
@@ -1328,7 +1340,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     calendarProfileIds: Object.freeze(profileIds),
     calendarProfileLabels: Object.freeze(profileIds.map(calendarProfileDisplayLabel)),
     directionFamily: directionKey(main),
-    directionPatternText: directionPatternText({ ...main, destination: destinationDecision.chosen, destinationLocality: null, circular: rowCircular }),
+    directionPatternText: directionPatternText({ ...main, destination: destinationDecision.chosen, destinationLocality: null, circular: rowCircular, circularServiceDecision }),
     servedAtStopId: representative.id,
     servedAtText: servedAtLines.join('\n') || servedAtText(representative),
     servedAtStops: Object.freeze(servedAtLines),
@@ -1367,6 +1379,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     rawServiceSummaries: Object.freeze(component),
     ambiguousServiceSummaries: Object.freeze([...(component.ambiguousServices ?? [])]),
     plannerServiceGroup,
+    circularServiceDecision,
     operatorRawNames: plannerServiceGroup.rawOperatorNames,
     operatorIdentities: plannerServiceGroup.operatorIdentities,
     sourceSelection: canonical.eligible.length ? 'representative-stop scheduled evidence' : 'representative-stop summary fallback',
@@ -1550,7 +1563,10 @@ export function buildPublicRouteFamilyDecisions(rows = []) {
       && members.length > 1
       && pairEvidence.length > 0
       && pairEvidence.every(evidence => evidence.proven)
-      && !members.some(row => row.circular)
+      // An unresolved circular assertion is still a material route-family
+      // distinction: do not collapse it into a sibling route before BUS-CIRC
+      // has enough ordered evidence to prove the relationship.
+      && !members.some(row => row.circular || row.circularServiceDecision?.classification === 'unresolved-review')
       && !hardSeparation
       && principalSelection.clear;
     const state = proven
@@ -1829,11 +1845,30 @@ function plannerAnnotationTaxonomy(row) {
   const mainDestination = normal(plannerDestination(row));
   const mainOrigin = normal(plannerOrigin(row) || row?.origin);
   const assessedTerminus = normal(row?.terminusDecision?.assessedPlace);
+  const annotationEvidenceKey = (service, route, location) => {
+    const pattern = unique([
+      ...(service?.routePatternStopIds ?? []),
+      ...(service?.orderedPatternEndpoints ?? []),
+      ...(service?.source?.orderedPatternEndpoints ?? []),
+      ...(service?.routePatternStops ?? []).map(stop => typeof stop === 'string' ? stop : stop?.id || stop?.sourceId)
+    ]);
+    const endpoint = [service?.origin, service?.destination].map(normal).filter(Boolean);
+    return [route, location, pattern.length ? pattern.join('>') : endpoint.join('|')].map(normal).join('|');
+  };
+  const annotationPatternComplete = service => {
+    const pattern = unique([
+      ...(service?.routePatternStopIds ?? []),
+      ...(service?.orderedPatternEndpoints ?? []),
+      ...(service?.source?.orderedPatternEndpoints ?? []),
+      ...(service?.routePatternStops ?? []).map(stop => typeof stop === 'string' ? stop : stop?.id || stop?.sourceId)
+    ]);
+    return pattern.length >= 3;
+  };
   const addUnique = (target, value) => {
     const clean = text(value);
     if (clean && !target.some(existing => normal(existing) === normal(clean))) target.push(clean);
   };
-  const addAdditionalEntry = (route, locations, variantKind = null) => {
+  const addAdditionalEntry = (route, locations, variantKind = null, service = null) => {
     const cleanLocations = unique(locations);
     if (!text(route) || !cleanLocations.length) return;
     const exists = additionalServiceEntries.some(entry => entry.routeNumber === text(route)
@@ -1842,9 +1877,19 @@ function plannerAnnotationTaxonomy(row) {
     if (!exists) additionalServiceEntries.push(Object.freeze({
       routeNumber: text(route),
       locations: Object.freeze(cleanLocations),
-      variantKind: text(variantKind) || null
+      variantKind: text(variantKind) || null,
+      evidenceKey: annotationEvidenceKey(service, route, cleanLocations.join('|')),
+      patternComplete: annotationPatternComplete(service)
     }));
     addUnique(additionalServices, `${text(route)} – ${cleanLocations.join(', ')}`);
+  };
+  const addShortWorkingEntry = (route, location, service = null, variantKind = null) => {
+    const cleanLocation = text(location);
+    if (!text(route) || !cleanLocation) return;
+    const evidenceKey = annotationEvidenceKey(service, route, cleanLocation);
+    if (shortWorkingEntries.some(entry => entry.evidenceKey === evidenceKey)) return;
+    shortWorkingEntries.push(Object.freeze({ routeNumber: text(route), location: cleanLocation, variantKind: text(variantKind) || null, evidenceKey, patternComplete: annotationPatternComplete(service) }));
+    addUnique(shortWorkings, `${text(route)} – ${cleanLocation}`);
   };
   const services = row?.rawServiceSummaries?.length ? [...row.rawServiceSummaries] : [];
   const duplicateIds = new Set(row?.publicServiceGroupingDecision?.deduplicatedSourceRecordIds ?? []);
@@ -1864,10 +1909,7 @@ function plannerAnnotationTaxonomy(row) {
         .filter(location => location.textKey && location.textKey !== assessedTerminus)
         .filter(location => !principalLocations.some(principalLocation => sameFamilyLocation(location, principalLocation)))
         .map(location => location.label);
-      if (uniqueLocations.length) {
-        const entry = `${memberRoute} – ${uniqueLocations.join(', ')}`;
-        addAdditionalEntry(memberRoute, uniqueLocations);
-      }
+       if (uniqueLocations.length) addAdditionalEntry(memberRoute, uniqueLocations);
       const profiles = (member.calendarProfileLabels ?? []).filter(label => label
         && !/^standard days$/i.test(label)
         && !/^calendar not confirmed$/i.test(label)
@@ -1882,7 +1924,8 @@ function plannerAnnotationTaxonomy(row) {
     const idSet = new Set(variant.sourceRecordIds ?? []);
     if ([...idSet].some(id => principalSourceIds.has(id))) continue;
     if (variant.sourceRecordIds?.length && [...idSet].every(id => duplicateIds.has(id))) continue;
-    const service = services.find(candidate => [...idSet].includes(serviceIdForPlanner(candidate)))
+    const service = services.find(candidate => [...idSet].includes(serviceIdForPlanner(candidate))
+      || (candidate.sourceRecordIds ?? []).some(sourceId => idSet.has(sourceId)))
       || services.find(candidate => text(candidate.routeNumber) === text(variant.routeNumber) && normal(plannerDestination(candidate)) === normal(variant.destination));
     const destination = text(variant.destination || plannerDestination(service));
     const origin = text(plannerOrigin(service));
@@ -1893,19 +1936,18 @@ function plannerAnnotationTaxonomy(row) {
     if ((variant.kind === 'short-working' && origin && normal(origin) !== mainOrigin)
       || (origin && normal(destination) === mainDestination && normal(origin) !== mainOrigin)) {
       const location = origin || destination;
-      shortWorkingEntries.push(Object.freeze({ routeNumber: route, location }));
-      addUnique(shortWorkings, `${route} – ${location}`);
+       addShortWorkingEntry(route, location, service, variant.kind);
     } else if (variant.kind === 'short-working' && destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
-      shortWorkingEntries.push(Object.freeze({ routeNumber: route, location: destination }));
-      addUnique(shortWorkings, `${route} – ${destination}`);
+       addShortWorkingEntry(route, destination, service, variant.kind);
     } else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
-      addAdditionalEntry(route, [destination], variant.kind);
+       addAdditionalEntry(route, [destination], variant.kind, service);
     }
     const qualification = variantCalendarQualification(service);
     if (qualification) addUnique(qualifications, `${route} – ${qualification}`);
   }
 
   if (!familyRow && !samePhysicalJourney) {
+    const shortWorkingSourceIds = new Set(row?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []);
     for (const service of services) {
       const id = serviceIdForPlanner(service);
       if (!id || duplicateIds.has(id)) continue;
@@ -1917,12 +1959,18 @@ function plannerAnnotationTaxonomy(row) {
       const route = service.routeNumber || row.routeNumber;
       const serviceKeys = plannerServiceDestinationKeys(service);
       const sameMainPlace = destination && sameStructuredPlannerPlace(mainDestinationKeys, serviceKeys);
-      if (originDiffers && destination && (normal(destination) === mainDestination || sameMainPlace)) {
-        shortWorkingEntries.push(Object.freeze({ routeNumber: route, location: origin }));
-        addUnique(shortWorkings, `${route} – ${origin}`);
+      const knownShortWorking = (service.sourceRecordIds ?? []).some(sourceId => shortWorkingSourceIds.has(sourceId));
+      if (knownShortWorking && originDiffers && destination && (normal(destination) === mainDestination || sameMainPlace)) {
+         addShortWorkingEntry(route, origin, service);
+      }
+      else if (knownShortWorking && destination && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
+         addShortWorkingEntry(route, destination, service, 'short-working');
+      }
+      else if (originDiffers && destination && (normal(destination) === mainDestination || sameMainPlace)) {
+         addShortWorkingEntry(route, origin, service);
       }
       else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
-        addAdditionalEntry(route, [destination]);
+         addAdditionalEntry(route, [destination], null, service);
       }
       const qualification = variantCalendarQualification(service);
       if (qualification) addUnique(qualifications, `${service.routeNumber || row.routeNumber} – ${qualification}`);
@@ -1943,27 +1991,46 @@ function plannerAnnotationTaxonomy(row) {
         ? unique([...(matchingVariant.endpointPlaceKeys ?? []), ...(matchingVariant.endpointStopPointIds ?? [])])
         : plannerServiceDestinationKeys(matchingService);
       const sameMainPlace = sameStructuredPlannerPlace(mainDestinationKeys, candidateKeys);
-      if (!sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
-        addAdditionalEntry(row.routeNumber, [destination], matchingVariant?.kind);
+      const isShortVariant = matchingVariant?.kind === 'short-working'
+        || (matchingService?.sourceRecordIds ?? []).some(sourceId => (row?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []).includes(sourceId));
+      if (isShortVariant && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
+         addShortWorkingEntry(row.routeNumber, destination, matchingService, 'short-working');
+      }
+      else if (!sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
+         addAdditionalEntry(row.routeNumber, [destination], matchingVariant?.kind, matchingService);
       }
     }
   }
 
   const rowQualification = materialServiceNote(row?.serviceNote);
   if (rowQualification && /school|term(?:[- ]time|[- ]only)|non-school|circular|holiday|calendar|operating days could not be fully confirmed/i.test(rowQualification)
-    && !(row?.circular && /circular service/i.test(rowQualification))
+    && !/circular service/i.test(rowQualification)
     && !qualifications.some(existing => normal(existing).includes(normal(rowQualification)))) addUnique(qualifications, rowQualification);
   const shortLocation = value => text(value).replace(/^[^–-]+[–-]\s*/u, '');
   const compactShortWorkings = shortWorkings.filter(candidate => !shortWorkings.some(other => other !== candidate
     && normal(shortLocation(other)).includes(normal(shortLocation(candidate)))));
+  // One ordered-pattern evidence item can have only one semantic display.
+  // Distinct patterns retain separate keys, so a real branch and a real short
+  // working may still coexist in the same public route row.
+  const additionalEvidenceKeys = new Set(additionalServiceEntries.map(entry => entry.evidenceKey).filter(Boolean));
+  const additionalLabels = new Set(additionalServiceEntries.flatMap(entry => entry.locations.map(location => `${normal(entry.routeNumber)}|${normal(location)}`)));
+  const exclusiveShortWorkingEntries = shortWorkingEntries.filter(entry => {
+    if (additionalEvidenceKeys.has(entry.evidenceKey)) return false;
+    const sameLabel = additionalLabels.has(`${normal(entry.routeNumber)}|${normal(entry.location)}`);
+    if (!sameLabel) return true;
+    const additional = additionalServiceEntries.find(candidate => candidate.routeNumber === entry.routeNumber
+      && candidate.locations.some(location => normal(location) === normal(entry.location)));
+    return Boolean(entry.patternComplete && additional?.patternComplete);
+  });
   const notes = Object.freeze({
     terminus: row?.terminusDecision?.proven && row.terminusDecision.terminalSides?.includes('origin')
       ? text(row.terminusDecision.assessedPlace) || null : null,
     additionalServices: additionalServiceEntries.length ? plannerAdditionalSentence(additionalServiceEntries) : (additionalServices.length ? additionalServices.join('; ') : null),
     additionalServiceEntries: Object.freeze(additionalServiceEntries),
-    shortWorkings: shortWorkingEntries.length ? plannerShortWorkingSentence(shortWorkingEntries) : (compactShortWorkings.length ? compactShortWorkings.join('; ') : null),
+    shortWorkings: exclusiveShortWorkingEntries.length ? plannerShortWorkingSentence(exclusiveShortWorkingEntries) : (additionalServiceEntries.length ? null : (compactShortWorkings.length ? compactShortWorkings.join('; ') : null)),
+    shortWorkingEntries: Object.freeze(exclusiveShortWorkingEntries),
     serviceQualification: qualifications.length ? qualifications.join('; ') : null,
-    circularService: row?.circular ? 'Circular service.' : null,
+    circularService: plannerCircularWording(row?.circularServiceDecision),
     reviewNote: row?.unresolvedPublicIdentity ? 'Destination requires review before formal use.' : null
   });
   return notes;
@@ -2080,12 +2147,22 @@ function attachRouteNotes(rows) {
       const row = group.at(-1).row;
       const additionalEntries = mergedAdditionalServiceEntries.map(({ __signature, ...entry }) => entry);
       const shortEntries = mergedShortWorkingEntries.map(({ __signature, ...entry }) => entry);
+      const additionalEvidenceKeys = new Set(additionalEntries.map(entry => entry.evidenceKey).filter(Boolean));
+      const additionalLabels = new Set(additionalEntries.flatMap(entry => entry.locations.map(location => `${normal(entry.routeNumber)}|${normal(location)}`)));
+      const exclusiveShortEntries = shortEntries.filter(entry => {
+        if (additionalEvidenceKeys.has(entry.evidenceKey)) return false;
+        const sameLabel = additionalLabels.has(`${normal(entry.routeNumber)}|${normal(entry.location)}`);
+        if (!sameLabel) return true;
+        const additional = additionalEntries.find(candidate => candidate.routeNumber === entry.routeNumber
+          && candidate.locations.some(location => normal(location) === normal(entry.location)));
+        return Boolean(entry.patternComplete && additional?.patternComplete);
+      });
       return Object.freeze({
         ...row.plannerNotes,
         additionalServices: additionalEntries.length ? plannerAdditionalSentence(additionalEntries) : row.plannerNotes?.additionalServices || null,
         additionalServiceEntries: Object.freeze(additionalEntries),
-        shortWorkings: shortEntries.length ? plannerShortWorkingSentence(shortEntries) : row.plannerNotes?.shortWorkings || null,
-        shortWorkingEntries: Object.freeze(shortEntries),
+        shortWorkings: exclusiveShortEntries.length ? plannerShortWorkingSentence(exclusiveShortEntries) : (additionalEntries.length ? null : row.plannerNotes?.shortWorkings || null),
+        shortWorkingEntries: Object.freeze(exclusiveShortEntries),
         serviceQualification: mergedQualifications.length ? mergedQualifications.join('; ') : row.plannerNotes?.serviceQualification || null
       });
     };

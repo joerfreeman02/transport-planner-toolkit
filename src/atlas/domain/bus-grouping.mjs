@@ -639,8 +639,14 @@ function terminusUnresolvedDecision(reason, assessedStops, principal, candidates
   });
 }
 
-export function makeTerminusDecision({ services = [], principal = services[0] || null, assessedStops = [], publicPlace = null } = {}) {
-  if (services.some(service => service?.circular) || principal?.circular) return Object.freeze({
+export function makeTerminusDecision({ services = [], principal = services[0] || null, assessedStops = [], publicPlace = null, circularDecision = null } = {}) {
+  // BUS-CIRC owns circular truth.  The legacy source flag remains accepted
+  // only for direct BUS-GROUP callers that have not supplied a decision; the
+  // production planner always passes the evidence-led decision explicitly.
+  const circularProven = circularDecision
+    ? circularDecision.classification === 'circular'
+    : services.some(service => service?.circular) || principal?.circular;
+  if (circularProven) return Object.freeze({
     type: 'TerminusDecision',
     status: 'not-assessed-endpoint',
     presentation: 'none',
@@ -650,7 +656,7 @@ export function makeTerminusDecision({ services = [], principal = services[0] ||
     terminalStopPointIds: Object.freeze([]),
     arrivalEvidence: Object.freeze([]),
     departureEvidence: Object.freeze([]),
-    reason: 'Circular classification is preserved and final circular semantics remain deferred; terminus suppression was not applied.',
+    reason: circularDecision?.reason || 'Circular classification is preserved; ordinary terminus-arrival suppression was not applied.',
     note: null,
     evidence: Object.freeze({ circularClassificationDeferred: true, principalSourceRecordId: serviceId(principal) || null })
   });

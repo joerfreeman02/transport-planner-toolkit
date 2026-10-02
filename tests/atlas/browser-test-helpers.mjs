@@ -48,5 +48,5 @@ export async function chooseFirstCandidateAndConfirm(page) {
   await page.getByRole('button', { name: 'Use this result' }).first().click();
   await page.locator('.assessment-point-marker').waitFor({ timeout: 5000 });
   await page.getByRole('button', { name: 'Confirm assessment point' }).click();
-  await page.getByText('Confirmed assessment point', { exact: true }).waitFor({ timeout: 5000 });
+  await page.locator('#siteStageSummary').waitFor({ state: 'visible', timeout: 5000 });
 }

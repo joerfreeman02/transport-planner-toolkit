@@ -60,15 +60,16 @@ try {
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.equal(await page.locator('#evidenceRows tr').count(), 2);
   assert.equal(await page.locator('#exportBusWord').isDisabled(), false);
-  assert.equal(await page.locator('#confirmedSite').isVisible(), true);
+  assert.equal(await page.locator('#siteStageSummary').isVisible(), true);
 
+  await page.getByRole('button', { name: 'Change assessment' }).click();
   await page.locator('#radius').fill('500');
   await page.locator('#stopStatus').waitFor({ timeout: 5000 });
   assert.equal(await page.locator('#stopStatus').innerText(), 'The assessment radius changed. Build the Bus assessment again to update the evidence.');
   assert.equal(await page.locator('#evidencePanel').isHidden(), true);
   assert.equal(await page.locator('#evidenceRows tr').count(), 0);
   assert.equal(await page.locator('#exportBusWord').isDisabled(), true);
-  assert.equal(await page.locator('#confirmedSite').isVisible(), true, 'radius edits retain the confirmed assessment point');
+  assert.equal(await page.locator('#siteStageSummary').isVisible(), true, 'radius edits retain the confirmed assessment point');
 
   await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
@@ -107,6 +108,7 @@ try {
   await expansionPage.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.equal(expansionStopRequests, 1, 'nearest assessment retains the nearest group after unresolved timetable evidence instead of expanding to a farther group');
   assert.doesNotMatch(await expansionPage.locator('#diagnostics').textContent(), /2000/);
+  await expansionPage.getByRole('button', { name: 'Change assessment' }).click();
   await expansionPage.locator('#radius').fill('550');
   assert.equal(await expansionPage.locator('#stopStatus').innerText(), 'The assessment radius changed. Build the Bus assessment again to update the evidence.');
   assert.equal(await expansionPage.locator('#evidencePanel').isHidden(), true);
@@ -156,6 +158,8 @@ try {
   await densePage.getByRole('button', { name: 'Continue full staged assessment' }).waitFor({ timeout: 20000 });
   assert.equal(await densePage.locator('#assessmentScope').isHidden(), false);
   assert.equal(await densePage.locator('#radius').inputValue(), '400');
+  const denseChangeAssessment = densePage.getByRole('button', { name: 'Change assessment' });
+  if (await denseChangeAssessment.isVisible()) await denseChangeAssessment.click();
   await densePage.locator('#radius').fill('500');
   assert.equal(await densePage.locator('#assessmentScope').isHidden(), true, 'radius change hides a stale dense scope preview');
   assert.equal(await densePage.getByRole('button', { name: 'Continue full staged assessment' }).count(), 0, 'radius change removes stale scope actions');

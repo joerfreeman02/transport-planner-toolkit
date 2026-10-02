@@ -44,8 +44,9 @@ assert.match(rowFor('66').plannerNotes.shortWorkings, /Hammond Street \(Smiths L
 
 for (const route of ['16', '16C']) {
   const row = rowFor(route);
-  assert.equal(row.plannerNotes.serviceQualification, null, `${route} circular truth is not repeated as a qualification`);
-  assert.equal(row.plannerNotes.circularService, 'Circular service.');
+  assert.equal(row.circular, false, `${route} does not expose the provisional source circular flag`);
+  assert.equal(row.circularServiceDecision.classification, 'unresolved-review', `${route} requires ordered-pattern review`);
+  assert.equal(row.plannerNotes.circularService, null, `${route} does not emit unsupported circular wording`);
 }
 for (const route of ['15', '66', '242', 'A1']) {
   const row = rowFor(route);
@@ -55,7 +56,7 @@ for (const route of ['15', '66', '242', 'A1']) {
 
 assert.match(wordNotes, /Additional services: Route 13A also serves St Margaret's Hospital/);
 assert.match(wordNotes, /route 13B also serves Railway Station/);
-assert.match(wordNotes, /Circular service: Circular service\./);
+assert.doesNotMatch(wordNotes, /Circular service: Circular service\./);
 assert.doesNotMatch(wordNotes, /Service qualification: Circular service/);
 assert.doesNotMatch(wordNotes, /Review note: Additional variants and short workings/);
 assert.doesNotMatch(wordNotes, /Service note: .*route terminus/);

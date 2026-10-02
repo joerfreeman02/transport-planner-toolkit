@@ -91,7 +91,9 @@ review controls, duplicate Additional/Short classification, and shared
 Browser/Word wording remain protected by the existing deterministic suites.
 The candidate-size delta and real Waltham/Pipers candidate replay remain
 pending raw frozen-source availability. The active prepared bank was not
-modified or activated.
+modified or activated. Its current derived size is 87,272,247 bytes across
+1,371 files; no candidate delta can be claimed without rebuilding from the
+missing raw snapshot.
 
 ## GitHub tooling review
 

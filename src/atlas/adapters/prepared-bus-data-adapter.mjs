@@ -61,6 +61,7 @@ export function normalisePreparedService(service = {}) {
     circularPatternStopIds: Array.isArray(service.circularPatternStopIds) ? service.circularPatternStopIds.map(String) : [],
     patternVariants: Array.isArray(service.patternVariants) ? service.patternVariants : [],
     frequencyEvidence: Array.isArray(service.frequencyEvidence) ? service.frequencyEvidence : [],
+    operatingPeriodEvidence: Array.isArray(service.operatingPeriodEvidence) ? service.operatingPeriodEvidence : [],
     timetableSource: String(service.timetableSource ?? '').trim() || null,
     qualifications: Array.isArray(service.qualifications) ? service.qualifications : [],
     stopSchedules

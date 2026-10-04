@@ -88,6 +88,7 @@ function mergeRecordSchedules(first, second) {
     departureEvidenceByDay: mergeDepartureEvidence(first.departureEvidenceByDay, second.departureEvidenceByDay),
     calendarProfileId: first.calendarProfileId || second.calendarProfileId || null,
     calendarEvidence: [...new Map(calendarEvidence.map(item => [JSON.stringify(item), item])).values()],
+    operatingPeriodEvidence: [...new Map([...(first.operatingPeriodEvidence ?? []), ...(second.operatingPeriodEvidence ?? [])].map(item => [JSON.stringify(item), item])).values()],
     serviceNotes: unique([...(first.serviceNotes ?? []), ...(second.serviceNotes ?? [])]),
     sourceWarnings: unique([...(first.sourceWarnings ?? []), ...(second.sourceWarnings ?? [])]),
     scheduleIntegrityWarnings: unique([...(first.scheduleIntegrityWarnings ?? []), ...(second.scheduleIntegrityWarnings ?? [])]),
@@ -158,6 +159,7 @@ function deduplicateServiceRecords(records = []) {
     const record = {
       ...raw,
       stopSchedules: Object.fromEntries(Object.entries(raw.stopSchedules ?? {}).map(([stopId, schedule]) => [stopId, normaliseSchedule(schedule, scheduleWarnings)])),
+      operatingPeriodEvidence: Array.isArray(raw.operatingPeriodEvidence) ? raw.operatingPeriodEvidence : [],
       scheduleIntegrityWarnings: unique([...(raw.scheduleIntegrityWarnings ?? []), ...scheduleWarnings])
     };
     const explicitIdentity = sourceJourneyIdentity(record);
@@ -178,9 +180,28 @@ export function formatClock(totalMinutes) {
 }
 
 export function calculateOperatingPeriods(departuresByDay = {}) {
+  return combineOperatingPeriodEvidence(departuresByDay).periods;
+}
+
+function evidenceBoundaries(evidenceByDay = {}, day) {
+  return (evidenceByDay?.[day] ?? []).flatMap(entry => {
+    if (Number.isFinite(Number(entry))) return [Number(entry)];
+    const from = Number(entry?.fromMinute);
+    const to = Number(entry?.toMinute);
+    return [from, to].filter(Number.isFinite);
+  });
+}
+
+export function combineOperatingPeriodEvidence(departuresByDay = {}, operatingPeriodEvidenceByDay = {}) {
   const periods = {};
+  const warnings = [];
   for (const day of DAY_ORDER) {
-    const values = ordered(departuresByDay[day] ?? []);
+    const exactValues = ordered(departuresByDay[day] ?? []);
+    const evidenceValues = ordered(evidenceBoundaries(operatingPeriodEvidenceByDay, day));
+    const materiallyConflicting = exactValues.length && evidenceValues.length
+      && (evidenceValues.at(-1) < exactValues[0] || evidenceValues[0] > exactValues.at(-1));
+    if (materiallyConflicting) warnings.push(`${day}: exact journey boundaries and operating-period evidence are materially disjoint; exact journey boundaries were retained and period evidence remains unresolved.`);
+    const values = materiallyConflicting ? exactValues : ordered([...exactValues, ...evidenceValues]);
     periods[day] = values.length ? Object.freeze({
       firstMinute: values[0],
       lastMinute: values.at(-1),
@@ -190,7 +211,7 @@ export function calculateOperatingPeriods(departuresByDay = {}) {
       departureCount: values.length
     }) : null;
   }
-  return Object.freeze(periods);
+  return Object.freeze({ periods: Object.freeze(periods), warnings: Object.freeze(warnings), state: warnings.length ? 'conflict' : 'resolved' });
 }
 
 function samePeriod(a, b) {
@@ -405,6 +426,43 @@ function representativeRecord(records, stopIds) {
   })[0];
 }
 
+function operatingPeriodScopeKey(record, entry) {
+  return [
+    text(entry?.provider || record?.timetableSource || record?.source?.provider),
+    text(record?.routeNumber),
+    text(record?.source?.lineId),
+    text(entry?.patternIdentity || record?.source?.intervalId || record?.id)
+  ].map(normal).join('|');
+}
+
+export function selectOperatingPeriodEvidence(records, stopId) {
+  const groups = new Map();
+  for (const record of records) for (const entry of record.operatingPeriodEvidence ?? []) {
+    if (text(entry?.stopPointId) !== text(stopId)) continue;
+    const key = operatingPeriodScopeKey(record, entry);
+    const group = groups.get(key) ?? [];
+    group.push(entry);
+    groups.set(key, group);
+  }
+  if (!groups.size) return { byDay: {}, warnings: [], state: 'absent' };
+  const signatures = [...groups.values()].map(entries => DAY_ORDER.map(day => {
+    const values = ordered(entries.filter(entry => text(entry.day) === day).flatMap(entry => [entry.fromMinute, entry.toMinute]));
+    return values.length ? `${values[0]}-${values.at(-1)}` : '';
+  }).join('|'));
+  const distinctSignatures = new Set(signatures);
+  if (distinctSignatures.size > 1) return {
+    byDay: {},
+    warnings: ['Operating-period evidence from different route/pattern identities was not combined because its service-day boundaries differ; review the source patterns separately.'],
+    state: 'conflict'
+  };
+  const entries = [...groups.values()].flat();
+  return {
+    byDay: Object.fromEntries(DAY_ORDER.map(day => [day, entries.filter(entry => text(entry.day) === day)])),
+    warnings: [],
+    state: 'resolved'
+  };
+}
+
 export function buildServiceSummaries(stops, serviceRecords) {
   const preparedRecords = deduplicateServiceRecords(serviceRecords);
   const selectedIds = new Set((stops ?? []).map(stop => text(stop.id || stop.sourceId)).filter(Boolean));
@@ -430,7 +488,9 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const frequencyStop = representativeStop(stops, records);
     const frequencyBasisStopId = text(frequencyStop?.id || frequencyStop?.sourceId) || stopIds[0] || null;
     const departuresByDay = mergeDepartures(records, frequencyBasisStopId ? [frequencyBasisStopId] : stopIds);
-    const periods = calculateOperatingPeriods(departuresByDay);
+    const operatingEvidence = selectOperatingPeriodEvidence(records, frequencyBasisStopId);
+    const combinedPeriods = combineOperatingPeriodEvidence(departuresByDay, operatingEvidence.byDay);
+    const periods = combinedPeriods.periods;
     const frequencyEvidence = records.flatMap(record => (record.frequencyEvidence ?? [])
       .filter(item => !item.stopPointId || item.stopPointId === frequencyBasisStopId)
       .map(item => ({ ...item, source: item.source || record.timetableSource || record.source?.provider || null })));
@@ -446,6 +506,8 @@ export function buildServiceSummaries(stops, serviceRecords) {
       ...records.flatMap(record => [...(record.serviceNotes ?? []), ...(record.qualifications ?? [])].map(plannerQualificationNote))
     ])
       .filter(note => qualificationAppliesToFinalRow(note, departuresByDay));
+    const operatingPeriodWarnings = unique([...operatingEvidence.warnings, ...combinedPeriods.warnings]);
+    if (operatingPeriodWarnings.length) notes.push(...operatingPeriodWarnings);
     const endpointPatterns = unique(records.map(record => `${text(record.origin)} → ${text(record.destination)}`));
     if (endpointPatterns.length > 1) notes.push('Includes scheduled short workings or route variants in this direction; the main origin/destination shown is the most extensive pattern in the source timetable.');
     if (records.some(record => record.circular)) notes.push('Circular service.');
@@ -509,6 +571,9 @@ export function buildServiceSummaries(stops, serviceRecords) {
       routePatternExtent: Math.max(0, ...records.map(record => orderedPatternEndpoints(record).length)),
       recordActivity: Math.max(0, ...records.map(record => recordActivity(record, stopIds))),
       operatingPeriods: periods,
+      operatingPeriodEvidence: Object.freeze(records.flatMap(record => (record.operatingPeriodEvidence ?? []).filter(item => !item.stopPointId || item.stopPointId === frequencyBasisStopId))),
+      operatingPeriodEvidenceState: operatingPeriodWarnings.length ? 'conflict' : operatingEvidence.state,
+      operatingPeriodReviewWarnings: Object.freeze(operatingPeriodWarnings),
       operatingPeriodLines: formatOperatingPeriod(periods),
       frequencyByDay,
       typicalFrequencyLines: formatTypicalFrequency(frequencyByDay),

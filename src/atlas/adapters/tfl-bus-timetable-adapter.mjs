@@ -131,6 +131,39 @@ function journeyMinutesAtStop(journey, stopPointId, responseDepartureStopId) {
   return journeyMinutes(journey);
 }
 
+function chronologicalPeriods(periods) {
+  let previousTo = null;
+  return (periods ?? []).map(period => {
+    const rawFromMinute = minutes(period?.fromTime);
+    const rawToMinute = minutes(period?.toTime);
+    if (!Number.isFinite(rawFromMinute) || !Number.isFinite(rawToMinute)) return null;
+    let fromMinute = rawFromMinute;
+    while (Number.isFinite(previousTo) && fromMinute < previousTo) fromMinute += 1440;
+    let toMinute = rawToMinute;
+    while (toMinute < fromMinute) toMinute += 1440;
+    previousTo = toMinute;
+    return {
+      periodType: text(period?.type) || 'Unknown',
+      fromMinute,
+      toMinute,
+      rawFromMinute,
+      rawToMinute,
+      rollover: fromMinute >= 1440 || toMinute >= 1440,
+      lowestFrequency: Number.isFinite(Number(period?.frequency?.lowestFrequency)) ? Number(period.frequency.lowestFrequency) : null,
+      highestFrequency: Number.isFinite(Number(period?.frequency?.highestFrequency)) ? Number(period.frequency.highestFrequency) : null
+    };
+  }).filter(Boolean);
+}
+
+function journeyMinuteInPeriodChronology(minute, periodEntries) {
+  if (!Number.isFinite(minute) || !periodEntries.length) return minute;
+  const firstPeriodMinute = periodEntries[0].fromMinute;
+  const lastPeriodMinute = periodEntries.at(-1).toMinute;
+  const crossesMidnight = firstPeriodMinute < 1440 && lastPeriodMinute >= 1440;
+  if (!crossesMidnight || minute >= firstPeriodMinute) return minute;
+  return minute + 1440;
+}
+
 function stationsForPattern(pattern, response) {
   const details = [...(Array.isArray(response?.stations) ? response.stations : []), ...(Array.isArray(response?.stops) ? response.stops : [])];
   const byId = new Map(details.map(station => [text(station?.id ?? station?.stopPointId ?? station?.naptanId), station]));
@@ -167,6 +200,7 @@ function scheduleForPattern(route, pattern, stopPointId, responseDepartureStopId
   const result = emptySchedule();
   const departureEvidence = Object.fromEntries(DAYS.map(day => [day, []]));
   const frequencyEvidence = [];
+  const operatingPeriodEvidence = [];
   const calendarEvidence = [];
   const profileBuckets = new Map();
   const schedules = Array.isArray(route?.schedules) ? route.schedules : [];
@@ -184,22 +218,24 @@ function scheduleForPattern(route, pattern, stopPointId, responseDepartureStopId
       schedule: emptySchedule(),
       departureEvidence: Object.fromEntries(DAYS.map(day => [day, []])),
       frequencyEvidence: [],
+      operatingPeriodEvidence: [],
       calendarEvidence: [],
       evidence: false
     });
     const profileBucket = profileBuckets.get(profileId);
     profileBucket.calendarEvidence.push(calendar);
+    const periodEntries = chronologicalPeriods(schedule?.periods);
     const journeys = Array.isArray(schedule?.knownJourneys) ? schedule.knownJourneys : [];
     const firstJourney = schedule?.firstJourney && belongsToPattern(schedule.firstJourney, pattern, pattern.count) ? schedule.firstJourney : null;
     const lastJourney = schedule?.lastJourney && belongsToPattern(schedule.lastJourney, pattern, pattern.count) ? schedule.lastJourney : null;
     const selectedKnown = journeys.filter(journey => belongsToPattern(journey, pattern, pattern.count));
     const entries = [...journeys, schedule?.firstJourney, schedule?.lastJourney].filter(Boolean);
     if (pattern.multiple && entries.some(journey => !text(journey?.intervalId))) ambiguous = true;
-    const first = journeyMinutesAtStop(firstJourney, stopPointId, responseDepartureStopId);
-    const last = journeyMinutesAtStop(lastJourney, stopPointId, responseDepartureStopId);
+    const first = journeyMinuteInPeriodChronology(journeyMinutesAtStop(firstJourney, stopPointId, responseDepartureStopId), periodEntries);
+    const last = journeyMinuteInPeriodChronology(journeyMinutesAtStop(lastJourney, stopPointId, responseDepartureStopId), periodEntries);
     if (selectedKnown.length && (!Number.isFinite(first) || !Number.isFinite(last))) chronologyIncomplete = true;
     const overnight = Number.isFinite(first) && Number.isFinite(last) && last < first;
-    const departureEntries = [...selectedKnown.map(journey => ({ journey, minute: journeyMinutesAtStop(journey, stopPointId, responseDepartureStopId) })), ...(firstJourney ? [{ journey: firstJourney, minute: first }] : []), ...(lastJourney ? [{ journey: lastJourney, minute: last }] : [])]
+    const departureEntries = [...selectedKnown.map(journey => ({ journey, minute: journeyMinuteInPeriodChronology(journeyMinutesAtStop(journey, stopPointId, responseDepartureStopId), periodEntries) })), ...(firstJourney ? [{ journey: firstJourney, minute: first }] : []), ...(lastJourney ? [{ journey: lastJourney, minute: last }] : [])]
       .filter(entry => Number.isFinite(entry.minute));
     const departures = departureEntries.map(entry => overnight && entry.minute < first && entry.minute <= last ? entry.minute + 1440 : entry.minute);
     if (departures.length) evidence = true;
@@ -219,27 +255,41 @@ function scheduleForPattern(route, pattern, stopPointId, responseDepartureStopId
       profileBucket.departureEvidence[day].push(...entries);
       profileBucket.evidence ||= departures.length > 0;
     }
-    for (const period of Array.isArray(schedule?.periods) ? schedule.periods : []) {
-      const lowestFrequency = Number(period?.frequency?.lowestFrequency);
-      const highestFrequency = Number(period?.frequency?.highestFrequency);
-      const fromMinute = minutes(period?.fromTime);
-      const toMinute = minutes(period?.toTime);
-      const periodType = text(period?.type) || 'Unknown';
-      if (!Number.isFinite(lowestFrequency) || !Number.isFinite(highestFrequency)) continue;
+    for (const period of periodEntries) {
       for (const day of calendar.days) {
         const entry = {
-        periodType,
+        periodType: period.periodType,
         day,
-        fromMinute,
-        toMinute,
-        lowestFrequency,
-        highestFrequency,
+        fromMinute: period.fromMinute,
+        toMinute: period.toMinute,
+        rawFromMinute: period.rawFromMinute,
+        rawToMinute: period.rawToMinute,
+        lowestFrequency: period.lowestFrequency,
+        highestFrequency: period.highestFrequency,
         stopPointId,
+        provider: 'TfL',
         source: 'TfL',
-        calendarProfileId: profileId
+        calendarProfileId: profileId,
+        patternIdentity: pattern.sourceId || null,
+        rollover: period.rollover,
+        evidenceBasis: 'TfL periods.fromTime/toTime operating-span evidence'
         };
-        frequencyEvidence.push(entry);
-        profileBucket.frequencyEvidence.push(entry);
+        operatingPeriodEvidence.push(entry);
+        profileBucket.operatingPeriodEvidence.push(entry);
+        if (!Number.isFinite(period.lowestFrequency) || !Number.isFinite(period.highestFrequency)) continue;
+        const frequencyEntry = {
+          periodType: period.periodType,
+          day,
+          fromMinute: period.rawFromMinute,
+          toMinute: period.rawToMinute,
+          lowestFrequency: period.lowestFrequency,
+          highestFrequency: period.highestFrequency,
+          stopPointId,
+          source: 'TfL',
+          calendarProfileId: profileId
+        };
+        frequencyEvidence.push(frequencyEntry);
+        profileBucket.frequencyEvidence.push(frequencyEntry);
       }
     }
   }
@@ -258,8 +308,8 @@ function scheduleForPattern(route, pattern, stopPointId, responseDepartureStopId
     && buckets.some((bucket, index) => buckets.slice(index + 1).some(other => calendarProfilesMutuallyExclusive(bucket.calendarEvidence[0], other.calendarEvidence[0])));
   const profiles = splitByCalendarProfile
     ? buckets.filter(bucket => bucket.evidence)
-    : [{ calendarProfileId: buckets.length === 1 ? buckets[0].calendarProfileId : null, schedule: result, departureEvidence, frequencyEvidence: frequencyEvidence.map(({ calendarProfileId, ...entry }) => entry), calendarEvidence, evidence }];
-  return { schedule: result, departureEvidence, frequencyEvidence, calendarEvidence, profiles, splitByCalendarProfile, evidence, ambiguous, hasPeriods, chronologyIncomplete };
+    : [{ calendarProfileId: buckets.length === 1 ? buckets[0].calendarProfileId : null, schedule: result, departureEvidence, frequencyEvidence: frequencyEvidence.map(({ calendarProfileId, ...entry }) => entry), operatingPeriodEvidence, calendarEvidence, evidence }];
+  return { schedule: result, departureEvidence, frequencyEvidence, operatingPeriodEvidence, calendarEvidence, profiles, splitByCalendarProfile, evidence, ambiguous, hasPeriods, chronologyIncomplete };
 }
 
 function sectionsFromMetadata(data, lineId) {
@@ -330,7 +380,7 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         ? 'TfL route metadata did not establish one complete route identity for this timetable pattern. ATLAS retained the scheduled pattern without inventing full origin or destination.'
         : 'TfL route metadata could not be checked. ATLAS retained the scheduled pattern without inventing full origin or destination.');
       const hasPeriods = timing.hasPeriods;
-      const profileTimings = timing.profiles ?? [{ calendarProfileId: null, schedule: timing.schedule, departureEvidence: timing.departureEvidence, frequencyEvidence: timing.frequencyEvidence, calendarEvidence: timing.calendarEvidence, evidence: timing.evidence }];
+      const profileTimings = timing.profiles ?? [{ calendarProfileId: null, schedule: timing.schedule, departureEvidence: timing.departureEvidence, frequencyEvidence: timing.frequencyEvidence, operatingPeriodEvidence: timing.operatingPeriodEvidence, calendarEvidence: timing.calendarEvidence, evidence: timing.evidence }];
       for (const profileTiming of profileTimings) services.push({
         id: `tfl:${lineId}:${normal(direction)}:${normal(pattern.id || `pattern-${index + 1}`)}${timing.splitByCalendarProfile ? `:calendar:${normal(profileTiming.calendarProfileId)}` : ''}`,
         routeNumber: lineName || lineId,
@@ -345,7 +395,7 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
           ...(departureStopConfirmed && !hasRequestedStop ? [stopPointId] : []),
           ...pattern.stations.map(station => station.id)
         ],
-        operatingPeriodEvidence: hasPeriods,
+        operatingPeriodEvidence: profileTiming.operatingPeriodEvidence ?? [],
         stopSchedules: { [stopPointId]: profileTiming.schedule },
         departureEvidenceByDay: profileTiming.departureEvidence,
         frequencyEvidence: profileTiming.frequencyEvidence,
@@ -357,7 +407,7 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         serviceNotes: calendarQualificationNotes(profileTiming.calendarEvidence),
         sourceWarnings: profileTiming.calendarEvidence.filter(calendar => !calendar.resolved).map(calendar => `TfL timetable period "${calendar.sourceCalendarLabel}" could not be safely mapped to operating days; no unverified days were fabricated.`),
         qualifications: [
-          ...(hasPeriods ? ['TfL supplied operating-period/frequency evidence; ATLAS retained only exact scheduled journeys and first/last journey boundaries, without synthesising departures from frequency ranges.'] : []),
+          ...(hasPeriods ? ['TfL supplied operating-period/frequency evidence; ATLAS retained the structured period boundaries separately from exact scheduled journeys, without synthesising departures from frequency ranges.'] : []),
           ...(!identity ? ['Full TfL route origin and destination were not deterministically established for this selected-stop timetable pattern.'] : [])
         ],
         validFrom: identity?.validFrom ?? null,

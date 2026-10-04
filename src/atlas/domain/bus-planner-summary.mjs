@@ -2,10 +2,12 @@ import {
   DAY_ORDER,
   LIMITED_SERVICE_JOURNEY_THRESHOLD,
   calculateOperatingPeriods,
+  combineOperatingPeriodEvidence,
   calculateTypicalServiceFrequency,
   formatOperatingPeriod,
   formatTypicalFrequency,
-  formatServiceOriginDestination
+  formatServiceOriginDestination,
+  selectOperatingPeriodEvidence
 } from './bus-service-assessment.mjs';
 import { calendarProfileLabel, deriveCalendarProfileId } from './service-calendar.mjs';
 import {
@@ -800,6 +802,13 @@ function profileFrequencyEvidence(component, representativeId, profileId) {
     .filter(item => calendarProfileFromEntry(service, item) === profileId));
 }
 
+function profileOperatingPeriodEvidence(component, representativeId, profileId) {
+  const records = component.filter(service => serviceAtRepresentative(service, representativeId));
+  const selected = selectOperatingPeriodEvidence(records, representativeId);
+  const byDay = Object.fromEntries(DAY_ORDER.map(day => [day, (selected.byDay?.[day] ?? []).filter(item => text(item?.calendarProfileId).toLowerCase() === text(profileId).toLowerCase())]));
+  return { byDay, warnings: selected.warnings, state: selected.state };
+}
+
 function profileEligibleServices(component, representativeId, profileId) {
   return component.filter(service => serviceAtRepresentative(service, representativeId)
     && serviceDepartureEntries(service, representativeId).some(entry => {
@@ -811,17 +820,23 @@ function profileEligibleServices(component, representativeId, profileId) {
 function calculateProfileResult(component, representativeId, profileId, partition) {
   const eligible = profileEligibleServices(component, representativeId, profileId);
   const evidence = profileFrequencyEvidence(eligible.length ? eligible : component, representativeId, profileId);
+  const operatingEvidence = profileOperatingPeriodEvidence(eligible.length ? eligible : component, representativeId, profileId);
   const calculationEvidence = eligible.length <= 1 || eligible.every(service => (service.frequencyEvidence ?? [])
     .some(item => (!item.stopPointId || text(item.stopPointId) === representativeId) && calendarProfileFromEntry(service, item) === profileId)) ? evidence : [];
   const frequencyByDay = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, calculateTypicalServiceFrequency(partition.schedules[day], { day, frequencyEvidence: calculationEvidence })])));
+  const combinedPeriods = combineOperatingPeriodEvidence(partition.schedules, operatingEvidence.byDay);
+  const periodWarnings = [...operatingEvidence.warnings, ...combinedPeriods.warnings];
   return Object.freeze({
     entries: Object.freeze(partition.entries),
     schedules: Object.freeze(partition.schedules),
-    periods: calculateOperatingPeriods(partition.schedules),
+    periods: combinedPeriods.periods,
     frequencyByDay,
     frequencyLines: Object.freeze(formatTypicalFrequency(frequencyByDay)),
-    operatingLines: Object.freeze(formatOperatingPeriod(calculateOperatingPeriods(partition.schedules))),
-    frequencyEvidence: Object.freeze(evidence)
+    operatingLines: Object.freeze(formatOperatingPeriod(combinedPeriods.periods)),
+    frequencyEvidence: Object.freeze(evidence),
+    operatingPeriodEvidence: Object.freeze(Object.values(operatingEvidence.byDay).flat()),
+    operatingPeriodEvidenceState: periodWarnings.length ? 'conflict' : operatingEvidence.state,
+    operatingPeriodReviewWarnings: Object.freeze(periodWarnings)
   });
 }
 
@@ -1305,6 +1320,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   if (mixedProfileOutput) profileNotes.push('Calendar profiles vary; each frequency line is labelled.');
   if (unresolvedNeedsQualification) profileNotes.push('Operating days could not be fully confirmed; check the timetable before use.');
   const notes = materialServiceNotesForComponent(component, displayResult.schedules);
+  notes.push(...displayResult.operatingPeriodReviewWarnings);
   notes.push(...profileNotes);
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
   const groupingDecision = Object.freeze({
@@ -1363,8 +1379,12 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     calendarDeparturePopulationByProfile: profilePopulations,
     calendarFrequencyByProfile: profileFrequency,
     calendarOperatingPeriodsByProfile: profilePeriods,
+    calendarOperatingPeriodEvidenceByProfile: Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).operatingPeriodEvidence]))),
     calendarFrequencyEvidenceByProfile: profileEvidence,
     frequencyEvidence: Object.freeze(displayResult.frequencyEvidence),
+    operatingPeriodEvidence: Object.freeze(displayResult.operatingPeriodEvidence),
+    operatingPeriodEvidenceState: displayResult.operatingPeriodEvidenceState,
+    operatingPeriodReviewWarnings: Object.freeze(displayResult.operatingPeriodReviewWarnings),
     serviceNote: unique(notes).join(' '),
     routeGroupKey: routeGroupKey(main),
     publicRouteFamilyKey: publicRouteFamilyKey || routeGroupKey(main),

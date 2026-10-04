@@ -3,9 +3,11 @@ import { readFile } from 'node:fs/promises';
 import {
   buildServiceSummaries,
   combineOperatingPeriodEvidence,
-  formatOperatingPeriod
+  formatOperatingPeriod,
+  selectOperatingPeriodEvidence
 } from '../../src/atlas/domain/bus-service-assessment.mjs';
 import { createTflBusTimetableAdapter } from '../../src/atlas/adapters/tfl-bus-timetable-adapter.mjs';
+import { buildPlannerBusServiceSummaries } from '../../src/atlas/domain/bus-planner-summary.mjs';
 import { createJsonCache, createMemoryStorage } from '../../src/atlas/infrastructure/cache.mjs';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
@@ -66,8 +68,45 @@ const patternRecords = [
   { id: 'pattern-b', routeNumber: 'P', operator: 'TfL', origin: 'A', destination: 'B', direction: 'B', timetableSource: 'TfL', routePatternStopIds: ['STOP', 'B'], stopSchedules: { STOP: schedule({ monday: [1000, 1200] }) }, operatingPeriodEvidence: [{ provider: 'TfL', stopPointId: 'STOP', patternIdentity: 'b', calendarProfileId: 'ordinary', day: 'monday', fromMinute: 1000, toMinute: 1200 }] }
 ];
 const [patternSummary] = buildServiceSummaries([{ id: 'STOP' }], patternRecords);
-assert.equal(patternSummary.operatingPeriodEvidenceState, 'conflict');
-assert.match(patternSummary.operatingPeriodReviewWarnings.join(' '), new RegExp('different route/pattern identities'));
+assert.equal(patternSummary.operatingPeriodEvidenceState, 'resolved');
+assert.deepEqual([patternSummary.operatingPeriods.monday.firstMinute, patternSummary.operatingPeriods.monday.lastMinute], [300, 1200], 'compatible TfL patterns contribute their union');
+const oppositePatternEvidence = selectOperatingPeriodEvidence([
+  patternRecords[0],
+  { ...patternRecords[1], direction: 'reverse', origin: 'B', destination: 'A' }
+], 'STOP');
+assert.equal(oppositePatternEvidence.state, 'conflict');
+assert.match(oppositePatternEvidence.warnings.join(' '), new RegExp('different route/pattern identities'));
+
+const mixedRecords = [
+  {
+    id: 'tfl-217', routeNumber: '217', operator: 'Shared operator', origin: 'Origin', destination: 'Terminus', direction: 'Terminus',
+    timetableSource: 'TfL', frequencyBasisStopId: 'STOP', stopSchedules: { STOP: schedule({ monday: [290, 1465] }) },
+    operatingPeriodEvidence: [{ provider: 'TfL', stopPointId: 'STOP', patternIdentity: 'tfl-217', calendarProfileId: 'ordinary', day: 'monday', fromMinute: 240, toMinute: 1499 }]
+  },
+  {
+    id: 'bods-217', routeNumber: '217', operator: 'Shared operator', origin: 'Origin', destination: 'Terminus', direction: 'Terminus',
+    timetableSource: 'BODS', frequencyBasisStopId: 'STOP', stopSchedules: { STOP: schedule({ monday: [5, 25, 290, 1465] }) }
+  }
+];
+const [mixedSummary] = buildServiceSummaries([{ id: 'STOP', name: 'Control stop', distanceMetres: 10 }], mixedRecords);
+assert.deepEqual([mixedSummary.operatingPeriods.monday.firstMinute, mixedSummary.operatingPeriods.monday.lastMinute], [240, 1499], 'TfL operating span beats supplementary exact departures');
+assert.deepEqual(mixedSummary.departuresByDay.monday.slice(0, 2), [5, 25], 'supplementary departures remain retained for audit/frequency');
+assert.match(mixedSummary.operatingPeriodReviewWarnings.join(' '), /retained for audit/);
+assert.equal(mixedSummary.operatingPeriodAuthority.provider, 'TfL');
+assert.deepEqual(mixedSummary.operatingPeriodAuthority.supplementaryProviders, ['BODS']);
+const [mixedPlannerRow] = buildPlannerBusServiceSummaries([mixedSummary], [{ id: 'STOP', name: 'Control stop', distanceMetres: 10 }]);
+assert.deepEqual([mixedPlannerRow.operatingPeriodLines[0], mixedPlannerRow.operatingPeriodLines[1]], ['Mon: Approx. 04:00–00:59 (next day)', 'Tue-Sun: No scheduled service']);
+
+const singleJourney = [{
+  id: 'tfl-657-single', routeNumber: '657', operator: 'TfL', origin: 'Grove Road', destination: 'Chingford', direction: 'Chingford',
+  timetableSource: 'TfL', calendarProfileId: 'school-day', frequencyBasisStopId: 'STOP', stopSchedules: { STOP: schedule({ monday: [421], tuesday: [421], wednesday: [421], thursday: [421], friday: [421] }) },
+  operatingPeriodEvidence: DAYS.slice(0, 5).map(day => ({ provider: 'TfL', stopPointId: 'STOP', calendarProfileId: 'school-day', day, fromMinute: 420, toMinute: 479 }))
+}];
+const [singleSummary] = buildServiceSummaries([{ id: 'STOP', name: 'Grove Road', distanceMetres: 10 }], singleJourney);
+assert.equal(singleSummary.operatingPeriods.monday.firstMinute, 421);
+assert.equal(singleSummary.operatingPeriods.monday.lastMinute, 421);
+assert.equal(singleSummary.operatingPeriodLines[0], 'Mon-Fri: Departs approx. 07:01');
+assert.equal(singleSummary.operatingPeriodEvidence[0].fromMinute, 420, 'broad TfL period remains technically retained');
 
 const rollover = combineOperatingPeriodEvidence({ monday: [1430, 1460] }, { monday: [{ fromMinute: 1430, toMinute: 1460 }] });
 assert.equal(rollover.periods.monday.last, '00:20');
@@ -107,5 +146,36 @@ const [summary317] = buildServiceSummaries([{ id: diagnostic.requestedStopPointI
 assert.equal(summary317.operatingPeriods.monday.overnight, true);
 assert.equal(summary317.operatingPeriods.monday.first, '05:00');
 assert.equal(summary317.operatingPeriods.monday.lastMinute >= 1440, true);
+
+const stopADiagnostic = JSON.parse(await readFile(new URL('./fixtures/tfl-waltham-stop-a-operating-period-1a.json', import.meta.url), 'utf8'));
+const stopAAdapter = createTflBusTimetableAdapter({
+  cache: createJsonCache({ storage: createMemoryStorage(), namespace: 'tfl-operating-period-1a-stop-a-fixture' }),
+  fetchImpl: async url => {
+    const value = String(url);
+    if (value.includes('/Route')) return response([]);
+    const line = decodeURIComponent(value.match(/\/Line\/([^/]+)\/Timetable/)?.[1] ?? '');
+    const request = stopADiagnostic.requests.find(item => item.lineId.toLowerCase() === line.toLowerCase());
+    if (!request) return new Response('not found', { status: 404 });
+    const body = structuredClone(request.response);
+    const stations = body.timetable.routes.flatMap(route => route.stationIntervals.flatMap(pattern => pattern.intervals.map(interval => ({ id: interval.stopId, name: interval.stopId }))));
+    body.stations = stations;
+    body.stops = stations;
+    return response(body);
+  }
+});
+for (const route of ['217', '317', '327']) {
+  const result = await stopAAdapter.servicesForStop({ lineId: route, stopPointId: stopADiagnostic.requestedStopPointId });
+  assert.equal(result.ok, true, `${route} Stop A fixture resolves`);
+  assert.ok(result.data.some(service => service.operatingPeriodEvidence.some(item => item.stopPointId === stopADiagnostic.requestedStopPointId)), `${route} has Stop A TfL period evidence`);
+}
+const stopA217 = await stopAAdapter.servicesForStop({ lineId: '217', stopPointId: stopADiagnostic.requestedStopPointId });
+const [stopA217Summary] = buildServiceSummaries([{ id: stopADiagnostic.requestedStopPointId }], stopA217.data);
+assert.ok(stopA217Summary.operatingPeriods.monday.firstMinute >= 240 && stopA217Summary.operatingPeriods.monday.firstMinute < 360, '217 Stop A keeps the official daytime start');
+assert.ok(stopA217Summary.operatingPeriods.monday.lastMinute >= 1440, '217 Stop A keeps the after-midnight finish');
+
+const stopA317 = await stopAAdapter.servicesForStop({ lineId: '317', stopPointId: stopADiagnostic.requestedStopPointId });
+const [stopA317Summary] = buildServiceSummaries([{ id: stopADiagnostic.requestedStopPointId }], stopA317.data);
+assert.ok(stopA317Summary.operatingPeriods.monday.firstMinute >= 300 && stopA317Summary.operatingPeriods.monday.firstMinute < 360, '317 Stop A keeps the official morning start');
+assert.ok(stopA317Summary.operatingPeriods.monday.lastMinute >= 1440, '317 Stop A keeps the after-midnight finish');
 
 console.log('PASS TfL operating-period evidence, service-day chronology, conflict isolation and Waltham diagnostic fixture tests.');

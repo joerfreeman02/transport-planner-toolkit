@@ -7,7 +7,8 @@ import {
   formatOperatingPeriod,
   formatTypicalFrequency,
   formatServiceOriginDestination,
-  selectOperatingPeriodEvidence
+  selectOperatingPeriodEvidence,
+  selectAuthoritativeDepartureEvidence
 } from './bus-service-assessment.mjs';
 import { calendarProfileLabel, deriveCalendarProfileId } from './service-calendar.mjs';
 import {
@@ -805,7 +806,11 @@ function profileFrequencyEvidence(component, representativeId, profileId) {
 function profileOperatingPeriodEvidence(component, representativeId, profileId) {
   const records = component.filter(service => serviceAtRepresentative(service, representativeId));
   const selected = selectOperatingPeriodEvidence(records, representativeId);
-  const byDay = Object.fromEntries(DAY_ORDER.map(day => [day, (selected.byDay?.[day] ?? []).filter(item => text(item?.calendarProfileId).toLowerCase() === text(profileId).toLowerCase())]));
+  const targetProfile = text(profileId).toLowerCase();
+  const byDay = Object.fromEntries(DAY_ORDER.map(day => [day, (selected.byDay?.[day] ?? []).filter(item => {
+    const itemProfile = text(item?.calendarProfileId).toLowerCase();
+    return itemProfile === targetProfile || (!targetProfile && (!itemProfile || itemProfile === 'ordinary'));
+  })]));
   return { byDay, warnings: selected.warnings, state: selected.state };
 }
 
@@ -824,8 +829,12 @@ function calculateProfileResult(component, representativeId, profileId, partitio
   const calculationEvidence = eligible.length <= 1 || eligible.every(service => (service.frequencyEvidence ?? [])
     .some(item => (!item.stopPointId || text(item.stopPointId) === representativeId) && calendarProfileFromEntry(service, item) === profileId)) ? evidence : [];
   const frequencyByDay = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, calculateTypicalServiceFrequency(partition.schedules[day], { day, frequencyEvidence: calculationEvidence })])));
-  const combinedPeriods = combineOperatingPeriodEvidence(partition.schedules, operatingEvidence.byDay);
-  const periodWarnings = [...operatingEvidence.warnings, ...combinedPeriods.warnings];
+  const operatingPopulation = selectAuthoritativeDepartureEvidence(Object.fromEntries(DAY_ORDER.map(day => [
+    day,
+    partition.entries.filter(entry => entry.day === day)
+  ])));
+  const combinedPeriods = combineOperatingPeriodEvidence(operatingPopulation.schedules, operatingEvidence.byDay);
+  const periodWarnings = [...operatingPopulation.warnings, ...operatingEvidence.warnings, ...combinedPeriods.warnings];
   return Object.freeze({
     entries: Object.freeze(partition.entries),
     schedules: Object.freeze(partition.schedules),
@@ -836,7 +845,13 @@ function calculateProfileResult(component, representativeId, profileId, partitio
     frequencyEvidence: Object.freeze(evidence),
     operatingPeriodEvidence: Object.freeze(Object.values(operatingEvidence.byDay).flat()),
     operatingPeriodEvidenceState: periodWarnings.length ? 'conflict' : operatingEvidence.state,
-    operatingPeriodReviewWarnings: Object.freeze(periodWarnings)
+    operatingPeriodReviewWarnings: Object.freeze(periodWarnings),
+    operatingPeriodAuthority: Object.freeze({
+      provider: operatingPopulation.authoritativeProvider || operatingPopulation.provider,
+      supplementaryProviders: Object.freeze(unique(DAY_ORDER.flatMap(day => operatingPopulation.supplementaryByDay[day].map(entry => entry?.provider)))),
+      supplementaryDepartureEvidenceRetained: Object.freeze(operatingPopulation.supplementaryByDay),
+      warnings: Object.freeze(operatingPopulation.warnings)
+    })
   });
 }
 

@@ -202,13 +202,20 @@ export function combineOperatingPeriodEvidence(departuresByDay = {}, operatingPe
       && (evidenceValues.at(-1) < exactValues[0] || evidenceValues[0] > exactValues.at(-1));
     if (materiallyConflicting) warnings.push(`${day}: exact journey boundaries and operating-period evidence are materially disjoint; exact journey boundaries were retained and period evidence remains unresolved.`);
     const values = materiallyConflicting ? exactValues : ordered([...exactValues, ...evidenceValues]);
-    periods[day] = values.length ? Object.freeze({
-      firstMinute: values[0],
-      lastMinute: values.at(-1),
-      first: formatClock(values[0]),
-      last: formatClock(values.at(-1)),
-      overnight: values.at(-1) >= 1440,
-      departureCount: values.length
+    const singleExactDeparture = exactValues.length === 1;
+    const displayValues = singleExactDeparture ? exactValues : values;
+    periods[day] = displayValues.length ? Object.freeze({
+      firstMinute: displayValues[0],
+      lastMinute: displayValues.at(-1),
+      first: formatClock(displayValues[0]),
+      last: formatClock(displayValues.at(-1)),
+      overnight: displayValues.at(-1) >= 1440,
+      departureCount: exactValues.length || displayValues.length,
+      exactDepartureCount: exactValues.length,
+      exactDepartureMinute: singleExactDeparture ? exactValues[0] : null,
+      singleExactDeparture,
+      evidenceFirstMinute: values[0],
+      evidenceLastMinute: values.at(-1)
     }) : null;
   }
   return Object.freeze({ periods: Object.freeze(periods), warnings: Object.freeze(warnings), state: warnings.length ? 'conflict' : 'resolved' });
@@ -293,6 +300,58 @@ function mergeDepartures(records, stopIds) {
   }
   for (const day of DAY_ORDER) merged[day] = numeric(merged[day]);
   return merged;
+}
+
+function scheduleFromDepartureEvidence(evidenceByDay = {}) {
+  return Object.fromEntries(DAY_ORDER.map(day => [day, numeric((evidenceByDay?.[day] ?? []).map(entry => entry?.minute))]));
+}
+
+function providerOfDepartureEvidence(entry) {
+  return normal(entry?.provider);
+}
+
+function supplementaryDepartureWarning(provider, day, authoritative, supplementary) {
+  const authoritativeStart = authoritative[0];
+  const authoritativeEnd = authoritative.at(-1);
+  const outside = supplementary.filter(value => value < authoritativeStart || value > authoritativeEnd);
+  const materiallyOutside = outside.some(value => Math.min(Math.abs(value - authoritativeStart), Math.abs(value - authoritativeEnd)) >= 60);
+  if (!materiallyOutside) return null;
+  return `${day}: ${provider || 'Supplementary'} departure evidence was retained for audit but not used to define the TfL operating period because it materially extends beyond the authoritative TfL service-day span.`;
+}
+
+export function selectAuthoritativeDepartureEvidence(departureEvidenceByDay = {}) {
+  const allEntries = Object.fromEntries(DAY_ORDER.map(day => [day, Array.isArray(departureEvidenceByDay?.[day]) ? departureEvidenceByDay[day] : []]));
+  const hasTfL = DAY_ORDER.some(day => allEntries[day].some(entry => providerOfDepartureEvidence(entry) === 'tfl'));
+  const authoritativeProvider = hasTfL ? 'TfL' : null;
+  const authoritative = Object.fromEntries(DAY_ORDER.map(day => [day, hasTfL
+    ? allEntries[day].filter(entry => providerOfDepartureEvidence(entry) === 'tfl')
+    : allEntries[day]]));
+  const supplementary = Object.fromEntries(DAY_ORDER.map(day => [day, hasTfL
+    ? allEntries[day].filter(entry => providerOfDepartureEvidence(entry) !== 'tfl')
+    : []]));
+  const warnings = [];
+  if (hasTfL) for (const day of DAY_ORDER) {
+    const authoritativeMinutes = numeric(authoritative[day].map(entry => entry?.minute));
+    const supplementaryMinutes = numeric(supplementary[day].map(entry => entry?.minute));
+    if (!authoritativeMinutes.length || !supplementaryMinutes.length) continue;
+    const warning = supplementaryDepartureWarning(
+      unique(supplementary[day].map(entry => entry?.provider))[0],
+      day,
+      authoritativeMinutes,
+      supplementaryMinutes
+    );
+    if (warning) warnings.push(warning);
+  }
+  return Object.freeze({
+    provider: authoritativeProvider || unique(DAY_ORDER.flatMap(day => allEntries[day].map(entry => entry?.provider))).join(' + ') || null,
+    authoritativeProvider,
+    authoritativeByDay: Object.freeze(authoritative),
+    supplementaryByDay: Object.freeze(supplementary),
+    allByDay: Object.freeze(allEntries),
+    schedules: Object.freeze(scheduleFromDepartureEvidence(authoritative)),
+    warnings: Object.freeze(warnings),
+    state: warnings.length ? 'conflict' : 'resolved'
+  });
 }
 
 function departureEvidenceForRecords(records, stopId) {
@@ -431,20 +490,31 @@ function operatingPeriodScopeKey(record, entry) {
     text(entry?.provider || record?.timetableSource || record?.source?.provider),
     text(record?.routeNumber),
     text(record?.source?.lineId),
-    text(entry?.patternIdentity || record?.source?.intervalId || record?.id)
+    text(record?.direction || record?.destination || record?.origin),
+    text(record?.origin),
+    text(record?.destination),
+    text(entry?.calendarProfileId || record?.calendarProfileId || record?.source?.calendarProfileId || 'ordinary')
   ].map(normal).join('|');
 }
 
 export function selectOperatingPeriodEvidence(records, stopId) {
-  const groups = new Map();
+  const candidates = [];
   for (const record of records) for (const entry of record.operatingPeriodEvidence ?? []) {
     if (text(entry?.stopPointId) !== text(stopId)) continue;
+    candidates.push({ record, entry });
+  }
+  if (!candidates.length) return { byDay: {}, warnings: [], state: 'absent', authority: null };
+  const hasTfL = candidates.some(({ record, entry }) => normal(entry?.provider || record?.timetableSource || record?.source?.provider) === 'tfl');
+  const retained = hasTfL
+    ? candidates.filter(({ record, entry }) => normal(entry?.provider || record?.timetableSource || record?.source?.provider) === 'tfl')
+    : candidates;
+  const groups = new Map();
+  for (const { record, entry } of retained) {
     const key = operatingPeriodScopeKey(record, entry);
     const group = groups.get(key) ?? [];
     group.push(entry);
     groups.set(key, group);
   }
-  if (!groups.size) return { byDay: {}, warnings: [], state: 'absent' };
   const signatures = [...groups.values()].map(entries => DAY_ORDER.map(day => {
     const values = ordered(entries.filter(entry => text(entry.day) === day).flatMap(entry => [entry.fromMinute, entry.toMinute]));
     return values.length ? `${values[0]}-${values.at(-1)}` : '';
@@ -453,13 +523,15 @@ export function selectOperatingPeriodEvidence(records, stopId) {
   if (distinctSignatures.size > 1) return {
     byDay: {},
     warnings: ['Operating-period evidence from different route/pattern identities was not combined because its service-day boundaries differ; review the source patterns separately.'],
-    state: 'conflict'
+    state: 'conflict',
+    authority: hasTfL ? 'TfL' : null
   };
   const entries = [...groups.values()].flat();
   return {
     byDay: Object.fromEntries(DAY_ORDER.map(day => [day, entries.filter(entry => text(entry.day) === day)])),
     warnings: [],
-    state: 'resolved'
+    state: 'resolved',
+    authority: hasTfL ? 'TfL' : unique(entries.map(entry => entry.provider)).join(' + ') || null
   };
 }
 
@@ -488,8 +560,10 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const frequencyStop = representativeStop(stops, records);
     const frequencyBasisStopId = text(frequencyStop?.id || frequencyStop?.sourceId) || stopIds[0] || null;
     const departuresByDay = mergeDepartures(records, frequencyBasisStopId ? [frequencyBasisStopId] : stopIds);
+    const departureEvidenceByDay = departureEvidenceForRecords(records, frequencyBasisStopId);
+    const operatingPopulation = selectAuthoritativeDepartureEvidence(departureEvidenceByDay);
     const operatingEvidence = selectOperatingPeriodEvidence(records, frequencyBasisStopId);
-    const combinedPeriods = combineOperatingPeriodEvidence(departuresByDay, operatingEvidence.byDay);
+    const combinedPeriods = combineOperatingPeriodEvidence(operatingPopulation.schedules, operatingEvidence.byDay);
     const periods = combinedPeriods.periods;
     const frequencyEvidence = records.flatMap(record => (record.frequencyEvidence ?? [])
       .filter(item => !item.stopPointId || item.stopPointId === frequencyBasisStopId)
@@ -506,7 +580,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
       ...records.flatMap(record => [...(record.serviceNotes ?? []), ...(record.qualifications ?? [])].map(plannerQualificationNote))
     ])
       .filter(note => qualificationAppliesToFinalRow(note, departuresByDay));
-    const operatingPeriodWarnings = unique([...operatingEvidence.warnings, ...combinedPeriods.warnings]);
+    const operatingPeriodWarnings = unique([...operatingPopulation.warnings, ...operatingEvidence.warnings, ...combinedPeriods.warnings]);
     if (operatingPeriodWarnings.length) notes.push(...operatingPeriodWarnings);
     const endpointPatterns = unique(records.map(record => `${text(record.origin)} → ${text(record.destination)}`));
     if (endpointPatterns.length > 1) notes.push('Includes scheduled short workings or route variants in this direction; the main origin/destination shown is the most extensive pattern in the source timetable.');
@@ -573,6 +647,12 @@ export function buildServiceSummaries(stops, serviceRecords) {
       operatingPeriods: periods,
       operatingPeriodEvidence: Object.freeze(records.flatMap(record => (record.operatingPeriodEvidence ?? []).filter(item => !item.stopPointId || item.stopPointId === frequencyBasisStopId))),
       operatingPeriodEvidenceState: operatingPeriodWarnings.length ? 'conflict' : operatingEvidence.state,
+      operatingPeriodAuthority: Object.freeze({
+        provider: operatingPopulation.authoritativeProvider || operatingPopulation.provider,
+        supplementaryProviders: Object.freeze(unique(DAY_ORDER.flatMap(day => operatingPopulation.supplementaryByDay[day].map(entry => entry?.provider)))),
+        supplementaryDepartureEvidenceRetained: Object.freeze(operatingPopulation.supplementaryByDay),
+        warnings: Object.freeze(operatingPopulation.warnings)
+      }),
       operatingPeriodReviewWarnings: Object.freeze(operatingPeriodWarnings),
       operatingPeriodLines: formatOperatingPeriod(periods),
       frequencyByDay,
@@ -605,7 +685,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
       stopIds,
       sourceRecordIds: unique(records.map(record => record.id)),
       departuresByDay,
-      departureEvidenceByDay: departureEvidenceForRecords(records, frequencyBasisStopId),
+      departureEvidenceByDay,
       validity: Object.freeze({ from: unique(records.map(record => record.validFrom)).sort()[0] || null, to: unique(records.map(record => record.validTo)).sort().at(-1) || null })
     });
   });

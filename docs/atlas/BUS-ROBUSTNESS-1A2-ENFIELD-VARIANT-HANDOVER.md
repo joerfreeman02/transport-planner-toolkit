@@ -13,7 +13,7 @@ Date: 2026-10-05 (Europe/London)
 - Fresh worktree: `C:\Users\joe.freeman\OneDrive - EAS Transport\Documents\Transport Planner Toolkit\atlas-bus-enfield-variant-closeout`.
 - Safe prior branch preserved unchanged: `codex/atlas-bus-robustness-1a-calendar-simple` at `d86be60fa82da2d430649f077c4ef52878e1b042`.
 - Implementation commit: `86b9d9c80b7a9e225bafa8118ceedb72a5e72493`.
-- Final documentation tip: recorded after the documentation-only handover commit and reported with the final branch SHA.
+- Documentation handover commit at review verification: `0847978439ac30a5648b4eaf982c87c88280ff13`.
 - No merge, deploy, publish, production refresh, Alpha.16 work, 1B work, or unrelated polish was performed.
 
 ## Files changed
@@ -157,8 +157,9 @@ ATLAS Alpha.15 deterministic suite passed.
 
 ## Review build and acceptance boundary
 
-- Final V2 development/review build: pending final clean review-server verification after the documentation commit.
-- Required build identity: `BUS-TFL-COMPLETE · <final branch tip first 7 characters>`.
+- Final V2 development/review build verified at `http://127.0.0.1:8770/atlas/?review=v2`.
+- Verified response: HTTP 200, ATLAS route served, build identity `BUS-TFL-COMPLETE · 0847978`.
+- The review build was served from a clean documentation tip; the implementation SHA remains `86b9d9c80b7a9e225bafa8118ceedb72a5e72493`.
 - The review build must respond on loopback and serve the ATLAS route directly; the legacy dashboard remains recoverable.
 - This handover requests Product Owner manual acceptance of the reproduced Enfield Town 250m review.
 - Dynamic TfL data can change after the bounded replay; the evidence is a dated closeout snapshot, not a claim of permanently static external data.

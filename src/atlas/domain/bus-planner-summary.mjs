@@ -857,7 +857,11 @@ function calculateProfileResult(component, representativeId, profileId, partitio
   const supplementaryDepartureEvidenceByDay = supplementaryAuditForServices(component, representativeId);
   const supplementaryDepartureAuditWarnings = Object.freeze(unique(component.flatMap(service => service?.supplementaryDepartureAuditWarnings ?? [])));
   const combinedPeriods = combineOperatingPeriodEvidence(operatingPopulation.schedules, operatingEvidence.byDay);
-  const periodWarnings = [...operatingPopulation.warnings, ...operatingEvidence.warnings, ...combinedPeriods.warnings];
+  // A resolved TfL authority difference is already retained as structured
+  // audit evidence. Its supplementary span warning must not be promoted to a
+  // planner conflict; only unresolved operating-period evidence or a genuine
+  // combined-period conflict requires intervention.
+  const periodWarnings = [...operatingEvidence.warnings, ...combinedPeriods.warnings];
   return Object.freeze({
     entries: Object.freeze(partition.entries),
     schedules: Object.freeze(partition.schedules),

@@ -37,7 +37,7 @@ function service({ provider, minutes, entries, id = `${provider}-R1`, calendarPr
 }
 
 const tflOne = service({ provider: 'TfL', minutes: [480], entries: [entry(480, 'TfL', 'journey-1')], operatingPeriodEvidence: [{ provider: 'TfL', stopPointId: stop.id, day: 'monday', fromMinute: 480, toMinute: 540 }] });
-const bodsOne = service({ provider: 'BODS', minutes: [487], entries: [entry(487, 'BODS', 'journey-1-bods')] });
+const bodsOne = service({ provider: 'BODS', minutes: [700], entries: [entry(700, 'BODS', 'journey-1-bods')] });
 const adapter = composition({ tflResult: tflOne, nationalData: [bodsOne] });
 const composed = await adapter.servicesForStops([stop, tflStop], { site });
 assert.equal(composed.ok, true);
@@ -45,7 +45,7 @@ const composedTfl = composed.data.find(item => item.provider === 'TfL');
 assert.ok(composedTfl, 'successful TfL evidence is retained as a TfL-primary record');
 assert.deepEqual(composedTfl.stopSchedules[stop.id].monday, [480], 'supplementary BODS minutes do not enter authoritative stopSchedules');
 assert.deepEqual(composedTfl.departureEvidenceByDay.monday.map(item => item.minute), [480], 'supplementary BODS minutes do not enter authoritative departureEvidenceByDay');
-assert.deepEqual(composedTfl.supplementaryDepartureEvidenceByDay.monday.map(item => item.minute), [487], 'supplementary BODS evidence remains attached for audit');
+assert.deepEqual(composedTfl.supplementaryDepartureEvidenceByDay.monday.map(item => item.minute), [700], 'supplementary BODS evidence remains attached for audit');
 assert.equal(composedTfl.primaryAuthority, 'TfL');
 
 const [summary] = buildServiceSummaries([stop, tflStop], composed.data);
@@ -54,11 +54,16 @@ assert.equal(plannerRow.frequencyByDay.monday.departureCount, 1, 'one physical j
 assert.deepEqual(plannerRow.departuresByDay.monday, [480]);
 assert.equal(plannerRow.operatingPeriods.monday.firstMinute, 480);
 assert.deepEqual(summary.operatingPeriodAuthority.supplementaryProviders, ['BODS']);
-assert.equal(summary.operatingPeriodAuthority.supplementaryDepartureEvidenceRetained.monday[0].minute, 487);
+assert.equal(summary.operatingPeriodAuthority.supplementaryDepartureEvidenceRetained.monday[0].minute, 700);
+assert.match(summary.operatingPeriodAuthority.auditWarnings.join(' '), /retained for audit/);
+assert.equal(plannerRow.operatingPeriodEvidenceState, 'resolved', 'supplementary span differences do not change resolved TfL authority');
+assert.equal(plannerRow.operatingPeriodReviewRequired, false, 'resolved TfL authority does not require planner review');
+assert.equal(plannerRow.plannerNotes.reviewNote, null, 'resolved TfL authority has no planner review note');
 assert.doesNotMatch(plannerRow.serviceNote, /BODS departure evidence was retained for audit/);
 const word = buildBusWordTables({ ok: true, stops: [stop, tflStop], plannerServiceSummaries: [plannerRow], serviceSummaries: [summary] });
 const wordText = JSON.stringify(word);
 assert.doesNotMatch(wordText, /BODS departure evidence was retained for audit/);
+assert.doesNotMatch(wordText, /Operating-period evidence requires review before formal use/);
 
 const tflTwo = service({ provider: 'TfL', minutes: [480, 600], entries: [entry(480, 'TfL', 'journey-1'), entry(600, 'TfL', 'journey-2')] });
 const twoComposed = await composition({ tflResult: tflTwo, nationalData: [bodsOne] }).servicesForStops([stop, tflStop], { site });

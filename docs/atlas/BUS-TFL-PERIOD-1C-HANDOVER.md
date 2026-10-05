@@ -24,6 +24,10 @@ The 1B adapter correctly retained BODS timing differences, but `buildServiceSumm
 
 The 1B `retainSupplementaryDepartures()` path merged matching BODS minutes into the TfL record’s `stopSchedules` and `departureEvidenceByDay`. The assessment layer then built `serviceDepartureEntries()`/frequency from that mixed population. A TfL journey and its slightly different BODS representation therefore became two exact-minute departures. The production-shaped 657 replay proved the mechanism: one authoritative TfL journey plus one BODS representation must remain one TfL journey/day, while two genuinely distinct TfL journeys remain two/day.
 
+### Remaining review-note semantic defect
+
+Product Owner review found that Waltham routes including 217, 317 and N279 still displayed `Operating-period evidence requires review before formal use.` even after TfL authority had been resolved. The forensic cause was in `calculateProfileResult()`: it re-added `selectAuthoritativeDepartureEvidence().warnings` to `periodWarnings`, changing a resolved TfL-versus-supplementary span difference into `operatingPeriodEvidenceState: 'conflict'` and `operatingPeriodReviewRequired: true`. The correction removes only that promotion. Supplementary span warnings remain in structured audit evidence; unresolved `selectOperatingPeriodEvidence()` warnings and genuine combined-period conflicts still set the planner review state and retain the concise review note.
+
 ### Why 1B tests missed both defects
 
 1B checked TfL authority, operating-period boundaries and retained supplementary evidence, but did not assert that the authoritative departure population remained TfL-only, did not assert the one-journey/two-representations invariant, and did not exercise the raw warning through a real planner row and Word export. It also lacked the generic unrelated-London presentation control. The 1C tests add those production-shaped contracts.
@@ -69,7 +73,7 @@ BODS-only national services remain national-primary. The explicit fallback path 
 
 ## 6. Browser and Word evidence
 
-The deterministic 1C presentation test verifies that supplementary audit evidence survives in structured detailed evidence while the raw “BODS departure evidence was retained for audit...” diagnostic is absent from the planner service note and Word output. It also verifies a genuine unresolved conflict still receives the concise planner review note. Final V2 runtime values:
+The deterministic 1C presentation test verifies that supplementary audit evidence survives in structured detailed evidence while the raw “BODS departure evidence was retained for audit...” diagnostic is absent from the planner service note and Word output. It also verifies that a materially extended supplementary BODS span leaves resolved TfL authority as `resolved`, sets no planner review flag, and produces no Browser/Word review note. A separate genuine unresolved conflict still receives the concise planner review note. Final V2 runtime values:
 
 - review URL: `http://127.0.0.1:8769/atlas/?review=v2#modules`;
 - `isV2Review`: `true` from the `review=v2` runtime mode;
@@ -87,7 +91,7 @@ Focused commands passed:
 - `node --check` for all three changed production modules
 - `git diff --check`
 
-The final full command was rerun after the handover evidence update and passed with exit code 0. The final worktree was clean before push.
+The full command passed with exit code 0 after the semantic correction on clean commit `83bee3e`. It included the paired resolved-authority/no-review-note and genuine-conflict/review-note regressions. The final worktree will be checked clean again after this handover update and before push.
 
 The full command `node tests/atlas/run-all.mjs` passed from the committed clean worktree, including the legacy-isolation guard, review-environment checks, TfL operating-period tests, 1B/1C tests, Browser contracts, Word contracts, GROUP, CIRC, DEST, calendar, frequency, QA-02 and QA-03 controls.
 

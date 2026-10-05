@@ -41,6 +41,7 @@ await import('./bus-alpha13-planner-summary.test.mjs');
 await import('./alpha13-summary-closeout.test.mjs');
 await import('./alpha13-calendar-safety.test.mjs');
 await import('./bus-robustness-1a-calendar-simple.test.mjs');
+await import('./bus-robustness-1a2-enfield-variant.test.mjs');
 await import('./alpha14-production-row-consolidation.test.mjs');
 await import('./alpha15-production-fidelity.test.mjs');
 await import('./alpha15-planner-service-group.test.mjs');

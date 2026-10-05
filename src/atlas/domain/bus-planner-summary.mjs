@@ -1206,8 +1206,7 @@ function variantNote(component, main, groupingDecision) {
   const sharedJourneyIdentity = journeyIdentitySets.length > 1 && journeyIdentitySets.every(set => set.size) && [...journeyIdentitySets[0]].some(identity => journeyIdentitySets.every(set => set.has(identity)));
   const hasVariant = component.length > 1 && ((endpoints.length > 1 && !sharedJourneyIdentity)
     || patterns.length > 1
-    || component.some(service => Number(service.patternVariantCount) > 1)
-    || (groupingDecision?.calendarVariantRecordIds?.length ?? 0) > 0);
+    || component.some(service => Number(service.patternVariantCount) > 1));
   if (!hasVariant) return null;
   const principalDestinationValue = normal(plannerDestination(main));
   const principalOriginEndpoint = endpointPair(main).origin;
@@ -1245,6 +1244,11 @@ function variantNote(component, main, groupingDecision) {
     const preposition = item.endpointRole === 'origin' ? 'from' : 'towards';
     return `${route} – ${prefix} ${preposition} ${item.destination}${item.qualification ? ` (${item.qualification})` : ''}.`;
   });
+  const unresolvedStructuralVariant = component.some(service => {
+    const id = serviceIdForPlanner(service);
+    return (shortIds.has(id) || branchIds.has(id)) && !plannerDestination(service);
+  });
+  if (unresolvedStructuralVariant) return null;
   return notes.length ? notes.join(' ') : 'Additional short workings and timetable variants operate.';
 }
 
@@ -2018,7 +2022,7 @@ function humanQualification(value) {
   return raw;
 }
 
-function plannerAnnotationTaxonomy(row) {
+export function plannerAnnotationTaxonomy(row) {
   const additionalServices = [];
   const shortWorkings = [];
   const qualifications = [];
@@ -2117,7 +2121,8 @@ function plannerAnnotationTaxonomy(row) {
     const service = services.find(candidate => [...idSet].includes(serviceIdForPlanner(candidate))
       || (candidate.sourceRecordIds ?? []).some(sourceId => idSet.has(sourceId)))
       || services.find(candidate => text(candidate.routeNumber) === text(variant.routeNumber) && normal(plannerDestination(candidate)) === normal(variant.destination));
-    const destination = text(variant.destination || plannerDestination(service));
+    const destination = plannerDestination(service)
+      || (/^(?:destination not supplied|destination not resolved)$/i.test(text(variant.destination)) ? '' : text(variant.destination));
     const origin = text(plannerOrigin(service));
     const route = text(variant.routeNumber || service?.routeNumber || row.routeNumber);
     if (!destination && !origin) continue;
@@ -2318,7 +2323,6 @@ function attachRouteNotes(rows) {
     });
     const hasVariant = !samePhysicalGroup && (
       (!familyRow && group.some(({ row }) => row.routeVariantNote))
-      || (!familyRow && group.some(({ row }) => (row.rawServiceSummaries ?? []).length > 1))
     );
     let routeNotes = [...shared];
     const taxonomyNotes = unique(group.flatMap(({ row }) => formattedPlannerAnnotations(row.plannerNotes)));

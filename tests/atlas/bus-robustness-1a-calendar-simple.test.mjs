@@ -55,12 +55,24 @@ const ordinaryWithVariants = planner([
 ])[0];
 
 assert.deepEqual(ordinaryWithVariants.calendarProfileIds, ['ordinary', 'school-day', 'non-school-day']);
-assert.equal(ordinaryWithVariants.typicalFrequencyText, 'Mon-Fri: Every ~15 mins\nSat-Sun: No scheduled service', 'school-day profile is the sole normal frequency presentation');
-assert.deepEqual(ordinaryWithVariants.departuresByDay, ordinaryWithVariants.calendarSchedulesByProfile['school-day'], 'principal departure population is the school-day population');
-assert.deepEqual(ordinaryWithVariants.frequencyByDay, ordinaryWithVariants.calendarFrequencyByProfile['school-day'], 'principal frequency is unchanged within the selected school-day profile');
-assert.deepEqual(ordinaryWithVariants.operatingPeriods, ordinaryWithVariants.calendarOperatingPeriodsByProfile['school-day'], 'principal operating period is unchanged within the selected school-day profile');
-assert.equal(ordinaryWithVariants.operatingPeriodLines.length, 2, 'only one operating-period presentation is emitted');
-assert.equal(ordinaryWithVariants.typicalFrequencyLines.length, 2, 'only one frequency presentation is emitted');
+assert.equal(ordinaryWithVariants.typicalFrequencyText, 'Mon-Fri: Every ~15 mins\nSat-Sun: 1 journey/day', 'representative week uses school-day weekdays and ordinary weekend evidence');
+assert.deepEqual(ordinaryWithVariants.departuresByDay, {
+  ...ordinaryWithVariants.calendarSchedulesByProfile['school-day'],
+  saturday: ordinaryWithVariants.calendarSchedulesByProfile.ordinary.saturday,
+  sunday: ordinaryWithVariants.calendarSchedulesByProfile.ordinary.sunday
+}, 'principal departure population is composed by representative week day');
+assert.deepEqual(ordinaryWithVariants.frequencyByDay, {
+  ...ordinaryWithVariants.calendarFrequencyByProfile['school-day'],
+  saturday: ordinaryWithVariants.calendarFrequencyByProfile.ordinary.saturday,
+  sunday: ordinaryWithVariants.calendarFrequencyByProfile.ordinary.sunday
+}, 'principal frequency is composed by representative week day');
+assert.deepEqual(ordinaryWithVariants.operatingPeriods, {
+  ...ordinaryWithVariants.calendarOperatingPeriodsByProfile['school-day'],
+  saturday: ordinaryWithVariants.calendarOperatingPeriodsByProfile.ordinary.saturday,
+  sunday: ordinaryWithVariants.calendarOperatingPeriodsByProfile.ordinary.sunday
+}, 'principal operating period is composed by representative week day');
+assert.equal(ordinaryWithVariants.operatingPeriodLines.length, 3, 'representative weekdays and ordinary weekend periods are emitted');
+assert.equal(ordinaryWithVariants.typicalFrequencyLines.length, 2, 'representative weekdays and ordinary weekend frequencies are emitted');
 assert.doesNotMatch(ordinaryWithVariants.typicalFrequencyText, /Standard days|School days \(additional\)|Non-school days \(additional\)/);
 assert.doesNotMatch(ordinaryWithVariants.operatingPeriodLines.join('\n'), /Standard days|School days \(additional\)|Non-school days \(additional\)/);
 assert.equal(ordinaryWithVariants.serviceNote, 'Timetable may vary during school holidays.');
@@ -69,6 +81,8 @@ assert.doesNotMatch(JSON.stringify(ordinaryWithVariants.plannerNotes), /School-d
 assert.equal(ordinaryWithVariants.calendarDeparturePopulationByProfile['school-day'].length, 10, 'school-day departure evidence remains profile-scoped');
 assert.ok(ordinaryWithVariants.calendarDeparturePopulationByProfile['non-school-day'].length, 'non-school timetable remains retained for detailed evidence');
 assert.ok(ordinaryWithVariants.calendarSchedulesByProfile['non-school-day'].monday.length, 'non-school schedule remains retained for audit');
+assert.equal(ordinaryWithVariants.canonicalDeparturePopulation.saturday.length, 1, 'ordinary Saturday evidence is present in the normal planner population');
+assert.equal(ordinaryWithVariants.canonicalDeparturePopulation.sunday.length, 1, 'ordinary Sunday evidence is present in the normal planner population');
 
 const word = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [ordinaryWithVariants], serviceSummaries: [] });
 const wordTableRow = word[1].rows.find(row => Array.isArray(row));
@@ -94,6 +108,14 @@ const nonSchoolOnly = planner([record({ routeNumber: 'HOL', profile: 'non-school
 assert.equal(nonSchoolOnly.serviceNote, 'Non-school days only.');
 assert.match(nonSchoolOnly.plannerNotes.serviceQualification, /non-school days only/i);
 assert.doesNotMatch(nonSchoolOnly.serviceNote, /Timetable may vary during school holidays/);
+
+const mixedWithoutWeekend = planner([
+  record({ routeNumber: 'NOWKND', profile: 'school-day', departures: week({ weekday: [480] }) }),
+  record({ routeNumber: 'NOWKND', profile: 'non-school-day', departures: week({ weekday: [540] }) })
+])[0];
+assert.equal(mixedWithoutWeekend.typicalFrequencyText, 'Mon-Fri: 1 journey/day\nSat-Sun: No scheduled service');
+assert.deepEqual(mixedWithoutWeekend.departuresByDay.saturday, [], 'mixed school calendars do not invent weekend service');
+assert.equal(mixedWithoutWeekend.serviceNote, 'Timetable may vary during school holidays.');
 
 const ordinarySingle = planner([record({ routeNumber: 'ORD', profile: 'ordinary', departures: week({ weekday: [720] }) })])[0];
 assert.equal(ordinarySingle.typicalFrequencyText, 'Mon-Fri: 1 journey/day\nSat-Sun: No scheduled service');

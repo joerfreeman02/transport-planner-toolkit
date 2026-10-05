@@ -886,6 +886,33 @@ function calculateProfileResult(component, representativeId, profileId, partitio
   });
 }
 
+function composeRepresentativeSchoolTermWeek(schoolDayResult, ordinaryResult) {
+  const selectedByDay = Object.fromEntries(DAY_ORDER.map(day => {
+    const useOrdinaryWeekend = (day === 'saturday' || day === 'sunday') && ordinaryResult;
+    return [day, useOrdinaryWeekend ? ordinaryResult : schoolDayResult];
+  }));
+  const entries = DAY_ORDER.flatMap(day => (selectedByDay[day]?.entries ?? []).filter(entry => entry.day === day));
+  const schedules = Object.fromEntries(DAY_ORDER.map(day => [day, selectedByDay[day]?.schedules?.[day] ?? []]));
+  const frequencyByDay = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, selectedByDay[day]?.frequencyByDay?.[day]])));
+  const periods = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, selectedByDay[day]?.periods?.[day] ?? null])));
+  const frequencyEvidence = DAY_ORDER.flatMap(day => (selectedByDay[day]?.frequencyEvidence ?? []).filter(item => item?.day === day));
+  const operatingPeriodEvidence = DAY_ORDER.flatMap(day => (selectedByDay[day]?.operatingPeriodEvidence ?? []).filter(item => item?.day === day));
+  const reviewWarnings = unique(DAY_ORDER.flatMap(day => selectedByDay[day]?.operatingPeriodReviewWarnings ?? []));
+  return Object.freeze({
+    entries: Object.freeze(entries),
+    schedules: Object.freeze(schedules),
+    periods,
+    frequencyByDay,
+    frequencyLines: Object.freeze(formatTypicalFrequency(frequencyByDay)),
+    operatingLines: Object.freeze(formatOperatingPeriod(periods)),
+    frequencyEvidence: Object.freeze(frequencyEvidence),
+    operatingPeriodEvidence: Object.freeze(operatingPeriodEvidence),
+    operatingPeriodEvidenceState: reviewWarnings.length ? 'conflict' : 'resolved',
+    operatingPeriodReviewWarnings: Object.freeze(reviewWarnings),
+    operatingPeriodReviewRequired: reviewWarnings.length > 0
+  });
+}
+
 function calendarQualifiedLines(lines, profileId, additional = false) {
   const label = calendarProfileDisplayLabel(profileId) + (additional ? ' (additional)' : '');
   return lines.map(line => `${label}: ${line}`);
@@ -1401,7 +1428,13 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const displayProfileId = schoolHolidayVariant
     ? 'school-day'
     : effectiveProfileIds.includes('ordinary') ? 'ordinary' : effectiveProfileIds[0] ?? profileIds[0] ?? null;
-  const displayResult = profileResults.get(displayProfileId) ?? calculateProfileResult(component, representative.id, displayProfileId, calendarPartition(canonical.entries, displayProfileId, ordinaryEntries, hasOrdinaryProfile));
+  const selectedProfileResult = profileResults.get(displayProfileId) ?? calculateProfileResult(component, representative.id, displayProfileId, calendarPartition(canonical.entries, displayProfileId, ordinaryEntries, hasOrdinaryProfile));
+  const displayResult = schoolHolidayVariant
+    ? composeRepresentativeSchoolTermWeek(
+      profileResults.get('school-day') ?? selectedProfileResult,
+      profileResults.get('ordinary')
+    )
+    : selectedProfileResult;
   const mixedProfileOutput = effectiveProfileIds.length > 1 && !schoolHolidayVariant;
   const outputProfileIds = mixedProfileOutput ? effectiveProfileIds : [displayProfileId];
   const unresolvedNeedsQualification = profileIds.includes(UNKNOWN_CALENDAR_PROFILE)

@@ -694,6 +694,16 @@ function departureIdentity(item) {
   return text(item?.journeyIdentity || item?.journeyId || item?.sourceJourneyId || item?.vehicleJourneyCode || item?.tripId || item?.vehicleJourneyId || item?.journeyCode);
 }
 
+function primaryProvider(service, item = null) {
+  return text(item?.primaryAuthority
+    || item?.provider
+    || service?.primaryAuthority
+    || service?.source?.primaryAuthority
+    || service?.provider
+    || service?.source?.provider
+    || service?.timetableSource) || null;
+}
+
 function serviceDepartureEntries(service, representativeId) {
   if (!serviceAtRepresentative(service, representativeId)) return [];
   const evidence = service?.departureEvidenceByDay;
@@ -708,7 +718,7 @@ function serviceDepartureEntries(service, representativeId) {
       const minute = Number(item?.minute ?? item?.departureMinute ?? item?.time ?? item);
       if (!Number.isFinite(minute)) return null;
       const calendarProfileId = calendarProfileFromEntry(service, item);
-      return { day, minute, stopPointId: text(item?.stopPointId) || representativeId, journeyIdentity: departureIdentity(item) || null, provider: text(item?.provider || service?.timetableSource || service?.source?.provider) || null, sourceRecordId: text(item?.sourceRecordId || service?.id) || null, routeNumber: text(item?.routeNumber || service?.routeNumber), direction: text(item?.direction || service?.direction || service?.destination || service?.origin), origin: text(item?.origin || service?.origin), destination: text(item?.destination || service?.destination), calendarProfileId, calendarProfileIds: [calendarProfileId] };
+      return { day, minute, stopPointId: text(item?.stopPointId) || representativeId, journeyIdentity: departureIdentity(item) || null, provider: primaryProvider(service, item), sourceRecordId: text(item?.sourceRecordId || service?.id) || null, routeNumber: text(item?.routeNumber || service?.routeNumber), direction: text(item?.direction || service?.direction || service?.destination || service?.origin), origin: text(item?.origin || service?.origin), destination: text(item?.destination || service?.destination), calendarProfileId, calendarProfileIds: [calendarProfileId] };
     }).filter(Boolean);
   });
 }

@@ -36,10 +36,18 @@ function routeAuthorities(stop, route) {
   return (stop?.timetableAuthorities ?? [stop?.timetableAuthority]).map(normal).filter(Boolean);
 }
 
-function stagedRequests(stops, { insideLondon = false } = {}) {
+function tflRoutesForStops(stops) {
+  return new Set((stops ?? []).flatMap(stop => Object.entries(stop?.routeAuthorities ?? {})
+    .filter(([, authorities]) => (Array.isArray(authorities) ? authorities : [authorities]).some(authority => normal(authority) === 'tfl'))
+    .map(([route]) => normal(route))
+    .filter(Boolean)));
+}
+
+function stagedRequests(stops, { insideLondon = false, crossBoundaryTfLRoutes = new Set() } = {}) {
   const entries = stops.flatMap(stop => (stop.routes ?? []).map(line => {
     const lineId = text(line), stopPointId = stopKey(stop);
-    if (!insideLondon && !routeAuthorities(stop, lineId).includes('tfl')) return [];
+    const routeHasTfLCoverage = crossBoundaryTfLRoutes.has(normal(lineId));
+    if (!insideLondon && !routeAuthorities(stop, lineId).includes('tfl') && !routeHasTfLCoverage) return [];
     return lineId && stopPointId ? [`${lineId}|${stopPointId}`, { lineId, stopPointId, stop }] : [];
   })).filter(entry => Array.isArray(entry) && entry.length === 2);
   return [...new Map(entries.sort(([, left], [, right]) => compareStops(left.stop, right.stop) || left.lineId.localeCompare(right.lineId, 'en-GB', { numeric: true }))).values()];
@@ -57,8 +65,8 @@ function isBods(service) { return !isTnds(service); }
 function annotateNationalSource(service) {
   const provider = isTnds(service) ? 'TNDS' : 'BODS';
   const existingProvider = text(service?.provider || service?.timetableSource || service?.source?.provider);
-  if (existingProvider) return service;
-  return { ...service, provider, timetableSource: provider, source: { ...(service.source ?? {}), provider } };
+  if (existingProvider) return { ...service, primaryAuthority: service.primaryAuthority || provider, source: { ...(service.source ?? {}), provider: service.source?.provider || provider, primaryAuthority: service.source?.primaryAuthority || provider } };
+  return { ...service, provider, primaryAuthority: provider, timetableSource: provider, source: { ...(service.source ?? {}), provider, primaryAuthority: provider } };
 }
 
 function matchNationalRequest(lineId, stopPointId, nationalServices) {
@@ -111,11 +119,54 @@ function nationalRoutesForStop(stop) {
 function sameText(left, right) { return normal(left) === normal(right); }
 function sameSequence(left, right) { return Array.isArray(left) && Array.isArray(right) && left.length === right.length && left.every((value, index) => sameText(value, right[index])); }
 
+const WEEK_DAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
+
+function supplementaryDepartureEntries(match, stopId, day, schedule) {
+  const explicit = Array.isArray(match?.departureEvidenceByDay?.[day])
+    ? match.departureEvidenceByDay[day].filter(entry => !text(entry?.stopPointId) || text(entry.stopPointId) === stopId)
+    : [];
+  const sourceEntries = explicit.length ? explicit : (schedule?.[day] ?? []).map(minute => ({ minute }));
+  return sourceEntries.map(entry => ({
+    ...entry,
+    minute: Number(entry?.minute ?? entry?.departureMinute ?? entry?.time),
+    stopPointId: text(entry?.stopPointId) || stopId,
+    provider: 'BODS',
+    primaryAuthority: 'BODS',
+    sourceRecordId: text(entry?.sourceRecordId) || text(match?.id) || null,
+    routeNumber: text(entry?.routeNumber) || text(match?.routeNumber) || null,
+    direction: text(entry?.direction) || text(match?.direction || match?.destination || match?.origin) || null,
+    origin: text(entry?.origin) || text(match?.origin) || null,
+    destination: text(entry?.destination) || text(match?.destination) || null,
+    calendarProfileId: text(entry?.calendarProfileId) || text(match?.calendarProfileId || match?.source?.calendarProfileId) || null
+  })).filter(entry => Number.isFinite(entry.minute));
+}
+
+function retainSupplementaryDepartures(service, match) {
+  const tflStopIds = new Set(scheduledStopIds(service));
+  const stopSchedules = { ...(service.stopSchedules ?? {}) };
+  const departureEvidenceByDay = Object.fromEntries(WEEK_DAYS.map(day => [day, [...(service.departureEvidenceByDay?.[day] ?? [])]]));
+  let retained = false;
+  let addedDeparture = false;
+  for (const [stopId, schedule] of Object.entries(match?.stopSchedules ?? {})) {
+    if (!tflStopIds.has(stopId)) continue;
+    const current = stopSchedules[stopId] ?? {};
+    for (const day of WEEK_DAYS) if ((schedule?.[day] ?? []).some(minute => !(current[day] ?? []).includes(minute))) addedDeparture = true;
+    stopSchedules[stopId] = Object.fromEntries(WEEK_DAYS.map(day => [day, [...new Set([...(current[day] ?? []), ...(schedule?.[day] ?? [])])].sort((left, right) => left - right)]));
+    for (const day of WEEK_DAYS) {
+      const entries = supplementaryDepartureEntries(match, stopId, day, schedule);
+      if (!entries.length) continue;
+      departureEvidenceByDay[day].push(...entries);
+      retained = true;
+    }
+  }
+  return retained ? { service: { ...service, stopSchedules, departureEvidenceByDay }, addedDeparture } : { service, addedDeparture: false };
+}
+
 function supplement(tfl, bods) {
   const match = matchBods(tfl, bods);
   if (!match) return { service: tfl, matched: false, conflict: false };
   let supplemented = false, conflict = false;
-  const service = { ...tfl };
+  let service = { ...tfl };
   for (const field of textFields) {
     const tfValue = service[field], bodsValue = match[field];
     const tfEmpty = Array.isArray(tfValue) ? tfValue.length === 0 : !text(tfValue);
@@ -127,8 +178,12 @@ function supplement(tfl, bods) {
   else if (service.principalLocations?.length && match.principalLocations?.length && !sameSequence(service.principalLocations, match.principalLocations)) conflict = true;
   if ((!Array.isArray(service.routePatternStopIds) || !service.routePatternStopIds.length) && Array.isArray(match.routePatternStopIds) && match.routePatternStopIds.length) { service.routePatternStopIds = [...match.routePatternStopIds]; supplemented = true; }
   else if (service.routePatternStopIds?.length && match.routePatternStopIds?.length && !sameSequence(service.routePatternStopIds, match.routePatternStopIds)) conflict = true;
+  const withSupplementaryDepartures = retainSupplementaryDepartures(service, match);
+  if (withSupplementaryDepartures.service !== service) service = withSupplementaryDepartures.service;
+  service.provider = 'TfL';
+  service.primaryAuthority = 'TfL';
   service.timetableSource = supplemented ? 'TfL + BODS supplementary' : 'TfL';
-  service.source = { ...service.source, supplementaryProvider: supplemented ? 'BODS' : null };
+  service.source = { ...service.source, provider: 'TfL', primaryAuthority: 'TfL', supplementaryProvider: supplemented ? 'BODS' : null };
   return { service, matched: true, conflict };
 }
 
@@ -220,7 +275,9 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     // genuinely unresolved source without altering prepared-data contracts.
     const nationalServices = national.ok ? (national.data ?? []).map(annotateNationalSource) : [];
     const bods = nationalServices.filter(isBods);
-    const requests = stagedRequests(tflStops, { insideLondon });
+    const crossBoundaryTfLRoutes = !insideLondon && typeof tflAdapter.routeMetadataForLines === 'function' ? tflRoutesForStops(stops) : new Set();
+    const requestStops = insideLondon ? tflStops : stops;
+    const requests = stagedRequests(requestStops, { insideLondon, crossBoundaryTfLRoutes });
     const stageSize = Math.max(1, Number(requestLimit) || 20);
     const maximumRequests = Number.isInteger(Number(options.maxRequests)) && Number(options.maxRequests) >= 0 ? Number(options.maxRequests) : requests.length;
     const processedRequests = requests.slice(0, maximumRequests);
@@ -257,7 +314,12 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       if (result.provenance?.timetableConclusion === 'NO_CURRENT_MATCH') return false;
       return !actualTfLServices({ result, request }).length;
     });
-    const services = successful.flatMap(entry => actualTfLServices(entry));
+    const services = successful.flatMap(entry => actualTfLServices(entry).map(service => ({
+      ...service,
+      provider: 'TfL',
+      primaryAuthority: 'TfL',
+      source: { ...(service.source ?? {}), provider: 'TfL', primaryAuthority: 'TfL' }
+    })));
     const unresolvedEntries = unresolvedObserved.filter(({ request }) => !matchNationalRequest(request?.lineId, request?.stopPointId, nationalServices));
     const tflUnresolvedRequestIdentities = unresolvedEntries.map(({ request }) => requestIdentity(request)).filter(Boolean);
     const noCurrentRequestIdentities = resultEntries
@@ -296,6 +358,7 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     const provenance = {
       source: insideLondon ? 'TfL scheduled timetable authority; BODS/TNDS controlled supplementary evidence' : 'TfL StopPoint authority with national BODS/TNDS evidence',
       authority: 'TfL', crossBoundaryTfL: !insideLondon, requestCount: requests.length, detailedRequests: results.length,
+      crossBoundaryTfLRoutes: [...crossBoundaryTfLRoutes].sort(),
       requestLimit: stageSize, requestStages: stageResults.length, selectedStage: null, unrequestedRequests: unprocessed.length,
       processedRequests: processedRequests.length, unprocessedRequests: unprocessed.length, processedRequestIdentities: processedRequests.map(request => `${request.lineId}|${request.stopPointId}`),
       unprocessedRequestIdentities: unprocessed.map(request => `${request.lineId}|${request.stopPointId}`), timetableRequests: results.length,

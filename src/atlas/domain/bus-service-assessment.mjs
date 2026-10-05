@@ -307,7 +307,7 @@ function scheduleFromDepartureEvidence(evidenceByDay = {}) {
 }
 
 function providerOfDepartureEvidence(entry) {
-  return normal(entry?.provider);
+  return normal(entry?.primaryAuthority || entry?.provider);
 }
 
 function supplementaryDepartureWarning(provider, day, authoritative, supplementary) {
@@ -317,6 +317,16 @@ function supplementaryDepartureWarning(provider, day, authoritative, supplementa
   const materiallyOutside = outside.some(value => Math.min(Math.abs(value - authoritativeStart), Math.abs(value - authoritativeEnd)) >= 60);
   if (!materiallyOutside) return null;
   return `${day}: ${provider || 'Supplementary'} departure evidence was retained for audit but not used to define the TfL operating period because it materially extends beyond the authoritative TfL service-day span.`;
+}
+
+function providerOfRecord(record, entry = null) {
+  return text(entry?.primaryAuthority
+    || record?.primaryAuthority
+    || record?.source?.primaryAuthority
+    || entry?.provider
+    || record?.provider
+    || record?.source?.provider
+    || record?.timetableSource);
 }
 
 export function selectAuthoritativeDepartureEvidence(departureEvidenceByDay = {}) {
@@ -359,7 +369,7 @@ function departureEvidenceForRecords(records, stopId) {
   for (const record of records ?? []) {
     const schedule = record.stopSchedules?.[stopId];
     if (!schedule) continue;
-    const provider = text(record.timetableSource || record.source?.provider);
+    const provider = providerOfRecord(record);
     const explicitJourney = sourceJourneyIdentity(record);
     const pattern = patternIdentity(record);
     for (const day of DAY_ORDER) {
@@ -375,7 +385,7 @@ function departureEvidenceForRecords(records, stopId) {
         stopPointId: text(sourceEntry?.stopPointId) || stopId,
         journeyIdentity: text(sourceEntry?.journeyIdentity) || explicitJourney || null,
         sourceRecordId: text(sourceEntry?.sourceRecordId) || text(record.id) || null,
-        provider: text(sourceEntry?.provider) || provider || null,
+        provider: providerOfRecord(record, sourceEntry) || provider || null,
         patternIdentity: text(sourceEntry?.patternIdentity) || pattern || null,
         routeNumber: text(sourceEntry?.routeNumber) || text(record.routeNumber) || null,
         direction: text(sourceEntry?.direction) || text(record.direction || record.destination || record.origin) || null,
@@ -487,7 +497,7 @@ function representativeRecord(records, stopIds) {
 
 function operatingPeriodScopeKey(record, entry) {
   return [
-    text(entry?.provider || record?.timetableSource || record?.source?.provider),
+    providerOfRecord(record, entry),
     text(record?.routeNumber),
     text(record?.source?.lineId),
     text(record?.direction || record?.destination || record?.origin),
@@ -504,9 +514,9 @@ export function selectOperatingPeriodEvidence(records, stopId) {
     candidates.push({ record, entry });
   }
   if (!candidates.length) return { byDay: {}, warnings: [], state: 'absent', authority: null };
-  const hasTfL = candidates.some(({ record, entry }) => normal(entry?.provider || record?.timetableSource || record?.source?.provider) === 'tfl');
+  const hasTfL = candidates.some(({ record, entry }) => normal(providerOfRecord(record, entry)) === 'tfl');
   const retained = hasTfL
-    ? candidates.filter(({ record, entry }) => normal(entry?.provider || record?.timetableSource || record?.source?.provider) === 'tfl')
+    ? candidates.filter(({ record, entry }) => normal(providerOfRecord(record, entry)) === 'tfl')
     : candidates;
   const groups = new Map();
   for (const { record, entry } of retained) {

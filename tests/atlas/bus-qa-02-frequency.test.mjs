@@ -109,7 +109,7 @@ assert.equal(multiStop[0].frequencyByDay.monday.intervalMinutes, 10);
 const schoolAndTerm = summaryFor(schedule({ monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420] }), {
   calendarEvidence: [{ schoolDayOnly: true, termTimeOnly: true }]
 });
-assert.match(schoolAndTerm.serviceNote, /School days only\./);
+assert.match(schoolAndTerm.serviceNote, /School-day journeys only\./);
 assert.doesNotMatch(schoolAndTerm.serviceNote, /Term-time service\./, 'school-day evidence takes precedence over the less-specific term-time note');
 const termOnly = summaryFor(schedule({ monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420] }), {
   calendarEvidence: [{ termTimeOnly: true }]
@@ -123,7 +123,7 @@ assert.match(holidayOnly.serviceNote, /Non-school days only\./);
 const schoolOnly = summaryFor(schedule({ monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420] }), {
   calendarEvidence: [{ schoolDayOnly: true, calendarResolved: true, daysOfWeek: days.slice(0, 5) }]
 });
-assert.equal(schoolOnly.serviceNote, 'School days only.');
+assert.equal(schoolOnly.serviceNote, 'School-day journeys only.');
 const nonSchoolOnly = summaryFor(schedule({ saturday: [420], sunday: [450] }), {
   calendarEvidence: [{ nonSchoolDayOnly: true, calendarResolved: true, daysOfWeek: ['saturday', 'sunday'] }]
 });
@@ -141,7 +141,7 @@ const mixedQualification = summaryFor(schedule({ monday: [420], saturday: [450] 
   ]
 });
 assert.equal(mixedQualification.serviceNote, 'Timetable varies between school and non-school days.');
-assert.doesNotMatch(mixedQualification.serviceNote, /School days only|Non-school days only/);
+assert.doesNotMatch(mixedQualification.serviceNote, /School-day journeys only|Non-school days only/);
 
 const html = fs.readFileSync(new URL('../../atlas/index.html', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../../atlas/assets/css/atlas-shell.css', import.meta.url), 'utf8');

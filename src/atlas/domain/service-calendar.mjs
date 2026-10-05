@@ -81,7 +81,7 @@ export function calendarQualificationNotes(calendarEvidence = []) {
   const school = evidence.some(item => item?.schoolDayOnly || item?.calendarProfileId === 'school-day');
   const nonSchool = evidence.some(item => item?.nonSchoolDayOnly || item?.holidayOnly || ['non-school-day', 'holiday'].includes(item?.calendarProfileId));
   if (school && nonSchool) notes.push('Timetable varies between school and non-school days.');
-  else if (school) notes.push('School days only.');
+  else if (school) notes.push('School-day journeys only.');
   else if (evidence.some(item => item?.termTimeOnly || item?.calendarProfileId === 'term-time')) notes.push('Term-time service.');
   else if (nonSchool) notes.push('Non-school days only.');
   return [...new Set(notes)];

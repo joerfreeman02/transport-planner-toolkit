@@ -32,7 +32,7 @@ assert.equal(main.servedAtText, 'Waltham Cross Bus Station — G · 82 m*\nWalth
 assert.deepEqual(main.departuresByDay.monday, [360, 360, 420, 480, 540, 600, 660], 'same representative-stop schedules are consolidated without cross-stop addition while a destination-distinguished short working remains represented');
 assert.deepEqual(main.typicalFrequencyLines, ['Mon-Fri: Every ~60 mins', 'Sat: 2 journeys/day', 'Sun: 1 journey/day']);
 assert.match(main.operatingPeriodLines.join(' '), /Sun: Departs approx\. 10:00/);
-assert.doesNotMatch(main.serviceNote, /School days only\./, 'a school-day qualification is not shown alongside retained weekend departures');
+assert.doesNotMatch(main.serviceNote, /School-day journeys only\./, 'a school-day qualification is not shown alongside retained weekend departures');
 assert.doesNotMatch(main.serviceNote, /Includes scheduled short workings/);
 assert.equal(main.directionPatternText, 'Towards Chingford');
 assert.equal(planner.filter(row => row.routeNumber === '657').length, 3);
@@ -211,7 +211,7 @@ const sharedRouteCharacteristics = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: '46', direction: 'outbound', directionFamily: 'outbound', destination: 'North Terminal', serviceNote: 'School days only.' }),
   plannerRecord({ routeNumber: '46', direction: 'inbound', directionFamily: 'inbound', origin: 'North Terminal', destination: 'South Terminal', pattern: ['C', 'B', 'A'], serviceNote: 'School days only.' })
 ], coherentStops);
-assert.equal(sharedRouteCharacteristics.filter(row => row.routeGroupNote === 'School days only.').length, 1, 'shared route characteristics are emitted once after the route group');
+assert.equal(sharedRouteCharacteristics.filter(row => row.routeGroupNote === 'School-day journeys only.').length, 1, 'shared route characteristics are emitted once after the route group');
 assert.equal(sharedRouteCharacteristics.filter(row => row.serviceNote.includes('School days')).length, 0);
 
 const single = buildPlannerBusServiceSummaries([plannerRecord({ routeNumber: '657', departures: [982], ids: '657-single' })], coherentStops)[0];

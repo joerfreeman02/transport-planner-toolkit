@@ -449,7 +449,7 @@ function plannerQualificationNote(note) {
   if (!value) return null;
   if (/school[- ]?days?.*non[- ]school|non[- ]school.*school[- ]?days?/i.test(value)) return 'Timetable varies between school and non-school days.';
   if (/non[- ]school|school holidays?/i.test(value)) return 'Non-school days only.';
-  if (/school[- ]?days?(?:[- ]only)?|schooldays?/i.test(value)) return 'School days only.';
+  if (/school[- ]?days?(?:[- ]only)?|schooldays?/i.test(value)) return 'School-day journeys only.';
   if (/term[- ]time|term[- ]only/i.test(value)) return 'Term-time service.';
   if (/circular service/i.test(value)) return 'Circular service.';
   return materialQualification(value) ? value : null;

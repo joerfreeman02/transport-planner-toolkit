@@ -13,6 +13,7 @@ import {
 import { calendarProfileLabel, deriveCalendarProfileId } from './service-calendar.mjs';
 import {
   endpointIdentity,
+  hasResolvedExactEndpointEvidence,
   assessedEndpointSupport,
   hasPublicServiceCopyEvidence,
   isUnspecifiedOperator,
@@ -890,7 +891,7 @@ function calendarQualifiedLines(lines, profileId, additional = false) {
 }
 
 function hasCalendarTaxonomyNote(note) {
-  return /^(?:School days only\.|Non-school days only\.|Term-time service\.|Timetable varies between school and non-school days\.)$/i.test(text(note));
+  return /^(?:School-day journeys only\.|School days only\.|Non-school days only\.|Term-time service\.|Timetable varies between school and non-school days\.)$/i.test(text(note));
 }
 
 function principalJourneyKeys(service, representativeId) {
@@ -973,7 +974,7 @@ function materialServiceNote(note) {
   if (/operating days could not be fully confirmed|calendar applicability is not confirmed|unresolved calendar/i.test(value)) return 'Operating days could not be fully confirmed; check the timetable before use.';
   if (/school[- ]?days?.*non[- ]school|non[- ]school.*school[- ]?days?/i.test(value)) return 'Timetable varies between school and non-school days.';
   if (/non[- ]school|school holidays?/i.test(value)) return 'Non-school days only.';
-  if (/school[- ]?days?(?:[- ]only)?|schooldays?/i.test(value)) return 'School days only.';
+  if (/school[- ]?days?(?:[- ]only)?|schooldays?/i.test(value)) return 'School-day journeys only.';
   if (/term[- ]time|term[- ]only/i.test(value)) return 'Term-time service.';
   // A source circular assertion is BUS-CIRC evidence only.  It must not leak
   // into planner prose unless the ordered-pattern decision proves a loop.
@@ -988,7 +989,7 @@ function materialServiceNotesForService(service) {
   const raw = text(service?.serviceNote);
   const route = text(service?.routeNumber);
   if (route && /(?:school[- ]?days?|schooldays?)/i.test(raw) && new RegExp(`\\b${route.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(raw)) {
-    return [`Route ${route} operates on school days only.`];
+    return ['School-day journeys only.'];
   }
   if (route && /term[- ]time|term[- ]only/i.test(raw) && new RegExp(`\\b${route.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(raw)) {
     return [`Route ${route} operates in term time only.`];
@@ -1000,7 +1001,7 @@ function noteAppliesToCanonicalPopulation(note, schedules, service = {}) {
   const representedDays = DAY_ORDER.filter(day => (schedules[day] ?? []).length);
   if (/limited service|no more than three scheduled journeys/i.test(note)) return representedDays.length > 0 && representedDays.every(day => (schedules[day] ?? []).length <= 3);
   if (/weekday-only service/i.test(note)) return representedDays.length > 0 && !representedDays.some(day => day === 'saturday' || day === 'sunday');
-  if (/^School days only\.$/i.test(note) && text(service?.calendarProfileId).toLowerCase() === 'school-day') return true;
+  if (/^(?:School days only|School-day journeys only)\.$/i.test(note) && text(service?.calendarProfileId).toLowerCase() === 'school-day') return true;
   if (!/non[- ]school/i.test(note) && /school\s*days?/i.test(note) && representedDays.some(day => day === 'saturday' || day === 'sunday')) return false;
   return true;
 }
@@ -1085,6 +1086,54 @@ function serviceEndpointDecision(service, side) {
   });
 }
 
+function endpointDecisionQuality(decision = {}) {
+  const label = text(decision?.chosenDisplayName || decision?.chosen);
+  const contextual = decision?.decisionType === 'street-landmark-qualified'
+    || (text(decision?.nptgLocalityName) && /\([^)]*\)/u.test(label));
+  const exact = Boolean(decision?.exactEvidence || /exact endpoint|prepared-exact-endpoint|runtime-exact-endpoint/i.test(text(decision?.evidenceSource)));
+  return [
+    Number(!decision?.unresolved && exact),
+    Number(contextual),
+    Number(Boolean(text(decision?.nptgLocalityName))),
+    Number(Boolean(text(decision?.stopArea?.name))),
+    Number(Boolean(label))
+  ];
+}
+
+function compareEndpointDecisionQuality(left, right) {
+  const leftScore = endpointDecisionQuality(left), rightScore = endpointDecisionQuality(right);
+  for (let index = 0; index < leftScore.length; index += 1) {
+    if (leftScore[index] !== rightScore[index]) return rightScore[index] - leftScore[index];
+  }
+  return text(left?.chosenDisplayName || left?.chosen).localeCompare(text(right?.chosenDisplayName || right?.chosen));
+}
+
+function serviceEndpointStopPointIds(service, side) {
+  const decision = service?.[`${side}EndpointDecision`] || {};
+  return unique([
+    service?.[`${side}StopPointId`],
+    ...(service?.[`${side}StopPointIds`] ?? []),
+    decision.primaryEndpointStopPointId,
+    decision.endpointStopPointId,
+    ...(decision.endpointStopPointIds ?? [])
+  ]);
+}
+
+function preferredServiceEndpointDecision(services, side, principal) {
+  const principalDecision = serviceEndpointDecision(principal, side);
+  const principalExact = hasResolvedExactEndpointEvidence(principal, side);
+  const identity = principalExact ? endpointIdentity(principal, side) : '';
+  const principalIds = new Set(serviceEndpointStopPointIds(principal, side));
+  const aliases = (services ?? [])
+    .filter(service => hasResolvedExactEndpointEvidence(service, side))
+    .filter(service => principalExact
+      ? Boolean(identity && !identity.startsWith('source:') && endpointIdentity(service, side) === identity)
+      : serviceEndpointStopPointIds(service, side).some(id => principalIds.has(id)))
+    .map(service => serviceEndpointDecision(service, side))
+    .filter(decision => text(decision?.chosenDisplayName || decision?.chosen));
+  return aliases.sort(compareEndpointDecisionQuality)[0] || principalDecision;
+}
+
 function destinationNames(values) {
   const names = unique(values).filter(Boolean);
   const normalised = names.map(name => ({ name, key: normal(name), words: normal(name).split(' ').filter(Boolean) }));
@@ -1115,7 +1164,7 @@ function variantCalendarQualification(service) {
   const raw = text(service?.serviceNote);
   const profile = calendarProfileFromService(service);
   if (profile === 'non-school-day' || /non[- ]school/i.test(raw)) return 'non-school days only';
-  if (profile === 'school-day' || /\bschool[- ]?days?\b|\bschooldays?\b/i.test(raw)) return 'school days only';
+  if (profile === 'school-day' || /\bschool[- ]?days?\b|\bschooldays?\b/i.test(raw)) return 'School-day journeys only';
   if (profile === 'term-time' || /term[- ]time|term[- ]only/i.test(raw)) return 'term time only';
   if (profile === 'holiday' || /holiday/i.test(raw)) return 'holidays only';
   return '';
@@ -1244,8 +1293,8 @@ function buildPlannerServiceGroup(component, stops, main, representative, public
   const operatorNames = operatorDisplayNames(component);
   const endpointEvidence = unique(component.map(service => `${text(service.origin)} → ${text(service.destination)}`)).sort();
   const endpointIdentity = endpointEvidence.map(value => normal(value)).join('~');
-  const originDecision = serviceEndpointDecision(main, 'origin');
-  const destinationDecision = serviceEndpointDecision(main, 'destination');
+  const originDecision = preferredServiceEndpointDecision(component, 'origin', main);
+  const destinationDecision = preferredServiceEndpointDecision(component, 'destination', main);
   const groupingDecision = makePublicServiceGroupingDecision({
     services: component,
     principal: main,
@@ -1324,8 +1373,8 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const representative = selectRepresentativeStop(component, stops);
   const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
   const plannerServiceGroup = serviceGroupOverride || buildPlannerServiceGroup(component, stops, main, representative, publicRouteFamilyKey);
-  const destinationDecision = serviceEndpointDecision(main, 'destination');
-  const originDecision = serviceEndpointDecision(main, 'origin');
+  const destinationDecision = plannerServiceGroup.destinationEndpointDecision || serviceEndpointDecision(main, 'destination');
+  const originDecision = plannerServiceGroup.originEndpointDecision || serviceEndpointDecision(main, 'origin');
   const circularServiceDecision = plannerServiceGroup.circularServiceDecision
     || resolveCircularServiceDecision(component, { principal: main, component });
   const rowCircular = circularClassificationIsProven(circularServiceDecision);
@@ -1829,13 +1878,37 @@ function sameFamilyLocation(left, right) {
 }
 
 function sameStructuredPlannerPlace(leftKeys = [], rightKeys = []) {
-  const left = new Set(leftKeys.map(normal).filter(Boolean));
-  return rightKeys.some(key => left.has(normal(key)));
+  const left = leftKeys.map(normal).filter(Boolean);
+  const right = rightKeys.map(normal).filter(Boolean);
+  const strong = keys => keys.filter(key => /^(?:stop-area|stop-point):/i.test(key));
+  const leftStrong = strong(left), rightStrong = strong(right);
+  // Exact StopArea/StopPoint evidence is authoritative.  If both sides have
+  // it, only a shared canonical key proves aliasing; locality/place labels
+  // cannot override a physical mismatch.
+  if (leftStrong.length || rightStrong.length) {
+    return leftStrong.length > 0 && rightStrong.length > 0
+      && rightStrong.some(key => leftStrong.includes(key));
+  }
+  const leftPlace = new Set(left.filter(key => /^(?:place|place-name):/i.test(key)));
+  return right.some(key => leftPlace.has(key));
 }
 
 function plannerServiceDestinationKeys(service) {
   const looksLikeDecision = service && (service.endpointStopPointId || service.primaryEndpointStopPointId || service.stopArea || service.chosenDisplayName || service.chosen);
   return endpointLocationKeys(looksLikeDecision ? service : (service?.destinationEndpointDecision ?? service?.destinationDecision ?? {}));
+}
+
+function sameCanonicalPlannerEndpoint(left, right, side = 'destination') {
+  if (!left || !right) return false;
+  const leftExact = hasResolvedExactEndpointEvidence(left, side);
+  const rightExact = hasResolvedExactEndpointEvidence(right, side);
+  if (!leftExact && !rightExact) return false;
+  if (leftExact && rightExact) {
+    const leftIdentity = endpointIdentity(left, side), rightIdentity = endpointIdentity(right, side);
+    if (leftIdentity && rightIdentity && !leftIdentity.startsWith('source:') && leftIdentity === rightIdentity) return true;
+  }
+  const leftIds = new Set(serviceEndpointStopPointIds(left, side));
+  return serviceEndpointStopPointIds(right, side).some(id => leftIds.has(id));
 }
 
 function plannerNaturalList(values = []) {
@@ -1894,7 +1967,7 @@ function humanQualification(value) {
   const route = raw.match(/^Route\s+([^–-]+?)\s*[–-]\s*(.+)$/i);
   const qualifier = route ? route[2] : raw;
   if (/non[- ]school/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates on non-school days only` : 'Runs on non-school days only';
-  if (/\bschool days only\b|\bschool-day\b/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates on school days only` : 'Runs on school days only';
+  if (/\bschool(?:[- ]day)?(?: journeys)? only\b|\bschool-day\b/i.test(qualifier)) return 'School-day journeys only';
   if (/term[- ]time|term[- ]only/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates during term time only` : 'Operates during term time only';
   if (/holiday/i.test(qualifier)) return route ? `Route ${route[1].trim()} operates on holidays only` : 'Operates on holidays only';
   return raw;
@@ -1930,17 +2003,20 @@ function plannerAnnotationTaxonomy(row) {
   const addAdditionalEntry = (route, locations, variantKind = null, service = null) => {
     const cleanLocations = unique(locations);
     if (!text(route) || !cleanLocations.length) return;
-    const exists = additionalServiceEntries.some(entry => entry.routeNumber === text(route)
+    const existingIndex = additionalServiceEntries.findIndex(entry => entry.routeNumber === text(route)
       && entry.locations.length === cleanLocations.length
       && entry.locations.every((location, index) => normal(location) === normal(cleanLocations[index])));
-    if (!exists) additionalServiceEntries.push(Object.freeze({
-      routeNumber: text(route),
-      locations: Object.freeze(cleanLocations),
-      variantKind: text(variantKind) || null,
-      evidenceKey: annotationEvidenceKey(service, route, cleanLocations.join('|')),
-      patternComplete: annotationPatternComplete(service),
-      pattern: Object.freeze(annotationPattern(service))
-    }));
+    if (existingIndex < 0) additionalServiceEntries.push(Object.freeze({
+        routeNumber: text(route),
+        locations: Object.freeze(cleanLocations),
+        variantKind: text(variantKind) || null,
+        evidenceKey: annotationEvidenceKey(service, route, cleanLocations.join('|')),
+        patternComplete: annotationPatternComplete(service),
+        pattern: Object.freeze(annotationPattern(service))
+      }));
+    else if (!additionalServiceEntries[existingIndex].variantKind && text(variantKind)) {
+      additionalServiceEntries[existingIndex] = Object.freeze({ ...additionalServiceEntries[existingIndex], variantKind: text(variantKind) });
+    }
     addUnique(additionalServices, `${text(route)} – ${cleanLocations.join(', ')}`);
   };
   const addShortWorkingEntry = (route, location, service = null, variantKind = null) => {
@@ -1959,6 +2035,7 @@ function plannerAnnotationTaxonomy(row) {
     addUnique(shortWorkings, `${text(route)} – ${cleanLocation}`);
   };
   const services = row?.rawServiceSummaries?.length ? [...row.rawServiceSummaries] : [];
+  const principalEndpointService = services.find(service => normal(plannerDestination(service)) === mainDestination) || services[0] || null;
   const duplicateIds = new Set(row?.publicServiceGroupingDecision?.deduplicatedSourceRecordIds ?? []);
   const principalSourceIds = new Set(services[0]?.sourceRecordIds ?? []);
   const samePhysicalJourney = services.length > 1
@@ -1999,7 +2076,8 @@ function plannerAnnotationTaxonomy(row) {
     const route = text(variant.routeNumber || service?.routeNumber || row.routeNumber);
     if (!destination && !origin) continue;
     const variantKeys = unique([...(variant.endpointPlaceKeys ?? []), ...(variant.endpointStopPointIds ?? []), ...plannerServiceDestinationKeys(service)]);
-    const sameMainPlace = destination && sameStructuredPlannerPlace(mainDestinationKeys, variantKeys);
+    const sameMainPlace = destination && (sameCanonicalPlannerEndpoint(service, principalEndpointService)
+      || sameStructuredPlannerPlace(mainDestinationKeys, variantKeys));
     if ((variant.kind === 'short-working' && origin && normal(origin) !== mainOrigin)
       || (origin && normal(destination) === mainDestination && normal(origin) !== mainOrigin)) {
       const location = origin || destination;
@@ -2025,7 +2103,8 @@ function plannerAnnotationTaxonomy(row) {
       const originDiffers = origin && normal(origin) !== mainOrigin;
       const route = service.routeNumber || row.routeNumber;
       const serviceKeys = plannerServiceDestinationKeys(service);
-      const sameMainPlace = destination && sameStructuredPlannerPlace(mainDestinationKeys, serviceKeys);
+      const sameMainPlace = destination && (sameCanonicalPlannerEndpoint(service, principalEndpointService)
+        || sameStructuredPlannerPlace(mainDestinationKeys, serviceKeys));
       const knownShortWorking = (service.sourceRecordIds ?? []).some(sourceId => shortWorkingSourceIds.has(sourceId));
       if (knownShortWorking && originDiffers && destination && (normal(destination) === mainDestination || sameMainPlace)) {
          addShortWorkingEntry(route, origin, service);
@@ -2057,7 +2136,8 @@ function plannerAnnotationTaxonomy(row) {
       const candidateKeys = matchingVariant
         ? unique([...(matchingVariant.endpointPlaceKeys ?? []), ...(matchingVariant.endpointStopPointIds ?? [])])
         : plannerServiceDestinationKeys(matchingService);
-      const sameMainPlace = sameStructuredPlannerPlace(mainDestinationKeys, candidateKeys);
+      const sameMainPlace = sameCanonicalPlannerEndpoint(matchingService, principalEndpointService)
+        || sameStructuredPlannerPlace(mainDestinationKeys, candidateKeys);
       const isShortVariant = matchingVariant?.kind === 'short-working'
         || (matchingService?.sourceRecordIds ?? []).some(sourceId => (row?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []).includes(sourceId));
       if (isShortVariant && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
@@ -2177,7 +2257,7 @@ function attachRouteNotes(rows) {
   prepared.forEach((row, index) => { const key = row.publicRouteFamilyKey || row.routeGroupKey; if (!groups.has(key)) groups.set(key, []); groups.get(key).push({ row, index }); });
   const notesFor = row => unique(text(row.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean));
   const structuredQualification = note => /school[- ]?days?|term[- ]time|non[- ]school|holiday|operating days could not be fully confirmed/i.test(text(note));
-  const sharedTaxonomy = new Set(['School days only.', 'Term-time service.', 'Non-school days only.', 'Circular service.']);
+  const sharedTaxonomy = new Set(['School-day journeys only.', 'School days only.', 'Term-time service.', 'Non-school days only.', 'Circular service.']);
   const updates = new Map();
   for (const group of groups.values()) {
     const rowNotes = group.map(({ row }) => notesFor(row));

@@ -113,7 +113,7 @@ const route657 = rowsFor([fixture({ routeNumber: '657', operator: 'Stagecoach Lo
 assert.equal(route657.length, 1);
 assert.equal(route657[0].departuresByDay.saturday.length, 0);
 assert.equal(route657[0].departuresByDay.sunday.length, 0);
-assert.equal(route657[0].serviceNote, 'School days only.');
+assert.equal(route657[0].serviceNote, 'School-day journeys only.');
 
 const wording = buildControlledBusWording(route25C, { nearestGroupName: 'Representative Stop' });
 assert.doesNotMatch(wording, /verified service|verified destination|verified pattern|verified timetable/i);

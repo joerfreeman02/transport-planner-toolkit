@@ -66,7 +66,7 @@ test('circular services with the same endpoints retain opposite directions', () 
 
 test('circular, school-day and limited qualifications remain visible', () => {
   const [summary] = buildServiceSummaries([{ id: 'A' }], [{ id: 'school-loop', routeNumber: 'S1', operator: 'School Bus', origin: 'School', destination: 'School', direction: 'Clockwise', circular: true, principalLocations: [], qualifications: ['School-day-only service.'], stopSchedules: { A: { monday: [480], tuesday: [480], wednesday: [480], thursday: [480], friday: [480], saturday: [], sunday: [] } } }]);
-  assert.match(summary.serviceNote, /School days only\./);
+  assert.match(summary.serviceNote, /School-day journeys only\./);
   assert.match(summary.serviceNote, /Circular service\./);
 });
 

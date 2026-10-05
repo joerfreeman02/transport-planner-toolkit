@@ -89,7 +89,7 @@ assert.equal(rows([record({ id: 'n13', routeNumber: 'N13' }), record({ id: '13',
 const school13 = record({ id: 'school-13', routeNumber: '13C', calendarProfileId: 'school-day', serviceNote: 'Route 13C operates on school days only.', sourceRouteIds: ['family-13'], departuresByDay: { ...week, saturday: [], sunday: [] } });
 const term13 = record({ id: 'term-13', routeNumber: '13', calendarProfileId: 'term-time', serviceNote: 'Route 13 operates in term-time only.', sourceRouteIds: ['family-13'] });
 const calendarRows = rows([school13, term13]);
-assert.ok(calendarRows.some(row => /school days/i.test(`${row.serviceNote} ${row.routeGroupNote || ''}`)));
+assert.ok(calendarRows.some(row => /school-day journeys only/i.test(`${row.serviceNote} ${row.routeGroupNote || ''}`)));
 assert.ok(calendarRows.some(row => /term time/i.test(`${row.serviceNote} ${row.routeGroupNote || ''}`)));
 const sameMinute = rows([record({ id: 'journey-a', routeNumber: '242', departureEvidenceByDay: { monday: [{ minute: 500, journeyIdentity: 'A', provider: 'TfL' }], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] } }), record({ id: 'journey-b', routeNumber: '242', departureEvidenceByDay: { monday: [{ minute: 500, journeyIdentity: 'B', provider: 'TfL' }], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] } })]);
 assert.equal(sameMinute[0].canonicalDeparturePopulation.monday.length, 2, 'same-minute journeys with different identities are not deduplicated');

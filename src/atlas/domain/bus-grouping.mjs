@@ -121,9 +121,10 @@ export function endpointPlaceKeys(service = {}, side = 'destination') {
     ...(patternEndpoint?.logicalGroupRefs ?? []).map(ref => ref?.id),
     ...(patternEndpoint?.logicalGroupIds ?? [])
   ].filter(Boolean);
+  // Keep canonical endpoint identity ahead of contextual locality labels.
+  // A locality is useful presentation evidence, but it must not make two
+  // different physical termini equivalent merely because they are nearby.
   add('stop-area', stopAreas.map(value => normal(value)));
-  add('place', [decision.endpointLogicalPlaceId, evidence.endpointLogicalPlaceId, decision.logicalPlaceId, evidence.logicalPlaceId,
-    ...resolvedPreparedEntries.map(entry => entry.nptgLocalityName), patternEndpoint?.nptgLocalityName, patternEndpoint?.localityName].map(normal));
   add('stop-point', [
     decision.primaryEndpointStopPointId,
     decision.endpointStopPointId,
@@ -135,6 +136,8 @@ export function endpointPlaceKeys(service = {}, side = 'destination') {
     ...(service?.[`${side}StopPointIds`] ?? []),
     orderedPattern[side === 'origin' ? 0 : -1]
   ].map(normal));
+  add('place', [decision.endpointLogicalPlaceId, evidence.endpointLogicalPlaceId, decision.logicalPlaceId, evidence.logicalPlaceId,
+    ...resolvedPreparedEntries.map(entry => entry.nptgLocalityName), patternEndpoint?.nptgLocalityName, patternEndpoint?.localityName].map(normal));
   add('place-name', [decision.chosenDisplayName, decision.chosen, evidence.stopArea?.name, ...(evidence.stopAreas ?? []).map(area => area?.name),
     ...resolvedPreparedEntries.flatMap(entry => [entry.naptanCommonName, ...(entry.stopAreas ?? []).map(area => area?.name)])].map(normal));
   return unique(keys);

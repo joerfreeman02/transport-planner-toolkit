@@ -51,7 +51,7 @@ assert.equal(unresolved.serviceNote, '');
 assert.match(unresolved.routeGroupNote, /Service qualification: Operating days could not be fully confirmed; check the timetable before use\./);
 
 const school = buildPlannerBusServiceSummaries([syntheticBase({ routeNumber: 'S1', calendarProfileId: 'school-day', serviceNote: 'School-day-only service.' })], [{ id: 'A', name: 'Origin', distanceMetres: 1 }])[0];
-assert.match(`${school.routeGroupNote} ${school.plannerNotes.serviceQualification}`, /Runs on school days only\./);
+assert.match(`${school.routeGroupNote} ${school.plannerNotes.serviceQualification}`, /School-day journeys only\./);
 const term = buildPlannerBusServiceSummaries([syntheticBase({ routeNumber: 'T1', calendarProfileId: 'term-time', serviceNote: 'Term-time service.' })], [{ id: 'A', name: 'Origin', distanceMetres: 1 }])[0];
 assert.match(`${term.routeGroupNote} ${term.plannerNotes.serviceQualification}`, /Operates during term time only\./);
 const nationalNoTaxonomy = buildPlannerBusServiceSummaries([syntheticBase({ routeNumber: 'N1' })], [{ id: 'A', name: 'Origin', distanceMetres: 1 }])[0];

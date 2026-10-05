@@ -27,6 +27,7 @@ await import('./bus-word-export.test.mjs');
 await import('./bus-ui-contract.test.mjs');
 await import('./bus-planner-golden-rule.test.mjs');
 await import('./bus-dest-endpoint-intelligence.test.mjs');
+await import('./bus-endpoint-alias-closeout.test.mjs');
 await import('./playwright-launch.test.mjs');
 await import('./tnds-transxchange.test.mjs');
 await import('./tnds-preparation-multiservice.test.mjs');

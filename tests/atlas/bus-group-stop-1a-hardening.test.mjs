@@ -158,10 +158,10 @@ assert.ok(plannerRows.length >= 2, 'the fictional branch remains a separate publ
 const plannerText = plannerRows.map(row => `${row.serviceNote} ${row.routeGroupNote ?? ''} ${row.routeVariantNote ?? ''}`).join(' ');
 assert.match(plannerText, /Q1/);
 assert.match(plannerText, /Midpoint/);
-assert.match(plannerText, /school days only/i);
+assert.match(plannerText, /school-day journeys only/i);
 const wordTables = buildBusWordTables({ ok: true, stops: assessedStops, plannerServiceSummaries: plannerRows, serviceSummaries: [] });
 const wordText = wordTables.flatMap(table => table.rows ?? []).map(row => Array.isArray(row) ? row.join(' ') : String(row?.text ?? '')).join(' ');
 assert.match(wordText, /Q1/);
-assert.match(wordText, /school days only/i);
+assert.match(wordText, /school-day journeys only/i);
 
 console.log('PASS BUS-GROUP-1A exactness, authority, audit, calendar, route attribution, service-relevant terminus, ambiguity, and fictional generalisation controls.');

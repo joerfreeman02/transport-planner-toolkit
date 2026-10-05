@@ -203,7 +203,7 @@ assert.equal(groveP.data[0].departureEvidenceByDay.monday[0].journeyIdentity, '6
 const grovePSummary = buildServiceSummaries([{ id: 'GROVE-P', name: 'Grove Road', indicator: 'P' }], groveP.data)[0];
 assert.match(grovePSummary.typicalFrequencyText, /Mon-Fri: 1 journey\/day/);
 assert.match(grovePSummary.operatingPeriodLines.join(' '), /Mon-Fri: Departs approx\. 07:56/);
-assert.match(grovePSummary.serviceNote, /School days only/);
+assert.match(grovePSummary.serviceNote, /School-day journeys only/);
 const groveN = await tfl657.servicesForStop({ lineId: '657', stopPointId: 'GROVE-N', routeMetadata: routeMetadata657 });
 assert.deepEqual(groveN.data[0].stopSchedules['GROVE-N'].monday, [982], 'Grove Road Stop N keeps its own 16:22 timetable time');
 assert.match(buildServiceSummaries([{ id: 'GROVE-N', name: 'Grove Road', indicator: 'N' }], groveN.data)[0].operatingPeriodLines.join(' '), /Mon-Fri: Departs approx\. 16:22/);

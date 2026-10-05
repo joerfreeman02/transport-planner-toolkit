@@ -78,8 +78,11 @@ The deterministic 1C presentation test verifies that supplementary audit evidenc
 - review URL: `http://127.0.0.1:8769/atlas/?review=v2#modules`;
 - `isV2Review`: `true` from the `review=v2` runtime mode;
 - V2 data base: `/__atlas-review/v2-data/`;
-- exact final build header: `Development/Test build · BUS-TFL-COMPLETE · <final branch short SHA>`; the exact final short SHA is reported with the final handover after the document commit;
-- Waltham, Chingford, central-London and Pipers Browser/Word parity: verified; each export was inspected as DOCX XML and the leaked raw audit diagnostic was absent.
+- exact final build header: verified in the final replay as `Development/Test build · BUS-TFL-COMPLETE · 3fd8877`; the documentation-only final commit SHA is reported with the final handover;
+- final Waltham replay: `16 stops · 17 planner service summaries`, 217 `04:00–00:59` next day, 317 `05:00–00:59` next day, 327 `07:00–19:59`, N279 `00:00–04:59` next day; no false operating-period review note;
+- final Chingford replay: `19 stops · 21 planner service summaries`, both 657 directions remain `1 journey/day` at approximately `07:53` and `16:22`, with no false operating-period review note;
+- final central-London replay: `27 stops · 37 planner service summaries`, ordinary 135/205/N205 presentation retained, with no false operating-period review note;
+- Waltham, Chingford, central-London and Pipers Browser/Word parity: verified; each final export was inspected as DOCX XML and the leaked raw audit diagnostic and false operating-period review note were absent.
 
 ## 7. Automated verification
 

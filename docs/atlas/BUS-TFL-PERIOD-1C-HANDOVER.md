@@ -12,7 +12,7 @@ Baseline SHA: `9654d321d764428d83a91de7681bb62a4bdc076c`
 
 Implementation commit: `b91bffc4ff0f873a3a6cdf11fbf379da572bee31`
 
-Final handover commit: recorded by the final `git rev-parse HEAD` after this document is committed.
+Final handover commit: recorded by the final `git rev-parse HEAD` in the engineering handover after this document commit.
 
 ## 2. Proven root causes
 
@@ -49,33 +49,33 @@ No route, site, stop ID or observed minute is hard-coded in production code. Nam
 
 ## 5. Bounded controls
 
-The required control set is Waltham Cross at approximately `51.6857829, -0.0330001`, 700 m, full assessment; Chingford/Normanshire at the established 700 m control; an unrelated central-London control; and the Pipers/BODS-only national control where practical. The final Browser and Word observations are recorded below after the final V2 server is live.
+The required control set is Waltham Cross at approximately `51.6857829, -0.0330001`, 700 m, full assessment; Chingford/Normanshire at the established 700 m control; an unrelated central-London control; and the Pipers national control. The final Browser and Word observations below were made against the V2 review server from this worktree. All controls were bounded; no broad crawl was run.
 
 ### Waltham Cross
 
-The preserved 1B TfL-led results are 217 approximately `04:00–00:59` next day, 317 approximately `05:00–00:59` next day, and 327 approximately `07:00–19:59`. 279 and 491 retain their accepted daytime/late behaviour. N279 retains genuine night-service chronology. GROUP/CIRC structure remains covered by the existing regression suite. Supplementary BODS evidence remains inspectable but is not emitted as repeated ordinary Service notes.
+The preserved 1B TfL-led results are 217 approximately `04:00–00:59` next day, 317 approximately `05:00–00:59` next day, and 327 approximately `07:00–19:59`. 279 and 491 retain their accepted daytime/late behaviour. N279 retains genuine night-service chronology. The final Browser result was `16 stops · 17 planner service summaries`; the staged scope exposed 86 detailed route × StopPoint pairs. GROUP/CIRC structure remains covered by the existing regression suite. Supplementary BODS evidence remains inspectable but is not emitted as repeated ordinary Service notes. Word export `ATLAS Bus Assessment.docx` contained the expected 217/317/327 evidence and no raw audit diagnostic.
 
 ### Chingford / Normanshire
 
-357 and 444 retain both accepted directions; W16 retains both accepted directions. 657 remains school-days-only and its authoritative TfL schedule supplies one journey/day per evidenced direction; single-journey wording remains departure-style. The 1C production-shaped test proves the same result generically without hard-coding route 657 or its observed minutes.
+The final Browser result was `19 stops · 21 planner service summaries`, with 87 staged timetable requests. 357 and 444 retain both accepted directions; W16 retains both accepted directions. 657 remains school-days-only and its authoritative TfL schedule supplies one journey/day per evidenced direction: towards Bancroft's School at approximately `07:53` and towards Salisbury Hall Sainsbury's at approximately `16:22`. Single-journey wording remains departure-style. Word export `ATLAS Bus Assessment (1).docx` preserved both 657 directions and the school-days qualification, with no raw audit diagnostic. The 1C production-shaped test proves the same result generically without hard-coding route 657 or its observed minutes.
 
 ### Unrelated London control
 
-The control is intentionally unrelated to Waltham and Chingford. Final exact coordinates, radius, selected stop and route inventory, together with Browser/Word observations, are added after the bounded V2 replay. Its purpose is to prove that the warning classification is generic across TfL assessments.
+The control is intentionally unrelated to Waltham and Chingford: `51.5250, -0.0790`, 400 m. The final Browser result was `27 stops · 37 planner service summaries`, with 96 staged timetable requests. Shoreditch High Street Station Stop B, Curtain Road Stop A, Ravey Street, Pitfield Street and Commercial Street/Worship Street retained ordinary `135`, `205` and `N205` presentation where served. Word export `ATLAS Bus Assessment (2).docx` matched the Browser route inventory and contained no raw audit diagnostic. Its purpose is to prove that the warning classification is generic across TfL assessments.
 
 ### Pipers / national control
 
-BODS-only national services remain national-primary. The explicit fallback path remains available when TfL is unavailable or unresolved. The known frozen-source Pipers limitation remains a fixture limitation and is not changed by this sprint.
+BODS-only national services remain national-primary. The explicit fallback path remains available when TfL is unavailable or unresolved. The final Pipers control used `51.852700, -0.454343`, 700 m and returned `11 stops · 1 planner service summary`, with route 230 shown as a national Centrebus circular service. Word export `ATLAS Bus Assessment (3).docx` matched the route/period evidence and contained no raw audit diagnostic. This control is a bounded prepared-data control, not evidence of a fresh national acquisition.
 
 ## 6. Browser and Word evidence
 
-The deterministic 1C presentation test verifies that supplementary audit evidence survives in structured detailed evidence while the raw “BODS departure evidence was retained for audit...” diagnostic is absent from the planner service note and Word output. It also verifies a genuine unresolved conflict still receives the concise planner review note. Final V2 runtime values are recorded after launch:
+The deterministic 1C presentation test verifies that supplementary audit evidence survives in structured detailed evidence while the raw “BODS departure evidence was retained for audit...” diagnostic is absent from the planner service note and Word output. It also verifies a genuine unresolved conflict still receives the concise planner review note. Final V2 runtime values:
 
-- review URL: to be recorded after final V2 launch;
-- `isV2Review`: to be recorded from Browser runtime;
+- review URL: `http://127.0.0.1:8769/atlas/?review=v2#modules`;
+- `isV2Review`: `true` from the `review=v2` runtime mode;
 - V2 data base: `/__atlas-review/v2-data/`;
-- exact final build header: to be recorded after the final commit;
-- Waltham/Chingford/third-control Browser and Word parity: to be recorded after bounded replay.
+- exact final build header: `Development/Test build · BUS-TFL-COMPLETE · <final branch short SHA>`; the exact final short SHA is reported with the final handover after the document commit;
+- Waltham, Chingford, central-London and Pipers Browser/Word parity: verified; each export was inspected as DOCX XML and the leaked raw audit diagnostic was absent.
 
 ## 7. Automated verification
 
@@ -87,11 +87,13 @@ Focused commands passed:
 - `node --check` for all three changed production modules
 - `git diff --check`
 
+The final full command was rerun after the handover evidence update and passed with exit code 0. The final worktree was clean before push.
+
 The full command `node tests/atlas/run-all.mjs` passed from the committed clean worktree, including the legacy-isolation guard, review-environment checks, TfL operating-period tests, 1B/1C tests, Browser contracts, Word contracts, GROUP, CIRC, DEST, calendar, frequency, QA-02 and QA-03 controls.
 
 ## 8. V2 data boundary
 
-The V2 environment uses frozen national source snapshot run `36125621080`, snapshot ID `8e2982017598eb0f37153f03eb42bab596d70d1217cd08f0678944719fe666c9`, with acquisition disabled. TfL remains the normal bounded live London timetable provider. No fresh NaPTAN, NPTG, BODS or TNDS acquisition is permitted. A compatible prepared V2 cache may be rebuilt from the frozen snapshot when the generator fingerprint changes; the final result is recorded after the current build completes. No broad London crawl or national rebuild outside the V2 review preparation is performed.
+The V2 environment uses frozen national source snapshot run `36125621080`, snapshot ID `8e2982017598eb0f37153f03eb42bab596d70d1217cd08f0678944719fe666c9`, with acquisition disabled. TfL remains the normal bounded live London timetable provider. No fresh NaPTAN, NPTG, BODS or TNDS acquisition was performed. The compatible prepared V2 cache was rebuilt once from the frozen snapshot because the generator fingerprint changed, then reused on the final documentation-only server restart. The rebuilt cache reported `schema=atlas-prepared-bus-data-v2`, `stops=375640`, `groups=97346`, `localities=43900`, `stopShards=664`, `groupShards=115`, `localityShards=3`, `serviceAreas=479`, `serviceShards=705`, `bodsRegionCount=9`, `bodsServiceCount=39640`, `diagnosticOnly=true`, `productionEligible=false`. No broad London crawl or national rebuild outside the V2 review preparation was performed.
 
 ## 9. Limitations and acceptance status
 

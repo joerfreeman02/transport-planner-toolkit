@@ -14,7 +14,7 @@ Date: 2026-10-05 (Europe/London)
 - Safe prior branch preserved unchanged: `codex/atlas-bus-robustness-1a-calendar-simple` at `d86be60fa82da2d430649f077c4ef52878e1b042`.
 - Implementation commit: `86b9d9c80b7a9e225bafa8118ceedb72a5e72493`.
 - Documentation handover commit before final review refresh: `0847978439ac30a5648b4eaf982c87c88280ff13`.
-- Final code/review tip: `3f32dbd64385a5a6fe08f40a82e8086f247f66f8`.
+- Final code/review tip: `8a3178791493f47f8a87221a7d5046e442c07fbe`.
 - No merge, deploy, publish, production refresh, Alpha.16 work, 1B work, or unrelated polish was performed.
 
 ## Files changed
@@ -159,7 +159,7 @@ ATLAS Alpha.15 deterministic suite passed.
 ## Review build and acceptance boundary
 
 - Final V2 development/review build verified at `http://127.0.0.1:8770/atlas/?review=v2`.
-- Verified response: HTTP 200, ATLAS route served, build identity `BUS-TFL-COMPLETE · 3f32dbd`.
+- Verified response: HTTP 200, ATLAS route served, build identity `BUS-TFL-COMPLETE · 8a31787`.
 - The review build was served from a clean documentation tip; the implementation SHA remains `86b9d9c80b7a9e225bafa8118ceedb72a5e72493`.
 - The review build must respond on loopback and serve the ATLAS route directly; the legacy dashboard remains recoverable.
 - This handover requests Product Owner manual acceptance of the reproduced Enfield Town 250m review.

@@ -86,6 +86,8 @@ function mergeRecordSchedules(first, second) {
     ...first,
     stopSchedules,
     departureEvidenceByDay: mergeDepartureEvidence(first.departureEvidenceByDay, second.departureEvidenceByDay),
+    supplementaryStopSchedules: mergeStopSchedules(first.supplementaryStopSchedules, second.supplementaryStopSchedules),
+    supplementaryDepartureEvidenceByDay: mergeDepartureEvidence(first.supplementaryDepartureEvidenceByDay, second.supplementaryDepartureEvidenceByDay),
     calendarProfileId: first.calendarProfileId || second.calendarProfileId || null,
     calendarEvidence: [...new Map(calendarEvidence.map(item => [JSON.stringify(item), item])).values()],
     operatingPeriodEvidence: [...new Map([...(first.operatingPeriodEvidence ?? []), ...(second.operatingPeriodEvidence ?? [])].map(item => [JSON.stringify(item), item])).values()],
@@ -96,6 +98,15 @@ function mergeRecordSchedules(first, second) {
     destinationStopPointIds: unique([first.destinationStopPointId, ...(first.destinationStopPointIds ?? []), second.destinationStopPointId, ...(second.destinationStopPointIds ?? [])]),
     endpointEvidence: mergeEndpointEvidence(first.endpointEvidence, second.endpointEvidence)
   };
+}
+
+function mergeStopSchedules(first = {}, second = {}) {
+  const output = { ...first };
+  for (const [stopId, schedule] of Object.entries(second ?? {})) {
+    const existing = output[stopId] ?? {};
+    output[stopId] = Object.fromEntries(DAY_ORDER.map(day => [day, numeric([...(existing[day] ?? []), ...(schedule?.[day] ?? [])])]));
+  }
+  return output;
 }
 
 function mergeEndpointEvidence(first = {}, second = {}) {
@@ -398,6 +409,37 @@ function departureEvidenceForRecords(records, stopId) {
   return Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, Object.freeze(evidence[day])])))
 }
 
+function supplementaryDepartureEvidenceForRecords(records, stopId) {
+  const evidence = Object.fromEntries(DAY_ORDER.map(day => [day, []]));
+  for (const record of records ?? []) {
+    const supplementary = record.supplementaryDepartureEvidenceByDay ?? {};
+    for (const day of DAY_ORDER) for (const entry of supplementary[day] ?? []) {
+      if (text(entry?.stopPointId) && text(entry.stopPointId) !== stopId) continue;
+      const minute = Number(entry?.minute ?? entry?.departureMinute ?? entry?.time);
+      if (!Number.isFinite(minute)) continue;
+      evidence[day].push({ ...entry, minute, stopPointId: text(entry?.stopPointId) || stopId, provider: text(entry?.provider) || 'BODS' });
+    }
+  }
+  return Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, Object.freeze(evidence[day])])))
+}
+
+function buildSupplementaryDepartureAuditWarnings(departureEvidenceByDay, supplementaryByDay) {
+  const warnings = [];
+  for (const day of DAY_ORDER) {
+    const authoritativeMinutes = numeric((departureEvidenceByDay?.[day] ?? []).map(entry => entry?.minute));
+    const supplementaryMinutes = numeric((supplementaryByDay?.[day] ?? []).map(entry => entry?.minute));
+    if (!authoritativeMinutes.length || !supplementaryMinutes.length) continue;
+    const warning = supplementaryDepartureWarning(
+      unique((supplementaryByDay?.[day] ?? []).map(entry => entry?.provider))[0],
+      day,
+      authoritativeMinutes,
+      supplementaryMinutes
+    );
+    if (warning) warnings.push(warning);
+  }
+  return Object.freeze(unique(warnings));
+}
+
 function materialQualification(note) {
   return note && !GENERIC_QUALIFICATION_PATTERNS.some(pattern => pattern.test(note));
 }
@@ -569,14 +611,24 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const identity = [first.routeNumber, first.operator, directionGroupKey(first), first.origin, first.destination].map(value => text(value).toLowerCase()).join('|');
     const frequencyStop = representativeStop(stops, records);
     const frequencyBasisStopId = text(frequencyStop?.id || frequencyStop?.sourceId) || stopIds[0] || null;
-    const departuresByDay = mergeDepartures(records, frequencyBasisStopId ? [frequencyBasisStopId] : stopIds);
-    const departureEvidenceByDay = departureEvidenceForRecords(records, frequencyBasisStopId);
-    const operatingPopulation = selectAuthoritativeDepartureEvidence(departureEvidenceByDay);
+    const allDepartureEvidenceByDay = departureEvidenceForRecords(records, frequencyBasisStopId);
+    const operatingPopulation = selectAuthoritativeDepartureEvidence(allDepartureEvidenceByDay);
+    const departureEvidenceByDay = operatingPopulation.authoritativeByDay;
+    const departuresByDay = scheduleFromDepartureEvidence(departureEvidenceByDay);
+    const supplementaryDepartureEvidenceByDay = mergeDepartureEvidence(
+      operatingPopulation.supplementaryByDay,
+      supplementaryDepartureEvidenceForRecords(records, frequencyBasisStopId)
+    );
+    const supplementaryDepartureAuditWarnings = Object.freeze(unique([
+      ...operatingPopulation.warnings,
+      ...buildSupplementaryDepartureAuditWarnings(departureEvidenceByDay, supplementaryDepartureEvidenceByDay)
+    ]));
     const operatingEvidence = selectOperatingPeriodEvidence(records, frequencyBasisStopId);
     const combinedPeriods = combineOperatingPeriodEvidence(operatingPopulation.schedules, operatingEvidence.byDay);
     const periods = combinedPeriods.periods;
     const frequencyEvidence = records.flatMap(record => (record.frequencyEvidence ?? [])
       .filter(item => !item.stopPointId || item.stopPointId === frequencyBasisStopId)
+      .filter(item => !operatingPopulation.authoritativeProvider || normal(providerOfRecord(record, item)) === normal(operatingPopulation.authoritativeProvider))
       .map(item => ({ ...item, source: item.source || record.timetableSource || record.source?.provider || null })));
     const frequencyByDay = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, calculateTypicalServiceFrequency(departuresByDay[day], { day, frequencyEvidence })])));
     const frequencyRepresentativeDay = representativeDay(departuresByDay);
@@ -584,14 +636,16 @@ export function buildServiceSummaries(stops, serviceRecords) {
       ? frequencyByDay[frequencyRepresentativeDay]
       : Object.freeze({ day: null, dayLabel: null, departureCount: 0, basis: 'unavailable', classification: 'unavailable', noService: true, busesPerHour: null, intervalMinutes: null, valueText: 'Frequency unavailable', wording: 'Frequency unavailable' });
     const sourceWarnings = unique(records.flatMap(record => [...(record.sourceWarnings ?? []), ...(record.qualifications ?? [])].filter(sourceDiagnostic)));
-    const calendarEvidence = records.flatMap(record => record.calendarEvidence ?? record.operatingCalendarEvidence ?? []);
+    const calendarEvidence = records.flatMap(record => {
+      if (operatingPopulation.authoritativeProvider && normal(providerOfRecord(record)) !== normal(operatingPopulation.authoritativeProvider)) return [];
+      return record.calendarEvidence ?? record.operatingCalendarEvidence ?? [];
+    });
     const notes = unique([
       ...calendarQualificationNotes(calendarEvidence),
       ...records.flatMap(record => [...(record.serviceNotes ?? []), ...(record.qualifications ?? [])].map(plannerQualificationNote))
     ])
       .filter(note => qualificationAppliesToFinalRow(note, departuresByDay));
-    const operatingPeriodWarnings = unique([...operatingPopulation.warnings, ...operatingEvidence.warnings, ...combinedPeriods.warnings]);
-    if (operatingPeriodWarnings.length) notes.push(...operatingPeriodWarnings);
+    const operatingPeriodWarnings = unique([...operatingEvidence.warnings, ...combinedPeriods.warnings]);
     const endpointPatterns = unique(records.map(record => `${text(record.origin)} → ${text(record.destination)}`));
     if (endpointPatterns.length > 1) notes.push('Includes scheduled short workings or route variants in this direction; the main origin/destination shown is the most extensive pattern in the source timetable.');
     if (records.some(record => record.circular)) notes.push('Circular service.');
@@ -655,12 +709,16 @@ export function buildServiceSummaries(stops, serviceRecords) {
       routePatternExtent: Math.max(0, ...records.map(record => orderedPatternEndpoints(record).length)),
       recordActivity: Math.max(0, ...records.map(record => recordActivity(record, stopIds))),
       operatingPeriods: periods,
-      operatingPeriodEvidence: Object.freeze(records.flatMap(record => (record.operatingPeriodEvidence ?? []).filter(item => !item.stopPointId || item.stopPointId === frequencyBasisStopId))),
+      operatingPeriodEvidence: Object.freeze(records.flatMap(record => {
+        if (operatingPopulation.authoritativeProvider && normal(providerOfRecord(record)) !== normal(operatingPopulation.authoritativeProvider)) return [];
+        return (record.operatingPeriodEvidence ?? []).filter(item => !item.stopPointId || item.stopPointId === frequencyBasisStopId);
+      })),
       operatingPeriodEvidenceState: operatingPeriodWarnings.length ? 'conflict' : operatingEvidence.state,
       operatingPeriodAuthority: Object.freeze({
         provider: operatingPopulation.authoritativeProvider || operatingPopulation.provider,
-        supplementaryProviders: Object.freeze(unique(DAY_ORDER.flatMap(day => operatingPopulation.supplementaryByDay[day].map(entry => entry?.provider)))),
-        supplementaryDepartureEvidenceRetained: Object.freeze(operatingPopulation.supplementaryByDay),
+        supplementaryProviders: Object.freeze(unique(DAY_ORDER.flatMap(day => supplementaryDepartureEvidenceByDay[day].map(entry => entry?.provider)))),
+        supplementaryDepartureEvidenceRetained: Object.freeze(supplementaryDepartureEvidenceByDay),
+        auditWarnings: supplementaryDepartureAuditWarnings,
         warnings: Object.freeze(operatingPopulation.warnings)
       }),
       operatingPeriodReviewWarnings: Object.freeze(operatingPeriodWarnings),
@@ -696,6 +754,9 @@ export function buildServiceSummaries(stops, serviceRecords) {
       sourceRecordIds: unique(records.map(record => record.id)),
       departuresByDay,
       departureEvidenceByDay,
+      supplementaryStopSchedules: Object.freeze(records.reduce((merged, record) => mergeStopSchedules(merged, record.supplementaryStopSchedules), {})),
+      supplementaryDepartureEvidenceByDay,
+      supplementaryDepartureAuditWarnings,
       validity: Object.freeze({ from: unique(records.map(record => record.validFrom)).sort()[0] || null, to: unique(records.map(record => record.validTo)).sort().at(-1) || null })
     });
   });

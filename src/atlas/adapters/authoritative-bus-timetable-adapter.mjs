@@ -143,23 +143,27 @@ function supplementaryDepartureEntries(match, stopId, day, schedule) {
 
 function retainSupplementaryDepartures(service, match) {
   const tflStopIds = new Set(scheduledStopIds(service));
-  const stopSchedules = { ...(service.stopSchedules ?? {}) };
-  const departureEvidenceByDay = Object.fromEntries(WEEK_DAYS.map(day => [day, [...(service.departureEvidenceByDay?.[day] ?? [])]]));
+  const supplementaryDepartureEvidenceByDay = Object.fromEntries(WEEK_DAYS.map(day => [day, [...(service.supplementaryDepartureEvidenceByDay?.[day] ?? [])]]));
+  const supplementaryStopSchedules = { ...(service.supplementaryStopSchedules ?? {}) };
   let retained = false;
   let addedDeparture = false;
   for (const [stopId, schedule] of Object.entries(match?.stopSchedules ?? {})) {
     if (!tflStopIds.has(stopId)) continue;
-    const current = stopSchedules[stopId] ?? {};
+    const current = supplementaryStopSchedules[stopId] ?? {};
     for (const day of WEEK_DAYS) if ((schedule?.[day] ?? []).some(minute => !(current[day] ?? []).includes(minute))) addedDeparture = true;
-    stopSchedules[stopId] = Object.fromEntries(WEEK_DAYS.map(day => [day, [...new Set([...(current[day] ?? []), ...(schedule?.[day] ?? [])])].sort((left, right) => left - right)]));
+    supplementaryStopSchedules[stopId] = Object.fromEntries(WEEK_DAYS.map(day => [day, [...new Set([...(current[day] ?? []), ...(schedule?.[day] ?? [])])].sort((left, right) => left - right)]));
     for (const day of WEEK_DAYS) {
       const entries = supplementaryDepartureEntries(match, stopId, day, schedule);
       if (!entries.length) continue;
-      departureEvidenceByDay[day].push(...entries);
+      supplementaryDepartureEvidenceByDay[day].push(...entries);
       retained = true;
     }
   }
-  return retained ? { service: { ...service, stopSchedules, departureEvidenceByDay }, addedDeparture } : { service, addedDeparture: false };
+  return retained ? {
+    service: { ...service, supplementaryStopSchedules, supplementaryDepartureEvidenceByDay },
+    addedDeparture,
+    retained: true
+  } : { service, addedDeparture: false, retained: false };
 }
 
 function supplement(tfl, bods) {
@@ -182,8 +186,9 @@ function supplement(tfl, bods) {
   if (withSupplementaryDepartures.service !== service) service = withSupplementaryDepartures.service;
   service.provider = 'TfL';
   service.primaryAuthority = 'TfL';
+  const hasSupplementaryEvidence = supplemented || withSupplementaryDepartures.retained;
   service.timetableSource = supplemented ? 'TfL + BODS supplementary' : 'TfL';
-  service.source = { ...service.source, provider: 'TfL', primaryAuthority: 'TfL', supplementaryProvider: supplemented ? 'BODS' : null };
+  service.source = { ...service.source, provider: 'TfL', primaryAuthority: 'TfL', supplementaryProvider: hasSupplementaryEvidence ? 'BODS' : null };
   return { service, matched: true, conflict };
 }
 

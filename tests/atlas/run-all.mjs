@@ -22,6 +22,7 @@ await import('./tfl-request-scheduler.test.mjs');
 await import('./tfl-bus-timetable.test.mjs');
 await import('./tfl-operating-period.test.mjs');
 await import('./tfl-operating-period-1b.test.mjs');
+await import('./tfl-operating-period-1c.test.mjs');
 await import('./bus-word-export.test.mjs');
 await import('./bus-ui-contract.test.mjs');
 await import('./bus-planner-golden-rule.test.mjs');

@@ -90,8 +90,10 @@ const mixedRecords = [
 ];
 const [mixedSummary] = buildServiceSummaries([{ id: 'STOP', name: 'Control stop', distanceMetres: 10 }], mixedRecords);
 assert.deepEqual([mixedSummary.operatingPeriods.monday.firstMinute, mixedSummary.operatingPeriods.monday.lastMinute], [240, 1499], 'TfL operating span beats supplementary exact departures');
-assert.deepEqual(mixedSummary.departuresByDay.monday.slice(0, 2), [5, 25], 'supplementary departures remain retained for audit/frequency');
-assert.match(mixedSummary.operatingPeriodReviewWarnings.join(' '), /retained for audit/);
+assert.deepEqual(mixedSummary.departuresByDay.monday, [290, 1465], 'authoritative frequency population excludes supplementary departures');
+assert.deepEqual(mixedSummary.supplementaryDepartureEvidenceByDay.monday.map(entry => entry.minute), [5, 25, 290, 1465]);
+assert.match(mixedSummary.operatingPeriodAuthority.auditWarnings.join(' '), /retained for audit/);
+assert.doesNotMatch(mixedSummary.serviceNote, /retained for audit/);
 assert.equal(mixedSummary.operatingPeriodAuthority.provider, 'TfL');
 assert.deepEqual(mixedSummary.operatingPeriodAuthority.supplementaryProviders, ['BODS']);
 const [mixedPlannerRow] = buildPlannerBusServiceSummaries([mixedSummary], [{ id: 'STOP', name: 'Control stop', distanceMetres: 10 }]);

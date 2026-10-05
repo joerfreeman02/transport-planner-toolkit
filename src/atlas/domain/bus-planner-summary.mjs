@@ -824,6 +824,17 @@ function profileOperatingPeriodEvidence(component, representativeId, profileId) 
   return { byDay, warnings: selected.warnings, state: selected.state };
 }
 
+function supplementaryAuditForServices(component, representativeId) {
+  const byDay = Object.fromEntries(DAY_ORDER.map(day => [day, []]));
+  for (const service of component ?? []) for (const day of DAY_ORDER) {
+    for (const entry of service?.supplementaryDepartureEvidenceByDay?.[day] ?? []) {
+      if (text(entry?.stopPointId) && text(entry.stopPointId) !== representativeId) continue;
+      byDay[day].push(entry);
+    }
+  }
+  return Object.freeze(byDay);
+}
+
 function profileEligibleServices(component, representativeId, profileId) {
   return component.filter(service => serviceAtRepresentative(service, representativeId)
     && serviceDepartureEntries(service, representativeId).some(entry => {
@@ -843,6 +854,8 @@ function calculateProfileResult(component, representativeId, profileId, partitio
     day,
     partition.entries.filter(entry => entry.day === day)
   ])));
+  const supplementaryDepartureEvidenceByDay = supplementaryAuditForServices(component, representativeId);
+  const supplementaryDepartureAuditWarnings = Object.freeze(unique(component.flatMap(service => service?.supplementaryDepartureAuditWarnings ?? [])));
   const combinedPeriods = combineOperatingPeriodEvidence(operatingPopulation.schedules, operatingEvidence.byDay);
   const periodWarnings = [...operatingPopulation.warnings, ...operatingEvidence.warnings, ...combinedPeriods.warnings];
   return Object.freeze({
@@ -856,10 +869,12 @@ function calculateProfileResult(component, representativeId, profileId, partitio
     operatingPeriodEvidence: Object.freeze(Object.values(operatingEvidence.byDay).flat()),
     operatingPeriodEvidenceState: periodWarnings.length ? 'conflict' : operatingEvidence.state,
     operatingPeriodReviewWarnings: Object.freeze(periodWarnings),
+    operatingPeriodReviewRequired: periodWarnings.length > 0,
     operatingPeriodAuthority: Object.freeze({
       provider: operatingPopulation.authoritativeProvider || operatingPopulation.provider,
-      supplementaryProviders: Object.freeze(unique(DAY_ORDER.flatMap(day => operatingPopulation.supplementaryByDay[day].map(entry => entry?.provider)))),
-      supplementaryDepartureEvidenceRetained: Object.freeze(operatingPopulation.supplementaryByDay),
+      supplementaryProviders: Object.freeze(unique(DAY_ORDER.flatMap(day => supplementaryDepartureEvidenceByDay[day].map(entry => entry?.provider)))),
+      supplementaryDepartureEvidenceRetained: supplementaryDepartureEvidenceByDay,
+      auditWarnings: supplementaryDepartureAuditWarnings,
       warnings: Object.freeze(operatingPopulation.warnings)
     })
   });
@@ -1345,7 +1360,6 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   if (mixedProfileOutput) profileNotes.push('Calendar profiles vary; each frequency line is labelled.');
   if (unresolvedNeedsQualification) profileNotes.push('Operating days could not be fully confirmed; check the timetable before use.');
   const notes = materialServiceNotesForComponent(component, displayResult.schedules);
-  notes.push(...displayResult.operatingPeriodReviewWarnings);
   notes.push(...profileNotes);
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
   const groupingDecision = Object.freeze({
@@ -1410,6 +1424,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     operatingPeriodEvidence: Object.freeze(displayResult.operatingPeriodEvidence),
     operatingPeriodEvidenceState: displayResult.operatingPeriodEvidenceState,
     operatingPeriodReviewWarnings: Object.freeze(displayResult.operatingPeriodReviewWarnings),
+    operatingPeriodReviewRequired: displayResult.operatingPeriodReviewRequired,
     serviceNote: unique(notes).join(' '),
     routeGroupKey: routeGroupKey(main),
     publicRouteFamilyKey: publicRouteFamilyKey || routeGroupKey(main),
@@ -2095,7 +2110,9 @@ function plannerAnnotationTaxonomy(row) {
     shortWorkingEntries: Object.freeze(exclusiveShortWorkingEntries),
     serviceQualification: qualifications.length ? qualifications.join('; ') : null,
     circularService: plannerCircularWording(row?.circularServiceDecision),
-    reviewNote: row?.unresolvedPublicIdentity ? 'Destination requires review before formal use.' : null
+    reviewNote: row?.unresolvedPublicIdentity
+      ? 'Destination requires review before formal use.'
+      : row?.operatingPeriodReviewRequired ? 'Operating-period evidence requires review before formal use.' : null
   });
   return notes;
 }

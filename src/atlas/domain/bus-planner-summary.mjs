@@ -29,6 +29,7 @@ import {
 
 export const PLANNER_METHODOLOGY_NOTE = '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence. Additional source evidence remains available in the ATLAS assessment workspace.';
 export const PLANNER_TERMINUS_PRESENTATION_NOTE = 'Where an assessed stop is the route terminus, ATLAS shows the useful departing direction only; arriving journeys terminating at that stop are not listed separately.';
+export const SCHOOL_HOLIDAY_VARIATION_NOTE = 'Timetable may vary during school holidays.';
 
 const UNKNOWN_CALENDAR_PROFILE = 'unresolved';
 const CALENDAR_PROFILE_ORDER = Object.freeze(['ordinary', 'school-day', 'term-time', 'non-school-day', 'holiday', 'other-resolved', UNKNOWN_CALENDAR_PROFILE]);
@@ -971,6 +972,7 @@ function servedAtText(representative) {
 function materialServiceNote(note) {
   const value = text(note);
   if (!value) return null;
+  if (value.toLowerCase() === SCHOOL_HOLIDAY_VARIATION_NOTE.toLowerCase()) return SCHOOL_HOLIDAY_VARIATION_NOTE;
   if (/operating days could not be fully confirmed|calendar applicability is not confirmed|unresolved calendar/i.test(value)) return 'Operating days could not be fully confirmed; check the timetable before use.';
   if (/school[- ]?days?.*non[- ]school|non[- ]school.*school[- ]?days?/i.test(value)) return 'Timetable varies between school and non-school days.';
   if (/non[- ]school|school holidays?/i.test(value)) return 'Non-school days only.';
@@ -1193,7 +1195,7 @@ function variantNote(component, main, groupingDecision) {
       const id = serviceIdForPlanner(service);
       const destination = plannerDestination(service);
       const kind = shortIds.has(id) ? 'short working' : branchIds.has(id) ? 'route variant' : calendarIds.has(id) ? 'calendar variant' : 'variant';
-      const qualification = variantCalendarQualification(service);
+      const qualification = hasSchoolAndNonSchoolProfiles(component) ? '' : variantCalendarQualification(service);
       const origin = plannerOrigin(service);
       const originDiffers = origin && normal(origin) !== normal(plannerOrigin(main));
       const returnsToAssessedOrigin = endpointPair(service).destination && principalOriginEndpoint
@@ -1217,6 +1219,11 @@ function variantNote(component, main, groupingDecision) {
     return `${route} – ${prefix} ${preposition} ${item.destination}${item.qualification ? ` (${item.qualification})` : ''}.`;
   });
   return notes.length ? notes.join(' ') : 'Additional short workings and timetable variants operate.';
+}
+
+function hasSchoolAndNonSchoolProfiles(services = []) {
+  const profiles = new Set(services.map(calendarProfileFromService));
+  return profiles.has('school-day') && profiles.has('non-school-day');
 }
 
 function serviceIdForPlanner(service) {
@@ -1390,9 +1397,12 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     calculateProfileResult(component, representative.id, profileId, calendarPartition(canonical.entries, profileId, ordinaryEntries, hasOrdinaryProfile))
   ]));
   const effectiveProfileIds = profileIds.filter(profileId => profileResults.get(profileId).entries.length);
-  const displayProfileId = effectiveProfileIds.includes('ordinary') ? 'ordinary' : effectiveProfileIds[0] ?? profileIds[0] ?? null;
+  const schoolHolidayVariant = effectiveProfileIds.includes('school-day') && effectiveProfileIds.includes('non-school-day');
+  const displayProfileId = schoolHolidayVariant
+    ? 'school-day'
+    : effectiveProfileIds.includes('ordinary') ? 'ordinary' : effectiveProfileIds[0] ?? profileIds[0] ?? null;
   const displayResult = profileResults.get(displayProfileId) ?? calculateProfileResult(component, representative.id, displayProfileId, calendarPartition(canonical.entries, displayProfileId, ordinaryEntries, hasOrdinaryProfile));
-  const mixedProfileOutput = effectiveProfileIds.length > 1;
+  const mixedProfileOutput = effectiveProfileIds.length > 1 && !schoolHolidayVariant;
   const outputProfileIds = mixedProfileOutput ? effectiveProfileIds : [displayProfileId];
   const unresolvedNeedsQualification = profileIds.includes(UNKNOWN_CALENDAR_PROFILE)
     && (profileIds.length > 1 || component.some(hasCalendarMetadata));
@@ -1403,7 +1413,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   if (mixedProfileOutput) {
     frequencyLines = outputProfileIds.flatMap(profileId => calendarQualifiedLines(profileResults.get(profileId).frequencyLines, profileId, hasOrdinaryProfile && profileId !== 'ordinary'));
     operatingLines = outputProfileIds.flatMap(profileId => calendarQualifiedLines(profileResults.get(profileId).operatingLines, profileId, hasOrdinaryProfile && profileId !== 'ordinary'));
-  } else if (displayProfileId !== 'ordinary' && (displayProfileId !== UNKNOWN_CALENDAR_PROFILE || unresolvedNeedsQualification)) {
+  } else if (!schoolHolidayVariant && displayProfileId !== 'ordinary' && (displayProfileId !== UNKNOWN_CALENDAR_PROFILE || unresolvedNeedsQualification)) {
     frequencyLines = profileLines(displayFrequencyLines, displayProfileId);
     operatingLines = profileLines(displayOperatingLines, displayProfileId);
   }
@@ -1412,7 +1422,9 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const profileNotes = [];
   if (mixedProfileOutput) profileNotes.push('Calendar profiles vary; each frequency line is labelled.');
   if (unresolvedNeedsQualification) profileNotes.push('Operating days could not be fully confirmed; check the timetable before use.');
-  const notes = materialServiceNotesForComponent(component, displayResult.schedules);
+  const notes = materialServiceNotesForComponent(component, displayResult.schedules)
+    .filter(note => !schoolHolidayVariant || !hasCalendarTaxonomyNote(note));
+  if (schoolHolidayVariant) notes.push(SCHOOL_HOLIDAY_VARIATION_NOTE);
   notes.push(...profileNotes);
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
   const groupingDecision = Object.freeze({
@@ -2064,6 +2076,7 @@ function plannerAnnotationTaxonomy(row) {
 
   const decisionVariants = samePhysicalJourney ? [] : (row?.publicServiceGroupingDecision?.variantDestinationEvidence ?? []);
   const mainDestinationKeys = plannerServiceDestinationKeys(row?.destinationDecision ?? row?.destinationEndpointDecision);
+  const mixedSchoolCalendar = hasSchoolAndNonSchoolProfiles(services);
   for (const variant of decisionVariants) {
     const idSet = new Set(variant.sourceRecordIds ?? []);
     if ([...idSet].some(id => principalSourceIds.has(id))) continue;
@@ -2087,7 +2100,7 @@ function plannerAnnotationTaxonomy(row) {
     } else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
        addAdditionalEntry(route, [destination], variant.kind, service);
     }
-    const qualification = variantCalendarQualification(service);
+    const qualification = mixedSchoolCalendar ? '' : variantCalendarQualification(service);
     if (qualification) addUnique(qualifications, `${route} – ${qualification}`);
   }
 
@@ -2118,7 +2131,7 @@ function plannerAnnotationTaxonomy(row) {
       else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
          addAdditionalEntry(route, [destination], null, service);
       }
-      const qualification = variantCalendarQualification(service);
+      const qualification = mixedSchoolCalendar ? '' : variantCalendarQualification(service);
       if (qualification) addUnique(qualifications, `${service.routeNumber || row.routeNumber} – ${qualification}`);
     }
     // Preserve material alternate destinations even when the source-record
@@ -2151,6 +2164,7 @@ function plannerAnnotationTaxonomy(row) {
 
   const rowQualification = materialServiceNote(row?.serviceNote);
   if (rowQualification && /school|term(?:[- ]time|[- ]only)|non-school|circular|holiday|calendar|operating days could not be fully confirmed/i.test(rowQualification)
+    && rowQualification.toLowerCase() !== SCHOOL_HOLIDAY_VARIATION_NOTE.toLowerCase()
     && !/circular service/i.test(rowQualification)
     && !qualifications.some(existing => normal(existing).includes(normal(rowQualification)))) addUnique(qualifications, rowQualification);
   const shortLocation = value => text(value).replace(/^[^–-]+[–-]\s*/u, '');

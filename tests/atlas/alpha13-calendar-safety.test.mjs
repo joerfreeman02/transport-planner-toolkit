@@ -106,15 +106,19 @@ const profileFrequencyBands = planner([
 assert.equal(profileFrequencyBands.calendarFrequencyByProfile.ordinary.monday.intervalMinutes, 10, 'A: ordinary frequency evidence stays in its profile');
 assert.equal(profileFrequencyBands.calendarFrequencyByProfile['school-day'].monday.intervalMinutes, 5, 'A: school-day frequency evidence stays in its profile');
 
-// B. School and non-school calendars remain distinct within one route-direction row.
+// B. School and non-school calendars retain separate evidence while the
+// school-day timetable is the sole normal planner presentation.
 const schoolNonSchool = planner([
   calendarRecord({ routeNumber: 'B', id: 'B-school', profile: 'school-day', departures: weekdayAt(480) }),
   calendarRecord({ routeNumber: 'B', id: 'B-non-school', profile: 'non-school-day', departures: weekdayAt(540) })
 ]);
 assert.equal(schoolNonSchool.length, 1);
-assert.match(schoolNonSchool[0].typicalFrequencyText, /School days: Mon-Fri: 1 journey\/day/);
-assert.match(schoolNonSchool[0].typicalFrequencyText, /Non-school days: Mon-Fri: 1 journey\/day/);
-assertNoUnconditionalCombinedFrequency(schoolNonSchool[0], 'B: school and non-school service are not summed');
+assert.equal(schoolNonSchool[0].typicalFrequencyText, 'Mon-Fri: 1 journey/day\nSat-Sun: No scheduled service');
+assert.equal(schoolNonSchool[0].operatingPeriodLines.join('\n'), 'Mon-Fri: Departs approx. 08:00\nSat-Sun: No scheduled service');
+assert.equal(schoolNonSchool[0].serviceNote, 'Timetable may vary during school holidays.');
+assert.doesNotMatch(schoolNonSchool[0].typicalFrequencyText, /Non-school days|Standard days|additional/);
+assert.doesNotMatch(`${schoolNonSchool[0].serviceNote} ${schoolNonSchool[0].plannerNotes.serviceQualification || ''}`, /School-day journeys only|Non-school days only/);
+assert.ok(schoolNonSchool[0].calendarDeparturePopulationByProfile['non-school-day'].length, 'B: non-school evidence remains retained');
 
 // C–F. Other resolved profiles follow the same safe row and line model.
 for (const [label, firstProfile, secondProfile] of [

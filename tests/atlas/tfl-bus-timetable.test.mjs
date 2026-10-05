@@ -57,10 +57,10 @@ assert.deepEqual(mixedCalendarResult.data.map(service => service.stopSchedules['
 const mixedCalendarSummaries = buildServiceSummaries([{ id: 'MIX-STOP', name: 'Mixed stop', walking: { status: 'routed', distanceMetres: 100 } }], mixedCalendarResult.data);
 const mixedCalendarPlanner = buildPlannerBusServiceSummaries(mixedCalendarSummaries, [{ id: 'MIX-STOP', name: 'Mixed stop', walking: { status: 'routed', distanceMetres: 100 } }]);
 assert.equal(mixedCalendarPlanner.length, 1, 'calendar variation remains one planner route-direction row');
-assert.match(mixedCalendarPlanner[0].typicalFrequencyText, /School days: Mon-Fri: 1 journey\/day/);
-assert.match(mixedCalendarPlanner[0].typicalFrequencyText, /Non-school days: Mon-Fri: 1 journey\/day/);
-assert.doesNotMatch(mixedCalendarPlanner[0].typicalFrequencyText, /(?:^|\n)Mon-Fri: 2 journeys\/day/, 'calendar-qualified populations are not flattened into an unconditional total');
-assert.match(mixedCalendarPlanner[0].serviceNote, /calendar profile/i);
+assert.equal(mixedCalendarPlanner[0].typicalFrequencyText, 'Mon-Fri: 1 journey/day\nSat-Sun: No scheduled service');
+assert.doesNotMatch(mixedCalendarPlanner[0].typicalFrequencyText, /Standard days|School days \(additional\)|Non-school days \(additional\)/);
+assert.equal(mixedCalendarPlanner[0].serviceNote, 'Timetable may vary during school holidays.');
+assert.ok(mixedCalendarPlanner[0].calendarDeparturePopulationByProfile['non-school-day'].length, 'non-school timetable evidence remains retained');
 
 const multiStopTflPayload = requestedStop => ({
   lineId: 'MSTOP', lineName: 'MSTOP', direction: 'outbound', stations: [{ id: 'MSTOP-A', name: 'MSTOP A' }, { id: 'MSTOP-B', name: 'MSTOP B' }, { id: 'MSTOP-C', name: 'MSTOP C' }],

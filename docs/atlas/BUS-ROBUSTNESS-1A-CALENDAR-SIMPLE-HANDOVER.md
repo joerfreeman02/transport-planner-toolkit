@@ -5,7 +5,7 @@ ATLAS version: `2.0.0-alpha.15`
 Baseline: `bb8f484677c7f44b56043f0ab87768963c281325`  
 Branch: `codex/atlas-bus-robustness-1a-calendar-simple`  
 Worktree: `C:\Users\joe.freeman\OneDrive - EAS Transport\Documents\Transport Planner Toolkit\atlas-bus-robustness-1a-calendar-simple`  
-Final implementation SHA: to be recorded after the implementation commit  
+Final implementation SHA: `03e2798` (`fix: simplify mixed school calendar presentation`)
 
 ## Scope and root cause
 
@@ -84,14 +84,14 @@ The complete deterministic suite command is:
 node tests/atlas/run-all.mjs
 ```
 
-The final clean-worktree execution result will be recorded here after the implementation commit. It must end with `ATLAS Alpha.15 deterministic suite passed.`
+Final clean-worktree result: `node tests/atlas/run-all.mjs` exited `0` and ended with `ATLAS Alpha.15 deterministic suite passed.` The first sandboxed attempt was blocked only at the legacy-isolation subprocess (`spawnSync git init`, `EPERM`); the authoritative rerun with native subprocess permissions passed all deterministic controls.
 
 ## Final review build
 
 Frozen national snapshot: `36125621080`. No fresh national acquisition was performed. The Enfield reproduction used bounded live TfL calls permitted by this sprint; prepared national evidence remained on the accepted configuration.
 
-Final review URL: to be recorded from the final clean implementation review server  
-Build header: to be recorded from the final clean implementation SHA  
+Final review URL: [ATLAS clean implementation review](http://127.0.0.1:58637/atlas/#modules)
+Build header: `BUS-TFL-COMPLETE · 03e2798`
 Browser/Word parity: passed by the deterministic planner and Word-table assertions; Product Owner visual/manual inspection remains the acceptance gate.
 
 ## Changed files

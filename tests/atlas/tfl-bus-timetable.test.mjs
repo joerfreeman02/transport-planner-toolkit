@@ -24,6 +24,10 @@ assert.equal(parseTflPeriodCalendar('Schooldays').schoolDayOnly, true);
 assert.deepEqual(parseTflPeriodCalendar('School days').days, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
 assert.deepEqual(parseTflPeriodCalendar('Monday to Friday, school days').days, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
 assert.deepEqual(parseTflPeriodCalendar('Mon-Fri Schooldays').days, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+assert.deepEqual(parseTflPeriodCalendar('Mon-Th Schooldays').days, ['monday', 'tuesday', 'wednesday', 'thursday']);
+assert.equal(parseTflPeriodCalendar('Mon-Th Schooldays').calendarProfileId, 'school-day');
+assert.deepEqual(parseTflPeriodCalendar('School Friday').days, ['friday']);
+assert.equal(parseTflPeriodCalendar('School Friday').calendarProfileId, 'school-day');
 assert.equal(parseTflPeriodCalendar('Monday-Friday non-schooldays').schoolDayOnly, false);
 assert.equal(parseTflPeriodCalendar('Monday-Friday non-schooldays').nonSchoolDayOnly, true);
 assert.deepEqual(parseTflPeriodCalendar('Unknown custom timetable period').days, [], 'unknown TfL calendar labels never become all seven days');
@@ -59,7 +63,7 @@ const mixedCalendarPlanner = buildPlannerBusServiceSummaries(mixedCalendarSummar
 assert.equal(mixedCalendarPlanner.length, 1, 'calendar variation remains one planner route-direction row');
 assert.equal(mixedCalendarPlanner[0].typicalFrequencyText, 'Mon-Fri: 1 journey/day\nSat-Sun: No scheduled service');
 assert.doesNotMatch(mixedCalendarPlanner[0].typicalFrequencyText, /Standard days|School days \(additional\)|Non-school days \(additional\)/);
-assert.equal(mixedCalendarPlanner[0].serviceNote, 'Timetable may vary during school holidays.');
+assert.equal(mixedCalendarPlanner[0].serviceNote, '');
 assert.ok(mixedCalendarPlanner[0].calendarDeparturePopulationByProfile['non-school-day'].length, 'non-school timetable evidence remains retained');
 
 const multiStopTflPayload = requestedStop => ({

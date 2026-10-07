@@ -115,7 +115,7 @@ const schoolNonSchool = planner([
 assert.equal(schoolNonSchool.length, 1);
 assert.equal(schoolNonSchool[0].typicalFrequencyText, 'Mon-Fri: 1 journey/day\nSat-Sun: No scheduled service');
 assert.equal(schoolNonSchool[0].operatingPeriodLines.join('\n'), 'Mon-Fri: Departs approx. 08:00\nSat-Sun: No scheduled service');
-assert.equal(schoolNonSchool[0].serviceNote, 'Timetable may vary during school holidays.');
+assert.equal(schoolNonSchool[0].serviceNote, '');
 assert.doesNotMatch(schoolNonSchool[0].typicalFrequencyText, /Non-school days|Standard days|additional/);
 assert.doesNotMatch(`${schoolNonSchool[0].serviceNote} ${schoolNonSchool[0].plannerNotes.serviceQualification || ''}`, /School-day journeys only|Non-school days only/);
 assert.ok(schoolNonSchool[0].calendarDeparturePopulationByProfile['non-school-day'].length, 'B: non-school evidence remains retained');

@@ -104,7 +104,7 @@ const pureCalendarRows = buildPlannerBusServiceSummaries([
   record({ id: 'calendar-non-school', routeNumber: 'CAL', calendarProfileId: 'non-school-day', departuresByDay: weekday, serviceNote: 'Non-school days only.' })
 ], stops);
 assert.equal(pureCalendarRows.length, 1);
-assert.equal(pureCalendarRows[0].serviceNote, 'Timetable may vary during school holidays.');
+assert.equal(pureCalendarRows[0].serviceNote, '');
 assert.equal(pureCalendarRows[0].routeVariantNote, null, 'calendar-only records do not create a generic variant note');
 assert.equal(pureCalendarRows[0].routeGroupNote, null);
 assert.equal(pureCalendarRows[0].plannerNotes.shortWorkings, null);
@@ -145,11 +145,19 @@ assert.equal(normalRoute.routeGroupNote, null);
 assert.equal(normalRoute.routeVariantNote, null);
 assert.equal(normalRoute.plannerNotes.shortWorkings, null);
 
-const wordText = buildBusWordTables({ ok: true, stops, plannerServiceSummaries: [pureCalendarRows[0], genuineShort, genuineBranch, school657, normalRoute], serviceSummaries: [] })
+const wordText = buildBusWordTables({
+  ok: true,
+  stops,
+  provenance: { stops: { retrievedAt: '2026-10-07T12:34:56Z' } },
+  plannerServiceSummaries: [pureCalendarRows[0], genuineShort, genuineBranch, school657, normalRoute],
+  serviceSummaries: []
+})
   .flatMap(table => table.rows ?? [])
   .map(row => Array.isArray(row) ? row.join(' ') : String(row?.text ?? ''))
   .join(' ');
-assert.match(wordText, /Timetable may vary during school holidays/);
+assert.match(wordText, /Timetable note: Where separate term-time and school-holiday timetables are published, the term-time timetable is shown\./);
+assert.match(wordText, /Timetable information reflects the data available to ATLAS on 2026-10-07/);
+assert.doesNotMatch(wordText, /Service note: Timetable may vary during school holidays/);
 assert.match(wordText, /Resolved Midpoint/);
 assert.match(wordText, /Branch Terminal/);
 assert.match(wordText, /School-day journeys only/);

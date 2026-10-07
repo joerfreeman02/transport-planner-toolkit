@@ -1,5 +1,5 @@
 import { buildServicePresentation, formatServiceOriginDestination } from '../domain/bus-service-assessment.mjs';
-import { PLANNER_METHODOLOGY_NOTE, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../domain/bus-planner-summary.mjs';
+import { buildBusTimetablePresentationNote, plannerRouteDisplayNumber, PLANNER_METHODOLOGY_NOTE, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../domain/bus-planner-summary.mjs';
 import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
 
 function text(value) { return String(value ?? '').trim(); }
@@ -78,13 +78,15 @@ export function buildBusWordTables(result) {
   const hasPlannerSummary = Array.isArray(result.plannerServiceSummaries);
   const services = hasPlannerSummary ? result.plannerServiceSummaries : buildServicePresentation(result.serviceSummaries ?? []);
   const serviceRows = [];
+  const timetableNote = hasPlannerSummary ? buildBusTimetablePresentationNote(result, services) : null;
+  if (timetableNote) serviceRows.push({ kind: 'methodology', semantic: 'timetable-variation', text: timetableNote });
   if (hasPlannerSummary && services.some(service => service.plannerNotes?.terminus)) {
     serviceRows.push({ kind: 'summary', semantic: 'terminus-presentation', text: `Presentation note: ${PLANNER_TERMINUS_PRESENTATION_NOTE}` });
   }
   services.forEach((service, index) => {
     serviceRows.push(hasPlannerSummary
       ? [
-        service.routeNumber,
+        plannerRouteDisplayNumber(service),
         service.operator,
         service.directionPatternText || formatServiceOriginDestination(service, ' – '),
         service.servedAtText || 'Representative stop not supplied',

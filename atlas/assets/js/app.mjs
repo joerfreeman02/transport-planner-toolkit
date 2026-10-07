@@ -16,7 +16,7 @@ import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-
 import { createBusAssessment, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/atlas/application/bus-assessment.mjs';
 import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
 import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-task-status.mjs';
-import { buildPlannerBusServiceSummaries, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
+import { buildBusTimetablePresentationNote, buildPlannerBusServiceSummaries, plannerRouteDisplayNumber, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
@@ -578,13 +578,19 @@ function renderAssessment(result) {
     const label = document.createElement('strong'); label.textContent = 'Presentation note: ';
     noteCell.append(label, PLANNER_TERMINUS_PRESENTATION_NOTE); noteRow.append(noteCell); serviceRows.append(noteRow);
   }
+  const timetableNote = buildBusTimetablePresentationNote(result, presentedServices);
+  if (timetableNote) {
+    const noteRow = document.createElement('tr'); noteRow.className = 'service-note methodology-note semantic-annotation annotation-timetable-variation';
+    const noteCell = document.createElement('td'); noteCell.colSpan = 8; noteCell.setAttribute('role', 'note');
+    noteCell.textContent = timetableNote; noteRow.append(noteCell); serviceRows.append(noteRow);
+  }
   presentedServices.forEach((service, index) => {
     const row = document.createElement('tr');
     const supported = service.stopIds?.some(id => selectedStopIds.has(String(id)));
     const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedServiceIds.has(serviceKey(service)) && supported; include.disabled = !supported; include.setAttribute('aria-label', `Include route ${service.routeNumber}`);
     include.addEventListener('change', () => { if (include.checked) selectedServiceIds.add(serviceKey(service)); else selectedServiceIds.delete(serviceKey(service)); renderAssessment(result); });
     appendCell(row, 'Include', include);
-    appendCell(row, 'Route', service.routeNumber);
+    appendCell(row, 'Route', plannerRouteDisplayNumber(service));
     appendCell(row, 'Operator', service.operator);
     appendCell(row, 'Direction / main service pattern', service.directionPatternText || formatServiceOriginDestination(service));
     appendCell(row, 'Stops', service.servedAtText || service.frequencyBasisStopName || 'Representative stop not supplied');

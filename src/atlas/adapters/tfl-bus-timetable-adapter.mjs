@@ -18,6 +18,7 @@ const WEEKDAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'f
 const DAY_ALIASES = Object.freeze({
   monday: 'monday', mon: 'monday', tuesday: 'tuesday', tue: 'tuesday', tues: 'tuesday',
   wednesday: 'wednesday', wed: 'wednesday', thursday: 'thursday', thu: 'thursday', thur: 'thursday', thurs: 'thursday',
+  th: 'thursday',
   friday: 'friday', fri: 'friday', saturday: 'saturday', sat: 'saturday', sunday: 'sunday', sun: 'sunday'
 });
 
@@ -49,7 +50,8 @@ function periodCalendar(input) {
   const { raw, days: structuredDays, structured } = calendarInput(input);
   const value = normal(raw);
   const nonSchoolDayOnly = /\bnon\s*school\s*days?\b|\bschool\s*holidays?\b|\bholidays?\s*only\b/.test(value);
-  const schoolDayOnly = !nonSchoolDayOnly && /\bschool\s*days?\b|\bschooldays?\b/.test(value);
+  const schoolDayOnly = !nonSchoolDayOnly && (/\bschool\s*days?\b|\bschooldays?\b/.test(value)
+    || /\bschool\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/.test(value));
   const termTimeOnly = /\bterm\s*[- ]?time\b|\bterm\s*[- ]?only\b/.test(value);
   const holidayOnly = /\bholiday(?:s)?\s*only\b|\bschool\s*holidays?\b/.test(value);
   let days = expandedDayRange(raw);

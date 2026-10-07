@@ -207,6 +207,7 @@ button.compact { padding: 7px 10px; font-size: .78rem; }
 .service-detail p { margin: 4px 0 0; color: var(--atlas-muted); font-size: .9em; white-space: pre-line; }
 .service-note td { border-top: 0; background: #fff8e8; color: #614200; padding-top: 8px; padding-bottom: 9px; }
 .service-note.semantic-annotation td { border-left: 4px solid #8a6a00; background: #fffaf0; color: #4f3a00; }
+.service-note.annotation-timetable-variation td { border-left-color: #1769aa; background: #eef6ff; color: #123b5d; font-weight: 600; }
 .service-note.annotation-terminus td, .service-note.annotation-terminus-presentation td { border-left-color: #1769aa; background: #eef6ff; color: #123b5d; }
 .service-note.annotation-additional-services td { border-left-color: #2c7a4b; background: #effaf2; color: #17452a; }
 .service-note.annotation-short-workings td { border-left-color: #ad6b00; background: #fff7e8; color: #5d3b00; }

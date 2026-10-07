@@ -30,6 +30,7 @@ import {
 export const PLANNER_METHODOLOGY_NOTE = '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence. Additional source evidence remains available in the ATLAS assessment workspace.';
 export const PLANNER_TERMINUS_PRESENTATION_NOTE = 'Where an assessed stop is the route terminus, ATLAS shows the useful departing direction only; arriving journeys terminating at that stop are not listed separately.';
 export const SCHOOL_HOLIDAY_VARIATION_NOTE = 'Timetable may vary during school holidays.';
+export const SEPARATE_TIMETABLE_MARKER = '†';
 
 const UNKNOWN_CALENDAR_PROFILE = 'unresolved';
 const CALENDAR_PROFILE_ORDER = Object.freeze(['ordinary', 'school-day', 'term-time', 'non-school-day', 'holiday', 'other-resolved', UNKNOWN_CALENDAR_PROFILE]);
@@ -108,6 +109,54 @@ function orderedCalendarProfiles(values) {
 
 function calendarProfileDisplayLabel(profileId) {
   return CALENDAR_PROFILE_LABELS[profileId] || calendarProfileLabel(profileId) || 'Calendar-specific service';
+}
+
+function isTermTimeProfile(profileId) {
+  return ['school-day', 'term-time'].includes(text(profileId).toLowerCase());
+}
+
+function isNonSchoolProfile(profileId) {
+  return ['non-school-day', 'holiday'].includes(text(profileId).toLowerCase());
+}
+
+function separateTimetableProfileIds(profileIds = []) {
+  const ids = unique(profileIds).map(value => value.toLowerCase());
+  return Object.freeze({
+    termTime: Object.freeze(ids.filter(isTermTimeProfile)),
+    nonSchool: Object.freeze(ids.filter(isNonSchoolProfile))
+  });
+}
+
+function datePart(value) {
+  const raw = text(value);
+  if (!raw) return '';
+  const explicit = raw.match(/^(\d{4}-\d{2}-\d{2})/u)?.[1];
+  if (explicit) return explicit;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString().slice(0, 10) : '';
+}
+
+export function assessmentDateForBusPresentation(result = {}) {
+  return [
+    result?.assessmentDate,
+    result?.generatedAt,
+    result?.provenance?.assessmentDate,
+    result?.provenance?.stops?.retrievedAt,
+    result?.provenance?.timetables?.retrievedAt,
+    result?.provenance?.timetables?.dataPreparedAt
+  ].map(datePart).find(Boolean) || null;
+}
+
+export function plannerRouteDisplayNumber(row = {}) {
+  const routeNumber = text(row?.routeNumber);
+  return routeNumber && row?.hasSeparateTimetablePair ? `${routeNumber}${SEPARATE_TIMETABLE_MARKER}` : routeNumber;
+}
+
+export function buildBusTimetablePresentationNote(result = {}, rows = []) {
+  if (!(rows ?? []).some(row => row?.hasSeparateTimetablePair)) return null;
+  const assessmentDate = assessmentDateForBusPresentation(result);
+  if (!assessmentDate) return null;
+  return `Timetable note: Where separate term-time and school-holiday timetables are published, the term-time timetable is shown. Routes marked ${SEPARATE_TIMETABLE_MARKER} have separate timetables. Timetable information reflects the data available to ATLAS on ${assessmentDate} and services may vary during school holidays.`;
 }
 
 function directionKey(service) {
@@ -886,25 +935,48 @@ function calculateProfileResult(component, representativeId, profileId, partitio
   });
 }
 
-function composeRepresentativeSchoolTermWeek(schoolDayResult, ordinaryResult) {
-  const selectedByDay = Object.fromEntries(DAY_ORDER.map(day => {
-    const useOrdinaryWeekend = (day === 'saturday' || day === 'sunday') && ordinaryResult;
-    return [day, useOrdinaryWeekend ? ordinaryResult : schoolDayResult];
+function composeRepresentativeSchoolTermWeek(termTimeResults = [], ordinaryResult = null) {
+  const weekdayResults = termTimeResults.filter(Boolean);
+  const entriesByDay = Object.fromEntries(DAY_ORDER.map(day => {
+    const sources = (day === 'saturday' || day === 'sunday')
+      ? (ordinaryResult ? [ordinaryResult] : [])
+      : weekdayResults;
+    return [day, deduplicateDepartureEntries(sources.flatMap(result => (result.entries ?? []).filter(entry => entry.day === day)))];
   }));
-  const entries = DAY_ORDER.flatMap(day => (selectedByDay[day]?.entries ?? []).filter(entry => entry.day === day));
-  const schedules = Object.fromEntries(DAY_ORDER.map(day => [day, selectedByDay[day]?.schedules?.[day] ?? []]));
-  const frequencyByDay = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, selectedByDay[day]?.frequencyByDay?.[day]])));
-  const periods = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, selectedByDay[day]?.periods?.[day] ?? null])));
-  const frequencyEvidence = DAY_ORDER.flatMap(day => (selectedByDay[day]?.frequencyEvidence ?? []).filter(item => item?.day === day));
-  const operatingPeriodEvidence = DAY_ORDER.flatMap(day => (selectedByDay[day]?.operatingPeriodEvidence ?? []).filter(item => item?.day === day));
-  const reviewWarnings = unique(DAY_ORDER.flatMap(day => selectedByDay[day]?.operatingPeriodReviewWarnings ?? []));
+  const schedules = Object.fromEntries(DAY_ORDER.map(day => [day, entriesByDay[day].map(entry => entry.minute).sort((first, second) => first - second)]));
+  const frequencyEvidence = DAY_ORDER.flatMap(day => {
+    const sources = (day === 'saturday' || day === 'sunday')
+      ? (ordinaryResult ? [ordinaryResult] : [])
+      : weekdayResults;
+    return sources.flatMap(result => (result.frequencyEvidence ?? []).filter(item => item?.day === day));
+  });
+  const operatingPeriodEvidence = DAY_ORDER.flatMap(day => {
+    const sources = (day === 'saturday' || day === 'sunday')
+      ? (ordinaryResult ? [ordinaryResult] : [])
+      : weekdayResults;
+    return sources.flatMap(result => (result.operatingPeriodEvidence ?? []).filter(item => item?.day === day));
+  });
+  const frequencyByDay = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [
+    day,
+    calculateTypicalServiceFrequency(schedules[day], { day, frequencyEvidence: frequencyEvidence.filter(item => item?.day === day) })
+  ])));
+  const combinedPeriods = combineOperatingPeriodEvidence(schedules, Object.fromEntries(DAY_ORDER.map(day => [
+    day,
+    operatingPeriodEvidence.filter(item => item?.day === day)
+  ])));
+  const reviewWarnings = unique([
+    ...weekdayResults.flatMap(result => result.operatingPeriodReviewWarnings ?? []),
+    ...(ordinaryResult?.operatingPeriodReviewWarnings ?? []),
+    ...combinedPeriods.warnings
+  ]);
+  const entries = DAY_ORDER.flatMap(day => entriesByDay[day]);
   return Object.freeze({
     entries: Object.freeze(entries),
     schedules: Object.freeze(schedules),
-    periods,
+    periods: Object.freeze(combinedPeriods.periods),
     frequencyByDay,
     frequencyLines: Object.freeze(formatTypicalFrequency(frequencyByDay)),
-    operatingLines: Object.freeze(formatOperatingPeriod(periods)),
+    operatingLines: Object.freeze(formatOperatingPeriod(combinedPeriods.periods)),
     frequencyEvidence: Object.freeze(frequencyEvidence),
     operatingPeriodEvidence: Object.freeze(operatingPeriodEvidence),
     operatingPeriodEvidenceState: reviewWarnings.length ? 'conflict' : 'resolved',
@@ -1428,14 +1500,15 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     calculateProfileResult(component, representative.id, profileId, calendarPartition(canonical.entries, profileId, ordinaryEntries, hasOrdinaryProfile))
   ]));
   const effectiveProfileIds = profileIds.filter(profileId => profileResults.get(profileId).entries.length);
-  const schoolHolidayVariant = effectiveProfileIds.includes('school-day') && effectiveProfileIds.includes('non-school-day');
+  const separateTimetableProfiles = separateTimetableProfileIds(effectiveProfileIds);
+  const schoolHolidayVariant = separateTimetableProfiles.termTime.length > 0 && separateTimetableProfiles.nonSchool.length > 0;
   const displayProfileId = schoolHolidayVariant
-    ? 'school-day'
+    ? separateTimetableProfiles.termTime[0]
     : effectiveProfileIds.includes('ordinary') ? 'ordinary' : effectiveProfileIds[0] ?? profileIds[0] ?? null;
   const selectedProfileResult = profileResults.get(displayProfileId) ?? calculateProfileResult(component, representative.id, displayProfileId, calendarPartition(canonical.entries, displayProfileId, ordinaryEntries, hasOrdinaryProfile));
   const displayResult = schoolHolidayVariant
     ? composeRepresentativeSchoolTermWeek(
-      profileResults.get('school-day') ?? selectedProfileResult,
+      separateTimetableProfiles.termTime.map(profileId => profileResults.get(profileId)).filter(Boolean),
       profileResults.get('ordinary')
     )
     : selectedProfileResult;
@@ -1461,7 +1534,6 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   if (unresolvedNeedsQualification) profileNotes.push('Operating days could not be fully confirmed; check the timetable before use.');
   const notes = materialServiceNotesForComponent(component, displayResult.schedules)
     .filter(note => !schoolHolidayVariant || !hasCalendarTaxonomyNote(note));
-  if (schoolHolidayVariant) notes.push(SCHOOL_HOLIDAY_VARIATION_NOTE);
   notes.push(...profileNotes);
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
   const groupingDecision = Object.freeze({
@@ -1496,6 +1568,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     calendarProfileLabel: calendarProfile,
     calendarProfileIds: Object.freeze(profileIds),
     calendarProfileLabels: Object.freeze(profileIds.map(calendarProfileDisplayLabel)),
+    hasSeparateTimetablePair: schoolHolidayVariant,
     directionFamily: directionKey(main),
     directionPatternText: directionPatternText({ ...main, destination: destinationDecision.chosen, destinationLocality: null, circular: rowCircular, circularServiceDecision }),
     servedAtStopId: representative.id,
@@ -1839,6 +1912,7 @@ function mergePublicRouteFamilyRows(members, decision) {
     familyFrequencyLines: familyFrequencyLines,
     familyOperatingPeriodLines: familyOperatingPeriodLines,
     familyCalendarProfilesByRoute: Object.freeze(Object.fromEntries(ordered.map(row => [row.routeNumber, Object.freeze([...(row.calendarProfileIds ?? [])])]))),
+    hasSeparateTimetablePair: ordered.some(row => row.hasSeparateTimetablePair),
     routeFamilyMembers,
     routeFamilyLabel: label,
     routeFamilyNote: familyNote,

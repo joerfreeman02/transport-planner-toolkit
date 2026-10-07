@@ -6,7 +6,7 @@ Branch: `codex/atlas-bus-final-accuracy-closeout`
 Worktree: `atlas-bus-term-time-presentation-closeout/atlas-bus-final-accuracy-closeout`  
 Baseline: `b5a23f27335c2eee8f9111c980cd01df1758e468`  
 Implementation SHA: `485ec1199195a04386394b0e04f9db58b1730bfb`  
-Final tip: `2e3e440`
+Final tip: recorded in the final handover response from the clean checkout (`git rev-parse HEAD`).
 
 No merge, deployment, publication, Alpha.16, Beta promotion, BUS-ROBUSTNESS-1B or BUS-POLISH work was performed.
 

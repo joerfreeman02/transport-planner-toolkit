@@ -112,13 +112,13 @@ No source authority, acquisition workflow, national snapshot, release/version, g
 
 ## Review build and manual gate
 
-The final clean review server is intended to be started from the final branch tip with:
+The final clean review server was verified at:
 
 ```text
-node tools/atlas-review/v2-review.mjs --no-open
+http://127.0.0.1:8769/atlas/?review=v2#modules
 ```
 
-The review route is `/atlas/#modules`; the clean server injects `BUS-TFL-COMPLETE · <7-char-final-tip>` into `data-atlas-test-build`. Browser/Word parity is covered deterministically, but Product Owner visual/manual inspection of the clean review build remains required.
+The review route is `/atlas/#modules`. At the clean implementation tip the server returned `data-atlas-test-build="BUS-TFL-COMPLETE · 4b14d6b"`; after the documentation-only closeout commit, restart the same server from the clean final tip to refresh that seven-character suffix. Browser/Word parity is covered deterministically, but Product Owner visual/manual inspection of the clean review build remains required.
 
 ## GitHub tooling adoption review
 

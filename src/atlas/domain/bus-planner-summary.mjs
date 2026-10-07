@@ -769,9 +769,95 @@ function serviceDepartureEntries(service, representativeId) {
       const minute = Number(item?.minute ?? item?.departureMinute ?? item?.time ?? item);
       if (!Number.isFinite(minute)) return null;
       const calendarProfileId = calendarProfileFromEntry(service, item);
-      return { day, minute, stopPointId: text(item?.stopPointId) || representativeId, journeyIdentity: departureIdentity(item) || null, provider: primaryProvider(service, item), sourceRecordId: text(item?.sourceRecordId || service?.id) || null, routeNumber: text(item?.routeNumber || service?.routeNumber), direction: text(item?.direction || service?.direction || service?.destination || service?.origin), origin: text(item?.origin || service?.origin), destination: text(item?.destination || service?.destination), calendarProfileId, calendarProfileIds: [calendarProfileId] };
+      const occurrenceRole = text(item?.occurrenceRole || item?.terminalOccurrenceRole || item?.stopOccurrenceRole).toLowerCase()
+        || (item?.isTerminatingArrival === true || (item?.isArrival === true && item?.isDeparture !== true) ? 'arrival' : '')
+        || (item?.isBoardingDeparture === true || (item?.isDeparture === true && item?.isArrival !== true) ? 'departure' : '')
+        || (item?.patternOccurrenceIndex === 0 || item?.isFirstPatternOccurrence === true ? 'departure' : '')
+        || (item?.isLastPatternOccurrence === true ? 'arrival' : '');
+      return {
+        day,
+        minute,
+        stopPointId: text(item?.stopPointId) || representativeId,
+        journeyIdentity: departureIdentity(item) || null,
+        provider: primaryProvider(service, item),
+        sourceRecordId: text(item?.sourceRecordId || service?.id) || null,
+        routeNumber: text(item?.routeNumber || service?.routeNumber),
+        direction: text(item?.direction || service?.direction || service?.destination || service?.origin),
+        origin: text(item?.origin || service?.origin),
+        destination: text(item?.destination || service?.destination),
+        calendarProfileId,
+        calendarProfileIds: [calendarProfileId],
+        occurrenceRole: occurrenceRole || null,
+        patternOccurrenceIndex: Number.isFinite(Number(item?.patternOccurrenceIndex)) ? Number(item.patternOccurrenceIndex) : null,
+        patternOccurrenceCount: Number.isFinite(Number(item?.patternOccurrenceCount)) ? Number(item.patternOccurrenceCount) : null
+      };
     }).filter(Boolean);
   });
+}
+
+function exactEndpointAtStop(service, side, representativeId) {
+  const decision = service?.[`${side}EndpointDecision`] ?? {};
+  const ids = unique([
+    service?.[`${side}StopPointId`],
+    ...(service?.[`${side}StopPointIds`] ?? []),
+    decision.primaryEndpointStopPointId,
+    decision.endpointStopPointId,
+    ...(decision.endpointStopPointIds ?? [])
+  ]);
+  return (decision.exactEvidence === true || decision.exact === true) && ids.includes(representativeId);
+}
+
+function sourceAssertsCircular(service) {
+  return service?.circular === true || service?.authoritativeCircular === true || service?.source?.circular === true;
+}
+
+function isClosedCircularTerminalService(service, representativeId) {
+  return sourceAssertsCircular(service)
+    && exactEndpointAtStop(service, 'origin', representativeId)
+    && exactEndpointAtStop(service, 'destination', representativeId)
+    && unique([
+      service?.originStopPointId,
+      ...(service?.originStopPointIds ?? []),
+      service?.originEndpointDecision?.primaryEndpointStopPointId,
+      service?.originEndpointDecision?.endpointStopPointId,
+      ...(service?.originEndpointDecision?.endpointStopPointIds ?? [])
+    ]).some(id => unique([
+      service?.destinationStopPointId,
+      ...(service?.destinationStopPointIds ?? []),
+      service?.destinationEndpointDecision?.primaryEndpointStopPointId,
+      service?.destinationEndpointDecision?.endpointStopPointId,
+      ...(service?.destinationEndpointDecision?.endpointStopPointIds ?? [])
+    ]).includes(id));
+}
+
+function median(values) {
+  const ordered = values.filter(value => Number.isFinite(value)).sort((left, right) => left - right);
+  if (!ordered.length) return null;
+  const middle = Math.floor(ordered.length / 2);
+  return ordered.length % 2 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2;
+}
+
+function inferBoardingEntriesForCircularTerminal(entries) {
+  const ordered = entries.slice().sort((left, right) => left.minute - right.minute);
+  if (ordered.length < 4 || ordered.some(entry => entry.occurrenceRole)) return ordered.filter(entry => entry.occurrenceRole !== 'arrival');
+  const gaps = ordered.slice(1).map((entry, index) => entry.minute - ordered[index].minute);
+  const typicalGap = median(gaps);
+  if (!Number.isFinite(typicalGap) || typicalGap <= 0) return ordered;
+  const shortGapThreshold = Math.max(5, typicalGap * 0.6);
+  const shortGapCount = gaps.filter(gap => gap > 0 && gap <= shortGapThreshold).length;
+  if (shortGapCount < 2) return ordered;
+  // Prepared GTFS snapshots can omit stop_sequence/pickup_type while retaining
+  // both terminal observations. A repeated short gap immediately before the
+  // boarding observation is the remaining generic evidence for the arrival;
+  // remove only that earlier member, and keep all other timetable evidence.
+  return ordered.filter((entry, index) => index < ordered.length - 1 && !(gaps[index] > 0 && gaps[index] <= shortGapThreshold));
+}
+
+function normaliseCircularTerminalEntries(entries) {
+  const withRoles = entries.filter(entry => entry.occurrenceRole === 'departure' || entry.occurrenceRole === 'arrival');
+  const untyped = entries.filter(entry => !entry.occurrenceRole);
+  if (withRoles.length) return [...withRoles.filter(entry => entry.occurrenceRole !== 'arrival'), ...untyped];
+  return inferBoardingEntriesForCircularTerminal(entries);
 }
 
 function semanticDepartureKey(entry) {
@@ -814,10 +900,20 @@ function deduplicateDepartureEntries(entries) {
   return output;
 }
 
-function canonicalDeparturePopulation(component, representativeId, main) {
+function canonicalDeparturePopulation(component, representativeId, main, plannerServiceGroup = null) {
   const eligible = component.filter(service => serviceAtRepresentative(service, representativeId));
   const records = eligible.length ? eligible : (main ? [main] : []);
-  const entries = deduplicateDepartureEntries(records.flatMap(service => serviceDepartureEntries(service, representativeId)));
+  const terminalEvidence = plannerServiceGroup?.terminusDecision?.proven
+    && plannerServiceGroup.terminusDecision.terminalStopPointIds?.includes(representativeId)
+    && records.some(service => sourceAssertsCircular(service));
+  const entries = deduplicateDepartureEntries(records.flatMap(service => {
+    const serviceEntries = serviceDepartureEntries(service, representativeId);
+    const circularTerminal = terminalEvidence && isClosedCircularTerminalService(service, representativeId);
+    if (terminalEvidence && !circularTerminal && exactEndpointAtStop(service, 'destination', representativeId) && !exactEndpointAtStop(service, 'origin', representativeId)) return [];
+    return circularTerminal
+      ? DAY_ORDER.flatMap(day => normaliseCircularTerminalEntries(serviceEntries.filter(entry => entry.day === day)))
+      : serviceEntries;
+  }));
   const schedules = emptySchedule();
   for (const entry of entries) schedules[entry.day].push(entry.minute);
   for (const day of DAY_ORDER) schedules[day].sort((first, second) => first - second);
@@ -1014,13 +1110,27 @@ function principalSupport(service, component, representativeId) {
 function compareMain(first, second, representativeId, component = [first, second]) {
   const firstSupport = principalSupport(first, component, representativeId);
   const secondSupport = principalSupport(second, component, representativeId);
+  const profiles = new Set(component.map(calendarProfileFromService));
+  const restrictedVariant = [...profiles].some(profile => ['school-day', 'term-time'].includes(profile))
+    && [...profiles].some(profile => ['ordinary', 'non-school-day', 'holiday', ''].includes(profile));
+  const destinationEvidenceComparison = restrictedVariant
+    ? [
+      secondSupport.destinationJourneys - firstSupport.destinationJourneys,
+      secondSupport.destinationRecords - firstSupport.destinationRecords,
+      secondSupport.journeys - firstSupport.journeys,
+      secondSupport.activity - firstSupport.activity,
+      assessedEndpointSupport(second) - assessedEndpointSupport(first)
+    ]
+    : [
+      assessedEndpointSupport(second) - assessedEndpointSupport(first),
+      secondSupport.destinationJourneys - firstSupport.destinationJourneys,
+      secondSupport.destinationRecords - firstSupport.destinationRecords,
+      secondSupport.journeys - firstSupport.journeys,
+      secondSupport.activity - firstSupport.activity
+    ];
   return Number(resolvedPlannerDestination(second)) - Number(resolvedPlannerDestination(first))
     || sourceAuthorityRank(second) - sourceAuthorityRank(first)
-    || assessedEndpointSupport(second) - assessedEndpointSupport(first)
-    || secondSupport.destinationJourneys - firstSupport.destinationJourneys
-    || secondSupport.destinationRecords - firstSupport.destinationRecords
-    || secondSupport.journeys - firstSupport.journeys
-    || secondSupport.activity - firstSupport.activity
+    || destinationEvidenceComparison.find(value => value !== 0) || 0
     || (second.routePatternExtent ?? explicitPattern(second).length) - (first.routePatternExtent ?? explicitPattern(first).length)
     || (second.principalLocations?.length ?? 0) - (first.principalLocations?.length ?? 0)
     || (text(first.origin) + '|' + text(first.destination) + '|' + text(first.id)).localeCompare(text(second.origin) + '|' + text(second.destination) + '|' + text(second.id));
@@ -1488,7 +1598,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const circularServiceDecision = plannerServiceGroup.circularServiceDecision
     || resolveCircularServiceDecision(component, { principal: main, component });
   const rowCircular = circularClassificationIsProven(circularServiceDecision);
-  const canonical = canonicalDeparturePopulation(component, representative.id, main);
+  const canonical = canonicalDeparturePopulation(component, representative.id, main, plannerServiceGroup);
   const profileIds = orderedCalendarProfiles([
     ...component.map(calendarProfileFromService),
     ...canonical.entries.flatMap(calendarProfileIdsForEntry)

@@ -649,6 +649,47 @@ export function makeTerminusDecision({ services = [], principal = services[0] ||
   const circularProven = circularDecision
     ? circularDecision.classification === 'circular'
     : services.some(service => service?.circular) || principal?.circular;
+  const circularSourceAssertion = services.some(service => service?.circular === true || service?.authoritativeCircular === true || service?.source?.circular === true)
+    || principal?.circular === true || principal?.authoritativeCircular === true || principal?.source?.circular === true;
+  const circularEndpointIds = side => unique([
+    principal?.[`${side}StopPointId`],
+    ...(principal?.[`${side}StopPointIds`] ?? []),
+    principal?.[`${side}EndpointDecision`]?.primaryEndpointStopPointId,
+    principal?.[`${side}EndpointDecision`]?.endpointStopPointId,
+    ...(principal?.[`${side}EndpointDecision`]?.endpointStopPointIds ?? [])
+  ]);
+  const assessedIds = new Set((assessedStops ?? []).map(stop => text(stop.id || stop.sourceId)).filter(Boolean));
+  const circularEndpointDecision = side => principal?.[`${side}EndpointDecision`] ?? {};
+  const circularClosedAtAssessedStop = (circularProven || circularSourceAssertion)
+    && ['origin', 'destination'].every(side => circularEndpointIds(side).some(id => assessedIds.has(id)))
+    && ['origin', 'destination'].every(side => circularEndpointDecision(side).exactEvidence === true || circularEndpointDecision(side).exact === true)
+    && circularEndpointIds('origin').some(id => circularEndpointIds('destination').includes(id));
+  if (circularClosedAtAssessedStop) {
+    const terminalStopPointIds = unique([...circularEndpointIds('origin'), ...circularEndpointIds('destination')].filter(id => assessedIds.has(id)));
+    const place = text(publicPlace
+      || circularEndpointDecision('origin').chosen
+      || circularEndpointDecision('destination').chosen
+      || assessedPlace(assessedStops, null));
+    return Object.freeze({
+      type: 'TerminusDecision',
+      status: 'proven-terminus',
+      presentation: 'departing-and-arriving',
+      proven: true,
+      assessedPlace: place || null,
+      terminalSides: Object.freeze(['origin', 'destination']),
+      terminalStopPointIds: Object.freeze(terminalStopPointIds),
+      arrivalEvidence: Object.freeze(sourceRecordIds(services)),
+      departureEvidence: Object.freeze(sourceRecordIds(services)),
+      reason: 'The source circular assertion and exact origin/destination StopPoint evidence close at the assessed place; terminal-arrival observations are not separate public departures.',
+      note: place ? `${place} is the route terminus.` : null,
+      evidence: Object.freeze({
+        circularClassificationDeferred: false,
+        circularEndpointClosure: true,
+        principalSourceRecordId: serviceId(principal) || null,
+        assessedStopPointIds: Object.freeze(terminalStopPointIds)
+      })
+    });
+  }
   if (circularProven) return Object.freeze({
     type: 'TerminusDecision',
     status: 'not-assessed-endpoint',

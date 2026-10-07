@@ -5,8 +5,8 @@ ATLAS version: `2.0.0-alpha.15`
 Branch: `codex/atlas-bus-final-accuracy-closeout`  
 Worktree: `atlas-bus-term-time-presentation-closeout/atlas-bus-final-accuracy-closeout`  
 Baseline: `b5a23f27335c2eee8f9111c980cd01df1758e468`  
-Implementation SHA: to be recorded in the final documentation commit  
-Final tip: to be recorded in the final documentation commit
+Implementation SHA: `485ec1199195a04386394b0e04f9db58b1730bfb`  
+Final tip before documentation closeout: `485ec1199195a04386394b0e04f9db58b1730bfb`
 
 No merge, deployment, publication, Alpha.16, Beta promotion, BUS-ROBUSTNESS-1B or BUS-POLISH work was performed.
 
@@ -98,7 +98,9 @@ ATLAS Alpha.15 deterministic suite passed.
 - Frozen national snapshot: run `36125621080`; snapshot SHA-256 `8e2982017598eb0f37153f03eb42bab596d70d1217cd08f0678944719fe666c9`.
 - Acquisition: no fresh national acquisition; the frozen diagnostic cache was reused. The only permitted live source activity was the bounded Enfield TfL control.
 - Review URL: `http://127.0.0.1:8770/atlas/?review=v2#modules`.
-- Build header and implementation SHA: to be recorded after the clean final commit and HTTP verification.
+- HTTP verification: `200 OK` from `http://127.0.0.1:8770/atlas/`.
+- Build header: `BUS-TFL-COMPLETE · 485ec11`.
+- The final documentation-only commit updates this handover; its SHA is the final branch tip below. The review server remains running against this clean worktree.
 - Review server: leave running for Product Owner inspection.
 
 ## GitHub tooling adoption review

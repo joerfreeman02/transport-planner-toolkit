@@ -5,7 +5,7 @@ import {
   groupStopsForPresentation,
   selectNearestStopGroup
 } from '../domain/bus-service-assessment.mjs';
-import { buildPlannerBusServiceSummaries, plannerSourceWarning } from '../domain/bus-planner-summary.mjs';
+import { buildPlannerBusServiceSummaries, plannerSourceWarning, resolvedPlannerDestination } from '../domain/bus-planner-summary.mjs';
 import { DEFAULT_TFL_REQUEST_LIMIT } from '../adapters/tfl-request-scheduler.mjs';
 import { deriveTimetableConclusion, hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
 import { buildStopTimetableSourcePresentation } from '../domain/bus-source-presentation.mjs';
@@ -169,7 +169,7 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     if (!/could not|unresolved|unsupported|quarantin|incomplete|not supplied|no deterministically/i.test(String(warning))) continue;
     add({ code: 'service-source-evidence', route: service.routeNumber, stop: service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0], source: service.timetableSource || service.source?.provider || 'timetable source', message: String(warning) });
   }
-  for (const service of serviceSummaries) if (!service.routeNumber || !service.destination || /not supplied|not resolved/i.test(service.destination)) add({ code: 'planner-route-identity', route: service.routeNumber, stop: service.frequencyBasisStopId, source: service.frequencyEvidenceSource || 'timetable source', message: 'The timetable pattern did not provide a complete planner-facing destination; review Detailed Evidence before using the row.' });
+  for (const service of serviceSummaries) if (!service.routeNumber || !resolvedPlannerDestination(service)) add({ code: 'planner-route-identity', route: service.routeNumber, stop: service.frequencyBasisStopId, source: service.frequencyEvidenceSource || 'timetable source', message: 'The timetable pattern did not provide a complete planner-facing destination; review Detailed Evidence before using the row.' });
   for (const service of serviceSummaries) for (const side of ['origin', 'destination']) {
     const decision = service[`${side}EndpointDecision`];
     if (!decision || (!decision.unresolved && !decision.conflict)) continue;

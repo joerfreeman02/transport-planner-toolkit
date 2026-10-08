@@ -1334,12 +1334,14 @@ function preferredServiceEndpointDecision(services, side, principal) {
   const principalDecision = serviceEndpointDecision(principal, side);
   const principalExact = hasResolvedExactEndpointEvidence(principal, side);
   const identity = principalExact ? endpointIdentity(principal, side) : '';
-  const principalIds = new Set(serviceEndpointStopPointIds(principal, side));
+  const principalPrimaryId = text(principal?.[`${side}StopPointId`]
+    || principalDecision?.primaryEndpointStopPointId
+    || principalDecision?.endpointStopPointId);
   const aliases = (services ?? [])
     .filter(service => hasResolvedExactEndpointEvidence(service, side))
     .filter(service => principalExact
       ? Boolean(identity && !identity.startsWith('source:') && endpointIdentity(service, side) === identity)
-      : serviceEndpointStopPointIds(service, side).some(id => principalIds.has(id)))
+      : Boolean(principalPrimaryId && serviceEndpointStopPointIds(service, side).includes(principalPrimaryId)))
     .map(service => serviceEndpointDecision(service, side))
     .filter(decision => text(decision?.chosenDisplayName || decision?.chosen));
   return aliases.sort(compareEndpointDecisionQuality)[0] || principalDecision;
@@ -1443,8 +1445,8 @@ function serviceIdForPlanner(service) {
   return text(service?.id || service?.sourceRecordId);
 }
 
-function resolvedPlannerDestination(service) {
-  const destination = text(service?.destination);
+export function resolvedPlannerDestination(service) {
+  const destination = plannerDestination(service);
   const direction = plannerDirection(service);
   return Boolean(destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination) && !sourceDirectionMarker(destination))
     || Boolean(direction && !sourceDirectionMarker(direction));

@@ -56,6 +56,7 @@ await import('./bus-group-1g-wording.test.mjs');
 await import('./bus-circ.test.mjs');
 await import('./bus-circ-1c-enriched-group.test.mjs');
 await import('./bus-robustness-1a4-accuracy-closeout.test.mjs');
+await import('./bus-robustness-1a4-313-principal-endpoint.test.mjs');
 await import('./alpha12-source-completeness.test.mjs');
 await import('./alpha12-evidence-integrity-audit.test.mjs');
 await import('./alpha12-source-presentation.test.mjs');

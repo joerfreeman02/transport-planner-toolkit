@@ -107,6 +107,37 @@ export function createAtlasReferenceData({ adapter = null } = {}) {
     });
   }
 
-  return Object.freeze({ id: 'atlas-reference-data-v1', resolveStopReferences, resolveStopAreaStructure, resolvePreparedStopPointsByIds });
+  async function resolveReferenceStopPointsByIds(stopIds = [], options = {}) {
+    if (typeof adapter?.referenceStopPointsByIds !== 'function') {
+      return Object.freeze({
+        ok: true,
+        referenceStopPoints: [],
+        warnings: [],
+        provenance: {
+          referenceDataSchema: 'atlas-reference-data-v1',
+          provider: adapter?.id || 'reference-data-provider',
+          referenceStopPointsAvailable: false,
+          requestedIds: [...new Set(stopIds.map(String))]
+        }
+      });
+    }
+    const result = await adapter.referenceStopPointsByIds(stopIds, options);
+    const safe = result && typeof result === 'object' ? result : { ok: false, code: 'invalid_response', message: 'Reference StopPoint evidence could not be checked.', data: [], warnings: [] };
+    return Object.freeze({
+      ok: Boolean(safe.ok),
+      referenceStopPoints: Object.freeze([...(safe.data ?? [])]),
+      warnings: Object.freeze([...(safe.warnings ?? [])]),
+      provenance: Object.freeze({
+        referenceDataSchema: 'atlas-reference-data-v1',
+        provider: adapter?.id || 'reference-data-provider',
+        referenceStopPointsAvailable: safe.provenance?.referenceStopPointsAvailable ?? safe.ok,
+        referenceStopPoints: safe.provenance ?? {}
+      }),
+      ...(safe.code ? { code: safe.code } : {}),
+      ...(safe.message ? { message: safe.message } : {})
+    });
+  }
+
+  return Object.freeze({ id: 'atlas-reference-data-v1', resolveStopReferences, resolveStopAreaStructure, resolvePreparedStopPointsByIds, resolveReferenceStopPointsByIds });
 }
 

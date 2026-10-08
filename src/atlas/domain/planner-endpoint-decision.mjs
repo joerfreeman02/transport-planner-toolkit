@@ -190,6 +190,7 @@ export function makePlannerEndpointDecision({ rawEndpointText = '', endpoint = {
       requestedEndpointStopPointIds: Object.freeze(endpoint.requestedEndpointStopPointIds ?? ids),
       hydratedEndpointStopPointIds: Object.freeze(endpoint.hydratedEndpointStopPointIds ?? []),
       runtimeHydratedEndpointStopPointIds: Object.freeze(endpoint.runtimeHydratedEndpointStopPointIds ?? []),
+      referenceHydratedEndpointStopPointIds: Object.freeze(endpoint.referenceHydratedEndpointStopPointIds ?? []),
       preparedEvidenceEndpointStopPointIds: Object.freeze(endpoint.preparedEvidenceEndpointStopPointIds ?? []),
       unresolvedEndpointStopPointIds: Object.freeze(endpoint.unresolvedEndpointStopPointIds ?? []),
       localities: Object.freeze(endpoint.nptgLocalities ?? (locality.name ? [locality] : [])),
@@ -353,40 +354,44 @@ function preparedRuntimeConflict(prepared, physicalStop, stopAreas, locality) {
   return Boolean(preparedName && runtimeName && preparedName !== runtimeName);
 }
 
-function endpointEvidenceForRecord(record, side, hydratedById, localitiesById, groupsById) {
+function endpointEvidenceForRecord(record, side, hydratedById, referenceById, localitiesById, groupsById) {
   const ids = endpointIdsForService(record, side);
   const preparedById = preparedEvidenceById(record, side);
   const endpointEvidenceById = Object.fromEntries(ids.map(id => {
     const physicalStop = hydratedById.get(id) || null;
+    const referenceStop = referenceById.get(id) || null;
     const prepared = preparedById.get(id) || null;
-    const locality = localityForPhysicalStop(physicalStop, localitiesById);
+    const authoritativeStop = physicalStop || referenceStop || null;
+    const locality = localityForPhysicalStop(authoritativeStop, localitiesById);
     const logicalGroups = groupRecordsForPhysicalStop(physicalStop, groupsById);
     const preparedEndpoint = prepared ? preparedEndpointToEndpoint(prepared) : null;
     const stopAreas = [...logicalGroups.map(group => ({ id: group.id, name: group.name })).filter(area => usable(area.name)), ...(preparedEndpoint?.stopAreas ?? [])]
       .filter((area, index, values) => values.findIndex(candidate => text(candidate.id) === text(area.id) && normal(candidate.name) === normal(area.name)) === index);
-    const materialConflict = preparedRuntimeConflict(prepared, physicalStop, stopAreas, locality);
+    const materialConflict = preparedRuntimeConflict(prepared, authoritativeStop, stopAreas, locality);
     const evidenceSource = materialConflict
       ? 'runtime-prepared-conflict'
       : physicalStop && prepared ? 'runtime-and-prepared-exact-endpoint'
         : physicalStop ? 'runtime-exact-endpoint'
-          : prepared ? 'prepared-exact-endpoint' : 'unresolved';
+          : referenceStop ? 'authoritative-reference-endpoint'
+            : prepared ? 'prepared-exact-endpoint' : 'unresolved';
     return [id, {
       endpointStopPointId: id,
-      hydrated: Boolean(physicalStop || prepared),
+      hydrated: Boolean(authoritativeStop || prepared),
       runtimeHydrated: Boolean(physicalStop),
+      referenceHydrated: Boolean(referenceStop),
       preparedEvidence: prepared,
-      physicalStop: physicalStop || preparedEndpoint?.physicalStop || null,
-      endpointStopName: physicalStop?.name || prepared?.naptanCommonName || null,
+      physicalStop: authoritativeStop || preparedEndpoint?.physicalStop || null,
+      endpointStopName: authoritativeStop?.name || prepared?.naptanCommonName || null,
       logicalGroupRefs: physicalStop?.logicalGroupRefs ?? prepared?.logicalGroupRefs ?? [],
       logicalGroupEvidence: [...logicalGroups, ...(preparedEndpoint?.logicalGroupEvidence ?? [])],
       stopAreas,
       stopArea: stopAreas[0] || null,
-      locality: locality || preparedEndpoint?.locality || physicalStop?.nptgLocality || null,
-      nptgLocality: locality || preparedEndpoint?.locality || physicalStop?.nptgLocality || null,
-      nptgLocalityCode: physicalStop?.nptgLocalityCode || locality?.code || prepared?.nptgLocalityCode || null,
-      nptgLocalityName: locality?.name || physicalStop?.nptgLocalityName || prepared?.nptgLocalityName || null,
-      parentLocalityId: locality?.parentLocalityId || locality?.parentLocality?.id || physicalStop?.parentLocalityId || prepared?.parentLocalityId || null,
-      parentLocalityName: locality?.parentLocalityName || locality?.parentLocality?.name || physicalStop?.parentLocalityName || prepared?.parentLocalityName || null,
+      locality: locality || preparedEndpoint?.locality || authoritativeStop?.nptgLocality || null,
+      nptgLocality: locality || preparedEndpoint?.locality || authoritativeStop?.nptgLocality || null,
+      nptgLocalityCode: authoritativeStop?.nptgLocalityCode || locality?.code || prepared?.nptgLocalityCode || null,
+      nptgLocalityName: locality?.name || authoritativeStop?.nptgLocalityName || prepared?.nptgLocalityName || null,
+      parentLocalityId: locality?.parentLocalityId || locality?.parentLocality?.id || authoritativeStop?.parentLocalityId || prepared?.parentLocalityId || null,
+      parentLocalityName: locality?.parentLocalityName || locality?.parentLocality?.name || authoritativeStop?.parentLocalityName || prepared?.parentLocalityName || null,
       evidenceSource,
       materialConflict
     }];
@@ -401,12 +406,14 @@ function endpointEvidenceForRecord(record, side, hydratedById, localitiesById, g
   const allLocalities = [...new Map(evidenceSet.map(item => item.locality).filter(Boolean).map(locality => [text(locality.id || locality.code) || normal(locality.name), locality])).values()];
   const conflict = materiallyConflicts(evidenceSet) || evidenceSet.some(item => item.materialConflict);
   const runtimeHydratedIds = ids.filter(id => endpointEvidenceById[id]?.runtimeHydrated);
+  const referenceHydratedIds = ids.filter(id => endpointEvidenceById[id]?.referenceHydrated);
   const preparedIds = ids.filter(id => endpointEvidenceById[id]?.preparedEvidence);
   const evidenceSource = conflict
     ? 'runtime-prepared-conflict'
     : runtimeHydratedIds.length && preparedIds.length ? 'runtime-and-prepared-exact-endpoint'
       : runtimeHydratedIds.length ? 'runtime-exact-endpoint'
-        : preparedIds.length ? 'prepared-exact-endpoint' : 'source-only';
+        : referenceHydratedIds.length ? 'authoritative-reference-endpoint'
+          : preparedIds.length ? 'prepared-exact-endpoint' : 'source-only';
   return {
     endpointStopPointId: primaryId,
     endpointStopPointIds: ids,
@@ -414,6 +421,7 @@ function endpointEvidenceForRecord(record, side, hydratedById, localitiesById, g
     requestedEndpointStopPointIds: ids,
     hydratedEndpointStopPointIds: hydratedIds,
     runtimeHydratedEndpointStopPointIds: runtimeHydratedIds,
+    referenceHydratedEndpointStopPointIds: referenceHydratedIds,
     preparedEvidenceEndpointStopPointIds: preparedIds,
     unresolvedEndpointStopPointIds: unresolvedIds,
     endpointEvidenceById,
@@ -446,7 +454,9 @@ export async function resolvePlannerEndpointDecisions(services = [], referenceDa
   const records = services ?? [];
   const ids = [...new Set(records.flatMap(service => ['origin', 'destination'].flatMap(side => endpointIdsForService(service, side))))];
   let hydrated = [];
+  let referenceStops = [];
   let prepared = { warnings: [], provenance: {} };
+  let referenceStopResolution = { ok: false, referenceStopPoints: [], warnings: [], provenance: {} };
   let reference = { ok: false, logicalGroups: [], localities: [], warnings: [], provenance: {} };
   let structure = { ok: false, structure: { groups: [], members: [] }, warnings: [], provenance: {} };
   if (ids.length && typeof referenceData?.resolvePreparedStopPointsByIds === 'function') {
@@ -461,7 +471,28 @@ export async function resolvePlannerEndpointDecisions(services = [], referenceDa
       reference = { ok: false, logicalGroups: [], localities: [], warnings: [], provenance: { failed: true } };
     }
   }
+  const hydratedIds = new Set(hydrated.map(record => text(record.id)).filter(Boolean));
+  const unresolvedReferenceIds = ids.filter(id => !hydratedIds.has(id));
+  if (unresolvedReferenceIds.length && typeof referenceData?.resolveReferenceStopPointsByIds === 'function') {
+    try {
+      referenceStopResolution = await referenceData.resolveReferenceStopPointsByIds(unresolvedReferenceIds, { forceRefresh });
+      referenceStops = referenceStopResolution?.referenceStopPoints ?? referenceStopResolution?.data ?? [];
+      if (typeof referenceData.resolveStopReferences === 'function' && referenceStops.length) {
+        const fallbackReference = await referenceData.resolveStopReferences(referenceStops, { forceRefresh });
+        reference = {
+          ...reference,
+          logicalGroups: [...(reference.logicalGroups ?? []), ...(fallbackReference?.logicalGroups ?? [])],
+          localities: [...(reference.localities ?? []), ...(fallbackReference?.localities ?? [])],
+          warnings: [...(reference.warnings ?? []), ...(fallbackReference?.warnings ?? [])],
+          provenance: { ...(reference.provenance ?? {}), authoritativeEndpointReferences: fallbackReference?.provenance ?? {} }
+        };
+      }
+    } catch (error) {
+      referenceStopResolution = { ok: false, referenceStopPoints: [], warnings: [`Exact endpoint authoritative reference resolution failed softly: ${text(error?.message || error)}`], provenance: { failed: true } };
+    }
+  }
   const hydratedById = new Map(hydrated.map(record => [text(record.id), record]));
+  const referenceById = new Map(referenceStops.map(record => [text(record.id), record]).filter(([key]) => key));
   const localities = reference?.localities ?? [];
   const localitiesById = new Map(localities.flatMap(locality => [[text(locality.code), locality], [text(locality.id), locality], [text(locality.id).replace(/^nptg:/, ''), locality]]).filter(([key]) => key));
   const groups = reference?.logicalGroups ?? [];
@@ -472,13 +503,29 @@ export async function resolvePlannerEndpointDecisions(services = [], referenceDa
     const decisions = {};
     for (const side of ['origin', 'destination']) {
       const idsForSide = endpointIdsForService(service, side);
-      const exactEvidence = idsForSide.length ? endpointEvidenceForRecord(service, side, hydratedById, localitiesById, groupsById) : endpointFromService(service, side);
+      const exactEvidence = idsForSide.length ? endpointEvidenceForRecord(service, side, hydratedById, referenceById, localitiesById, groupsById) : endpointFromService(service, side);
       const decision = makePlannerEndpointDecision({ rawEndpointText: side === 'origin' ? service.origin : service.destination, endpoint: exactEvidence, provider: providerFor(service), sourceRecordId: service.id, provenance: { exactRequestedIds: exactEvidence.requestedEndpointStopPointIds ?? [], exactHydratedIds: exactEvidence.hydratedEndpointStopPointIds ?? [], exactUnresolvedIds: exactEvidence.unresolvedEndpointStopPointIds ?? [], runtimeHydratedIds: exactEvidence.runtimeHydratedEndpointStopPointIds ?? [], preparedEvidenceIds: exactEvidence.preparedEvidenceEndpointStopPointIds ?? [], primaryEndpointStopPointId: exactEvidence.primaryEndpointStopPointId ?? null, partialExactCoverage: Boolean(exactEvidence.partialExactCoverage), materialConflict: Boolean(exactEvidence.materialConflict), evidenceSource: exactEvidence.evidenceSource || null, reference: reference?.provenance ?? {}, stopArea: structure?.provenance ?? {} } });
       decisions[side] = decision;
     }
     return Object.freeze({ ...service, originEndpointEvidence: decisions.origin.evidence, destinationEndpointEvidence: decisions.destination.evidence, originEndpointDecision: decisions.origin, destinationEndpointDecision: decisions.destination, endpointResolutionWarnings: Object.freeze(warnings) });
   });
-  return Object.freeze({ services: Object.freeze(enriched), warnings: Object.freeze(warnings), provenance: Object.freeze({ exactRequestedIds: ids.sort(), exactHydratedIds: [...hydratedById.keys()].sort(), exactUnresolvedIds: ids.filter(id => !hydratedById.has(id)).sort(), physicalStops: prepared?.provenance ?? {}, nptg: reference?.provenance ?? {}, stopArea: structure?.provenance ?? {}, preparedEndpointEvidence: 'persisted-in-service-records' }) });
+  const finalWarnings = [...new Set([...warnings, ...(referenceStopResolution?.warnings ?? [])])];
+  return Object.freeze({
+    services: Object.freeze(enriched),
+    warnings: Object.freeze(finalWarnings),
+    provenance: Object.freeze({
+      exactRequestedIds: ids.sort(),
+      exactHydratedIds: [...new Set([...hydratedById.keys(), ...referenceById.keys()])].sort(),
+      runtimeHydratedIds: [...hydratedById.keys()].sort(),
+      referenceHydratedIds: [...referenceById.keys()].sort(),
+      exactUnresolvedIds: ids.filter(id => !hydratedById.has(id) && !referenceById.has(id)).sort(),
+      physicalStops: prepared?.provenance ?? {},
+      authoritativeReferenceStops: referenceStopResolution?.provenance ?? {},
+      nptg: reference?.provenance ?? {},
+      stopArea: structure?.provenance ?? {},
+      preparedEndpointEvidence: 'persisted-in-service-records'
+    })
+  });
 }
 
 export const PlannerEndpointDecision = makePlannerEndpointDecision;

@@ -370,7 +370,7 @@ export function createPreparedBusDataAdapter({
       const reference = references.get(id);
       if (!reference) continue;
       const status = String(reference.status ?? '').toLowerCase();
-      if (status !== 'active' || reference.busPreparedEligible !== true || String(reference.transportMode ?? '').toLowerCase() !== 'bus' || reference.coordinateValid !== true || !Number.isFinite(Number(reference.latitude)) || !Number.isFinite(Number(reference.longitude))) {
+      if (status !== 'active' || reference.busPreparedEligible !== true || !['bus', 'bus_coach'].includes(String(reference.transportMode ?? '').toLowerCase()) || reference.coordinateValid !== true || !Number.isFinite(Number(reference.latitude)) || !Number.isFinite(Number(reference.longitude))) {
         invalidReferenceIds.push({ id, status: status || 'invalid-reference' });
         continue;
       }
@@ -452,7 +452,7 @@ export function createPreparedBusDataAdapter({
       if (!record) { invalidMembers.push({ id, groupId: group.id, status: malformedReferenceIds.has(id) ? 'malformed-reference' : 'missing' }); continue; }
       const status = String(record.status ?? '').toLowerCase();
       if (status !== 'active') { invalidMembers.push({ id, groupId: group.id, status: status || 'missing-status' }); continue; }
-      if (record.busPreparedEligible !== true || String(record.transportMode ?? '').toLowerCase() !== 'bus') { invalidMembers.push({ id, groupId: group.id, status: 'non-bus' }); continue; }
+      if (record.busPreparedEligible !== true || !['bus', 'bus_coach'].includes(String(record.transportMode ?? '').toLowerCase())) { invalidMembers.push({ id, groupId: group.id, status: 'non-bus' }); continue; }
       if (record.coordinateValid !== true || !Number.isFinite(Number(record.latitude)) || !Number.isFinite(Number(record.longitude))) { invalidMembers.push({ id, groupId: group.id, status: 'malformed-coordinate' }); continue; }
       if (!candidateIds.includes(id)) candidateIds.push(id);
       if (!memberGroups.has(id)) memberGroups.set(id, []);

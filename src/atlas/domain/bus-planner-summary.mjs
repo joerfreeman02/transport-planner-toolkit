@@ -1128,9 +1128,10 @@ function compareMain(first, second, representativeId, component = [first, second
       secondSupport.journeys - firstSupport.journeys,
       secondSupport.activity - firstSupport.activity
     ];
-  return Number(resolvedPlannerDestination(second)) - Number(resolvedPlannerDestination(first))
+  const resolvedDestinationComparison = Number(resolvedPlannerDestination(second)) - Number(resolvedPlannerDestination(first));
+  const supportComparison = destinationEvidenceComparison.find(value => value !== 0) || 0;
+  return (restrictedVariant ? supportComparison || resolvedDestinationComparison : resolvedDestinationComparison || supportComparison)
     || sourceAuthorityRank(second) - sourceAuthorityRank(first)
-    || destinationEvidenceComparison.find(value => value !== 0) || 0
     || (second.routePatternExtent ?? explicitPattern(second).length) - (first.routePatternExtent ?? explicitPattern(first).length)
     || (second.principalLocations?.length ?? 0) - (first.principalLocations?.length ?? 0)
     || (text(first.origin) + '|' + text(first.destination) + '|' + text(first.id)).localeCompare(text(second.origin) + '|' + text(second.destination) + '|' + text(second.id));
@@ -2619,7 +2620,10 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
     const row = buildPlannerRow(component, stops, index, routeFamilyServices, routeKey, serviceGroup);
     if (resolvedPlannerDestination(row)) provisionalRows.push(row);
     else {
-      const representedByResolvedRow = routeFamilyServices.some(service => service !== component[0] && resolvedPlannerDestination(service));
+      const unresolvedOrdinaryVariant = component.some(service => !resolvedPlannerDestination(service)
+        && ['ordinary', 'non-school-day', 'holiday', ''].includes(calendarProfileFromService(service)));
+      const representedByResolvedRow = !unresolvedOrdinaryVariant
+        && routeFamilyServices.some(service => service !== component[0] && resolvedPlannerDestination(service));
       if (!representedByResolvedRow) provisionalRows.push(Object.freeze({ ...row, destination: 'Destination requires review', directionPatternText: 'Destination requires review', unresolvedPublicIdentity: true, serviceNote: unique([row.serviceNote, 'Destination requires review before formal use.']).join(' ') }));
     }
   }

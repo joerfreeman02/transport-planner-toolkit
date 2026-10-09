@@ -243,7 +243,7 @@ function supplement(tfl, bods) {
   service.provider = 'TfL';
   service.primaryAuthority = 'TfL';
   const hasSupplementaryEvidence = supplemented || operatorSupplemented || withSupplementaryDepartures.retained;
-  service.timetableSource = supplemented || withSupplementaryDepartures.retained ? 'TfL + BODS supplementary' : 'TfL';
+  service.timetableSource = supplemented ? 'TfL + BODS supplementary' : 'TfL';
   service.source = { ...service.source, provider: 'TfL', primaryAuthority: 'TfL', supplementaryProvider: hasSupplementaryEvidence ? 'BODS' : null };
   const deterministicTfLIdentity = service.source?.routeMetadata === 'matched' && Boolean(text(service.origin) && text(service.destination));
   const identityFields = new Set(['origin', 'destination', 'direction', 'principalLocations', 'routePatternStopIds']);

@@ -103,8 +103,30 @@ const conflict = await resolvePlannerEndpointDecisions([service({
   destinationStopPointId: 'TARGET',
   endpointEvidence: { destination: { TARGET: { resolvedStopPointId: 'TARGET', naptanCommonName: 'Weaker persisted name' } } }
 })], referenceData);
-assert.equal(conflict.services[0].destinationEndpointDecision.conflict, true);
+assert.equal(conflict.services[0].destinationEndpointDecision.conflict, false, 'same exact StopPoint identity with an older name alias is not a material conflict');
 assert.equal(conflict.services[0].destinationEndpointDecision.chosenDisplayName, 'Authoritative Main Station');
+
+const genuineConflict = await resolvePlannerEndpointDecisions([service({
+  id: 'genuine-conflict',
+  destination: 'Destination not supplied',
+  destinationStopPointId: 'TARGET',
+  endpointEvidence: { destination: { TARGET: { resolvedStopPointId: 'TARGET', exactMatchMethod: 'exact-atco-code', naptanCommonName: 'Older endpoint alias', nptgLocalityCode: 'OTHER-LOCALITY' } } }
+})], referenceData);
+assert.equal(genuineConflict.services[0].destinationEndpointDecision.conflict, true, 'an incompatible authoritative locality remains reviewable');
+
+const clippedCorridor = await resolvePlannerEndpointDecisions([service({
+  id: 'clipped-corridor-endpoint-candidates',
+  destination: 'Destination not supplied',
+  destinationStopPointId: 'TARGET',
+  destinationStopPointIds: ['TARGET', 'OTHER-AREA'],
+  routePatternStopIds: ['ORIGIN', 'CORRIDOR-EDGE'],
+  endpointEvidence: { destination: {
+    TARGET: { resolvedStopPointId: 'TARGET', exactMatchMethod: 'exact-atco-code', naptanCommonName: 'Authoritative Main Station', stopAreas: [{ id: 'area:one', name: 'One' }] },
+    'OTHER-AREA': { resolvedStopPointId: 'OTHER-AREA', exactMatchMethod: 'exact-atco-code', naptanCommonName: 'Different Place', stopAreas: [{ id: 'area:two', name: 'Two' }] }
+  } }
+})], referenceData);
+assert.deepEqual(clippedCorridor.services[0].destinationEndpointDecision.endpointStopPointIds, [], 'mismatched corridor candidates are not hydrated as route endpoints');
+assert.equal(clippedCorridor.services[0].destinationEndpointDecision.conflict, false, 'clipped corridor candidates cannot manufacture a multi-place endpoint conflict');
 
 for (const sourcePath of [
   'src/atlas/adapters/prepared-bus-data-adapter.mjs',

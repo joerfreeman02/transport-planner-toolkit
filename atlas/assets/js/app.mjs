@@ -18,7 +18,7 @@ import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presenta
 import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-task-status.mjs';
 import { buildBusTimetablePresentationNote, buildPlannerBusServiceSummaries, plannerRouteDisplayNumber, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
-import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
+import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
@@ -548,6 +548,8 @@ function renderAssessment(result) {
   if (detailRows) detailRows.replaceChildren();
   for (const stop of result.stops) {
     const row = document.createElement('tr');
+    const selectedForReport = selectedStopIds.has(stopKey(stop));
+    if (!selectedForReport) row.classList.add('diagnostic-candidate');
     row.dataset.stopId = stopKey(stop);
     const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedStopIds.has(stopKey(stop)); include.setAttribute('aria-label', `Include ${stop.name}`);
     include.addEventListener('change', () => { if (include.checked) selectedStopIds.add(stopKey(stop)); else selectedStopIds.delete(stopKey(stop)); renderAssessment(result); });
@@ -561,7 +563,7 @@ function renderAssessment(result) {
     appendCell(row, 'Direction / indicator', stop.displayDirection);
     const walking = appendCell(row, 'Walking distance / time', formatAccess(stop.walking));
     if (stop.walking.status !== 'routed') walking.classList.add('route-unavailable');
-    appendCell(row, 'Routes serving stop', stop.routes?.length ? stop.routes.join(', ') : 'Routes unavailable');
+    appendCell(row, 'Routes serving stop', stopRoutesPresentation(stop, { selectedForReport }));
     row.addEventListener('click', event => {
       if (event.target.closest('input, a, button')) return;
       const marker = busStopMarkers.find(candidate => candidate.__atlasStopId === stopKey(stop));
@@ -580,9 +582,10 @@ function renderAssessment(result) {
   }
   const timetableNote = buildBusTimetablePresentationNote(result, presentedServices);
   if (timetableNote) {
-    const noteRow = document.createElement('tr'); noteRow.className = 'service-note methodology-note semantic-annotation annotation-timetable-variation';
+    const noteRow = document.createElement('tr'); noteRow.className = 'service-note semantic-annotation annotation-presentation-note annotation-timetable-variation';
     const noteCell = document.createElement('td'); noteCell.colSpan = 8; noteCell.setAttribute('role', 'note');
-    noteCell.textContent = timetableNote; noteRow.append(noteCell); serviceRows.append(noteRow);
+    const label = document.createElement('strong'); label.textContent = 'Timetable note: ';
+    noteCell.append(label, timetableNote); noteRow.append(noteCell); serviceRows.append(noteRow);
   }
   presentedServices.forEach((service, index) => {
     const row = document.createElement('tr');

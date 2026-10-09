@@ -206,7 +206,9 @@ function endpointFromService(service, side) {
   const suffix = side === 'origin' ? 'Origin' : 'Destination';
   const pattern = Array.isArray(service?.routePatternStops) ? service.routePatternStops : [];
   const patternEndpoint = side === 'origin' ? pattern[0] : pattern.at(-1);
-  const ids = unique([
+  const orderedIds = unique(service?.routePatternStopIds ?? service?.orderedPatternEndpoints ?? service?.source?.orderedPatternEndpoints ?? []);
+  const orderedEndpointId = orderedIds.length >= 2 ? (side === 'origin' ? orderedIds[0] : orderedIds.at(-1)) : null;
+  const candidateIds = unique([
     service?.[`${side}StopPointId`],
     ...(service?.[`${side}StopPointIds`] ?? []),
     // Existing ordered pattern evidence is accepted only as an exact
@@ -214,7 +216,9 @@ function endpointFromService(service, side) {
     patternEndpoint?.id && (patternEndpoint?.nptgLocalityCode || patternEndpoint?.nptgLocalityName || patternEndpoint?.stopArea || patternEndpoint?.logicalGroupRefs) ? patternEndpoint.id : null,
     ...preparedEndpointEvidenceForService(service, side).map(item => item.resolvedStopPointId)
   ]);
-  const prepared = preparedEndpointEvidenceForService(service, side)[0] || null;
+  const ids = orderedEndpointId && !candidateIds.includes(orderedEndpointId) ? [] : candidateIds;
+  const prepared = preparedEndpointEvidenceForService(service, side).find(item => !orderedEndpointId || item.resolvedStopPointId === orderedEndpointId)
+    || (!ids.length ? null : preparedEndpointEvidenceForService(service, side)[0]) || null;
   return {
     rawEndpointText: side === 'origin' ? service?.origin : service?.destination,
     endpointStopPointId: ids[0] || null,
@@ -243,11 +247,15 @@ export function plannerEndpointDecisionForService(service, side = 'destination')
 }
 
 function endpointIdsForService(service, side) {
-  return unique([
+  const ids = unique([
     service?.[`${side}StopPointId`],
     ...(service?.[`${side}StopPointIds`] ?? []),
     ...preparedEndpointEvidenceForService(service, side).map(item => item.resolvedStopPointId)
   ]);
+  const ordered = unique(service?.routePatternStopIds ?? service?.orderedPatternEndpoints ?? service?.source?.orderedPatternEndpoints ?? []);
+  if (ordered.length < 2) return ids;
+  const orderedEndpointId = side === 'origin' ? ordered[0] : ordered.at(-1);
+  return ids.includes(orderedEndpointId) ? ids : [];
 }
 
 function preparedEndpointEvidenceForService(service, side) {
@@ -349,9 +357,11 @@ function preparedRuntimeConflict(prepared, physicalStop, stopAreas, locality) {
   const preparedGroups = new Set((prepared.stopAreas ?? []).map(area => text(area.id)).filter(Boolean));
   const runtimeGroups = new Set((stopAreas ?? []).map(area => text(area.id)).filter(Boolean));
   if (preparedGroups.size && runtimeGroups.size && [...preparedGroups].some(id => !runtimeGroups.has(id))) return true;
-  const preparedName = normal(prepared.naptanCommonName);
-  const runtimeName = normal(physicalStop.name);
-  return Boolean(preparedName && runtimeName && preparedName !== runtimeName);
+  // Both records are keyed by the same exact StopPoint ID at this boundary.
+  // Names are presentation aliases and can vary across snapshots/providers;
+  // authoritative reference/runtime wording wins without manufacturing a
+  // physical-place conflict. Identity disagreements above remain reviewable.
+  return false;
 }
 
 function endpointEvidenceForRecord(record, side, hydratedById, referenceById, localitiesById, groupsById) {

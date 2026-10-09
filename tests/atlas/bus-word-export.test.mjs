@@ -1,6 +1,7 @@
 import { docxBlob } from '../../assets/js/word-export.js';
 import assert from 'node:assert/strict';
 import { buildBusWordTables, busWordFilename } from '../../src/atlas/presentation/bus-word-export.mjs';
+import { stopRoutesPresentation } from '../../src/atlas/domain/bus-source-presentation.mjs';
 
 const result = {
   ok: true,
@@ -29,6 +30,13 @@ assert.equal(tables[0].rows[0][0], '?');
 assert.equal(tables[0].rows[0][1], 'Balaam Street');
 assert.equal(tables[0].rows[0][2], 'Stop S (Eastbound)');
 assert.equal(tables[0].rows[0][5], '262, 473');
+const diagnosticCandidate = { name: 'Enfield Town / Cecil Road', displayDirection: 'Stop Z1 (Westbound)', walking: { status: 'routed', distanceMetres: 454, durationSeconds: 360 }, cycling: { status: 'routed', distanceMetres: 510, durationSeconds: 180 }, routes: [], timetableMatch: false, timetableEvidenceStatus: 'SOURCE_UNAVAILABLE', groupCompleted: true };
+const candidateText = buildBusWordTables({ ...result, stops: [diagnosticCandidate], serviceSummaries: [] })[0].rows[0][5];
+assert.match(candidateText, /No routes recorded by NaPTAN/);
+assert.match(candidateText, /candidate not assessed in detail/);
+assert.match(stopRoutesPresentation(diagnosticCandidate, { selectedForReport: false }), /not included in report/, 'Browser identifies an unselected diagnostic candidate as outside the report population');
+const unassessedText = buildBusWordTables({ ...result, stops: [{ ...diagnosticCandidate, timetableEvidenceStatus: null }], serviceSummaries: [] })[0].rows[0][5];
+assert.match(unassessedText, /candidate not assessed in detail/);
 assert.equal(tables[1].caption, 'Table 3.3 - Bus Service Summary');
 assert.deepEqual(tables[1].headers, ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period']);
 assert.match(tables[1].rows[0][2], /Here East, Hackney Wick – Royal Crest Avenue, Silvertown/);

@@ -10,6 +10,24 @@ export const STOP_PRESENTATION_LABELS = Object.freeze({
   national: 'Department for Transport NaPTAN'
 });
 
+/** Plain-English route evidence for an assessed stop or an unselected candidate. */
+export function stopRoutesPresentation(stop = {}, { selectedForReport = true } = {}) {
+  const routes = [...new Set((stop.routes ?? []).map(value => String(value ?? '').trim()).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, 'en-GB', { numeric: true }));
+  let result;
+  if (routes.length) result = routes.join(', ');
+  else {
+    const status = String(stop.timetableEvidenceStatus ?? '').toUpperCase();
+    if (stop.groupCompleted === true && stop.timetableMatch === false) result = 'No routes recorded by NaPTAN · candidate not assessed in detail';
+    else if (status === 'NO_CURRENT_MATCH') result = 'No routes recorded by NaPTAN · no current timetable match';
+    else if (status === 'SOURCE_UNAVAILABLE' || status === 'PARTIAL') result = 'No routes recorded by NaPTAN · timetable evidence unavailable or incomplete';
+    else if (status === 'MATCHED' || status === 'SUPPLEMENTED' || status === 'FALLBACK') result = 'Timetable evidence matched · route label unavailable';
+    else result = 'No routes recorded by NaPTAN · candidate not assessed in detail';
+  }
+  if (!selectedForReport) result += ' · not included in report';
+  return result;
+}
+
 const text = value => String(value ?? '').trim();
 const normal = value => text(value).toLowerCase();
 

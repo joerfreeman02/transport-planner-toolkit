@@ -108,7 +108,8 @@ const symmetric = await resolvePlannerEndpointDecisions([{
   origin: 'Bus Station',
   originStopPointId: 'STAND_A',
   originStopPointIds: ['STAND_A', 'STAND_C'],
-  destinationStopPointIds: ['STAND_A', 'STAND_C']
+  destinationStopPointIds: ['STAND_A', 'STAND_C'],
+  routePatternStopIds: ['STAND_A', 'STAND_C']
 }], referenceData);
 assert.deepEqual(symmetric.services[0].originEndpointDecision.requestedEndpointStopPointIds, ['STAND_A', 'STAND_C']);
 assert.deepEqual(symmetric.services[0].destinationEndpointDecision.requestedEndpointStopPointIds, ['STAND_A', 'STAND_C']);

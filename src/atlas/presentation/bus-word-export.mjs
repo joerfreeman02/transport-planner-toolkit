@@ -1,6 +1,7 @@
 import { buildServicePresentation, formatServiceOriginDestination } from '../domain/bus-service-assessment.mjs';
 import { buildBusTimetablePresentationNote, plannerRouteDisplayNumber, PLANNER_METHODOLOGY_NOTE, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../domain/bus-planner-summary.mjs';
 import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
+import { stopRoutesPresentation } from '../domain/bus-source-presentation.mjs';
 
 function text(value) { return String(value ?? '').trim(); }
 
@@ -72,16 +73,16 @@ export function buildBusWordTables(result) {
     stop.displayDirection,
     accessText(stop.walking),
     accessText(stop.cycling),
-    stop.routes?.length ? stop.routes.join(', ') : 'Timetable route match unavailable'
+    stopRoutesPresentation(stop)
   ]);
 
   const hasPlannerSummary = Array.isArray(result.plannerServiceSummaries);
   const services = hasPlannerSummary ? result.plannerServiceSummaries : buildServicePresentation(result.serviceSummaries ?? []);
   const serviceRows = [];
   const timetableNote = hasPlannerSummary ? buildBusTimetablePresentationNote(result, services) : null;
-  if (timetableNote) serviceRows.push({ kind: 'methodology', semantic: 'timetable-variation', text: timetableNote });
+  if (timetableNote) serviceRows.push({ kind: 'summary', semantic: 'presentation-note', text: `Timetable note: ${timetableNote}` });
   if (hasPlannerSummary && services.some(service => service.plannerNotes?.terminus)) {
-    serviceRows.push({ kind: 'summary', semantic: 'terminus-presentation', text: `Presentation note: ${PLANNER_TERMINUS_PRESENTATION_NOTE}` });
+    serviceRows.push({ kind: 'summary', semantic: 'presentation-note', text: `Presentation note: ${PLANNER_TERMINUS_PRESENTATION_NOTE}` });
   }
   services.forEach((service, index) => {
     serviceRows.push(hasPlannerSummary

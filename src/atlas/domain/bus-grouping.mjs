@@ -136,8 +136,10 @@ export function endpointPlaceKeys(service = {}, side = 'destination') {
     ...(service?.[`${side}StopPointIds`] ?? []),
     orderedPattern[side === 'origin' ? 0 : -1]
   ].map(normal));
-  add('place', [decision.endpointLogicalPlaceId, evidence.endpointLogicalPlaceId, decision.logicalPlaceId, evidence.logicalPlaceId,
-    ...resolvedPreparedEntries.map(entry => entry.nptgLocalityName), patternEndpoint?.nptgLocalityName, patternEndpoint?.localityName].map(normal));
+  // Locality names describe a broad administrative area, not a terminal
+  // identity. They must not make an endpoint elsewhere in the same locality
+  // appear to terminate at an assessed StopArea.
+  add('place', [decision.endpointLogicalPlaceId, evidence.endpointLogicalPlaceId, decision.logicalPlaceId, evidence.logicalPlaceId].map(normal));
   add('place-name', [decision.chosenDisplayName, decision.chosen, evidence.stopArea?.name, ...(evidence.stopAreas ?? []).map(area => area?.name),
     ...resolvedPreparedEntries.flatMap(entry => [entry.naptanCommonName, ...(entry.stopAreas ?? []).map(area => area?.name)])].map(normal));
   return unique(keys);
@@ -198,11 +200,12 @@ function endpointStopIds(service, side) {
   const decision = service?.[`${side}EndpointDecision`] || {};
   const preparedEntries = endpointEvidenceEntries(service, side);
   const resolved = hasResolvedExactEndpointEvidence(service, side);
-  return unique([
+  const ids = unique([
     ...(resolved ? [service?.[`${side}StopPointId`], ...(service?.[`${side}StopPointIds`] ?? [])] : []),
     ...(resolved ? [decision.primaryEndpointStopPointId, decision.endpointStopPointId, ...(decision.endpointStopPointIds ?? [])] : []),
     ...preparedEntries.filter(preparedEndpointIsResolved).map(entry => entry.resolvedStopPointId)
   ]);
+  return ids;
 }
 
 function endpointIsExact(service, side) {
@@ -530,7 +533,18 @@ function assessedPlace(stops, matchedStop) {
 }
 
 function endpointMatchesAssessed(service, side, stopsById, assessedKeys) {
-  if (!endpointIsExact(service, side)) return { matched: false, proof: false, through: false, stopIds: [], place: null };
+  if (!endpointIsExact(service, side)) {
+    const routePattern = pattern(service);
+    const clippedEdgeId = routePattern.length >= 2 ? routePattern[side === 'origin' ? 0 : routePattern.length - 1] : null;
+    const clippedEdge = clippedEdgeId ? stopsById.get(clippedEdgeId) : null;
+    const matched = Boolean(clippedEdgeId && (
+      assessedKeys.has(`stop-point:${normal(clippedEdgeId)}`)
+      || stopPlaceKeys(clippedEdge).some(key => assessedKeys.has(key))
+    ));
+    // Preserve an unresolved-review classification for a corridor edge at the
+    // assessed place, but never promote it to exact endpoint proof.
+    return { matched, proof: false, through: false, stopIds: [], place: clippedEdge || null };
+  }
   const ids = endpointStopIds(service, side);
   const matchingStops = ids.map(id => stopsById.get(id)).filter(stop => stop && (assessedKeys.has(`stop-point:${normal(stop.id || stop.sourceId)}`) || stopPlaceKeys(stop).some(key => assessedKeys.has(key))));
   const exactStopMatch = matchingStops.length > 0;
@@ -548,6 +562,17 @@ function patternPositionProof(service, side, stopsById, assessedKeys) {
   if (routePattern.length < 2) return { terminal: false, through: false };
   const index = side === 'origin' ? 0 : routePattern.length - 1;
   const terminalId = routePattern[index];
+  const exactEndpointIds = new Set(endpointStopIds(service, side).map(normal));
+  // Runtime timetable patterns may be clipped to the assessed corridor. An
+  // assessed stop at the clipped edge is not a terminus unless that ordered
+  // edge agrees with the exact endpoint StopPoint identity for this side.
+  if (!exactEndpointIds.has(normal(terminalId))) {
+    const internalMatches = routePattern.slice(1, -1).some(id => {
+      const stop = stopsById.get(id);
+      return id && (assessedKeys.has(`stop-point:${normal(id)}`) || stopPlaceKeys(stop).some(key => assessedKeys.has(key)));
+    });
+    return { terminal: false, through: internalMatches };
+  }
   const terminalStop = stopsById.get(terminalId);
   const terminalKeys = new Set([...stopPlaceKeys(terminalStop), ...endpointPlaceKeys(service, side)]);
   const terminalMatches = stopsById.has(terminalId) && [...terminalKeys].some(key => assessedKeys.has(key));

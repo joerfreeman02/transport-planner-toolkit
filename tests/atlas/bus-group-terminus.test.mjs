@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { buildPlannerBusServiceSummaries, buildPlannerServiceGroups } from '../../src/atlas/domain/bus-planner-summary.mjs';
+import { makeTerminusDecision } from '../../src/atlas/domain/bus-grouping.mjs';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
 
 const week = Object.freeze({ monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420], saturday: [], sunday: [] });
@@ -119,6 +120,24 @@ assert.equal(rows([through])[0].terminusDecision.status, 'through-service', 'thr
 const uncertain = record({ id: 'uncertain', routeNumber: '15', origin: 'Bus Station', destination: 'Harlow Town Centre', originStopPointId: 'W-A', destinationStopPointId: 'H', pattern: ['W-A', 'M', 'H'] });
 uncertain.originEndpointDecision = { chosen: 'Waltham Cross Bus Station', chosenDisplayName: 'Waltham Cross Bus Station', primaryEndpointStopPointId: 'W-A', stopArea: { id: 'area:WALTHAM', name: 'Waltham Cross Bus Station' } };
 assert.equal(rows([uncertain])[0].terminusDecision.proven, false, 'uncertain endpoint proof fails safe');
+
+const clippedPattern = record({ id: 'clipped-pattern', routeNumber: '121', origin: 'Waltham Cross Bus Station', destination: 'Loughton Station', originStopPointId: 'ELSEWHERE', destinationStopPointId: 'L', pattern: ['W-A', 'L'] });
+clippedPattern.originEndpointDecision = endpoint('Waltham Cross Bus Station', 'ELSEWHERE', 'area:WALTHAM');
+clippedPattern.stopIds = ['W-A', 'ELSEWHERE', 'L'];
+clippedPattern.assessedStops = ['W-A'];
+const clippedDecision = makeTerminusDecision({ services: [clippedPattern], assessedStops: [stops[0]] });
+assert.equal(clippedDecision.proven, false, 'a clipped pattern edge at the assessed stop cannot override a different exact endpoint StopPoint ID');
+assert.equal(clippedDecision.status, 'unresolved-review');
+
+// A route endpoint elsewhere in the same NPTG locality is not an assessed
+// terminus. Locality text cannot stand in for an exact StopArea identity.
+const intermediate = record({ id: 'intermediate-locality-control', routeNumber: '191', origin: 'Elsewhere', destination: 'Beyond', originStopPointId: 'ELSEWHERE', destinationStopPointId: 'BEYOND', pattern: ['ELSEWHERE', 'ASSESSED', 'BEYOND'] });
+intermediate.originEndpointEvidence = { endpointStopPointId: 'ELSEWHERE', endpointStopPointIds: ['ELSEWHERE'], endpointStopName: 'Elsewhere', hydrated: true, nptgLocalityName: 'Enfield Town', evidenceSource: 'authoritative-reference-endpoint' };
+intermediate.originEndpointDecision = { ...endpoint('Elsewhere', 'ELSEWHERE', 'area:ELSEWHERE'), evidence: { endpointEvidenceSet: [{ endpointStopPointId: 'ELSEWHERE', nptgLocalityName: 'Enfield Town' }] } };
+intermediate.endpointEvidence = { origin: { ELSEWHERE: { resolvedStopPointId: 'ELSEWHERE', exactMatchMethod: 'exact-atco-code', nptgLocalityName: 'Enfield Town' } } };
+const intermediateDecision = makeTerminusDecision({ services: [intermediate], assessedStops: [{ id: 'ASSESSED', name: 'Enfield stop', logicalGroupId: 'area:ASSESSED', logicalGroupName: 'Enfield Town', walking: { status: 'routed', distanceMetres: 100 } }] });
+assert.equal(intermediateDecision.status, 'through-service');
+assert.equal(intermediateDecision.proven, false, 'a matching locality label cannot prove the route endpoint is the assessed StopPoint');
 
 // Circular state is carried through unchanged, and Browser/Word use the same
 // grouped row and note.

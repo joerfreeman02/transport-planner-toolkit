@@ -60,8 +60,8 @@ assert.deepEqual(stopIdsFor('25C', record => /^Bus Station$/i.test(record.destin
 
 const representative242 = rowsFor('242').find(row => row.destination === 'Potters Bar Railway Station');
 const wordTables = buildBusWordTables({ ok: true, stops: fixture.stops, plannerServiceSummaries: rows, serviceSummaries: [] });
-const word242 = wordTables.flatMap(table => table.rows ?? []).find(row => Array.isArray(row) && row[0] === '242' && row[3] === representative242.directionPatternText);
-assert.equal(word242[4], representative242.servedAtText, 'Word uses the same multi-stop served-at value as Browser');
+const word242 = wordTables.flatMap(table => table.rows ?? []).find(row => Array.isArray(row) && row[0] === '242' && row[2] === representative242.directionPatternText);
+assert.equal(word242[3], representative242.servedAtText, 'Word uses the same multi-stop served-at value as Browser');
 const docxBytes = new TextDecoder().decode(new Uint8Array(await docxBlob('Alpha.15', wordTables).arrayBuffer()));
 assert.match(docxBytes, /Stop used for the frequency and operating-period information shown/);
 assert.match(docxBytes, /The Vine PH/, 'DOCX keeps multiple served stops readable in the protected legacy Word renderer');

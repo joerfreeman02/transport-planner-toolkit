@@ -45,6 +45,42 @@ assert.equal(currentIndex.baseVersion, baseVersion);
 const mixed = makeIndex();
 mixed.patterns[0].journeys[0].baseVersion = '20260101';
 assert.throws(() => validateTflIbusOperatorIndex(mixed), /Mixed TfL iBus Base_Version/);
+const mixedCalendarVersion = makeIndex();
+mixedCalendarVersion.patterns[0].journeys[0].calendarEvidence[0].baseVersion = '20260101';
+assert.throws(() => validateTflIbusOperatorIndex(mixedCalendarVersion), /Mixed TfL iBus Base_Version in Block_CalendarDay/);
+
+// A shared Base_Version does not allow one date's active operator to leak into another.
+const twoDateIndex = makeIndex();
+const dayA = '2026-10-09';
+const dayB = '2026-10-10';
+const noServiceDay = '2026-10-11';
+const journeyA = twoDateIndex.patterns[0].journeys[0];
+journeyA.calendarEvidence = [
+  { calendarDay: dayA, blockRunsOnDay: true, baseVersion },
+  { calendarDay: dayB, blockRunsOnDay: false, baseVersion },
+  { calendarDay: noServiceDay, blockRunsOnDay: false, baseVersion }
+];
+twoDateIndex.patterns[0].journeys.push({
+  ...journeyA,
+  journeyIdx: 'j2',
+  blockIdx: 'b2',
+  operatorCode: 'OP2',
+  operatorName: 'Operator Two',
+  calendarEvidence: [
+    { calendarDay: dayA, blockRunsOnDay: false, baseVersion },
+    { calendarDay: dayB, blockRunsOnDay: true, baseVersion },
+    { calendarDay: noServiceDay, blockRunsOnDay: false, baseVersion }
+  ]
+});
+validateTflIbusOperatorIndex(twoDateIndex);
+const resolvedDayA = resolveTflIbusOperatorEvidence(makeService(), twoDateIndex, dayA);
+const resolvedDayB = resolveTflIbusOperatorEvidence(makeService(), twoDateIndex, dayB);
+assert.equal(resolvedDayA.operator.code, 'OP1');
+assert.deepEqual(resolvedDayA.patterns.flatMap(pattern => pattern.journeys.map(item => item.journeyIdx)), ['j1'], 'inactive block on day A is excluded');
+assert.ok(resolvedDayA.patterns.flatMap(pattern => pattern.journeys).every(item => item.calendarEvidence.every(calendar => calendar.calendarDay === dayA && calendar.blockRunsOnDay)));
+assert.equal(resolvedDayB.operator.code, 'OP2', 'day B resolves from its own active block, not day A evidence');
+assert.deepEqual(resolvedDayB.patterns.flatMap(pattern => pattern.journeys.map(item => item.journeyIdx)), ['j2']);
+assert.equal(resolveTflIbusOperatorEvidence(makeService(), twoDateIndex, noServiceDay).status, 'no-active-journey-on-date', 'an inactive valid day does not borrow another day’s operator');
 
 // 3-4. Passenger-facing Service_Line_No maps to a different internal contract; Logical_Line_No is not substituted.
 assert.equal(currentIndex.serviceLines[0].serviceLineNo, '313');
@@ -78,6 +114,29 @@ assert.equal(journey.blockIdx, '19158');
 assert.equal(journey.operatorCode, 'MN');
 assert.equal(journey.operatorName, 'Arriva London North');
 assert.equal(journey.journeyType, 1);
+
+// The committed 313 index retains real calendar rows across the full Base_Version window.
+const realCalendarDays = new Set(currentIndex.patterns.flatMap(pattern => pattern.journeys.flatMap(item => item.calendarEvidence.map(calendar => calendar.calendarDay))));
+assert.ok(realCalendarDays.size > 1, 'real production index contains multiple Block_CalendarDay dates');
+assert.ok([...realCalendarDays].every(day => day >= currentIndex.validFrom.slice(0, 10) && day < currentIndex.validTo.slice(0, 10)), 'real index excludes calendar dates outside Base_Version validity');
+const realPatternForDayB = currentIndex.patterns.find(pattern => pattern.serviceLineNo === '313'
+  && pattern.journeys.some(item => item.calendarEvidence.some(calendar => calendar.calendarDay === '2026-10-10' && calendar.blockRunsOnDay)));
+assert.ok(realPatternForDayB, 'real iBus evidence has an active 313 block on the second valid date');
+const real313Service = makeService({
+  routeNumber: '313',
+  source: { provider: 'TfL', lineId: '313', routePatternStartIsAssessedStop: false },
+  routePatternStopIds: realPatternForDayB.orderedStopPointIds,
+  originStopPointId: realPatternForDayB.orderedStopPointIds[0],
+  destinationStopPointId: realPatternForDayB.orderedStopPointIds.at(-1),
+  stopSchedules: { [realPatternForDayB.orderedStopPointIds[1]]: { monday: [420] } }
+});
+for (const day of ['2026-10-09', '2026-10-10']) {
+  const realEvidence = resolveTflIbusOperatorEvidence(real313Service, currentIndex, day);
+  assert.equal(realEvidence.status, 'resolved', `real 313 evidence resolves on ${day}`);
+  assert.deepEqual(realEvidence.operator, { code: 'MN', name: 'Arriva London North' });
+  assert.ok(realEvidence.patterns.flatMap(pattern => pattern.journeys).every(item => item.calendarEvidence.every(calendar => calendar.calendarDay === day && calendar.blockRunsOnDay)), `only active ${day} calendar rows are returned`);
+}
+assert.equal(resolveTflIbusOperatorEvidence(real313Service, currentIndex, '2026-11-05').status, 'outside-base-version-validity');
 
 // 12-13. The assessment date's active Block_CalendarDay is accepted; inactive blocks are not operator candidates.
 const activeEvidence = resolveTflIbusOperatorEvidence(makeService(), makeIndex(), assessmentDate);
@@ -172,9 +231,10 @@ const summary = {
 };
 const word = buildBusWordTables({ ok: true, plannerServiceSummaries: [summary], serviceSummaries: [], stops: [], reviewItems: [] })[1];
 assert.equal(word.rows[0][1], resolvedService.operator, 'Word receives the same resolved operator value as the Browser service object');
-assert.equal(word.rows[0][2], operatorProvenanceLabel(summary));
-assert.equal(word.rows[0][2], `TfL iBus Static Data · Base_Version ${currentIndex.baseVersion}`, 'Planner-row projection retains provenance from its source records');
-assert.match(word.headers[2], /provenance/i);
+assert.equal(word.rows[0].length, 7, 'Word retains the seven-column planner-facing contract');
+assert.deepEqual(word.headers, ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']);
+assert.equal(operatorProvenanceLabel(summary), `TfL iBus Static Data · Base_Version ${currentIndex.baseVersion}`, 'Planner-row projection retains provenance in the engineering model and audit evidence');
+assert.equal(resolvedService.source.operatorProvenance.tier, 'tfl-ibus', 'removing the report column does not remove operator provenance');
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../../atlas/data/tfl-ibus/manifest.json', import.meta.url), 'utf8'));
 assert.equal(manifest.baseVersion, currentIndex.baseVersion);

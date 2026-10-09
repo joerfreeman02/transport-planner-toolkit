@@ -161,6 +161,8 @@ def main() -> int:
     version = str(version)
     start = dt.datetime.fromisoformat(valid_from)
     end = dt.datetime.fromisoformat(valid_to)
+    valid_from_day = start.date().isoformat()
+    valid_to_day = end.date().isoformat()
     date_start = dt.datetime.combine(assessment_date, dt.time.min)
     if not (start <= date_start < end):
         raise ValueError(f"Assessment date {assessment_date} is outside Base_Version {version} validity {valid_from}–{valid_to}.")
@@ -314,7 +316,7 @@ def main() -> int:
                         calendar_count += 1
                         block_id = record.get("aBlock_Idx")
                         day = record.get("aCalendar_Day") or child_text(record, "Calendar_Day")
-                        if day != assessment_date.isoformat() or not block_id:
+                        if not block_id or not day or not (valid_from_day <= day < valid_to_day):
                             continue
                         runs = child_text(record, "Block_Runs_On_Day")
                         date_calendars.setdefault(block_id, []).append({"calendarDay": day, "blockRunsOnDay": runs == "1", "baseVersion": version})

@@ -111,8 +111,8 @@ assert.equal(buildBusTimetablePresentationNote(presentationResult, [ordinaryWith
 const word = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [ordinaryWithVariants], serviceSummaries: [], ...presentationResult });
 const wordTableRow = word[1].rows.find(row => Array.isArray(row));
 assert.equal(wordTableRow[0], 'CONTROL†', 'Word adds the presentation-only dagger without changing routeNumber');
-assert.equal(wordTableRow[6], ordinaryWithVariants.typicalFrequencyText, 'Word frequency matches Browser planner output');
-assert.equal(wordTableRow[7], ordinaryWithVariants.operatingPeriodLines.join('\n'), 'Word operating period matches Browser planner output');
+assert.equal(wordTableRow[5], ordinaryWithVariants.typicalFrequencyText, 'Word frequency matches Browser planner output');
+assert.equal(wordTableRow[6], ordinaryWithVariants.operatingPeriodLines.join('\n'), 'Word operating period matches Browser planner output');
 const wordNotes = word[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
 assert.equal(word[1].rows.filter(row => !Array.isArray(row) && row.text.startsWith('Timetable note:')).length, 1, 'Word emits one table-wide timetable note');
 assert.match(wordNotes, /Timetable information reflects the data available to ATLAS on 2026-10-07/);

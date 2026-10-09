@@ -102,7 +102,7 @@ assert.match(row317.operatingPeriodLines[0], /05:00–00:59/);
 assert.match(row327.operatingPeriodLines[0], /07:00–19:59/);
 const wordRows = buildBusWordTables({ ok: true, stops: [stopA, returnedTfLStop], plannerServiceSummaries: planner, serviceSummaries: summaries })[1].rows.filter(row => Array.isArray(row));
 for (const [route, row] of [['217', row217], ['317', row317], ['327', row327]]) {
-  const wordRow = wordRows.find(candidate => candidate[0] === route && candidate[7] === row.operatingPeriodLines.join('\n'));
+  const wordRow = wordRows.find(candidate => candidate[0] === route && candidate[6] === row.operatingPeriodLines.join('\n'));
   assert.ok(wordRow, `${route} Word output consumes the corrected planner operating period`);
 }
 

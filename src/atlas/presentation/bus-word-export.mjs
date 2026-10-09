@@ -1,4 +1,4 @@
-import { buildServicePresentation, formatServiceOriginDestination, operatorProvenanceLabel } from '../domain/bus-service-assessment.mjs';
+import { buildServicePresentation, formatServiceOriginDestination } from '../domain/bus-service-assessment.mjs';
 import { buildBusTimetablePresentationNote, plannerRouteDisplayNumber, PLANNER_METHODOLOGY_NOTE, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../domain/bus-planner-summary.mjs';
 import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
 import { isOtherNearbyStopRecord, plannerFacingServiceNote, stopRoutesPresentation } from '../domain/bus-source-presentation.mjs';
@@ -89,7 +89,6 @@ export function buildBusWordTables(result) {
       ? [
         plannerRouteDisplayNumber(service),
         service.operator,
-        operatorProvenanceLabel(service),
         service.directionPatternText || formatServiceOriginDestination(service, ' – '),
         service.servedAtText || 'Representative stop not supplied',
         principalLocationsText(service),
@@ -131,10 +130,10 @@ export function buildBusWordTables(result) {
     {
       caption: 'Table 3.3 - Bus Service Summary',
       headers: hasPlannerSummary
-        ? ['Route', 'Operator', 'Operator provenance', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']
+        ? ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']
         : ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period'],
       rows: serviceRows,
-      widths: hasPlannerSummary ? [6, 12, 16, 14, 16, 11, 12, 13] : [7, 14, 22, 25, 17, 15]
+      widths: hasPlannerSummary ? [7, 14, 18, 17, 13, 14, 17] : [7, 14, 22, 25, 17, 15]
     }
   ];
 }

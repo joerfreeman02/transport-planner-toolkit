@@ -165,7 +165,7 @@ assert.equal(unresolved.data[0].source.operatorProvenance.tier, 'ambiguous');
 assert.ok(unresolved.data[0].sourceWarnings.some(note => /materially ambiguous/.test(note)));
 
 const summary = {
-  routeNumber: 'X1', operator: resolvedService.operator, source: resolvedService.source,
+  routeNumber: 'X1', operator: resolvedService.operator,
   directionPatternText: 'Alpha → Charlie', servedAtText: 'Stop B', principalLocationsText: 'Alpha, Charlie',
   typicalFrequencyText: 'Every 10 minutes', operatingPeriodLines: ['Weekdays 06:00–20:00'],
   stopIds: ['B'], rawServiceSummaries: [resolvedService]
@@ -173,6 +173,7 @@ const summary = {
 const word = buildBusWordTables({ ok: true, plannerServiceSummaries: [summary], serviceSummaries: [], stops: [], reviewItems: [] })[1];
 assert.equal(word.rows[0][1], resolvedService.operator, 'Word receives the same resolved operator value as the Browser service object');
 assert.equal(word.rows[0][2], operatorProvenanceLabel(summary));
+assert.equal(word.rows[0][2], `TfL iBus Static Data · Base_Version ${currentIndex.baseVersion}`, 'Planner-row projection retains provenance from its source records');
 assert.match(word.headers[2], /provenance/i);
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../../atlas/data/tfl-ibus/manifest.json', import.meta.url), 'utf8'));

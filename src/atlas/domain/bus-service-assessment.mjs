@@ -993,7 +993,15 @@ export function formatServiceOriginDestination(service, separator = ' - ') {
 }
 
 export function operatorProvenanceLabel(service) {
-  const evidence = service?.source?.operatorProvenance ?? service?.provenance?.operatorProvenance ?? {};
+  let evidence = service?.source?.operatorProvenance ?? service?.provenance?.operatorProvenance ?? null;
+  if (!evidence) {
+    const sourceRecords = service?.rawServiceSummaries ?? service?.plannerServiceGroup?.services ?? [];
+    const provenance = sourceRecords.map(record => record?.source?.operatorProvenance).filter(item => item?.tier);
+    const identities = new Set(provenance.map(item => `${item.tier}|${item.baseVersion ?? ''}`));
+    if (provenance.length && provenance.length === sourceRecords.length && identities.size === 1) evidence = provenance[0];
+    else if (provenance.length) return 'Mixed or incomplete operator provenance';
+  }
+  evidence ??= {};
   if (evidence.tier === 'tfl-timetable') return 'TfL timetable';
   if (evidence.tier === 'tfl-ibus') return `TfL iBus Static Data · Base_Version ${text(evidence.baseVersion) || 'not supplied'}`;
   if (evidence.tier === 'bods-supplementary-consensus') return 'BODS supplementary consensus';

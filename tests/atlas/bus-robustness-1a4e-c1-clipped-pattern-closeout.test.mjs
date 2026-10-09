@@ -100,12 +100,13 @@ for (const field of ['routePatternStopIds', 'circularPatternStopIds', 'typicalFr
 }
 
 // Build a compact assessment through the production review-item path.
-async function assessmentFor(serviceRecords) {
+async function assessmentFor(serviceRecords, referenceData = null) {
   const stop = { id: 'ASSESS', name: 'Assessment stop', latitude: 51.6, longitude: -0.1, routes: ['313'], timetableAuthority: 'TfL' };
   const assessment = createBusAssessment({
     stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
     accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 80 }], warnings: [], provenance: {} }) },
-    timetableData: { servicesForStops: async () => ({ ok: true, data: serviceRecords, warnings: [], provenance: {} }) }
+    timetableData: { servicesForStops: async () => ({ ok: true, data: serviceRecords, warnings: [], provenance: {} }) },
+    referenceData
   });
   return assessment.assess({ latitude: 51.6, longitude: -0.1 }, { radius: 250 });
 }
@@ -124,6 +125,27 @@ const duplicatedFact = [
 ];
 const deduped = await assessmentFor(duplicatedFact);
 assert.equal(deduped.reviewItems.filter(item => item.code === 'planner-endpoint-resolution').length, 1, '16: the same material planner fact is deduplicated');
+
+const conflictRecord = (id, calendarProfileId, endpointStopPointIds) => ({
+  id, sourceRecordIds: [id], routeNumber: '313', operator: 'TfL', origin: 'Origin requires review', destination: 'Known destination', direction: 'outbound',
+  calendarProfileId, timetableSource: 'TfL', stopSchedules: { ASSESS: schedule },
+  source: { provider: 'TfL', lineId: '313', directionId: 'outbound', intervalId: id, calendarProfileId },
+  originStopPointIds: endpointStopPointIds
+});
+const conflictPlaces = {
+  'PLACE-A': { id: 'PLACE-A', name: 'Origin A', nptgLocalityCode: 'LOC-A', nptgLocalityName: 'Locality A', busPreparedEligible: true },
+  'PLACE-B': { id: 'PLACE-B', name: 'Origin B', nptgLocalityCode: 'LOC-B', nptgLocalityName: 'Locality B', busPreparedEligible: true },
+  'PLACE-C': { id: 'PLACE-C', name: 'Origin C', nptgLocalityCode: 'LOC-C', nptgLocalityName: 'Locality C', busPreparedEligible: true }
+};
+const repeatedConflict = await assessmentFor([
+  conflictRecord('conflict-school', 'school-day', ['PLACE-A', 'PLACE-B']),
+  conflictRecord('conflict-ordinary', 'ordinary', ['PLACE-A', 'PLACE-B']),
+  conflictRecord('conflict-other-place', 'ordinary', ['PLACE-A', 'PLACE-C'])
+], {
+  resolvePreparedStopPointsByIds: async ids => ({ ok: true, physicalStops: ids.map(id => conflictPlaces[id]).filter(Boolean), warnings: [], provenance: {} })
+});
+const conflictReviews = repeatedConflict.reviewItems.filter(item => item.code === 'planner-endpoint-resolution');
+assert.equal(conflictReviews.length, 2, '16a: repeated exact-place conflict facts collapse across calendars while different conflicting places remain reviewable');
 
 function tflAdapterFor(service) {
   return { servicesForStop: async ({ stopPointId }) => ({ ok: true, data: [{ ...service, stopSchedules: { [stopPointId]: schedule } }], warnings: [], provenance: {} }) };

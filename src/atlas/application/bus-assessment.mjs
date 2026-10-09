@@ -176,13 +176,37 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     if (!materialPlannerEndpointUncertainty(service, side, decision)) continue;
     const sourceIdentity = [...new Set((service.sourceRecordIds ?? []).map(value => String(value ?? '').trim()).filter(Boolean))].sort().join(',');
     const intervalIdentity = [service.source?.lineId, service.source?.directionId || service.directionFamily || service.direction, service.source?.intervalId, service.source?.calendarProfileId || service.calendarProfileId, side].map(value => String(value ?? '').trim()).join('|');
-    add({ code: 'planner-endpoint-resolution', route: service.routeNumber, stop: decision.endpointStopPointId || service.frequencyBasisStopId, source: decision.provider || service.frequencyEvidenceSource || 'timetable source', factKey: `${side}:${sourceIdentity || 'no-source-record'}:${intervalIdentity}`, message: `${side[0].toUpperCase() + side.slice(1)} endpoint decision requires review: ${decision.reason}` });
+    const factIdentity = decision.conflict
+      ? conflictEndpointFactIdentity(service, side, decision)
+      : `${side}:${sourceIdentity || 'no-source-record'}:${intervalIdentity}`;
+    add({ code: 'planner-endpoint-resolution', route: service.routeNumber, stop: decision.endpointStopPointId || service.frequencyBasisStopId, source: decision.provider || service.frequencyEvidenceSource || 'timetable source', factKey: factIdentity, message: `${side[0].toUpperCase() + side.slice(1)} endpoint decision requires review: ${decision.reason}` });
   }
   if (!stopCoverageComplete) add({ code: 'stop-source-coverage', stop: selectedStops[0]?.id, source: 'NaPTAN', message: 'Stop-source coverage was incomplete; the returned stop set does not establish an authoritative zero-stop conclusion.' });
   if (!routingComplete) for (const stop of selectedStops.filter(item => item.walking?.status !== 'routed' || item.cycling?.status !== 'routed')) add({ code: 'access-routing', stop: stop.id, source: 'OSRM', message: 'Walking or cycling access could not be routed for this stop; review access distances before formal use.' });
   if (servicesResult && !servicesResult.ok && !Number(provenance.unprocessedRequests || 0) && !Number(provenance.failedRequests || 0)) add({ code: 'timetable-source-unavailable', stop: selectedStops[0]?.id, source: provenance.source || 'timetable source', message: 'The timetable source did not return a usable result for this assessment; review the source response before formal use.' });
   if (!serviceSummaries.length && servicesResult?.ok) add({ code: 'no-planner-summary', stop: selectedStops[0]?.id, source: 'timetable source', message: 'No planner-facing timetable row was established from the selected-stop evidence.' });
   return [...items.values()];
+}
+
+function conflictEndpointFactIdentity(service, side, decision) {
+  const endpointIds = [...new Set((decision.endpointStopPointIds ?? decision.requestedEndpointStopPointIds ?? []).map(value => String(value ?? '').trim()).filter(Boolean))].sort();
+  const oppositeSide = side === 'origin' ? 'destination' : 'origin';
+  const opposite = service[`${oppositeSide}EndpointDecision`];
+  const oppositeIds = [...new Set((opposite?.endpointStopPointIds ?? opposite?.requestedEndpointStopPointIds ?? []).map(value => String(value ?? '').trim()).filter(Boolean))].sort();
+  const sequence = service.tflRouteSequenceEvidence ?? {};
+  const sectionIds = (sequence.matchedSections ?? sequence.matchedRouteSections ?? []).map(section => String(section?.id ?? section?.routeSectionId ?? '').trim()).filter(Boolean).sort();
+  const branch = sequence.matchedSequence?.branchId ?? sequence.branchId ?? '';
+  const oppositeText = String(service[oppositeSide] ?? '').trim().toLowerCase();
+  return [
+    'conflict', side,
+    service.source?.lineId ?? service.routeNumber,
+    service.source?.directionId ?? service.directionFamily ?? service.direction,
+    service.source?.serviceType ?? service.serviceType,
+    branch,
+    sectionIds.join(','),
+    endpointIds.join(','),
+    oppositeIds.join(',') || oppositeText
+  ].map(value => String(value ?? '').trim().toLowerCase()).join('|');
 }
 
 function materialPlannerEndpointUncertainty(service, side, decision) {

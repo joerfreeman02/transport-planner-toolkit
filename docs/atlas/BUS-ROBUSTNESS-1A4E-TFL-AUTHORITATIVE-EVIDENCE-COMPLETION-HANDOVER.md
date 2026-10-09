@@ -7,7 +7,7 @@
 - Worktree: `C:\Users\joe.freeman\OneDrive - EAS Transport\Documents\Transport Planner Toolkit\atlas-bus-tfl-authoritative-evidence-completion`.
 - Baseline: `01ef6769375b5288685e2486c66f50f469177075`.
 - Implementation commit before this handover/test follow-up: `ca1b0e6f23907dd53546ad617f95126e1d9b3795`.
-- Final tip: the final commit containing this handover; the exact full SHA is reported in the delivery message (a commit cannot include its own object ID in its tree).
+- Final tip: the final commit containing this handover; the exact full SHA is reported in the delivery message (a commit cannot include its own object ID in its tree). The final build check is repeated after this documentation-only update.
 - Formal version remains `2.0.0-alpha.15`.
 - Remote parity: not checked and branch not pushed; this sprint request prohibited merge/deploy but did not request a push. No remote branch state is claimed.
 - Worktree is expected clean after the final commit and full-suite run; verify at handover.
@@ -100,10 +100,10 @@ No route in this list was classified as a newly proven alternate origin or true 
 
 ## Live Enfield result and remaining review items
 
-- Replay: same Enfield Town Station coordinate (`51.6523584, -0.0783252`), 250 m radius, V2 diagnostic route, prepared snapshot `36125621080`; no fresh national acquisition.
-- HTTP: diagnostic review server at `http://127.0.0.1:8771/atlas/?review=v2#modules` returned the current page. Visible header was `BUS-TFL-COMPLETE · ca1b0e6` on alpha.15. This was a diagnostic build, not a final acceptance build.
+- Replay: same Enfield Town Station coordinate (`51.6523584, -0.0783252`), 250 m radius, V2 diagnostic route, prepared snapshot `36125621080`; no fresh national acquisition. The final-tip replay checked 9 October 2026 at 11:21.
+- HTTP: diagnostic review server at `http://127.0.0.1:8771/atlas/?review=v2#modules` returned HTTP 200. Visible header was `BUS-TFL-COMPLETE · 29c3e82` on alpha.15. This was an engineering diagnostic build, not a Product Owner acceptance build.
 - Result: “Assessment complete”; 13 ordinary stop records; one “Other nearby stop records — no route information currently available” record remains separate; 24 planner service summaries; 14 distinct route numbers in the route inventory.
-- Word export: `ATLAS Bus Assessment (7).docx`, exported 9 October 2026 at 11:15; its route rows and 313 additional/short-working notes were inspected. No document was edited.
+- Word export: `C:\Users\joe.freeman\Downloads\ATLAS Bus Assessment (8).docx`, exported 9 October 2026 at 11:26; its route rows, planner-review summary, and 313 additional/short-working notes were inspected. Browser and Word both retain the 313 review signal. No document was edited.
 - Enfield evidence-item count before this sprint's replay: 2 (the 1A4D K/N items).
 - Enfield evidence-item count after: 4.
 

@@ -409,7 +409,7 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         calendarEvidence: profileTiming.calendarEvidence,
         calendarProfileId: profileTiming.calendarProfileId,
         frequencyBasisStopId: stopPointId,
-        source: { provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId, calendarProfileId: profileTiming.calendarProfileId, routeMetadata: identity ? 'matched' : 'incomplete', endpointIdentity: 'StationInterval exact ordered endpoints', assessedStopPointId: stopPointId, routePatternStartIsAssessedStop: Boolean(departureStopConfirmed && !hasRequestedStop), intervalOriginStopPointId: pattern.stations[0]?.id || null },
+        source: { provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId, calendarProfileId: profileTiming.calendarProfileId, routeMetadata: identity ? 'matched' : 'incomplete', endpointIdentity: 'StationInterval exact ordered endpoints', assessedStopPointId: stopPointId, routePatternStartIsAssessedStop: Boolean(departureStopConfirmed && (!hasRequestedStop || normal(pattern.stations[0]?.id) === normal(stopPointId))), intervalOriginStopPointId: pattern.stations[0]?.id || null },
         timetableSource: 'TfL',
         serviceNotes: calendarQualificationNotes(profileTiming.calendarEvidence),
         sourceWarnings: profileTiming.calendarEvidence.filter(calendar => !calendar.resolved).map(calendar => `TfL timetable period "${calendar.sourceCalendarLabel}" could not be safely mapped to operating days; no unverified days were fabricated.`),
@@ -516,7 +516,10 @@ export function tflRouteSequenceEvidenceForService(service, result) {
     const exactOrigin = unique([service?.originStopPointIds, service?.originStopPointId].flat().map(text).filter(Boolean));
     const exactDestination = unique([service?.destinationStopPointIds, service?.destinationStopPointId].flat().map(text).filter(Boolean));
     const intervalOrigin = text(service?.source?.intervalOriginStopPointId);
-    const effectiveExactOrigin = exactOrigin.filter(id => !clippedAtAssessedOrigin || !sameStopId(id, intervalOrigin));
+    const patternSet = new Set(patternIds.map(id => normal(id)));
+    const clippedOriginEdges = new Set([intervalOrigin, text(service?.source?.assessedStopPointId)]
+      .filter(id => id && patternSet.has(normal(id))).map(normal));
+    const effectiveExactOrigin = exactOrigin.filter(id => !clippedAtAssessedOrigin || !clippedOriginEdges.has(normal(id)));
     if (effectiveExactOrigin.length && !effectiveExactOrigin.some(id => sameStopId(id, ids[0]))) return false;
     // A known endpoint either seals the clipped interval edge or proves the
     // full branch terminus; merely occurring somewhere inside the branch is

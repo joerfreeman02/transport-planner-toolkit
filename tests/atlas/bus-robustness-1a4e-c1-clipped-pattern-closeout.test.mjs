@@ -3,6 +3,7 @@ import { tflRouteSequenceEvidenceForService } from '../../src/atlas/adapters/tfl
 import { createAuthoritativeBusTimetableAdapter } from '../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
 import { createBusAssessment } from '../../src/atlas/application/bus-assessment.mjs';
 import { buildServiceSummaries } from '../../src/atlas/domain/bus-service-assessment.mjs';
+import { resolvePlannerEndpointDecisions } from '../../src/atlas/domain/planner-endpoint-decision.mjs';
 
 const seq = (ids, { branchId = null, direction = 'outbound', serviceType = 'Regular', nextBranchIds = [], prevBranchIds = [] } = {}) => ({
   lineId: '313', direction, branchId, serviceType, nextBranchIds, prevBranchIds,
@@ -66,6 +67,26 @@ const ordinary = { id: 'ordinary', routeNumber: '313', operator: 'TfL', origin: 
 // outbound clipped pattern.
 const wrongDirection = tflRouteSequenceEvidenceForService(clipped({ pattern: ['B', 'C', 'D'], destination: 'D' }), result([seq(['A', 'B', 'C', 'D'], { direction: 'inbound' })]));
 assert.notEqual(wrongDirection.status, 'resolved');
+
+// 7b: the planner endpoint gate admits the linked full origin beyond the
+// clipped pattern edge, while excluding that edge from endpoint hydration.
+const clippedGateService = {
+  id: 'clipped-gate', routeNumber: '313', direction: 'outbound', origin: '', destination: 'Known destination',
+  provider: 'TfL', timetableSource: 'TfL', source: { provider: 'TfL', lineId: '313', routePatternStartIsAssessedStop: true, assessedStopPointId: 'C', intervalOriginStopPointId: 'C' },
+  originStopPointId: 'C', originStopPointIds: ['C'], destinationStopPointId: 'E', routePatternStopIds: ['C', 'D', 'E'],
+  stopSchedules: { C: { monday: [600] } },
+  tflRouteSequenceEvidence: { status: 'resolved', endpointStopPointIds: { origin: 'A', destination: 'Z' }, endpointStops: { origin: { id: 'A', name: 'Full route origin' } } }
+};
+let requestedEndpointIds = [];
+const clippedGate = await resolvePlannerEndpointDecisions([clippedGateService], {
+  resolvePreparedStopPointsByIds: async ids => {
+    requestedEndpointIds = ids;
+    return { ok: true, physicalStops: [{ id: 'A', name: 'Full route origin', nptgLocalityCode: null, logicalGroupRefs: [], busPreparedEligible: true }], warnings: [], provenance: {} };
+  }
+});
+assert.ok(requestedEndpointIds.includes('A'), 'the exact full-route origin reaches endpoint hydration');
+assert.ok(!requestedEndpointIds.includes('C'), 'the clipped assessed/interval edge is not treated as the full origin');
+assert.equal(clippedGate.services[0].originEndpointDecision.endpointStopPointId, 'A');
 
 // 8-13: sequence sidecars do not alter routePatternStopIds, grouping/CIRC,
 // frequency, operating periods, or calendar evidence.

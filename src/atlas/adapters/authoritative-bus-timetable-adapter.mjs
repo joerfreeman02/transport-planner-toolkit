@@ -262,6 +262,82 @@ function supplement(tfl, bods) {
   return { service, matched: Boolean(match || operatorConsensus), conflict: materialConflictFields.length > 0, technicalDiscrepancy: conflictFields.length > 0 };
 }
 
+function withIbusOperatorEvidence(service, evidence, directTfLOperator = '') {
+  const source = { ...(service.source ?? {}), tflIbusOperatorEvidence: evidence };
+  const diagnostics = [...(service.sourceAuthorityDiagnostics ?? [])];
+  const addDiagnostic = diagnostic => {
+    if (!diagnostics.some(item => JSON.stringify(item) === JSON.stringify(diagnostic))) diagnostics.push(Object.freeze(diagnostic));
+  };
+  const bodsEvidence = source.supplementaryOperatorEvidence;
+  const bodsOperator = text(bodsEvidence?.candidates?.[0]?.operator);
+  const operatorSource = {
+    provider: 'TfL timetable',
+    tier: 'tfl-timetable',
+    operator: text(directTfLOperator) || null
+  };
+
+  if (text(directTfLOperator)) {
+    if (evidence.status === 'resolved' && normal(directTfLOperator) !== normal(evidence.operator?.name)) {
+      addDiagnostic({
+        provider: 'TfL iBus Static Data', type: 'operator-source-discrepancy', fields: ['operator'],
+        classification: 'audit-only-authoritative-TfL-timetable-retained', authoritativeProvider: 'TfL timetable',
+        timetableOperator: text(directTfLOperator), iBusOperator: evidence.operator?.name ?? null,
+        baseVersion: evidence.baseVersion, assessmentDate: evidence.assessmentDate
+      });
+    }
+    source.operatorProvenance = Object.freeze(operatorSource);
+    return { ...service, operator: text(directTfLOperator), source, sourceAuthorityDiagnostics: Object.freeze(diagnostics) };
+  }
+
+  if (evidence.status === 'resolved') {
+    const resolvedName = text(evidence.operator?.name);
+    if (bodsOperator && normal(bodsOperator) !== normal(resolvedName)) {
+      addDiagnostic({
+        provider: 'BODS', type: 'operator-source-discrepancy', fields: ['operator'],
+        classification: 'audit-only-authoritative-iBus-retained', authoritativeProvider: 'TfL iBus Static Data',
+        bodsOperator, iBusOperator: resolvedName, baseVersion: evidence.baseVersion, assessmentDate: evidence.assessmentDate
+      });
+    }
+    source.operatorProvenance = Object.freeze({
+      provider: 'TfL iBus Static Data', tier: 'tfl-ibus', operatorCode: evidence.operator.code,
+      operator: resolvedName, baseVersion: evidence.baseVersion, assessmentDate: evidence.assessmentDate
+    });
+    return { ...service, operator: resolvedName, source, sourceAuthorityDiagnostics: Object.freeze(diagnostics) };
+  }
+
+  if (evidence.status === 'ambiguous') {
+    if (bodsOperator) addDiagnostic({
+      provider: 'BODS', type: 'operator-source-discrepancy', fields: ['operator'],
+      classification: 'audit-only-supplement-not-used-due-to-iBus-ambiguity', authoritativeProvider: 'TfL iBus Static Data',
+      bodsOperator, iBusCandidateCount: evidence.candidateOperatorCount, baseVersion: evidence.baseVersion, assessmentDate: evidence.assessmentDate
+    });
+    source.operatorProvenance = Object.freeze({
+      provider: 'TfL iBus Static Data', tier: 'ambiguous', baseVersion: evidence.baseVersion,
+      assessmentDate: evidence.assessmentDate, candidateOperatorCount: evidence.candidateOperatorCount
+    });
+    const ambiguityNote = 'Official TfL iBus operator evidence is materially ambiguous across active matching patterns; no operator was selected.';
+    addDiagnostic({
+      provider: 'TfL iBus Static Data', type: 'operator-evidence-ambiguity', fields: ['operator'],
+      classification: 'technical-review-required', authoritativeProvider: 'TfL iBus Static Data',
+      candidateOperatorCount: evidence.candidateOperatorCount, baseVersion: evidence.baseVersion, assessmentDate: evidence.assessmentDate
+    });
+    return {
+      ...service,
+      operator: 'Operator unresolved (TfL iBus ambiguity)',
+      source,
+      sourceAuthorityDiagnostics: Object.freeze(diagnostics),
+      sourceWarnings: Object.freeze([...new Set([...(service.sourceWarnings ?? []), ambiguityNote])])
+    };
+  }
+
+  if (bodsEvidence) source.operatorProvenance = Object.freeze({
+    provider: 'BODS', tier: 'bods-supplementary-consensus', operator: bodsOperator || text(service.operator) || null,
+    iBusStatus: evidence.status
+  });
+  else if (text(service.operator)) source.operatorProvenance = Object.freeze({ ...operatorSource, operator: text(service.operator) });
+  return { ...service, source, sourceAuthorityDiagnostics: Object.freeze(diagnostics) };
+}
+
 function fallbackService(service, request, reason = 'failure') {
   const provider = isTnds(service) ? 'TNDS' : 'BODS';
   const fallbackReason = reason === 'unresolved' ? 'TfL unresolved timetable result' : 'TfL scheduled timetable failure';
@@ -330,7 +406,7 @@ function nationalCoverageAfterAuthority(service, tflServices, fallbackServices, 
   return retainedStopIds.length ? scopedScheduledService(service, retainedStopIds) : null;
 }
 
-export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAdapter, londonSupplementAdapter = nationalAdapter, londonCoverage = isGreaterLondonPoint, requestLimit = 20 } = {}) {
+export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAdapter, londonSupplementAdapter = nationalAdapter, tflIbusOperatorAdapter = null, londonCoverage = isGreaterLondonPoint, requestLimit = 20 } = {}) {
   if (!tflAdapter?.servicesForStop || !nationalAdapter?.servicesForStops || !londonSupplementAdapter?.servicesForStops) throw new Error('TfL, national and London supplementary timetable adapters are required.');
 
   async function servicesForStops(stops, options = {}) {
@@ -395,6 +471,7 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       primaryAuthority: 'TfL',
       source: { ...(service.source ?? {}), provider: 'TfL', primaryAuthority: 'TfL' }
     })));
+    const directTfLOperators = new Map(services.map(service => [text(service.id), text(service.operator)]).filter(([id]) => id));
     const unresolvedEntries = unresolvedObserved.filter(({ request }) => !matchNationalRequest(request?.lineId, request?.stopPointId, nationalServices));
     const tflUnresolvedRequestIdentities = unresolvedEntries.map(({ request }) => requestIdentity(request)).filter(Boolean);
     const noCurrentRequestIdentities = resultEntries
@@ -452,6 +529,14 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
         composed[index] = { ...service, tflRouteSequenceEvidence: tflRouteSequenceEvidenceForService(service, { ...routeSequenceResult, routeMetadata }) };
       }
       warnings.push(...(routeSequenceResult.warnings ?? []));
+    }
+    if (tflIbusOperatorAdapter?.resolveOperator) {
+      for (let index = 0; index < composed.length; index += 1) {
+        const service = composed[index];
+        if (normal(service.provider ?? service.timetableSource ?? service.source?.provider) !== 'tfl') continue;
+        const evidence = await tflIbusOperatorAdapter.resolveOperator(service, { assessmentDate: options.assessmentDate ?? options.serviceDate ?? new Date() });
+        composed[index] = withIbusOperatorEvidence(service, evidence, directTfLOperators.get(text(service.id)) ?? '');
+      }
     }
     const routeMetadataRequests = routeMetadata && routeMetadata.cache?.status !== 'hit' ? 1 : 0;
     const provenance = {

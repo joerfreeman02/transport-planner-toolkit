@@ -215,7 +215,7 @@ const genericRow = after.find(row => row.routeNumber === '310');
 assert.equal(genericRow.destination, 'Waltham Cross Bus Station');
 assert.equal(genericRow.rawDestination, 'Bus Station');
 const wordRow = buildBusWordTables({ ok: true, stops, plannerServiceSummaries: [genericRow], serviceSummaries: [], reviewItems: [] })[1].rows[0];
-assert.match(wordRow[2], /Waltham Cross Bus Station/);
+assert.match(wordRow[3], /Waltham Cross Bus Station/);
 assert.match(genericRow.directionPatternText, /Waltham Cross Bus Station/);
 
 console.log('PASS BUS-DEST exact endpoint hydration, NPTG/parent/StopArea evidence, conservative decisions, invariants, conflict handling, and Browser/Word parity.');

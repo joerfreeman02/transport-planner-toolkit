@@ -9,6 +9,7 @@ import { createNominatimGeocodingAdapter } from '../../../src/atlas/adapters/nom
 import { createTflBusStopAdapter } from '../../../src/atlas/adapters/tfl-bus-stop-adapter.mjs';
 import { createPreparedBusDataAdapter } from '../../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { createTflBusTimetableAdapter } from '../../../src/atlas/adapters/tfl-bus-timetable-adapter.mjs';
+import { createTflIbusOperatorAdapter } from '../../../src/atlas/adapters/tfl-ibus-operator-adapter.mjs';
 import { createAuthoritativeBusTimetableAdapter } from '../../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
 import { createOsrmAccessRoutingAdapter } from '../../../src/atlas/adapters/osrm-access-routing-adapter.mjs';
 import { createTflRequestScheduler } from '../../../src/atlas/adapters/tfl-request-scheduler.mjs';
@@ -17,7 +18,7 @@ import { createBusAssessment, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/
 import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
 import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-task-status.mjs';
 import { buildBusTimetablePresentationNote, buildPlannerBusServiceSummaries, plannerRouteDisplayNumber, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
-import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination, operatorProvenanceLabel } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, isOtherNearbyStopRecord, plannerFacingServiceNote, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
@@ -45,7 +46,11 @@ const preparedBusData = createPreparedBusDataAdapter({
 });
 const referenceData = createAtlasReferenceData({ adapter: preparedBusData });
 const tflTimetable = createTflBusTimetableAdapter({ cache, requestScheduler: tflRequestScheduler });
-const authoritativeTimetable = createAuthoritativeBusTimetableAdapter({ tflAdapter: tflTimetable, nationalAdapter: preparedBusData, londonSupplementAdapter: preparedBusData });
+const tflIbusOperatorAdapter = createTflIbusOperatorAdapter({
+  fetchImpl: globalThis.fetch,
+  manifestUrl: new URL('../../data/tfl-ibus/manifest.json', import.meta.url).toString()
+});
+const authoritativeTimetable = createAuthoritativeBusTimetableAdapter({ tflAdapter: tflTimetable, tflIbusOperatorAdapter, nationalAdapter: preparedBusData, londonSupplementAdapter: preparedBusData });
 const accessRouting = createOsrmAccessRoutingAdapter();
 const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: preparedBusData, referenceData, crossBoundaryTfL: true });
 const busAssessment = createBusAssessment({ stopDiscovery: busStops, timetableData: authoritativeTimetable, accessRouting, referenceData });
@@ -716,7 +721,7 @@ function renderAssessment(result) {
         });
         const sourceRouteIds = service.sourceRouteIds ?? service.source?.sourceRouteIds ?? [];
         const orderedPattern = service.routePatternStopIds ?? service.orderedPatternEndpoints ?? [];
-        const sourceIdentity = `Route/source identity: ${sourceRouteIds.join(', ') || service.source?.lineId || service.routeNumber || 'not supplied'} · direction: ${service.direction || 'not supplied'} · operator: ${service.operator || 'not supplied'} · calendar: ${service.calendarProfileId || 'not supplied'} · origin StopPoint IDs: ${(service.originStopPointIds ?? [service.originStopPointId]).filter(Boolean).join(', ') || 'not supplied'} · destination StopPoint IDs: ${(service.destinationStopPointIds ?? [service.destinationStopPointId]).filter(Boolean).join(', ') || 'not supplied'} · ordered pattern StopPoint IDs: ${orderedPattern.join(' → ') || 'not supplied'}`;
+        const sourceIdentity = `Route/source identity: ${sourceRouteIds.join(', ') || service.source?.lineId || service.routeNumber || 'not supplied'} · direction: ${service.direction || 'not supplied'} · operator: ${service.operator || 'not supplied'} · operator provenance: ${operatorProvenanceLabel(service)} · calendar: ${service.calendarProfileId || 'not supplied'} · origin StopPoint IDs: ${(service.originStopPointIds ?? [service.originStopPointId]).filter(Boolean).join(', ') || 'not supplied'} · destination StopPoint IDs: ${(service.destinationStopPointIds ?? [service.destinationStopPointId]).filter(Boolean).join(', ') || 'not supplied'} · ordered pattern StopPoint IDs: ${orderedPattern.join(' → ') || 'not supplied'}`;
         const sourceNotes = [...(service.qualifications ?? []), ...(service.sourceWarnings ?? [])].filter(Boolean).map(note => `Technical source note — ${note}`);
         const reconciliationLines = (service.sourceAuthorityDiagnostics ?? []).map(diagnostic => `Technical source reconciliation — ${diagnostic.provider}: fields ${diagnostic.fields.join(', ')} differ; classification ${diagnostic.classification}; authoritative result ${diagnostic.authoritativeProvider}.`);
         detail.textContent = [`Pattern: ${pattern} · Stops: ${stopIds} · Source: ${service.timetableSource || service.source?.provider || 'timetable source'}`, sourceIdentity, ...endpointLines, ...sourceNotes, ...reconciliationLines].join('\n');

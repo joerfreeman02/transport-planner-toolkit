@@ -146,7 +146,7 @@ const circularRow = rows([circular])[0];
 assert.equal(circularRow.circular, true);
 const wordRow = buildBusWordTables({ ok: true, stops, plannerServiceSummaries: tenRows, serviceSummaries: [] })[1].rows.find(row => Array.isArray(row) && row[0] === '310');
 assert.equal(wordRow[1], tenRows[0].operator);
-assert.match(wordRow[2], /Hertford Bus Station/);
+assert.match(wordRow[3], /Hertford Bus Station/);
 const wordNotes = buildBusWordTables({ ok: true, stops, plannerServiceSummaries: tenRows, serviceSummaries: [] })[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
 assert.match(wordNotes, /Route terminus: Waltham Cross Bus Station/);
 assert.ok(tenRows[0].plannerServiceGroup.destinationEndpointDecision, 'BUS-DEST endpoint decision remains under the planner group');

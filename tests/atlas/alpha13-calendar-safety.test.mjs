@@ -189,8 +189,8 @@ assert.equal(distinctCorridors.length, 2, 'K: genuinely distinct corridors remai
 
 // L. Browser-facing row data and Word Table 3.3 consume the same grouped meaning.
 const wordTable = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [ordinarySchool[0]], serviceSummaries: [] })[1];
-assert.equal(wordTable.rows[0][5], ordinarySchool[0].typicalFrequencyText, 'L: Word uses the same profile-qualified frequency text as Browser');
-assert.equal(wordTable.rows[0][6], ordinarySchool[0].operatingPeriodLines.join('\n'), 'L: Word uses the same profile-qualified operating-period text as Browser');
+assert.equal(wordTable.rows[0][6], ordinarySchool[0].typicalFrequencyText, 'L: Word uses the same profile-qualified frequency text as Browser');
+assert.equal(wordTable.rows[0][7], ordinarySchool[0].operatingPeriodLines.join('\n'), 'L: Word uses the same profile-qualified operating-period text as Browser');
 
 // Full pairwise calendar-profile matrix, including missing metadata.
 const profiles = ['ordinary', 'school-day', 'term-time', 'non-school-day', 'holiday', 'other-resolved', 'unresolved', undefined];

@@ -38,8 +38,8 @@ assert.equal(main.directionPatternText, 'Towards Chingford');
 assert.equal(planner.filter(row => row.routeNumber === '657').length, 3);
 
 const word = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [main], serviceSummaries: [] });
-assert.deepEqual(word[1].headers, ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']);
-assert.equal(word[1].rows[0][3], main.servedAtText);
+assert.deepEqual(word[1].headers, ['Route', 'Operator', 'Operator provenance', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']);
+assert.equal(word[1].rows[0][4], main.servedAtText);
 assert.ok(word[1].rows.some(row => !Array.isArray(row) && /frequency and operating-period information/.test(row.text)));
 
 assert.equal(formatAtlasTaskStatus({ phase: 'finding-stops' }), 'Step 1 of 5 · Finding nearby stops');
@@ -224,8 +224,8 @@ const builtSummary = buildServiceSummaries([{ id: 'A', name: 'Waltham Cross Bus 
 assert.equal(builtSummary.departureEvidenceByDay.monday[0].minute, 678, 'raw summary retains traceable departure evidence for planner deduplication');
 
 const wordRows = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [route279[0]], serviceSummaries: [] })[1].rows;
-assert.equal(wordRows[0][2], route279[0].directionPatternText, 'Word consumes the same direction model as Browser');
-assert.equal(wordRows[0][5], route279[0].typicalFrequencyText, 'Word consumes the same frequency model as Browser');
+assert.equal(wordRows[0][3], route279[0].directionPatternText, 'Word consumes the same direction model as Browser');
+assert.equal(wordRows[0][6], route279[0].typicalFrequencyText, 'Word consumes the same frequency model as Browser');
 assert.equal(wordRows.filter(row => !Array.isArray(row) && row.text === '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence. Additional source evidence remains available in the ATLAS assessment workspace.').length, 1, 'Word carries the shared planner methodology note once');
 const reviewWordRows = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [], serviceSummaries: [], reviewItems: [{ route: '279', stop: 'A', source: 'TfL', message: 'Review this timetable evidence.' }] })[1].rows;
 assert.equal(reviewWordRows.some(row => !Array.isArray(row) && /^Planner review required:/.test(row.text)), true, 'Word retains one concise material review qualification');

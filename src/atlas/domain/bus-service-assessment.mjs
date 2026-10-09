@@ -992,6 +992,15 @@ export function formatServiceOriginDestination(service, separator = ' - ') {
   return service?.stopContext ? `${directed}; ${service.stopContext}` : directed;
 }
 
+export function operatorProvenanceLabel(service) {
+  const evidence = service?.source?.operatorProvenance ?? service?.provenance?.operatorProvenance ?? {};
+  if (evidence.tier === 'tfl-timetable') return 'TfL timetable';
+  if (evidence.tier === 'tfl-ibus') return `TfL iBus Static Data · Base_Version ${text(evidence.baseVersion) || 'not supplied'}`;
+  if (evidence.tier === 'bods-supplementary-consensus') return 'BODS supplementary consensus';
+  if (evidence.tier === 'ambiguous') return `TfL iBus Static Data ambiguity · Base_Version ${text(evidence.baseVersion) || 'not supplied'}`;
+  return text(service?.source?.provider || service?.timetableSource) || 'Operator source not recorded';
+}
+
 /** Shared planner-facing frequency rule; no synthetic departures are created. */
 export function calculateTypicalServiceFrequency(departures, { day, label = '', frequencyEvidence = [] } = {}) {
   const scheduled = ordered(departures);

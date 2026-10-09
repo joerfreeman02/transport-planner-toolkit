@@ -310,7 +310,7 @@ const word25cNotes = wordReview[1].rows.filter(row => !Array.isArray(row) && /Te
 assert.match(word25cNotes, /Temp Bus Station/);
 assert.match(word25cNotes, /Maple Gate/);
 assert.match(word25cNotes, /Maynard Court/);
-assert.equal(wordReview[1].widths.length, 7, 'Word Table 3.3 keeps the seven-column planner contract');
+assert.equal(wordReview[1].widths.length, 8, 'Word Table 3.3 includes the operator-provenance column in the planner contract');
 
 const legacyAlpha13IdentityCount = alpha14ReviewRecords.filter(record => record.routeNumber === '25C' && record.source.directionId === '0')
   .map(record => [record.routeNumber, record.source.routeId, record.source.directionId, record.origin, record.destination, record.stopSchedules['REP-A'], record.routePatternStopIds.join('>')].join('|'))

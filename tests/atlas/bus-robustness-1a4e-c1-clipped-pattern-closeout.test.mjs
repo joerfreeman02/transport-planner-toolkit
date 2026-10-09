@@ -22,7 +22,7 @@ const clipped = ({ pattern, destination, direction = 'outbound', line = '313' })
 const uniqueBranch = tflRouteSequenceEvidenceForService(clipped({ pattern: ['C', 'D', 'E'], destination: 'E' }), result([seq(['A', 'B', 'C', 'D', 'E'])]));
 assert.equal(uniqueBranch.status, 'resolved');
 assert.equal(uniqueBranch.matchType, 'ordered-subsequence');
-assert.equal(uniqueBranch.endpointStopPointIds.origin, 'A');
+assert.equal(uniqueBranch.routeTopologyEndpoints.origin, 'A');
 
 // 2: common clipped section cannot choose between materially distinct branches.
 const branchA = seq(['A', 'B', 'C', 'D', 'E1'], { branchId: 'A', nextBranchIds: ['B'] });
@@ -34,13 +34,13 @@ assert.equal(ambiguous.candidateCount, 2);
 // 3: exact known full terminus discriminates the correct branch.
 const selected = tflRouteSequenceEvidenceForService(clipped({ pattern: ['B', 'C', 'D', 'E1'], destination: 'E1' }), result([branchA, branchB]));
 assert.equal(selected.status, 'resolved');
-assert.equal(selected.endpointStopPointIds.origin, 'A');
+assert.equal(selected.routeTopologyEndpoints.origin, 'A');
 const exactOriginService = clipped({ pattern: ['B', 'C', 'D'], destination: 'D' });
 exactOriginService.originStopPointId = 'X';
 exactOriginService.originStopPointIds = ['X'];
 const selectedByExactOrigin = tflRouteSequenceEvidenceForService(exactOriginService, result([branchA, branchB]));
 assert.equal(selectedByExactOrigin.status, 'resolved');
-assert.equal(selectedByExactOrigin.endpointStopPointIds.origin, 'X', 'an exact known origin still discriminates clipped branches');
+assert.equal(selectedByExactOrigin.routeTopologyEndpoints.origin, 'X', 'an exact known origin still discriminates clipped branches');
 
 // 4: a materially conflicting authoritative endpoint must fail closed.
 const conflictingEndpointService = clipped({ pattern: ['B', 'C', 'D'], destination: 'Not a terminus' });
@@ -56,7 +56,7 @@ const extended = seq(['A', 'B', 'C', 'D', 'PB', 'SCHOOL']);
 const shortMatch = tflRouteSequenceEvidenceForService(shortWorking, result([extended]));
 assert.equal(shortMatch.status, 'resolved');
 assert.equal(shortWorking.destinationStopPointId, 'PB');
-assert.equal(shortMatch.endpointStopPointIds.destination, 'SCHOOL');
+assert.equal(shortMatch.routeTopologyEndpoints.destination, 'SCHOOL');
 
 // 6: the existing BUS-ROBUSTNESS-1A4A principal-endpoint regression verifies
 // ordinary-versus-school public-family selection against the full planner row.
@@ -68,14 +68,14 @@ const ordinary = { id: 'ordinary', routeNumber: '313', operator: 'TfL', origin: 
 const wrongDirection = tflRouteSequenceEvidenceForService(clipped({ pattern: ['B', 'C', 'D'], destination: 'D' }), result([seq(['A', 'B', 'C', 'D'], { direction: 'inbound' })]));
 assert.notEqual(wrongDirection.status, 'resolved');
 
-// 7b: the planner endpoint gate admits the linked full origin beyond the
-// clipped pattern edge, while excluding that edge from endpoint hydration.
+// 7b: linked topology remains available, but is not promoted to an exact
+// selected-service endpoint or sent for endpoint hydration.
 const clippedGateService = {
   id: 'clipped-gate', routeNumber: '313', direction: 'outbound', origin: '', destination: 'Known destination',
   provider: 'TfL', timetableSource: 'TfL', source: { provider: 'TfL', lineId: '313', routePatternStartIsAssessedStop: true, assessedStopPointId: 'C', intervalOriginStopPointId: 'C' },
   originStopPointId: 'C', originStopPointIds: ['C'], destinationStopPointId: 'E', routePatternStopIds: ['C', 'D', 'E'],
   stopSchedules: { C: { monday: [600] } },
-  tflRouteSequenceEvidence: { status: 'resolved', endpointStopPointIds: { origin: 'A', destination: 'Z' }, endpointStops: { origin: { id: 'A', name: 'Full route origin' } } }
+  tflRouteSequenceEvidence: { status: 'resolved', routeTopologyEndpoints: { origin: 'A', destination: 'Z' }, routeTopologyStops: { origin: { id: 'A', name: 'Full route origin' } } }
 };
 let requestedEndpointIds = [];
 const clippedGate = await resolvePlannerEndpointDecisions([clippedGateService], {
@@ -84,16 +84,16 @@ const clippedGate = await resolvePlannerEndpointDecisions([clippedGateService], 
     return { ok: true, physicalStops: [{ id: 'A', name: 'Full route origin', nptgLocalityCode: null, logicalGroupRefs: [], busPreparedEligible: true }], warnings: [], provenance: {} };
   }
 });
-assert.ok(requestedEndpointIds.includes('A'), 'the exact full-route origin reaches endpoint hydration');
+assert.ok(!requestedEndpointIds.includes('A'), 'full-route topology is not treated as an exact service endpoint');
 assert.ok(!requestedEndpointIds.includes('C'), 'the clipped assessed/interval edge is not treated as the full origin');
-assert.equal(clippedGate.services[0].originEndpointDecision.endpointStopPointId, 'A');
+assert.equal(clippedGate.services[0].originEndpointDecision.endpointStopPointId, null);
 
 // 8-13: sequence sidecars do not alter routePatternStopIds, grouping/CIRC,
 // frequency, operating periods, or calendar evidence.
 const baselineSummary = buildServiceSummaries([{ id: 'ASSESS' }], [ordinary])[0];
 const enrichedSummary = buildServiceSummaries([{ id: 'ASSESS' }], [{
   ...ordinary,
-  tflRouteSequenceEvidence: { status: 'resolved', endpointStopPointIds: { origin: 'FULL-A', destination: 'FULL-Z' }, matchedSequence: { branchId: 'one', nextBranchIds: ['two'], prevBranchIds: [], orderedStopPointIds: ['FULL-A', 'A', 'PB', 'FULL-Z'] } }
+  tflRouteSequenceEvidence: { status: 'resolved', routeTopologyEndpoints: { origin: 'FULL-A', destination: 'FULL-Z' }, matchedSequence: { branchId: 'one', nextBranchIds: ['two'], prevBranchIds: [], orderedStopPointIds: ['FULL-A', 'A', 'PB', 'FULL-Z'] } }
 }])[0];
 for (const field of ['routePatternStopIds', 'circularPatternStopIds', 'typicalFrequencyText', 'operatingPeriods', 'calendarEvidence', 'calendarProfileId']) {
   assert.deepEqual(enrichedSummary[field], baselineSummary[field], `sidecar isolation for ${field}`);
@@ -128,7 +128,7 @@ assert.equal(deduped.reviewItems.filter(item => item.code === 'planner-endpoint-
 
 const conflictRecord = (id, calendarProfileId, endpointStopPointIds) => ({
   id, sourceRecordIds: [id], routeNumber: '313', operator: 'TfL', origin: 'Origin requires review', destination: 'Known destination', direction: 'outbound',
-  calendarProfileId, timetableSource: 'TfL', stopSchedules: { ASSESS: schedule },
+  calendarProfileId, timetableSource: 'TfL', plannerEndpointMateriality: 'material', stopSchedules: { ASSESS: schedule },
   source: { provider: 'TfL', lineId: '313', directionId: 'outbound', intervalId: id, calendarProfileId },
   originStopPointIds: endpointStopPointIds
 });

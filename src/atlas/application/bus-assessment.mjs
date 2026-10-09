@@ -194,24 +194,31 @@ function conflictEndpointFactIdentity(service, side, decision) {
   const opposite = service[`${oppositeSide}EndpointDecision`];
   const oppositeIds = [...new Set((opposite?.endpointStopPointIds ?? opposite?.requestedEndpointStopPointIds ?? []).map(value => String(value ?? '').trim()).filter(Boolean))].sort();
   const sequence = service.tflRouteSequenceEvidence ?? {};
-  const sectionIds = (sequence.matchedSections ?? sequence.matchedRouteSections ?? []).map(section => String(section?.id ?? section?.routeSectionId ?? '').trim()).filter(Boolean).sort();
-  const branch = sequence.matchedSequence?.branchId ?? sequence.branchId ?? '';
+  const topologyIdentities = sequence.routeTopologyIdentities?.length
+    ? sequence.routeTopologyIdentities.map(identity => ({
+      branchId: String(identity?.branchId ?? '').trim(),
+      sectionIds: [...(identity?.sectionIds ?? [])].map(String).map(value => value.trim()).filter(Boolean).sort()
+    }))
+    : [{
+      branchId: String(sequence.matchedSequence?.branchId ?? sequence.branchId ?? '').trim(),
+      sectionIds: (sequence.matchedSections ?? sequence.matchedRouteSections ?? []).map(section => String(section?.id ?? section?.routeSectionId ?? '').trim()).filter(Boolean).sort()
+    }];
+  const topologyIdentity = JSON.stringify(topologyIdentities.sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))));
   const oppositeText = String(service[oppositeSide] ?? '').trim().toLowerCase();
   return [
     'conflict', side,
     service.source?.lineId ?? service.routeNumber,
     service.source?.directionId ?? service.directionFamily ?? service.direction,
     service.source?.serviceType ?? service.serviceType,
-    branch,
-    sectionIds.join(','),
+    topologyIdentity,
     endpointIds.join(','),
     oppositeIds.join(',') || oppositeText
   ].map(value => String(value ?? '').trim().toLowerCase()).join('|');
 }
 
 function materialPlannerEndpointUncertainty(service, side, decision) {
-  if (decision.conflict || service?.plannerEndpointMateriality === 'material') return true;
   if (service?.plannerEndpointMateriality === 'non-material') return false;
+  if (service?.plannerEndpointMateriality === 'material') return true;
   if (!decision.unresolved) return false;
   const routeKnown = Boolean(String(service?.routeNumber ?? '').trim());
   const directionKnown = Boolean(String(service?.directionFamily || service?.direction || '').trim());
@@ -220,6 +227,7 @@ function materialPlannerEndpointUncertainty(service, side, decision) {
     || service?.shortWorkingIdentityResolved === false
     || service?.tflRouteSequenceEvidence?.status === 'ambiguous-or-incomplete-link';
   if (side === 'origin' && routeKnown && directionKnown && resolvedPlannerDestination(service) && !structuralAmbiguity) return false;
+  if (decision.conflict && side !== 'origin') return true;
   return true;
 }
 

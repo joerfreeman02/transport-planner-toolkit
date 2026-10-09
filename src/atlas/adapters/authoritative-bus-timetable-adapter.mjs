@@ -109,11 +109,11 @@ function bodsOperatorConsensus(tfl, bods) {
   const sameRouteAndStop = (bods ?? []).filter(service => normal(service.routeNumber) === normal(tfl.routeNumber)
     && stopIds.some(id => hasScheduledEvidenceAt(service, id)));
   if (!sameRouteAndStop.length || sameRouteAndStop.some(service => routeLineageConflict(tfl, service))) return null;
-  const tflDirection = normal(tfl.direction || tfl.destination || tfl.origin);
-  const sameDirection = sameRouteAndStop.filter(service => normal(service.direction || service.destination || service.origin) === tflDirection);
-  const relevant = sameDirection.length ? sameDirection : sameRouteAndStop.length === 1 ? sameRouteAndStop : [];
-  if (!relevant.length) return null;
-  const candidates = relevant.map(service => ({ service, operator: text(service.operator), canonical: normal(service.operator) })).filter(item => item.canonical);
+  // A route/stop candidate with missing direction or operator cannot be
+  // silently discarded in favour of a unanimous-looking subset. Only exact
+  // incompatible lineage above can prove a candidate irrelevant.
+  const candidates = sameRouteAndStop.map(service => ({ service, operator: text(service.operator), canonical: normal(service.operator) }));
+  if (candidates.some(item => !item.canonical)) return null;
   const canonical = [...new Set(candidates.map(item => item.canonical))];
   if (!candidates.length || canonical.length !== 1) return null;
   return Object.freeze({

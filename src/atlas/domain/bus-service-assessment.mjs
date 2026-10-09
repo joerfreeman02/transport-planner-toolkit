@@ -674,17 +674,36 @@ export function buildServiceSummaries(stops, serviceRecords) {
       ? Object.freeze({ ...first.source, orderedPatternEndpoints: Object.freeze(principalPattern) })
       : null;
     const routeSequenceEvidence = records.map(record => record.tflRouteSequenceEvidence).filter(Boolean);
-    const resolvedRouteSequences = routeSequenceEvidence.filter(evidence => evidence.status === 'resolved' && evidence.endpointStopPointIds);
-    const resolvedSequenceEndpointIds = side => unique(resolvedRouteSequences.map(evidence => text(evidence.endpointStopPointIds?.[side])).filter(Boolean));
+    const resolvedRouteSequences = routeSequenceEvidence.filter(evidence => evidence.status === 'resolved' && evidence.routeTopologyEndpoints);
+    const topologyEndpoints = evidence => evidence.routeTopologyEndpoints;
+    const resolvedSequenceEndpointIds = side => unique(resolvedRouteSequences.map(evidence => text(topologyEndpoints(evidence)?.[side])).filter(Boolean));
     const routeSequenceEndpoints = {
       origin: resolvedSequenceEndpointIds('origin'),
       destination: resolvedSequenceEndpointIds('destination')
     };
+    const routeTopologyIdentities = unique(routeSequenceEvidence.filter(evidence => evidence.status === 'resolved').map(evidence => {
+      const branchId = text(evidence.matchedSequence?.branchId ?? evidence.branchId);
+      const sectionIds = unique((evidence.matchedRouteSections ?? evidence.matchedSections ?? [])
+        .map(section => text(section?.id ?? section?.routeSectionId)).filter(Boolean)).sort();
+      return JSON.stringify({ branchId, sectionIds });
+    })).map(identity => JSON.parse(identity)).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+    const uniqueBranchIds = unique(routeTopologyIdentities.map(identity => identity.branchId).filter(Boolean));
     const tflRouteSequenceEvidence = routeSequenceEvidence.length ? Object.freeze({
       status: resolvedRouteSequences.length === routeSequenceEvidence.length
         && routeSequenceEndpoints.origin.length === 1
         && routeSequenceEndpoints.destination.length === 1 ? 'resolved' : 'ambiguous-or-incomplete-link',
-      endpointStopPointIds: resolvedRouteSequences.length === routeSequenceEvidence.length
+      routeTopologyEndpoints: resolvedRouteSequences.length === routeSequenceEvidence.length
+        && routeSequenceEndpoints.origin.length === 1
+        && routeSequenceEndpoints.destination.length === 1
+        ? Object.freeze({ origin: routeSequenceEndpoints.origin[0], destination: routeSequenceEndpoints.destination[0] }) : null,
+      routeTopologyIdentities: Object.freeze(routeTopologyIdentities.map(identity => Object.freeze({
+        branchId: identity.branchId || null,
+        sectionIds: Object.freeze(identity.sectionIds)
+      }))),
+      branchId: uniqueBranchIds.length === 1 ? uniqueBranchIds[0] : null,
+      matchedSequence: uniqueBranchIds.length === 1 ? Object.freeze({ branchId: uniqueBranchIds[0] }) : null,
+      // Compatibility alias: diagnostic topology only; never exact-service endpoint evidence.
+      routeTopologyEndpoints: resolvedRouteSequences.length === routeSequenceEvidence.length
         && routeSequenceEndpoints.origin.length === 1
         && routeSequenceEndpoints.destination.length === 1
         ? Object.freeze({ origin: routeSequenceEndpoints.origin[0], destination: routeSequenceEndpoints.destination[0] }) : null,

@@ -500,13 +500,20 @@ export function tflRouteSequenceEvidenceForService(service, result) {
   const entry = (result?.data ?? []).find(item => normal(item.lineId) === normal(lineId) && normal(item.direction) === normal(direction));
   const sequences = entry?.sequences ?? [];
   const patternIds = (service?.routePatternStopIds ?? []).map(text).filter(Boolean);
-  const routeSections = sectionsFromMetadata(result?.routeMetadata, lineId)
-    .filter(section => normal(section.direction) === normal(direction));
+  const metadataResult = result?.routeMetadata;
+  const metadataFailed = metadataResult && typeof metadataResult === 'object' && metadataResult.ok === false;
+  const metadata = metadataResult && typeof metadataResult === 'object' && 'data' in metadataResult
+    ? metadataResult.data
+    : metadataResult;
+  const lineSections = metadataFailed ? [] : sectionsFromMetadata(metadata, lineId);
+  const routeSections = lineSections.filter(section => normal(section.direction) === normal(direction));
   const candidates = sequences.filter(sequence => {
     const ids = sequence.orderedStopPointIds ?? [];
     const sequenceServiceType = normal(sequence.serviceType);
     const serviceType = normal(service?.serviceType ?? service?.source?.serviceType);
+    if (metadataFailed) return false;
     if (normal(sequence.lineId) !== normal(lineId) || normal(sequence.direction) !== normal(direction)) return false;
+    if (lineSections.length && !routeSections.length) return false;
     if (serviceType && sequenceServiceType && serviceType !== sequenceServiceType) return false;
     if (!assessedStopIds.some(id => ids.some(candidate => sameStopId(candidate, id)))) return false;
     if (assessedStopIds.some(id => !ids.some(candidate => sameStopId(candidate, id)))) return false;
@@ -526,7 +533,7 @@ export function tflRouteSequenceEvidenceForService(service, result) {
     // not enough to promote that branch.
     if (exactDestination.length && !exactDestination.some(id => sameStopId(id, patternIds.at(-1)) || sameStopId(id, ids.at(-1)))) return false;
     if (exactDestination.length && !exactDestination.some(id => ids.some(candidate => sameStopId(candidate, id)))) return false;
-    if (!routeSections.length) return true;
+    if (!lineSections.length) return true;
     return routeSections.some(section => {
       if (section.serviceType && sequenceServiceType && normal(section.serviceType) !== sequenceServiceType) return false;
       if (section.originStopPointId && !sameStopId(section.originStopPointId, ids[0])) return false;
@@ -552,11 +559,11 @@ export function tflRouteSequenceEvidenceForService(service, result) {
     status: resolved ? 'resolved' : entry ? (sequences.length ? 'ambiguous-or-incomplete-link' : 'no-sequence') : 'lookup-failed-or-not-requested',
     matchType: resolved ? (patternIds.length === matched.orderedStopPointIds.length ? 'exact-sequence' : 'ordered-subsequence') : null,
     candidateCount: distinctCandidates.length,
-    endpointStopPointIds: resolved ? Object.freeze({
+    routeTopologyEndpoints: resolved ? Object.freeze({
       origin: matched.orderedStopPointIds[0],
       destination: matched.orderedStopPointIds.at(-1)
     }) : null,
-    endpointStops: resolved ? Object.freeze({
+    routeTopologyStops: resolved ? Object.freeze({
       origin: matched.orderedStops[0],
       destination: matched.orderedStops.at(-1)
     }) : null,

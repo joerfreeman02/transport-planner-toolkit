@@ -32,7 +32,7 @@ const linkedService = { source: { lineId: 'R' }, direction: 'outbound', originSt
 const linkedEvidence = tflRouteSequenceEvidenceForService(linkedService, { data: [{ lineId: 'R', direction: 'outbound', sequences: parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'R', direction: 'outbound' }), provenance: { endpoint: 'official TfL endpoint' }, cache: { status: 'miss' } }], provenance: {} });
 const linkedSequenceResult = { data: [{ lineId: 'R', direction: 'outbound', sequences: parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'R', direction: 'outbound' }) }] };
 assert.equal(linkedEvidence.status, 'resolved', 'direction, assessed-stop membership and exact complete ordered endpoints link the sequence');
-assert.deepEqual(linkedEvidence.endpointStopPointIds, { origin: 'A', destination: 'C' }, 'resolved endpoint IDs come only from the exact linked sequence');
+assert.deepEqual(linkedEvidence.routeTopologyEndpoints, { origin: 'A', destination: 'C' }, 'resolved route topology endpoints come only from the exact linked sequence');
 const absentOriginService = { ...linkedService, originStopPointId: null, destinationStopPointId: null };
 assert.equal(tflRouteSequenceEvidenceForService(absentOriginService, { data: [{ lineId: 'R', direction: 'outbound', sequences: parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'R', direction: 'outbound' }) }] }).status, 'resolved', 'a complete exact ordered timetable pattern can supply a previously absent origin');
 const twoBranches = { data: [{ lineId: 'R', direction: 'outbound', sequences: [

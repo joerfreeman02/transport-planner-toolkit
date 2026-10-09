@@ -247,9 +247,13 @@ export function plannerEndpointDecisionForService(service, side = 'destination')
 }
 
 function endpointIdsForService(service, side) {
+  const sequenceEndpoint = service?.tflRouteSequenceEvidence?.status === 'resolved'
+    ? service.tflRouteSequenceEvidence.endpointStopPointIds?.[side]
+    : null;
   const ids = unique([
     service?.[`${side}StopPointId`],
     ...(service?.[`${side}StopPointIds`] ?? []),
+    sequenceEndpoint,
     ...preparedEndpointEvidenceForService(service, side).map(item => item.resolvedStopPointId)
   ]);
   const ordered = unique(service?.routePatternStopIds ?? service?.orderedPatternEndpoints ?? service?.source?.orderedPatternEndpoints ?? []);

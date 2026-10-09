@@ -673,6 +673,23 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const source = first.source && typeof first.source === 'object'
       ? Object.freeze({ ...first.source, orderedPatternEndpoints: Object.freeze(principalPattern) })
       : null;
+    const routeSequenceEvidence = records.map(record => record.tflRouteSequenceEvidence).filter(Boolean);
+    const resolvedRouteSequences = routeSequenceEvidence.filter(evidence => evidence.status === 'resolved' && evidence.endpointStopPointIds);
+    const resolvedSequenceEndpointIds = side => unique(resolvedRouteSequences.map(evidence => text(evidence.endpointStopPointIds?.[side])).filter(Boolean));
+    const routeSequenceEndpoints = {
+      origin: resolvedSequenceEndpointIds('origin'),
+      destination: resolvedSequenceEndpointIds('destination')
+    };
+    const tflRouteSequenceEvidence = routeSequenceEvidence.length ? Object.freeze({
+      status: resolvedRouteSequences.length === routeSequenceEvidence.length
+        && routeSequenceEndpoints.origin.length === 1
+        && routeSequenceEndpoints.destination.length === 1 ? 'resolved' : 'ambiguous-or-incomplete-link',
+      endpointStopPointIds: resolvedRouteSequences.length === routeSequenceEvidence.length
+        && routeSequenceEndpoints.origin.length === 1
+        && routeSequenceEndpoints.destination.length === 1
+        ? Object.freeze({ origin: routeSequenceEndpoints.origin[0], destination: routeSequenceEndpoints.destination[0] }) : null,
+      records: Object.freeze(routeSequenceEvidence)
+    }) : null;
     return Object.freeze({
       id: identity,
       routeNumber: text(first.routeNumber) || 'Not supplied',
@@ -687,6 +704,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
         origin: Object.freeze(endpointEvidence.origin),
         destination: Object.freeze(endpointEvidence.destination)
       }),
+      tflRouteSequenceEvidence,
       originEndpointEvidence: Object.freeze(endpointEvidence.origin),
       destinationEndpointEvidence: Object.freeze(endpointEvidence.destination),
       destinationLocality: text(first.destinationLocality || first.destinationLocalityName || first.destinationQualifier) || null,

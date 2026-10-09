@@ -2,6 +2,7 @@ import { isGreaterLondonPoint } from '../domain/geography.mjs';
 import { deriveTimetableConclusion, hasScheduledEvidenceAt, scheduledStopIds, scopedScheduledService } from '../domain/scheduled-evidence.mjs';
 import { timetableProviderLabelsFromText } from '../domain/bus-source-presentation.mjs';
 import { sourceFailure, sourceSuccess } from './source-adapter.mjs';
+import { tflRouteSequenceEvidenceForService } from './tfl-bus-timetable-adapter.mjs';
 
 const text = value => String(value ?? '').trim();
 const normal = value => text(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -380,6 +381,24 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     if (!nationalSourceAvailable) warnings.push(nationalUnavailableWarning);
     if (fallbackServices.length) warnings.push(fallbackWarning);
     if (unprocessed.length) warnings.push(`Unprocessed timetable scope: ${unprocessed.map(request => `${request.lineId}/${request.stopPointId}`).join(', ')}.`);
+    let routeSequenceResult = null;
+    if (typeof tflAdapter.routeSequencesForLineDirections === 'function' && services.length) {
+      const sequenceRequests = [...new Map(services.map(service => {
+        const lineId = text(service.source?.lineId);
+        const direction = text(service.direction);
+        return [`${normal(lineId)}|${normal(direction)}`, { lineId, direction }];
+      }).filter(([, request]) => request.lineId && request.direction)).values()];
+      routeSequenceResult = await tflAdapter.routeSequencesForLineDirections(sequenceRequests, {
+        forceRefresh: options.forceRefresh,
+        progress: { phase: 'checking-timetables', completed: processedRequests.length, total: processedRequests.length }
+      });
+      for (let index = 0; index < composed.length; index += 1) {
+        const service = composed[index];
+        if (normal(service.provider ?? service.timetableSource ?? service.source?.provider) !== 'tfl') continue;
+        composed[index] = { ...service, tflRouteSequenceEvidence: tflRouteSequenceEvidenceForService(service, routeSequenceResult) };
+      }
+      warnings.push(...(routeSequenceResult.warnings ?? []));
+    }
     const routeMetadataRequests = routeMetadata && routeMetadata.cache?.status !== 'hit' ? 1 : 0;
     const provenance = {
       source: insideLondon ? 'TfL scheduled timetable authority; BODS/TNDS controlled supplementary evidence' : 'TfL StopPoint authority with national BODS/TNDS evidence',
@@ -388,7 +407,13 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       requestLimit: stageSize, requestStages: stageResults.length, selectedStage: null, unrequestedRequests: unprocessed.length,
       processedRequests: processedRequests.length, unprocessedRequests: unprocessed.length, processedRequestIdentities: processedRequests.map(request => `${request.lineId}|${request.stopPointId}`),
       unprocessedRequestIdentities: unprocessed.map(request => `${request.lineId}|${request.stopPointId}`), timetableRequests: results.length,
-      routeMetadataRequests, totalTfLRequests: results.length + routeMetadataRequests, successfulRequests: successful.length, failedRequests: failed.length,
+      routeMetadataRequests,
+      routeSequenceRequests: routeSequenceResult?.provenance?.requestCount ?? 0,
+      routeSequenceCacheHits: routeSequenceResult?.provenance?.cacheHits ?? 0,
+      routeSequenceReusedRequests: routeSequenceResult?.provenance?.reusedRequests ?? 0,
+      routeSequenceFailedRequests: routeSequenceResult?.provenance?.failedRequests ?? 0,
+      routeSequenceAmbiguousMatches: composed.filter(service => service.tflRouteSequenceEvidence?.status === 'ambiguous-or-incomplete-link').length,
+      totalTfLRequests: results.length + routeMetadataRequests + (routeSequenceResult?.provenance?.requestCount ?? 0), successfulRequests: successful.length, failedRequests: failed.length,
       unresolvedRequests: unresolvedRequestIdentities.length, unresolvedRequestIdentities,
       noCurrentRequestIdentities: [...new Set(noCurrentRequestIdentities)],
       nationalUnresolvedRequestIdentities,

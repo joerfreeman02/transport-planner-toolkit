@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { createTflBusTimetableAdapter, parseTflPeriodCalendar } from '../../src/atlas/adapters/tfl-bus-timetable-adapter.mjs';
+import { createTflBusTimetableAdapter, parseTflPeriodCalendar, parseTflRouteSequenceResponse, tflRouteSequenceEvidenceForService } from '../../src/atlas/adapters/tfl-bus-timetable-adapter.mjs';
 import { createAuthoritativeBusTimetableAdapter } from '../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
 import { createPreparedBusDataAdapter } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { buildServiceSummaries, calculateOperatingPeriods, formatOperatingPeriod } from '../../src/atlas/domain/bus-service-assessment.mjs';
@@ -23,6 +23,30 @@ assert.deepEqual(parseTflPeriodCalendar('Schooldays').days, ['monday', 'tuesday'
 assert.equal(parseTflPeriodCalendar('Schooldays').schoolDayOnly, true);
 assert.deepEqual(parseTflPeriodCalendar('School days').days, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
 assert.deepEqual(parseTflPeriodCalendar('Monday to Friday, school days').days, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+const sequenceFixture = { lineId: 'R', direction: 'outbound', stopPointSequences: [{ branchId: 7, serviceType: 'Regular', stopPoint: [{ naptanId: 'A', name: 'Origin' }, { naptanId: 'B', name: 'Middle' }, { naptanId: 'C', name: 'Terminus' }] }] };
+assert.deepEqual(parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'R', direction: 'outbound' })[0].orderedStopPointIds, ['A', 'B', 'C'], 'ordered exact StopPoint IDs are retained');
+assert.equal(parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'OTHER', direction: 'outbound' }), null, 'a mismatched line identity fails closed');
+assert.equal(parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'R', direction: 'inbound' }), null, 'a mismatched direction fails closed');
+assert.equal(parseTflRouteSequenceResponse({ lineId: 'R', direction: 'outbound', stopPointSequences: [{ stopPoint: [] }] }, { lineId: 'R', direction: 'outbound' })[0], undefined, 'an empty sequence is not fabricated');
+const linkedService = { source: { lineId: 'R' }, direction: 'outbound', originStopPointId: 'A', destinationStopPointId: 'C', routePatternStopIds: ['A', 'B', 'C'], stopSchedules: { B: { monday: [500] } } };
+const linkedEvidence = tflRouteSequenceEvidenceForService(linkedService, { data: [{ lineId: 'R', direction: 'outbound', sequences: parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'R', direction: 'outbound' }), provenance: { endpoint: 'official TfL endpoint' }, cache: { status: 'miss' } }], provenance: {} });
+assert.equal(linkedEvidence.status, 'resolved', 'direction, assessed-stop membership and exact complete ordered endpoints link the sequence');
+assert.deepEqual(linkedEvidence.endpointStopPointIds, { origin: 'A', destination: 'C' }, 'resolved endpoint IDs come only from the exact linked sequence');
+const linkedSequenceResult = { data: [{ lineId: 'R', direction: 'outbound', sequences: parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'R', direction: 'outbound' }) }] };
+assert.equal(tflRouteSequenceEvidenceForService({ ...linkedService, destinationStopPointId: 'B' }, linkedSequenceResult).status, 'ambiguous-or-incomplete-link', 'an interior destination cannot promote a longer route branch');
+assert.equal(tflRouteSequenceEvidenceForService({ ...linkedService, direction: 'inbound' }, linkedSequenceResult).status, 'lookup-failed-or-not-requested', 'opposite-direction evidence is not applied');
+const sequenceCalls = [];
+const sequenceCache = cache();
+const sequenceAdapter = createTflBusTimetableAdapter({ cache: sequenceCache, fetchImpl: async url => { sequenceCalls.push(String(url)); return response(sequenceFixture); } });
+const sequenceFirst = await sequenceAdapter.routeSequencesForLineDirections([{ lineId: 'R', direction: 'outbound' }, { lineId: 'R', direction: 'outbound' }, { lineId: 'R', direction: 'inbound' }]);
+assert.equal(sequenceCalls.length, 2, 'duplicate line/direction requests are deduplicated');
+assert.equal(sequenceFirst.provenance.requestCount, 2, 'request count reflects only unique line/direction lookups');
+assert.equal(sequenceFirst.provenance.reusedRequests, 1, 'duplicate requests are reported as reused');
+assert.equal(sequenceFirst.provenance.failedRequests, 1, 'invalid response for a direction is reported as failed');
+const sequenceCached = await sequenceAdapter.routeSequencesForLineDirections([{ lineId: 'R', direction: 'outbound' }]);
+assert.equal(sequenceCalls.length, 2, 'successful route sequence response is reused from cache');
+assert.equal(sequenceCached.provenance.cacheHits, 1, 'cache-hit provenance is retained');
+assert.equal(sequenceCached.provenance.requestCount, 0, 'cache hits do not inflate network request counts');
 assert.deepEqual(parseTflPeriodCalendar('Mon-Fri Schooldays').days, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
 assert.deepEqual(parseTflPeriodCalendar('Mon-Th Schooldays').days, ['monday', 'tuesday', 'wednesday', 'thursday']);
 assert.equal(parseTflPeriodCalendar('Mon-Th Schooldays').calendarProfileId, 'school-day');
@@ -465,8 +489,8 @@ const budgetResult = await budgetAuthority.servicesForStops(tooManyStops, { site
 assert.equal(budgetResult.ok, true, 'dense London discovery must produce a controlled result rather than a raw request-budget failure');
 assert.equal(budgetResult.provenance.detailedRequests, 21, 'all 21 detailed pairs are processed');
 assert.equal(budgetResult.provenance.unprocessedRequests, 0);
-assert.equal(budgetResult.provenance.totalTfLRequests, 22, '21 timetable requests plus one batched metadata request are counted');
-assert.equal(budgetCalls.length, 22, 'the complete 21-pair assessment makes every controlled outbound request');
+assert.equal(budgetResult.provenance.totalTfLRequests, 43, '21 timetable, one metadata, and 21 deduplicated line/direction sequence requests are counted');
+assert.equal(budgetCalls.length, 43, 'the complete bounded assessment makes each controlled outbound request');
 
 let fakeNow = 0;
 const sleeps = [];
@@ -497,11 +521,12 @@ const busyStops = Array.from({ length: 6 }, (_, index) => ({ id: `BUSY${index}`,
 const busyResult = await busyAuthority.servicesForStops(busyStops, { site: { latitude: 51.418, longitude: -0.082 } });
 assert.equal(busyResult.ok, true);
 assert.equal(busyTimetable, 12);
-assert.equal(busyRoute, 1, 'route metadata batches distinct lines once');
+assert.equal(busyRoute, 3, 'one batched metadata request plus two deduplicated line/direction sequence requests are made');
 assert.match(busyRouteUrls[0], /\/Line\/322,323\/Route\?serviceTypes=Regular%2CNight$|\/Line\/322,323\/Route\?serviceTypes=Regular,Night$/);
 assert.equal(busyResult.provenance.timetableRequests, 12);
 assert.equal(busyResult.provenance.routeMetadataRequests, 1);
-assert.equal(busyResult.provenance.totalTfLRequests, 13);
+assert.equal(busyResult.provenance.routeSequenceRequests, 2);
+assert.equal(busyResult.provenance.totalTfLRequests, 15);
 
 const cachedStore = cache();
 const primeScheduler = createTflRequestScheduler({ now: () => 0, sleep: async () => {} });
@@ -514,4 +539,4 @@ assert.equal(cachedResult.cache.status, 'hit');
 assert.equal(hitScheduler.snapshot().requestsInWindow, 0, 'cache hits do not consume the rolling TfL request budget');
 
 console.log('PASS TfL interval linkage, full-route identity, cross-source validation, fallback and outside-London composition tests.');
-console.log('PASS deterministic request counts: Crystal Palace mid-route 1 timetable + 1 metadata = 2; opposite direction 1 + 1 = 2 with a fresh assessment; busy 12 + 1 batched metadata = 13.');
+console.log('PASS deterministic request counts: TfL timetable, route metadata, and deduplicated route-sequence lookups remain bounded and cacheable.');

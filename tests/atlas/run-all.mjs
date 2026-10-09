@@ -20,6 +20,7 @@ await import('./bus-assessment.test.mjs');
 await import('./bus-alpha5-assessment.test.mjs');
 await import('./tfl-request-scheduler.test.mjs');
 await import('./tfl-bus-timetable.test.mjs');
+await import('./tfl-route-sequence-sidecar.test.mjs');
 await import('./tfl-operating-period.test.mjs');
 await import('./tfl-operating-period-1b.test.mjs');
 await import('./tfl-operating-period-1c.test.mjs');

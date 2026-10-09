@@ -420,12 +420,73 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
   return { services, warnings: [...new Set(warnings)] };
 }
 
+/** Parse TfL's ordered direction route-sequence response without flattening branches. */
+export function parseTflRouteSequenceResponse(data, { lineId, direction } = {}) {
+  const expectedLine = text(lineId);
+  const expectedDirection = normal(direction);
+  const responseLine = text(data?.lineId ?? data?.id);
+  const responseDirection = text(data?.direction);
+  if (!data || !Array.isArray(data.stopPointSequences)
+    || (responseLine && expectedLine && normal(responseLine) !== normal(expectedLine))
+    || (responseDirection && expectedDirection && normal(responseDirection) !== expectedDirection)) return null;
+  const sequences = data.stopPointSequences.map((sequence, index) => {
+    const stops = sequence?.stopPointSequence ?? sequence?.stopPoint ?? sequence?.stops ?? [];
+    const orderedStops = (Array.isArray(stops) ? stops : []).map(stop => ({
+      id: text(typeof stop === 'string' ? stop : stop?.id ?? stop?.naptanId ?? stop?.stopPointId),
+      name: text(typeof stop === 'object' ? stop?.name ?? stop?.commonName ?? stop?.platformName : '') || null
+    })).filter(stop => stop.id);
+    if (!orderedStops.length) return null;
+    return Object.freeze({
+      lineId: responseLine || expectedLine,
+      direction: responseDirection || text(direction),
+      branchId: sequence?.branchId ?? null,
+      serviceType: text(sequence?.serviceType) || null,
+      orderedStops: Object.freeze(orderedStops),
+      orderedStopPointIds: Object.freeze(orderedStops.map(stop => stop.id)),
+      sourceSequenceIndex: index
+    });
+  }).filter(Boolean);
+  return Object.freeze(sequences);
+}
+
+/** Link sequence evidence only when the timetable record proves the complete ordered pattern. */
+export function tflRouteSequenceEvidenceForService(service, result) {
+  const lineId = text(service?.source?.lineId ?? service?.routeNumber);
+  const direction = text(service?.direction);
+  const assessedStopIds = Object.keys(service?.stopSchedules ?? {}).sort();
+  const entry = (result?.data ?? []).find(item => normal(item.lineId) === normal(lineId) && normal(item.direction) === normal(direction));
+  const sequences = entry?.sequences ?? [];
+  const patternIds = (service?.routePatternStopIds ?? []).map(text).filter(Boolean);
+  const candidates = sequences.filter(sequence => {
+    const ids = sequence.orderedStopPointIds ?? [];
+    return normal(sequence.direction) === normal(direction)
+      && assessedStopIds.some(id => ids.includes(id))
+      && patternIds.length === ids.length
+      && patternIds.every((id, index) => id === ids[index])
+      && text(service.originStopPointId) === ids[0]
+      && text(service.destinationStopPointId) === ids.at(-1);
+  });
+  const resolved = candidates.length === 1;
+  return Object.freeze({
+    provider: SOURCE,
+    lineId: lineId || null,
+    direction: direction || null,
+    status: resolved ? 'resolved' : entry ? (sequences.length ? 'ambiguous-or-incomplete-link' : 'no-sequence') : 'lookup-failed-or-not-requested',
+    candidateCount: candidates.length,
+    endpointStopPointIds: resolved ? Object.freeze({ origin: candidates[0].orderedStopPointIds[0], destination: candidates[0].orderedStopPointIds.at(-1) }) : null,
+    sequences: Object.freeze(sequences.map(sequence => Object.freeze({ branchId: sequence.branchId, serviceType: sequence.serviceType, orderedStopPointIds: sequence.orderedStopPointIds }))),
+    cacheStatus: entry?.cache?.status ?? null,
+    provenance: entry?.provenance ?? result?.provenance?.requests?.find(request => normal(request.lineId) === normal(lineId) && normal(request.direction) === normal(direction)) ?? null
+  });
+}
+
 function validResponse(data) {
   return Boolean(data && text(data.lineId ?? data.lineName) && (Array.isArray(data.stations) || Array.isArray(data.timetable?.routes) || Array.isArray(data.routes)));
 }
 
 export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cache, clock = () => new Date(), timeoutMs = 12000, baseUrl = 'https://api.tfl.gov.uk', requestScheduler = createTflRequestScheduler() } = {}) {
   const metadataInflight = new Map();
+  const sequenceInflight = new Map();
   async function routeMetadataForLines(lineIds, { forceRefresh = false, progress = null } = {}) {
     const lines = [...new Set((lineIds ?? []).map(text).filter(Boolean))].sort();
     const provenance = { source: SOURCE, authoritativeFor: 'London bus route identity', endpoint: `${baseUrl}/Line/{ids}/Route`, anonymousRequest: true, apiKeyEmbedded: false };
@@ -451,6 +512,61 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
     try { return await task; } finally { metadataInflight.delete(key); }
   }
 
+  async function routeSequencesForLineDirections(requests, { forceRefresh = false, progress = null } = {}) {
+    const unique = new Map();
+    for (const request of requests ?? []) {
+      const lineId = text(request?.lineId);
+      const direction = text(request?.direction);
+      const serviceTypes = [...new Set((request?.serviceTypes ?? ['Regular', 'Night']).map(text).filter(Boolean))].sort();
+      if (!lineId || !direction || !serviceTypes.length) continue;
+      const key = `${normal(lineId)}|${normal(direction)}|${serviceTypes.map(normal).join(',')}`;
+      unique.set(key, { lineId, direction, serviceTypes, key });
+    }
+    const identities = [...unique.values()].sort((a, b) => a.key.localeCompare(b.key));
+    const outcomes = await Promise.all(identities.map(async identity => {
+      const provenance = {
+        source: SOURCE,
+        authoritativeFor: 'direction-aware ordered TfL route sequence',
+        endpoint: `${baseUrl}/Line/${encodeURIComponent(identity.lineId)}/Route/Sequence/${encodeURIComponent(identity.direction)}`,
+        anonymousRequest: true,
+        apiKeyEmbedded: false,
+        lineId: identity.lineId,
+        direction: identity.direction,
+        serviceTypes: identity.serviceTypes
+      };
+      if (!forceRefresh && sequenceInflight.has(identity.key)) return sequenceInflight.get(identity.key);
+      const task = runCachedSourceQuery({ cache, cacheKey: `tfl-route-sequence:${identity.key}`, freshForMs: 5 * 60 * 1000, forceRefresh, load: async () => {
+        const endpointUrl = new URL(provenance.endpoint, baseUrl);
+        endpointUrl.searchParams.set('serviceTypes', identity.serviceTypes.join(','));
+        const endpoint = endpointUrl.toString();
+        const response = await requestScheduler.schedule('route-sequence', () => requestJson({ url: endpoint, fetchImpl, timeoutMs }), { progress: progress ?? {} });
+        const source = { ...provenance, endpoint, retrievedAt: clock().toISOString(), httpStatus: response.status ?? null, requestCount: 1 };
+        if (!response.ok) return sourceFailure({ code: response.code, message: `TfL route sequence could not be checked: ${response.message}`, status: response.status, provenance: source });
+        const sequences = parseTflRouteSequenceResponse(response.data, identity);
+        if (!sequences) return sourceFailure({ code: 'invalid_response', message: 'TfL returned a route sequence that ATLAS could not safely interpret.', provenance: source });
+        return sourceSuccess({ data: sequences, warnings: [], provenance: { ...source, sequenceCount: sequences.length } });
+      }});
+      sequenceInflight.set(identity.key, task);
+      try { return await task; } finally { sequenceInflight.delete(identity.key); }
+    }));
+    const data = outcomes.flatMap((result, index) => result.ok ? [{ ...identities[index], sequences: result.data, provenance: result.provenance, cache: result.cache }] : []);
+    const failed = outcomes.filter(result => !result.ok);
+    return sourceSuccess({
+      data,
+      warnings: failed.map(result => result.message),
+      provenance: {
+        source: SOURCE,
+        authoritativeFor: 'direction-aware ordered TfL route sequence',
+        requestCount: outcomes.reduce((sum, result) => sum + (result.cache?.status === 'hit' ? 0 : result.provenance?.requestCount || 0), 0),
+        cacheHits: outcomes.filter(result => result.cache?.status === 'hit').length,
+        reusedRequests: Math.max(0, (requests ?? []).length - identities.length),
+        failedRequests: failed.length,
+        ambiguousSequenceMatches: 0,
+        requests: identities.map((identity, index) => ({ ...identity, ok: outcomes[index]?.ok ?? false, cacheStatus: outcomes[index]?.cache?.status ?? null, retrievedAt: outcomes[index]?.provenance?.retrievedAt ?? null, endpoint: outcomes[index]?.provenance?.endpoint ?? null }))
+      }
+    });
+  }
+
   async function servicesForStop({ lineId, stopPointId, forceRefresh = false, routeMetadata = null, progress = null } = {}) {
     const line = text(lineId), stop = text(stopPointId);
     const provenance = { source: SOURCE, authoritativeFor: 'scheduled London bus timetables', endpoint: `${baseUrl}/Line/{id}/Timetable/{fromStopPointId}`, anonymousRequest: true, apiKeyEmbedded: false, timetableConclusion: 'UNRESOLVED' };
@@ -472,5 +588,5 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
       return sourceSuccess({ data: parsed.services, evidence, warnings, provenance: { ...source, requestedStopPointId: stop, departureStopId: responseDepartureStopId || stop, departureStopMatched: !responseDepartureStopId || responseDepartureStopId === stop, resultCount: matchedServices.length, serviceDiscovery: 'scheduled-timetable', timetableRequests: 1, routeMetadataRequests, realtimeArrivalsUsed: false, timetableConclusion: matchedServices.length ? 'MATCHED' : 'UNRESOLVED' } });
     }});
   }
-  return Object.freeze({ id: 'tfl-bus-timetable-v1', servicesForStop, routeMetadataForLines });
+  return Object.freeze({ id: 'tfl-bus-timetable-v1', servicesForStop, routeMetadataForLines, routeSequencesForLineDirections });
 }

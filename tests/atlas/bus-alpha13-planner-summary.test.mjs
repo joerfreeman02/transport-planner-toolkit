@@ -109,7 +109,7 @@ assert.match(route279[0].operatingPeriodLines[0], /Approx\. 05:00–01:00 \(next
 assert.equal(route279[0].servedAtStopId, 'A');
 assert.equal(route279[0].frequencyBasisStopId, 'A');
 assert.equal(route279[0].canonicalDeparturePopulation.monday.every(item => item.stopPointId === 'A'), true);
-assert.equal(route279[0].routeGroupNote, 'Additional short workings and timetable variants operate.');
+assert.equal(route279[0].routeGroupNote, 'Additional short workings and timetable variants operate.'); // legacy audit field; not planner-facing
 assert.equal(route279[0].directionPatternText, 'Towards Theobalds Grove');
 
 const sameTime = buildPlannerBusServiceSummaries([
@@ -157,7 +157,7 @@ const route13 = buildPlannerBusServiceSummaries([
 ], coherentStops)[0];
 assert.equal(route13.departuresByDay.monday.length, 21);
 assert.doesNotMatch(route13.serviceNote, /Limited service|no more than three/i, 'limited-service notes are recalculated after consolidation');
-assert.equal(route13.routeGroupNote, 'Additional short workings and timetable variants operate.');
+assert.equal(route13.routeGroupNote, 'Additional short workings and timetable variants operate.'); // legacy audit field; not planner-facing
 assert.equal(route13.directionPatternText, 'Towards North Weald');
 
 const mixedPatternEvidence = buildPlannerBusServiceSummaries([

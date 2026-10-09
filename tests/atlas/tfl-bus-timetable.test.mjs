@@ -377,7 +377,26 @@ const conflictAuthority = createAuthoritativeBusTimetableAdapter({ tflAdapter: t
 const conflict = await conflictAuthority.servicesForStops([stop], { site: { latitude: 51.418, longitude: -0.082 } });
 assert.equal(conflict.data[0].origin, 'Full Route Origin');
 assert.equal(conflict.data[0].destination, 'Clapham Common');
-assert.equal(conflict.warnings.filter(warning => /conflicting/i.test(warning)).length, 1, 'a material origin/destination disagreement is aggregated once');
+assert.equal(conflict.warnings.filter(warning => /unresolved route identity/i.test(warning)).length, 0, 'a deterministic TfL route identity keeps supplementary differences out of planner warnings');
+assert.equal(conflict.provenance.supplementaryTechnicalDiscrepancyCount, 1);
+assert.equal(conflict.provenance.supplementaryMaterialConflictCount, 0);
+assert.deepEqual(conflict.data[0].sourceAuthorityDiagnostics[0].fields, ['origin', 'destination']);
+assert.equal(conflict.data[0].sourceAuthorityDiagnostics[0].classification, 'audit-only-authoritative-TfL-result');
+
+const incompleteIdentityTfl = {
+  servicesForStop: async ({ stopPointId }) => ({ ok: true, data: [{
+    id: 'tfl-322-incomplete', routeNumber: '322', operator: 'TfL operator', origin: 'Full Route Origin', destination: 'Clapham Common', direction: 'outbound',
+    stopSchedules: { [stopPointId]: { monday: [370], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] } },
+    source: { provider: 'TfL', routeMetadata: 'incomplete' }
+  }], warnings: [], provenance: {} })
+};
+const unresolvedConflict = await createAuthoritativeBusTimetableAdapter({
+  tflAdapter: incompleteIdentityTfl,
+  nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [conflictingBods], warnings: [], provenance: { source: 'BODS' } }) }
+}).servicesForStops([stop], { site: { latitude: 51.418, longitude: -0.082 } });
+assert.equal(unresolvedConflict.provenance.supplementaryMaterialConflictCount, 1);
+assert.equal(unresolvedConflict.data[0].sourceAuthorityDiagnostics[0].classification, 'material-identity-ambiguity');
+assert.match(unresolvedConflict.warnings.join(' '), /unresolved route identity/i, 'an unresolved TfL identity disagreement remains reviewable');
 
 const missingMetadataTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => String(url).includes('/Route') ? httpFailure(503) : response(withOperator) });
 const supplemented = await createAuthoritativeBusTimetableAdapter({ tflAdapter: missingMetadataTfl, nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [matchingBods], warnings: [], provenance: { source: 'BODS' } }) } }).servicesForStops([stop], { site: { latitude: 51.418, longitude: -0.082 } });

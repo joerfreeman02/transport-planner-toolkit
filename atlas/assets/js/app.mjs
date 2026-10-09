@@ -18,7 +18,7 @@ import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presenta
 import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-task-status.mjs';
 import { buildBusTimetablePresentationNote, buildPlannerBusServiceSummaries, plannerRouteDisplayNumber, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
-import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
+import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, isOtherNearbyStopRecord, plannerFacingServiceNote, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
@@ -526,7 +526,7 @@ function renderAssessment(result) {
     ? result.plannerServiceSummaries
     : buildPlannerBusServiceSummaries(result.serviceSummaries, result.stops);
   if (!selectionInitialised) {
-    selectedStopIds = new Set(result.stops.filter(stop => stop.timetableMatch !== false).map(stopKey));
+    selectedStopIds = new Set(result.stops.filter(stop => !isOtherNearbyStopRecord(stop) && stop.timetableMatch !== false).map(stopKey));
     selectedServiceIds = new Set(presentedServices.map(serviceKey));
     selectionInitialised = true;
   }
@@ -544,9 +544,11 @@ function renderAssessment(result) {
   moveResultsMap(true);
   collapseAssessmentSetup(true);
   rows.replaceChildren();
+  rows.closest('.table-wrap')?.parentElement?.querySelector('.other-nearby-stop-records')?.remove();
   serviceRows.replaceChildren();
   if (detailRows) detailRows.replaceChildren();
-  for (const stop of result.stops) {
+  const otherNearbyRecords = result.stops.filter(isOtherNearbyStopRecord);
+  for (const stop of result.stops.filter(stop => !isOtherNearbyStopRecord(stop))) {
     const row = document.createElement('tr');
     const selectedForReport = selectedStopIds.has(stopKey(stop));
     if (!selectedForReport) row.classList.add('diagnostic-candidate');
@@ -571,8 +573,37 @@ function renderAssessment(result) {
     });
     rows.append(row);
   }
-  if (!result.stops.length) {
+  if (!result.stops.some(stop => !isOtherNearbyStopRecord(stop))) {
     const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 6; cell.textContent = 'No authoritative bus stops were found within the selected discovery radius.'; row.append(cell); rows.append(row);
+  }
+  if (otherNearbyRecords.length) {
+    const region = document.createElement('details');
+    region.className = 'other-nearby-stop-records';
+    const summary = document.createElement('summary');
+    summary.textContent = `Other nearby stop records — no route information currently available (${otherNearbyRecords.length})`;
+    region.append(summary);
+    const explanation = document.createElement('p');
+    explanation.textContent = 'The source records currently provide no route information. This does not establish that a stop is inactive or that no service uses it. These records remain on the map and in the detailed source evidence, but are not presented as route-bearing stops or included in the Word summary.';
+    region.append(explanation);
+    const table = document.createElement('table');
+    table.className = 'other-nearby-stop-table';
+    const head = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    for (const label of ['Map reference', 'Stop name', 'Indicator', 'Walking distance / time', 'Status']) {
+      const cell = document.createElement('th'); cell.scope = 'col'; cell.textContent = label; headerRow.append(cell);
+    }
+    head.append(headerRow); table.append(head);
+    const body = document.createElement('tbody');
+    for (const stop of otherNearbyRecords) {
+      const row = document.createElement('tr');
+      for (const value of [stop.mapReference || '?', stop.name || 'Stop name not supplied', stop.displayDirection || stop.indicator || 'Not supplied', formatAccess(stop.walking), 'No route information is currently available in the source']) {
+        const cell = document.createElement('td'); cell.textContent = value; row.append(cell);
+      }
+      row.dataset.stopId = stopKey(stop);
+      body.append(row);
+    }
+    table.append(body); region.append(table);
+    rows.closest('.table-wrap')?.after(region);
   }
   if (presentedServices.some(service => service.plannerNotes?.terminus)) {
     const noteRow = document.createElement('tr'); noteRow.className = 'service-note semantic-annotation annotation-terminus-presentation';
@@ -607,11 +638,12 @@ function renderAssessment(result) {
     serviceRows.append(row);
     const duplicateTerminusNote = service.plannerNotes?.terminus && /\broute terminus\b/i.test(String(service.serviceNote || ''));
     const structuredQualificationNote = /^(?:school[- ]day(?:s)?(?:[- ]only)?(?: service)?|runs? on school days only|operates? during term time only|term[- ]time service|runs? on non-school days only|non-school days only|operates? on holidays only|operating days could not be fully confirmed)(?:;.*)?\.?$/i.test(String(service.serviceNote || '').trim());
-    if (service.serviceNote && !duplicateTerminusNote && !structuredQualificationNote) {
+    const visibleServiceNote = plannerFacingServiceNote(service.serviceNote);
+    if (visibleServiceNote && !duplicateTerminusNote && !structuredQualificationNote) {
       const noteRow = document.createElement('tr'); noteRow.className = 'service-note';
       const noteCell = document.createElement('td'); noteCell.colSpan = 8;
       const label = document.createElement('strong'); label.textContent = 'Service note: ';
-      noteCell.append(label, service.serviceNote); noteRow.append(noteCell); serviceRows.append(noteRow);
+      noteCell.append(label, visibleServiceNote); noteRow.append(noteCell); serviceRows.append(noteRow);
     }
     const next = presentedServices[index + 1];
     if (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey) {
@@ -624,11 +656,11 @@ function renderAssessment(result) {
           const label = document.createElement('strong'); label.textContent = `${labelText}: `;
           noteCell.append(label, value); noteRow.append(noteCell); serviceRows.append(noteRow);
         }
-      } else if (service.routeGroupNote) {
+      } else if (plannerFacingServiceNote(service.routeGroupNote)) {
         const noteRow = document.createElement('tr'); noteRow.className = 'service-note route-group-note';
         const noteCell = document.createElement('td'); noteCell.colSpan = 8;
         const label = document.createElement('strong'); label.textContent = 'Service note: ';
-        noteCell.append(label, service.routeGroupNote); noteRow.append(noteCell); serviceRows.append(noteRow);
+        noteCell.append(label, plannerFacingServiceNote(service.routeGroupNote)); noteRow.append(noteCell); serviceRows.append(noteRow);
       }
     }
   });
@@ -639,6 +671,14 @@ function renderAssessment(result) {
     detailPanel.hidden = !detailedEvidenceVisible;
     if (detailToggle) detailToggle.textContent = detailedEvidenceVisible ? 'Hide detailed evidence' : 'Show detailed evidence';
     if (detailedEvidenceVisible) {
+      const otherStopRecords = result.stops.filter(isOtherNearbyStopRecord);
+      if (otherStopRecords.length) {
+        const article = document.createElement('article'); article.className = 'service-detail other-nearby-stop-evidence';
+        const heading = document.createElement('strong'); heading.textContent = 'Other nearby stop records — retained, without route attribution';
+        const detail = document.createElement('p');
+        detail.textContent = otherStopRecords.map(stop => `${stop.name || 'Stop name not supplied'} · StopPoint ${stop.id} · map reference ${stop.mapReference || 'not supplied'} · mode ${stop.transportMode || 'not supplied'} · status ${stop.status || 'not supplied'} · routes currently absent from the source`).join('\n');
+        article.append(heading, detail); detailRows.append(article);
+      }
       for (const service of result.services ?? []) {
         const article = document.createElement('article');
         article.className = 'service-detail';
@@ -674,7 +714,12 @@ function renderAssessment(result) {
             preparedSummary,
           ];
         });
-        detail.textContent = [`Pattern: ${pattern} · Stops: ${stopIds} · Source: ${service.timetableSource || service.source?.provider || 'timetable source'}`, ...endpointLines].join('\n');
+        const sourceRouteIds = service.sourceRouteIds ?? service.source?.sourceRouteIds ?? [];
+        const orderedPattern = service.routePatternStopIds ?? service.orderedPatternEndpoints ?? [];
+        const sourceIdentity = `Route/source identity: ${sourceRouteIds.join(', ') || service.source?.lineId || service.routeNumber || 'not supplied'} · direction: ${service.direction || 'not supplied'} · operator: ${service.operator || 'not supplied'} · calendar: ${service.calendarProfileId || 'not supplied'} · origin StopPoint IDs: ${(service.originStopPointIds ?? [service.originStopPointId]).filter(Boolean).join(', ') || 'not supplied'} · destination StopPoint IDs: ${(service.destinationStopPointIds ?? [service.destinationStopPointId]).filter(Boolean).join(', ') || 'not supplied'} · ordered pattern StopPoint IDs: ${orderedPattern.join(' → ') || 'not supplied'}`;
+        const sourceNotes = [...(service.qualifications ?? []), ...(service.sourceWarnings ?? [])].filter(Boolean).map(note => `Technical source note — ${note}`);
+        const reconciliationLines = (service.sourceAuthorityDiagnostics ?? []).map(diagnostic => `Technical source reconciliation — ${diagnostic.provider}: fields ${diagnostic.fields.join(', ')} differ; classification ${diagnostic.classification}; authoritative result ${diagnostic.authoritativeProvider}.`);
+        detail.textContent = [`Pattern: ${pattern} · Stops: ${stopIds} · Source: ${service.timetableSource || service.source?.provider || 'timetable source'}`, sourceIdentity, ...endpointLines, ...sourceNotes, ...reconciliationLines].join('\n');
         article.append(heading, detail);
         detailRows.append(article);
       }
@@ -936,7 +981,7 @@ $('refreshStops').addEventListener('click', () => loadStops(true, lastAssessment
 $('exportBusWord').addEventListener('click', exportBusWord);
 $('clearRoutes').addEventListener('click', clearRouteLines);
 $('recommendedSelection').addEventListener('click', () => { selectionInitialised = false; renderAssessment(currentBusResult); });
-$('selectAllRows').addEventListener('click', () => { selectedStopIds = new Set(currentBusResult?.stops.map(stopKey) ?? []); selectedServiceIds = new Set((currentBusResult?.plannerServiceSummaries ?? currentBusResult?.serviceSummaries ?? []).map(serviceKey)); selectionInitialised = true; renderAssessment(currentBusResult); });
+  $('selectAllRows').addEventListener('click', () => { selectedStopIds = new Set((currentBusResult?.stops ?? []).filter(stop => !isOtherNearbyStopRecord(stop)).map(stopKey)); selectedServiceIds = new Set((currentBusResult?.plannerServiceSummaries ?? currentBusResult?.serviceSummaries ?? []).map(serviceKey)); selectionInitialised = true; renderAssessment(currentBusResult); });
 $('clearAllRows').addEventListener('click', () => { selectedStopIds = new Set(); selectedServiceIds = new Set(); selectionInitialised = true; renderAssessment(currentBusResult); });
 $('toggleDetailedEvidence').addEventListener('click', () => { detailedEvidenceVisible = !detailedEvidenceVisible; renderAssessment(currentBusResult); });
 $('refreshDataStatus').addEventListener('click', refreshDataStatus);

@@ -156,7 +156,7 @@ export function buildBusTimetablePresentationNote(result = {}, rows = []) {
   if (!(rows ?? []).some(row => row?.hasSeparateTimetablePair)) return null;
   const assessmentDate = assessmentDateForBusPresentation(result);
   if (!assessmentDate) return null;
-  return `Timetable note: Where separate term-time and school-holiday timetables are published, the term-time timetable is shown. Routes marked ${SEPARATE_TIMETABLE_MARKER} have separate timetables. Timetable information reflects the data available to ATLAS on ${assessmentDate} and services may vary during school holidays.`;
+  return `Where separate term-time and school-holiday timetables are published, the term-time timetable is shown. Routes marked ${SEPARATE_TIMETABLE_MARKER} have separate timetables. Timetable information reflects the data available to ATLAS on ${assessmentDate} and services may vary during school holidays.`;
 }
 
 function directionKey(service) {
@@ -1457,7 +1457,6 @@ export function plannerSourceWarning(service) {
   const route = text(service?.routeNumber) || 'Unknown route';
   const warnings = [];
   if (!resolvedPlannerDestination(service)) warnings.push(`Route ${route} — one timetable pattern could not be assigned a complete route identity. It is retained as a concise review item and under Detailed Evidence.`);
-  if (!text(service?.operator) || /not supplied/i.test(text(service?.operator))) warnings.push(`Route ${route} — operator identity was not deterministically supplied for one timetable pattern. The source evidence is retained under Detailed Evidence.`);
   return warnings;
 }
 

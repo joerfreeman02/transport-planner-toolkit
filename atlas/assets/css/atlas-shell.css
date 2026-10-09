@@ -170,6 +170,10 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .check-summary span { color: var(--atlas-muted); font-size: .74rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
 .check-summary strong { color: var(--atlas-blue); font-size: .88rem; }
 .table-wrap { overflow: auto; border: 1px solid var(--atlas-line); border-radius: 8px; }
+details.other-nearby-stop-records { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--atlas-line); border-radius: 8px; background: #f8fafc; }
+.other-nearby-stop-records summary { color: var(--atlas-blue); font-weight: 800; cursor: pointer; }
+.other-nearby-stop-records p { max-width: 100ch; color: var(--atlas-muted); }
+.other-nearby-stop-table { min-width: 760px; margin-top: 8px; }
 table { border-collapse: collapse; width: 100%; min-width: 900px; font-size: .84rem; }
 th { background: var(--atlas-blue) !important; color: #fff !important; text-align: left; padding: 10px 11px; }
 td { border-top: 1px solid var(--atlas-line); padding: 10px 11px; vertical-align: top; }

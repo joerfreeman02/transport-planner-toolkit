@@ -42,7 +42,7 @@ assert.equal(hasPublicServiceCopyEvidence(makeService({ id: 'national-42', route
 const wording = buildControlledBusWording([{ routeNumber: '13 / 13A / 13B / 13C', publicRouteNumbers: ['13', '13A', '13B', '13C'], principalLocations: ['Waltham Cross'] }]);
 assert.match(wording, /13, 13A, 13B, 13C/);
 assert.doesNotMatch(wording, /13 \/ 13A/);
-assert.match(plannerSourceWarning({ routeNumber: '42', destination: 'Gamma', operator: '' }).join(' '), /operator identity/i);
+assert.equal(plannerSourceWarning({ routeNumber: '42', destination: 'Gamma', operator: '' }).length, 0, 'a missing operator on one source record is retained in Detailed Evidence rather than emitted as a planner warning');
 
 const word = buildBusWordTables({ ok: true, stops: waltham.stops, plannerServiceSummaries: rows, serviceSummaries: [] });
 const wordText = word.flatMap(table => table.rows ?? []).map(row => Array.isArray(row) ? row.join(' ') : String(row?.text ?? '')).join(' ');

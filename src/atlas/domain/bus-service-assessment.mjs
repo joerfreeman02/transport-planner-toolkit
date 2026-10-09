@@ -457,7 +457,7 @@ function plannerQualificationNote(note) {
 
 function sourceDiagnostic(note) {
   const value = text(note);
-  return Boolean(value && /full tfl route origin|timetable did not supply|tfl route metadata|could not be safely mapped|without intervalid linkage|frequency ranges?|representative stop.*(?:evidence|frequency)|source (?:evidence|processing)|processing|provenance|schedule integrity note/i.test(value));
+  return Boolean(value && /could not be safely mapped|without intervalid linkage|frequency ranges?|representative stop.*(?:evidence|frequency)|source (?:evidence|processing)|processing|provenance|schedule integrity note/i.test(value));
 }
 
 export function collectServiceWarnings(serviceRecords = []) {

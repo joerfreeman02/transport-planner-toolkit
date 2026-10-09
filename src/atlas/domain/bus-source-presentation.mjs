@@ -10,6 +10,19 @@ export const STOP_PRESENTATION_LABELS = Object.freeze({
   national: 'Department for Transport NaPTAN'
 });
 
+/** A nearby NaPTAN record without route or matched timetable evidence. */
+export function isOtherNearbyStopRecord(stop = {}) {
+  const routes = (stop.routes ?? []).map(value => String(value ?? '').trim()).filter(Boolean);
+  if (String(stop.transportMode ?? '').toLowerCase() !== 'bus_coach' || routes.length || stop.timetableMatch === true) return false;
+  return !['MATCHED', 'SUPPLEMENTED', 'FALLBACK'].includes(String(stop.timetableEvidenceStatus ?? '').toUpperCase());
+}
+
+/** Strip only the non-actionable legacy variant banner; preserve all evidence-qualified notes. */
+export function plannerFacingServiceNote(value) {
+  const generic = /^(?:Additional short workings and timetable variants operate\.|Additional variants and short workings operate\.)$/i;
+  return String(value ?? '').trim().split(/(?<=[.!?])\s+/u).filter(sentence => !generic.test(sentence.trim())).join(' ').trim();
+}
+
 /** Plain-English route evidence for an assessed stop or an unselected candidate. */
 export function stopRoutesPresentation(stop = {}, { selectedForReport = true } = {}) {
   const routes = [...new Set((stop.routes ?? []).map(value => String(value ?? '').trim()).filter(Boolean))]

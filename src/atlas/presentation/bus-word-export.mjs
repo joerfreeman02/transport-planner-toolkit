@@ -1,7 +1,7 @@
 import { buildServicePresentation, formatServiceOriginDestination } from '../domain/bus-service-assessment.mjs';
 import { buildBusTimetablePresentationNote, plannerRouteDisplayNumber, PLANNER_METHODOLOGY_NOTE, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../domain/bus-planner-summary.mjs';
 import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
-import { stopRoutesPresentation } from '../domain/bus-source-presentation.mjs';
+import { isOtherNearbyStopRecord, plannerFacingServiceNote, stopRoutesPresentation } from '../domain/bus-source-presentation.mjs';
 
 function text(value) { return String(value ?? '').trim(); }
 
@@ -67,7 +67,7 @@ function reviewQualification(reviewItems) {
 
 export function buildBusWordTables(result) {
   if (!result?.ok) throw new Error('A completed Bus assessment is required for Word export.');
-  const stopRows = (result.stops ?? []).map(stop => [
+  const stopRows = (result.stops ?? []).filter(stop => !isOtherNearbyStopRecord(stop)).map(stop => [
     stop.mapReference || '?',
     stop.name,
     stop.displayDirection,
@@ -105,14 +105,15 @@ export function buildBusWordTables(result) {
     ]);
     const duplicateTerminusNote = service.plannerNotes?.terminus && /\broute terminus\b/i.test(text(service.serviceNote));
     const structuredQualificationNote = /^(?:school[- ]day(?:s)?(?:[- ]only)?(?: journeys? only| service)?|runs? on school days only|operates? during term time only|term[- ]time service|runs? on non-school days only|non-school days only|operates? on holidays only|operating days could not be fully confirmed)(?:;.*)?\.?$/i.test(text(service.serviceNote));
-    if (service.serviceNote && !duplicateTerminusNote && !structuredQualificationNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.serviceNote}` });
+    const visibleServiceNote = plannerFacingServiceNote(service.serviceNote);
+    if (visibleServiceNote && !duplicateTerminusNote && !structuredQualificationNote) serviceRows.push({ kind: 'summary', text: `Service note: ${visibleServiceNote}` });
     const plannerAnnotations = hasPlannerSummary ? plannerAnnotationRows(service) : [];
     const next = services[index + 1];
     if (hasPlannerSummary && (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey)) {
       if (plannerAnnotations.length) {
         plannerAnnotations.forEach(textValue => serviceRows.push({ kind: 'summary', text: textValue }));
       }
-      else if (service.routeGroupNote) serviceRows.push({ kind: 'summary', text: `Service note: ${service.routeGroupNote}` });
+      else if (plannerFacingServiceNote(service.routeGroupNote)) serviceRows.push({ kind: 'summary', text: `Service note: ${plannerFacingServiceNote(service.routeGroupNote)}` });
     }
   });
   const qualification = reviewQualification(result.reviewItems);

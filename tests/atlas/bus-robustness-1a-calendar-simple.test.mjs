@@ -107,7 +107,7 @@ assert.equal(splitTermTime.serviceNote, '');
 assert.equal(plannerRouteDisplayNumber(splitTermTime), 'SPLIT†');
 
 const presentationResult = { provenance: { stops: { retrievedAt: '2026-10-07T12:34:56Z' } } };
-assert.equal(buildBusTimetablePresentationNote(presentationResult, [ordinaryWithVariants]), 'Timetable note: Where separate term-time and school-holiday timetables are published, the term-time timetable is shown. Routes marked † have separate timetables. Timetable information reflects the data available to ATLAS on 2026-10-07 and services may vary during school holidays.');
+assert.equal(buildBusTimetablePresentationNote(presentationResult, [ordinaryWithVariants]), 'Where separate term-time and school-holiday timetables are published, the term-time timetable is shown. Routes marked † have separate timetables. Timetable information reflects the data available to ATLAS on 2026-10-07 and services may vary during school holidays.');
 const word = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [ordinaryWithVariants], serviceSummaries: [], ...presentationResult });
 const wordTableRow = word[1].rows.find(row => Array.isArray(row));
 assert.equal(wordTableRow[0], 'CONTROL†', 'Word adds the presentation-only dagger without changing routeNumber');

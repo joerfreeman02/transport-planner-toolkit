@@ -6,7 +6,7 @@ import { sourceFailure, sourceSuccess } from './source-adapter.mjs';
 const text = value => String(value ?? '').trim();
 const normal = value => text(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 const textFields = Object.freeze(['operator', 'origin', 'destination', 'direction']);
-const conflictWarning = 'TfL and the supplementary national timetable source contain conflicting information for one or more London services. ATLAS retained the TfL scheduled information and flagged the difference for planner review.';
+const conflictWarning = 'TfL and supplementary national evidence disagree on an unresolved route identity for one or more London services. ATLAS retained the authoritative TfL schedule; inspect the affected service evidence before formal use.';
 const fallbackWarning = 'TfL scheduled timetable information was unavailable, so matching national evidence was used as an explicit supplementary fallback. This is not a TfL timetable result.';
 const partialWarning = 'TfL scheduled timetable information could not be checked for one or more services. ATLAS retained available authoritative results and used matching national timetable evidence where available. Review the affected service evidence before formal use.';
 const incompleteWarning = 'TfL scheduled timetable information could not be checked for one or more services, and no defensible national fallback was available. ATLAS did not assume zero service; review the incomplete evidence before formal use.';
@@ -169,19 +169,20 @@ function retainSupplementaryDepartures(service, match) {
 function supplement(tfl, bods) {
   const match = matchBods(tfl, bods);
   if (!match) return { service: tfl, matched: false, conflict: false };
-  let supplemented = false, conflict = false;
+  let supplemented = false;
+  const conflictFields = [];
   let service = { ...tfl };
   for (const field of textFields) {
     const tfValue = service[field], bodsValue = match[field];
     const tfEmpty = Array.isArray(tfValue) ? tfValue.length === 0 : !text(tfValue);
     const bodsEmpty = Array.isArray(bodsValue) ? bodsValue.length === 0 : !text(bodsValue);
     if (tfEmpty && !bodsEmpty) { service[field] = Array.isArray(bodsValue) ? [...bodsValue] : bodsValue; supplemented = true; }
-    else if (!tfEmpty && !bodsEmpty && !sameText(tfValue, bodsValue)) conflict = true;
+    else if (!tfEmpty && !bodsEmpty && !sameText(tfValue, bodsValue)) conflictFields.push(field);
   }
   if ((!Array.isArray(service.principalLocations) || !service.principalLocations.length) && Array.isArray(match.principalLocations) && match.principalLocations.length) { service.principalLocations = [...match.principalLocations]; supplemented = true; }
-  else if (service.principalLocations?.length && match.principalLocations?.length && !sameSequence(service.principalLocations, match.principalLocations)) conflict = true;
+  else if (service.principalLocations?.length && match.principalLocations?.length && !sameSequence(service.principalLocations, match.principalLocations)) conflictFields.push('principalLocations');
   if ((!Array.isArray(service.routePatternStopIds) || !service.routePatternStopIds.length) && Array.isArray(match.routePatternStopIds) && match.routePatternStopIds.length) { service.routePatternStopIds = [...match.routePatternStopIds]; supplemented = true; }
-  else if (service.routePatternStopIds?.length && match.routePatternStopIds?.length && !sameSequence(service.routePatternStopIds, match.routePatternStopIds)) conflict = true;
+  else if (service.routePatternStopIds?.length && match.routePatternStopIds?.length && !sameSequence(service.routePatternStopIds, match.routePatternStopIds)) conflictFields.push('routePatternStopIds');
   const withSupplementaryDepartures = retainSupplementaryDepartures(service, match);
   if (withSupplementaryDepartures.service !== service) service = withSupplementaryDepartures.service;
   service.provider = 'TfL';
@@ -189,7 +190,21 @@ function supplement(tfl, bods) {
   const hasSupplementaryEvidence = supplemented || withSupplementaryDepartures.retained;
   service.timetableSource = supplemented ? 'TfL + BODS supplementary' : 'TfL';
   service.source = { ...service.source, provider: 'TfL', primaryAuthority: 'TfL', supplementaryProvider: hasSupplementaryEvidence ? 'BODS' : null };
-  return { service, matched: true, conflict };
+  const deterministicTfLIdentity = service.source?.routeMetadata === 'matched' && Boolean(text(service.origin) && text(service.destination));
+  const identityFields = new Set(['origin', 'destination', 'direction', 'principalLocations', 'routePatternStopIds']);
+  const materialConflictFields = conflictFields.filter(field => identityFields.has(field) && !deterministicTfLIdentity);
+  if (conflictFields.length) {
+    const diagnostic = Object.freeze({
+      provider: 'BODS',
+      type: 'supplementary-field-disagreement',
+      fields: Object.freeze([...new Set(conflictFields)]),
+      materialFields: Object.freeze([...new Set(materialConflictFields)]),
+      classification: materialConflictFields.length ? 'material-identity-ambiguity' : 'audit-only-authoritative-TfL-result',
+      authoritativeProvider: 'TfL'
+    });
+    service = { ...service, sourceAuthorityDiagnostics: Object.freeze([...(service.sourceAuthorityDiagnostics ?? []), diagnostic]) };
+  }
+  return { service, matched: true, conflict: materialConflictFields.length > 0, technicalDiscrepancy: conflictFields.length > 0 };
 }
 
 function fallbackService(service, request, reason = 'failure') {
@@ -344,7 +359,13 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     const nationalUnresolvedRequestIdentities = rawNationalUnresolvedRequestIdentities.filter(identity => !fallbackServices.some(fallback => `${fallback.source?.requestedLineId}|${fallback.source?.requestedStopPointId}` === identity));
     const unresolvedRequestIdentities = [...new Set([...tflUnresolvedRequestIdentities, ...nationalUnresolvedRequestIdentities])];
     let conflicts = 0;
-    const composed = services.map(service => { const result = supplement(service, bods); if (result.conflict) conflicts += 1; return result.service; });
+    let technicalDiscrepancies = 0;
+    const composed = services.map(service => {
+      const result = supplement(service, bods);
+      if (result.conflict) conflicts += 1;
+      if (result.technicalDiscrepancy) technicalDiscrepancies += 1;
+      return result.service;
+    });
     composed.push(...fallbackServices);
     if (!insideLondon) {
       const nationalOnlyStopIds = new Set(nationalStops.map(stopKey));
@@ -379,6 +400,8 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       nationalTimetableStopIds: nationalStops.map(stopKey),
       tflTimetableRequestIdentities: processedRequests.map(request => requestIdentity(request)),
       nationalTimetableProviders: timetableProviderLabelsFromText(national.provenance?.source),
+      supplementaryTechnicalDiscrepancyCount: technicalDiscrepancies,
+      supplementaryMaterialConflictCount: conflicts,
       realtimeArrivalsUsed: false, anonymousRequest: true, apiKeyEmbedded: false
     };
     const nationalConclusion = national.timetableConclusion || national.provenance?.timetableConclusion;

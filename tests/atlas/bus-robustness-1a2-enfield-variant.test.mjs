@@ -156,6 +156,7 @@ const wordText = buildBusWordTables({
   .map(row => Array.isArray(row) ? row.join(' ') : String(row?.text ?? ''))
   .join(' ');
 assert.match(wordText, /Timetable note: Where separate term-time and school-holiday timetables are published, the term-time timetable is shown\./);
+assert.doesNotMatch(wordText, /Timetable note: Timetable note:/);
 assert.match(wordText, /Timetable information reflects the data available to ATLAS on 2026-10-07/);
 assert.doesNotMatch(wordText, /Service note: Timetable may vary during school holidays/);
 assert.match(wordText, /Resolved Midpoint/);

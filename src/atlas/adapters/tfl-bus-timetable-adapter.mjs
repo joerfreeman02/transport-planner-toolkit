@@ -463,8 +463,8 @@ export function tflRouteSequenceEvidenceForService(service, result) {
       && assessedStopIds.some(id => ids.includes(id))
       && patternIds.length === ids.length
       && patternIds.every((id, index) => id === ids[index])
-      && text(service.originStopPointId) === ids[0]
-      && text(service.destinationStopPointId) === ids.at(-1);
+      && (!text(service.originStopPointId) || text(service.originStopPointId) === ids[0])
+      && (!text(service.destinationStopPointId) || text(service.destinationStopPointId) === ids.at(-1));
   });
   const resolved = candidates.length === 1;
   return Object.freeze({

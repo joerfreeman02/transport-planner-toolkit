@@ -30,9 +30,17 @@ assert.equal(parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'R', direc
 assert.equal(parseTflRouteSequenceResponse({ lineId: 'R', direction: 'outbound', stopPointSequences: [{ stopPoint: [] }] }, { lineId: 'R', direction: 'outbound' })[0], undefined, 'an empty sequence is not fabricated');
 const linkedService = { source: { lineId: 'R' }, direction: 'outbound', originStopPointId: 'A', destinationStopPointId: 'C', routePatternStopIds: ['A', 'B', 'C'], stopSchedules: { B: { monday: [500] } } };
 const linkedEvidence = tflRouteSequenceEvidenceForService(linkedService, { data: [{ lineId: 'R', direction: 'outbound', sequences: parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'R', direction: 'outbound' }), provenance: { endpoint: 'official TfL endpoint' }, cache: { status: 'miss' } }], provenance: {} });
+const linkedSequenceResult = { data: [{ lineId: 'R', direction: 'outbound', sequences: parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'R', direction: 'outbound' }) }] };
 assert.equal(linkedEvidence.status, 'resolved', 'direction, assessed-stop membership and exact complete ordered endpoints link the sequence');
 assert.deepEqual(linkedEvidence.endpointStopPointIds, { origin: 'A', destination: 'C' }, 'resolved endpoint IDs come only from the exact linked sequence');
-const linkedSequenceResult = { data: [{ lineId: 'R', direction: 'outbound', sequences: parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'R', direction: 'outbound' }) }] };
+const absentOriginService = { ...linkedService, originStopPointId: null, destinationStopPointId: null };
+assert.equal(tflRouteSequenceEvidenceForService(absentOriginService, { data: [{ lineId: 'R', direction: 'outbound', sequences: parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'R', direction: 'outbound' }) }] }).status, 'resolved', 'a complete exact ordered timetable pattern can supply a previously absent origin');
+const twoBranches = { data: [{ lineId: 'R', direction: 'outbound', sequences: [
+  ...parseTflRouteSequenceResponse(sequenceFixture, { lineId: 'R', direction: 'outbound' }),
+  ...parseTflRouteSequenceResponse({ ...sequenceFixture, stopPointSequences: [{ branchId: 8, serviceType: 'Regular', stopPoint: [{ naptanId: 'A' }, { naptanId: 'B' }, { naptanId: 'C' }] }] }, { lineId: 'R', direction: 'outbound' })
+] }] };
+assert.equal(tflRouteSequenceEvidenceForService(linkedService, twoBranches).status, 'ambiguous-or-incomplete-link', 'duplicate matching branches remain ambiguous rather than selecting arbitrarily');
+assert.equal(tflRouteSequenceEvidenceForService({ ...linkedService, destinationStopPointId: 'AUTHORITATIVE-OTHER' }, linkedSequenceResult).status, 'ambiguous-or-incomplete-link', 'sequence evidence cannot override a conflicting already-authoritative exact endpoint');
 assert.equal(tflRouteSequenceEvidenceForService({ ...linkedService, destinationStopPointId: 'B' }, linkedSequenceResult).status, 'ambiguous-or-incomplete-link', 'an interior destination cannot promote a longer route branch');
 assert.equal(tflRouteSequenceEvidenceForService({ ...linkedService, direction: 'inbound' }, linkedSequenceResult).status, 'lookup-failed-or-not-requested', 'opposite-direction evidence is not applied');
 const sequenceCalls = [];

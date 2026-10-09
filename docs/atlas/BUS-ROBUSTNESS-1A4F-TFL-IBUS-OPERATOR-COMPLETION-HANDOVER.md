@@ -9,7 +9,7 @@
 - Version: `2.0.0-alpha.15`; unchanged.
 - Functional implementation SHA: `35c83e3c1bc5edda119edfbb06626243a3116f99`.
 - Final tip: this handover commit; its exact SHA is reported in the closeout response because a commit cannot contain its own SHA.
-- Working tree is expected clean after this documentation commit. Branch remains local-only; no push or remote parity is claimed.
+- Working tree is clean after the documentation commit. Branch remains local-only; no push or remote parity is claimed.
 - Frozen national prepared-data run: `36125621080`. No fresh national acquisition and no TNDS activation.
 
 ## Exact files changed
@@ -72,13 +72,13 @@ The bounded path is official raw source → single-version validated builder →
 - **191:** Arriva London remains in both Brimsdown Station / Edmonton Green directions; provenance follows the actual source records (TfL timetable, iBus, or BODS consensus) and is not inferred from the operator name.
 - **313:** Arriva London North in both ordinary directions, Towards Chingford Station and Towards Potters Bar Railway Station, from active TfL iBus evidence (`MN`, Base_Version `20261009`). The deterministic source evidence agrees across all relevant active matching patterns; no multi-operator ambiguity remains.
 - **317:** Metroline Travel remains in both Little Park Gardens / Waltham Cross directions; provenance follows the actual source records and is not inferred from the operator name.
-- Browser and Word use the same resolved planner-row operator value. The Word table includes a separate operator-provenance column; the regression specifically covers planner-row source projection. The final clean V2 review export is the acceptance artifact to inspect.
+- Browser and Word use the same resolved planner-row operator value. The Word table includes a separate operator-provenance column; the regression specifically covers planner-row source projection. The final clean V2 Word export was inspected: both 313 ordinary directions show `TfL iBus Static Data · Base_Version 20261009`; 317 rows show `BODS supplementary consensus` where that is the actual source.
 - Dame Alice Owen's School remains a separate restricted/additional 313 service. Crown Road (EN1) remains the named short working. Enfield's principal Chingford and Potters Bar directions remain. Frequency, calendar, operating period, GROUP, DEST, CIRC, and endpoint semantics are unchanged by operator enrichment.
 - Direct TfL timetable operator values take precedence. No direct-TfL/iBus disagreement was found for the accepted 313 rows. The operator index itself has no competing active operator for the matched 313 evidence.
 
 ## Live engineering controls
 
-- **Enfield Town, 250 m** (`51.6523584, -0.0783252`): accepted V2 replay had 13 stops, 14 distinct routes, 44 detailed route × StopPoint pairs, and 24 planner service summaries. Route inventory remained `121, 191, 192, 231, 307, 313, 317, 329, 377, 456, 629, N29, W8, W9`. Both 313 ordinary directions display Arriva London North; 191 remains Arriva London and 317 Metroline Travel. Dame Alice Owen's School and Crown Road remain separately qualified. The pre-fix Planner review queue was zero avoidable endpoint items. Final acceptance must use the post-fix clean V2 build and verify its review queue and Word provenance.
+- **Enfield Town, 250 m** (`51.6523584, -0.0783252`): final clean V2 replay had 13 stops, 14 distinct routes, 44 detailed route × StopPoint pairs, and 24 planner service summaries. Route inventory remained `121, 191, 192, 231, 307, 313, 317, 329, 377, 456, 629, N29, W8, W9`. Both 313 ordinary directions display Arriva London North; 191 remains Arriva London and 317 Metroline Travel. Dame Alice Owen's School and Crown Road remain separately qualified. The final Planner review queue contains zero avoidable endpoint-review items. The exported Word report shows the iBus provenance label on both 313 rows.
 - **Chingford Mount / Normanshire Drive, 250 m** (`51.616596, -0.011789`): live replay returned 2 stops and routes 357, 444, 657 and W16. There were no planner review items. Route 657 remained school-days-only: one journey/day toward Bancroft's School at about 07:55 and one/day toward Salisbury Hall Sainsbury's at about 16:26; no false general-service dagger was introduced.
 - **Waltham Cross Bus Station, 250 m** (`51.685520, -0.031123`): live replay returned 6 stops and 19 summaries. Protected families 13/13A/B/C, 15/15A, 16/16C, 66, 251, 279, 317, 327, 491 and N279 were present. Other existing route rows were not altered. The known contradictory “no bus stops were found within the selected distance” note persisted despite stop rows, and the OSRM review remained at StopPoint `210021703430`. Both are retained for BUS-ROBUSTNESS-1B; neither was changed.
 - Frozen national snapshot remains `36125621080` (prepared snapshot `8e2982017598eb0f37153f03eb42bab596d70d1217cd08f0678944719fe666c9`); diagnostic-only, not production-eligible. V2 preparation reused this frozen artifact. No fresh national acquisition, TNDS activation, third-party operator source, or new credentials were used.
@@ -92,8 +92,8 @@ The bounded path is official raw source → single-version validated builder →
 
 ## Review runtime and final acceptance
 
-- Review URL: `http://127.0.0.1:8773/atlas/?review=v2#modules` (`?review=v2`). The currently running V2 process was started against the prior clean functional tip, before the narrow Word provenance fix; it must not be represented as the final build. A fresh clean V2 server must be launched from the final committed tip, return HTTP 200, show the final tip in its visible build header, and leave the Enfield assessment open before this sprint can be called ready for Product Owner acceptance.
-- Final recommendation is conditional on that last clean-build/export verification. Do not begin 1B, polish, merge, deploy, or Alpha.16 work.
+- Review URL: `http://127.0.0.1:8773/atlas/?review=v2#modules` (`?review=v2`). The clean V2 server returned HTTP 200. Its visible header was verified against the clean final tip, and the final Enfield assessment remains open for Product Owner review. The server is left running.
+- Final recommendation: ready for Product Owner final TfL/London intelligence acceptance. Do not begin 1B, polish, merge, deploy, or Alpha.16 work.
 
 ## GitHub tooling adoption review (no changes)
 
@@ -105,4 +105,4 @@ The bounded path is official raw source → single-version validated builder →
 
 ## Recommendation
 
-**NOT READY** until the final clean V2 server, final-tip build header, Enfield zero-avoidable-review result, and post-fix Word operator-provenance output have been verified together.
+**READY FOR PRODUCT OWNER FINAL TFL/LONDON INTELLIGENCE ACCEPTANCE**

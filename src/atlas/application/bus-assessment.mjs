@@ -144,10 +144,10 @@ export function createReviewItem({ code, severity = 'warning', actionability = '
 
 function buildReviewItems({ selectedStops = [], services = [], serviceSummaries = [], servicesResult = null, prepared = null, stopCoverageComplete = true, routingComplete = true } = {}) {
   const items = new Map();
-  const add = ({ code, severity = 'warning', actionability = 'review', route = null, stop = null, source = 'timetable source', message }) => {
+  const add = ({ code, severity = 'warning', actionability = 'review', route = null, stop = null, source = 'timetable source', message, factKey = null }) => {
     const item = createReviewItem({ code, severity, actionability, route, stop, source, message, id: code + ':' + items.size });
     if (!item) return;
-    const key = [code, route, stop, source, item.message].map(value => String(value ?? '').toLowerCase()).join('|');
+    const key = [code, route, factKey ?? stop, source, item.message].map(value => String(value ?? '').toLowerCase()).join('|');
     if (!items.has(key)) items.set(key, item);
   };
   const provenance = servicesResult?.provenance ?? {};
@@ -173,13 +173,30 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
   for (const service of serviceSummaries) for (const side of ['origin', 'destination']) {
     const decision = service[`${side}EndpointDecision`];
     if (!decision || (!decision.unresolved && !decision.conflict)) continue;
-    add({ code: 'planner-endpoint-resolution', route: service.routeNumber, stop: decision.endpointStopPointId || service.frequencyBasisStopId, source: decision.provider || service.frequencyEvidenceSource || 'timetable source', message: `${side[0].toUpperCase() + side.slice(1)} endpoint decision requires review: ${decision.reason}` });
+    if (!materialPlannerEndpointUncertainty(service, side, decision)) continue;
+    const sourceIdentity = [...new Set((service.sourceRecordIds ?? []).map(value => String(value ?? '').trim()).filter(Boolean))].sort().join(',');
+    const intervalIdentity = [service.source?.lineId, service.source?.directionId || service.directionFamily || service.direction, service.source?.intervalId, service.source?.calendarProfileId || service.calendarProfileId, side].map(value => String(value ?? '').trim()).join('|');
+    add({ code: 'planner-endpoint-resolution', route: service.routeNumber, stop: decision.endpointStopPointId || service.frequencyBasisStopId, source: decision.provider || service.frequencyEvidenceSource || 'timetable source', factKey: `${side}:${sourceIdentity || 'no-source-record'}:${intervalIdentity}`, message: `${side[0].toUpperCase() + side.slice(1)} endpoint decision requires review: ${decision.reason}` });
   }
   if (!stopCoverageComplete) add({ code: 'stop-source-coverage', stop: selectedStops[0]?.id, source: 'NaPTAN', message: 'Stop-source coverage was incomplete; the returned stop set does not establish an authoritative zero-stop conclusion.' });
   if (!routingComplete) for (const stop of selectedStops.filter(item => item.walking?.status !== 'routed' || item.cycling?.status !== 'routed')) add({ code: 'access-routing', stop: stop.id, source: 'OSRM', message: 'Walking or cycling access could not be routed for this stop; review access distances before formal use.' });
   if (servicesResult && !servicesResult.ok && !Number(provenance.unprocessedRequests || 0) && !Number(provenance.failedRequests || 0)) add({ code: 'timetable-source-unavailable', stop: selectedStops[0]?.id, source: provenance.source || 'timetable source', message: 'The timetable source did not return a usable result for this assessment; review the source response before formal use.' });
   if (!serviceSummaries.length && servicesResult?.ok) add({ code: 'no-planner-summary', stop: selectedStops[0]?.id, source: 'timetable source', message: 'No planner-facing timetable row was established from the selected-stop evidence.' });
   return [...items.values()];
+}
+
+function materialPlannerEndpointUncertainty(service, side, decision) {
+  if (decision.conflict || service?.plannerEndpointMateriality === 'material') return true;
+  if (service?.plannerEndpointMateriality === 'non-material') return false;
+  if (!decision.unresolved) return false;
+  const routeKnown = Boolean(String(service?.routeNumber ?? '').trim());
+  const directionKnown = Boolean(String(service?.directionFamily || service?.direction || '').trim());
+  const structuralAmbiguity = service?.plannerStructuralBranchResolved === false
+    || service?.plannerServiceFamilyResolved === false
+    || service?.shortWorkingIdentityResolved === false
+    || service?.tflRouteSequenceEvidence?.status === 'ambiguous-or-incomplete-link';
+  if (side === 'origin' && routeKnown && directionKnown && resolvedPlannerDestination(service) && !structuralAmbiguity) return false;
+  return true;
 }
 
 function partialDetail(reviewItems) {

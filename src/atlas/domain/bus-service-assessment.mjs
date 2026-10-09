@@ -770,6 +770,12 @@ export function buildServiceSummaries(stops, serviceRecords) {
       serviceNote: unique(notes).join(' '),
       stopIds,
       sourceRecordIds: unique(records.map(record => record.id)),
+      plannerEndpointMateriality: records.some(record => record.plannerEndpointMateriality === 'material')
+        ? 'material'
+        : records.length && records.every(record => record.plannerEndpointMateriality === 'non-material') ? 'non-material' : null,
+      plannerStructuralBranchResolved: records.some(record => record.plannerStructuralBranchResolved === false) ? false : null,
+      plannerServiceFamilyResolved: records.some(record => record.plannerServiceFamilyResolved === false) ? false : null,
+      shortWorkingIdentityResolved: records.some(record => record.shortWorkingIdentityResolved === false) ? false : null,
       departuresByDay,
       departureEvidenceByDay,
       supplementaryStopSchedules: Object.freeze(records.reduce((merged, record) => mergeStopSchedules(merged, record.supplementaryStopSchedules), {})),

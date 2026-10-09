@@ -60,6 +60,7 @@ await import('./bus-robustness-1a4-accuracy-closeout.test.mjs');
 await import('./bus-robustness-1a4-313-principal-endpoint.test.mjs');
 await import('./bus-robustness-1a4b-authoritative-endpoint-hydration.test.mjs');
 await import('./bus-robustness-1a4d-tfl-planner-trust.test.mjs');
+await import('./bus-robustness-1a4e-c1-clipped-pattern-closeout.test.mjs');
 await import('./alpha12-source-completeness.test.mjs');
 await import('./alpha12-evidence-integrity-audit.test.mjs');
 await import('./alpha12-source-presentation.test.mjs');

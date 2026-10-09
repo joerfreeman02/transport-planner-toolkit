@@ -25,6 +25,25 @@ function endpointIdValues(endpoint = {}) {
 
 function firstName(...values) { return values.map(text).find(Boolean) || null; }
 
+function clippedTfLOrigin(service) {
+  const source = service?.source ?? {};
+  const sequence = service?.tflRouteSequenceEvidence;
+  return source.provider === 'TfL'
+    && source.routePatternStartIsAssessedStop === true
+    && sequence?.status === 'resolved'
+    && Boolean(sequence.endpointStopPointIds?.origin);
+}
+
+function intervalEdgeOriginId(service) {
+  const source = service?.source ?? {};
+  const direct = text(service?.originStopPointId);
+  return source.routePatternStartIsAssessedStop === true
+    && direct
+    && direct === text(source.intervalOriginStopPointId)
+    ? direct
+    : null;
+}
+
 function localityEvidence(endpoint = {}) {
   const locality = endpoint.nptgLocality ?? endpoint.nptgLocalityEvidence ?? {};
   return {
@@ -203,27 +222,34 @@ export function makePlannerEndpointDecision({ rawEndpointText = '', endpoint = {
 }
 
 function endpointFromService(service, side) {
-  const suffix = side === 'origin' ? 'Origin' : 'Destination';
   const pattern = Array.isArray(service?.routePatternStops) ? service.routePatternStops : [];
   const patternEndpoint = side === 'origin' ? pattern[0] : pattern.at(-1);
   const orderedIds = unique(service?.routePatternStopIds ?? service?.orderedPatternEndpoints ?? service?.source?.orderedPatternEndpoints ?? []);
   const orderedEndpointId = orderedIds.length >= 2 ? (side === 'origin' ? orderedIds[0] : orderedIds.at(-1)) : null;
+  const isClippedOrigin = side === 'origin' && clippedTfLOrigin(service);
+  const intervalEdge = isClippedOrigin ? intervalEdgeOriginId(service) : null;
+  const sequenceId = isClippedOrigin ? service.tflRouteSequenceEvidence.endpointStopPointIds.origin : null;
+  const sequenceStop = isClippedOrigin ? service.tflRouteSequenceEvidence.endpointStops?.origin : null;
+  const directIds = unique([
+    service?.[`${side}StopPointId`] === intervalEdge ? null : service?.[`${side}StopPointId`],
+    ...(service?.[`${side}StopPointIds`] ?? [])
+  ]);
   const candidateIds = unique([
-    service?.[`${side}StopPointId`],
-    ...(service?.[`${side}StopPointIds`] ?? []),
+    ...directIds,
+    sequenceId,
     // Existing ordered pattern evidence is accepted only as an exact
     // provider endpoint when it carries its own identity and locality data.
-    patternEndpoint?.id && (patternEndpoint?.nptgLocalityCode || patternEndpoint?.nptgLocalityName || patternEndpoint?.stopArea || patternEndpoint?.logicalGroupRefs) ? patternEndpoint.id : null,
+    !isClippedOrigin && patternEndpoint?.id && (patternEndpoint?.nptgLocalityCode || patternEndpoint?.nptgLocalityName || patternEndpoint?.stopArea || patternEndpoint?.logicalGroupRefs) ? patternEndpoint.id : null,
     ...preparedEndpointEvidenceForService(service, side).map(item => item.resolvedStopPointId)
   ]);
-  const ids = orderedEndpointId && !candidateIds.includes(orderedEndpointId) ? [] : candidateIds;
+  const ids = orderedEndpointId && !candidateIds.includes(orderedEndpointId) && !isClippedOrigin ? [] : candidateIds;
   const prepared = preparedEndpointEvidenceForService(service, side).find(item => !orderedEndpointId || item.resolvedStopPointId === orderedEndpointId)
     || (!ids.length ? null : preparedEndpointEvidenceForService(service, side)[0]) || null;
   return {
     rawEndpointText: side === 'origin' ? service?.origin : service?.destination,
     endpointStopPointId: ids[0] || null,
     endpointStopPointIds: ids,
-    endpointStopName: patternEndpoint?.name || patternEndpoint?.commonName || null,
+    endpointStopName: sequenceStop?.name || patternEndpoint?.name || patternEndpoint?.commonName || null,
     nptgLocalityCode: patternEndpoint?.nptgLocalityCode || null,
     nptgLocalityName: patternEndpoint?.nptgLocalityName || patternEndpoint?.localityName || patternEndpoint?.locality || null,
     logicalGroupRefs: patternEndpoint?.logicalGroupRefs || [],
@@ -247,11 +273,11 @@ export function plannerEndpointDecisionForService(service, side = 'destination')
 }
 
 function endpointIdsForService(service, side) {
-  const sequenceEndpoint = service?.tflRouteSequenceEvidence?.status === 'resolved'
-    ? service.tflRouteSequenceEvidence.endpointStopPointIds?.[side]
-    : null;
+  const isClippedOrigin = side === 'origin' && clippedTfLOrigin(service);
+  const intervalEdge = isClippedOrigin ? intervalEdgeOriginId(service) : null;
+  const sequenceEndpoint = isClippedOrigin ? service.tflRouteSequenceEvidence.endpointStopPointIds.origin : null;
   const ids = unique([
-    service?.[`${side}StopPointId`],
+    service?.[`${side}StopPointId`] === intervalEdge ? null : service?.[`${side}StopPointId`],
     ...(service?.[`${side}StopPointIds`] ?? []),
     sequenceEndpoint,
     ...preparedEndpointEvidenceForService(service, side).map(item => item.resolvedStopPointId)
@@ -259,7 +285,7 @@ function endpointIdsForService(service, side) {
   const ordered = unique(service?.routePatternStopIds ?? service?.orderedPatternEndpoints ?? service?.source?.orderedPatternEndpoints ?? []);
   if (ordered.length < 2) return ids;
   const orderedEndpointId = side === 'origin' ? ordered[0] : ordered.at(-1);
-  return ids.includes(orderedEndpointId) ? ids : [];
+  return ids.includes(orderedEndpointId) || isClippedOrigin ? ids : [];
 }
 
 function preparedEndpointEvidenceForService(service, side) {

@@ -11,6 +11,8 @@ const DAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'frida
 
 const text = value => String(value ?? '').trim();
 const normal = value => text(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const unique = values => [...new Set(values)];
+const sameSequence = (left, right) => Array.isArray(left) && Array.isArray(right) && left.length === right.length && left.every((value, index) => text(value) === text(right[index]));
 const emptySchedule = () => Object.fromEntries(DAYS.map(day => [day, []]));
 
 const WEEKDAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
@@ -321,10 +323,13 @@ function sectionsFromMetadata(data, lineId) {
     if (Array.isArray(line?.sections)) return line.sections;
     return [];
   }).map(section => ({
-    id: text(section?.id),
+    id: text(section?.id ?? section?.routeSectionId),
     direction: text(section?.direction),
     origin: text(section?.originationName),
     destination: text(section?.destinationName),
+    originStopPointId: text(section?.originator) || null,
+    destinationStopPointId: text(section?.destination) || null,
+    serviceType: text(section?.serviceType) || null,
     validFrom: text(section?.validFrom) || null,
     validTo: text(section?.validTo) || null
   })).filter(section => section.origin && section.destination);
@@ -404,7 +409,7 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         calendarEvidence: profileTiming.calendarEvidence,
         calendarProfileId: profileTiming.calendarProfileId,
         frequencyBasisStopId: stopPointId,
-        source: { provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId, calendarProfileId: profileTiming.calendarProfileId, routeMetadata: identity ? 'matched' : 'incomplete', endpointIdentity: 'StationInterval exact ordered endpoints' },
+        source: { provider: 'TfL', lineId, directionId: text(response?.directionId), intervalId: pattern.sourceId, calendarProfileId: profileTiming.calendarProfileId, routeMetadata: identity ? 'matched' : 'incomplete', endpointIdentity: 'StationInterval exact ordered endpoints', assessedStopPointId: stopPointId, routePatternStartIsAssessedStop: Boolean(departureStopConfirmed && !hasRequestedStop), intervalOriginStopPointId: pattern.stations[0]?.id || null },
         timetableSource: 'TfL',
         serviceNotes: calendarQualificationNotes(profileTiming.calendarEvidence),
         sourceWarnings: profileTiming.calendarEvidence.filter(calendar => !calendar.resolved).map(calendar => `TfL timetable period "${calendar.sourceCalendarLabel}" could not be safely mapped to operating days; no unverified days were fabricated.`),
@@ -440,7 +445,10 @@ export function parseTflRouteSequenceResponse(data, { lineId, direction } = {}) 
       lineId: responseLine || expectedLine,
       direction: responseDirection || text(direction),
       branchId: sequence?.branchId ?? null,
+      nextBranchIds: Object.freeze(Array.isArray(sequence?.nextBranchIds) ? [...sequence.nextBranchIds] : []),
+      prevBranchIds: Object.freeze(Array.isArray(sequence?.prevBranchIds) ? [...sequence.prevBranchIds] : []),
       serviceType: text(sequence?.serviceType) || null,
+      orderedLineRoutes: Object.freeze([...(Array.isArray(sequence?.orderedLineRoutes) ? sequence.orderedLineRoutes : Array.isArray(data?.orderedLineRoutes) ? data.orderedLineRoutes : [])]),
       orderedStops: Object.freeze(orderedStops),
       orderedStopPointIds: Object.freeze(orderedStops.map(stop => stop.id)),
       sourceSequenceIndex: index
@@ -449,7 +457,42 @@ export function parseTflRouteSequenceResponse(data, { lineId, direction } = {}) 
   return Object.freeze(sequences);
 }
 
-/** Link sequence evidence only when the timetable record proves the complete ordered pattern. */
+function isOrderedSubsequence(pattern, sequence) {
+  if (!pattern.length || !sequence.length) return false;
+  let cursor = 0;
+  for (const id of sequence) if (sameStopId(id, pattern[cursor])) cursor += 1;
+  return cursor === pattern.length;
+}
+
+function sameStopId(left, right) { return normal(left) === normal(right); }
+
+function compatibleValidity(service, section) {
+  if (!service?.validFrom && !service?.validTo) return true;
+  if (!section?.validFrom && !section?.validTo) return true;
+  const serviceFrom = service.validFrom ? Date.parse(service.validFrom) : Number.NEGATIVE_INFINITY;
+  const serviceTo = service.validTo ? Date.parse(service.validTo) : Number.POSITIVE_INFINITY;
+  const sectionFrom = section.validFrom ? Date.parse(section.validFrom) : Number.NEGATIVE_INFINITY;
+  const sectionTo = section.validTo ? Date.parse(section.validTo) : Number.POSITIVE_INFINITY;
+  return Number.isFinite(serviceFrom) || serviceFrom === Number.NEGATIVE_INFINITY
+    ? (Number.isFinite(serviceTo) || serviceTo === Number.POSITIVE_INFINITY)
+      && (Number.isFinite(sectionFrom) || sectionFrom === Number.NEGATIVE_INFINITY)
+      && (Number.isFinite(sectionTo) || sectionTo === Number.POSITIVE_INFINITY)
+      && serviceFrom <= sectionTo && sectionFrom <= serviceTo
+    : false;
+}
+
+function sameSequenceIdentity(left, right) {
+  return normal(left.lineId) === normal(right.lineId)
+    && normal(left.direction) === normal(right.direction)
+    && normal(left.serviceType) === normal(right.serviceType)
+    && text(left.branchId) === text(right.branchId)
+    && sameSequence(left.orderedStopPointIds, right.orderedStopPointIds)
+    && sameSequence(left.nextBranchIds, right.nextBranchIds)
+    && sameSequence(left.prevBranchIds, right.prevBranchIds)
+    && JSON.stringify(left.orderedLineRoutes ?? []) === JSON.stringify(right.orderedLineRoutes ?? []);
+}
+
+/** Link clipped timetable evidence only to one materially compatible full TfL branch. */
 export function tflRouteSequenceEvidenceForService(service, result) {
   const lineId = text(service?.source?.lineId ?? service?.routeNumber);
   const direction = text(service?.direction);
@@ -457,24 +500,82 @@ export function tflRouteSequenceEvidenceForService(service, result) {
   const entry = (result?.data ?? []).find(item => normal(item.lineId) === normal(lineId) && normal(item.direction) === normal(direction));
   const sequences = entry?.sequences ?? [];
   const patternIds = (service?.routePatternStopIds ?? []).map(text).filter(Boolean);
+  const routeSections = sectionsFromMetadata(result?.routeMetadata, lineId)
+    .filter(section => normal(section.direction) === normal(direction));
   const candidates = sequences.filter(sequence => {
     const ids = sequence.orderedStopPointIds ?? [];
-    return normal(sequence.direction) === normal(direction)
-      && assessedStopIds.some(id => ids.includes(id))
-      && patternIds.length === ids.length
-      && patternIds.every((id, index) => id === ids[index])
-      && (!text(service.originStopPointId) || text(service.originStopPointId) === ids[0])
-      && (!text(service.destinationStopPointId) || text(service.destinationStopPointId) === ids.at(-1));
+    const sequenceServiceType = normal(sequence.serviceType);
+    const serviceType = normal(service?.serviceType ?? service?.source?.serviceType);
+    if (normal(sequence.lineId) !== normal(lineId) || normal(sequence.direction) !== normal(direction)) return false;
+    if (serviceType && sequenceServiceType && serviceType !== sequenceServiceType) return false;
+    if (!assessedStopIds.some(id => ids.some(candidate => sameStopId(candidate, id)))) return false;
+    if (assessedStopIds.some(id => !ids.some(candidate => sameStopId(candidate, id)))) return false;
+    if (!isOrderedSubsequence(patternIds, ids)) return false;
+
+    const clippedAtAssessedOrigin = service?.source?.routePatternStartIsAssessedStop === true;
+    const exactOrigin = unique([service?.originStopPointIds, service?.originStopPointId].flat().map(text).filter(Boolean));
+    const exactDestination = unique([service?.destinationStopPointIds, service?.destinationStopPointId].flat().map(text).filter(Boolean));
+    const intervalOrigin = text(service?.source?.intervalOriginStopPointId);
+    const effectiveExactOrigin = exactOrigin.filter(id => !clippedAtAssessedOrigin || !sameStopId(id, intervalOrigin));
+    if (effectiveExactOrigin.length && !effectiveExactOrigin.some(id => sameStopId(id, ids[0]))) return false;
+    // A known endpoint either seals the clipped interval edge or proves the
+    // full branch terminus; merely occurring somewhere inside the branch is
+    // not enough to promote that branch.
+    if (exactDestination.length && !exactDestination.some(id => sameStopId(id, patternIds.at(-1)) || sameStopId(id, ids.at(-1)))) return false;
+    if (exactDestination.length && !exactDestination.some(id => ids.some(candidate => sameStopId(candidate, id)))) return false;
+    if (!routeSections.length) return true;
+    return routeSections.some(section => {
+      if (section.serviceType && sequenceServiceType && normal(section.serviceType) !== sequenceServiceType) return false;
+      if (section.originStopPointId && !sameStopId(section.originStopPointId, ids[0])) return false;
+      if (section.destinationStopPointId && !sameStopId(section.destinationStopPointId, ids.at(-1))) return false;
+      return compatibleValidity(service, section);
+    });
   });
-  const resolved = candidates.length === 1;
+  const distinctCandidates = candidates.filter((candidate, index) => !candidates.slice(0, index).some(previous => sameSequenceIdentity(previous, candidate)));
+  const resolved = distinctCandidates.length === 1;
+  const matched = resolved ? distinctCandidates[0] : null;
+  const matchedSections = matched ? routeSections.filter(section => {
+    const ids = matched.orderedStopPointIds ?? [];
+    return (!section.originStopPointId || sameStopId(section.originStopPointId, ids[0]))
+      && (!section.destinationStopPointId || sameStopId(section.destinationStopPointId, ids.at(-1)))
+      && (!section.serviceType || !matched.serviceType || normal(section.serviceType) === normal(matched.serviceType))
+      && compatibleValidity(service, section);
+  }) : [];
+  const clippedOrigin = service?.source?.routePatternStartIsAssessedStop === true;
   return Object.freeze({
     provider: SOURCE,
     lineId: lineId || null,
     direction: direction || null,
     status: resolved ? 'resolved' : entry ? (sequences.length ? 'ambiguous-or-incomplete-link' : 'no-sequence') : 'lookup-failed-or-not-requested',
-    candidateCount: candidates.length,
-    endpointStopPointIds: resolved ? Object.freeze({ origin: candidates[0].orderedStopPointIds[0], destination: candidates[0].orderedStopPointIds.at(-1) }) : null,
-    sequences: Object.freeze(sequences.map(sequence => Object.freeze({ branchId: sequence.branchId, serviceType: sequence.serviceType, orderedStopPointIds: sequence.orderedStopPointIds }))),
+    matchType: resolved ? (patternIds.length === matched.orderedStopPointIds.length ? 'exact-sequence' : 'ordered-subsequence') : null,
+    candidateCount: distinctCandidates.length,
+    endpointStopPointIds: resolved ? Object.freeze({
+      origin: matched.orderedStopPointIds[0],
+      destination: matched.orderedStopPointIds.at(-1)
+    }) : null,
+    endpointStops: resolved ? Object.freeze({
+      origin: matched.orderedStops[0],
+      destination: matched.orderedStops.at(-1)
+    }) : null,
+    matchedSequence: resolved ? Object.freeze({
+      branchId: matched.branchId,
+      nextBranchIds: matched.nextBranchIds,
+      prevBranchIds: matched.prevBranchIds,
+      serviceType: matched.serviceType,
+      orderedLineRoutes: matched.orderedLineRoutes,
+      orderedStops: matched.orderedStops,
+      orderedStopPointIds: matched.orderedStopPointIds
+    }) : null,
+    matchedRouteSections: Object.freeze(matchedSections),
+    sequences: Object.freeze(sequences.map(sequence => Object.freeze({
+      branchId: sequence.branchId,
+      nextBranchIds: sequence.nextBranchIds,
+      prevBranchIds: sequence.prevBranchIds,
+      serviceType: sequence.serviceType,
+      orderedLineRoutes: sequence.orderedLineRoutes,
+      orderedStops: sequence.orderedStops,
+      orderedStopPointIds: sequence.orderedStopPointIds
+    }))),
     cacheStatus: entry?.cache?.status ?? null,
     provenance: entry?.provenance ?? result?.provenance?.requests?.find(request => normal(request.lineId) === normal(lineId) && normal(request.direction) === normal(direction)) ?? null
   });

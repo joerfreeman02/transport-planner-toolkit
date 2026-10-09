@@ -122,6 +122,7 @@ assert.ok([...realCalendarDays].every(day => day >= currentIndex.validFrom.slice
 const realPatternForDayB = currentIndex.patterns.find(pattern => pattern.serviceLineNo === '313'
   && pattern.journeys.some(item => item.calendarEvidence.some(calendar => calendar.calendarDay === '2026-10-10' && calendar.blockRunsOnDay)));
 assert.ok(realPatternForDayB, 'real iBus evidence has an active 313 block on the second valid date');
+assert.ok(realPatternForDayB.journeys.some(item => !item.calendarEvidence.some(calendar => calendar.calendarDay === '2026-10-10' && calendar.blockRunsOnDay)), 'real 313 evidence also contains journeys inactive on the second valid date');
 const real313Service = makeService({
   routeNumber: '313',
   source: { provider: 'TfL', lineId: '313', routePatternStartIsAssessedStop: false },

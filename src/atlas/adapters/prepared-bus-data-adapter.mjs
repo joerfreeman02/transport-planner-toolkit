@@ -207,9 +207,12 @@ export function createPreparedBusDataAdapter({
     const manifestResult = await manifest(forceRefresh);
     if (!manifestResult.ok) return manifestResult;
     const index = manifestResult.data;
-    const stopIds = new Set((stops ?? []).map(stop => String(stop.id || stop.sourceId || '')).filter(Boolean));
+    // Infrastructure/access StopPoints remain in the physical/reference data,
+    // but do not create timetable shard requests or missing-call defects.
+    const callStops = (stops ?? []).filter(stop => stop?.timetableCallEligible !== false);
+    const stopIds = new Set(callStops.map(stop => String(stop.id || stop.sourceId || '')).filter(Boolean));
     const prefixLength = Number(index.serviceShardKeyLength || 3);
-    const shardKeys = [...new Set((stops ?? []).map(stop => String(stop.id || stop.sourceId || '').slice(0, prefixLength)).filter(code => code.length === prefixLength))];
+    const shardKeys = [...new Set(callStops.map(stop => String(stop.id || stop.sourceId || '').slice(0, prefixLength)).filter(code => code.length === prefixLength))];
     const stopIdsByShardKey = new Map(shardKeys.map(key => [key, [...stopIds].filter(stopId => stopId.slice(0, prefixLength) === key)]));
     const shardDiagnostics = [];
     const shardPayloads = [];
@@ -240,12 +243,7 @@ export function createPreparedBusDataAdapter({
       }
     }
     if (!shardKeys.length) {
-      return sourceFailure({
-        code: 'unavailable_source',
-        message: 'Bus timetable information could not be checked. Please try again.',
-        provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url, sourceCompleteness: 'SOURCE_UNAVAILABLE', timetableConclusion: 'UNRESOLVED', requestedShardKeys: [] },
-        warnings: ['No prepared timetable area could be identified for the selected stops. No zero-service conclusion has been assumed.']
-      });
+      return sourceSuccess({ data: [], evidence: [], warnings: [], provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url, sourceCompleteness: 'COMPLETE', timetableConclusion: 'NO_CURRENT_MATCH', requestedShardKeys: [], checkedStopIds: [] } });
     }
     const failedShardDiagnostics = shardDiagnostics.filter(item => item.status !== 'loaded');
     const successfulShardDiagnostics = shardDiagnostics.filter(item => item.status === 'loaded');
@@ -260,10 +258,10 @@ export function createPreparedBusDataAdapter({
     }
     const failedStopIds = [...new Set(failedShardDiagnostics.flatMap(item => item.stopIds))].sort();
     const incompleteRequestIdentities = [...new Set(failedStopIds.flatMap(stopId => {
-      const stop = (stops ?? []).find(candidate => String(candidate.id || candidate.sourceId || '') === stopId);
+      const stop = callStops.find(candidate => String(candidate.id || candidate.sourceId || '') === stopId);
       return (stop?.routes ?? []).map(route => `${String(route)}|${stopId}`);
     }))].sort();
-    const unresolvedRoutes = [...new Set((stops ?? []).filter(stop => failedStopIds.includes(String(stop.id || stop.sourceId || ''))).flatMap(stop => stop.routes ?? []).map(String))].sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+    const unresolvedRoutes = [...new Set(callStops.filter(stop => failedStopIds.includes(String(stop.id || stop.sourceId || ''))).flatMap(stop => stop.routes ?? []).map(String))].sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
     const services = new Map();
     for (const shard of shardPayloads) for (const rawService of shard.services) {
       const service = normalisePreparedService(rawService);
@@ -332,7 +330,7 @@ export function createPreparedBusDataAdapter({
     const allUnresolvedRequestIdentities = [...new Set([...unresolvedRequestIdentities, ...incompleteRequestIdentities])].sort();
     return sourceSuccess({
       data: mergedServices, evidence: [], warnings,
-      provenance: { source: tndsProvenance ? `${TIMETABLE_SOURCE}; ${tndsProvenance.source}` : TIMETABLE_SOURCE, endpoint: index.sources.bods.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, tndsPreparedAt: tndsProvenance?.dataPreparedAt || null, tndsServing: tndsProvenance?.serving || null, tndsShardRequests: tndsProvenance?.shardRequests ?? null, datasetVersion: index.sources.bods.sha256, regions: index.sources.bods.regions, representativeDates: index.representativeDates, anonymousRequest: true, apiKeyEmbedded: false, attribution: TIMETABLE_ATTRIBUTION, unresolvedRequestIdentities: allUnresolvedRequestIdentities, nationalUnresolvedRequestIdentities: allUnresolvedRequestIdentities, nationalUnresolvedRoutes: [...new Set([...(tndsProvenance?.unresolvedRequestIdentities ?? []).map(identity => String(identity).split('|')[0]), ...unresolvedRoutes])].filter(Boolean).sort((left, right) => left.localeCompare(right, undefined, { numeric: true })), unresolvedStopIds: failedStopIds, requestedShardKeys: shardKeys, failedShardCount: failedShardDiagnostics.length, successfulShardCount: successfulShardDiagnostics.length, failedShardDiagnostics, successfulShardDiagnostics, failedRequests: failedShardDiagnostics.length, unresolvedRequests: failedShardDiagnostics.length, sourceCompleteness: partial ? 'PARTIAL' : 'COMPLETE', timetableConclusion }
+      provenance: { source: tndsProvenance ? `${TIMETABLE_SOURCE}; ${tndsProvenance.source}` : TIMETABLE_SOURCE, endpoint: index.sources.bods.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, tndsPreparedAt: tndsProvenance?.dataPreparedAt || null, tndsServing: tndsProvenance?.serving || null, tndsShardRequests: tndsProvenance?.shardRequests ?? null, datasetVersion: index.sources.bods.sha256, regions: index.sources.bods.regions, representativeDates: index.representativeDates, anonymousRequest: true, apiKeyEmbedded: false, attribution: TIMETABLE_ATTRIBUTION, unresolvedRequestIdentities: allUnresolvedRequestIdentities, nationalUnresolvedRequestIdentities: allUnresolvedRequestIdentities, nationalUnresolvedRoutes: [...new Set([...(tndsProvenance?.unresolvedRequestIdentities ?? []).map(identity => String(identity).split('|')[0]), ...unresolvedRoutes])].filter(Boolean).sort((left, right) => left.localeCompare(right, undefined, { numeric: true })), checkedStopIds: [...new Set(successfulShardDiagnostics.flatMap(item => item.stopIds))].sort(), unresolvedStopIds: failedStopIds, requestedShardKeys: shardKeys, failedShardCount: failedShardDiagnostics.length, successfulShardCount: successfulShardDiagnostics.length, failedShardDiagnostics, successfulShardDiagnostics, failedRequests: failedShardDiagnostics.length, unresolvedRequests: failedShardDiagnostics.length, sourceCompleteness: partial ? 'PARTIAL' : 'COMPLETE', timetableConclusion }
     });
   }
 
@@ -426,7 +424,7 @@ export function createPreparedBusDataAdapter({
       const reference = references.get(id);
       if (!reference) continue;
       const status = String(reference.status ?? '').toLowerCase();
-      if (status !== 'active' || reference.busPreparedEligible !== true || !['bus', 'bus_coach'].includes(String(reference.transportMode ?? '').toLowerCase()) || reference.coordinateValid !== true || !Number.isFinite(Number(reference.latitude)) || !Number.isFinite(Number(reference.longitude))) {
+      if (status !== 'active' || (reference.busDomainEligible ?? reference.busPreparedEligible) !== true || !['bus', 'bus_coach'].includes(String(reference.transportMode ?? '').toLowerCase()) || reference.coordinateValid !== true || !Number.isFinite(Number(reference.latitude)) || !Number.isFinite(Number(reference.longitude))) {
         invalidReferenceIds.push({ id, status: status || 'invalid-reference' });
         continue;
       }
@@ -508,7 +506,7 @@ export function createPreparedBusDataAdapter({
       if (!record) { invalidMembers.push({ id, groupId: group.id, status: malformedReferenceIds.has(id) ? 'malformed-reference' : 'missing' }); continue; }
       const status = String(record.status ?? '').toLowerCase();
       if (status !== 'active') { invalidMembers.push({ id, groupId: group.id, status: status || 'missing-status' }); continue; }
-      if (record.busPreparedEligible !== true || !['bus', 'bus_coach'].includes(String(record.transportMode ?? '').toLowerCase())) { invalidMembers.push({ id, groupId: group.id, status: 'non-bus' }); continue; }
+      if ((record.busDomainEligible ?? record.busPreparedEligible) !== true || !['bus', 'bus_coach'].includes(String(record.transportMode ?? '').toLowerCase())) { invalidMembers.push({ id, groupId: group.id, status: 'non-bus' }); continue; }
       if (record.coordinateValid !== true || !Number.isFinite(Number(record.latitude)) || !Number.isFinite(Number(record.longitude))) { invalidMembers.push({ id, groupId: group.id, status: 'malformed-coordinate' }); continue; }
       if (!candidateIds.includes(id)) candidateIds.push(id);
       if (!memberGroups.has(id)) memberGroups.set(id, []);

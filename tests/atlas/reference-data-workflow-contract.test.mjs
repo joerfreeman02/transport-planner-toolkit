@@ -54,7 +54,9 @@ assert.match(diagnostic, /Copy deterministic test log into evidence workspace/);
 assert.ok(diagnostic.indexOf('Restore last-known-good diagnostic comparison state') < diagnostic.indexOf('Run aggregate structural scan'));
 assert.ok(diagnostic.indexOf('Run aggregate structural scan') < diagnostic.indexOf('Run hard candidate validation'));
 assert.ok(diagnostic.indexOf('Run hard candidate validation') < diagnostic.indexOf('Probe TNDS metadata'));
-assert.ok(diagnostic.indexOf('Probe TNDS metadata') < diagnostic.indexOf('Run same-source-window parity'));
+assert.ok(diagnostic.indexOf('Probe TNDS metadata') < diagnostic.indexOf('Measure diagnostic candidate capacity'));
+assert.doesNotMatch(diagnostic, /Run same-source-window parity|national_v2_diagnostic\.py/);
+assert.match(top, /Legacy v1 shadow parity is deferred: no exact same-window frozen NaPTAN CSV is available/);
 assert.match(diagnostic, /verified-snapshot-manifest\.json/);
 assert.match(diagnostic, /atlas-reference-diagnostic-\$\{\{ github\.run_id \}\}/);
 

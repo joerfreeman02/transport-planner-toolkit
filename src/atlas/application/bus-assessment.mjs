@@ -59,6 +59,18 @@ function incompleteTimetableIdentitiesForStop(stop, provenance = {}) {
   ].map(String).filter(identity => identity.endsWith(identitySuffix)))];
 }
 
+function failedTimetableEvidenceForStop(stop, provenance = {}) {
+  const id = stopKey(stop);
+  return (provenance.unresolvedStopIds ?? []).map(String).includes(id)
+    || (provenance.failedShardDiagnostics ?? []).some(item => (item.stopIds ?? []).map(String).includes(id));
+}
+
+function hasCheckedTimetableEvidenceForStop(stop, provenance = {}) {
+  const id = stopKey(stop);
+  return (provenance.checkedStopIds ?? []).map(String).includes(id)
+    || hasNoCurrentTimetableConclusionForStop(stop, provenance);
+}
+
 function hasNoCurrentTimetableConclusionForStop(stop, provenance = {}) {
   const identitySuffix = `|${stopKey(stop)}`;
   return (provenance.noCurrentRequestIdentities ?? []).map(String).some(identity => identity.endsWith(identitySuffix));
@@ -101,12 +113,15 @@ function checkedSourceLabels(stop, provenance = {}, services = []) {
 
 function buildStopTimetableEvidence(stop, services, servicesResult) {
   const provenance = servicesResult?.provenance ?? {};
+  if (stop?.timetableCallEligible === false) return Object.freeze({ status: 'NOT_A_TIMETABLE_CALL_POINT', label: 'Station access/infrastructure point · scheduled calls are not expected here', sources: [] });
   const incompleteIdentities = incompleteTimetableIdentitiesForStop(stop, provenance);
   const incompleteCount = incompleteIdentities.length;
   const incompleteLabel = `timetable evidence unresolved or incomplete for ${incompleteCount} route${incompleteCount === 1 ? '' : 's'}`;
   const matched = (services ?? []).filter(service => hasScheduledEvidence(service.stopSchedules?.[stopKey(stop)] || {}));
   const labels = [...new Set(matched.map(sourceLabel))];
-  const nationalIncomplete = nationalEvidenceUnavailableForStop(stop, provenance);
+  const exactFailure = failedTimetableEvidenceForStop(stop, provenance) || incompleteCount > 0;
+  const exactSuccess = hasCheckedTimetableEvidenceForStop(stop, provenance);
+  const nationalIncomplete = !exactSuccess && nationalEvidenceUnavailableForStop(stop, provenance);
   if (labels.length) {
     if (nationalIncomplete) return Object.freeze({ status: 'PARTIAL', label: `Matched · ${labels.join(' + ')} · national timetable source unavailable for required route coverage`, sources: labels });
     if (incompleteCount) return Object.freeze({ status: 'PARTIAL', label: `Matched · ${labels.join(' + ')} · ${incompleteLabel}`, sources: labels });
@@ -116,12 +131,15 @@ function buildStopTimetableEvidence(stop, services, servicesResult) {
   const sourcePresentation = buildStopTimetableSourcePresentation(stop, provenance, services);
   const checked = sourcePresentation.checked;
   if (incompleteCount) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: `Timetable source unavailable · ${incompleteLabel}`, sources: checked });
-  if (!servicesResult?.ok && Number(provenance.failedRequests || 0) === 0 && provenance.unavailable !== true && hasNoCurrentTimetableConclusionForStop(stop, provenance)) {
+  if (exactFailure) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: `Timetable source unavailable · ${incompleteLabel}`, sources: checked });
+  if (hasNoCurrentTimetableConclusionForStop(stop, provenance)) {
     return Object.freeze({ status: 'NO_CURRENT_MATCH', label: `No current match · ${checked.join('/') || 'timetable sources'} checked`, sources: checked });
   }
+  if (!(stop.routes ?? []).length && exactSuccess) return Object.freeze({ status: 'NO_ROUTES', label: 'No routes recorded by the authoritative stop source', sources: checked });
+  if (exactSuccess && servicesResult?.ok && !matched.length) return Object.freeze({ status: 'NO_CURRENT_MATCH', label: `No current match · ${checked.join('/') || 'timetable sources'} checked`, sources: checked });
   if (!servicesResult?.ok) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable', sources: checked });
   if (Number(provenance.unprocessedRequests || 0) > 0) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · timetable request scope was incomplete', sources: checked });
-  if (Number(provenance.failedRequests || 0) > 0 || provenance.unavailable === true) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable', sources: checked });
+  if ((Number(provenance.failedRequests || 0) > 0 || provenance.unavailable === true) && !exactSuccess) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable', sources: checked });
   if (nationalIncomplete) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · required national evidence could not be checked', sources: checked });
   if ((provenance.timetableConclusion || servicesResult?.timetableConclusion) === 'UNRESOLVED') return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · evidence remained unresolved', sources: checked });
   const explicitConclusion = provenance.timetableConclusion || servicesResult?.timetableConclusion;
@@ -157,7 +175,11 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     const parts = requestParts(identity);
     add({ code: 'unresolved-timetable-request', route: parts.route, stop: parts.stop, source: 'timetable source', message: 'This route/stop timetable request remained unresolved; inspect the returned source evidence before formal use.' });
   }
-  if (provenance.failedShardDiagnostics?.length) add({ code: 'timetable-shard-failure', stop: selectedStops[0]?.id, source: provenance.source || 'prepared timetable source', message: `Prepared timetable evidence was incomplete: ${provenance.failedShardDiagnostics.length} shard failure${provenance.failedShardDiagnostics.length === 1 ? '' : 's'} affected ${provenance.unresolvedStopIds?.length || 0} selected stop record${(provenance.unresolvedStopIds?.length || 0) === 1 ? '' : 's'}. Successful shards were retained; affected routes were not treated as absent.` });
+  for (const failure of provenance.failedShardDiagnostics ?? []) {
+    const affected = (failure.stopIds ?? []).map(String);
+    const targets = affected.length ? affected : [null];
+    for (const stop of targets) add({ code: 'timetable-shard-failure', stop, source: provenance.source || 'prepared timetable source', factKey: failure.key || failure.path, message: `Prepared timetable evidence was incomplete for ${failure.key || failure.path || 'a selected shard'}; successful shards were retained and affected routes were not treated as absent.` });
+  }
   for (const identity of [...(provenance.unprocessedRequestIdentities ?? [])]) {
     const parts = requestParts(identity);
     add({ code: 'unprocessed-timetable-request', route: parts.route, stop: parts.stop, source: 'timetable source', message: 'This route/stop timetable request was outside the processed assessment scope; no zero-service conclusion was made.' });
@@ -167,7 +189,11 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     const parts = requestParts(identity);
     add({ code: 'quarantined-timetable-request', route: parts.route, stop: parts.stop, source: 'TNDS/BODS', message: 'A timetable pattern was quarantined because its source identity or affected StopPoint evidence was incomplete.' });
   }
-  if (provenance.nationalUnresolvedRoutes?.length) for (const route of provenance.nationalUnresolvedRoutes) add({ code: 'national-route-evidence', route, stop: selectedStops.find(stop => (stop.routes ?? []).map(String).includes(String(route)))?.id, source: 'BODS/TNDS', message: 'Required national timetable evidence could not be checked for this route; do not infer zero service.' });
+  if (provenance.nationalUnresolvedRoutes?.length) for (const route of provenance.nationalUnresolvedRoutes) {
+    const exactStops = [...new Set([...(provenance.nationalUnresolvedRequestIdentities ?? []), ...(provenance.unresolvedRequestIdentities ?? [])].map(String).map(requestParts).filter(parts => parts.route === String(route) && parts.stop).map(parts => parts.stop))];
+    const targets = exactStops.length ? exactStops : [null];
+    for (const stop of targets) add({ code: 'national-route-evidence', route, stop, source: 'BODS/TNDS', message: 'Required national timetable evidence could not be checked for this route; do not infer zero service.' });
+  }
   for (const service of services) for (const warning of [...(service.sourceWarnings ?? []), ...(service.qualifications ?? [])]) {
     if (!/could not|unresolved|unsupported|quarantin|incomplete|not supplied|no deterministically/i.test(String(warning))) continue;
     add({ code: 'service-source-evidence', route: service.routeNumber, stop: service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0], source: service.timetableSource || service.source?.provider || 'timetable source', message: String(warning) });

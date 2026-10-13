@@ -681,12 +681,7 @@ def run(args: argparse.Namespace) -> dict:
                     coverage_result = json.loads(coverage_process.stdout)
                 except json.JSONDecodeError as error:
                     raise RefreshError("Coverage ledger did not return valid JSON") from error
-        if bus_only:
-            diagnostic_cache = site / ".atlas-diagnostic-source-cache" / "gtfs"
-            shutil.rmtree(diagnostic_cache.parent, ignore_errors=True)
-            diagnostic_cache.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(gtfs, diagnostic_cache)
-        else:
+        if not bus_only:
             node = os.environ.get("ATLAS_NODE", "node")
             subprocess.run([node, str(Path(__file__).with_name("prepare_tnds.mjs")), "--input", str(tnds_xml), "--output", str(site_tnds), "--preparedAt", started], check=True)
         counts = validate_candidate(site, baseline, bus_only=bus_only)

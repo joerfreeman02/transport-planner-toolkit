@@ -30,7 +30,8 @@ FORENSIC_SCHEMA = "atlas-bus-0590b-forensic-v1"
 
 STATES = (
     "CURRENT_TIMETABLE_EVIDENCE",
-    "CONFIRMED_NO_CURRENT_SERVICE",
+    "BUS_DOMAIN_NON_CALL_POINT",
+    "NO_CURRENT_PRIMARY_TIMETABLE_EVIDENCE",
     "INACTIVE_OR_LEGACY",
     "SOURCE_IDENTITY_UNRESOLVED",
     "SOURCE_DATA_INCOMPLETE",
@@ -120,6 +121,7 @@ def _new_region(region: str, archive: Path) -> dict:
         "stopRecords": 0,
         "stopRecordsValid": 0,
         "stopRecordsRejected": 0,
+        "naptanIdentityStopsTxtRecords": 0,
         "routes": 0,
         "busRoutes": 0,
         "nonBusRoutes": 0,
@@ -144,7 +146,7 @@ def _new_region(region: str, archive: Path) -> dict:
     }
 
 
-def _process_trip(region: str, rows: list[dict], trip: dict, route: dict, gtfs_stops: dict, all_identifiers: dict, prepared_stops: dict, naptan_stops: dict, dates: dict[str, date], result: dict, per_stop: dict[str, dict], raw_stop_evidence: dict[str, list[dict]]) -> None:
+def _process_trip(region: str, rows: list[dict], trip: dict, route: dict, gtfs_stops: dict, all_identifiers: dict, prepared_stops: dict, naptan_stops: dict, dates: dict[str, date], result: dict, per_stop: dict[str, dict], raw_stop_evidence: dict[str, list[dict]], forensic_stop_ids: set[str]) -> None:
     is_bus = _clean(route.get("route_type")) in BUS_ROUTE_TYPES and bool(_clean(route.get("route_short_name")) or _clean(route.get("route_long_name")))
     service_days = trip.get("active_days") or []
     if not is_bus or not service_days:
@@ -161,6 +163,7 @@ def _process_trip(region: str, rows: list[dict], trip: dict, route: dict, gtfs_s
         resolved, method = resolve_exact_gtfs_stop(gtfs_id, details, all_identifiers)
         departure = parse_minutes(_clean(row.get("departure_time")) or _clean(row.get("arrival_time")))
         raw = {
+            "evidenceType": "stop_times",
             "region": region,
             "gtfsStopId": gtfs_id or None,
             "gtfsStopCode": stop_code or None,
@@ -171,8 +174,8 @@ def _process_trip(region: str, rows: list[dict], trip: dict, route: dict, gtfs_s
             "matchMethod": method,
             "resolvedStopPointId": resolved,
         }
-        if (gtfs_id or stop_code).startswith("0590B"):
-            raw_stop_evidence.setdefault(gtfs_id or stop_code, []).append(raw)
+        if gtfs_id.startswith("0590B") or stop_code.startswith("0590B"):
+            raw_stop_evidence.setdefault(gtfs_id if gtfs_id.startswith("0590B") else stop_code, []).append(raw)
         if departure is None:
             result["malformedScheduledCalls"] += 1
             result["rejectedRecords"].append({**raw, "reason": "invalid_or_missing_time"})
@@ -195,9 +198,9 @@ def _process_trip(region: str, rows: list[dict], trip: dict, route: dict, gtfs_s
         record.setdefault("identityMethods", set()).add(method)
         record.setdefault("routes", set()).add(raw["routeNumber"])
         record.setdefault("regions", set()).add(region)
-        if resolved.startswith("0590B"):
+        if resolved in forensic_stop_ids:
             record.setdefault("rawEvidence", []).append(raw)
-        if stop and stop.get("status") in ("", "active") and stop.get("busPreparedEligible") is True and stop.get("coordinateValid") is True:
+        if stop and stop.get("status") in ("", "active") and stop.get("busDomainEligible", stop.get("busPreparedEligible")) is True and stop.get("timetableCallEligible") is not False and stop.get("coordinateValid") is True:
             retained += 1
             result["retainedScheduledCalls"] += 1
             calls += 1
@@ -218,6 +221,16 @@ def _region_ledger(archive: Path, region: str, snapshot_date: date, naptan, prep
     per_stop: dict[str, dict] = {}
     raw_stop_evidence: dict[str, list[dict]] = {}
     all_identifiers = _identifiers(naptan)
+    forensic_stop_ids = {stop_id for stop_id in naptan.stops if stop_id.startswith("0590BCE")}
+    forensic_group_ids = {
+        ref.get("sourceId")
+        for stop_id in forensic_stop_ids
+        for ref in naptan.stops[stop_id].get("logicalGroupRefs", [])
+        if ref.get("sourceId")
+    }
+    for group_id in forensic_group_ids:
+        group = naptan.groups.get(f"naptan:{group_id}", {})
+        forensic_stop_ids.update(group.get("sourceMemberStopPointIds", []))
     dates = representative_dates(snapshot_date)
     try:
         with zipfile.ZipFile(archive) as zf:
@@ -237,6 +250,15 @@ def _region_ledger(archive: Path, region: str, snapshot_date: date, naptan, prep
                     continue
                 result["stopRecordsValid"] += 1
                 gtfs_stops[stop_id] = row
+                resolved_stop, identity_method = resolve_exact_gtfs_stop(stop_id, row, all_identifiers)
+                if resolved_stop in forensic_stop_ids:
+                    result["naptanIdentityStopsTxtRecords"] += 1
+                    raw_stop_evidence.setdefault(resolved_stop, []).append({
+                        "evidenceType": "stops.txt", "region": region,
+                        "gtfsStopId": stop_id, "gtfsStopCode": _clean(row.get("stop_code")) or None,
+                        "gtfsStopName": _clean(row.get("stop_name")) or None,
+                        "matchMethod": identity_method, "resolvedStopPointId": resolved_stop,
+                    })
             routes = {}
             for row in gtfs_rows(zf, "routes.txt"):
                 result["routes"] += 1
@@ -275,7 +297,7 @@ def _region_ledger(archive: Path, region: str, snapshot_date: date, naptan, prep
                     result["inactiveOrNonBusTrips"] += 1
                     return
                 route = routes.get(_clean(trip.get("route_id")), {})
-                _process_trip(region, current_rows, trip, route, gtfs_stops, all_identifiers, prepared_evidence, naptan.stops, dates, result, per_stop, raw_stop_evidence)
+                _process_trip(region, current_rows, trip, route, gtfs_stops, all_identifiers, prepared_evidence, naptan.stops, dates, result, per_stop, raw_stop_evidence, forensic_stop_ids)
             for row in gtfs_rows(zf, "stop_times.txt"):
                 result["stopTimes"] += 1
                 trip_id = _clean(row.get("trip_id"))
@@ -302,8 +324,10 @@ def _region_ledger(archive: Path, region: str, snapshot_date: date, naptan, prep
 def final_state(stop: dict, source: dict, prepared: dict | None) -> tuple[str, str]:
     if stop.get("status") not in ("", "active"):
         return "INACTIVE_OR_LEGACY", "NaPTAN status is inactive/deleted/historical"
-    if stop.get("busPreparedEligible") is not True:
+    if stop.get("busDomainEligible", stop.get("busPreparedEligible")) is not True:
         return "OUTSIDE_APPLICABLE_SCOPE", "NaPTAN stop type is not bus/coach eligible"
+    if stop.get("timetableCallExpectation") == "not_expected":
+        return "BUS_DOMAIN_NON_CALL_POINT", "NaPTAN identifies a station access/infrastructure point rather than a scheduled boarding call point"
     if stop.get("coordinateValid") is not True:
         return "SOURCE_DATA_INCOMPLETE", "active bus-eligible StopPoint lacks valid coordinates"
     if prepared and prepared.get("calls", 0) > 0:
@@ -314,11 +338,24 @@ def final_state(stop: dict, source: dict, prepared: dict | None) -> tuple[str, s
         return "SOURCE_IDENTITY_UNRESOLVED", "timetable evidence was retained but no permitted deterministic identity resolved it to this StopPoint"
     if source.get("rejected"):
         return "PREPARATION_REJECTED", "source records for this StopPoint were rejected with explicit reasons"
-    return "CONFIRMED_NO_CURRENT_SERVICE", "all relevant frozen BODS regions were checked and no current scheduled call resolved to this StopPoint"
+    return "NO_CURRENT_PRIMARY_TIMETABLE_EVIDENCE", "no current primary timetable call was resolved; this is not proof of service absence"
 
 
 def conservation_pass(ledger: dict) -> bool:
     return all(item.get("balanced") is True for region in ledger.get("regions", []) for item in region.get("conservation", {}).values())
+
+
+def source_identity_trust(region_reports: list[dict], *, stop_points_fully_classified: bool) -> dict:
+    unresolved = sum(report.get("unresolvedStopIdentities", 0) for report in region_reports)
+    return {
+        "relevantScheduledCallRecords": sum(report.get("relevantScheduledCalls", 0) for report in region_reports),
+        "resolvedScheduledCallRecords": sum(report.get("resolvedScheduledCalls", 0) for report in region_reports),
+        "unresolvedScheduledCallIdentityRecords": unresolved,
+        "malformedScheduledCallRecords": sum(report.get("malformedScheduledCalls", 0) for report in region_reports),
+        "stopPointsFullyClassified": stop_points_fully_classified,
+        "sourceIdentitiesFullyResolved": unresolved == 0,
+        "identityConservationBalanced": all(report.get("conservation", {}).get("relevantScheduledCalls", {}).get("balanced") is True for report in region_reports),
+    }
 
 
 def _state_counts(rows: list[dict]) -> dict[str, int]:
@@ -336,8 +373,10 @@ def _forensic_root_cause(row: dict, previous_manifest: dict | None, current_snap
         if not old_paths:
             return "source-window mismatch" if old_snapshot and old_snapshot != current_snapshot_id else "ATLAS preparation/sharding defect"
         return "no proven current gap in the new candidate; old snapshot had a different prepared evidence set"
-    if row.get("rawBodsScheduledCalls", 0) == 0 and not row.get("rawBodsStops"):
-        return "BODS omission/incomplete publication"
+    if row.get("timetableCallExpectation") == "not_expected":
+        return "non-call station access/infrastructure record; scheduled calls are assessed at boarding-point members"
+    if row.get("rawBodsScheduledCalls", 0) == 0 and not row.get("rawBodsStopExistsInStopsTxt"):
+        return "no matching frozen BODS stops.txt record or stop_times call; absence alone does not establish a publication omission"
     if row.get("unresolvedIdentityEvidence"):
         return "ATLAS identity-mapping defect"
     if row.get("rejectedEvidence"):
@@ -376,7 +415,10 @@ def run_ledger(*, candidate_site: Path, naptan_xml: Path, gtfs_dir: Path, snapsh
             "name": stop.get("name"),
             "status": stop.get("status"),
             "stopType": stop.get("stopType"),
-            "busEligible": stop.get("busPreparedEligible") is True,
+            "busEligible": stop.get("busDomainEligible", stop.get("busPreparedEligible")) is True,
+            "busDomainEligible": stop.get("busDomainEligible", stop.get("busPreparedEligible")) is True,
+            "timetableCallEligible": stop.get("timetableCallEligible"),
+            "timetableCallExpectation": stop.get("timetableCallExpectation", "unknown"),
             "coordinateValid": stop.get("coordinateValid") is True,
             "rawBodsResolvedCalls": source.get("resolvedCalls", 0),
             "rawBodsRoutes": sorted(source.get("routes", set())),
@@ -392,21 +434,25 @@ def run_ledger(*, candidate_site: Path, naptan_xml: Path, gtfs_dir: Path, snapsh
         row["reason"] = reason
         rows.append(row)
     counts = _state_counts(rows)
-    relevant = sum(1 for row in rows if row["busEligible"] and row["status"] in ("", "active"))
+    relevant = sum(1 for row in rows if row["busDomainEligible"] and row["status"] in ("", "active"))
     classified = sum(counts.get(state, 0) for state in STATES)
     gap = {
         "schema": GAP_SCHEMA,
         "activeBusEligibleStopCount": relevant,
         "stateCounts": counts,
         "confirmedTimetableCoverage": counts["CURRENT_TIMETABLE_EVIDENCE"],
-        "confirmedNoCurrentService": counts["CONFIRMED_NO_CURRENT_SERVICE"],
+        "confirmedNoCurrentService": 0,
+        "serviceAbsenceConfidence": "NOT_ESTABLISHED_BY_ABSENCE_FROM_PRIMARY_TIMETABLE_EVIDENCE",
+        "noCurrentPrimaryTimetableEvidence": counts["NO_CURRENT_PRIMARY_TIMETABLE_EVIDENCE"],
+        "nonCallBusDomainRecordCount": counts["BUS_DOMAIN_NON_CALL_POINT"],
         "unclassifiedRemainder": relevant - sum(counts[state] for state in STATES if state != "OUTSIDE_APPLICABLE_SCOPE" and state != "INACTIVE_OR_LEGACY"),
         "preparationErrorCount": counts["PREPARATION_ERROR"],
         "unresolvedIdentityCount": counts["SOURCE_IDENTITY_UNRESOLVED"],
         "unresolvedGtfsIdentityRecordCount": sum(report.get("unresolvedStopIdentities", 0) for report in region_reports),
+        "unresolvedSourceIdentityCount": sum(report.get("unresolvedStopIdentities", 0) for report in region_reports),
         "incompleteSourceCount": counts["SOURCE_DATA_INCOMPLETE"],
         "classifiedRelevantStopCount": classified,
-        "allRelevantStopsHaveFinalState": all(row["finalState"] in STATES for row in rows if row["busEligible"] and row["status"] in ("", "active")),
+        "allRelevantStopsHaveFinalState": all(row["finalState"] in STATES for row in rows if row["busDomainEligible"] and row["status"] in ("", "active")),
     }
     # The remainder is deliberately scoped to active bus-eligible stops only.
     gap["unclassifiedRemainder"] = relevant - sum(counts[state] for state in STATES if state not in {"INACTIVE_OR_LEGACY", "OUTSIDE_APPLICABLE_SCOPE"})
@@ -422,16 +468,42 @@ def run_ledger(*, candidate_site: Path, naptan_xml: Path, gtfs_dir: Path, snapsh
     for row in rows:
         if not row["stopPointId"].startswith("0590B"):
             continue
-        raw = [item for values in raw_stop_evidence.values() for item in values if item.get("resolvedStopPointId") == row["stopPointId"] or item.get("gtfsStopId") == row["stopPointId"] or item.get("gtfsStopCode") == row["stopPointId"]]
+        raw = [item for values in raw_stop_evidence.values() for item in values if item.get("resolvedStopPointId") == row["stopPointId"]]
+        stop = naptan.stops[row["stopPointId"]]
+        stop_txt_records = [item for item in raw if item.get("evidenceType") == "stops.txt"]
+        memberships = [ref.get("sourceId") for ref in stop.get("logicalGroupRefs", []) if ref.get("sourceId")]
+        siblings = []
+        for group_id in memberships:
+            group = naptan.groups.get(f"naptan:{group_id}")
+            for sibling_id in sorted(set((group or {}).get("sourceMemberStopPointIds", []))):
+                sibling = naptan.stops.get(sibling_id)
+                if sibling and sibling_id != row["stopPointId"]:
+                    sibling_txt = [item for values in raw_stop_evidence.values() for item in values if item.get("evidenceType") == "stops.txt" and item.get("resolvedStopPointId") == sibling_id]
+                    siblings.append({
+                        "stopPointId": sibling_id, "name": sibling.get("name"), "naptanCode": sibling.get("naptanCode"),
+                        "stopType": sibling.get("stopType"), "status": sibling.get("status"),
+                        "coordinates": {"latitude": sibling.get("latitude"), "longitude": sibling.get("longitude")},
+                        "stopAreaId": group_id, "rawBodsStopExistsInStopsTxt": bool(sibling_txt),
+                        "rawBodsStopsTxtRecords": sibling_txt,
+                        "rawBodsResolvedScheduledCalls": per_stop.get(sibling_id, {}).get("resolvedCalls", 0),
+                        "rawBodsRoutes": sorted(per_stop.get(sibling_id, {}).get("routes", set())),
+                    })
         forensic = {
             **row,
             "exists": True,
             "active": row["status"] in ("", "active"),
             "busEligible": row["busEligible"],
-            "rawBodsStops": sorted({item.get("gtfsStopId") for item in raw if item.get("gtfsStopId")}),
-            "rawBodsScheduledCalls": len(raw),
-            "scheduledRoutes": sorted({item.get("routeNumber") for item in raw if item.get("routeNumber")}),
-            "unresolvedIdentityEvidence": [item for values in raw_stop_evidence.values() for item in values if item.get("resolvedStopPointId") is None and (item.get("gtfsStopId") == row["stopPointId"] or item.get("gtfsStopCode") == row["stopPointId"])],
+            "naptanCode": stop.get("naptanCode"),
+            "indicator": stop.get("indicator"),
+            "coordinates": {"latitude": stop.get("latitude"), "longitude": stop.get("longitude")},
+            "stopAreaMemberships": memberships,
+            "siblings": sorted(siblings, key=lambda item: (item["stopAreaId"], item["stopPointId"])),
+            "rawBodsStopExistsInStopsTxt": bool(stop_txt_records),
+            "rawBodsStopsTxtRecords": stop_txt_records,
+            "rawBodsStops": sorted({item.get("gtfsStopId") for item in stop_txt_records if item.get("gtfsStopId")}),
+            "rawBodsScheduledCalls": sum(1 for item in raw if item.get("evidenceType") == "stop_times"),
+            "scheduledRoutes": sorted({item.get("routeNumber") for item in raw if item.get("evidenceType") == "stop_times" and item.get("routeNumber")}),
+            "unresolvedIdentityEvidence": [item for values in raw_stop_evidence.values() for item in values if item.get("evidenceType") == "stop_times" and item.get("resolvedStopPointId") is None and (item.get("gtfsStopId") == row["stopPointId"] or item.get("gtfsStopCode") == row["stopPointId"])],
         }
         forensic["previousServiceShardPaths"] = (previous_manifest or {}).get("serviceShards", {}).get(row["stopPointId"][:5], [])
         forensic["previousServiceShardPresent"] = bool(forensic["previousServiceShardPaths"])
@@ -441,8 +513,9 @@ def run_ledger(*, candidate_site: Path, naptan_xml: Path, gtfs_dir: Path, snapsh
         "schema": SCHEMA,
         "snapshot": {"root": str(snapshot_root), "snapshotId": snapshot_manifest["snapshotId"], "state": snapshot_manifest["state"], "sourceCount": snapshot_manifest.get("sourceCount"), "totalBytes": sum(int(item.get("bytes", 0)) for item in snapshot_manifest.get("sources", []))},
         "preparedCandidate": {"root": str(candidate_site), "manifestSha256": sha256((candidate_site / "atlas" / "data" / "bus" / "manifest.json") if (candidate_site / "atlas" / "data" / "bus" / "manifest.json").is_file() else (candidate_site / "manifest.json")), "schema": prepared_manifest.get("schema"), "snapshotDate": prepared_manifest.get("snapshotDate")},
-        "naptan": {"sourceStopPointCount": naptan.qa.get("stopPointRecords", 0), "validSourceStopPointCount": naptan.qa.get("validSourceStopPointCount", 0), "activeBusEligibleStopCount": relevant, "inactiveOrLegacyBusStopCount": counts["INACTIVE_OR_LEGACY"], "unsupportedOrNonBusCount": sum(1 for stop in naptan.stops.values() if stop.get("busPreparedEligible") is not True), "malformedOrRejectedCount": sum(value for key, value in naptan.qa.items() if key.startswith("malformed") or key.startswith("duplicate")), "invalidCoordinateCount": naptan.qa.get("invalidOrMissingCoordinateCount", 0), "qa": naptan.qa},
+        "naptan": {"sourceStopPointCount": naptan.qa.get("stopPointRecords", 0), "validSourceStopPointCount": naptan.qa.get("validSourceStopPointCount", 0), "activeBusEligibleStopCount": relevant, "timetableCallPointCount": sum(1 for stop in naptan.stops.values() if stop.get("timetableCallEligible") is True and stop.get("status") in ("", "active")), "nonCallBusDomainCount": counts["BUS_DOMAIN_NON_CALL_POINT"], "inactiveOrLegacyBusStopCount": counts["INACTIVE_OR_LEGACY"], "unsupportedOrNonBusCount": sum(1 for stop in naptan.stops.values() if stop.get("busDomainEligible", stop.get("busPreparedEligible")) is not True), "malformedOrRejectedCount": sum(value for key, value in naptan.qa.items() if key.startswith("malformed") or key.startswith("duplicate")), "invalidCoordinateCount": naptan.qa.get("invalidOrMissingCoordinateCount", 0), "qa": naptan.qa},
         "regions": region_reports,
+        "sourceIdentityTrust": source_identity_trust(region_reports, stop_points_fully_classified=gap["unclassifiedRemainder"] == 0),
         "stops": rows,
         "coverage": gap,
         "conservation": {"allRegionEquationsBalanced": all(all(item.get("balanced") for item in report.get("conservation", {}).values()) for report in region_reports), "allRelevantStopsClassified": gap["unclassifiedRemainder"] == 0},

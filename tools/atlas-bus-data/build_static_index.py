@@ -272,10 +272,10 @@ def load_naptan(path: Path) -> tuple[dict[str, dict], dict[str, dict[str, str]],
 def load_naptan_v2(path: Path, nptg_path: Path):
     """Load authoritative XML into the v2 prepared-data contract.
 
-    The v1 CSV loader above remains untouched for compatibility.  v2 carries
-    the logical StopArea and NPTG records as separate deterministic sidecars;
-    the service builder still consumes the same physical-stop map and therefore
-    cannot change route/timetable semantics merely by selecting v2.
+    The v1 CSV loader above remains untouched for compatibility. v2 carries
+    separate StopArea/NPTG sidecars and retains all active bus-domain physical
+    points. Only explicit non-call infrastructure types are excluded from
+    timetable-call schedules; ambiguous legacy BCP remains eligible.
     """
     from prepared_data_v2 import hydrate_stop_localities, parse_naptan_xml, parse_nptg_xml
 
@@ -286,7 +286,7 @@ def load_naptan_v2(path: Path, nptg_path: Path):
     identifiers = {"atco": {}, "naptan": {}}
     excluded = 0
     for stop_id, source in naptan.stops.items():
-        if source.get("status") not in ("", "active") or source.get("busPreparedEligible") is not True or source.get("coordinateValid") is not True:
+        if source.get("status") not in ("", "active") or source.get("busDomainEligible") is not True or source.get("coordinateValid") is not True:
             excluded += 1
             continue
         stop = {**source, "routes": set()}
@@ -340,6 +340,9 @@ def endpoint_evidence(calls: list[dict], position: int, groups: dict[str, dict],
         "status": stop.get("status"),
         "transportMode": stop.get("transportMode"),
         "busPreparedEligible": stop.get("busPreparedEligible"),
+        "busDomainEligible": stop.get("busDomainEligible"),
+        "timetableCallEligible": stop.get("timetableCallEligible"),
+        "timetableCallExpectation": stop.get("timetableCallExpectation"),
         "nptgLocalityCode": stop.get("nptgLocalityCode"),
         "nptgLocalityName": locality.get("name") or stop.get("locality"),
         "parentLocalityId": stop.get("parentLocalityId") or parent.get("id"),
@@ -532,7 +535,7 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             "resolved_stop": stop,
             "match_method": match_method,
         })
-        if stop and departure is not None:
+        if stop and departure is not None and stop.get("timetableCallEligible") is not False:
             matched.append((stop, departure))
     if not matched or len(calls) < 2:
         return
@@ -761,7 +764,7 @@ def build_v2(args: argparse.Namespace) -> dict:
             service_shards[area].append(relative)
 
     stop_groups: dict[str, list[dict]] = defaultdict(list)
-    stop_fields = ["id", "naptanCode", "name", "indicator", "direction", "latitude", "longitude", "stopType", "busStopType", "locality", "parentLocality", "parentLocalityId", "nptgLocalityCode", "nptgLocality", "parentLocalityEvidence", "areaCode", "modifiedAt", "coordinateMethod", "routes", "logicalGroupRefs", "status", "provenance", "localityResolution", "transportMode", "administrativeAreaCode"]
+    stop_fields = ["id", "naptanCode", "name", "indicator", "direction", "latitude", "longitude", "stopType", "busStopType", "locality", "parentLocality", "parentLocalityId", "nptgLocalityCode", "nptgLocality", "parentLocalityEvidence", "areaCode", "modifiedAt", "coordinateMethod", "routes", "logicalGroupRefs", "status", "provenance", "localityResolution", "transportMode", "administrativeAreaCode", "busDomainEligible", "timetableCallEligible", "timetableCallExpectation"]
     for stop in stops.values():
         key = cell_key(stop["latitude"], stop["longitude"], args.grid_size)
         normalised = normalise_for_json({**stop, "routes": sorted(stop["routes"], key=lambda value: (len(value), value))})
@@ -795,7 +798,7 @@ def build_v2(args: argparse.Namespace) -> dict:
     reference_groups: dict[str, list[dict]] = defaultdict(list)
     for stop_id, source in sorted(naptan.stops.items()):
         key = stop_id[:3] or "misc"
-        reference_groups[key].append(normalise_for_json({field: source.get(field) for field in ("id", "name", "naptanCode", "indicator", "stopType", "busStopType", "transportMode", "knownTransportMode", "busPreparedEligible", "sourceValidity", "coordinateValid", "latitude", "longitude", "coordinateMethod", "status", "nptgLocalityCode", "administrativeAreaCode", "modifiedAt", "provenance")}))
+        reference_groups[key].append(normalise_for_json({field: source.get(field) for field in ("id", "name", "naptanCode", "indicator", "stopType", "busStopType", "transportMode", "knownTransportMode", "busPreparedEligible", "busDomainEligible", "timetableCallEligible", "timetableCallExpectation", "sourceValidity", "coordinateValid", "latitude", "longitude", "coordinateMethod", "status", "logicalGroupRefs", "nptgLocalityCode", "administrativeAreaCode", "modifiedAt", "provenance")}))
     reference_shards = {}
     for key, records in sorted(reference_groups.items()):
         relative = f"reference/stop-points/{key}.json.gz"
@@ -817,7 +820,7 @@ def build_v2(args: argparse.Namespace) -> dict:
         "groupShardKeyLength": 3, "localityShardKeyLength": 3,
         "representativeDates": {day: value.isoformat() for day, value in dates.items()},
         "schemas": {"logicalGroups": GROUP_SCHEMA, "localities": LOCALITY_SCHEMA, "referenceStopPoints": "atlas-national-reference-stop-points-v1"},
-        "referenceStopFields": ["id", "name", "naptanCode", "indicator", "stopType", "busStopType", "transportMode", "knownTransportMode", "busPreparedEligible", "sourceValidity", "coordinateValid", "latitude", "longitude", "coordinateMethod", "status", "nptgLocalityCode", "administrativeAreaCode", "modifiedAt", "provenance"],
+        "referenceStopFields": ["id", "name", "naptanCode", "indicator", "stopType", "busStopType", "transportMode", "knownTransportMode", "busPreparedEligible", "busDomainEligible", "timetableCallEligible", "timetableCallExpectation", "sourceValidity", "coordinateValid", "latitude", "longitude", "coordinateMethod", "status", "logicalGroupRefs", "nptgLocalityCode", "administrativeAreaCode", "modifiedAt", "provenance"],
         "sources": {
             "naptan": {"url": "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml", **naptan.metadata, "stopCount": len(stops), "excludedRecordCount": excluded},
             "nptg": {"url": "https://naptan.api.dft.gov.uk/v1/nptg", **nptg.metadata, "localityCount": len(nptg.localities), "districtCount": len(nptg.districts)},

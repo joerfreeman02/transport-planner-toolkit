@@ -24,14 +24,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from build_static_index import build as build_v1
-from refresh_bus_data import BODS_REGIONS, NAPTAN_URL, acquire_bods, download, now_utc, sha256
+from refresh_bus_data import sha256
 from refresh_state import transition
 from prepared_data_v2 import bearing_compass_point, british_national_grid_to_wgs84, child_text, direct_child_text, local_name, stop_type_semantics
 
 MAX_SAMPLES = 20
 MAX_OUTLIERS = 20
 GIT_BLOB_CEILING = 95 * 1024 * 1024
-PHYSICAL_COMPARISON_CLASSIFICATION = "LIVE_CSV_COMPARISON_NOT_SAME_SOURCE_WINDOW"
+PHYSICAL_COMPARISON_CLASSIFICATION = "EXPLICIT_CSV_INPUT_SOURCE_WINDOW_UNVERIFIED"
 LEGACY_STOP_FIELDS = (
     "id", "naptanCode", "name", "indicator", "direction", "latitude", "longitude",
     "stopType", "busStopType", "locality", "parentLocality", "areaCode", "modifiedAt",
@@ -510,20 +510,21 @@ def source_window(v2_manifest: dict, shadow_bods: dict) -> dict:
     return {"expectedBodsRegionHashes": expected, "shadowBodsRegionHashes": received, "unchangedRegions": sorted(set(expected) - set(changed)), "changedRegions": changed, "classification": "SAME_WINDOW" if not changed else "SOURCE_WINDOW_CHANGED"}
 
 
-def build_shadow_v1(candidate: Path, temp: Path, v2_manifest: dict, status: dict, same_window_bods_dir: Path | None = None) -> tuple[Path, dict, dict, dict]:
+def build_shadow_v1(candidate: Path, temp: Path, v2_manifest: dict, status: dict, same_window_bods_dir: Path, naptan_csv: Path) -> tuple[Path, dict, dict, dict]:
+    if not same_window_bods_dir or not same_window_bods_dir.is_dir():
+        raise ValueError("A same-window frozen BODS directory is required; live acquisition is disabled")
+    if not naptan_csv or not naptan_csv.is_file():
+        raise ValueError("An explicit NaPTAN CSV input is required; live fallback is disabled")
     shadow_root = temp / "shadow-v1"
     staging = temp / "shadow-sources"
     staging.mkdir(parents=True, exist_ok=True)
     naptan = staging / "naptan.csv"
-    naptan_source = download(NAPTAN_URL, naptan, label="shadow v1 NaPTAN CSV")
-    naptan_source["acquiredAt"] = now_utc()
-    if same_window_bods_dir:
-        gtfs = staging / "gtfs"
-        shutil.copytree(same_window_bods_dir, gtfs)
-        regions = [{"region": archive.stem, "sourceHash": sha256(archive), "bytes": archive.stat().st_size} for archive in sorted(gtfs.glob("*.zip"))]
-        bods = {"identity": "same-window diagnostic cache", "regions": regions, "sourceHash": hashlib.sha256("".join(f"{item['region']}:{item['sourceHash']}" for item in regions).encode("ascii")).hexdigest()}
-    else:
-        gtfs, bods = acquire_bods(staging)
+    shutil.copy2(naptan_csv, naptan)
+    naptan_source = {"identity": "explicit frozen NaPTAN CSV", "sourceHash": sha256(naptan), "bytes": naptan.stat().st_size}
+    gtfs = staging / "gtfs"
+    shutil.copytree(same_window_bods_dir, gtfs)
+    regions = [{"region": archive.stem, "sourceHash": sha256(archive), "bytes": archive.stat().st_size} for archive in sorted(gtfs.glob("*.zip"))]
+    bods = {"identity": "same-window frozen diagnostic cache", "regions": regions, "sourceHash": hashlib.sha256("".join(f"{item['region']}:{item['sourceHash']}" for item in regions).encode("ascii")).hexdigest()}
     output = shadow_root
     args = SimpleNamespace(
         naptan=naptan, gtfs_dir=gtfs, output=output,
@@ -547,7 +548,7 @@ def compact_markdown(report: dict) -> str:
         f"Candidate fingerprint: `{report['candidateGenerationCompatibilityFingerprint']}`",
         "",
         "## Physical Stop comparison",
-        f"- Classification: `{parity['comparisonClassification']}`; v2 uses frozen XML and v1 uses a live CSV shadow.",
+        f"- Classification: `{parity['comparisonClassification']}`; v1 uses only the explicitly supplied CSV, and source-window equivalence is not inferred.",
         f"- Physical StopPoints: v1 `{parity['v1ActiveStopPointCount']}`, v2 `{parity['v2ActiveStopPointCount']}`, common `{parity['commonIdCount']}`, v1-only `{parity['v1OnlyCount']}`, v2-only `{parity['v2OnlyCount']}`.",
         f"- Route-set mismatches: `{parity['routeSetMismatchCount']}`; field mismatches: `{parity['mismatchCountsByField']}`.",
         f"- Direction mismatches: `{parity['mismatchCountsByField'].get('direction', 0)}`; per-field samples are bounded in `mismatchSamplesByField`; coordinate forensics: `{parity['coordinateDeltaSummary']}`.",
@@ -578,20 +579,19 @@ def compact_markdown(report: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, repository_root: Path | None = None, candidate_fingerprint: str | None = None, same_window_bods_dir: Path | None = None, structural_report: Path | None = None, source_snapshot: Path | None = None) -> dict:
+def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, repository_root: Path | None = None, candidate_fingerprint: str | None = None, same_window_bods_dir: Path | None = None, structural_report: Path | None = None, source_snapshot: Path | None = None, naptan_csv: Path | None = None) -> dict:
     started = time.perf_counter()
     candidate_site = candidate_site.resolve()
     report_dir = report_dir.resolve()
     bus_root = candidate_site / "atlas" / "data" / "bus"
+    if not same_window_bods_dir or not same_window_bods_dir.is_dir() or not naptan_csv or not naptan_csv.is_file():
+        raise ValueError("Frozen diagnostics require explicit same-window BODS and NaPTAN CSV inputs; network acquisition is disabled")
     status = read_json(candidate_site / "atlas" / "data" / "status" / "manifest.json")
     v2_manifest = read_json(bus_root / "manifest.json")
     v2_stops = load_stop_records(bus_root, v2_manifest)
     v2_services = load_service_records(bus_root, v2_manifest)
     with temporary_workspace("atlas-v2-diagnostic-") as temporary:
-        if same_window_bods_dir:
-            shadow_root, csv_source, shadow_bods, shadow_measurement = build_shadow_v1(candidate_site, temporary, v2_manifest, status, same_window_bods_dir)
-        else:
-            shadow_root, csv_source, shadow_bods, shadow_measurement = build_shadow_v1(candidate_site, temporary, v2_manifest, status)
+        shadow_root, csv_source, shadow_bods, shadow_measurement = build_shadow_v1(candidate_site, temporary, v2_manifest, status, same_window_bods_dir, naptan_csv)
         v1_manifest = read_json(shadow_root / "manifest.json")
         v1_stops = load_stop_records(shadow_root, v1_manifest)
         v1_services = load_service_records(shadow_root, v1_manifest)
@@ -703,7 +703,7 @@ def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, 
         "generatedAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "candidateGenerationCompatibilityFingerprint": candidate_fingerprint,
         "candidate": {"busManifest": v2_manifest, "statusManifest": status},
-        "sources": {"naptanXml": status.get("sources", {}).get("naptan", {}), "naptanCsvShadow": {**csv_source, "comparisonOnly": True, "partOfV2Snapshot": False}, "nptgXml": status.get("sources", {}).get("nptg", {}), "bodsV2": v2_manifest.get("sources", {}).get("bods", {}), "bodsShadow": shadow_bods, "tnds": status.get("sources", {}).get("tnds", {}), "sameWindowCache": str(same_window_bods_dir) if same_window_bods_dir else None},
+        "sources": {"naptanXml": status.get("sources", {}).get("naptan", {}), "naptanCsvShadow": {**csv_source, "comparisonOnly": True, "partOfV2Snapshot": None, "sourceWindowVerified": False}, "nptgXml": status.get("sources", {}).get("nptg", {}), "bodsV2": v2_manifest.get("sources", {}).get("bods", {}), "bodsShadow": shadow_bods, "tnds": status.get("sources", {}).get("tnds", {}), "sameWindowCache": str(same_window_bods_dir) if same_window_bods_dir else None},
         "sourceIntegrity": source_integrity,
         "sourceWindow": source_window_result,
         "physicalStopParity": stop_parity, "v2OnlyStopEvidence": v2_only_evidence, "serviceParity": service_parity,
@@ -711,7 +711,7 @@ def run_diagnostic(candidate_site: Path, previous_root: Path, report_dir: Path, 
         "payload": {"shadowV1": shadow_measurement, "freshV2": fresh_measurement, "run24": run24_measurement, "v2VsShadowV1": delta(fresh_measurement, shadow_measurement), "v2VsRun24": delta(fresh_measurement, run24_measurement), "candidateCapacityMeasurement": candidate_measurement},
         "timings": status.get("timings", {}), "sourceAnomalies": source_anomalies, "sourceAnomalySummary": source_anomaly_summary, "runtimeIntegrity": runtime_integrity, "structuralScan": structural_payload,
         "acceptanceGates": acceptance_gates,
-        "limitations": ["Physical Stop comparison is LIVE_CSV_COMPARISON_NOT_SAME_SOURCE_WINDOW because the legacy shadow uses a comparison-only live NaPTAN CSV.", "Same-window service parity excludes BODS regions whose reacquired source hash changed.", "Run #24 comparison is operational/source-date qualified and is not a schema-regression claim.", "No runtime StopArea completion or planner-facing behaviour is exercised."],
+        "limitations": ["The v1 shadow requires an explicit CSV input; its source-window equivalence is not inferred.", "Service comparison is limited to explicitly supplied BODS archive hashes.", "Run #24 comparison is operational/source-date qualified and is not a schema-regression claim.", "No runtime StopArea completion or planner-facing behaviour is exercised."],
         "diagnosticElapsedSeconds": round(time.perf_counter() - started, 3),
     }
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -730,13 +730,15 @@ def main() -> None:
     parser.add_argument("--repository-root")
     parser.add_argument("--candidate-fingerprint", required=True)
     parser.add_argument("--same-window-bods-dir")
+    parser.add_argument("--naptan-csv")
     parser.add_argument("--structural-report")
     parser.add_argument("--source-snapshot")
     args = parser.parse_args()
     same_window = Path(args.same_window_bods_dir).resolve() if args.same_window_bods_dir else None
+    naptan_csv = Path(args.naptan_csv).resolve() if args.naptan_csv else None
     structural = Path(args.structural_report).resolve() if args.structural_report else None
     source_snapshot = Path(args.source_snapshot).resolve() if args.source_snapshot else None
-    report = run_diagnostic(Path(args.candidate_site), Path(args.previous_root), Path(args.report_dir), Path(args.repository_root).resolve() if args.repository_root else None, args.candidate_fingerprint, same_window, structural, source_snapshot)
+    report = run_diagnostic(Path(args.candidate_site), Path(args.previous_root), Path(args.report_dir), Path(args.repository_root).resolve() if args.repository_root else None, args.candidate_fingerprint, same_window, structural, source_snapshot, naptan_csv)
     print(json.dumps({"status": report["status"], "reportDir": str(Path(args.report_dir).resolve()), "sourceWindow": report["sourceWindow"], "physicalStopParity": report["physicalStopParity"], "serviceParity": report["serviceParity"]}, indent=2))
 
 

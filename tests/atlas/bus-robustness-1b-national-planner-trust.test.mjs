@@ -124,11 +124,49 @@ test('genuine no-route and no-current-match conclusions remain distinct', async 
   assert.match(stopRoutesPresentation(noMatch.stops[0]), /no current timetable match/);
 });
 
+test('stop-scoped outcomes survive unrelated national failures and repeated route numbers', async () => {
+  const good = { ...stopA, routes: ['20'], routeAuthorities: { '20': ['BODS'] } };
+  const failed = { ...stopB, routes: ['20'], routeAuthorities: { '20': ['BODS'] } };
+  const matched = await assessmentFor([good, failed], { ok: true, data: [serviceFor('good-20', '20', good.id)], warnings: [], provenance: {
+    source: 'Department for Transport Bus Open Data Service', sourceCompleteness: 'PARTIAL', timetableConclusion: 'MATCHED',
+    checkedStopIds: [good.id], unresolvedStopIds: [failed.id], failedRequests: 1, nationalUnresolvedRoutes: ['20'],
+    failedShardDiagnostics: [{ status: 'missing', key: 'BBBBB', stopIds: [failed.id] }]
+  } }).assess({});
+  assert.equal(matched.stops.find(stop => stop.id === good.id).timetableEvidenceStatus, 'MATCHED');
+  assert.equal(matched.stops.find(stop => stop.id === failed.id).timetableEvidenceStatus, 'SOURCE_UNAVAILABLE');
+  assert.equal(matched.status, 'partial');
+  assert.ok(matched.serviceSummaries.some(service => service.routeNumber === '20'));
+  assert.ok(matched.reviewItems.some(item => item.code === 'timetable-shard-failure' && item.stop === failed.id));
+
+  const noCurrent = await assessmentFor([good, failed], { ok: true, data: [], warnings: [], provenance: {
+    source: 'Department for Transport Bus Open Data Service', sourceCompleteness: 'PARTIAL', timetableConclusion: 'UNRESOLVED',
+    checkedStopIds: [good.id], noCurrentRequestIdentities: [`20|${good.id}`], unresolvedStopIds: [failed.id], failedRequests: 1
+  } }).assess({});
+  assert.equal(noCurrent.stops.find(stop => stop.id === good.id).timetableEvidenceStatus, 'NO_CURRENT_MATCH');
+  assert.equal(noCurrent.stops.find(stop => stop.id === failed.id).timetableEvidenceStatus, 'SOURCE_UNAVAILABLE');
+
+  const routeLess = { id: 'ROUTELESS', name: 'Nearby only', routes: [], transportMode: 'bus_coach' };
+  const noRoutes = await assessmentFor([routeLess, failed], { ok: true, data: [], warnings: [], provenance: {
+    source: 'Department for Transport Bus Open Data Service', sourceCompleteness: 'PARTIAL', timetableConclusion: 'UNRESOLVED',
+    checkedStopIds: [routeLess.id], unresolvedStopIds: [failed.id], failedRequests: 1
+  } }).assess({});
+  assert.equal(noRoutes.stops.find(stop => stop.id === routeLess.id).timetableEvidenceStatus, 'NO_ROUTES');
+  assert.equal(noRoutes.stops.find(stop => stop.id === failed.id).timetableEvidenceStatus, 'SOURCE_UNAVAILABLE');
+  assert.equal(recommendedBusStop(noRoutes.stops.find(stop => stop.id === routeLess.id)), false);
+});
+
 test('source-unavailable route-bearing stops remain recommended while Other nearby stays separate', () => {
   assert.equal(recommendedBusStop({ id: 'affected', routes: ['20'], timetableMatch: false, timetableEvidenceStatus: 'SOURCE_UNAVAILABLE' }), true);
   assert.equal(recommendedBusStop({ id: 'other', transportMode: 'bus_coach', routes: [], timetableMatch: false, timetableEvidenceStatus: 'SOURCE_UNAVAILABLE' }), false);
   assert.equal(plannerStopWarning('The prepared dataset reported no bus stops within the selected distance.', { stops: [{ id: 'waltham-1' }] }), '');
   assert.equal(plannerStopWarning('The prepared dataset reported no bus stops within the selected distance.', { stops: [] }), 'No bus stops were found within the selected distance.');
+});
+
+test('station access infrastructure is not reported as a missing timetable call point', async () => {
+  const entrance = { id: '0590BCE01L', name: 'Queensgate station entrance', routes: [], transportMode: 'bus_coach', timetableCallEligible: false, timetableCallExpectation: 'not_expected' };
+  const assessment = await assessmentFor([entrance], { ok: false, code: 'unavailable_source', data: [], warnings: [], provenance: { failedRequests: 1, unresolvedStopIds: [entrance.id] } }).assess({});
+  assert.equal(assessment.stops[0].timetableEvidenceStatus, 'NOT_A_TIMETABLE_CALL_POINT');
+  assert.equal(assessment.reviewItems.some(item => item.code === 'timetable-shard-failure' && item.stop === entrance.id), false);
 });
 
 test('Word export carries the same partial national qualification as the planner wording', () => {

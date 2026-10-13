@@ -133,7 +133,13 @@ class NationalDiagnosticTests(unittest.TestCase):
         self.assertGreater(rows[0]["xmlWgs84ToXmlBngDerivedMetres"], 250)
 
     def test_physical_comparison_is_not_claimed_as_same_window(self):
-        self.assertEqual(diagnostic.PHYSICAL_COMPARISON_CLASSIFICATION, "LIVE_CSV_COMPARISON_NOT_SAME_SOURCE_WINDOW")
+        self.assertEqual(diagnostic.PHYSICAL_COMPARISON_CLASSIFICATION, "EXPLICIT_CSV_INPUT_SOURCE_WINDOW_UNVERIFIED")
+
+    def test_legacy_shadow_requires_explicit_local_sources(self):
+        with temporary_directory() as temp:
+            root = Path(temp)
+            with self.assertRaisesRegex(ValueError, "same-window frozen BODS"):
+                diagnostic.build_shadow_v1(root, root, {}, {}, None, None)
 
     def test_group_nptg_payload_and_report_generation_are_compact(self):
         with temporary_directory() as temp:
@@ -146,9 +152,13 @@ class NationalDiagnosticTests(unittest.TestCase):
             (candidate / "atlas" / "data" / "status").mkdir(parents=True)
             (candidate / "atlas" / "data" / "status" / "manifest.json").write_text(json.dumps({"sources": {"naptan": {}, "nptg": {}, "bods": {}, "tnds": {}}}), encoding="utf-8")
             (candidate / "atlas" / "config").mkdir(parents=True)
-            fake_shadow = lambda _candidate, temporary, _manifest, _status: (make_shadow(Path(temporary)), {"sourceHash": "csv"}, {"regions": [{"region": "r", "sourceHash": "same"}]}, {})
+            bods = root / "bods"
+            bods.mkdir()
+            csv_source = root / "naptan.csv"
+            csv_source.write_text("AtcoCode,CommonName\nX,Fixture\n", encoding="utf-8")
+            fake_shadow = lambda _candidate, temporary, _manifest, _status, _bods, _csv: (make_shadow(Path(temporary)), {"sourceHash": "csv"}, {"regions": [{"region": "r", "sourceHash": "same"}]}, {})
             with patch.object(diagnostic, "build_shadow_v1", side_effect=fake_shadow):
-                result = diagnostic.run_diagnostic(candidate, previous, report_dir, candidate_fingerprint="fingerprint")
+                result = diagnostic.run_diagnostic(candidate, previous, report_dir, candidate_fingerprint="fingerprint", same_window_bods_dir=bods, naptan_csv=csv_source)
             self.assertEqual(result["status"], "completed")
             self.assertEqual(result["stopAreaEvidence"]["activeGroupCount"], 1)
             self.assertTrue((report_dir / "atlas-v2-national-diagnostic.json").is_file())

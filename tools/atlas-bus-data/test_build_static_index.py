@@ -31,6 +31,53 @@ FIXTURES = Path(__file__).parents[2] / "tests" / "fixtures" / "atlas-bus-data-v2
 
 
 class CircularIdentityTests(unittest.TestCase):
+    def test_authoritative_bus_types_separate_domain_from_call_expectation(self):
+        for code in ("BCT", "BCS", "BCQ", "BST", "BCE", "BCP"):
+            self.assertTrue(V2.stop_type_semantics(code)["busDomainEligible"], code)
+        for code in ("BCT", "BCS", "BCQ"):
+            self.assertTrue(V2.stop_type_semantics(code)["timetableCallEligible"], code)
+        for code in ("BCE", "BST"):
+            semantics = V2.stop_type_semantics(code)
+            self.assertFalse(semantics["timetableCallEligible"], code)
+            self.assertEqual(semantics["timetableCallExpectation"], "not_expected")
+        self.assertEqual(V2.stop_type_semantics("BCP")["timetableCallExpectation"], "context_dependent")
+        self.assertIsNone(V2.stop_type_semantics("BCP")["timetableCallEligible"])
+
+    def test_non_call_bus_access_point_is_not_added_to_prepared_service_calls(self):
+        rows = [
+            {"stop_sequence": "1", "stop_id": "origin", "departure_time": "08:00:00"},
+            {"stop_sequence": "2", "stop_id": "entrance", "departure_time": "08:05:00"},
+            {"stop_sequence": "3", "stop_id": "destination", "departure_time": "08:10:00"},
+        ]
+        gtfs_stops = {key: {"stop_name": key} for key in ("origin", "entrance", "destination")}
+        stops = {
+            "ORIGIN": {"id": "ORIGIN", "name": "Origin", "locality": "Fixture", "routes": set(), "timetableCallEligible": True},
+            "ENTRANCE": {"id": "ENTRANCE", "name": "Station entrance", "locality": "Fixture", "routes": set(), "timetableCallEligible": False},
+            "DESTINATION": {"id": "DESTINATION", "name": "Destination", "locality": "Fixture", "routes": set(), "timetableCallEligible": True},
+        }
+        services = {}
+        BUILDER.process_trip("fixture", rows, {"route_id": "r", "direction_id": "0", "active_days": ["monday"], "trip_headsign": "Destination"}, {}, {"r": {"route_short_name": "1", "route_type": "3"}}, gtfs_stops, {}, {}, stops, {"atco": {"origin": "ORIGIN", "entrance": "ENTRANCE", "destination": "DESTINATION"}, "naptan": {}}, services)
+        self.assertTrue(services)
+        self.assertNotIn("ENTRANCE", next(iter(services.values()))["stopSchedules"])
+
+    def test_bus_station_grouping_retains_non_call_access_member(self):
+        xml = '''<NaPTAN SchemaVersion="2.1"><StopPoints>
+          <StopPoint><AtcoCode>0590BCE01L</AtcoCode><CommonName>Queensgate Bus Stn</CommonName><StopType>BCE</StopType><StopAreaRef>0590B0001</StopAreaRef><Location><Latitude>52.5700</Latitude><Longitude>-0.2500</Longitude></Location></StopPoint>
+          <StopPoint><AtcoCode>0590BCS01L</AtcoCode><CommonName>Queensgate Bus Stn</CommonName><StopType>BCS</StopType><StopAreaRef>0590B0001</StopAreaRef><Location><Latitude>52.5701</Latitude><Longitude>-0.2500</Longitude></Location></StopPoint>
+        </StopPoints><StopAreas><StopArea><StopAreaCode>0590B0001</StopAreaCode><Name>Queensgate Bus Station</Name><StopAreaType>GBCS</StopAreaType><StopPointRef>0590BCE01L</StopPointRef><StopPointRef>0590BCS01L</StopPointRef></StopArea></StopAreas></NaPTAN>'''
+        root = Path(__file__).parents[2] / "tmp" / "bus-domain-grouping-test"
+        root.mkdir(parents=True, exist_ok=True)
+        path = root / "naptan.xml"
+        try:
+            path.write_text(xml, encoding="utf-8")
+            parsed = V2.parse_naptan_xml(path)
+        finally:
+            path.unlink(missing_ok=True)
+            root.rmdir()
+        group = parsed.groups["naptan:0590B0001"]
+        self.assertEqual(group["memberStopPointIds"], ["0590BCE01L", "0590BCS01L"])
+        self.assertFalse(parsed.stops["0590BCE01L"]["timetableCallEligible"])
+
     def test_endpoint_evidence_keeps_exact_identity_and_source_metadata(self):
         identifiers = {"atco": {"ATCO-1": "ATCO-1", "atco-1": "ATCO-1"}, "naptan": {"naptan-code-1": "ATCO-1"}}
         stop = {

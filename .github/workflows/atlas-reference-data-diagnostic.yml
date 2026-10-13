@@ -11,6 +11,18 @@ on:
         description: Workflow run that produced the exact source snapshot artifact
         required: true
         type: string
+      expected_snapshot_id:
+        description: Exact expected immutable source snapshot ID
+        required: true
+        type: string
+      expected_source_count:
+        description: Exact expected source count
+        required: true
+        type: number
+      expected_total_bytes:
+        description: Exact expected total source bytes
+        required: true
+        type: number
 
 permissions:
   actions: read
@@ -52,9 +64,9 @@ jobs:
         id: verify-snapshot
         run: |
           python tools/atlas-bus-data/source_snapshot.py --verify source-input/source-snapshot \
-            --expected-snapshot-id cf0c64b980b0516378bb705843d428a74a797d19f527f79c6c43a5540f0b8bde \
-            --expected-source-count 11 \
-            --expected-total-bytes 2244572632 > source-input/verified-manifest.json
+            --expected-snapshot-id '${{ inputs.expected_snapshot_id }}' \
+            --expected-source-count '${{ inputs.expected_source_count }}' \
+            --expected-total-bytes '${{ inputs.expected_total_bytes }}' > source-input/verified-manifest.json
           cp source-input/source-snapshot/manifest.json source-input/verified-snapshot-manifest.json
       - name: Restore last-known-good diagnostic comparison state
         id: restore-last-known-good
@@ -108,13 +120,6 @@ jobs:
           TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
           TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
         run: python tools/atlas-bus-data/tnds_capability_probe.py --output diagnostic-output/tnds-capability-probe.json
-      - name: Run same-source-window parity and capacity diagnostics
-        id: national-diagnostic
-        if: always()
-        continue-on-error: true
-        run: |
-          CANDIDATE_FINGERPRINT=$(node --input-type=module -e "import { computeCandidateGenerationCompatibilityFingerprint } from './tools/atlas-data-publication/candidate-compatibility.mjs'; console.log((await computeCandidateGenerationCompatibilityFingerprint({ rootDir: process.cwd() })).sha256)")
-          python tools/atlas-bus-data/national_v2_diagnostic.py --candidate-site pages-site --previous-root last-known-good --report-dir diagnostic-output --candidate-fingerprint "$CANDIDATE_FINGERPRINT" --same-window-bods-dir source-input/source-snapshot/sources/bods --source-snapshot source-input/source-snapshot --structural-report diagnostic-output/structural-scan.json
       - name: Measure diagnostic candidate capacity
         id: capacity
         if: always()
@@ -144,7 +149,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       - name: Preserve fail-closed conclusions
-        if: always() && (steps.verify-snapshot.outcome != 'success' || steps.release-metadata.outcome != 'success' || steps.prepare-v2.outcome != 'success' || steps.coverage-gate.outcome != 'success' || steps.structural-scan.outcome != 'success' || steps.hard-validator.outcome != 'success' || steps.deterministic-tests.outcome != 'success' || steps.tnds-probe.outcome != 'success' || steps.national-diagnostic.outcome != 'success' || steps.capacity.outcome != 'success')
+        if: always() && (steps.verify-snapshot.outcome != 'success' || steps.release-metadata.outcome != 'success' || steps.prepare-v2.outcome != 'success' || steps.coverage-gate.outcome != 'success' || steps.structural-scan.outcome != 'success' || steps.hard-validator.outcome != 'success' || steps.deterministic-tests.outcome != 'success' || steps.tnds-probe.outcome != 'success' || steps.capacity.outcome != 'success')
         run: |
           echo 'A required diagnostic conclusion failed, including preparation or a downstream gate; evidence was uploaded and this run remains non-publishable.'
           exit 1

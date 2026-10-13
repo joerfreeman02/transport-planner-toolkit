@@ -37,6 +37,11 @@ STOP_TYPE_MODES = {
     "TXR": "other", "STR": "other", "SDA": "other",
 }
 BUS_COACH_STOP_TYPES = frozenset(key for key, value in STOP_TYPE_MODES.items() if value == "bus_coach")
+# NaPTAN 2.5 Schema Guide stop-point concepts. BCP is retained in the bus
+# domain as a legacy private-stop code, but is not a generic scheduled-call
+# point; its historic/public-flag caveat is recorded in the handover.
+TIMETABLE_CALL_STOP_TYPES = frozenset({"BCT", "BCS", "BCQ"})
+BUS_INFRASTRUCTURE_STOP_TYPES = frozenset({"BCE", "BST"})
 
 
 class SourceParseError(ValueError):
@@ -165,7 +170,18 @@ def valid_reference_id(value: str) -> bool:
 
 def stop_type_semantics(stop_type: str) -> dict[str, object]:
     code = (stop_type or "").strip().upper()
-    return {"mode": STOP_TYPE_MODES.get(code, "unknown"), "known": code in STOP_TYPE_MODES, "busEligible": code in BUS_COACH_STOP_TYPES}
+    bus_domain = code in BUS_COACH_STOP_TYPES
+    call_expected = code in TIMETABLE_CALL_STOP_TYPES
+    expectation = "expected" if call_expected else "not_expected" if code in {"BCE", "BST"} else "context_dependent" if code == "BCP" else "unknown"
+    call_eligible = True if call_expected else False if expectation == "not_expected" else None
+    return {
+        "mode": STOP_TYPE_MODES.get(code, "unknown"),
+        "known": code in STOP_TYPE_MODES,
+        "busEligible": bus_domain,
+        "busDomainEligible": bus_domain,
+        "timetableCallEligible": call_eligible,
+        "timetableCallExpectation": expectation,
+    }
 
 
 def status_of(element: ET.Element) -> str:
@@ -230,6 +246,9 @@ def _parse_stop_point(element: ET.Element, version: str) -> tuple[dict | None, s
         "transportMode": semantics["mode"],
         "knownTransportMode": semantics["known"],
         "busPreparedEligible": semantics["busEligible"],
+        "busDomainEligible": semantics["busDomainEligible"],
+        "timetableCallEligible": semantics["timetableCallEligible"],
+        "timetableCallExpectation": semantics["timetableCallExpectation"],
         "sourceValidity": "valid",
         "coordinateValid": coordinate is not None,
         "nptgLocalityCode": locality_code,
@@ -371,7 +390,7 @@ def parse_naptan_xml(path: str | Path) -> NaptanParseResult:
                     member_counts[stop["id"]] += 1
     for group in groups.values():
         members = sorted(set(group.get("sourceMemberStopPointIds", [])))
-        active_bus_members = sorted(member for member in members if member in stops and stops[member].get("status") in ("", "active") and stops[member].get("busPreparedEligible") is True and stops[member].get("coordinateValid") is True)
+        active_bus_members = sorted(member for member in members if member in stops and stops[member].get("status") in ("", "active") and stops[member].get("busDomainEligible") is True and stops[member].get("coordinateValid") is True)
         group["sourceMemberStopPointIds"] = members
         group["memberStopPointIds"] = active_bus_members
         group["activeBusMemberStopPointIds"] = active_bus_members
@@ -379,18 +398,20 @@ def parse_naptan_xml(path: str | Path) -> NaptanParseResult:
         group["missingMemberStopPointIds"] = list(group["unresolvedSourceMemberStopPointIds"])
         group["inactivePhysicalMemberStopPointIds"] = sorted(member for member in members if member in stops and stops[member].get("status") not in ("", "active"))
         group["inactiveMemberStopPointIds"] = list(group["inactivePhysicalMemberStopPointIds"])
-        group["nonBusMemberStopPointIds"] = sorted(member for member in members if member in stops and stops[member].get("busPreparedEligible") is not True)
+        group["nonBusMemberStopPointIds"] = sorted(member for member in members if member in stops and stops[member].get("busDomainEligible") is not True)
         group["inactiveMembershipStopPointIds"] = sorted(set(group.get("inactiveMembershipStopPointIds", [])))
         group["missingMemberStopPointIds"] = sorted(set(group.get("missingMemberStopPointIds", [])))
         group["qa"] = geometry_qa(group, stops, member_counts)
-    counts["validBusCoachSourceStopPointCount"] = sum(1 for stop in stops.values() if stop.get("busPreparedEligible") is True)
+    counts["validBusCoachSourceStopPointCount"] = sum(1 for stop in stops.values() if stop.get("busDomainEligible") is True)
     counts["validRailSourceStopPointCount"] = sum(1 for stop in stops.values() if stop.get("transportMode") == "rail")
     counts["validTramMetroSourceStopPointCount"] = sum(1 for stop in stops.values() if stop.get("transportMode") == "tram_metro")
     counts["validFerryWaterSourceStopPointCount"] = sum(1 for stop in stops.values() if stop.get("transportMode") == "ferry_water")
     counts["validAirSourceStopPointCount"] = sum(1 for stop in stops.values() if stop.get("transportMode") == "air")
     counts["validOtherSourceStopPointCount"] = sum(1 for stop in stops.values() if stop.get("transportMode") == "other")
-    counts["activeBusStopPointCount"] = sum(1 for stop in stops.values() if stop.get("busPreparedEligible") is True and stop.get("status") in ("", "active") and stop.get("coordinateValid") is True)
-    counts["inactiveBusStopPointCount"] = sum(1 for stop in stops.values() if stop.get("busPreparedEligible") is True and stop.get("status") not in ("", "active"))
+    counts["activeBusStopPointCount"] = sum(1 for stop in stops.values() if stop.get("busDomainEligible") is True and stop.get("status") in ("", "active") and stop.get("coordinateValid") is True)
+    counts["timetableCallStopPointCount"] = sum(1 for stop in stops.values() if stop.get("timetableCallEligible") is True and stop.get("status") in ("", "active") and stop.get("coordinateValid") is True)
+    counts["nonCallBusDomainStopPointCount"] = sum(1 for stop in stops.values() if stop.get("busDomainEligible") is True and stop.get("timetableCallExpectation") == "not_expected")
+    counts["inactiveBusStopPointCount"] = sum(1 for stop in stops.values() if stop.get("busDomainEligible") is True and stop.get("status") not in ("", "active"))
     qa = {
         **dict(sorted(counts.items())),
         "activeGroupCount": sum(group["status"] == "active" for group in groups.values()),

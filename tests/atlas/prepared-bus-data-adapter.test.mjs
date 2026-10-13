@@ -223,6 +223,17 @@ test('TNDS stop-prefix shards bound requests and preserve quarantine impact', as
   assert.equal((await malformed.servicesForStops([stop])).ok, false);
 });
 
+test('non-call bus-domain infrastructure does not request a missing timetable shard', async () => {
+  const access = { id: '0590BCE01L', routes: [], timetableCallEligible: false, transportMode: 'bus_coach' };
+  const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchFixture, baseUrl: 'https://atlas.example/data/' });
+  const result = await adapter.servicesForStops([access]);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.data, []);
+  assert.deepEqual(result.provenance.requestedShardKeys, []);
+  assert.deepEqual(result.provenance.checkedStopIds, []);
+  assert.equal(result.provenance.sourceCompleteness, 'COMPLETE');
+});
+
 test('missing prepared timetable area remains an unavailable source, not zero', async () => {
   const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchFixture, baseUrl: 'https://atlas.example/data/' });
   const result = await adapter.servicesForStops([{ id: '9990A', areaCode: '999' }]);

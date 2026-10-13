@@ -22,8 +22,12 @@ TNDS activation, or accepted London redesign was performed.
 - Frozen national run: `36125621080`.
 - Frozen snapshot hash: `8e2982017598eb0f37153f03eb42bab596d70d1217cd08f0678944719fe666c9`.
 - Implementation commit: `24c9c04ce05e5a96ef65316c381939df30176a05`.
-- Final functional SHA, remote SHA, parity, and clean status: recorded after
-  the final documentation commit/push verification in the task handover.
+- Final functional SHA/code tip: `814191a7dc030a41c309fd5d32bd4dc38bff5e3c`.
+- Remote SHA verified after push: `814191a7dc030a41c309fd5d32bd4dc38bff5e3c`.
+- Local/origin parity at verification: `0 ahead / 0 behind`.
+- Worktree status at verification: clean.
+- The final branch tip includes this handover record; its exact documentation
+  commit is reported with the final Git verification in the task response.
 
 ## London pre-flight freeze gate
 

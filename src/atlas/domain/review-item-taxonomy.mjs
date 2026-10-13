@@ -4,6 +4,7 @@ export const REVIEW_ITEM_CATEGORIES = Object.freeze({
   'unprocessed-timetable-scope': Object.freeze({ category: 'timetable', routeBearing: false }),
   'quarantined-timetable-request': Object.freeze({ category: 'timetable', routeBearing: true }),
   'national-route-evidence': Object.freeze({ category: 'timetable', routeBearing: true }),
+  'timetable-shard-failure': Object.freeze({ category: 'timetable-source', routeBearing: false }),
   'service-source-evidence': Object.freeze({ category: 'service-source', routeBearing: true }),
   'planner-route-identity': Object.freeze({ category: 'planner-route-identity', routeBearing: true }),
   'planner-endpoint-resolution': Object.freeze({ category: 'planner-route-identity', routeBearing: true }),

@@ -230,12 +230,17 @@ test('missing prepared timetable area remains an unavailable source, not zero', 
   assert.equal(result.code, 'unavailable_source');
 });
 
-test('partial timetable coverage is unavailable instead of silently treating uncovered selected stops as complete', async () => {
+test('partial timetable coverage keeps successful shard evidence and marks the uncovered scope', async () => {
   const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchFixture, baseUrl: 'https://atlas.example/data/' });
   const result = await adapter.servicesForStops([stop, { id: '9990A', areaCode: '999' }]);
-  assert.equal(result.ok, false);
-  assert.equal(result.code, 'unavailable_source');
-  assert.match(result.warnings.join(' '), /No zero-service conclusion has been assumed/);
+  assert.equal(result.ok, true);
+  assert.equal(result.data.length, 1);
+  assert.equal(result.provenance.sourceCompleteness, 'PARTIAL');
+  assert.equal(result.provenance.failedShardCount, 1);
+  assert.equal(result.provenance.successfulShardCount, 1);
+  assert.deepEqual(result.provenance.unresolvedStopIds, ['9990A']);
+  assert.match(result.warnings.join(' '), /not treated as absent/);
+  assert.match(result.warnings.join(' '), /Successful timetable shards were retained/);
 });
 
 test('malformed prepared stop data is distinguished from a genuine zero', async () => {

@@ -28,10 +28,14 @@ export function stopRoutesPresentation(stop = {}, { selectedForReport = true } =
   const routes = [...new Set((stop.routes ?? []).map(value => String(value ?? '').trim()).filter(Boolean))]
     .sort((left, right) => left.localeCompare(right, 'en-GB', { numeric: true }));
   let result;
-  if (routes.length) result = routes.join(', ');
+  const timetableStatus = String(stop.timetableEvidenceStatus ?? '').toUpperCase();
+  if (routes.length && ['SOURCE_UNAVAILABLE', 'PARTIAL'].includes(timetableStatus)) result = `${routes.join(', ')} · Timetable data unavailable/incomplete; these routes were not treated as absent`;
+  else if (routes.length && timetableStatus === 'NO_CURRENT_MATCH') result = `${routes.join(', ')} · no current timetable match`;
+  else if (routes.length) result = routes.join(', ');
   else {
-    const status = String(stop.timetableEvidenceStatus ?? '').toUpperCase();
+    const status = timetableStatus;
     if (stop.groupCompleted === true && stop.timetableMatch === false) result = 'No routes recorded by NaPTAN · candidate not assessed in detail';
+    else if (status === 'NO_ROUTES') result = 'No routes recorded by NaPTAN · authoritative stop source recorded no routes';
     else if (status === 'NO_CURRENT_MATCH') result = 'No routes recorded by NaPTAN · no current timetable match';
     else if (status === 'SOURCE_UNAVAILABLE' || status === 'PARTIAL') result = 'No routes recorded by NaPTAN · timetable evidence unavailable or incomplete';
     else if (status === 'MATCHED' || status === 'SUPPLEMENTED' || status === 'FALLBACK') result = 'Timetable evidence matched · route label unavailable';
@@ -39,6 +43,13 @@ export function stopRoutesPresentation(stop = {}, { selectedForReport = true } =
   }
   if (!selectedForReport) result += ' · not included in report';
   return result;
+}
+
+export function partialTimetableQualification(stops = []) {
+  const affected = (stops ?? []).filter(stop => ['SOURCE_UNAVAILABLE', 'PARTIAL'].includes(String(stop?.timetableEvidenceStatus ?? '').toUpperCase()) && (stop?.routes ?? []).length);
+  if (!affected.length) return null;
+  const routes = [...new Set(affected.flatMap(stop => stop.routes ?? []).map(String))].sort((left, right) => left.localeCompare(right, 'en-GB', { numeric: true }));
+  return `Timetable data unavailable/incomplete for ${affected.length} assessed stop${affected.length === 1 ? '' : 's'}; ATLAS found routes ${routes.join(', ')} recorded at these stops, but prepared timetable evidence could not be checked. These routes have therefore not been treated as absent.`;
 }
 
 const text = value => String(value ?? '').trim();

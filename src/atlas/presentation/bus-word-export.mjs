@@ -1,7 +1,7 @@
 import { buildServicePresentation, formatServiceOriginDestination } from '../domain/bus-service-assessment.mjs';
 import { buildBusTimetablePresentationNote, plannerRouteDisplayNumber, PLANNER_METHODOLOGY_NOTE, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../domain/bus-planner-summary.mjs';
 import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
-import { isOtherNearbyStopRecord, plannerFacingServiceNote, stopRoutesPresentation } from '../domain/bus-source-presentation.mjs';
+import { isOtherNearbyStopRecord, partialTimetableQualification, plannerFacingServiceNote, stopRoutesPresentation } from '../domain/bus-source-presentation.mjs';
 
 function text(value) { return String(value ?? '').trim(); }
 
@@ -118,6 +118,8 @@ export function buildBusWordTables(result) {
   });
   const qualification = reviewQualification(result.reviewItems);
   if (qualification) serviceRows.push({ kind: 'summary', text: qualification });
+  const partialQualification = partialTimetableQualification(result.stops);
+  if (partialQualification) serviceRows.push({ kind: 'summary', semantic: 'partial-timetable-qualification', text: partialQualification });
   if (hasPlannerSummary) serviceRows.push({ kind: 'summary', text: PLANNER_METHODOLOGY_NOTE });
 
   return [

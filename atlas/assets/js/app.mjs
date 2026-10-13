@@ -19,7 +19,8 @@ import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presenta
 import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-task-status.mjs';
 import { buildBusTimetablePresentationNote, buildPlannerBusServiceSummaries, plannerRouteDisplayNumber, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination, operatorProvenanceLabel } from '../../../src/atlas/domain/bus-service-assessment.mjs';
-import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, isOtherNearbyStopRecord, plannerFacingServiceNote, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
+import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, isOtherNearbyStopRecord, partialTimetableQualification, plannerFacingServiceNote, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
+import { plannerStopWarning, recommendedBusStop } from '../../../src/atlas/domain/bus-planner-trust.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
@@ -161,16 +162,11 @@ function plannerFailure(kind, result) {
   return 'Bus information is temporarily unavailable. Please try again shortly.';
 }
 
-function plannerStopWarning(warning) {
-  if (/sidecar|prepared v1 data does not contain|logical stoparea|nptg locality/i.test(warning)) return '';
-  if (/incomplete/i.test(warning)) return 'Some incomplete stop records were left out.';
-  if (/duplicate/i.test(warning)) return 'Repeated stop records were counted once.';
-  if (/no bus stops/i.test(warning)) return 'No bus stops were found within the selected distance.';
-  if (/dataset timestamp|dataset.*version/i.test(warning)) return '';
-  if (/prepared bus dataset is .*days old/i.test(warning)) return 'The prepared national bus information should be refreshed before formal use.';
-  if (/date-specific exceptions/i.test(warning)) return 'Some timetables contain date-specific changes. Check the assessment date before formal use.';
-  if (/No zero-stop conclusion/i.test(warning)) return warning;
-  return warning.replace(/TfL/g, 'Transport for London');
+function assessmentWording(result, services, selectedIds = null) {
+  const presented = (services ?? []).filter(service => !selectedIds || (selectedIds.has(serviceKey(service)) && service.stopIds?.some(id => result.stops.some(stop => selectedIds.has(stopKey(stop)) && String(id) === stopKey(stop)))));
+  const base = buildControlledBusWording(presented, { nearestGroupName: result.nearestGroup?.name ?? null });
+  const qualification = partialTimetableQualification(result.stops);
+  return qualification ? `${base} ${qualification}` : base;
 }
 
 function plannerAnnotationEntries(service) {
@@ -531,7 +527,7 @@ function renderAssessment(result) {
     ? result.plannerServiceSummaries
     : buildPlannerBusServiceSummaries(result.serviceSummaries, result.stops);
   if (!selectionInitialised) {
-    selectedStopIds = new Set(result.stops.filter(stop => !isOtherNearbyStopRecord(stop) && stop.timetableMatch !== false).map(stopKey));
+    selectedStopIds = new Set(result.stops.filter(recommendedBusStop).map(stopKey));
     selectedServiceIds = new Set(presentedServices.map(serviceKey));
     selectionInitialised = true;
   }
@@ -732,7 +728,7 @@ function renderAssessment(result) {
     }
   }
   renderBusStopMarkers(result.stops);
-  $('assessmentWording').textContent = buildControlledBusWording(presentedServices.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => selectedStopIds.has(String(id)))), { nearestGroupName: result.nearestGroup?.name ?? null });
+  $('assessmentWording').textContent = assessmentWording(result, presentedServices.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => selectedStopIds.has(String(id)))));
   const stopProvenance = result.provenance.stops ?? {};
   const timetableProvenance = result.provenance.timetables ?? {};
   const checked = formatTime(stopProvenance.retrievedAt || timetableProvenance.retrievedAt);
@@ -751,7 +747,7 @@ function renderAssessment(result) {
   for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', result.status === 'complete' ? 'Complete for the information shown' : 'Assessment finished — ' + evidenceReviewText(reviewItems.length)]]) {
     const line = document.createElement('p'); const label = document.createElement('strong'); label.textContent = `${labelText}: `; line.append(label, value); plannerChecks.append(line);
   }
-  const plannerWarnings = [...new Set(result.warnings.map(plannerStopWarning).filter(Boolean))];
+  const plannerWarnings = [...new Set(result.warnings.map(warning => plannerStopWarning(warning, result)).filter(Boolean))];
   if (plannerWarnings.length) {
     const heading = document.createElement('strong'); heading.textContent = 'Points to note';
     const list = document.createElement('ul');

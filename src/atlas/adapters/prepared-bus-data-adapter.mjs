@@ -87,6 +87,26 @@ async function requestPreparedJson({ url, fetchImpl, timeoutMs }) {
   } finally { clearTimeout(timer); }
 }
 
+function preparedServiceRecordValid(service) {
+  return Boolean(service
+    && typeof service === 'object'
+    && String(service.id ?? '').trim()
+    && service.stopSchedules
+    && typeof service.stopSchedules === 'object'
+    && !Array.isArray(service.stopSchedules));
+}
+
+function serviceShardFailure({ key, path: shardPath = null, status, code = null, message = null, stopIds = [] } = {}) {
+  return Object.freeze({
+    key: String(key),
+    path: shardPath,
+    status,
+    code,
+    message,
+    stopIds: Object.freeze([...new Set(stopIds.map(String).filter(Boolean))].sort())
+  });
+}
+
 export function createPreparedBusDataAdapter({
   fetchImpl = globalThis.fetch,
   baseUrl,
@@ -190,29 +210,62 @@ export function createPreparedBusDataAdapter({
     const stopIds = new Set((stops ?? []).map(stop => String(stop.id || stop.sourceId || '')).filter(Boolean));
     const prefixLength = Number(index.serviceShardKeyLength || 3);
     const shardKeys = [...new Set((stops ?? []).map(stop => String(stop.id || stop.sourceId || '').slice(0, prefixLength)).filter(code => code.length === prefixLength))];
-    const missingShardKeys = shardKeys.filter(code => {
-      const configured = index.serviceShards?.[code];
-      return Array.isArray(configured) ? configured.length === 0 : !configured;
-    });
-    if (!shardKeys.length || missingShardKeys.length) {
+    const stopIdsByShardKey = new Map(shardKeys.map(key => [key, [...stopIds].filter(stopId => stopId.slice(0, prefixLength) === key)]));
+    const shardDiagnostics = [];
+    const shardPayloads = [];
+    for (const key of shardKeys) {
+      const configured = index.serviceShards?.[key];
+      const shardStopIds = stopIdsByShardKey.get(key) ?? [];
+      if (!configured || (Array.isArray(configured) && configured.length === 0)) {
+        shardDiagnostics.push(serviceShardFailure({ key, status: 'missing', code: 'missing_shard', message: `No prepared timetable shard is configured for stop prefix ${key}.`, stopIds: shardStopIds }));
+        continue;
+      }
+      const paths = [...new Set(Array.isArray(configured) ? configured : [configured])];
+      for (const shardPath of paths) {
+        const response = await loadJson(shardPath, forceRefresh);
+        if (!response.ok) {
+          shardDiagnostics.push(serviceShardFailure({ key, path: shardPath, status: 'load-failed', code: response.code, message: response.message, stopIds: shardStopIds }));
+          continue;
+        }
+        if (!PREPARED_BUS_SCHEMAS.has(response.data?.schema) || !Array.isArray(response.data?.services)) {
+          shardDiagnostics.push(serviceShardFailure({ key, path: shardPath, status: 'malformed', code: 'malformed_shard', message: 'Prepared timetable shard schema or service collection was invalid.', stopIds: shardStopIds }));
+          continue;
+        }
+        if (!response.data.services.every(preparedServiceRecordValid)) {
+          shardDiagnostics.push(serviceShardFailure({ key, path: shardPath, status: 'validation-failed', code: 'invalid_service_record', message: 'One or more prepared timetable service records failed validation.', stopIds: shardStopIds }));
+          continue;
+        }
+        shardDiagnostics.push(serviceShardFailure({ key, path: shardPath, status: 'loaded', stopIds: shardStopIds }));
+        shardPayloads.push({ key, path: shardPath, services: response.data.services });
+      }
+    }
+    if (!shardKeys.length) {
       return sourceFailure({
         code: 'unavailable_source',
         message: 'Bus timetable information could not be checked. Please try again.',
-        provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url },
-        warnings: [missingShardKeys.length
-          ? `Prepared timetable coverage is unavailable for ${missingShardKeys.length} selected stop area${missingShardKeys.length === 1 ? '' : 's'}. No zero-service conclusion has been assumed.`
-          : 'No prepared timetable area could be identified for the selected stops.']
+        provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url, sourceCompleteness: 'SOURCE_UNAVAILABLE', timetableConclusion: 'UNRESOLVED', requestedShardKeys: [] },
+        warnings: ['No prepared timetable area could be identified for the selected stops. No zero-service conclusion has been assumed.']
       });
     }
-    const paths = [...new Set(shardKeys.flatMap(code => {
-      const configured = index.serviceShards?.[code];
-      return Array.isArray(configured) ? configured : configured ? [configured] : [];
-    }))];
-    const responses = await Promise.all(paths.map(path => loadJson(path, forceRefresh)));
-    if (!paths.length || responses.some(response => !response.ok)) return sourceFailure({ code: 'unavailable_source', message: 'Bus timetable information could not be checked. Please try again.', provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url }, warnings: ['One or more prepared timetable files could not be loaded.'] });
-    if (responses.some(response => !PREPARED_BUS_SCHEMAS.has(response.data?.schema) || !Array.isArray(response.data?.services))) return sourceFailure({ code: 'invalid_response', message: 'Bus timetable information could not be safely interpreted. Please try again.', provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url }, warnings: ['A prepared timetable file was incomplete or malformed.'] });
+    const failedShardDiagnostics = shardDiagnostics.filter(item => item.status !== 'loaded');
+    const successfulShardDiagnostics = shardDiagnostics.filter(item => item.status === 'loaded');
+    if (!shardPayloads.length) {
+      const failedStopIds = [...new Set(failedShardDiagnostics.flatMap(item => item.stopIds))].sort();
+      return sourceFailure({
+        code: failedShardDiagnostics.some(item => item.status === 'malformed' || item.status === 'validation-failed') ? 'invalid_response' : 'unavailable_source',
+        message: 'Bus timetable information could not be checked. Please try again.',
+        provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url, sourceCompleteness: 'SOURCE_UNAVAILABLE', timetableConclusion: 'UNRESOLVED', requestedShardKeys: shardKeys, unresolvedStopIds: failedStopIds, failedShardCount: failedShardDiagnostics.length, successfulShardCount: 0, failedShardDiagnostics, successfulShardDiagnostics, failedRequests: failedShardDiagnostics.length, unresolvedRequests: failedShardDiagnostics.length },
+        warnings: [`Prepared timetable evidence was unavailable for ${failedStopIds.length || failedShardDiagnostics.length} selected stop area${(failedStopIds.length || failedShardDiagnostics.length) === 1 ? '' : 's'}. No zero-service conclusion has been assumed.`]
+      });
+    }
+    const failedStopIds = [...new Set(failedShardDiagnostics.flatMap(item => item.stopIds))].sort();
+    const incompleteRequestIdentities = [...new Set(failedStopIds.flatMap(stopId => {
+      const stop = (stops ?? []).find(candidate => String(candidate.id || candidate.sourceId || '') === stopId);
+      return (stop?.routes ?? []).map(route => `${String(route)}|${stopId}`);
+    }))].sort();
+    const unresolvedRoutes = [...new Set((stops ?? []).filter(stop => failedStopIds.includes(String(stop.id || stop.sourceId || ''))).flatMap(stop => stop.routes ?? []).map(String))].sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
     const services = new Map();
-    for (const response of responses) for (const rawService of response.data?.services ?? []) {
+    for (const shard of shardPayloads) for (const rawService of shard.services) {
       const service = normalisePreparedService(rawService);
       const scoped = scopedScheduledService(service, stopIds);
       if (!scheduledStopIds(scoped).length) continue;
@@ -268,15 +321,18 @@ export function createPreparedBusDataAdapter({
         tndsProvenance = { source: 'Traveline National Dataset supplementary data', dataPreparedAt: manifest.generatedAt, regions: manifest.regions, serving: legacy ? 'bounded-legacy-manifest' : 'stop-prefix-shards', shardRequests: [...new Set(shardPaths)].length, unresolvedRequestIdentities };
     }
     const checkedAt = clock().toISOString();
+    const partial = failedShardDiagnostics.length > 0;
     const warnings = [...snapshotWarnings(index), ...tndsWarnings];
+    if (partial) warnings.push(`Prepared timetable evidence was incomplete for ${failedStopIds.length || failedShardDiagnostics.length} selected stop area${(failedStopIds.length || failedShardDiagnostics.length) === 1 ? '' : 's'}. Successful timetable shards were retained; affected route/stop evidence was not treated as absent.`);
     if (!mergedServices.some(service => scheduledStopIds(service).length)) warnings.push('No current BODS timetable records matched the selected authoritative stop identifiers.');
     const unresolvedRequestIdentities = [...new Set(tndsProvenance?.unresolvedRequestIdentities ?? [])].sort();
     const timetableConclusion = mergedServices.some(service => scheduledStopIds(service).length)
       ? 'MATCHED'
-      : unresolvedRequestIdentities.length ? 'UNRESOLVED' : 'NO_CURRENT_MATCH';
+      : (partial || unresolvedRequestIdentities.length) ? 'UNRESOLVED' : 'NO_CURRENT_MATCH';
+    const allUnresolvedRequestIdentities = [...new Set([...unresolvedRequestIdentities, ...incompleteRequestIdentities])].sort();
     return sourceSuccess({
       data: mergedServices, evidence: [], warnings,
-      provenance: { source: tndsProvenance ? `${TIMETABLE_SOURCE}; ${tndsProvenance.source}` : TIMETABLE_SOURCE, endpoint: index.sources.bods.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, tndsPreparedAt: tndsProvenance?.dataPreparedAt || null, tndsServing: tndsProvenance?.serving || null, tndsShardRequests: tndsProvenance?.shardRequests ?? null, datasetVersion: index.sources.bods.sha256, regions: index.sources.bods.regions, representativeDates: index.representativeDates, anonymousRequest: true, apiKeyEmbedded: false, attribution: TIMETABLE_ATTRIBUTION, unresolvedRequestIdentities, nationalUnresolvedRequestIdentities: unresolvedRequestIdentities, timetableConclusion }
+      provenance: { source: tndsProvenance ? `${TIMETABLE_SOURCE}; ${tndsProvenance.source}` : TIMETABLE_SOURCE, endpoint: index.sources.bods.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, tndsPreparedAt: tndsProvenance?.dataPreparedAt || null, tndsServing: tndsProvenance?.serving || null, tndsShardRequests: tndsProvenance?.shardRequests ?? null, datasetVersion: index.sources.bods.sha256, regions: index.sources.bods.regions, representativeDates: index.representativeDates, anonymousRequest: true, apiKeyEmbedded: false, attribution: TIMETABLE_ATTRIBUTION, unresolvedRequestIdentities: allUnresolvedRequestIdentities, nationalUnresolvedRequestIdentities: allUnresolvedRequestIdentities, nationalUnresolvedRoutes: [...new Set([...(tndsProvenance?.unresolvedRequestIdentities ?? []).map(identity => String(identity).split('|')[0]), ...unresolvedRoutes])].filter(Boolean).sort((left, right) => left.localeCompare(right, undefined, { numeric: true })), unresolvedStopIds: failedStopIds, requestedShardKeys: shardKeys, failedShardCount: failedShardDiagnostics.length, successfulShardCount: successfulShardDiagnostics.length, failedShardDiagnostics, successfulShardDiagnostics, failedRequests: failedShardDiagnostics.length, unresolvedRequests: failedShardDiagnostics.length, sourceCompleteness: partial ? 'PARTIAL' : 'COMPLETE', timetableConclusion }
     });
   }
 

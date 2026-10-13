@@ -8,7 +8,7 @@ import {
 import { buildPlannerBusServiceSummaries, plannerSourceWarning, resolvedPlannerDestination } from '../domain/bus-planner-summary.mjs';
 import { DEFAULT_TFL_REQUEST_LIMIT } from '../adapters/tfl-request-scheduler.mjs';
 import { deriveTimetableConclusion, hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
-import { buildStopTimetableSourcePresentation } from '../domain/bus-source-presentation.mjs';
+import { buildStopTimetableSourcePresentation, partialTimetableQualification } from '../domain/bus-source-presentation.mjs';
 import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
 import { resolvePlannerEndpointDecisions } from '../domain/planner-endpoint-decision.mjs';
 
@@ -124,6 +124,8 @@ function buildStopTimetableEvidence(stop, services, servicesResult) {
   if (Number(provenance.failedRequests || 0) > 0 || provenance.unavailable === true) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable', sources: checked });
   if (nationalIncomplete) return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · required national evidence could not be checked', sources: checked });
   if ((provenance.timetableConclusion || servicesResult?.timetableConclusion) === 'UNRESOLVED') return Object.freeze({ status: 'SOURCE_UNAVAILABLE', label: 'Timetable source unavailable · evidence remained unresolved', sources: checked });
+  const explicitConclusion = provenance.timetableConclusion || servicesResult?.timetableConclusion;
+  if (!(stop.routes ?? []).length && servicesResult?.ok && !Number(provenance.failedRequests || 0) && provenance.sourceCompleteness !== 'PARTIAL' && explicitConclusion && explicitConclusion !== 'UNRESOLVED') return Object.freeze({ status: 'NO_ROUTES', label: 'No routes recorded by the authoritative stop source', sources: checked });
   if (((provenance.timetableConclusion || servicesResult?.timetableConclusion) === 'NO_CURRENT_MATCH' && checked.length) || hasNoCurrentTimetableConclusionForStop(stop, provenance)) {
     return Object.freeze({ status: 'NO_CURRENT_MATCH', label: `No current match · ${checked.join('/') || 'timetable sources'} checked`, sources: checked });
   }
@@ -155,6 +157,7 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     const parts = requestParts(identity);
     add({ code: 'unresolved-timetable-request', route: parts.route, stop: parts.stop, source: 'timetable source', message: 'This route/stop timetable request remained unresolved; inspect the returned source evidence before formal use.' });
   }
+  if (provenance.failedShardDiagnostics?.length) add({ code: 'timetable-shard-failure', stop: selectedStops[0]?.id, source: provenance.source || 'prepared timetable source', message: `Prepared timetable evidence was incomplete: ${provenance.failedShardDiagnostics.length} shard failure${provenance.failedShardDiagnostics.length === 1 ? '' : 's'} affected ${provenance.unresolvedStopIds?.length || 0} selected stop record${(provenance.unresolvedStopIds?.length || 0) === 1 ? '' : 's'}. Successful shards were retained; affected routes were not treated as absent.` });
   for (const identity of [...(provenance.unprocessedRequestIdentities ?? [])]) {
     const parts = requestParts(identity);
     add({ code: 'unprocessed-timetable-request', route: parts.route, stop: parts.stop, source: 'timetable source', message: 'This route/stop timetable request was outside the processed assessment scope; no zero-service conclusion was made.' });
@@ -384,13 +387,15 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
       ...(servicesResult?.provenance?.unresolvedRequestIdentities ?? []),
       ...(servicesResult?.provenance?.nationalUnresolvedRequestIdentities ?? [])
     ].map(String)).size;
-    const timetablesComplete = Boolean(servicesResult?.ok) && nationalEvidenceComplete && Number(servicesResult?.provenance?.unprocessedRequests || 0) === 0 && Math.max(Number(servicesResult?.provenance?.unresolvedRequests || 0), unresolvedIdentityCount) === 0;
+    const timetablesComplete = Boolean(servicesResult?.ok) && servicesResult?.provenance?.sourceCompleteness !== 'PARTIAL' && !Number(servicesResult?.provenance?.failedShardCount || 0) && nationalEvidenceComplete && Number(servicesResult?.provenance?.unprocessedRequests || 0) === 0 && Math.max(Number(servicesResult?.provenance?.unresolvedRequests || 0), unresolvedIdentityCount) === 0;
     const status = stopCoverageComplete && timetablesComplete && serviceSummaries.length && routingComplete ? 'complete' : 'partial';
     const reviewItems = buildReviewItems({ selectedStops, services, serviceSummaries: resolvedServiceSummaries, servicesResult, prepared, stopCoverageComplete, routingComplete });
     const selectedIds = new Set(selectedStops.map(stopKey));
     const routes = new Set(enrichedDiscoveredStops.flatMap(stop => stop.routes ?? []));
     onProgress({ phase: status === 'complete' ? 'complete' : 'partial', detail: status === 'complete' ? 'Complete' : partialDetail(reviewItems) });
-    return Object.freeze({ ok: true, status, assessmentMode, discoveredStopCount: enrichedDiscoveredStops.length, scope: { stopCount: enrichedDiscoveredStops.length, routeCount: routes.size, pairCount: routePairs(enrichedDiscoveredStops).size }, nearestGroup, stops: Object.freeze(selectedStops), services: Object.freeze(services), serviceSummaries: Object.freeze(resolvedServiceSummaries), plannerServiceSummaries: Object.freeze(plannerServiceSummaries), endpointResolution: Object.freeze(endpointResolution), wording: buildControlledBusWording(plannerServiceSummaries, { nearestGroupName: nearestGroup?.name ?? null }), warnings: Object.freeze(warnings), reviewItems: Object.freeze(reviewItems), provenance: Object.freeze({ stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres }, timetables: servicesResult?.provenance ?? {}, endpoints: endpointResolution.provenance ?? {}, walking: prepared.walkingResult?.provenance ?? {}, cycling: prepared.cyclingResult?.provenance ?? {} }), evidence: Object.freeze((prepared.stopsResult.evidence ?? []).filter(item => assessmentMode === 'full' || selectedIds.has(item?.subject?.id))) });
+    const wordingBase = buildControlledBusWording(plannerServiceSummaries, { nearestGroupName: nearestGroup?.name ?? null });
+    const wordingQualification = partialTimetableQualification(selectedStops);
+    return Object.freeze({ ok: true, status, assessmentMode, discoveredStopCount: enrichedDiscoveredStops.length, scope: { stopCount: enrichedDiscoveredStops.length, routeCount: routes.size, pairCount: routePairs(enrichedDiscoveredStops).size }, nearestGroup, stops: Object.freeze(selectedStops), services: Object.freeze(services), serviceSummaries: Object.freeze(resolvedServiceSummaries), plannerServiceSummaries: Object.freeze(plannerServiceSummaries), endpointResolution: Object.freeze(endpointResolution), wording: wordingQualification ? `${wordingBase} ${wordingQualification}` : wordingBase, warnings: Object.freeze(warnings), reviewItems: Object.freeze(reviewItems), provenance: Object.freeze({ stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres }, timetables: servicesResult?.provenance ?? {}, endpoints: endpointResolution.provenance ?? {}, walking: prepared.walkingResult?.provenance ?? {}, cycling: prepared.cyclingResult?.provenance ?? {} }), evidence: Object.freeze((prepared.stopsResult.evidence ?? []).filter(item => assessmentMode === 'full' || selectedIds.has(item?.subject?.id))) });
   }
 
   async function inspectScope(site, { radius = 700, forceRefresh = false } = {}) {

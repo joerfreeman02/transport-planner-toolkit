@@ -21,8 +21,9 @@ TNDS activation, or accepted London redesign was performed.
 - Version: `2.0.0-alpha.15`.
 - Frozen national run: `36125621080`.
 - Frozen snapshot hash: `8e2982017598eb0f37153f03eb42bab596d70d1217cd08f0678944719fe666c9`.
+- Implementation commit: `24c9c04ce05e5a96ef65316c381939df30176a05`.
 - Final functional SHA, remote SHA, parity, and clean status: recorded after
-  the final commit/push verification in the task handover.
+  the final documentation commit/push verification in the task handover.
 
 ## London pre-flight freeze gate
 
@@ -148,10 +149,24 @@ empty. The accepted Waltham route/service inventory is unchanged.
 
 ## Files changed
 
-The final handover records the exact committed file list after the final Git
-verification. The implementation scope is limited to national shard
-isolation, planner-state/presentation handling, focused tests, and these
-forensic/handover documents.
+- `atlas/assets/js/app.mjs`
+- `atlas/index.html` (metadata-only Alpha.15 test-build marker required by the
+  protected review-environment contract)
+- `docs/atlas/BUS-ROBUSTNESS-1B-NATIONAL-PLANNER-TRUST-HANDOVER.md`
+- `docs/atlas/BUS-ROBUSTNESS-1B-PHASE-A-PE1-FORENSIC-TRACE.md`
+- `src/atlas/adapters/prepared-bus-data-adapter.mjs`
+- `src/atlas/application/bus-assessment.mjs`
+- `src/atlas/domain/bus-planner-trust.mjs`
+- `src/atlas/domain/bus-source-presentation.mjs`
+- `src/atlas/domain/review-item-taxonomy.mjs`
+- `src/atlas/presentation/bus-word-export.mjs`
+- `tests/atlas/bus-robustness-1b-national-planner-trust.test.mjs`
+- `tests/atlas/prepared-bus-data-adapter.test.mjs`
+- `tests/atlas/run-all.mjs`
+
+The implementation scope is limited to national shard isolation,
+planner-state/presentation handling, focused tests, the protected test-build
+metadata correction, and these forensic/handover documents.
 
 ## Tests and limitations
 

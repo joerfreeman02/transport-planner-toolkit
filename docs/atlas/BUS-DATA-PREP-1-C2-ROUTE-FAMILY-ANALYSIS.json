@@ -1,0 +1,21 @@
+{
+  "schema": "atlas.bus.pe1-route-family-analysis.v1",
+  "controlId": "PE1-2TL-HISTORIC",
+  "point": {"latitude": 52.577554, "longitude": -0.242489, "radiusMetres": 500},
+  "sourceSnapshotId": "cf0c64b980b0516378bb705843d428a74a797d19f527f79c6c43a5540f0b8bde",
+  "historicalRouteFamilies": ["1", "2", "3", "4", "4P", "5", "5A", "6", "23", "24", "25", "26", "26A", "27", "33", "37", "48", "60", "61", "62", "63", "101", "102", "201", "202", "415", "904", "A", "B", "C", "X4", "X31"],
+  "prep1CurrentRouteFamilies": ["1", "2", "3", "4", "4P", "5", "5A", "6", "23", "24", "25", "26", "26A", "27", "33", "37", "48", "61", "62", "63", "101", "102", "201", "202", "415", "904", "A", "B", "C", "X4", "X31"],
+  "c1CurrentRouteFamilies": ["1", "2", "3", "4", "4P", "5", "5A", "6", "23", "24", "25", "26", "26A", "27", "33", "37", "48", "61", "62", "63", "101", "102", "201", "202", "415", "904", "A", "B", "C", "X4", "X31"],
+  "retainedHistoricRouteFamilies": ["1", "2", "3", "4", "4P", "5", "5A", "6", "23", "24", "25", "26", "26A", "27", "33", "37", "48", "61", "62", "63", "101", "102", "201", "202", "415", "904", "A", "B", "C", "X4", "X31"],
+  "newCurrentRouteFamilies": [],
+  "absentFromCurrentSource": ["60"],
+  "unexplainedLostRouteFamilies": [],
+  "rawSourceTrace": {
+    "currentNaptanStopRouteMetadataAtControl": "Route 60 absent",
+    "currentBodsRegionalArchives": [
+      {"region": "east_anglia", "archiveSha256": "f0b9847e0e7fea8e73172505707f5f699cf9b2d6bcb22c15a6bbd3713b73015e", "globalRouteShortName60IdCount": 2, "globalRoute60TripCount": 72, "matchedPe1StopTimeCount": 0},
+      {"region": "east_midlands", "archiveSha256": "990a813c78bf1a65ba671cbe5db3a2a3350a0d03704c91688b991c85aa35efbf", "globalRouteShortName60IdCount": 4, "globalRoute60TripCount": 503, "matchedPe1StopTimeCount": 0}
+    ],
+    "conclusion": "SOURCE-WINDOW CHANGE; route 60 no longer appears in current PE1 StopPoint route metadata or matched current regional stop_times. The route may remain active elsewhere in the regional feeds."
+  }
+}

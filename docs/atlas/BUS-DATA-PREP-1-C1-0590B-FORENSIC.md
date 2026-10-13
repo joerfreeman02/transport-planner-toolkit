@@ -44,9 +44,9 @@ The call-bearing station members and their resolved route labels are:
 
 Raw identity provenance uses only exact allowed relationships: `stops.txt.stop_id` equal to the NaPTAN ATCO StopPoint ID, or `stops.txt.stop_code` equal to a NaPTAN code. The 18 identified BCS members matched by the former rule. Some exact identities occur in both East Anglia and East Midlands feeds; regional duplicates are preserved as source evidence, not interpreted as distinct physical StopPoints.
 
-## Same-runtime PE1 replay
+## Same-runtime QUEENSGATE-0590B replay
 
-Both candidates were assessed at Queensgate Bus Station, Peterborough (`52.5701, -0.2498`) through the real prepared-data adapter → bus assessment application → Word-table builder path.
+Both candidates were assessed at QUEENSGATE-0590B, Queensgate Bus Station, Peterborough (`52.5701, -0.2498`) through the real prepared-data adapter → bus assessment application → Word-table builder path. The original C1 proof used the then-default 700 m radius; it was never the historical PE1 2TL (`52.577554, -0.242489`) control. C2 separately records an exact 500 m QUEENSGATE-0590B run.
 
 | Result | PREP-1 control | C1 |
 |---|---:|---:|

@@ -1,0 +1,50 @@
+{
+  "schema": "atlas.bus.control-lineage.v1",
+  "version": "2.0.0-alpha.15",
+  "controls": [
+    {
+      "id": "PE1-2TL-HISTORIC",
+      "label": "PE1 2TL",
+      "latitude": 52.577554,
+      "longitude": -0.242489,
+      "radiusMetres": 500,
+      "historicalRepositoryBranch": "codex/atlas-bus-robustness-1b-national-planner-trust",
+      "historicalEvidenceCommit": "814191a7dc030a41c309fd5d32bd4dc38bff5e3c",
+      "historicalSourceRunId": "36125621080",
+      "historicalSnapshotSha256": "8e2982017598eb0f37153f03eb42bab596d70d1217cd08f0678944719fe666c9",
+      "historicalPurpose": "National partial-shard and planner-trust regression",
+      "historicalExpected": {
+        "nearbyStopPoints": 57,
+        "routeBearingStopPoints": 41,
+        "recoveredServiceRecords": 189,
+        "serviceSummaries": 126,
+        "plannerServiceSummaries": 44,
+        "routeFamilies": ["1", "2", "3", "4", "4P", "5", "5A", "6", "23", "24", "25", "26", "27", "33", "37", "48", "60", "61", "62", "63", "101", "102", "201", "202", "415", "904", "A", "B", "C", "X4", "X31"]
+      }
+    },
+    {
+      "id": "QUEENSGATE-0590B",
+      "label": "Queensgate Bus Station, Peterborough",
+      "latitude": 52.5701,
+      "longitude": -0.2498,
+      "radiusMetres": 500,
+      "sourceSnapshotId": "cf0c64b980b0516378bb705843d428a74a797d19f527f79c6c43a5540f0b8bde",
+      "purpose": "Station entrance/timetable-call semantics and 0590B regression",
+      "legacyC1ProofRadiusMetres": 700,
+      "legacyC1HistoricalCountsAt700m": {
+        "nearbyStopPoints": 47,
+        "routeBearingStopPoints": 38,
+        "serviceRecords": 193,
+        "serviceSummaries": 132,
+        "physicalBceRecords": 4
+      },
+      "standardizedCurrentCountsAt500m": {
+        "prep1": {"nearbyStopPoints": 14, "routeBearingStopPoints": 13, "serviceRecords": 157, "serviceSummaries": 96, "plannerServiceSummaries": 38, "status": "partial"},
+        "c1": {"nearbyStopPoints": 14, "routeBearingStopPoints": 13, "serviceRecords": 157, "serviceSummaries": 96, "plannerServiceSummaries": 38, "status": "complete"}
+      }
+    }
+  ],
+  "substitutionProhibited": true,
+  "controlDifferenceMetresApprox": 965,
+  "lineageRule": "QUEENSGATE-0590B is never a substitute for PE1-2TL-HISTORIC; compare only by stable control id, exact coordinates, radius, and source window."
+}

@@ -1,0 +1,33 @@
+{
+  "schema": "atlas.bus.prep-control-comparison.v1",
+  "historical": {
+    "controlId": "PE1-2TL-HISTORIC",
+    "sourceWindow": {"runId": "36125621080", "snapshotSha256": "8e2982017598eb0f37153f03eb42bab596d70d1217cd08f0678944719fe666c9"},
+    "counts": {"nearbyStopPoints": 57, "routeBearingStopPoints": 41, "serviceRecords": 189, "serviceSummaries": 126, "plannerServiceSummaries": 44},
+    "status": "partial",
+    "routeFamilies": ["1", "2", "3", "4", "4P", "5", "5A", "6", "23", "24", "25", "26", "27", "33", "37", "48", "60", "61", "62", "63", "101", "102", "201", "202", "415", "904", "A", "B", "C", "X4", "X31"]
+  },
+  "prep1": {
+    "sourceWindow": {"snapshotId": "cf0c64b980b0516378bb705843d428a74a797d19f527f79c6c43a5540f0b8bde", "generatedAt": "2026-10-13T12:28:27Z"},
+    "counts": {"nearbyStopPoints": 57, "routeBearingStopPoints": 41, "selectedRecommendedStopPoints": 41, "timetableCallPoints": 57, "busDomainNonCallInfrastructure": 0, "serviceRecords": 191, "serviceSummaries": 126, "plannerServiceSummaries": 40, "wordServiceSummaryRows": 40},
+    "status": "partial",
+    "failedShardDiagnostics": 1,
+    "unresolvedStopPoints": 4,
+    "reviewItems": 1
+  },
+  "c1": {
+    "sourceWindow": {"snapshotId": "cf0c64b980b0516378bb705843d428a74a797d19f527f79c6c43a5540f0b8bde", "generatedAt": "2026-10-13T13:53:38Z"},
+    "counts": {"nearbyStopPoints": 57, "routeBearingStopPoints": 41, "selectedRecommendedStopPoints": 41, "timetableCallPoints": 53, "busDomainNonCallInfrastructure": 4, "serviceRecords": 191, "serviceSummaries": 126, "plannerServiceSummaries": 40, "wordServiceSummaryRows": 40},
+    "status": "complete",
+    "failedShardDiagnostics": 0,
+    "unresolvedStopPoints": 0,
+    "reviewItems": 0
+  },
+  "differenceClassification": [
+    {"difference": "Historical service records 189 vs current-source 191; summaries remain 126", "classification": "SOURCE-WINDOW CHANGE", "evidence": "PREP-1 and C1 use the same accepted 13 October source set and agree at 191/126; historical 1B used the earlier 25 September frozen run."},
+    {"difference": "Historic route family 60 absent at the exact point in both current candidates", "classification": "SOURCE-WINDOW CHANGE", "evidence": "Current NaPTAN route metadata at PE1 has no route 60, and exact matched PE1 stop IDs have zero route-60 stop_times in both current East Anglia and East Midlands raw GTFS feeds."},
+    {"difference": "Historical planner summaries 44 vs current PREP-1/C1 40", "classification": "SOURCE-WINDOW CHANGE", "evidence": "Both candidates prepared from the same current snapshot produce 40. The historical trace records aggregate totals but not per-route planner rows; the old route-60 family is absent from the current raw source window. No current PREP/C1 disagreement exists."},
+    {"difference": "PREP-1 partial/four BCE unresolved vs C1 complete/four BCE non-call infrastructure", "classification": "C1 STOP-TYPE SEMANTIC CORRECTION", "evidence": "Same exact historic coordinates, same radius and same frozen source set; C1 marks the four discovered BCEs bus-domain non-call points and requests no 0590B timetable shard."}
+  ],
+  "unexplainedRegressionCount": 0
+}

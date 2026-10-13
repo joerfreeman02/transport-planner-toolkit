@@ -2,7 +2,7 @@
 
 ## Executive verdict
 
-Local implementation and evidence gates pass on the isolated C1 branch. This is ready for Technical Director review, not acceptance: exact GitHub Actions execution and remote branch publication remain outstanding because the configured GitHub credential is invalid. No merge, deployment, or Beta promotion was performed.
+Local implementation and evidence gates pass on the isolated C1 branch. The branch has been pushed and is ready for Technical Director review, not acceptance: exact GitHub Actions execution remains outstanding because the available CLI/API dispatch credentials are invalid and no workflow-dispatch connector is available. No merge, deployment, or Beta promotion was performed.
 
 ## Repository, branch and baseline
 
@@ -44,7 +44,7 @@ Same-runtime Queensgate PE1 replay through adapter → application → Word-tabl
 
 ## Frozen-source workflow
 
-The reusable diagnostic workflow now receives expected snapshot ID, source count and total bytes as required inputs and verifies all three strictly. The refresh workflow passes explicit operator-selected expected values. The legacy v1 shadow diagnostic is removed from frozen workflow gates; its script no longer has a live NaPTAN/BODS acquisition fallback and requires explicit local input files. No fresh national operational-data acquisition occurred in this sprint; only the existing frozen snapshot was verified and read. Remote GitHub Actions was not run: the configured CLI credential is invalid, and no authorized workflow-dispatch connector is available. The exact remote execution is still required before acceptance.
+The reusable diagnostic workflow now receives expected snapshot ID, source count and total bytes as required inputs and verifies all three strictly. The refresh workflow passes explicit operator-selected expected values. The legacy v1 shadow diagnostic is removed from frozen workflow gates; its script no longer has a live NaPTAN/BODS acquisition fallback and requires explicit local input files. No fresh national operational-data acquisition occurred in this sprint; only the existing frozen snapshot was verified and read. Remote GitHub Actions was not run: the configured GitHub CLI/API credential is invalid, and no authorized workflow-dispatch connector is available. Git transport credentials did permit pushing the branch. The exact remote execution is still required before acceptance.
 
 ## Candidate, evidence and verification
 
@@ -57,7 +57,7 @@ The reusable diagnostic workflow now receives expected snapshot ID, source count
 - Evidence SHA-256: `coverage-ledger.json` `AEE79D3DD4A91B9C384021CD9C54989BE89789E6E10A2AEF467A55970C1C7731`; `gap-report.json` `709D6BA6B670D4DD2C6C929D75F066B6063E6F1996BA31A9D8C20D9E1C702D2A`; `0590B-forensic.json` `782BA163FB4BC2E3DF69A4656F8DAAB8DC3030BC97F7F730940B2E964FAA4644`; `structural-scan.json` `017E1E998DD06A3C5D222826D7E4DC0DBF4F9DCB01A30F98E66FA0A1D66250EF`; `candidate-measurement.json` `419C9723AE4F547D457869449BF7F908627DCA6B32DF02D0AC81F661DD147690`; `PE1-review.json` `8A912099C332D5444CEFEDAB23AEA82C8B7A97E2707EBCCC215AC268E7C2A6D3`.
 - PREP-1 controls: manifest SHA-256 `DD3015D3F82245070B65D7C5325B06227DAC463E304C196478FA0161DE0348DE`; coverage-ledger SHA-256 `105C59DF38D45BB94F8EACFA8ED3213B849609C72DFD8AAB12E87895D7245FE1`.
 - Verification: 100 Python tests pass; full `node tests/atlas/run-all.mjs` passes with `ATLAS Alpha.15 deterministic suite passed.`; `git diff --check` passes. Candidate hard validation and the final national coverage gate pass; aggregate structural scan reports `runtimeIntegrity.failClosed: false` (347 retained source-anomaly findings, with zero unsupported structures and zero malformed required source records).
-- Remote parity: GitHub CLI reported an invalid configured token/API connectivity failure. No Actions run or push is claimed. Exact GitHub Actions execution is required before acceptance.
+- Remote parity: branch `codex/atlas-bus-data-prep-1-c1-coverage-semantics` was pushed successfully to `origin`; the push created the upstream ref at the implementation SHA. GitHub CLI/API inspection and workflow dispatch were unavailable, so no Actions run is claimed. Exact GitHub Actions execution is required before acceptance.
 
 ## GitHub Tooling Adoption Review
 

@@ -263,6 +263,151 @@ def acquire_tnds(
     return staging / "tnds-xml", {"identity": f"ftp://{TNDS_HOST}{TNDS_PATH}", "regions": list(TNDS_REGIONS), "regionHashes": hashes, "regionBytes": sizes, "sourceHash": aggregate}
 
 
+TNDS_SNAPSHOT_SCHEMA = "atlas-bus-tnds-source-snapshot-v1"
+TNDS_SNAPSHOT_STATE = "ACQUIRED / UNINTERPRETED / VERIFIED / QUARANTINED"
+TNDS_ACQUIRING_STATE = "ACQUIRING / UNINTERPRETED / INCOMPLETE / QUARANTINED"
+
+
+def _new_tnds_snapshot_manifest(root: Path) -> dict:
+    from source_snapshot import now_utc, write_manifest
+
+    timestamp = now_utc()
+    manifest = {
+        "schema": TNDS_SNAPSHOT_SCHEMA,
+        "snapshotKind": "TNDS COMPARISON SNAPSHOT",
+        "state": TNDS_ACQUIRING_STATE,
+        "quarantined": True,
+        "diagnosticOnly": True,
+        "preparationOnly": True,
+        "runtimeActive": False,
+        "productionEligible": False,
+        "neverUseAsProductionCheckpoint": True,
+        "snapshotId": None,
+        "createdAt": timestamp,
+        "acquisitionTimestamp": timestamp,
+        "updatedAt": timestamp,
+        "sources": [],
+        "sourceCount": len(TNDS_REGIONS),
+        "completedSourceCount": 0,
+        "progress": [],
+        "regions": list(TNDS_REGIONS),
+    }
+    write_manifest(root, manifest)
+    return manifest
+
+
+def acquire_tnds_snapshot(
+    destination: str | Path,
+    username: str,
+    password: str,
+    ftp_factory=ftplib.FTP,
+    sleep_fn=time.sleep,
+) -> dict:
+    """Acquire raw TNDS archives into a separate durable quarantine snapshot.
+
+    This path intentionally does not extract or parse TransXChange. It shares
+    the primary snapshot's atomic file and checkpoint semantics while keeping
+    TNDS out of the primary source manifest and Planner runtime.
+    """
+    from source_snapshot import (
+        _acquire_durable_source,
+        _checkpoint,
+        now_utc,
+        sha256_file,
+        validate_zip_source,
+        write_manifest,
+    )
+
+    root = Path(destination).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    manifest_path = root / "manifest.json"
+    if manifest_path.is_file():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise RefreshError(f"TNDS durable acquisition manifest is invalid: {manifest_path}") from error
+    else:
+        manifest = _new_tnds_snapshot_manifest(root)
+
+    if not username or not password:
+        manifest["state"] = "BLOCKED / CREDENTIALS REQUIRED / QUARANTINED"
+        manifest["lastError"] = "TNDS ACQUISITION BLOCKED — SECURE CREDENTIALS REQUIRED"
+        write_manifest(root, manifest)
+        raise RefreshError("TNDS ACQUISITION BLOCKED — SECURE CREDENTIALS REQUIRED")
+
+    manifest["state"] = TNDS_ACQUIRING_STATE
+    manifest["quarantined"] = True
+    manifest["productionEligible"] = False
+    manifest["diagnosticOnly"] = True
+    write_manifest(root, manifest)
+    try:
+        names = ftp_files(ftp_factory, username, password)
+        selected = {}
+        for name in names:
+            region = tnds_region_from_filename(name)
+            if region in TNDS_REGIONS:
+                selected.setdefault(region, name)
+        missing = [region for region in TNDS_REGIONS if region not in selected]
+        if missing:
+            raise RefreshError(f"TNDS acquisition is incomplete; missing regions: {', '.join(missing)}")
+
+        def downloader(identity, partial, label=None):
+            remote_name = str(identity).rsplit("/", 1)[-1]
+            region = tnds_region_from_filename(remote_name)
+            if region not in selected:
+                raise RefreshError("TNDS source identity has no supported region")
+            last_error = None
+            for attempt in range(1, TNDS_TRANSFER_ATTEMPTS + 1):
+                try:
+                    partial.parent.mkdir(parents=True, exist_ok=True)
+                    with partial.open("wb") as output:
+                        with ftp_factory(TNDS_HOST, timeout=120) as ftp:
+                            ftp.login(username, password)
+                            ftp.cwd(TNDS_PATH)
+                            ftp.retrbinary(f"RETR {remote_name}", output.write)
+                    validate_zip_source(partial)
+                    return {"identity": identity, "sourceHash": sha256_file(partial), "bytes": partial.stat().st_size}
+                except Exception as error:
+                    last_error = error
+                    retryable = _is_retryable_ftp_error(error)
+                    message = _safe_ftp_error(error, username, password)
+                    if not retryable or attempt == TNDS_TRANSFER_ATTEMPTS:
+                        raise RefreshError(f"TNDS {region} archive acquisition failed after {attempt}/{TNDS_TRANSFER_ATTEMPTS} attempts ({message})") from error
+                    print(f"TNDS {region} durable transfer attempt {attempt}/{TNDS_TRANSFER_ATTEMPTS} failed: {message}", file=sys.stderr, flush=True)
+                    sleep_fn(TNDS_TRANSFER_BACKOFF_SECONDS[attempt - 1])
+            raise RefreshError(f"TNDS {region} archive acquisition failed: {last_error}")
+
+        for region in TNDS_REGIONS:
+            remote_name = selected[region]
+            identity = f"ftp://{TNDS_HOST}{TNDS_PATH}{remote_name}"
+            _acquire_durable_source(
+                root,
+                manifest,
+                relative=f"sources/{region}.zip",
+                identity=identity,
+                fmt="tnds-zip",
+                region=region,
+                remote_metadata={"remoteFilename": remote_name, "transport": "FTP"},
+                downloader=downloader,
+                validator=validate_zip_source,
+                label=f"TNDS {region} raw source",
+            )
+    except Exception as error:
+        manifest["state"] = TNDS_ACQUIRING_STATE
+        manifest["lastError"] = _safe_ftp_error(error, username, password)
+        _checkpoint(manifest, root)
+        raise
+
+    entries = sorted(manifest.get("sources", []), key=lambda item: item["path"])
+    manifest["sources"] = entries
+    manifest["snapshotId"] = hashlib.sha256("".join(item["sha256"] for item in entries).encode("ascii")).hexdigest()
+    manifest["state"] = TNDS_SNAPSHOT_STATE
+    manifest["verifiedAt"] = now_utc()
+    manifest.pop("lastError", None)
+    _checkpoint(manifest, root)
+    return manifest
+
+
 def validate_tnds_region_coverage(tnds_manifest: dict) -> tuple[list[str], dict[str, int]]:
     processed_regions = sorted({str(region).strip().upper() for region in tnds_manifest.get("regions", []) if str(region).strip()})
     if set(processed_regions) != set(TNDS_REGIONS):

@@ -13,13 +13,17 @@ import hashlib
 import json
 import os
 import shutil
-import tempfile
+import time
+import xml.etree.ElementTree as ET
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 SNAPSHOT_SCHEMA = "atlas-bus-source-snapshot-v1"
-SNAPSHOT_STATE = "ACQUIRED / UNINTERPRETED"
+SNAPSHOT_STATE = "ACQUIRED / UNINTERPRETED / VERIFIED"
+ACQUIRING_STATE = "ACQUIRING / UNINTERPRETED"
 REGIONS = ("east_anglia", "east_midlands", "london", "north_east", "north_west", "south_east", "south_west", "west_midlands", "yorkshire")
+GTFS_REQUIRED_MEMBERS = {"agency.txt", "stops.txt", "routes.txt", "calendar.txt", "trips.txt", "stop_times.txt"}
 
 
 class SourceSnapshotError(ValueError):
@@ -36,6 +40,48 @@ def sha256_file(path: Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def validate_xml_source(path: Path, expected_root: str | tuple[str, ...]) -> None:
+    """Validate only that an XML source is readable and from its source family."""
+    if not path.is_file() or path.stat().st_size == 0:
+        raise SourceSnapshotError(f"XML source is missing or empty: {path.name}")
+    try:
+        root = ET.parse(path).getroot()
+    except (ET.ParseError, OSError) as error:
+        raise SourceSnapshotError(f"XML source is unreadable: {path.name}") from error
+    local_name = str(root.tag).rsplit("}", 1)[-1].lower()
+    expected_roots = (expected_root,) if isinstance(expected_root, str) else expected_root
+    if not any(expected.lower() in local_name for expected in expected_roots):
+        raise SourceSnapshotError(f"XML source has unexpected root for {'/'.join(expected_roots)}: {local_name}")
+
+
+def validate_gtfs_archive(path: Path) -> None:
+    """Validate the GTFS container contract without reading timetable records."""
+    if not path.is_file() or path.stat().st_size == 0:
+        raise SourceSnapshotError(f"GTFS archive is missing or empty: {path.name}")
+    try:
+        with zipfile.ZipFile(path) as archive:
+            members = {Path(name).name for name in archive.namelist()}
+            missing = sorted(GTFS_REQUIRED_MEMBERS - members)
+            if missing:
+                raise SourceSnapshotError(f"GTFS archive is missing required files: {', '.join(missing)}")
+            if archive.testzip() is not None:
+                raise SourceSnapshotError(f"GTFS archive contains a corrupt member: {path.name}")
+    except zipfile.BadZipFile as error:
+        raise SourceSnapshotError(f"GTFS archive is not a valid ZIP: {path.name}") from error
+
+
+def validate_zip_source(path: Path) -> None:
+    """Validate a quarantined raw archive as a readable, non-empty ZIP."""
+    if not path.is_file() or path.stat().st_size == 0:
+        raise SourceSnapshotError(f"Raw archive is missing or empty: {path.name}")
+    try:
+        with zipfile.ZipFile(path) as archive:
+            if not archive.namelist() or archive.testzip() is not None:
+                raise SourceSnapshotError(f"Raw archive is empty or corrupt: {path.name}")
+    except zipfile.BadZipFile as error:
+        raise SourceSnapshotError(f"Raw archive is not a valid ZIP: {path.name}") from error
 
 
 def _safe_relative(root: Path, relative: str) -> Path:
@@ -84,7 +130,16 @@ def build_manifest(root: Path, *, source_entries: list[dict], producer_workflow:
 def write_manifest(root: Path, manifest: dict) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     path = root / "manifest.json"
-    path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary = root / ".manifest.json.part"
+    temporary.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    for attempt in range(5):
+        try:
+            temporary.replace(path)
+            break
+        except PermissionError:
+            if attempt == 4:
+                raise
+            time.sleep(0.1 * (attempt + 1))
     return path
 
 
@@ -95,7 +150,7 @@ def load_and_verify(root: str | Path, *, require_bods: bool = True) -> dict:
     except (OSError, json.JSONDecodeError) as error:
         raise SourceSnapshotError(f"Source snapshot manifest is missing or invalid: {base}") from error
     if manifest.get("schema") != SNAPSHOT_SCHEMA or manifest.get("state") != SNAPSHOT_STATE:
-        raise SourceSnapshotError("Source snapshot is not in ACQUIRED / UNINTERPRETED state")
+        raise SourceSnapshotError("Source snapshot is not ACQUIRED / UNINTERPRETED / VERIFIED")
     if manifest.get("productionEligible") is not False or manifest.get("diagnosticOnly") is not True:
         raise SourceSnapshotError("Source snapshot has unsafe production eligibility flags")
     entries = manifest.get("sources")
@@ -123,10 +178,9 @@ def load_and_verify(root: str | Path, *, require_bods: bool = True) -> dict:
 
 def snapshot_from_staging(staging: Path, destination: Path, *, xml_sources: dict, bods: dict, producer_workflow: str | None = None, run_id: str | None = None, repository_commit_sha: str | None = None) -> dict:
     """Copy one acquired v2 Bus source set into a reusable snapshot."""
-    shutil.rmtree(destination, ignore_errors=True)
     (destination / "sources" / "bods").mkdir(parents=True, exist_ok=True)
-    shutil.copy2(staging / "naptan.xml", destination / "sources/naptan.xml")
-    shutil.copy2(staging / "nptg.xml", destination / "sources/nptg.xml")
+    for source, target in ((staging / "naptan.xml", destination / "sources/naptan.xml"), (staging / "nptg.xml", destination / "sources/nptg.xml")):
+        shutil.copyfile(source, target)
     acquired_at = now_utc()
     entries = [
         _entry(destination, "sources/naptan.xml", identity=xml_sources["naptan"].get("identity", ""), fmt="xml", region=None, acquired_at=acquired_at, remote_metadata=xml_sources["naptan"].get("remoteMetadata"), acquisition="fresh"),
@@ -135,12 +189,152 @@ def snapshot_from_staging(staging: Path, destination: Path, *, xml_sources: dict
     for region in REGIONS:
         source = staging / "gtfs" / f"{region}.zip"
         target = destination / "sources" / "bods" / f"{region}.zip"
-        shutil.copy2(source, target)
+        if not source.is_file():
+            raise SourceSnapshotError(f"Staging source is missing: {source}")
+        shutil.copyfile(source, target)
         metadata = next((item for item in bods.get("regions", []) if item.get("region") == region), {})
         entries.append(_entry(destination, f"sources/bods/{region}.zip", identity=metadata.get("identity", f"https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/{region}/"), fmt="gtfs-zip", region=region, acquired_at=acquired_at, remote_metadata=metadata.get("remoteMetadata"), acquisition="fresh"))
     manifest = build_manifest(destination, source_entries=entries, producer_workflow=producer_workflow, run_id=run_id, repository_commit_sha=repository_commit_sha)
     write_manifest(destination, manifest)
     return manifest
+
+
+def _primary_manifest(root: Path, *, remote_freshness: dict | None = None) -> dict:
+    """Load or initialise a durable primary acquisition checkpoint."""
+    manifest_path = root / "manifest.json"
+    if manifest_path.is_file():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise SourceSnapshotError(f"Durable acquisition manifest is invalid: {manifest_path}") from error
+        if manifest.get("schema") != SNAPSHOT_SCHEMA:
+            raise SourceSnapshotError("Durable acquisition manifest has an unexpected schema")
+        return manifest
+    timestamp = now_utc()
+    manifest = {
+        "schema": SNAPSHOT_SCHEMA,
+        "snapshotKind": "NATIONAL BUS SOURCE SNAPSHOT",
+        "state": ACQUIRING_STATE,
+        "diagnosticOnly": True,
+        "preparationOnly": True,
+        "runtimeActive": False,
+        "productionEligible": False,
+        "neverUseAsProductionCheckpoint": True,
+        "snapshotId": None,
+        "createdAt": timestamp,
+        "acquisitionTimestamp": timestamp,
+        "updatedAt": timestamp,
+        "producer": {"workflow": os.environ.get("GITHUB_WORKFLOW"), "runId": os.environ.get("GITHUB_RUN_ID"), "repositoryCommitSha": os.environ.get("GITHUB_SHA"), "acquisitionTimestamp": timestamp},
+        "currentSourceFreshnessClaimed": False,
+        "remoteFreshness": remote_freshness or {},
+        "sources": [],
+        "sourceCount": 11,
+        "completedSourceCount": 0,
+        "progress": [],
+        "regions": list(REGIONS),
+    }
+    write_manifest(root, manifest)
+    return manifest
+
+
+def _checkpoint(manifest: dict, root: Path) -> None:
+    manifest["updatedAt"] = now_utc()
+    manifest["completedSourceCount"] = len(manifest.get("sources", []))
+    manifest["progress"] = [{"path": item["path"], "acquisition": item.get("acquisition"), "sha256": item.get("sha256"), "bytes": item.get("bytes"), "completedAt": item.get("acquiredAt")} for item in manifest.get("sources", [])]
+    write_manifest(root, manifest)
+
+
+def _verified_completed_source(root: Path, entry: dict, validator) -> bool:
+    try:
+        path = _safe_relative(root, str(entry["path"]))
+        if not path.is_file() or path.stat().st_size != int(entry.get("bytes", -1)) or sha256_file(path) != entry.get("sha256"):
+            return False
+        validator(path)
+        return True
+    except (KeyError, TypeError, ValueError, OSError, SourceSnapshotError):
+        return False
+
+
+def _acquire_durable_source(root: Path, manifest: dict, *, relative: str, identity: str, fmt: str, region: str | None, remote_metadata: dict | None, downloader, validator, label: str) -> dict:
+    existing = next((item for item in manifest.get("sources", []) if item.get("path") == relative), None)
+    if existing and _verified_completed_source(root, existing, validator):
+        target = _safe_relative(root, relative)
+        target.with_name(f".{target.name}.part").unlink(missing_ok=True)
+        existing["acquisition"] = "reused"
+        existing["verifiedAt"] = now_utc()
+        _checkpoint(manifest, root)
+        return existing
+
+    target = _safe_relative(root, relative)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    partial = target.with_name(f".{target.name}.part")
+    acquisition = "reacquired" if existing or target.exists() else "fresh"
+    result = downloader(identity, partial, label=label)
+    try:
+        validator(partial)
+    except SourceSnapshotError:
+        raise
+    bytes_count = partial.stat().st_size
+    digest = sha256_file(partial)
+    partial.replace(target)
+    entry = {
+        "path": relative,
+        "format": fmt,
+        "region": region,
+        "sourceIdentity": identity,
+        "sha256": digest,
+        "bytes": bytes_count,
+        "acquiredAt": now_utc(),
+        "remoteMetadata": remote_metadata or {},
+        "acquisition": acquisition,
+        "structuralValidation": "passed",
+    }
+    manifest["sources"] = [item for item in manifest.get("sources", []) if item.get("path") != relative] + [entry]
+    _checkpoint(manifest, root)
+    return entry
+
+
+def acquire_primary_snapshot(destination: str | Path, *, remote_freshness: dict | None = None, download_fn=None) -> dict:
+    """Acquire the raw primary sources with durable per-source checkpoints.
+
+    This function deliberately stops at download, structural validation and
+    hashing. It never invokes preparation, sharding or planner intelligence.
+    """
+    from refresh_bus_data import BODS_DOWNLOAD_ROOT, NAPTAN_XML_URL, NPTG_XML_URL, download
+
+    root = Path(destination).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    manifest = _primary_manifest(root, remote_freshness=remote_freshness)
+    manifest["state"] = ACQUIRING_STATE
+    manifest["productionEligible"] = False
+    manifest["diagnosticOnly"] = True
+    manifest["preparationOnly"] = True
+    _checkpoint(manifest, root)
+    downloader = download_fn or download
+    freshness = remote_freshness or manifest.get("remoteFreshness") or {}
+    specs = [
+        ("sources/naptan.xml", NAPTAN_XML_URL, "xml", None, freshness.get("naptan"), lambda path: validate_xml_source(path, "naptan"), "NaPTAN XML source"),
+        ("sources/nptg.xml", NPTG_XML_URL, "xml", None, freshness.get("nptg"), lambda path: validate_xml_source(path, ("nptg", "nationalpublictransportgazetteer")), "NPTG XML source"),
+    ]
+    specs.extend((f"sources/bods/{region}.zip", f"{BODS_DOWNLOAD_ROOT}{region}/", "gtfs-zip", region, freshness.get("bods", {}).get("regions", {}).get(region, {}), validate_gtfs_archive, f"BODS {region} GTFS source") for region in REGIONS)
+    try:
+        for relative, identity, fmt, region, metadata, validator, label in specs:
+            _acquire_durable_source(root, manifest, relative=relative, identity=identity, fmt=fmt, region=region, remote_metadata=metadata, downloader=downloader, validator=validator, label=label)
+    except Exception as error:
+        manifest["state"] = ACQUIRING_STATE
+        manifest["lastError"] = str(error)
+        _checkpoint(manifest, root)
+        raise
+
+    entries = sorted(manifest["sources"], key=lambda item: item["path"])
+    manifest["sources"] = entries
+    manifest["snapshotId"] = hashlib.sha256("".join(item["sha256"] for item in entries).encode("ascii")).hexdigest()
+    manifest["state"] = SNAPSHOT_STATE
+    manifest["verifiedAt"] = now_utc()
+    manifest["currentSourceFreshnessClaimed"] = True
+    manifest.pop("lastError", None)
+    _checkpoint(manifest, root)
+    return load_and_verify(root)
 
 
 def materialise_for_preparation(root: Path, staging: Path) -> tuple[Path, Path, Path, dict]:
@@ -218,8 +412,10 @@ def mark_frozen_reuse(source: str | Path, destination: str | Path, source_run_id
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--verify", metavar="ROOT")
-    parser.add_argument("--acquire", action="store_true", help="Acquire the authorised NaPTAN, NPTG and nine BODS sources once")
+    parser.add_argument("--acquire", action="store_true", help="Acquire the authorised NaPTAN, NPTG and nine BODS sources durably and resumably")
+    parser.add_argument("--acquire-tnds", action="store_true", help="Acquire raw TNDS archives into a separate quarantined snapshot")
     parser.add_argument("--output", help="Snapshot destination for --acquire")
+    parser.add_argument("--tnds-output", help="TNDS snapshot destination for --acquire-tnds")
     parser.add_argument("--reuse-from", help="Existing snapshot to reuse when all remote discriminators match")
     parser.add_argument("--freshness", help="Freshness JSON produced by source_freshness.py")
     parser.add_argument("--mark-frozen-reuse", help="Copy one exact verified snapshot for explicit diagnostic reuse")
@@ -230,22 +426,14 @@ def main() -> None:
     elif args.acquire:
         if not args.output:
             parser.error("--acquire requires --output")
-        # Lazy import keeps the contract module usable by preparation tests
-        # without importing the acquisition implementation at module load.
-        from refresh_bus_data import acquire_bods, acquire_prepared_data_v2_sources
+        # Freshness probes are metadata-only; acquisition still hashes bytes.
         from source_freshness import probe_all
-        with tempfile.TemporaryDirectory(prefix="atlas-source-acquisition-") as temporary:
-            staging = Path(temporary)
-            freshness = probe_all()
-            naptan, nptg, xml_sources = acquire_prepared_data_v2_sources(staging)
-            _gtfs, bods = acquire_bods(staging)
-            xml_sources["naptan"]["remoteMetadata"] = freshness["naptan"]
-            xml_sources["nptg"]["remoteMetadata"] = freshness["nptg"]
-            for item in bods["regions"]:
-                item["remoteMetadata"] = freshness["bods"]["regions"].get(item["region"], {})
-            manifest = snapshot_from_staging(staging, Path(args.output).resolve(), xml_sources=xml_sources, bods=bods)
-        load_and_verify(args.output)
-        print(json.dumps(manifest, indent=2))
+        print(json.dumps(acquire_primary_snapshot(args.output, remote_freshness=probe_all()), indent=2))
+    elif args.acquire_tnds:
+        if not args.tnds_output:
+            parser.error("--acquire-tnds requires --tnds-output")
+        from refresh_bus_data import acquire_tnds_snapshot
+        print(json.dumps(acquire_tnds_snapshot(args.tnds_output, os.environ.get("TNDS_USERNAME", ""), os.environ.get("TNDS_PASSWORD", "")), indent=2))
     elif args.mark_frozen_reuse:
         if not args.output or not args.source_run_id:
             parser.error("--mark-frozen-reuse requires --source-run-id and --output")

@@ -23,7 +23,7 @@ Beta readiness, 0590B resolution, or BODS/TNDS reconciliation.
 - Branch: `codex/atlas-bus-data-acq-1-resumable-source-freeze`
 - Worktree: `C:\Users\joe.freeman\OneDrive - EAS Transport\Documents\Transport Planner Toolkit\atlas-bus-robustness-1b-national-planner-trust\atlas-bus-data-acq-1-resumable-source-freeze`
 - Version: `2.0.0-alpha.15` (unchanged)
-- Functional implementation SHA: `7169c65` (`feat: add resumable national bus source acquisition`).
+- Functional implementation SHA: `7169c658fd924a6094185c582075a5af31c6cd5c` (`feat: add resumable national bus source acquisition`).
 - Remote SHA/parity: recorded after the sprint branch push and fetch-back.
 - Raw snapshot root: `C:\Users\joe.freeman\OneDrive - EAS Transport\Documents\Transport Planner Toolkit\data-snapshots`
 - Repository changes:

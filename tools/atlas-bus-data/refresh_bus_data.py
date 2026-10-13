@@ -660,6 +660,27 @@ def run(args: argparse.Namespace) -> dict:
         for source in (("naptan", "nptg", "bods") if prepared_schema == "v2" else ("naptan", "bods")):
             prepared_manifest.get("sources", {}).get(source, {}).pop("downloadedAt", None)
         prepared_manifest_path.write_text(json.dumps(prepared_manifest, separators=(",", ":")) + "\n", encoding="utf-8")
+        coverage_result = None
+        if prepared_schema == "v2" and bus_only and snapshot_root:
+            coverage_output = site / "diagnostic-output"
+            coverage_command = [
+                sys.executable,
+                str(Path(__file__).with_name("coverage_ledger.py")),
+                "--candidate-site", str(site),
+                "--naptan-xml", str(naptan),
+                "--gtfs-dir", str(gtfs),
+                "--source-snapshot", str(snapshot_root),
+                "--output", str(coverage_output),
+            ]
+            if previous_root:
+                coverage_command.extend(["--previous-root", str(previous_root)])
+            coverage_process = subprocess.run(coverage_command, check=True, capture_output=True, text=True)
+            if coverage_process.stdout.strip():
+                print(coverage_process.stdout, end="")
+                try:
+                    coverage_result = json.loads(coverage_process.stdout)
+                except json.JSONDecodeError as error:
+                    raise RefreshError("Coverage ledger did not return valid JSON") from error
         if bus_only:
             diagnostic_cache = site / ".atlas-diagnostic-source-cache" / "gtfs"
             shutil.rmtree(diagnostic_cache.parent, ignore_errors=True)
@@ -693,7 +714,7 @@ def run(args: argparse.Namespace) -> dict:
         for source, note in notes:
             if note: sources[source]["note"] = note
         release = load_release_metadata(site)
-        status = {"schema": "atlas-bus-refresh-status-v1", "status": "sanity_checked" if bus_only else "validated", "candidateGeneratedAt": started, "version": release["version"], "build": release["build"], "repositoryCommit": os.environ.get("GITHUB_SHA"), "workflowRun": os.environ.get("GITHUB_RUN_ID"), "sources": sources, "preparedCounts": counts, "validation": "diagnostic_only" if bus_only else "passed", "diagnosticOnly": bus_only, "productionEligible": not bus_only, "sanityThresholds": {"collapseMinimum": 0.5, "description": "Existing meaningful baselines must retain at least 50% of stop/service counts; BODS region count may not decrease."}}
+        status = {"schema": "atlas-bus-refresh-status-v1", "status": "sanity_checked" if bus_only else "validated", "candidateGeneratedAt": started, "version": release["version"], "build": release["build"], "repositoryCommit": os.environ.get("GITHUB_SHA"), "workflowRun": os.environ.get("GITHUB_RUN_ID"), "sources": sources, "preparedCounts": counts, "validation": "diagnostic_only" if bus_only else "passed", "diagnosticOnly": bus_only, "productionEligible": not bus_only, "coverageLedger": coverage_result, "sanityThresholds": {"collapseMinimum": 0.5, "description": "Existing meaningful baselines must retain at least 50% of stop/service counts; BODS region count may not decrease."}}
         status_path = site / "atlas" / "data" / "status" / "manifest.json"
         status_path.parent.mkdir(parents=True, exist_ok=True)
         status_path.write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")

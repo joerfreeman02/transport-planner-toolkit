@@ -143,7 +143,7 @@ def write_manifest(root: Path, manifest: dict) -> Path:
     return path
 
 
-def load_and_verify(root: str | Path, *, require_bods: bool = True) -> dict:
+def load_and_verify(root: str | Path, *, require_bods: bool = True, expected_snapshot_id: str | None = None, expected_source_count: int | None = None, expected_total_bytes: int | None = None) -> dict:
     base = Path(root).resolve()
     try:
         manifest = json.loads((base / "manifest.json").read_text(encoding="utf-8"))
@@ -156,6 +156,8 @@ def load_and_verify(root: str | Path, *, require_bods: bool = True) -> dict:
     entries = manifest.get("sources")
     if not isinstance(entries, list) or not entries:
         raise SourceSnapshotError("Source snapshot contains no source entries")
+    if any(path.name.endswith(".part") for path in base.rglob("*")):
+        raise SourceSnapshotError("Source snapshot contains unexpected .part files")
     seen = set()
     for item in entries:
         if not isinstance(item, dict) or not item.get("path") or not item.get("sha256"):
@@ -172,6 +174,16 @@ def load_and_verify(root: str | Path, *, require_bods: bool = True) -> dict:
         raise SourceSnapshotError(f"Source snapshot is incomplete; missing: {', '.join(missing)}")
     if any("tnds" in str(item.get("path", "")).lower() for item in entries):
         raise SourceSnapshotError("TNDS raw archives are not permitted in a Bus source snapshot")
+    calculated_snapshot_id = hashlib.sha256("".join(item["sha256"] for item in entries).encode("ascii")).hexdigest()
+    if manifest.get("snapshotId") != calculated_snapshot_id:
+        raise SourceSnapshotError("Source snapshot manifest snapshot ID does not match its recorded source hashes")
+    if expected_snapshot_id and calculated_snapshot_id != expected_snapshot_id:
+        raise SourceSnapshotError(f"Source snapshot ID mismatch: expected {expected_snapshot_id}, received {calculated_snapshot_id}")
+    if expected_source_count is not None and len(entries) != expected_source_count:
+        raise SourceSnapshotError(f"Source snapshot source count mismatch: expected {expected_source_count}, received {len(entries)}")
+    total_bytes = sum(int(item.get("bytes", 0)) for item in entries)
+    if expected_total_bytes is not None and total_bytes != expected_total_bytes:
+        raise SourceSnapshotError(f"Source snapshot byte count mismatch: expected {expected_total_bytes}, received {total_bytes}")
     manifest["verifiedAt"] = now_utc()
     return manifest
 
@@ -412,6 +424,9 @@ def mark_frozen_reuse(source: str | Path, destination: str | Path, source_run_id
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--verify", metavar="ROOT")
+    parser.add_argument("--expected-snapshot-id")
+    parser.add_argument("--expected-source-count", type=int)
+    parser.add_argument("--expected-total-bytes", type=int)
     parser.add_argument("--acquire", action="store_true", help="Acquire the authorised NaPTAN, NPTG and nine BODS sources durably and resumably")
     parser.add_argument("--acquire-tnds", action="store_true", help="Acquire raw TNDS archives into a separate quarantined snapshot")
     parser.add_argument("--output", help="Snapshot destination for --acquire")
@@ -422,7 +437,7 @@ def main() -> None:
     parser.add_argument("--source-run-id", help="Producer run ID for --mark-frozen-reuse")
     args = parser.parse_args()
     if args.verify:
-        print(json.dumps(load_and_verify(args.verify), indent=2))
+        print(json.dumps(load_and_verify(args.verify, expected_snapshot_id=args.expected_snapshot_id, expected_source_count=args.expected_source_count, expected_total_bytes=args.expected_total_bytes), indent=2))
     elif args.acquire:
         if not args.output:
             parser.error("--acquire requires --output")

@@ -16,7 +16,8 @@ production recommendation.
 - Worktree: `C:\Users\joe.freeman\OneDrive - EAS Transport\Documents\Transport Planner Toolkit\atlas-bus-data-prep-1-national-coverage-ledger`
 - Baseline and remote SHA: `247c16f7f0e8bcee24bf5da2d527748bfdc608c4`
 - Version: `2.0.0-alpha.15`; no Alpha.16 and no Beta promotion.
-- Functional implementation SHA/final tip/remote parity: recorded after commit and push below.
+- Functional implementation SHA/final tip/remote parity: verified against the pushed
+  branch and recorded in the completion handover.
 - Changed files: `tools/atlas-bus-data/coverage_ledger.py`, `tools/atlas-bus-data/test_coverage_ledger.py`, `tools/atlas-bus-data/source_snapshot.py`, `tools/atlas-bus-data/refresh_bus_data.py`, `.github/workflows/atlas-reference-data-diagnostic.yml`, this document, and `docs/atlas/BUS-DATA-PREP-1-0590B-FORENSIC.md`.
 
 ## Source snapshot

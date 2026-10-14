@@ -1,12 +1,37 @@
 """Static contracts for the manual-dispatcher TNDS TRUST safety gate."""
 import unittest
 import subprocess
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).parents[2]
 DISPATCHER = ROOT / ".github/workflows/atlas-bus-data-refresh.yml"
 CALLEE = ROOT / ".github/workflows/atlas-bus-tnds-trust-diagnostic.yml"
 DRIVER = ROOT / "tools/atlas-bus-data/tnds_trust_diagnostic.py"
+TRUST_BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c1-browser-dispatch-entry"
+
+
+def parse_dispatch_input_names(workflow_text):
+    """Parse the workflow_dispatch inputs mapping from this indentation-based YAML block."""
+    lines = workflow_text.splitlines()
+    dispatch_index = next(i for i, line in enumerate(lines) if re.fullmatch(r"  workflow_dispatch:\s*", line))
+    inputs_index = next(i for i in range(dispatch_index + 1, len(lines))
+                        if re.fullmatch(r"    inputs:\s*", lines[i]))
+    names = set()
+    for line in lines[inputs_index + 1:]:
+        if line.strip() and len(line) - len(line.lstrip()) <= 4:
+            break
+        match = re.fullmatch(r"      ([A-Za-z_][A-Za-z0-9_-]*):\s*", line)
+        if match:
+            names.add(match.group(1))
+    return names
+
+
+def workflow_job_block(workflow_text, job_name):
+    match = re.search(rf"(?ms)^  {re.escape(job_name)}:\n(.*?)(?=^  [A-Za-z0-9_-]+:\s*$|\Z)", workflow_text)
+    if not match:
+        raise AssertionError(f"Workflow job not found: {job_name}")
+    return match.group(1)
 
 
 class TndsWorkflowContractTests(unittest.TestCase):
@@ -41,6 +66,94 @@ class TndsWorkflowContractTests(unittest.TestCase):
                                 cwd=ROOT, capture_output=True, text=True)
         self.assertIn("name: ATLAS Bus data refresh", dispatcher)
         self.assertNotEqual(callee.returncode, 0)
+
+    def test_trust_browser_inputs_are_subset_of_actual_origin_main_dispatch_schema(self):
+        dispatcher = subprocess.run(["git", "show", "origin/main:.github/workflows/atlas-bus-data-refresh.yml"],
+                                    cwd=ROOT, check=True, capture_output=True, text=True).stdout
+        names = parse_dispatch_input_names(dispatcher)
+        self.assertEqual(names, {"force_refresh", "measure_only", "resume_checkpoint_run_id", "prepared_schema"})
+        required_by_product_owner = {"force_refresh", "measure_only", "resume_checkpoint_run_id", "prepared_schema"}
+        self.assertLessEqual(required_by_product_owner, names)
+
+        selector = self.dispatcher.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]
+        for input_name in required_by_product_owner:
+            self.assertIn(f"inputs.{input_name}", selector)
+        for branch_only_name in ("v2_source_snapshot_run_id", "v2_expected_snapshot_id",
+                                 "v2_expected_source_count", "v2_expected_total_bytes"):
+            self.assertNotIn(f"inputs.{branch_only_name}", selector)
+        self.assertNotIn("v2_", selector)
+
+    def test_exact_branch_selector_maps_all_three_modes_and_fails_closed(self):
+        selector = self.dispatcher.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]
+        self.assertIn(f"TRUST_BRANCH: {TRUST_BRANCH}", selector)
+        self.assertIn('[[ "$GITHUB_REF" != "$TRUST_BRANCH" ]]', selector)
+        self.assertIn('"$PREPARED_SCHEMA" != \'v2\'', selector)
+        self.assertIn('"$MEASURE_ONLY" != \'true\'', selector)
+        self.assertIn('"$FORCE_REFRESH" == \'false\'', selector)
+        self.assertIn('-z "$RESUME_RUN_ID"', selector)
+        self.assertIn("trust_mode=offline_preflight", selector)
+        self.assertIn('"$FORCE_REFRESH" == \'true\'', selector)
+        self.assertIn("trust_mode=live_trust", selector)
+        self.assertIn('"$RESUME_RUN_ID" =~ ^[0-9]+$', selector)
+        self.assertIn("Invalid controlled TRUST selection", selector)
+        self.assertIn("trust_prior_producer_run_id: ${{ steps.trust-selector.outputs.prior_producer_run_id }}", self.dispatcher)
+
+    def test_non_numeric_raw_reuse_ids_fail_closed(self):
+        selector = self.dispatcher.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]
+        self.assertIn('"$RESUME_RUN_ID" =~ ^[0-9]+$', selector)
+        self.assertIn("else\n            echo '::error::Invalid controlled TRUST selection", selector)
+        for valid in ("1", "1024", "9876543210"):
+            self.assertRegex(valid, r"^[0-9]+$")
+        for malformed in ("abc", "12x", "-12", "1.2", " 12", "12 ", ""):
+            self.assertIsNone(re.fullmatch(r"[0-9]+", malformed), malformed)
+
+    def test_trust_selector_is_not_activated_on_other_branches_or_main(self):
+        selector = self.dispatcher.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]
+        self.assertIn('if [[ "$GITHUB_REF" != "$TRUST_BRANCH" ]]; then', selector)
+        self.assertIn("echo 'trust_mode='", selector)
+        self.assertIn("echo 'prior_producer_run_id='", selector)
+        self.assertEqual(self.dispatcher.count(TRUST_BRANCH), 4)
+        generic_resume_guard = self.dispatcher.split("- name: Refuse checkpoint resume outside trusted production context", 1)[1].split("- name:", 1)[0]
+        self.assertIn("github.ref != 'refs/heads/main'", generic_resume_guard)
+        self.assertIn(f"github.ref != '{TRUST_BRANCH}'", generic_resume_guard)
+        self.assertIn("Cross-run checkpoint resume is allowed only from refs/heads/main", generic_resume_guard)
+
+    def test_all_trust_modes_skip_primary_acquisition_and_production_jobs(self):
+        for job in ("freshness", "build-validate", "deploy", "freshness-no-op", "reference-source", "reference-diagnostic",
+                    "tnds-trust-offline-preflight", "tnds-trust-live-diagnostic"):
+            block = workflow_job_block(self.dispatcher, job)
+            self.assertIn("needs.main-guard.outputs.trust_mode == ''", block, job)
+        for job, mode in (("tnds-trust-browser-offline-preflight", "offline_preflight"),
+                          ("tnds-trust-browser-live", "live_trust")):
+            block = workflow_job_block(self.dispatcher, job)
+            self.assertIn(f"github.ref == '{TRUST_BRANCH}'", block)
+            self.assertIn(f"needs.main-guard.outputs.trust_mode == '{mode}'", block)
+            self.assertIn("uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml", block)
+        self.assertIn("prior_producer_run_id: ${{ needs.main-guard.outputs.trust_prior_producer_run_id }}", self.dispatcher)
+        self.assertIn("TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}", self.dispatcher.split("  tnds-trust-browser-live:", 1)[1])
+        offline = self.dispatcher.split("  tnds-trust-browser-offline-preflight:", 1)[1].split("  tnds-trust-browser-live:", 1)[0]
+        self.assertNotIn("secrets:", offline)
+        self.assertNotIn("TNDS_USERNAME", offline)
+        self.assertNotIn("TNDS_PASSWORD", offline)
+
+    def test_same_commit_preflight_gate_and_nonpublishing_trust_callee_remain(self):
+        live = self.workflow.split("  live-raw-and-prepare:", 1)[1]
+        for condition in ("run.get('head_sha') == os.environ['GH_SHA']",
+                          "run.get('head_branch') == os.environ['GH_REF_NAME']",
+                          "run.get('event') == 'workflow_dispatch'",
+                          "run.get('conclusion') == 'success'",
+                          "atlas-tnds-trust-offline-preflight-{run_id}",
+                          "item.get('expired') is False"):
+            self.assertIn(condition, live)
+        self.assertIn("GH_REPOSITORY: ${{ github.repository }}", live)
+        self.assertIn("actions/runs?{query}", live)
+        self.assertIn("needs.main-guard.outputs.trust_mode == 'live_trust'", self.dispatcher)
+        self.assertRegex(self.workflow, r"(?m)^  actions: read$")
+        self.assertRegex(self.workflow, r"(?m)^  contents: read$")
+        self.assertNotIn("pages: write", self.workflow)
+        self.assertNotIn("id-token: write", self.workflow)
+        self.assertNotIn("upload-pages-artifact", self.workflow)
+        self.assertNotIn("deploy-pages", self.workflow)
 
     def test_offline_preflight_checks_out_selected_branch_and_has_zero_acquisition_authority(self):
         offline = self.workflow.split("  offline-preflight:", 1)[1].split("  live-raw-and-prepare:", 1)[0]

@@ -31,7 +31,7 @@ assert.match(top, /expected_snapshot_id: \$\{\{ inputs\.v2_source_snapshot_run_i
 assert.match(top, /expected_source_count: \$\{\{ inputs\.v2_source_snapshot_run_id != '' && inputs\.v2_expected_source_count \|\| '' \}\}/);
 assert.match(top, /expected_total_bytes: \$\{\{ inputs\.v2_source_snapshot_run_id != '' && inputs\.v2_expected_total_bytes \|\| '' \}\}/);
 assert.match(top, /secrets: inherit/);
-assert.match(top, /if: inputs\.prepared_schema != 'v2' && needs\.freshness\.result == 'success'/);
+assert.match(top, /if: inputs\.prepared_schema != 'v2' && needs\.main-guard\.outputs\.trust_mode == '' && needs\.freshness\.result == 'success'/);
 
 assert.match(source, /workflow_call:/);
 assert.match(source, /v2_source_snapshot_run_id:/);
@@ -164,8 +164,8 @@ assert.match(source, /reuse:|--mark-frozen-reuse/);
 // The diagnostic reusable workflow has read-only permissions and the V2 path is
 // excluded from the existing production build, Pages upload, and deployment jobs.
 assert.match(diagnostic, /permissions:\s+actions: read\s+contents: read/);
-assert.match(top, /if: inputs\.prepared_schema != 'v2' && needs\.freshness\.result == 'success'/);
-assert.match(top, /if: inputs\.prepared_schema != 'v2' && needs\.freshness\.outputs\.refresh_required == 'true'.*github\.ref == 'refs\/heads\/main' && inputs\.measure_only != true/);
+assert.match(top, /if: inputs\.prepared_schema != 'v2' && needs\.main-guard\.outputs\.trust_mode == '' && needs\.freshness\.result == 'success'/);
+assert.match(top, /if: inputs\.prepared_schema != 'v2' && needs\.main-guard\.outputs\.trust_mode == '' && needs\.freshness\.outputs\.refresh_required == 'true'.*github\.ref == 'refs\/heads\/main' && inputs\.measure_only != true/);
 assert.match(top, /deploy:[\s\S]*?if: inputs\.prepared_schema != 'v2'[\s\S]*?github\.ref == 'refs\/heads\/main' && inputs\.measure_only != true/);
 assert.doesNotMatch(diagnostic, /configure-pages|upload-pages-artifact|deploy-pages|publish-snapshot\.mjs/);
 assert.match(top, /needs\.reference-source\.result == 'success'/);

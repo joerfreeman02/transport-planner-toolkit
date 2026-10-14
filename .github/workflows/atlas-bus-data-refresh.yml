@@ -66,6 +66,9 @@ jobs:
   main-guard:
     name: Check refresh execution context
     runs-on: ubuntu-latest
+    outputs:
+      trust_mode: ${{ steps.trust-selector.outputs.trust_mode }}
+      trust_prior_producer_run_id: ${{ steps.trust-selector.outputs.prior_producer_run_id }}
     steps:
       - name: Refuse non-manual non-main execution
         if: github.ref != 'refs/heads/main' && github.event_name != 'workflow_dispatch'
@@ -73,7 +76,7 @@ jobs:
           echo "::error::Only refs/heads/main or a manually dispatched diagnostic may run this workflow; refusing $GITHUB_REF."
           exit 1
       - name: Refuse checkpoint resume outside trusted production context
-        if: inputs.resume_checkpoint_run_id != '' && github.ref != 'refs/heads/main'
+        if: inputs.resume_checkpoint_run_id != '' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c1-browser-dispatch-entry'
         run: |
           echo '::error::Cross-run checkpoint resume is allowed only from refs/heads/main.'
           exit 1
@@ -102,6 +105,39 @@ jobs:
         run: |
           echo '::error::A normal expected snapshot ID is valid only with an explicit frozen source producer run ID.'
           exit 1
+      - name: Resolve exact-branch TRUST browser selector
+        id: trust-selector
+        env:
+          TRUST_BRANCH: refs/heads/codex/atlas-bus-data-trust-1a-c1b-c1-browser-dispatch-entry
+          PREPARED_SCHEMA: ${{ inputs.prepared_schema }}
+          MEASURE_ONLY: ${{ inputs.measure_only }}
+          FORCE_REFRESH: ${{ inputs.force_refresh }}
+          RESUME_RUN_ID: ${{ inputs.resume_checkpoint_run_id }}
+        run: |
+          if [[ "$GITHUB_REF" != "$TRUST_BRANCH" ]]; then
+            echo 'trust_mode=' >> "$GITHUB_OUTPUT"
+            echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$GITHUB_EVENT_NAME" != 'workflow_dispatch' || "$PREPARED_SCHEMA" != 'v2' || "$MEASURE_ONLY" != 'true' ]]; then
+            echo '::error::The controlled TRUST branch accepts only workflow_dispatch with prepared_schema=v2 and measure_only=true.'
+            exit 1
+          fi
+
+          if [[ "$FORCE_REFRESH" == 'false' && -z "$RESUME_RUN_ID" ]]; then
+            echo 'trust_mode=offline_preflight' >> "$GITHUB_OUTPUT"
+            echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
+          elif [[ "$FORCE_REFRESH" == 'true' && -z "$RESUME_RUN_ID" ]]; then
+            echo 'trust_mode=live_trust' >> "$GITHUB_OUTPUT"
+            echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
+          elif [[ "$FORCE_REFRESH" == 'true' && "$RESUME_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo 'trust_mode=live_trust' >> "$GITHUB_OUTPUT"
+            echo "prior_producer_run_id=$RESUME_RUN_ID" >> "$GITHUB_OUTPUT"
+          else
+            echo '::error::Invalid controlled TRUST selection. Use offline false/true/v2/blank or live true/true/v2 with a blank or numeric resume run ID.'
+            exit 1
+          fi
       - name: Record safe execution mode
         run: |
           if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
@@ -113,7 +149,7 @@ jobs:
   freshness:
     name: Check weekly Bus refresh freshness
     needs: main-guard
-    if: inputs.prepared_schema != 'v2'
+    if: inputs.prepared_schema != 'v2' && needs.main-guard.outputs.trust_mode == ''
     runs-on: ubuntu-latest
     outputs:
       refresh_required: ${{ steps.decision.outputs.refresh_required }}
@@ -137,7 +173,7 @@ jobs:
   build-validate:
     name: Build and validate Bus/TNDS candidate
     needs: [main-guard, freshness]
-    if: inputs.prepared_schema != 'v2' && needs.freshness.result == 'success' && needs.freshness.outputs.refresh_required == 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    if: inputs.prepared_schema != 'v2' && needs.main-guard.outputs.trust_mode == '' && needs.freshness.result == 'success' && needs.freshness.outputs.refresh_required == 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 180
     permissions:
@@ -359,7 +395,7 @@ jobs:
   deploy:
     name: Deploy validated Pages artifact
     needs: [main-guard, freshness, build-validate]
-    if: inputs.prepared_schema != 'v2' && needs.freshness.outputs.refresh_required == 'true' && needs.build-validate.result == 'success' && github.ref == 'refs/heads/main' && inputs.measure_only != true
+    if: inputs.prepared_schema != 'v2' && needs.main-guard.outputs.trust_mode == '' && needs.freshness.outputs.refresh_required == 'true' && needs.build-validate.result == 'success' && github.ref == 'refs/heads/main' && inputs.measure_only != true
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -372,7 +408,7 @@ jobs:
   freshness-no-op:
     name: Confirm already-fresh Bus data
     needs: [main-guard, freshness, build-validate]
-    if: always() && inputs.prepared_schema != 'v2' && needs.main-guard.result == 'success' && needs.freshness.outputs.refresh_required == 'false' && github.ref == 'refs/heads/main'
+    if: always() && inputs.prepared_schema != 'v2' && needs.main-guard.outputs.trust_mode == '' && needs.main-guard.result == 'success' && needs.freshness.outputs.refresh_required == 'false' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - run: echo "${{ needs.freshness.outputs.message }}"
@@ -380,7 +416,7 @@ jobs:
   reference-source:
     name: Acquire or reuse exact v2 Bus source snapshot
     needs: main-guard
-    if: inputs.prepared_schema == 'v2' && github.event_name == 'workflow_dispatch' && needs.main-guard.result == 'success' && inputs.v2_expected_snapshot_id != 'TNDS-TRUST-DIAGNOSTIC-C1A' && inputs.v2_expected_snapshot_id != 'TNDS-TRUST-PREFLIGHT-C1B' && !startsWith(inputs.v2_expected_snapshot_id, 'TNDS-TRUST-')
+    if: inputs.prepared_schema == 'v2' && github.event_name == 'workflow_dispatch' && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == '' && inputs.v2_expected_snapshot_id != 'TNDS-TRUST-DIAGNOSTIC-C1A' && inputs.v2_expected_snapshot_id != 'TNDS-TRUST-PREFLIGHT-C1B' && !startsWith(inputs.v2_expected_snapshot_id, 'TNDS-TRUST-')
     uses: ./.github/workflows/atlas-reference-data-source.yml
     with:
       v2_source_snapshot_run_id: ${{ inputs.v2_source_snapshot_run_id }}
@@ -395,7 +431,7 @@ jobs:
   reference-diagnostic:
     name: Prepare and diagnose v2 Bus data
     needs: [main-guard, reference-source]
-    if: inputs.prepared_schema == 'v2' && needs.main-guard.result == 'success' && needs.reference-source.result == 'success'
+    if: inputs.prepared_schema == 'v2' && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == '' && needs.reference-source.result == 'success'
     uses: ./.github/workflows/atlas-reference-data-diagnostic.yml
     with:
       source_snapshot_artifact: ${{ needs.reference-source.outputs.snapshot_artifact }}
@@ -413,7 +449,7 @@ jobs:
   tnds-trust-offline-preflight:
     name: Run offline TNDS TRUST C1B preflight
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && inputs.prepared_schema == 'v2' && inputs.measure_only == true && inputs.force_refresh == true && inputs.resume_checkpoint_run_id == '' && inputs.v2_source_snapshot_run_id == '' && inputs.v2_expected_snapshot_id == 'TNDS-TRUST-PREFLIGHT-C1B' && inputs.v2_expected_source_count == '' && inputs.v2_expected_total_bytes == '' && needs.main-guard.result == 'success'
+    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && inputs.prepared_schema == 'v2' && inputs.measure_only == true && inputs.force_refresh == true && inputs.resume_checkpoint_run_id == '' && inputs.v2_source_snapshot_run_id == '' && inputs.v2_expected_snapshot_id == 'TNDS-TRUST-PREFLIGHT-C1B' && inputs.v2_expected_source_count == '' && inputs.v2_expected_total_bytes == '' && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == ''
     uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml
     with:
       mode: offline_preflight
@@ -424,11 +460,37 @@ jobs:
   tnds-trust-live-diagnostic:
     name: Run quarantined TNDS TRUST live diagnostic
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && inputs.prepared_schema == 'v2' && inputs.measure_only == true && inputs.force_refresh == true && inputs.resume_checkpoint_run_id == '' && inputs.v2_expected_snapshot_id == 'TNDS-TRUST-DIAGNOSTIC-C1A' && inputs.v2_expected_source_count == '' && inputs.v2_expected_total_bytes == '' && needs.main-guard.result == 'success'
+    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && inputs.prepared_schema == 'v2' && inputs.measure_only == true && inputs.force_refresh == true && inputs.resume_checkpoint_run_id == '' && inputs.v2_expected_snapshot_id == 'TNDS-TRUST-DIAGNOSTIC-C1A' && inputs.v2_expected_source_count == '' && inputs.v2_expected_total_bytes == '' && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == ''
     uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml
     with:
       mode: live_trust
       prior_producer_run_id: ${{ inputs.v2_source_snapshot_run_id }}
+    secrets:
+      TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
+      TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
+    permissions:
+      actions: read
+      contents: read
+
+  tnds-trust-browser-offline-preflight:
+    name: Run default-branch-compatible TNDS TRUST offline preflight
+    needs: main-guard
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c1-browser-dispatch-entry' && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'offline_preflight'
+    uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml
+    with:
+      mode: offline_preflight
+    permissions:
+      actions: read
+      contents: read
+
+  tnds-trust-browser-live:
+    name: Run default-branch-compatible TNDS TRUST live diagnostic
+    needs: main-guard
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c1-browser-dispatch-entry' && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'live_trust'
+    uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml
+    with:
+      mode: live_trust
+      prior_producer_run_id: ${{ needs.main-guard.outputs.trust_prior_producer_run_id }}
     secrets:
       TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
       TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}

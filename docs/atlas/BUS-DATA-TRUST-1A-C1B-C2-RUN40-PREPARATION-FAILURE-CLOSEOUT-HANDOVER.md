@@ -40,7 +40,7 @@ Run #39 was an offline preflight. It proved workflow and small synthetic behavio
 
 ## Synthetic national rehearsal
 
-The Python integration test creates eight ZIP archives and runs the real Python-to-Node preparation chain with 36 XML files per region (288 total), 288 services, 576 distinct StopPoint IDs, 16 shard keys per region, and each service represented across two shard keys. It asserts one preparer subprocess per region, no buffered stdout, exact eight-region aggregate coverage, all services retained, multiple shard files materialized, and completed regional input cleanup. Two-clock replay hashes of the established manifest and shard set are identical. Node’s existing 1,800-file materialization stress test and explicit oversized-XML rejection also pass.
+The Python integration test creates eight ZIP archives and runs the real Python-to-Node preparation chain with 36 XML files per region (288 total), 288 services, 576 distinct StopPoint IDs, 32 shard keys per region (256 region-key combinations), with each service represented across two shard keys. It asserts one preparer subprocess per region, no buffered stdout, exact eight-region aggregate coverage, all services retained, multiple shard files materialized, and completed regional input cleanup. Two-clock replay hashes of the established manifest and shard set are identical. Node’s existing 1,800-file materialization stress test and explicit oversized-XML rejection also pass.
 
 ## Test results
 

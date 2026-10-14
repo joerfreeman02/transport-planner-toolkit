@@ -1,0 +1,1346 @@
+{
+  "schema": "atlas-primary-unresolved-forensic-v2",
+  "snapshotId": "cf0c64b980b0516378bb705843d428a74a797d19f527f79c6c43a5540f0b8bde",
+  "sourceWindow": "2026-10-13 frozen ACQ-1 BODS/NaPTAN evidence",
+  "coverageLedgerSha256": "aee79d3dd4a91b9c384021cd9c54989be89789e6e10a2aef467a55970c1c7731",
+  "unresolvedScheduledCallCount": 4908,
+  "knownBaselineUnresolvedCount": 4908,
+  "baselineCountMatches": true,
+  "distinctRegions": 9,
+  "countsByRegion": {
+    "east_anglia": 290,
+    "east_midlands": 162,
+    "london": 1748,
+    "north_east": 430,
+    "north_west": 118,
+    "south_east": 1519,
+    "south_west": 58,
+    "west_midlands": 391,
+    "yorkshire": 192
+  },
+  "countsByMatchMethod": {
+    "unresolved": 4908
+  },
+  "countsByRouteNumberTop25": [
+    {
+      "routeNumber": "80",
+      "count": 520
+    },
+    {
+      "routeNumber": "213",
+      "count": 415
+    },
+    {
+      "routeNumber": "B12",
+      "count": 338
+    },
+    {
+      "routeNumber": "151",
+      "count": 328
+    },
+    {
+      "routeNumber": "27",
+      "count": 308
+    },
+    {
+      "routeNumber": "434",
+      "count": 294
+    },
+    {
+      "routeNumber": "403",
+      "count": 270
+    },
+    {
+      "routeNumber": "26",
+      "count": 240
+    },
+    {
+      "routeNumber": "X22",
+      "count": 148
+    },
+    {
+      "routeNumber": "100",
+      "count": 146
+    },
+    {
+      "routeNumber": "2",
+      "count": 140
+    },
+    {
+      "routeNumber": "31",
+      "count": 94
+    },
+    {
+      "routeNumber": "272",
+      "count": 86
+    },
+    {
+      "routeNumber": "430",
+      "count": 78
+    },
+    {
+      "routeNumber": "435",
+      "count": 77
+    },
+    {
+      "routeNumber": "229",
+      "count": 72
+    },
+    {
+      "routeNumber": "84",
+      "count": 68
+    },
+    {
+      "routeNumber": "159",
+      "count": 68
+    },
+    {
+      "routeNumber": "7",
+      "count": 67
+    },
+    {
+      "routeNumber": "704",
+      "count": 64
+    },
+    {
+      "routeNumber": "79",
+      "count": 62
+    },
+    {
+      "routeNumber": "270",
+      "count": 60
+    },
+    {
+      "routeNumber": "620",
+      "count": 57
+    },
+    {
+      "routeNumber": "H2B",
+      "count": 55
+    },
+    {
+      "routeNumber": "26A",
+      "count": 48
+    }
+  ],
+  "countsByOperatorTop25": [
+    {
+      "operator": "Go Ahead Luton Parkway",
+      "count": 1422
+    },
+    {
+      "operator": "Go Ahead London",
+      "count": 743
+    },
+    {
+      "operator": "Metrobus",
+      "count": 505
+    },
+    {
+      "operator": "Central Connect",
+      "count": 434
+    },
+    {
+      "operator": "Arriva North East",
+      "count": 400
+    },
+    {
+      "operator": "Arriva Midlands",
+      "count": 308
+    },
+    {
+      "operator": "Diamond Bus South East",
+      "count": 189
+    },
+    {
+      "operator": "Hodgsons",
+      "count": 146
+    },
+    {
+      "operator": "West Berkshire Council Transport Services",
+      "count": 94
+    },
+    {
+      "operator": "Carousel Buses",
+      "count": 94
+    },
+    {
+      "operator": "Regent Coaches",
+      "count": 90
+    },
+    {
+      "operator": "Diamond Bus",
+      "count": 81
+    },
+    {
+      "operator": "Arriva Beds and Bucks",
+      "count": 68
+    },
+    {
+      "operator": "Kirkby Lonsdale Coaches",
+      "count": 65
+    },
+    {
+      "operator": "Thames Valley Buses",
+      "count": 64
+    },
+    {
+      "operator": "Arriva North West",
+      "count": 24
+    },
+    {
+      "operator": "Redline",
+      "count": 24
+    },
+    {
+      "operator": "Link Network",
+      "count": 22
+    },
+    {
+      "operator": "Connexions Buses",
+      "count": 20
+    },
+    {
+      "operator": "Squarepeg",
+      "count": 19
+    },
+    {
+      "operator": "Bland's",
+      "count": 14
+    },
+    {
+      "operator": "Stanley Travel",
+      "count": 12
+    },
+    {
+      "operator": "Newport Bus",
+      "count": 11
+    },
+    {
+      "operator": "TLC Travel",
+      "count": 11
+    },
+    {
+      "operator": "Reays Coaches",
+      "count": 10
+    }
+  ],
+  "topStopNames": [
+    {
+      "stopName": "Brabham Court",
+      "count": 747
+    },
+    {
+      "stopName": "Stonecot Hill",
+      "count": 520
+    },
+    {
+      "stopName": "PSMWGH",
+      "count": 338
+    },
+    {
+      "stopName": "Greenfield Park",
+      "count": 334
+    },
+    {
+      "stopName": "Park Lane / Fairfield Halls",
+      "count": 270
+    },
+    {
+      "stopName": "Redhill Bus Station 4.",
+      "count": 155
+    },
+    {
+      "stopName": "Woodlands Grove, Rickman Hill",
+      "count": 154
+    },
+    {
+      "stopName": "WDCTGR",
+      "count": 140
+    },
+    {
+      "stopName": "Lodge Way Hail&Ride (26)",
+      "count": 96
+    },
+    {
+      "stopName": "Beaconsfield, Seeleys Road",
+      "count": 94
+    },
+    {
+      "stopName": "Shops",
+      "count": 77
+    },
+    {
+      "stopName": "Westbourne Rise",
+      "count": 77
+    },
+    {
+      "stopName": "Green Lane",
+      "count": 77
+    },
+    {
+      "stopName": "Glebe Road Junction",
+      "count": 77
+    },
+    {
+      "stopName": "Waterbeach, NHS Staff Accommodation",
+      "count": 73
+    },
+    {
+      "stopName": "Waterbeach, NHS Staff Accommodation (N)",
+      "count": 73
+    },
+    {
+      "stopName": "Heathrow Terminal 3 Departures (Set down only)",
+      "count": 72
+    },
+    {
+      "stopName": "Anchor Rd",
+      "count": 72
+    },
+    {
+      "stopName": "Mallow Gate",
+      "count": 68
+    },
+    {
+      "stopName": "Holiday Inn Staybridge",
+      "count": 67
+    },
+    {
+      "stopName": "Dover Road South, Dover Road South",
+      "count": 64
+    },
+    {
+      "stopName": "War Memorial, Hornby",
+      "count": 55
+    },
+    {
+      "stopName": "Stone Cross.",
+      "count": 52
+    },
+    {
+      "stopName": "Stone Cross",
+      "count": 51
+    },
+    {
+      "stopName": "Courtyard Marriott",
+      "count": 50
+    }
+  ],
+  "gtfsLineageJoin": {
+    "gtfs_stop_found": 4908,
+    "trip_found": 4908,
+    "trip_route_consistent": 4908
+  },
+  "lineageFields": {
+    "unresolved_stop_point_id": 4908
+  },
+  "uniqueTrips": 3255,
+  "uniqueTripCount": 3255,
+  "uniqueGtfsStopIdCount": 161,
+  "uniqueGtfsStopCodeCount": 0,
+  "uniqueRouteIdCount": 80,
+  "uniqueRouteNumberCount": 78,
+  "uniqueOperatorCount": 38,
+  "naPTANExactIdentityCheck": {
+    "gtfsStopIdBlank": 0,
+    "gtfsStopIdAtcoShapeCompatible": 4272,
+    "gtfsStopIdNonAtcoOrInternalShape": 636,
+    "gtfsStopCodeBlank": 4908,
+    "gtfsStopCodePresent": 0,
+    "gtfsStopCodeNaptanShapeCompatible": 0,
+    "exactAtcoCodeMatches": 0,
+    "exactNaptanCodeMatches": 0,
+    "nonmatchingStopIds": 4908,
+    "nonmatchingStopCodes": 0,
+    "stopPointCountWithAtco": 436777,
+    "stopPointCountWithNaptanCode": 410438,
+    "atcoShapePatterns": [
+      {
+        "shape": "9999AAA99999",
+        "count": 78847
+      },
+      {
+        "shape": "999999999",
+        "count": 56323
+      },
+      {
+        "shape": "999999999999",
+        "count": 48280
+      },
+      {
+        "shape": "9999A999999",
+        "count": 25122
+      },
+      {
+        "shape": "999999999A",
+        "count": 23071
+      },
+      {
+        "shape": "9999AA9999",
+        "count": 21705
+      },
+      {
+        "shape": "99999999999",
+        "count": 19382
+      },
+      {
+        "shape": "9999AA99999",
+        "count": 16981
+      },
+      {
+        "shape": "99999999",
+        "count": 14394
+      },
+      {
+        "shape": "9999999",
+        "count": 11383
+      },
+      {
+        "shape": "9999AAA9999",
+        "count": 10588
+      },
+      {
+        "shape": "9999999999",
+        "count": 9399
+      },
+      {
+        "shape": "9999A9999",
+        "count": 8349
+      },
+      {
+        "shape": "9999A99999A",
+        "count": 7796
+      },
+      {
+        "shape": "9999AAAA9999",
+        "count": 7568
+      },
+      {
+        "shape": "99999999999A",
+        "count": 7014
+      },
+      {
+        "shape": "9999AA999999",
+        "count": 6773
+      },
+      {
+        "shape": "9999A999999A",
+        "count": 5930
+      },
+      {
+        "shape": "9999AAAAAAA9",
+        "count": 5724
+      },
+      {
+        "shape": "99999999A",
+        "count": 5645
+      },
+      {
+        "shape": "999999999AA",
+        "count": 5374
+      },
+      {
+        "shape": "9999AAA999",
+        "count": 4970
+      },
+      {
+        "shape": "9999AAAAA999",
+        "count": 4257
+      },
+      {
+        "shape": "999999999AAA",
+        "count": 3884
+      },
+      {
+        "shape": "9999AA999",
+        "count": 3521
+      },
+      {
+        "shape": "9999A999",
+        "count": 3376
+      },
+      {
+        "shape": "9999AAAAAAA",
+        "count": 2802
+      },
+      {
+        "shape": "9999A99999",
+        "count": 2496
+      },
+      {
+        "shape": "9999AA99",
+        "count": 2192
+      },
+      {
+        "shape": "999999999A9",
+        "count": 1329
+      },
+      {
+        "shape": "999999",
+        "count": 1195
+      },
+      {
+        "shape": "9999AAAAAA9",
+        "count": 847
+      },
+      {
+        "shape": "9999AAA9",
+        "count": 731
+      },
+      {
+        "shape": "9999AAAA9",
+        "count": 702
+      },
+      {
+        "shape": "9999999999A9",
+        "count": 531
+      },
+      {
+        "shape": "9999AAA",
+        "count": 512
+      },
+      {
+        "shape": "9999A999A999",
+        "count": 511
+      },
+      {
+        "shape": "9999999999A",
+        "count": 478
+      },
+      {
+        "shape": "9999AAAA",
+        "count": 470
+      },
+      {
+        "shape": "9999AAAAAA",
+        "count": 469
+      },
+      {
+        "shape": "999999999A99",
+        "count": 419
+      },
+      {
+        "shape": "9999AA9999A",
+        "count": 392
+      },
+      {
+        "shape": "9999AAAA999",
+        "count": 367
+      },
+      {
+        "shape": "9999AAAAA9",
+        "count": 336
+      },
+      {
+        "shape": "9999AA999A",
+        "count": 297
+      },
+      {
+        "shape": "9999AAAA9A9",
+        "count": 296
+      },
+      {
+        "shape": "9999AAA99",
+        "count": 287
+      },
+      {
+        "shape": "9999A9999999",
+        "count": 286
+      },
+      {
+        "shape": "9999A99",
+        "count": 267
+      },
+      {
+        "shape": "9999AAAAA",
+        "count": 238
+      },
+      {
+        "shape": "9999AA999AA",
+        "count": 227
+      },
+      {
+        "shape": "9999AAAA9A",
+        "count": 214
+      },
+      {
+        "shape": "9999AAAAAAAA",
+        "count": 201
+      },
+      {
+        "shape": "99999999AA99",
+        "count": 194
+      },
+      {
+        "shape": "9999AA9999AA",
+        "count": 155
+      },
+      {
+        "shape": "9999999999AA",
+        "count": 125
+      },
+      {
+        "shape": "9999999AAAAA",
+        "count": 115
+      },
+      {
+        "shape": "9999A9",
+        "count": 113
+      },
+      {
+        "shape": "99999",
+        "count": 107
+      },
+      {
+        "shape": "9999AAA999A",
+        "count": 91
+      },
+      {
+        "shape": "9999AA99A",
+        "count": 78
+      },
+      {
+        "shape": "99999999AAAA",
+        "count": 77
+      },
+      {
+        "shape": "999999AA99",
+        "count": 71
+      },
+      {
+        "shape": "999999999AA9",
+        "count": 69
+      },
+      {
+        "shape": "9999999AA99A",
+        "count": 61
+      },
+      {
+        "shape": "9999AAAAAA99",
+        "count": 58
+      },
+      {
+        "shape": "9999AAAA99",
+        "count": 56
+      },
+      {
+        "shape": "9999AA9",
+        "count": 49
+      },
+      {
+        "shape": "9999AA99999A",
+        "count": 45
+      },
+      {
+        "shape": "99999AAA9999",
+        "count": 43
+      },
+      {
+        "shape": "9999AAA99A",
+        "count": 36
+      },
+      {
+        "shape": "99999999AA",
+        "count": 31
+      },
+      {
+        "shape": "999999AAA999",
+        "count": 30
+      },
+      {
+        "shape": "9999AA999AAA",
+        "count": 30
+      },
+      {
+        "shape": "9999999AA999",
+        "count": 29
+      },
+      {
+        "shape": "9999AAA9999A",
+        "count": 24
+      },
+      {
+        "shape": "99999999A99",
+        "count": 21
+      },
+      {
+        "shape": "9999AAAAAA9A",
+        "count": 19
+      },
+      {
+        "shape": "999999A99",
+        "count": 18
+      },
+      {
+        "shape": "9999AAA9A9",
+        "count": 16
+      },
+      {
+        "shape": "9999AA99A9",
+        "count": 16
+      },
+      {
+        "shape": "9999AAAAA99",
+        "count": 16
+      },
+      {
+        "shape": "9999AAA99A9",
+        "count": 14
+      },
+      {
+        "shape": "99999999AAA",
+        "count": 13
+      },
+      {
+        "shape": "9999999AAA9",
+        "count": 12
+      },
+      {
+        "shape": "99999999AAA9",
+        "count": 11
+      },
+      {
+        "shape": "99999999A9",
+        "count": 11
+      },
+      {
+        "shape": "9999AA999A99",
+        "count": 10
+      },
+      {
+        "shape": "9999999A9999",
+        "count": 9
+      },
+      {
+        "shape": "9999AA99AA",
+        "count": 9
+      },
+      {
+        "shape": "99999AAA999",
+        "count": 8
+      },
+      {
+        "shape": "9999999AA",
+        "count": 8
+      },
+      {
+        "shape": "9999AAA999A9",
+        "count": 8
+      },
+      {
+        "shape": "99999AA99",
+        "count": 8
+      },
+      {
+        "shape": "9999999A9",
+        "count": 7
+      },
+      {
+        "shape": "9999AAA99AAA",
+        "count": 7
+      },
+      {
+        "shape": "9999AAA999AA",
+        "count": 6
+      },
+      {
+        "shape": "99999999A999",
+        "count": 5
+      },
+      {
+        "shape": "9999999A",
+        "count": 5
+      },
+      {
+        "shape": "99999A999999",
+        "count": 5
+      },
+      {
+        "shape": "99999AA999",
+        "count": 4
+      },
+      {
+        "shape": "9999AAAA9AA9",
+        "count": 4
+      },
+      {
+        "shape": "9999AAAAA9AA",
+        "count": 4
+      },
+      {
+        "shape": "9999A9A9999",
+        "count": 4
+      },
+      {
+        "shape": "9999AAAA9AA",
+        "count": 3
+      },
+      {
+        "shape": "9999AAAAA9A",
+        "count": 3
+      },
+      {
+        "shape": "99999AA9999",
+        "count": 3
+      },
+      {
+        "shape": "9999A999A",
+        "count": 3
+      },
+      {
+        "shape": "999AAAAAAA9",
+        "count": 2
+      },
+      {
+        "shape": "999999AAA99",
+        "count": 2
+      },
+      {
+        "shape": "9999AAA9A",
+        "count": 2
+      },
+      {
+        "shape": "9999AAAA99A",
+        "count": 2
+      },
+      {
+        "shape": "9999AA999A9",
+        "count": 2
+      },
+      {
+        "shape": "9999AA9999A9",
+        "count": 2
+      },
+      {
+        "shape": "999999A99999",
+        "count": 2
+      },
+      {
+        "shape": "9999A9999A",
+        "count": 2
+      },
+      {
+        "shape": "9999A99AAAA9",
+        "count": 2
+      },
+      {
+        "shape": "9999AAA99AA",
+        "count": 2
+      },
+      {
+        "shape": "9999999AAAA9",
+        "count": 2
+      },
+      {
+        "shape": "99999AA99A",
+        "count": 2
+      },
+      {
+        "shape": "9999AA99AAA",
+        "count": 1
+      },
+      {
+        "shape": "999999AAAAA",
+        "count": 1
+      },
+      {
+        "shape": "999999AAA9",
+        "count": 1
+      },
+      {
+        "shape": "99999AAAAAA",
+        "count": 1
+      },
+      {
+        "shape": "9999A99A999",
+        "count": 1
+      },
+      {
+        "shape": "9999A99A999A",
+        "count": 1
+      },
+      {
+        "shape": "9999AA9AA",
+        "count": 1
+      },
+      {
+        "shape": "9999AA99A9A",
+        "count": 1
+      },
+      {
+        "shape": "9999A9AAAAAA",
+        "count": 1
+      },
+      {
+        "shape": "9999AAAAA99A",
+        "count": 1
+      },
+      {
+        "shape": "9999AA9A",
+        "count": 1
+      },
+      {
+        "shape": "9999AA9A99",
+        "count": 1
+      },
+      {
+        "shape": "9999AA9A9",
+        "count": 1
+      },
+      {
+        "shape": "9999AAAA99A9",
+        "count": 1
+      },
+      {
+        "shape": "9999A99AAAA",
+        "count": 1
+      },
+      {
+        "shape": "99999999A9A",
+        "count": 1
+      },
+      {
+        "shape": "9999AA",
+        "count": 1
+      },
+      {
+        "shape": "99999999AA9",
+        "count": 1
+      },
+      {
+        "shape": "999A99999AAA",
+        "count": 1
+      },
+      {
+        "shape": "9999999AAA99",
+        "count": 1
+      },
+      {
+        "shape": "999999AA9999",
+        "count": 1
+      },
+      {
+        "shape": "99999AA999A",
+        "count": 1
+      },
+      {
+        "shape": "99999AA999AA",
+        "count": 1
+      },
+      {
+        "shape": "9999999AA99",
+        "count": 1
+      },
+      {
+        "shape": "9999A9A9",
+        "count": 1
+      },
+      {
+        "shape": "9999A99A",
+        "count": 1
+      },
+      {
+        "shape": "99999A9999",
+        "count": 1
+      },
+      {
+        "shape": "999999A",
+        "count": 1
+      }
+    ],
+    "naptanCodeShapePatterns": [
+      {
+        "shape": "AAAAAAAA",
+        "count": 237507
+      },
+      {
+        "shape": "99999999",
+        "count": 86729
+      },
+      {
+        "shape": "AAAAAAA",
+        "count": 65174
+      },
+      {
+        "shape": "99999",
+        "count": 19265
+      },
+      {
+        "shape": "9999999",
+        "count": 1129
+      },
+      {
+        "shape": "AAAAAA",
+        "count": 606
+      },
+      {
+        "shape": "AAAAA",
+        "count": 49
+      },
+      {
+        "shape": "AAAAAAAAA",
+        "count": 41
+      },
+      {
+        "shape": "999999",
+        "count": 26
+      },
+      {
+        "shape": "999999999",
+        "count": 3
+      }
+    ],
+    "shapeMatchingIsDiagnosticOnly": true,
+    "stopIdComparedOnlyToAtcoCode": true,
+    "stopCodeComparedOnlyToNaptanCode": true,
+    "fuzzyMatchingUsed": false,
+    "spatialMatchingUsed": false,
+    "identityResolutionActivated": false
+  },
+  "topGtfsStopIds": [
+    {
+      "gtfsStopId": "490000283N",
+      "count": 747
+    },
+    {
+      "gtfsStopId": "490013608N1",
+      "count": 520
+    },
+    {
+      "gtfsStopId": "490006706C13",
+      "count": 270
+    },
+    {
+      "gtfsStopId": "490002249Z",
+      "count": 178
+    },
+    {
+      "gtfsStopId": "3100Z269882",
+      "count": 168
+    },
+    {
+      "gtfsStopId": "3100Z269382",
+      "count": 166
+    },
+    {
+      "gtfsStopId": "490002249Y",
+      "count": 160
+    },
+    {
+      "gtfsStopId": "00000000ADI7",
+      "count": 155
+    },
+    {
+      "gtfsStopId": "490017851W",
+      "count": 154
+    },
+    {
+      "gtfsStopId": "490016489N1",
+      "count": 140
+    },
+    {
+      "gtfsStopId": "00000000PBXR",
+      "count": 96
+    },
+    {
+      "gtfsStopId": "3500B298300",
+      "count": 77
+    },
+    {
+      "gtfsStopId": "3500B452103",
+      "count": 77
+    },
+    {
+      "gtfsStopId": "3500B455001",
+      "count": 77
+    },
+    {
+      "gtfsStopId": "3500B455003",
+      "count": 77
+    },
+    {
+      "gtfsStopId": "00000000O4JJ",
+      "count": 73
+    },
+    {
+      "gtfsStopId": "00000000O4JK",
+      "count": 73
+    },
+    {
+      "gtfsStopId": "49000802621",
+      "count": 72
+    },
+    {
+      "gtfsStopId": "43007280002",
+      "count": 72
+    },
+    {
+      "gtfsStopId": "049004005025",
+      "count": 68
+    },
+    {
+      "gtfsStopId": "490020173E",
+      "count": 67
+    },
+    {
+      "gtfsStopId": "03700999",
+      "count": 64
+    },
+    {
+      "gtfsStopId": "2500120601",
+      "count": 55
+    },
+    {
+      "gtfsStopId": "00000000A8G0",
+      "count": 52
+    },
+    {
+      "gtfsStopId": "00000000A8FX",
+      "count": 51
+    }
+  ],
+  "topGtfsStopCodes": [],
+  "gtfsStopIdRepeatCountDistribution": {
+    "1": 11,
+    "2": 48,
+    "3": 5,
+    "4": 17,
+    "5": 1,
+    "6": 12,
+    "7": 3,
+    "8": 2,
+    "10": 4,
+    "11": 3,
+    "12": 1,
+    "13": 3,
+    "16": 1,
+    "17": 3,
+    "18": 2,
+    "19": 1,
+    "20": 5,
+    "22": 1,
+    "24": 3,
+    "37": 1,
+    "40": 1,
+    "42": 1,
+    "46": 1,
+    "48": 5,
+    "50": 1,
+    "51": 1,
+    "52": 1,
+    "55": 1,
+    "64": 1,
+    "67": 1,
+    "68": 1,
+    "72": 2,
+    "73": 2,
+    "77": 4,
+    "96": 1,
+    "140": 1,
+    "154": 1,
+    "155": 1,
+    "160": 1,
+    "166": 1,
+    "168": 1,
+    "178": 1,
+    "270": 1,
+    "520": 1,
+    "747": 1
+  },
+  "gtfsStopCodeRepeatCountDistribution": {},
+  "repeatAndConcentration": {
+    "calls": 4908,
+    "distinctNonblankGtfsStopIds": 161,
+    "callsOnRepeatedGtfsStopIds": 4897,
+    "singleUseGtfsStopIdCount": 11,
+    "top10GtfsStopIdCallCount": 2658,
+    "top10GtfsStopIdCallShare": 0.541565,
+    "top5RouteCallCount": 1909,
+    "top5RouteCallShare": 0.388957,
+    "top5OperatorCallCount": 3504,
+    "top5OperatorCallShare": 0.713936,
+    "topRegionOperatorPairs": [
+      {
+        "region": "london",
+        "operator": "Go Ahead Luton Parkway",
+        "count": 778
+      },
+      {
+        "region": "london",
+        "operator": "Go Ahead London",
+        "count": 743
+      },
+      {
+        "region": "south_east",
+        "operator": "Go Ahead Luton Parkway",
+        "count": 644
+      },
+      {
+        "region": "south_east",
+        "operator": "Metrobus",
+        "count": 505
+      },
+      {
+        "region": "north_east",
+        "operator": "Arriva North East",
+        "count": 379
+      },
+      {
+        "region": "west_midlands",
+        "operator": "Arriva Midlands",
+        "count": 308
+      },
+      {
+        "region": "east_anglia",
+        "operator": "Central Connect",
+        "count": 290
+      },
+      {
+        "region": "london",
+        "operator": "Diamond Bus South East",
+        "count": 189
+      },
+      {
+        "region": "east_midlands",
+        "operator": "Central Connect",
+        "count": 144
+      },
+      {
+        "region": "yorkshire",
+        "operator": "Hodgsons",
+        "count": 109
+      },
+      {
+        "region": "south_east",
+        "operator": "Carousel Buses",
+        "count": 94
+      },
+      {
+        "region": "south_east",
+        "operator": "Regent Coaches",
+        "count": 90
+      },
+      {
+        "region": "west_midlands",
+        "operator": "Diamond Bus",
+        "count": 81
+      },
+      {
+        "region": "south_east",
+        "operator": "Arriva Beds and Bucks",
+        "count": 68
+      },
+      {
+        "region": "north_west",
+        "operator": "Kirkby Lonsdale Coaches",
+        "count": 59
+      },
+      {
+        "region": "south_east",
+        "operator": "West Berkshire Council Transport Services",
+        "count": 47
+      },
+      {
+        "region": "south_west",
+        "operator": "West Berkshire Council Transport Services",
+        "count": 47
+      },
+      {
+        "region": "north_east",
+        "operator": "Hodgsons",
+        "count": 37
+      },
+      {
+        "region": "south_east",
+        "operator": "Thames Valley Buses",
+        "count": 34
+      },
+      {
+        "region": "london",
+        "operator": "Thames Valley Buses",
+        "count": 30
+      },
+      {
+        "region": "north_west",
+        "operator": "Arriva North West",
+        "count": 24
+      },
+      {
+        "region": "south_east",
+        "operator": "Redline",
+        "count": 24
+      },
+      {
+        "region": "north_west",
+        "operator": "Link Network",
+        "count": 22
+      },
+      {
+        "region": "yorkshire",
+        "operator": "Arriva North East",
+        "count": 21
+      },
+      {
+        "region": "yorkshire",
+        "operator": "Connexions Buses",
+        "count": 20
+      }
+    ]
+  },
+  "duplicateGtfsKeys": {
+    "counts": {
+      "agency.txt.duplicateKeyCount": 0,
+      "agency.txt.duplicateRowCount": 0,
+      "routes.txt.duplicateKeyCount": 0,
+      "routes.txt.duplicateRowCount": 0,
+      "stops.txt.duplicateKeyCount": 0,
+      "stops.txt.duplicateRowCount": 0,
+      "trips.txt.duplicateKeyCount": 0,
+      "trips.txt.duplicateRowCount": 0
+    },
+    "samplesByRegionAndTable": {
+      "east_anglia:routes.txt": [],
+      "east_anglia:trips.txt": [],
+      "east_anglia:stops.txt": [],
+      "east_anglia:agency.txt": [],
+      "east_midlands:routes.txt": [],
+      "east_midlands:trips.txt": [],
+      "east_midlands:stops.txt": [],
+      "east_midlands:agency.txt": [],
+      "london:routes.txt": [],
+      "london:trips.txt": [],
+      "london:stops.txt": [],
+      "london:agency.txt": [],
+      "north_east:routes.txt": [],
+      "north_east:trips.txt": [],
+      "north_east:stops.txt": [],
+      "north_east:agency.txt": [],
+      "north_west:routes.txt": [],
+      "north_west:trips.txt": [],
+      "north_west:stops.txt": [],
+      "north_west:agency.txt": [],
+      "south_east:routes.txt": [],
+      "south_east:trips.txt": [],
+      "south_east:stops.txt": [],
+      "south_east:agency.txt": [],
+      "south_west:routes.txt": [],
+      "south_west:trips.txt": [],
+      "south_west:stops.txt": [],
+      "south_west:agency.txt": [],
+      "west_midlands:routes.txt": [],
+      "west_midlands:trips.txt": [],
+      "west_midlands:stops.txt": [],
+      "west_midlands:agency.txt": [],
+      "yorkshire:routes.txt": [],
+      "yorkshire:trips.txt": [],
+      "yorkshire:stops.txt": [],
+      "yorkshire:agency.txt": []
+    },
+    "duplicateKeysSuppressJoinRows": true
+  },
+  "diagnosticOnly": true,
+  "sourceSnapshotMutated": false,
+  "status": "PRIMARY_FORENSIC_LINEAGE_AVAILABLE",
+  "summarySha256": "9d014aef2c3b9b632085417c6091bd7ccdc96ea5b5f7f10a4427c47dde1be7dc"
+}

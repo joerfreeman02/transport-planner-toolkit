@@ -82,10 +82,25 @@ jobs:
         run: |
           echo '::error::Prepared-data v2 is diagnostic-only; measure_only=true is required on main and publication is disabled.'
           exit 1
-      - name: Refuse malformed TNDS TRUST diagnostic selection
-        if: inputs.v2_expected_snapshot_id == 'TNDS-TRUST-DIAGNOSTIC-C1A' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' || inputs.prepared_schema != 'v2' || inputs.measure_only != true || inputs.force_refresh != true || inputs.resume_checkpoint_run_id != '' || inputs.v2_source_snapshot_run_id != '' || inputs.v2_expected_source_count != '' || inputs.v2_expected_total_bytes != '')
+      - name: Refuse malformed TNDS TRUST selector
+        if: startsWith(inputs.v2_expected_snapshot_id, 'TNDS-TRUST-') && inputs.v2_expected_snapshot_id != 'TNDS-TRUST-DIAGNOSTIC-C1A' && inputs.v2_expected_snapshot_id != 'TNDS-TRUST-PREFLIGHT-C1B'
         run: |
-          echo '::error::TNDS TRUST diagnostic selection is valid only for a manual non-main v2 measure-only forced diagnostic with all unrelated snapshot inputs blank.'
+          echo '::error::Unrecognized TNDS TRUST selector; refusing before source acquisition.'
+          exit 1
+      - name: Refuse invalid TNDS TRUST diagnostic selection
+        if: inputs.v2_expected_snapshot_id == 'TNDS-TRUST-DIAGNOSTIC-C1A' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' || inputs.prepared_schema != 'v2' || inputs.measure_only != true || inputs.force_refresh != true || inputs.resume_checkpoint_run_id != '' || inputs.v2_expected_source_count != '' || inputs.v2_expected_total_bytes != '')
+        run: |
+          echo '::error::TNDS TRUST live selection requires manual non-main v2 measure-only forced diagnostic mode with unrelated snapshot inputs blank.'
+          exit 1
+      - name: Refuse invalid TNDS TRUST offline preflight selection
+        if: inputs.v2_expected_snapshot_id == 'TNDS-TRUST-PREFLIGHT-C1B' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' || inputs.prepared_schema != 'v2' || inputs.measure_only != true || inputs.force_refresh != true || inputs.resume_checkpoint_run_id != '' || inputs.v2_source_snapshot_run_id != '' || inputs.v2_expected_source_count != '' || inputs.v2_expected_total_bytes != '')
+        run: |
+          echo '::error::TNDS TRUST offline preflight requires manual non-main v2 measure-only forced mode and all unrelated snapshot inputs blank.'
+          exit 1
+      - name: Refuse expected snapshot without an explicit frozen producer run
+        if: inputs.v2_expected_snapshot_id != '' && !startsWith(inputs.v2_expected_snapshot_id, 'TNDS-TRUST-') && inputs.v2_source_snapshot_run_id == ''
+        run: |
+          echo '::error::A normal expected snapshot ID is valid only with an explicit frozen source producer run ID.'
           exit 1
       - name: Record safe execution mode
         run: |
@@ -365,7 +380,7 @@ jobs:
   reference-source:
     name: Acquire or reuse exact v2 Bus source snapshot
     needs: main-guard
-    if: inputs.prepared_schema == 'v2' && github.event_name == 'workflow_dispatch' && needs.main-guard.result == 'success' && inputs.v2_expected_snapshot_id != 'TNDS-TRUST-DIAGNOSTIC-C1A'
+    if: inputs.prepared_schema == 'v2' && github.event_name == 'workflow_dispatch' && needs.main-guard.result == 'success' && inputs.v2_expected_snapshot_id != 'TNDS-TRUST-DIAGNOSTIC-C1A' && inputs.v2_expected_snapshot_id != 'TNDS-TRUST-PREFLIGHT-C1B' && !startsWith(inputs.v2_expected_snapshot_id, 'TNDS-TRUST-')
     uses: ./.github/workflows/atlas-reference-data-source.yml
     with:
       v2_source_snapshot_run_id: ${{ inputs.v2_source_snapshot_run_id }}
@@ -395,11 +410,25 @@ jobs:
       actions: read
       contents: read
 
-  tnds-trust-diagnostic:
-    name: Run quarantined TNDS TRUST diagnostic
+  tnds-trust-offline-preflight:
+    name: Run offline TNDS TRUST C1B preflight
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && inputs.prepared_schema == 'v2' && inputs.measure_only == true && inputs.force_refresh == true && inputs.resume_checkpoint_run_id == '' && inputs.v2_source_snapshot_run_id == '' && inputs.v2_expected_snapshot_id == 'TNDS-TRUST-DIAGNOSTIC-C1A' && inputs.v2_expected_source_count == '' && inputs.v2_expected_total_bytes == '' && needs.main-guard.result == 'success'
+    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && inputs.prepared_schema == 'v2' && inputs.measure_only == true && inputs.force_refresh == true && inputs.resume_checkpoint_run_id == '' && inputs.v2_source_snapshot_run_id == '' && inputs.v2_expected_snapshot_id == 'TNDS-TRUST-PREFLIGHT-C1B' && inputs.v2_expected_source_count == '' && inputs.v2_expected_total_bytes == '' && needs.main-guard.result == 'success'
     uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml
+    with:
+      mode: offline_preflight
+    permissions:
+      actions: read
+      contents: read
+
+  tnds-trust-live-diagnostic:
+    name: Run quarantined TNDS TRUST live diagnostic
+    needs: main-guard
+    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && inputs.prepared_schema == 'v2' && inputs.measure_only == true && inputs.force_refresh == true && inputs.resume_checkpoint_run_id == '' && inputs.v2_expected_snapshot_id == 'TNDS-TRUST-DIAGNOSTIC-C1A' && inputs.v2_expected_source_count == '' && inputs.v2_expected_total_bytes == '' && needs.main-guard.result == 'success'
+    uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml
+    with:
+      mode: live_trust
+      prior_producer_run_id: ${{ inputs.v2_source_snapshot_run_id }}
     secrets:
       TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
       TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}

@@ -9,7 +9,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from refresh_bus_data import TNDS_HOST, TNDS_PATH, TNDS_REGIONS, tnds_region_from_filename
+from refresh_bus_data import (TNDS_HOST, TNDS_PATH, TNDS_REGIONS, RefreshError,
+                              select_tnds_region_archives)
 
 
 def _valid_mdtm(value: object) -> bool:
@@ -25,23 +26,17 @@ def probe(username: str, password: str) -> dict:
         with ftplib.FTP(TNDS_HOST, timeout=120) as ftp:
             ftp.login(username, password)
             ftp.cwd(TNDS_PATH)
-            candidates = {region: [] for region in TNDS_REGIONS}
-            for name in ftp.nlst():
-                if not isinstance(name, str) or not name.lower().endswith(".zip"):
-                    continue
-                region = tnds_region_from_filename(name)
-                if region in candidates:
-                    candidates[region].append(name)
+            names = [name for name in ftp.nlst() if isinstance(name, str)]
+            try:
+                selected = select_tnds_region_archives(names)
+            except RefreshError as error:
+                result["directoryError"] = str(error)
+                result["classification"] = "INVALID_DIRECTORY"
+                result["regions"] = {region: {"candidates": [], "matches": [], "metadataAvailable": False,
+                                              "classification": "DIRECTORY_REJECTED"} for region in TNDS_REGIONS}
+                return result
             for region in TNDS_REGIONS:
-                names = sorted(candidates[region], key=str.casefold)
-                if not names:
-                    result["regions"][region] = {"candidates": [], "matches": [], "metadataAvailable": False, "classification": "MISSING"}
-                    continue
-                if len(names) > 1:
-                    result["regions"][region] = {"candidates": names, "matches": [], "metadataAvailable": False, "classification": "AMBIGUOUS"}
-                    continue
-
-                name = names[0]
+                name = selected[region]
                 item = {"name": name}
                 try:
                     size = ftp.size(name)
@@ -60,7 +55,7 @@ def probe(username: str, password: str) -> dict:
                 available = size_valid and modified_valid
                 item["metadataAvailable"] = available
                 result["regions"][region] = {
-                    "candidates": names,
+                    "candidates": [name],
                     "matches": [item],
                     "metadataAvailable": available,
                     "classification": "RELIABLE_METADATA" if available else "INCOMPLETE_METADATA",
@@ -74,6 +69,25 @@ def probe(username: str, password: str) -> dict:
     except Exception as error:
         result["reason"] = type(error).__name__
     return result
+
+
+def validate_metadata_probe(result: dict) -> None:
+    """Fail closed unless authentication and exact eight-file metadata gate pass."""
+    if result.get("retrievalPerformed") is not False:
+        raise ValueError("TNDS metadata gate must not retrieve archives")
+    if result.get("classification") != "RELIABLE_METADATA_ONLY":
+        raise ValueError("TNDS metadata gate is not reliable")
+    regions = result.get("regions")
+    if not isinstance(regions, dict) or set(regions) != set(TNDS_REGIONS):
+        raise ValueError("TNDS metadata gate does not identify exactly eight regions")
+    for region in TNDS_REGIONS:
+        item = regions[region]
+        matches = item.get("matches") if isinstance(item, dict) else None
+        if item.get("classification") != "RELIABLE_METADATA" or item.get("metadataAvailable") is not True or len(item.get("candidates", [])) != 1 or not isinstance(matches, list) or len(matches) != 1:
+            raise ValueError(f"TNDS metadata is incomplete or ambiguous for {region}")
+        match = matches[0]
+        if not isinstance(match.get("size"), int) or isinstance(match.get("size"), bool) or match["size"] <= 0 or not _valid_mdtm(match.get("modified")):
+            raise ValueError(f"TNDS SIZE/MDTM metadata is invalid for {region}")
 
 
 def main() -> None:

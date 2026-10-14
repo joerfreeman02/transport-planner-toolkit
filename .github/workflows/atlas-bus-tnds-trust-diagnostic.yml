@@ -1,77 +1,260 @@
-name: ATLAS quarantined TNDS trust diagnostic
+name: ATLAS Bus TNDS TRUST diagnostic
 
 on:
   workflow_call:
+    inputs:
+      mode:
+        description: Offline zero-download preflight or quarantined live TRUST gate.
+        required: true
+        type: string
+      prior_producer_run_id:
+        description: Optional prior TRUST producer run ID, used only for verified raw snapshot reuse.
+        required: false
+        type: string
+        default: ''
     secrets:
       TNDS_USERNAME:
-        required: true
+        required: false
       TNDS_PASSWORD:
-        required: true
+        required: false
 
 permissions:
   actions: read
   contents: read
 
-concurrency:
-  group: atlas-tnds-trust-diagnostic-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
-  acquire-prepare-quarantine:
-    name: Acquire, validate, and quarantine TNDS
+  offline-preflight:
+    name: Offline C1B zero-download proof
+    if: inputs.mode == 'offline_preflight'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Check out the selected feature branch commit
+        uses: actions/checkout@v4
         with:
-          python-version: '3.11'
-      - uses: actions/setup-node@v4
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
           node-version: '22.x'
-      - name: Run isolated TNDS acquisition and preparation gate
-        id: tnds
-        env:
-          TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
-          TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
-        run: python tools/atlas-bus-data/tnds_trust_diagnostic.py
-      - name: Ensure secret-safe failure evidence exists
-        if: always()
-        env:
-          TNDS_STEP_OUTCOME: ${{ steps.tnds.outcome }}
+      - name: Run full Bus data, TNDS and workflow contract suite
+        run: python -m unittest discover -s tools/atlas-bus-data -p 'test_*.py' -v
+      - name: Run deterministic Alpha.15 suite
         run: |
+          set -o pipefail
+          node tests/atlas/run-all.mjs | tee "$RUNNER_TEMP/atlas-alpha15-suite.log"
+          grep -Fx 'ATLAS Alpha.15 deterministic suite passed.' "$RUNNER_TEMP/atlas-alpha15-suite.log"
+      - name: Record offline preflight evidence
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/tnds-evidence"
           python - <<'PY'
           import json, os
           from pathlib import Path
-          root = Path(os.environ['RUNNER_TEMP']) / 'tnds-evidence'
-          root.mkdir(parents=True, exist_ok=True)
-          path = root / 'run-evidence.json'
-          record = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {
-              'schema': 'atlas-tnds-trust-run-evidence-v2', 'stage': 'WORKFLOW_SETUP',
-              'result': 'FAILED', 'errorType': 'WorkflowStepFailure', 'snapshotId': None,
-              'completedRegions': [], 'expectedRegions': ['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y'],
-              'preparedManifestPresent': False, 'diagnosticOnly': True, 'plannerEligible': False,
-              'publicationAttempted': False, 'deploymentAttempted': False, 'secretValuesIncluded': False,
-              'producer': {'runId': os.environ.get('GITHUB_RUN_ID'), 'repositoryCommitSha': os.environ.get('GITHUB_SHA'),
-                           'repository': os.environ.get('GITHUB_REPOSITORY'), 'ref': os.environ.get('GITHUB_REF')}}
-          if os.environ.get('TNDS_STEP_OUTCOME') != 'success' and record.get('result') == 'RUNNING':
-              record['result'] = 'FAILED'
-              record['errorType'] = 'WorkflowStepFailure'
-          path.write_text(json.dumps(record, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          outcome = os.environ.get('PREFLIGHT_OUTCOME', 'unknown')
+          record = {
+              'schema': 'atlas-tnds-trust-offline-preflight-v1',
+              'stage': 'PREFLIGHT_SUCCEEDED' if outcome == 'success' else 'PREFLIGHT_FAILED',
+              'result': outcome,
+              'mode': 'offline_preflight',
+              'selector': 'TNDS-TRUST-PREFLIGHT-C1B',
+              'snapshotAcquired': False,
+              'tndsSecretsInjected': False,
+              'tndsFtpCalled': False,
+              'retrievalPerformed': False,
+              'boddsAcquired': False,
+              'publicationAttempted': False,
+              'deploymentAttempted': False,
+              'plannerEligible': False,
+              'commit': os.environ.get('GITHUB_SHA'),
+              'branch': os.environ.get('GITHUB_REF_NAME'),
+          }
+          Path(os.environ['RUNNER_TEMP'], 'tnds-evidence', 'run-evidence.json').write_text(json.dumps(record, indent=2) + '\n')
           PY
-      - name: Upload quarantined raw TNDS snapshot
-        if: always() && steps.tnds.outputs.snapshot_available == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: atlas-tnds-quarantined-${{ github.run_id }}
-          path: ${{ runner.temp }}/tnds-quarantined-snapshot/
-          if-no-files-found: warn
-          retention-days: 14
-      - name: Upload secret-free preparation and gate evidence
+        env:
+          PREFLIGHT_OUTCOME: ${{ job.status }}
+      - name: Upload offline preflight evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: atlas-tnds-trust-diagnostic-${{ github.run_id }}
-          path: ${{ runner.temp }}/tnds-evidence/
+          name: atlas-tnds-trust-offline-preflight-${{ github.run_id }}
+          path: ${{ runner.temp }}/tnds-evidence
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 90
+
+  live-raw-and-prepare:
+    name: Quarantined live TRUST acquisition and preparation
+    if: inputs.mode == 'live_trust'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out the selected feature branch commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Require successful offline preflight for this exact branch commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          GH_REF_NAME: ${{ github.ref_name }}
+          GH_API_URL: ${{ github.api_url }}
+          GH_CURRENT_RUN_ID: ${{ github.run_id }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.parse, urllib.request
+
+          base = os.environ['GH_API_URL'].rstrip('/')
+          repository = urllib.parse.quote(os.environ['GH_REPOSITORY'], safe='/')
+          headers = {
+              'Accept': 'application/vnd.github+json',
+              'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+              'X-GitHub-Api-Version': '2022-11-28',
+          }
+
+          def get(path):
+              request = urllib.request.Request(base + path, headers=headers)
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.loads(response.read())
+
+          query = urllib.parse.urlencode({'head_sha': os.environ['GH_SHA'], 'event': 'workflow_dispatch', 'per_page': 100})
+          runs = get(f'/repos/{repository}/actions/runs?{query}').get('workflow_runs', [])
+          qualifying = [run for run in runs if run.get('head_sha') == os.environ['GH_SHA']
+                        and run.get('head_branch') == os.environ['GH_REF_NAME']
+                        and run.get('event') == 'workflow_dispatch'
+                        and '.github/workflows/atlas-bus-data-refresh.yml' in run.get('path', '')
+                        and run.get('conclusion') == 'success'
+                        and str(run.get('id')) != os.environ['GH_CURRENT_RUN_ID']]
+          for run in qualifying:
+              run_id = str(run['id'])
+              artifact_name = f'atlas-tnds-trust-offline-preflight-{run_id}'
+              artifacts = get(f'/repos/{repository}/actions/runs/{run_id}/artifacts?per_page=100').get('artifacts', [])
+              if any(item.get('name') == artifact_name and item.get('expired') is False for item in artifacts):
+                  print('Successful same-commit C1B offline preflight and unexpired evidence artifact verified.')
+                  raise SystemExit(0)
+          raise SystemExit('No successful, unexpired C1B offline preflight evidence exists for this exact branch commit.')
+      - name: Run metadata-only authentication and archive gate
+        id: metadata
+        if: inputs.prior_producer_run_id == ''
+        env:
+          TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
+          TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
+        run: |
+          python tools/atlas-bus-data/tnds_capability_probe.py --output "$RUNNER_TEMP/tnds-capability-probe.json"
+          PYTHONPATH=tools/atlas-bus-data python -c "import json, os; from pathlib import Path; from tnds_capability_probe import validate_metadata_probe; validate_metadata_probe(json.loads(Path(os.environ['RUNNER_TEMP'], 'tnds-capability-probe.json').read_text()))"
+      - name: Restore exact prior raw snapshot artifact from selected producer run
+        id: restore
+        if: inputs.prior_producer_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: atlas-tnds-quarantined-${{ inputs.prior_producer_run_id }}
+          run-id: ${{ inputs.prior_producer_run_id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/tnds-quarantined-snapshot
+      - name: Verify restored raw snapshot and producer identity
+        if: inputs.prior_producer_run_id != ''
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PRIOR_PRODUCER_RUN_ID: ${{ inputs.prior_producer_run_id }}
+          PRIOR_ARTIFACT_NAME: atlas-tnds-quarantined-${{ inputs.prior_producer_run_id }}
+        run: >-
+          python tools/atlas-bus-data/tnds_trust_diagnostic.py --verify-reused
+          --producer-run-id "$PRIOR_PRODUCER_RUN_ID"
+          --artifact-name "$PRIOR_ARTIFACT_NAME"
+      - name: Acquire and verify raw TNDS checkpoint
+        id: acquire
+        if: inputs.prior_producer_run_id == ''
+        env:
+          TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
+          TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
+        run: python tools/atlas-bus-data/tnds_trust_diagnostic.py --acquire-only
+      - name: Upload immutable raw TNDS checkpoint before extraction
+        id: raw-artifact
+        if: always() && steps.acquire.outputs.snapshot_available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-tnds-quarantined-${{ github.run_id }}
+          path: ${{ runner.temp }}/tnds-quarantined-snapshot
+          compression-level: 0
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Check runner capacity from ZIP central directories
+        id: capacity
+        if: success()
+        run: python tools/atlas-bus-data/tnds_trust_diagnostic.py --capacity-only
+      - name: Extract and prepare quarantined TNDS handoff
+        id: prepare
+        if: success()
+        env:
+          ATLAS_NODE: node
+          PRODUCER_RUN_ID: ${{ inputs.prior_producer_run_id || github.run_id }}
+        run: >-
+          python tools/atlas-bus-data/tnds_trust_diagnostic.py --prepare-only
+          --producer-run-id "$PRODUCER_RUN_ID"
+      - name: Ensure secret-safe failure evidence exists
+        if: always()
+        env:
+          METADATA_OUTCOME: ${{ steps.metadata.outcome }}
+          RESTORE_OUTCOME: ${{ steps.restore.outcome }}
+          ACQUIRE_OUTCOME: ${{ steps.acquire.outcome }}
+          RAW_ARTIFACT_OUTCOME: ${{ steps.raw-artifact.outcome }}
+          CAPACITY_OUTCOME: ${{ steps.capacity.outcome }}
+          PREPARE_OUTCOME: ${{ steps.prepare.outcome }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/tnds-evidence"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          evidence_dir = Path(os.environ['RUNNER_TEMP'], 'tnds-evidence')
+          target = evidence_dir / 'run-evidence.json'
+          outcomes = {name: os.environ.get(name, 'skipped') for name in ('METADATA_OUTCOME', 'RESTORE_OUTCOME', 'ACQUIRE_OUTCOME', 'RAW_ARTIFACT_OUTCOME', 'CAPACITY_OUTCOME', 'PREPARE_OUTCOME')}
+          if target.exists():
+              record = json.loads(target.read_text())
+          else:
+              stage = 'PREFLIGHT_FAILED'
+              if outcomes['METADATA_OUTCOME'] == 'failure': stage = 'METADATA_FAILED'
+              elif outcomes['RESTORE_OUTCOME'] == 'failure': stage = 'RAW_RESTORE_FAILED'
+              elif outcomes['ACQUIRE_OUTCOME'] == 'failure': stage = 'ACQUISITION_FAILED'
+              elif outcomes['CAPACITY_OUTCOME'] == 'failure': stage = 'CAPACITY_BLOCKED'
+              elif outcomes['PREPARE_OUTCOME'] == 'failure': stage = 'PREPARATION_FAILED'
+              record = {
+                  'schema': 'atlas-tnds-trust-run-evidence-v2', 'stage': stage, 'result': 'FAILED',
+                  'stageOutcomes': outcomes, 'snapshotId': None, 'completedRegions': [],
+                  'expectedRegions': ['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y'],
+                  'diagnosticOnly': True, 'plannerEligible': False, 'publicationAttempted': False,
+                  'deploymentAttempted': False, 'secretValuesIncluded': False,
+                  'currentFreshnessClaimed': False,
+              }
+          record['stageOutcomes'] = outcomes
+          record['rawArtifactUploaded'] = outcomes['RAW_ARTIFACT_OUTCOME'] == 'success'
+          record['sourceArtifactRestored'] = outcomes['RESTORE_OUTCOME'] == 'success'
+          if outcomes['RAW_ARTIFACT_OUTCOME'] == 'failure':
+              record['stage'] = 'RAW_CHECKPOINT_UPLOAD_FAILED'
+              record['result'] = 'FAILED'
+          target.write_text(json.dumps(record, indent=2, sort_keys=True) + '\n')
+          PY
+      - name: Upload TRUST evidence and capability report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-tnds-trust-evidence-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/tnds-evidence
+            ${{ runner.temp }}/tnds-capability-probe.json
+          if-no-files-found: warn
+          retention-days: 90

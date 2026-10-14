@@ -42,6 +42,81 @@ def make_snapshot(root: Path) -> Path:
 
 
 class QuarantinedExtractionTests(unittest.TestCase):
+    def test_capacity_inspection_reads_zip_metadata_without_extracting(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
+            root = Path(tmp)
+            snapshot = make_snapshot(root)
+            report = diagnostic.inspect_tnds_capacity(snapshot, free_bytes=1)
+            self.assertEqual(report["status"], "CAPACITY_BLOCKED")
+            self.assertFalse(report["extractionStarted"])
+            self.assertEqual(len(report["perRegion"]), 8)
+            self.assertEqual(report["memberCount"], 8)
+            self.assertGreater(report["compressedSourceBytes"], 0)
+            self.assertGreater(report["uncompressedMemberBytes"], 0)
+            self.assertGreaterEqual(report["requiredFreeBytes"], 10 * 1024**3)
+            self.assertFalse((snapshot.parent / "tnds-extracted-input").exists())
+            evidence = root / "evidence"
+            with patch.object(diagnostic, "inspect_tnds_capacity", return_value=report):
+                with self.assertRaisesRegex(RuntimeError, "capacity gate blocked"):
+                    diagnostic.capacity_checkpoint(snapshot, evidence)
+            state = json.loads((evidence / "run-evidence.json").read_text(encoding="utf-8"))
+            self.assertEqual(state["stage"], "CAPACITY_BLOCKED")
+            self.assertEqual(state["result"], "CAPACITY_BLOCKED")
+            self.assertFalse((snapshot.parent / "tnds-extracted-input").exists())
+
+    def test_reused_checkpoint_requires_exact_producer_run_name_and_repository(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
+            root = Path(tmp)
+            snapshot = make_snapshot(root)
+            manifest_path = snapshot / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["producer"] = {"runId": "12345", "repository": "owner/repo"}
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with patch.dict(os.environ, {"GITHUB_REPOSITORY": "owner/repo"}):
+                verified = diagnostic.verify_reused_checkpoint(snapshot, root / "evidence",
+                    producer_run_id="12345", artifact_name="atlas-tnds-quarantined-12345")
+                self.assertEqual(verified["snapshotId"], manifest["snapshotId"])
+                evidence = json.loads((root / "evidence/run-evidence.json").read_text(encoding="utf-8"))
+                self.assertFalse(evidence["currentFreshnessClaimed"])
+            with self.assertRaises(ValueError):
+                diagnostic.verify_reused_checkpoint(snapshot, root / "wrong-name-evidence",
+                    producer_run_id="12345", artifact_name="atlas-tnds-quarantined-99999")
+            with self.assertRaises(ValueError):
+                diagnostic.verify_reused_checkpoint(snapshot, root / "wrong-run-evidence",
+                    producer_run_id="99999", artifact_name="atlas-tnds-quarantined-99999")
+
+    def test_raw_checkpoint_is_durable_before_a_later_preparation_failure(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
+            root = Path(tmp)
+            source_snapshot = make_snapshot(root)
+            source_manifest = json.loads((source_snapshot / "manifest.json").read_text(encoding="utf-8"))
+            raw = root / "run/tnds-quarantined-snapshot"
+            evidence = root / "run/tnds-evidence"
+
+            def acquire(destination, _username, _password):
+                shutil.copytree(source_snapshot, destination, dirs_exist_ok=True)
+                return source_manifest
+
+            def prepare_failure(*args, **kwargs):
+                kwargs["stage_callback"]("PREPARATION_STARTED")
+                raise RuntimeError("fixture prepare failure")
+
+            with patch.object(diagnostic, "acquire_tnds_snapshot", side_effect=acquire), \
+                 patch.object(diagnostic, "inspect_tnds_capacity", return_value={"status": "CAPACITY_SUFFICIENT", "extractionStarted": False}), \
+                 patch.object(diagnostic, "prepare_tnds_handoff", side_effect=prepare_failure), \
+                 patch.dict(os.environ, {"GITHUB_RUN_ID": "current-run", "GITHUB_OUTPUT": str(root / "outputs")}):
+                diagnostic.acquire_raw_checkpoint(raw, evidence)
+                self.assertTrue((raw / "manifest.json").is_file())
+                self.assertEqual(json.loads((evidence / "run-evidence.json").read_text())["stage"], "RAW_SNAPSHOT_VERIFIED")
+                with self.assertRaisesRegex(RuntimeError, "fixture prepare failure"):
+                    diagnostic.prepare_checkpoint(raw, evidence, source_producer_run_id="current-run")
+            self.assertTrue((raw / "manifest.json").is_file())
+            self.assertEqual(len(list((raw / "sources").glob("*.zip"))), 8)
+            final_evidence = json.loads((evidence / "run-evidence.json").read_text(encoding="utf-8"))
+            self.assertEqual(final_evidence["stage"], "PREPARATION_FAILED")
+            self.assertFalse(final_evidence["publicationAttempted"])
+            self.assertFalse(final_evidence["deploymentAttempted"])
+
     def test_archive_members_are_scoped_under_region_and_extractable(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
             root = Path(tmp); archive_path = root / "EA.zip"

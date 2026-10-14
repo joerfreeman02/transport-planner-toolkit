@@ -55,6 +55,9 @@ class FakeFTP:
 
 
 class TndsCapabilityProbeTests(unittest.TestCase):
+    def all_regions(self):
+        return [f"{region}.zip" for region in TNDS_REGIONS]
+
     def run_probe(self, ftp):
         with patch.object(capability.ftplib, "FTP", return_value=ftp):
             return capability.probe("fixture-user", "fixture-password")
@@ -64,13 +67,14 @@ class TndsCapabilityProbeTests(unittest.TestCase):
             with self.subTest(region=region):
                 name = f"{region}.zip"
                 self.assertEqual(tnds_region_from_filename(name), region)
-                ftp = FakeFTP([name])
+                ftp = FakeFTP(self.all_regions())
                 result = self.run_probe(ftp)
                 for candidate_region in TNDS_REGIONS:
-                    expected = [name] if candidate_region == region else []
+                    expected = [f"{candidate_region}.zip"]
                     self.assertEqual(result["regions"][candidate_region]["candidates"], expected)
                 self.assertEqual(result["regions"][region]["classification"], "RELIABLE_METADATA")
                 self.assertTrue(result["regions"][region]["metadataAvailable"])
+                self.assertEqual(result["classification"], "RELIABLE_METADATA_ONLY")
                 self.assertFalse(result["retrievalPerformed"])
                 self.assertEqual(ftp.retrieval_calls, [])
 
@@ -93,12 +97,12 @@ class TndsCapabilityProbeTests(unittest.TestCase):
         self.assertFalse(non_archive["regions"]["EA"]["candidates"])
 
     def test_positive_size_and_successful_mdtm_are_reliable(self):
-        result = self.run_probe(FakeFTP(["EA.zip"]))
+        result = self.run_probe(FakeFTP(self.all_regions()))
         self.assertEqual(result["regions"]["EA"]["classification"], "RELIABLE_METADATA")
         self.assertEqual(result["regions"]["EA"]["matches"][0]["size"], 1234)
         self.assertEqual(result["regions"]["EA"]["matches"][0]["modified"], "213 20261014081249")
-        self.assertEqual(result["classification"], "PARTIALLY_RELIABLE")
-        fractional = self.run_probe(FakeFTP(["EA.zip"], modified="213 20261014081249.125"))
+        self.assertEqual(result["classification"], "RELIABLE_METADATA_ONLY")
+        fractional = self.run_probe(FakeFTP(self.all_regions(), modified="213 20261014081249.125"))
         self.assertTrue(fractional["regions"]["EA"]["metadataAvailable"])
 
     def test_all_eight_approved_regions_are_required_for_reliable_probe_classification(self):
@@ -107,11 +111,12 @@ class TndsCapabilityProbeTests(unittest.TestCase):
         self.assertEqual(result["classification"], "RELIABLE_METADATA_ONLY")
         self.assertTrue(all(item["metadataAvailable"] for item in result["regions"].values()))
         self.assertFalse(result["retrievalPerformed"])
+        capability.validate_metadata_probe(result)
 
     def test_size_error_or_nonpositive_size_prevents_reliable_metadata(self):
         for options in ({"size_error": True}, {"size": 0}):
             with self.subTest(options=options):
-                result = self.run_probe(FakeFTP(["EA.zip"], **options))
+                result = self.run_probe(FakeFTP(self.all_regions(), **options))
                 self.assertEqual(result["regions"]["EA"]["classification"], "INCOMPLETE_METADATA")
                 self.assertFalse(result["regions"]["EA"]["metadataAvailable"])
                 self.assertNotEqual(result["classification"], "RELIABLE_METADATA_ONLY")
@@ -119,7 +124,7 @@ class TndsCapabilityProbeTests(unittest.TestCase):
     def test_mdtm_error_or_invalid_value_prevents_reliable_metadata(self):
         for options in ({"modified_error": True}, {"modified": "not-a-valid-MDTM"}):
             with self.subTest(options=options):
-                result = self.run_probe(FakeFTP(["EA.zip"], **options))
+                result = self.run_probe(FakeFTP(self.all_regions(), **options))
                 self.assertEqual(result["regions"]["EA"]["classification"], "INCOMPLETE_METADATA")
                 self.assertFalse(result["regions"]["EA"]["metadataAvailable"])
 
@@ -127,11 +132,23 @@ class TndsCapabilityProbeTests(unittest.TestCase):
         names = ["EA.zip", "TNDS-EA-v2.5.zip"]
         ftp = FakeFTP(names)
         result = self.run_probe(ftp)
-        self.assertEqual(result["regions"]["EA"]["classification"], "AMBIGUOUS")
-        self.assertEqual(result["regions"]["EA"]["candidates"], sorted(names, key=str.casefold))
-        self.assertFalse(result["regions"]["EA"]["metadataAvailable"])
+        self.assertEqual(result["classification"], "INVALID_DIRECTORY")
+        self.assertEqual(result["regions"]["EA"]["classification"], "DIRECTORY_REJECTED")
+        self.assertIn("EA.zip", result["directoryError"])
+        self.assertIn("TNDS-EA-v2.5.zip", result["directoryError"])
         self.assertEqual(ftp.size_calls, [])
         self.assertNotEqual(result["classification"], "RELIABLE_METADATA_ONLY")
+        with self.assertRaises(ValueError):
+            capability.validate_metadata_probe(result)
+
+    def test_missing_region_is_rejected_before_metadata_commands(self):
+        ftp = FakeFTP([f"{region}.zip" for region in TNDS_REGIONS if region != "Y"])
+        result = self.run_probe(ftp)
+        self.assertEqual(result["classification"], "INVALID_DIRECTORY")
+        self.assertEqual(ftp.size_calls, [])
+        self.assertEqual(ftp.commands, [])
+        with self.assertRaises(ValueError):
+            capability.validate_metadata_probe(result)
 
     def test_probe_contract_never_transfers_archives(self):
         ftp = FakeFTP(["Y.zip"])

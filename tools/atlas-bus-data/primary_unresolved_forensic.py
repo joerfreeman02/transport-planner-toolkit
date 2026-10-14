@@ -84,6 +84,22 @@ def csv_index(archive: zipfile.ZipFile, member: str, key: str) -> tuple[dict[str
                    "duplicateKeySamples": sorted(duplicate_keys)[:10]}
 
 
+def normalize_exact_stop_identity(value: str) -> str:
+    """Mirror coverage_ledger.resolve_exact_gtfs_stop's case-insensitive equality."""
+    return str(value or "").lower()
+
+
+def exact_identity_match(value: str, identities: set[str]) -> bool:
+    """Case-insensitive exact membership; punctuation and spacing remain significant."""
+    normalized = normalize_exact_stop_identity(value)
+    return bool(normalized and normalized in identities)
+
+
+def identity_shape(value: str) -> str:
+    """Case-normalized character shape; diagnostic only, never an identity key."""
+    return re.sub(r"[A-Z]", "A", re.sub(r"[0-9]", "9", str(value or "").upper()))
+
+
 def read_naptan_identity_sets(path: Path) -> tuple[set[str], set[str], dict]:
     """Stream exact StopPoint codes; shape profiles are diagnostic only."""
     import xml.etree.ElementTree as ET
@@ -102,9 +118,9 @@ def read_naptan_identity_sets(path: Path) -> tuple[set[str], set[str], dict]:
             if tag == "StopPoint" and current is not None:
                 a, n = current["AtcoCode"], current["NaptanCode"]
                 if a:
-                    atco.add(a); atco_shapes[re.sub(r"[A-Z]", "A", re.sub(r"[0-9]", "9", a))] += 1
+                    atco.add(normalize_exact_stop_identity(a)); atco_shapes[identity_shape(a)] += 1
                 if n:
-                    naptan.add(n); naptan_shapes[re.sub(r"[A-Z]", "A", re.sub(r"[0-9]", "9", n))] += 1
+                    naptan.add(normalize_exact_stop_identity(n)); naptan_shapes[identity_shape(n)] += 1
                 current = None
                 if len(stack) > 1: stack[-2].remove(element)
                 element.clear()
@@ -133,10 +149,10 @@ def analyse(ledger: Path, snapshot: Path, expected_snapshot_id: str) -> dict:
     atco_shapes = {item["shape"] for item in naptan_profile["atcoShapePatterns"]}
     naptan_shapes = {item["shape"] for item in naptan_profile["naptanCodeShapePatterns"]}
     total, by_region, by_method, by_route, by_operator, stops, lineage = Counter(), Counter(), Counter(), Counter(), Counter(), Counter(), Counter()
-    trip_ids, stop_ids, route_ids, route_numbers, operators = set(), set(), set(), set(), set()
+    trip_ids, stop_ids, stop_codes, route_ids, route_numbers, operators = set(), set(), set(), set(), set(), set()
     duplicate_tables = Counter(); duplicate_samples = {}; identity_counts = Counter()
     stop_id_frequency, stop_code_frequency = Counter(), Counter()
-    join_findings = Counter(); region_count = 0
+    by_region_operator = Counter(); join_findings = Counter(); region_count = 0
     for report in load_region_records(ledger):
         region_count += 1
         region = str(report.get("region", ""))
@@ -169,16 +185,19 @@ def analyse(ledger: Path, snapshot: Path, expected_snapshot_id: str) -> dict:
             stop_code = str((stop or {}).get("stop_code") or row.get("gtfsStopCode") or row.get("stopCode") or "")
             if stop_id: stop_id_frequency[stop_id] += 1
             if stop_code: stop_code_frequency[stop_code] += 1
+            if stop_code: stop_codes.add(stop_code)
             identity_counts["gtfsStopIdBlank"] += not bool(stop_id)
-            identity_counts["gtfsStopIdAtcoShapeCompatible"] += bool(stop_id and re.sub(r"[A-Z]", "A", re.sub(r"[0-9]", "9", stop_id)) in atco_shapes)
-            identity_counts["gtfsStopIdNonAtcoOrInternalShape"] += bool(stop_id and re.sub(r"[A-Z]", "A", re.sub(r"[0-9]", "9", stop_id)) not in atco_shapes)
+            identity_counts["gtfsStopIdAtcoShapeCompatible"] += bool(stop_id and identity_shape(stop_id) in atco_shapes)
+            identity_counts["gtfsStopIdNonAtcoOrInternalShape"] += bool(stop_id and identity_shape(stop_id) not in atco_shapes)
             identity_counts["gtfsStopCodeBlank"] += not bool(stop_code)
             identity_counts["gtfsStopCodePresent"] += bool(stop_code)
-            identity_counts["gtfsStopCodeNaptanShapeCompatible"] += bool(stop_code and re.sub(r"[A-Z]", "A", re.sub(r"[0-9]", "9", stop_code)) in naptan_shapes)
-            identity_counts["exactAtcoCodeMatches"] += stop_id in atco_ids
-            identity_counts["exactNaptanCodeMatches"] += bool(stop_code and stop_code in naptan_codes)
-            identity_counts["nonmatchingStopIds"] += bool(stop_id and stop_id not in atco_ids)
-            identity_counts["nonmatchingStopCodes"] += bool(stop_code and stop_code not in naptan_codes)
+            identity_counts["gtfsStopCodeNaptanShapeCompatible"] += bool(stop_code and identity_shape(stop_code) in naptan_shapes)
+            normalized_stop_id = normalize_exact_stop_identity(stop_id)
+            normalized_stop_code = normalize_exact_stop_identity(stop_code)
+            identity_counts["exactAtcoCodeMatches"] += exact_identity_match(stop_id, atco_ids)
+            identity_counts["exactNaptanCodeMatches"] += exact_identity_match(stop_code, naptan_codes)
+            identity_counts["nonmatchingStopIds"] += bool(stop_id and normalized_stop_id not in atco_ids)
+            identity_counts["nonmatchingStopCodes"] += bool(stop_code and normalized_stop_code not in naptan_codes)
             for field, value in (("gtfsStopId", stop_id), ("tripId", trip_id), ("routeId", route_id)):
                 if not value: lineage[f"missing_{field}"] += 1
             if trip: join_findings["trip_found"] += 1
@@ -196,8 +215,12 @@ def analyse(ledger: Path, snapshot: Path, expected_snapshot_id: str) -> dict:
             operator = agencies.get(agency_id, {}).get("agency_name") or "unknown"
             operators.add(str(operator))
             by_operator[str(operator)] += 1
+            by_region_operator[(region, str(operator))] += 1
             stops[str(row.get("gtfsStopName") or (stop or {}).get("stop_name") or "unknown")] += 1
     if region_count != 9: raise ValueError(f"Expected nine primary BODS regions, received {region_count}")
+    top_stop_id_calls = sum(count for _, count in stop_id_frequency.most_common(10))
+    top_route_calls = sum(count for _, count in by_route.most_common(5))
+    top_operator_calls = sum(count for _, count in by_operator.most_common(5))
     body = {"schema": "atlas-primary-unresolved-forensic-v2", "snapshotId": expected_snapshot_id,
         "sourceWindow": "2026-10-13 frozen ACQ-1 BODS/NaPTAN evidence", "coverageLedgerSha256": sha256_file(ledger),
         "unresolvedScheduledCallCount": total["records"], "knownBaselineUnresolvedCount": 4908,
@@ -208,6 +231,7 @@ def analyse(ledger: Path, snapshot: Path, expected_snapshot_id: str) -> dict:
         "topStopNames": [{"stopName": k, "count": v} for k, v in stops.most_common(25)],
         "gtfsLineageJoin": dict(sorted(join_findings.items())), "lineageFields": dict(sorted(lineage.items())),
         "uniqueTrips": len(trip_ids), "uniqueTripCount": len(trip_ids), "uniqueGtfsStopIdCount": len(stop_ids),
+        "uniqueGtfsStopCodeCount": len(stop_codes),
         "uniqueRouteIdCount": len(route_ids), "uniqueRouteNumberCount": len(route_numbers), "uniqueOperatorCount": len(operators),
         "naPTANExactIdentityCheck": {**dict(identity_counts), **naptan_profile,
             "stopIdComparedOnlyToAtcoCode": True, "stopCodeComparedOnlyToNaptanCode": True,
@@ -216,6 +240,17 @@ def analyse(ledger: Path, snapshot: Path, expected_snapshot_id: str) -> dict:
         "topGtfsStopCodes": [{"gtfsStopCode": k, "count": v} for k, v in stop_code_frequency.most_common(25)],
         "gtfsStopIdRepeatCountDistribution": dict(sorted(Counter(stop_id_frequency.values()).items())),
         "gtfsStopCodeRepeatCountDistribution": dict(sorted(Counter(stop_code_frequency.values()).items())),
+        "repeatAndConcentration": {"calls": total["records"], "distinctNonblankGtfsStopIds": len(stop_ids),
+            "callsOnRepeatedGtfsStopIds": sum(count for count in stop_id_frequency.values() if count > 1),
+            "singleUseGtfsStopIdCount": sum(count == 1 for count in stop_id_frequency.values()),
+            "top10GtfsStopIdCallCount": top_stop_id_calls,
+            "top10GtfsStopIdCallShare": round(top_stop_id_calls / total["records"], 6) if total["records"] else 0,
+            "top5RouteCallCount": top_route_calls,
+            "top5RouteCallShare": round(top_route_calls / total["records"], 6) if total["records"] else 0,
+            "top5OperatorCallCount": top_operator_calls,
+            "top5OperatorCallShare": round(top_operator_calls / total["records"], 6) if total["records"] else 0,
+            "topRegionOperatorPairs": [{"region": region, "operator": operator, "count": count}
+                for (region, operator), count in by_region_operator.most_common(25)]},
         "duplicateGtfsKeys": {"counts": dict(sorted(duplicate_tables.items())), "samplesByRegionAndTable": duplicate_samples,
             "duplicateKeysSuppressJoinRows": True}, "diagnosticOnly": True,
         "sourceSnapshotMutated": False, "status": "PRIMARY_FORENSIC_LINEAGE_AVAILABLE" if not lineage["missing_tripId"] and not lineage["missing_routeId"] and not lineage["missing_gtfsStopId"] and not sum(duplicate_tables.values()) else "PRIMARY_FORENSIC_LINEAGE_INSUFFICIENT"}

@@ -101,6 +101,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           path: source-input
+          merge-multiple: true
       - name: Verify snapshot before interpretation
         id: verify-snapshot
         env:
@@ -108,6 +109,7 @@ jobs:
           EXPECTED_SOURCE_COUNT: ${{ inputs.expected_source_count }}
           EXPECTED_TOTAL_BYTES: ${{ inputs.expected_total_bytes }}
         run: |
+          test -f source-input/source-snapshot/manifest.json
           python tools/atlas-bus-data/source_snapshot.py --verify source-input/source-snapshot \
             --expected-snapshot-id "$EXPECTED_SNAPSHOT_ID" \
             --expected-source-count "$EXPECTED_SOURCE_COUNT" \
@@ -147,14 +149,14 @@ jobs:
         run: python tools/atlas-bus-data/coverage_ledger.py --gate pages-site/diagnostic-output/coverage-ledger.json
       - name: Run aggregate structural scan
         id: structural-scan
-        if: always()
+        if: always() && steps.prepare-v2.outcome == 'success'
         continue-on-error: true
         run: |
           mkdir -p diagnostic-output
           python tools/atlas-bus-data/structural_scan.py --site-root pages-site --output diagnostic-output/structural-scan.json
       - name: Run hard candidate validation (fail closed)
         id: hard-validator
-        if: always()
+        if: always() && steps.prepare-v2.outcome == 'success'
         continue-on-error: true
         run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site --bus-only
       - name: Probe TNDS metadata without archive transfer
@@ -167,7 +169,7 @@ jobs:
         run: python tools/atlas-bus-data/tnds_capability_probe.py --output diagnostic-output/tnds-capability-probe.json
       - name: Measure diagnostic candidate capacity
         id: capacity
-        if: always()
+        if: always() && steps.prepare-v2.outcome == 'success'
         continue-on-error: true
         run: mkdir -p pages-site/atlas/config && node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json --bus-only
       - name: Copy deterministic test log into evidence workspace

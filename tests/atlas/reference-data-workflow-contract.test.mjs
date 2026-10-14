@@ -10,6 +10,7 @@ const diagnostic = fs.readFileSync(path.join(root, '.github/workflows/atlas-refe
 const refresh = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/refresh_bus_data.py'), 'utf8');
 const snapshotTool = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/source_snapshot.py'), 'utf8');
 const integrity = fs.readFileSync(path.join(root, 'tests/atlas/prepared-bus-data-integrity.test.mjs'), 'utf8');
+const tndsProbe = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/tnds_capability_probe.py'), 'utf8');
 
 assert.match(top, /uses: \.\/\.github\/workflows\/atlas-reference-data-source\.yml/);
 assert.match(top, /uses: \.\/\.github\/workflows\/atlas-reference-data-diagnostic\.yml/);
@@ -72,7 +73,11 @@ assert.match(diagnostic, /producer_run_id:/);
 assert.match(diagnostic, /actions\/artifacts\/\$SOURCE_ARTIFACT_ID/);
 assert.match(diagnostic, /workflow_run/);
 assert.match(diagnostic, /artifact-ids: \$\{\{ inputs\.source_snapshot_artifact_id \}\}/);
+assert.match(diagnostic, /merge-multiple: true/);
+assert.match(diagnostic, /path: source-input/);
 assert.match(diagnostic, /run-id: \$\{\{ inputs\.source_snapshot_run_id \}\}/);
+assert.match(diagnostic, /test -f source-input\/source-snapshot\/manifest\.json/);
+assert.match(diagnostic, /--verify source-input\/source-snapshot/);
 assert.match(diagnostic, /--acquisition-disabled/);
 assert.match(diagnostic, /steps\.verify-producer-artifact\.outcome == 'success'.*steps\.verify-snapshot\.outcome == 'success'/);
 assert.match(diagnostic, /EXPECTED_SNAPSHOT_ID/);
@@ -84,6 +89,12 @@ assert.match(diagnostic, /git status --porcelain/);
 assert.match(diagnostic, /RUNNER_TEMP\/atlas-deterministic-tests\.log/);
 assert.match(diagnostic, /TNDS_USERNAME: \$\{\{ secrets\.TNDS_USERNAME \}\}/);
 assert.match(diagnostic, /TNDS_PASSWORD: \$\{\{ secrets\.TNDS_PASSWORD \}\}/);
+assert.match(diagnostic, /id: tnds-probe\s+if: always\(\)/);
+assert.match(tndsProbe, /retrievalPerformed": False/);
+assert.match(tndsProbe, /ftp\.nlst\(\)/);
+assert.match(tndsProbe, /ftp\.size\(name\)/);
+assert.match(tndsProbe, /MDTM \{name\}/);
+assert.doesNotMatch(tndsProbe, /retrbinary|retrlines|RETR /);
 assert.ok(diagnostic.indexOf('Run deterministic ATLAS checks from pristine checkout') < diagnostic.indexOf('Restore supplied source snapshot'));
 assert.ok(diagnostic.indexOf('Restore supplied source snapshot') < diagnostic.indexOf('Restore last-known-good diagnostic comparison state'));
 assert.match(diagnostic, /Stage and verify diagnostic release metadata/);
@@ -94,6 +105,10 @@ assert.ok(diagnostic.indexOf('Stage and verify diagnostic release metadata') < d
 assert.match(diagnostic, /--previous-root last-known-good/);
 assert.match(diagnostic, /--acquisition-disabled/);
 assert.match(diagnostic, /steps\.prepare-v2\.outcome/);
+assert.match(diagnostic, /id: coverage-gate\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success'/);
+assert.match(diagnostic, /id: structural-scan\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success'/);
+assert.match(diagnostic, /id: hard-validator\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success'/);
+assert.match(diagnostic, /id: capacity\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success'/);
 assert.match(diagnostic, /steps\.release-metadata\.outcome/);
 assert.match(diagnostic, /if: always\(\) &&/);
 assert.match(diagnostic, /Copy deterministic test log into evidence workspace/);
@@ -105,6 +120,8 @@ assert.doesNotMatch(diagnostic, /Run same-source-window parity|national_v2_diagn
 assert.match(top, /Legacy v1 shadow parity is deferred: no exact same-window frozen NaPTAN CSV is available/);
 assert.match(diagnostic, /verified-snapshot-manifest\.json/);
 assert.match(diagnostic, /atlas-reference-diagnostic-\$\{\{ github\.run_id \}\}/);
+assert.match(diagnostic, /Upload evidence-safe diagnostic artifact\s+if: always\(\)/);
+assert.match(diagnostic, /Preserve fail-closed conclusions\s+if: always\(\)[\s\S]*steps\.verify-snapshot\.outcome != 'success'[\s\S]*steps\.prepare-v2\.outcome != 'success'/);
 
 // Fresh acquisition passes producer-measured metadata without applying optional
 // frozen-reuse expectations; no automatic latest-artifact lookup exists.
@@ -137,4 +154,4 @@ assert.match(refresh, /--acquisition-disabled requires --source-snapshot/);
 assert.match(refresh, /materialise_for_preparation\(snapshot_root, staging\)/);
 assert.match(snapshotTool, /TNDS raw archives are not permitted in a Bus source snapshot/);
 
-console.log('PASS REMOTE-1 source/diagnostic contract: verified producer metadata, exact artifact identity, fresh/frozen handoff, fail-closed preparation, no publication, and bounded artifact scope.');
+console.log('PASS REMOTE-1A source/diagnostic contract: immutable producer identity, exact frozen reuse, corrected artifact extraction path, candidate-gate sequencing, evidence retention, metadata-only TNDS probe, and no publication.');

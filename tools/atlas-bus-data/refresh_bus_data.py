@@ -166,9 +166,46 @@ def acquire_bods(staging: Path, download_fn=download) -> tuple[Path, dict]:
 
 
 def tnds_region_from_filename(name: str) -> str | None:
-    """Recognise a whole region token, including TNDS-EA-v2.5.zip."""
-    match = re.search(r"(?:^|[-_.])(EA|EM|NE|NW|SE|SW|WM|Y)(?:[-_.]|$)", Path(name).name, flags=re.IGNORECASE)
-    return match.group(1).upper() if match else None
+    """Return a region only when the filename has exactly one whole token."""
+    basename = str(name).replace("\\", "/").rsplit("/", 1)[-1]
+    if any(token in basename.casefold() for token in ("registration", "register", "nonregional", "non-regional")):
+        return None
+    matches = re.findall(r"(?:^|[-_.])(EA|EM|NE|NW|SE|SW|WM|Y)(?=[-_.]|$)", basename, flags=re.IGNORECASE)
+    return matches[0].upper() if len(matches) == 1 else None
+
+
+def select_tnds_region_archives(names: list[str]) -> dict[str, str]:
+    """Require exactly one unambiguous, non-registration archive per region."""
+    candidates = {region: [] for region in TNDS_REGIONS}
+    ambiguous_names = []
+    token_pattern = re.compile(r"(?:^|[-_.])(EA|EM|NE|NW|SE|SW|WM|Y)(?=[-_.]|$)", re.IGNORECASE)
+    for raw_name in names:
+        basename = str(raw_name).replace("\\", "/").rsplit("/", 1)[-1]
+        if not basename.casefold().endswith(".zip"):
+            continue
+        lowered = basename.casefold()
+        if any(token in lowered for token in ("registration", "register", "nonregional", "non-regional")):
+            continue
+        matches = [match.upper() for match in token_pattern.findall(basename)]
+        if len(matches) > 1:
+            ambiguous_names.append(basename)
+        elif len(matches) == 1:
+            candidates[matches[0]].append(basename)
+    if ambiguous_names:
+        raise RefreshError("Ambiguous TNDS regional archive filenames: " + ", ".join(sorted(_safe_candidate_filename(name) for name in ambiguous_names)))
+    duplicate = {region: sorted(values) for region, values in candidates.items() if len(values) > 1}
+    if duplicate:
+        details = "; ".join(f"{region}: {', '.join(_safe_candidate_filename(name) for name in names)}" for region, names in sorted(duplicate.items()))
+        raise RefreshError("Multiple TNDS regional archive candidates: " + details)
+    missing = [region for region in TNDS_REGIONS if not candidates[region]]
+    if missing:
+        raise RefreshError("TNDS archive candidates missing regions: " + ", ".join(missing))
+    return {region: candidates[region][0] for region in TNDS_REGIONS}
+
+
+def _safe_candidate_filename(name: str) -> str:
+    safe = "".join(char if char.isprintable() else "?" for char in str(name))
+    return safe[:160]
 
 
 def ftp_files(ftp_factory, username: str, password: str) -> list[str]:
@@ -262,14 +299,7 @@ def acquire_tnds(
     raw = staging / "tnds-raw"
     raw.mkdir(parents=True)
     names = ftp_files(ftp_factory, username, password)
-    selected = {}
-    for name in names:
-        region = tnds_region_from_filename(name)
-        if region in TNDS_REGIONS:
-            selected.setdefault(region, name)
-    missing = [region for region in TNDS_REGIONS if region not in selected]
-    if missing:
-        raise RefreshError(f"TNDS acquisition is incomplete; missing regions: {', '.join(missing)}")
+    selected = select_tnds_region_archives(names)
     sizes = {}
     for region in TNDS_REGIONS:
         sizes[region] = _download_tnds_region(
@@ -310,9 +340,18 @@ def _new_tnds_snapshot_manifest(root: Path) -> dict:
         "createdAt": timestamp,
         "acquisitionTimestamp": timestamp,
         "updatedAt": timestamp,
+        "producer": {
+            "workflow": os.environ.get("GITHUB_WORKFLOW"),
+            "runId": os.environ.get("GITHUB_RUN_ID"),
+            "repositoryCommitSha": os.environ.get("GITHUB_SHA"),
+            "repository": os.environ.get("GITHUB_REPOSITORY"),
+            "ref": os.environ.get("GITHUB_REF"),
+        },
         "sources": [],
         "sourceCount": len(TNDS_REGIONS),
+        "expectedRegionCount": len(TNDS_REGIONS),
         "completedSourceCount": 0,
+        "completedRegionCount": 0,
         "progress": [],
         "regions": list(TNDS_REGIONS),
     }
@@ -352,6 +391,11 @@ def acquire_tnds_snapshot(
             raise RefreshError(f"TNDS durable acquisition manifest is invalid: {manifest_path}") from error
     else:
         manifest = _new_tnds_snapshot_manifest(root)
+    manifest.setdefault("expectedRegionCount", len(TNDS_REGIONS))
+    if "producer" not in manifest:
+        manifest["producer"] = {"workflow": None, "runId": None, "repositoryCommitSha": None,
+                                "repository": None, "ref": None,
+                                "lineageStatus": "NOT_CAPTURED_FOR_PREEXISTING_SNAPSHOT"}
 
     if not username or not password:
         manifest["state"] = "BLOCKED / CREDENTIALS REQUIRED / QUARANTINED"
@@ -366,14 +410,7 @@ def acquire_tnds_snapshot(
     write_manifest(root, manifest)
     try:
         names = ftp_files(ftp_factory, username, password)
-        selected = {}
-        for name in names:
-            region = tnds_region_from_filename(name)
-            if region in TNDS_REGIONS:
-                selected.setdefault(region, name)
-        missing = [region for region in TNDS_REGIONS if region not in selected]
-        if missing:
-            raise RefreshError(f"TNDS acquisition is incomplete; missing regions: {', '.join(missing)}")
+        selected = select_tnds_region_archives(names)
 
         def downloader(identity, partial, label=None):
             remote_name = str(identity).rsplit("/", 1)[-1]
@@ -416,9 +453,12 @@ def acquire_tnds_snapshot(
                 validator=validate_zip_source,
                 label=f"TNDS {region} raw source",
             )
+            manifest["completedRegionCount"] = len({str(item.get("region", "")).upper() for item in manifest.get("sources", []) if item.get("region")})
+            _checkpoint(manifest, root)
     except Exception as error:
         manifest["state"] = TNDS_ACQUIRING_STATE
         manifest["lastError"] = _safe_ftp_error(error, username, password)
+        manifest["completedRegionCount"] = len({str(item.get("region", "")).upper() for item in manifest.get("sources", []) if item.get("region")})
         _checkpoint(manifest, root)
         raise
 
@@ -427,8 +467,45 @@ def acquire_tnds_snapshot(
     manifest["snapshotId"] = hashlib.sha256("".join(item["sha256"] for item in entries).encode("ascii")).hexdigest()
     manifest["state"] = TNDS_SNAPSHOT_STATE
     manifest["verifiedAt"] = now_utc()
+    manifest["completedRegionCount"] = len(TNDS_REGIONS)
     manifest.pop("lastError", None)
     _checkpoint(manifest, root)
+    return manifest
+
+
+def load_and_verify_tnds_snapshot(root: str | Path) -> dict:
+    """Verify exact quarantined TNDS source identity before preparation."""
+    from source_snapshot import _safe_relative, sha256_file, validate_zip_source
+
+    base = Path(root).resolve()
+    try:
+        manifest = json.loads((base / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise RefreshError("TNDS quarantine manifest is missing or invalid") from error
+    if manifest.get("schema") != TNDS_SNAPSHOT_SCHEMA or manifest.get("state") != TNDS_SNAPSHOT_STATE:
+        raise RefreshError("TNDS snapshot is not ACQUIRED / UNINTERPRETED / VERIFIED / QUARANTINED")
+    if manifest.get("quarantined") is not True or manifest.get("productionEligible") is not False or manifest.get("runtimeActive") is not False:
+        raise RefreshError("TNDS snapshot is missing quarantine or runtime-ineligibility flags")
+    entries = manifest.get("sources")
+    if not isinstance(entries, list) or len(entries) != len(TNDS_REGIONS) or manifest.get("sourceCount") != len(TNDS_REGIONS):
+        raise RefreshError("TNDS snapshot source count is incomplete")
+    regions, paths = [], []
+    for entry in entries:
+        if not isinstance(entry, dict): raise RefreshError("TNDS snapshot has a malformed source entry")
+        region = str(entry.get("region", "")).upper()
+        relative = str(entry.get("path", "")).replace("\\", "/")
+        if region not in TNDS_REGIONS or relative != f"sources/{region}.zip":
+            raise RefreshError("TNDS snapshot contains an unexpected source path or region")
+        if region in regions or relative in paths: raise RefreshError("TNDS snapshot contains duplicate region or source path")
+        path = _safe_relative(base, relative)
+        if not path.is_file() or path.stat().st_size != int(entry.get("bytes", -1)) or sha256_file(path) != entry.get("sha256"):
+            raise RefreshError(f"TNDS snapshot hash/size verification failed for {region}")
+        validate_zip_source(path)
+        regions.append(region); paths.append(relative)
+    if set(regions) != set(TNDS_REGIONS) or manifest.get("completedRegionCount") != len(TNDS_REGIONS):
+        raise RefreshError("TNDS snapshot does not contain exactly one verified archive for every region")
+    snapshot_id = hashlib.sha256("".join(entry["sha256"] for entry in sorted(entries, key=lambda item: item["path"])).encode("ascii")).hexdigest()
+    if manifest.get("snapshotId") != snapshot_id: raise RefreshError("TNDS snapshot identity does not match its source hashes")
     return manifest
 
 

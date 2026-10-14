@@ -5,7 +5,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from refresh_bus_data import BODS_DOWNLOAD_ROOT, BODS_REGIONS, NAPTAN_XML_URL, NPTG_XML_URL, RefreshError, TNDS_REGIONS, acquire_bods, acquire_prepared_data_v2_sources, acquire_tnds, baseline_metrics, source_outcome, source_snapshot_status, tnds_region_from_filename, validate_candidate
+from refresh_bus_data import BODS_DOWNLOAD_ROOT, BODS_REGIONS, NAPTAN_XML_URL, NPTG_XML_URL, RefreshError, TNDS_REGIONS, acquire_bods, acquire_prepared_data_v2_sources, acquire_tnds, baseline_metrics, select_tnds_region_archives, source_outcome, source_snapshot_status, tnds_region_from_filename, validate_candidate
 
 
 class IncompleteFtp:
@@ -124,6 +124,31 @@ class RefreshTests(unittest.TestCase):
     def test_incomplete_regions_fail_before_download(self):
         with self.assertRaisesRegex(RefreshError, 'missing regions'):
             acquire_tnds(self.root, 'masked-user', 'masked-password', ftp_factory=IncompleteFtp)
+
+    def test_tnds_archive_selection_requires_exactly_one_archive_per_region(self):
+        names = [f'TNDS-{region}-v2.5.zip' for region in TNDS_REGIONS]
+        names += ['readme.zip', 'EA-registration.zip', 'unrelated-YORKSHIRE.zip']
+        self.assertEqual(select_tnds_region_archives(names), {region: f'TNDS-{region}-v2.5.zip' for region in TNDS_REGIONS})
+
+    def test_tnds_archive_selection_fails_on_missing_region(self):
+        names = [f'TNDS-{region}-v2.5.zip' for region in TNDS_REGIONS if region != 'Y']
+        with self.assertRaisesRegex(RefreshError, 'Y'):
+            select_tnds_region_archives(names)
+
+    def test_tnds_archive_selection_fails_closed_on_duplicate_east_anglia(self):
+        names = [f'TNDS-{region}-v2.5.zip' for region in TNDS_REGIONS] + ['Alternate-EA-v3.zip']
+        with self.assertRaisesRegex(RefreshError, 'EA.*Alternate-EA-v3.zip'):
+            select_tnds_region_archives(names)
+
+    def test_tnds_archive_selection_fails_closed_on_duplicate_yorkshire(self):
+        names = [f'TNDS-{region}-v2.5.zip' for region in TNDS_REGIONS] + ['Alternate-Y-v3.zip']
+        with self.assertRaisesRegex(RefreshError, 'Y.*Alternate-Y-v3.zip'):
+            select_tnds_region_archives(names)
+
+    def test_tnds_archive_selection_fails_on_filename_with_multiple_region_tokens(self):
+        names = [f'TNDS-{region}-v2.5.zip' for region in TNDS_REGIONS] + ['TNDS-EA-Y-v2.5.zip']
+        with self.assertRaisesRegex(RefreshError, 'Ambiguous TNDS regional archive filenames'):
+            select_tnds_region_archives(names)
 
     def test_each_tnds_region_uses_an_isolated_transfer_session(self):
         sessions = []

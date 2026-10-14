@@ -82,6 +82,11 @@ jobs:
         run: |
           echo '::error::Prepared-data v2 is diagnostic-only; measure_only=true is required on main and publication is disabled.'
           exit 1
+      - name: Refuse malformed TNDS TRUST diagnostic selection
+        if: inputs.v2_expected_snapshot_id == 'TNDS-TRUST-DIAGNOSTIC-C1A' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' || inputs.prepared_schema != 'v2' || inputs.measure_only != true || inputs.force_refresh != true || inputs.resume_checkpoint_run_id != '' || inputs.v2_source_snapshot_run_id != '' || inputs.v2_expected_source_count != '' || inputs.v2_expected_total_bytes != '')
+        run: |
+          echo '::error::TNDS TRUST diagnostic selection is valid only for a manual non-main v2 measure-only forced diagnostic with all unrelated snapshot inputs blank.'
+          exit 1
       - name: Record safe execution mode
         run: |
           if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
@@ -360,7 +365,7 @@ jobs:
   reference-source:
     name: Acquire or reuse exact v2 Bus source snapshot
     needs: main-guard
-    if: inputs.prepared_schema == 'v2' && github.event_name == 'workflow_dispatch' && needs.main-guard.result == 'success'
+    if: inputs.prepared_schema == 'v2' && github.event_name == 'workflow_dispatch' && needs.main-guard.result == 'success' && inputs.v2_expected_snapshot_id != 'TNDS-TRUST-DIAGNOSTIC-C1A'
     uses: ./.github/workflows/atlas-reference-data-source.yml
     with:
       v2_source_snapshot_run_id: ${{ inputs.v2_source_snapshot_run_id }}
@@ -386,6 +391,18 @@ jobs:
       expected_source_count: ${{ needs.reference-source.outputs.source_count }}
       expected_total_bytes: ${{ needs.reference-source.outputs.total_bytes }}
     secrets: inherit
+    permissions:
+      actions: read
+      contents: read
+
+  tnds-trust-diagnostic:
+    name: Run quarantined TNDS TRUST diagnostic
+    needs: main-guard
+    if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && inputs.prepared_schema == 'v2' && inputs.measure_only == true && inputs.force_refresh == true && inputs.resume_checkpoint_run_id == '' && inputs.v2_source_snapshot_run_id == '' && inputs.v2_expected_snapshot_id == 'TNDS-TRUST-DIAGNOSTIC-C1A' && inputs.v2_expected_source_count == '' && inputs.v2_expected_total_bytes == '' && needs.main-guard.result == 'success'
+    uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml
+    secrets:
+      TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
+      TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
     permissions:
       actions: read
       contents: read

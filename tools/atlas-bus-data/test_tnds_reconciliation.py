@@ -11,9 +11,10 @@ from tnds_reconciliation import (EXPECTED_REGIONS, State, access_status, fixture
 
 
 def row(region="EA", stop="0100A", side="bods", **extra):
+    identity_bridge = extra.get("identityBridge", "bridge:service:one")
     return {"region": region, "stopId": stop, "routeNumber": "46", "evidenceId": side + "-evidence",
             "nativeIds": {"bods_route_id" if side == "bods" else "tnds_service_code": side + "-native-1"},
-            "identityBridge": "bridge:service:one", "validFrom": "2026-01-01", "validTo": "2027-01-01",
+            "identityBridge": identity_bridge, "identityBridgeValidated": bool(identity_bridge), "validFrom": "2026-01-01", "validTo": "2027-01-01",
             "operatingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
             "schoolTermQualifier": "ordinary", "operator": "Example Transit", "origin": "North",
             "destination": "South", "stopSequence": ["0100A", "0100B"], **extra}
@@ -114,8 +115,30 @@ class ReconciliationContractTests(unittest.TestCase):
         self.assertNotEqual(p["nativeIds"], t["nativeIds"])
 
     def test_explicit_identity_bridge_is_required_for_corroboration(self):
-        result = compare([row(identityBridge="bridge-X")], [row(side="tnds", identityBridge="bridge-X")])
+        result = compare([row(identityBridge="bridge-X", identityBridgeValidated=True)], [row(side="tnds", identityBridge="bridge-X", identityBridgeValidated=True)])
         self.assertTrue(result["rows"][0]["identityCorroborated"])
+
+    def test_unvalidated_identity_bridge_cannot_establish_exact_identity(self):
+        result = compare([row(identityBridge="bridge-X", identityBridgeValidated=False)], [row(side="tnds", identityBridge="bridge-X", identityBridgeValidated=False)])
+        self.assertEqual(result["rows"][0]["category"], "STRONG_COMPOSITE_CANDIDATE")
+
+    def test_same_operator_id_only_is_not_exact_identity(self):
+        result = compare([row(identityBridge=None, nativeIds={"operatorCode": "OP1"})],
+                         [row(side="tnds", identityBridge=None, nativeIds={"operatorCode": "OP1"})])
+        self.assertEqual(result["rows"][0]["category"], "STRONG_COMPOSITE_CANDIDATE")
+        self.assertFalse(result["rows"][0]["identityCorroborated"])
+
+    def test_same_route_id_only_is_not_exact_identity(self):
+        result = compare([row(identityBridge=None, nativeIds={"routeId": "R1"})],
+                         [row(side="tnds", identityBridge=None, nativeIds={"routeId": "R1"})])
+        self.assertEqual(result["rows"][0]["category"], "STRONG_COMPOSITE_CANDIDATE")
+        self.assertFalse(result["rows"][0]["identityCorroborated"])
+
+    def test_same_generic_service_code_without_contract_is_not_exact_identity(self):
+        result = compare([row(identityBridge=None, nativeIds={"serviceCode": "S1"})],
+                         [row(side="tnds", identityBridge=None, nativeIds={"serviceCode": "S1"})])
+        self.assertEqual(result["rows"][0]["category"], "STRONG_COMPOSITE_CANDIDATE")
+        self.assertFalse(result["rows"][0]["identityCorroborated"])
 
     def test_no_identity_bridge_cannot_become_false_agreement(self):
         result = compare([row(identityBridge=None)], [row(side="tnds", identityBridge=None)])

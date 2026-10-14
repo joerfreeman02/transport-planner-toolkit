@@ -1,7 +1,12 @@
 name: ATLAS quarantined TNDS trust diagnostic
 
 on:
-  workflow_dispatch:
+  workflow_call:
+    secrets:
+      TNDS_USERNAME:
+        required: true
+      TNDS_PASSWORD:
+        required: true
 
 permissions:
   actions: read
@@ -30,19 +35,43 @@ jobs:
           TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
           TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
         run: python tools/atlas-bus-data/tnds_trust_diagnostic.py
+      - name: Ensure secret-safe failure evidence exists
+        if: always()
+        env:
+          TNDS_STEP_OUTCOME: ${{ steps.tnds.outcome }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'tnds-evidence'
+          root.mkdir(parents=True, exist_ok=True)
+          path = root / 'run-evidence.json'
+          record = json.loads(path.read_text(encoding='utf-8')) if path.is_file() else {
+              'schema': 'atlas-tnds-trust-run-evidence-v2', 'stage': 'WORKFLOW_SETUP',
+              'result': 'FAILED', 'errorType': 'WorkflowStepFailure', 'snapshotId': None,
+              'completedRegions': [], 'expectedRegions': ['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y'],
+              'preparedManifestPresent': False, 'diagnosticOnly': True, 'plannerEligible': False,
+              'publicationAttempted': False, 'deploymentAttempted': False, 'secretValuesIncluded': False,
+              'producer': {'runId': os.environ.get('GITHUB_RUN_ID'), 'repositoryCommitSha': os.environ.get('GITHUB_SHA'),
+                           'repository': os.environ.get('GITHUB_REPOSITORY'), 'ref': os.environ.get('GITHUB_REF')}}
+          if os.environ.get('TNDS_STEP_OUTCOME') != 'success' and record.get('result') == 'RUNNING':
+              record['result'] = 'FAILED'
+              record['errorType'] = 'WorkflowStepFailure'
+          path.write_text(json.dumps(record, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          PY
       - name: Upload quarantined raw TNDS snapshot
-        if: always() && steps.tnds.outputs.snapshot_created == 'true'
+        if: always() && steps.tnds.outputs.snapshot_available == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: atlas-tnds-quarantined-${{ github.run_id }}
           path: ${{ runner.temp }}/tnds-quarantined-snapshot/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
       - name: Upload secret-free preparation and gate evidence
-        if: success()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: atlas-tnds-trust-diagnostic-${{ github.run_id }}
           path: ${{ runner.temp }}/tnds-evidence/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14

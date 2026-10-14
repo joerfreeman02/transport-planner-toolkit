@@ -143,11 +143,7 @@ def _identity_decision(p: dict[str, Any], t: dict[str, Any]) -> tuple[str, str]:
     if normalize_stop_id(p.get("stopId")) != normalize_stop_id(t.get("stopId")) or not p.get("stopId"):
         return "NO_IDENTITY_BRIDGE", "none"
     pb, tb = _bridge(p), _bridge(t)
-    if pb and tb and pb == tb:
-        return "EXACT_SHARED_IDENTITY", "high"
-    pi, ti = _ids(p), _ids(t)
-    common = [(k, pi[k]) for k in pi.keys() & ti.keys() if pi[k] == ti[k]]
-    if common:
+    if p.get("identityBridgeValidated") is True and t.get("identityBridgeValidated") is True and pb and tb and pb == tb:
         return "EXACT_SHARED_IDENTITY", "high"
     # Composite evidence may nominate a candidate but never establish identity.
     shared_attrs = all(p.get(key) and t.get(key) and str(p[key]).strip().casefold() == str(t[key]).strip().casefold()
@@ -267,6 +263,7 @@ def _ledger_row(region: str, p: dict[str, Any] | None, t: dict[str, Any] | None,
             "primaryEvidenceId": p.get("evidenceId"), "tndsEvidenceId": t.get("evidenceId"),
             "primaryNativeIds": _ids(p), "tndsNativeIds": _ids(t),
             "primaryPreparedId": p.get("preparedId"), "tndsPreparedId": t.get("preparedId"),
+            "primaryIdentityBridge": p.get("identityBridge"), "tndsIdentityBridge": t.get("identityBridge"),
             "primaryStopId": p.get("stopId"), "tndsStopId": t.get("stopId"),
             "primaryStopIdNormalized": normalize_stop_id(p.get("stopId")),
             "tndsStopIdNormalized": normalize_stop_id(t.get("stopId")),

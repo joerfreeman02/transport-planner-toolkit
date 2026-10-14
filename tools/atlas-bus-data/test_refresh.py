@@ -5,7 +5,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from refresh_bus_data import BODS_DOWNLOAD_ROOT, BODS_REGIONS, NAPTAN_XML_URL, NPTG_XML_URL, RefreshError, TNDS_REGIONS, acquire_bods, acquire_prepared_data_v2_sources, acquire_tnds, source_outcome, source_snapshot_status, tnds_region_from_filename, validate_candidate
+from refresh_bus_data import BODS_DOWNLOAD_ROOT, BODS_REGIONS, NAPTAN_XML_URL, NPTG_XML_URL, RefreshError, TNDS_REGIONS, acquire_bods, acquire_prepared_data_v2_sources, acquire_tnds, baseline_metrics, source_outcome, source_snapshot_status, tnds_region_from_filename, validate_candidate
 
 
 class IncompleteFtp:
@@ -275,6 +275,13 @@ class RefreshTests(unittest.TestCase):
         self.assertEqual(source_outcome('hash-a', None), ('UPDATED', 'INITIAL AUTOMATED BASELINE'))
         self.assertEqual(source_outcome('hash-a', {'sourceHash': 'hash-a'}), ('CHECKED_NO_CHANGE', None))
         self.assertEqual(source_outcome('hash-b', {'sourceHash': 'hash-a'}), ('UPDATED', None))
+
+    def test_incomplete_last_known_good_is_not_an_authoritative_zero_baseline(self):
+        root = self.root / 'incomplete-lkg'
+        manifest = root / 'atlas/data/bus/manifest.json'
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text(json.dumps({'schema': 'atlas-prepared-bus-data-v2', 'sources': {'naptan': {}, 'bods': {'regions': []}}}))
+        self.assertEqual(baseline_metrics(root), {})
 
     def test_source_snapshot_status_uses_manifest_reuse_provenance(self):
         manifest = {

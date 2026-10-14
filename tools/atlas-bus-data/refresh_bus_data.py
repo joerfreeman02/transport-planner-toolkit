@@ -58,6 +58,20 @@ def now_utc() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def frozen_snapshot_date(snapshot_manifest: dict) -> str:
+    """Return the immutable acquisition date for a verified frozen snapshot."""
+    created_at = snapshot_manifest.get("createdAt")
+    if not isinstance(created_at, str) or not created_at.strip():
+        raise RefreshError("Verified source snapshot manifest has missing or invalid createdAt acquisition timestamp")
+    try:
+        parsed = datetime.fromisoformat(created_at.strip().replace("Z", "+00:00"))
+    except ValueError as error:
+        raise RefreshError("Verified source snapshot manifest has missing or invalid createdAt acquisition timestamp") from error
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise RefreshError("Verified source snapshot manifest has missing or invalid createdAt acquisition timestamp")
+    return parsed.date().isoformat()
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -552,11 +566,21 @@ def baseline_metrics(site: Path) -> dict:
         return {}
     try:
         bus = json.loads(manifest.read_text(encoding="utf-8"))
+        if bus.get("schema") not in {"atlas-prepared-bus-data-v1", "atlas-prepared-bus-data-v2"}:
+            return {}
         bods = bus.get("sources", {}).get("bods", {})
+        naptan_stops = int(bus.get("sources", {}).get("naptan", {}).get("stopCount", 0) or 0)
+        bods_regions = bods.get("regions", [])
+        bods_region_count = len(bods_regions)
+        bods_service_count = sum(int(region.get("serviceCount", 0) or 0) for region in bods_regions)
+        # An incomplete/placeholder manifest is not a zero-valued baseline.
+        # Return no baseline so the caller can fall back to the bundled data.
+        if naptan_stops <= 0 or bods_region_count <= 0 or bods_service_count <= 0:
+            return {}
         result = {
-            "naptanStopCount": bus.get("sources", {}).get("naptan", {}).get("stopCount", 0),
-            "bodsRegionCount": len(bods.get("regions", [])),
-            "bodsServiceCount": sum(int(region.get("serviceCount", 0) or 0) for region in bods.get("regions", [])),
+            "naptanStopCount": naptan_stops,
+            "bodsRegionCount": bods_region_count,
+            "bodsServiceCount": bods_service_count,
         }
         if tnds_manifest.is_file():
             tnds = json.loads(tnds_manifest.read_text(encoding="utf-8"))
@@ -649,7 +673,8 @@ def run(args: argparse.Namespace) -> dict:
         site_bus = site / "atlas" / "data" / "bus"
         site_tnds = site / "atlas" / "data" / "bus-tnds"
         site_bus.parent.mkdir(parents=True, exist_ok=True)
-        build_command = [sys.executable, str(Path(__file__).with_name("build_static_index.py")), "--gtfs-dir", str(gtfs), "--output", str(site_bus), "--snapshot-date", datetime.now(timezone.utc).date().isoformat(), "--generated-at", started]
+        snapshot_date = frozen_snapshot_date(snapshot_manifest) if snapshot_root else datetime.now(timezone.utc).date().isoformat()
+        build_command = [sys.executable, str(Path(__file__).with_name("build_static_index.py")), "--gtfs-dir", str(gtfs), "--output", str(site_bus), "--snapshot-date", snapshot_date, "--generated-at", started]
         if prepared_schema == "v2":
             build_command.extend(["--schema", "atlas-prepared-bus-data-v2", "--naptan-xml", str(naptan), "--nptg-xml", str(nptg)])
         else:

@@ -6,6 +6,7 @@ import ftplib
 import json
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 
 from refresh_bus_data import TNDS_HOST, TNDS_PATH, TNDS_REGIONS
 
@@ -42,7 +43,9 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     result = probe(os.environ.get("TNDS_USERNAME", ""), os.environ.get("TNDS_PASSWORD", ""))
-    with open(args.output, "w", encoding="utf-8") as stream: json.dump(result, stream, indent=2); stream.write("\n")
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("w", encoding="utf-8") as stream: json.dump(result, stream, indent=2); stream.write("\n")
     print(json.dumps(result, indent=2))
 
 

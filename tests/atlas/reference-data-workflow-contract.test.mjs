@@ -11,6 +11,7 @@ const refresh = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/refresh_bu
 const snapshotTool = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/source_snapshot.py'), 'utf8');
 const integrity = fs.readFileSync(path.join(root, 'tests/atlas/prepared-bus-data-integrity.test.mjs'), 'utf8');
 const tndsProbe = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/tnds_capability_probe.py'), 'utf8');
+const handoff = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/verify_prepared_handoff.py'), 'utf8');
 
 assert.match(top, /uses: \.\/\.github\/workflows\/atlas-reference-data-source\.yml/);
 assert.match(top, /uses: \.\/\.github\/workflows\/atlas-reference-data-diagnostic\.yml/);
@@ -53,6 +54,12 @@ assert.match(source, /overwrite: false/);
 assert.match(source, /run-id: \$\{\{ inputs\.v2_source_snapshot_run_id \}\}/);
 assert.match(source, /github-token: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
 assert.match(source, /--mark-frozen-reuse/);
+assert.match(source, /Assert restored frozen snapshot manifest[\s\S]*?test -f prior-source\/source-snapshot\/manifest\.json/);
+assert.match(source, /Assert frozen reuse output manifest[\s\S]*?test -f source-snapshot\/manifest\.json/);
+assert.match(source, /source-probe\/evidence\/source-snapshot-mode\.json/);
+assert.match(source, /mode': 'explicit frozen reuse' if frozen else 'fresh acquisition'/);
+assert.match(source, /currentSourceFreshnessClaimed': not frozen/);
+assert.match(source, /path:\s+\|\s+source-snapshot\s+source-probe/);
 assert.match(snapshotTool, /currentSourceFreshnessClaimed"] = False/);
 assert.match(snapshotTool, /frozenReuseSourceRunId"] = str\(source_run_id\)/);
 assert.match(snapshotTool, /manifest = load_and_verify\(source_root\)/);
@@ -105,10 +112,20 @@ assert.ok(diagnostic.indexOf('Stage and verify diagnostic release metadata') < d
 assert.match(diagnostic, /--previous-root last-known-good/);
 assert.match(diagnostic, /--acquisition-disabled/);
 assert.match(diagnostic, /steps\.prepare-v2\.outcome/);
-assert.match(diagnostic, /id: coverage-gate\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success'/);
-assert.match(diagnostic, /id: structural-scan\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success'/);
-assert.match(diagnostic, /id: hard-validator\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success'/);
-assert.match(diagnostic, /id: capacity\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success'/);
+assert.match(diagnostic, /id: prepared-output-handoff\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success'[\s\S]*?verify_prepared_handoff\.py/);
+assert.match(handoff, /atlas\/data\/bus\/manifest\.json/);
+assert.match(handoff, /atlas\/data\/status\/manifest\.json/);
+assert.match(handoff, /diagnostic-output\/coverage-ledger\.json/);
+assert.match(handoff, /diagnostic-output\/gap-report\.json/);
+assert.match(handoff, /diagnostic-output\/0590B-forensic\.json/);
+assert.match(handoff, /atlas-prepared-bus-data-v2/);
+assert.match(handoff, /atlas-bus-refresh-status-v1/);
+assert.match(handoff, /atlas-bus-national-coverage-ledger-v1/);
+assert.match(handoff, /source snapshot ID does not match/);
+assert.match(diagnostic, /id: coverage-gate\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success' && steps\.prepared-output-handoff\.outcome == 'success'/);
+assert.match(diagnostic, /id: structural-scan\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success' && steps\.prepared-output-handoff\.outcome == 'success'/);
+assert.match(diagnostic, /id: hard-validator\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success' && steps\.prepared-output-handoff\.outcome == 'success'/);
+assert.match(diagnostic, /id: capacity\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success' && steps\.prepared-output-handoff\.outcome == 'success'/);
 assert.match(diagnostic, /steps\.release-metadata\.outcome/);
 assert.match(diagnostic, /if: always\(\) &&/);
 assert.match(diagnostic, /Copy deterministic test log into evidence workspace/);
@@ -121,7 +138,7 @@ assert.match(top, /Legacy v1 shadow parity is deferred: no exact same-window fro
 assert.match(diagnostic, /verified-snapshot-manifest\.json/);
 assert.match(diagnostic, /atlas-reference-diagnostic-\$\{\{ github\.run_id \}\}/);
 assert.match(diagnostic, /Upload evidence-safe diagnostic artifact\s+if: always\(\)/);
-assert.match(diagnostic, /Preserve fail-closed conclusions\s+if: always\(\)[\s\S]*steps\.verify-snapshot\.outcome != 'success'[\s\S]*steps\.prepare-v2\.outcome != 'success'/);
+assert.match(diagnostic, /Preserve fail-closed conclusions\s+if: always\(\)[\s\S]*steps\.verify-snapshot\.outcome != 'success'[\s\S]*steps\.prepare-v2\.outcome != 'success'[\s\S]*steps\.prepared-output-handoff\.outcome != 'success'/);
 
 // Fresh acquisition passes producer-measured metadata without applying optional
 // frozen-reuse expectations; no automatic latest-artifact lookup exists.
@@ -152,6 +169,11 @@ assert.match(top, /uses: actions\/upload-pages-artifact@v3[\s\S]*?path: pages-si
 assert.match(top, /rsync -a --exclude='.git' --exclude='pages-site' --exclude='atlas\/data\/bus' --exclude='atlas\/data\/bus-tnds' \.\/ pages-site\//);
 assert.match(refresh, /--acquisition-disabled requires --source-snapshot/);
 assert.match(refresh, /materialise_for_preparation\(snapshot_root, staging\)/);
+assert.match(refresh, /snapshot_date = frozen_snapshot_date\(snapshot_manifest\) if snapshot_root else datetime\.now\(timezone\.utc\)\.date\(\)\.isoformat\(\)/);
+assert.match(refresh, /createdAt/);
+assert.match(tndsProbe, /output\.parent\.mkdir\(parents=True, exist_ok=True\)/);
+assert.match(tndsProbe, /retrievalPerformed": False/);
+assert.doesNotMatch(tndsProbe, /retrbinary|retrlines|RETR /);
 assert.match(snapshotTool, /TNDS raw archives are not permitted in a Bus source snapshot/);
 
-console.log('PASS REMOTE-1A source/diagnostic contract: immutable producer identity, exact frozen reuse, corrected artifact extraction path, candidate-gate sequencing, evidence retention, metadata-only TNDS probe, and no publication.');
+console.log('PASS REMOTE-1B source/diagnostic contract: immutable producer identity, exact frozen reuse, manifest-anchored dates, prepared-output handoff, candidate-gate sequencing, evidence retention, metadata-only TNDS probe, and no publication.');

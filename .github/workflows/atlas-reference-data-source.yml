@@ -78,9 +78,15 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           path: prior-source
+      - name: Assert restored frozen snapshot manifest
+        if: inputs.v2_source_snapshot_run_id != ''
+        run: test -f prior-source/source-snapshot/manifest.json
       - name: Reuse exact verified snapshot without claiming current freshness
         if: inputs.v2_source_snapshot_run_id != ''
         run: python tools/atlas-bus-data/source_snapshot.py --mark-frozen-reuse prior-source/source-snapshot --source-run-id "${{ inputs.v2_source_snapshot_run_id }}" --output source-snapshot
+      - name: Assert frozen reuse output manifest
+        if: inputs.v2_source_snapshot_run_id != ''
+        run: test -f source-snapshot/manifest.json
       - name: Acquire the authorised Bus source set once
         if: inputs.v2_source_snapshot_run_id == ''
         run: python tools/atlas-bus-data/source_snapshot.py --acquire --output source-snapshot
@@ -112,6 +118,33 @@ jobs:
               for key, value in values.items():
                   output.write(f'{key}={value}\n')
           PY
+      - name: Record verified snapshot mode evidence
+        id: snapshot-mode-evidence
+        env:
+          FROZEN_SOURCE_RUN_ID: ${{ inputs.v2_source_snapshot_run_id }}
+          VERIFIED_SNAPSHOT_ID: ${{ steps.verify.outputs.snapshot_id }}
+          VERIFIED_SOURCE_COUNT: ${{ steps.verify.outputs.source_count }}
+          VERIFIED_TOTAL_BYTES: ${{ steps.verify.outputs.total_bytes }}
+        run: |
+          mkdir -p source-probe/evidence
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          frozen_run_id = os.environ['FROZEN_SOURCE_RUN_ID']
+          frozen = bool(frozen_run_id)
+          evidence = {
+              'schema': 'atlas-source-snapshot-mode-evidence-v1',
+              'mode': 'explicit frozen reuse' if frozen else 'fresh acquisition',
+              'originalSourceRunId': frozen_run_id or None,
+              'currentSourceFreshnessClaimed': not frozen,
+              'snapshotId': os.environ['VERIFIED_SNAPSHOT_ID'],
+              'sourceCount': int(os.environ['VERIFIED_SOURCE_COUNT']),
+              'totalBytes': int(os.environ['VERIFIED_TOTAL_BYTES']),
+          }
+          Path('source-probe/evidence/source-snapshot-mode.json').write_text(json.dumps(evidence, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          PY
       - name: Record exact snapshot artifact name
         id: snapshot-name
         run: echo "name=atlas-reference-source-snapshot-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
@@ -122,7 +155,7 @@ jobs:
           name: ${{ steps.snapshot-name.outputs.name }}
           path: |
             source-snapshot
-            source-probe/freshness.json
+            source-probe
           if-no-files-found: error
           overwrite: false
           retention-days: 14

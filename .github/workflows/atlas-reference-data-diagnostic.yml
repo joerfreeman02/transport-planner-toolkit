@@ -142,21 +142,25 @@ jobs:
         if: always() && steps.verify-producer-artifact.outcome == 'success' && steps.verify-snapshot.outcome == 'success' && steps.restore-last-known-good.outcome == 'success' && steps.release-metadata.outcome == 'success'
         run: |
           python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --previous-root last-known-good --prepared-schema v2 --bus-only-diagnostic --source-snapshot source-input/source-snapshot --acquisition-disabled
+      - name: Verify prepared candidate handoff
+        id: prepared-output-handoff
+        if: always() && steps.prepare-v2.outcome == 'success'
+        run: python tools/atlas-bus-data/verify_prepared_handoff.py --site-root pages-site --expected-snapshot-id "${{ inputs.expected_snapshot_id }}"
       - name: Run national coverage ledger gate
         id: coverage-gate
-        if: always() && steps.prepare-v2.outcome == 'success'
+        if: always() && steps.prepare-v2.outcome == 'success' && steps.prepared-output-handoff.outcome == 'success'
         continue-on-error: true
         run: python tools/atlas-bus-data/coverage_ledger.py --gate pages-site/diagnostic-output/coverage-ledger.json
       - name: Run aggregate structural scan
         id: structural-scan
-        if: always() && steps.prepare-v2.outcome == 'success'
+        if: always() && steps.prepare-v2.outcome == 'success' && steps.prepared-output-handoff.outcome == 'success'
         continue-on-error: true
         run: |
           mkdir -p diagnostic-output
           python tools/atlas-bus-data/structural_scan.py --site-root pages-site --output diagnostic-output/structural-scan.json
       - name: Run hard candidate validation (fail closed)
         id: hard-validator
-        if: always() && steps.prepare-v2.outcome == 'success'
+        if: always() && steps.prepare-v2.outcome == 'success' && steps.prepared-output-handoff.outcome == 'success'
         continue-on-error: true
         run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site --bus-only
       - name: Probe TNDS metadata without archive transfer
@@ -169,7 +173,7 @@ jobs:
         run: python tools/atlas-bus-data/tnds_capability_probe.py --output diagnostic-output/tnds-capability-probe.json
       - name: Measure diagnostic candidate capacity
         id: capacity
-        if: always() && steps.prepare-v2.outcome == 'success'
+        if: always() && steps.prepare-v2.outcome == 'success' && steps.prepared-output-handoff.outcome == 'success'
         continue-on-error: true
         run: mkdir -p pages-site/atlas/config && node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json --bus-only
       - name: Copy deterministic test log into evidence workspace
@@ -196,7 +200,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       - name: Preserve fail-closed conclusions
-        if: always() && (steps.verify-snapshot.outcome != 'success' || steps.release-metadata.outcome != 'success' || steps.prepare-v2.outcome != 'success' || steps.coverage-gate.outcome != 'success' || steps.structural-scan.outcome != 'success' || steps.hard-validator.outcome != 'success' || steps.deterministic-tests.outcome != 'success' || steps.tnds-probe.outcome != 'success' || steps.capacity.outcome != 'success')
+        if: always() && (steps.verify-snapshot.outcome != 'success' || steps.release-metadata.outcome != 'success' || steps.prepare-v2.outcome != 'success' || steps.prepared-output-handoff.outcome != 'success' || steps.coverage-gate.outcome != 'success' || steps.structural-scan.outcome != 'success' || steps.hard-validator.outcome != 'success' || steps.deterministic-tests.outcome != 'success' || steps.tnds-probe.outcome != 'success' || steps.capacity.outcome != 'success')
         run: |
           echo 'A required diagnostic conclusion failed, including preparation or a downstream gate; evidence was uploaded and this run remains non-publishable.'
           exit 1

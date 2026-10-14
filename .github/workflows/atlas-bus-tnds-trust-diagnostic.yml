@@ -1,0 +1,48 @@
+name: ATLAS quarantined TNDS trust diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: atlas-tnds-trust-diagnostic-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  acquire-prepare-quarantine:
+    name: Acquire, validate, and quarantine TNDS
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Run isolated TNDS acquisition and preparation gate
+        id: tnds
+        env:
+          TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
+          TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
+        run: python tools/atlas-bus-data/tnds_trust_diagnostic.py
+      - name: Upload quarantined raw TNDS snapshot
+        if: always() && steps.tnds.outputs.snapshot_created == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-tnds-quarantined-${{ github.run_id }}
+          path: ${{ runner.temp }}/tnds-quarantined-snapshot/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload secret-free preparation and gate evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-tnds-trust-diagnostic-${{ github.run_id }}
+          path: ${{ runner.temp }}/tnds-evidence/
+          if-no-files-found: error
+          retention-days: 14

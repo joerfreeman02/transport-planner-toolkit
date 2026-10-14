@@ -1,0 +1,343 @@
+{
+  "schema": "atlas-primary-unresolved-forensic-v1",
+  "snapshotId": "cf0c64b980b0516378bb705843d428a74a797d19f527f79c6c43a5540f0b8bde",
+  "sourceWindow": "2026-10-13 frozen ACQ-1 BODS/NaPTAN evidence",
+  "coverageLedgerSha256": "aee79d3dd4a91b9c384021cd9c54989be89789e6e10a2aef467a55970c1c7731",
+  "unresolvedScheduledCallCount": 4908,
+  "knownBaselineUnresolvedCount": 4908,
+  "baselineCountMatches": true,
+  "distinctRegions": 9,
+  "countsByRegion": {
+    "east_anglia": 290,
+    "east_midlands": 162,
+    "london": 1748,
+    "north_east": 430,
+    "north_west": 118,
+    "south_east": 1519,
+    "south_west": 58,
+    "west_midlands": 391,
+    "yorkshire": 192
+  },
+  "countsByMatchMethod": {
+    "unresolved": 4908
+  },
+  "countsByRouteNumberTop25": [
+    {
+      "routeNumber": "80",
+      "count": 520
+    },
+    {
+      "routeNumber": "213",
+      "count": 415
+    },
+    {
+      "routeNumber": "B12",
+      "count": 338
+    },
+    {
+      "routeNumber": "151",
+      "count": 328
+    },
+    {
+      "routeNumber": "27",
+      "count": 308
+    },
+    {
+      "routeNumber": "434",
+      "count": 294
+    },
+    {
+      "routeNumber": "403",
+      "count": 270
+    },
+    {
+      "routeNumber": "26",
+      "count": 240
+    },
+    {
+      "routeNumber": "X22",
+      "count": 148
+    },
+    {
+      "routeNumber": "100",
+      "count": 146
+    },
+    {
+      "routeNumber": "2",
+      "count": 140
+    },
+    {
+      "routeNumber": "31",
+      "count": 94
+    },
+    {
+      "routeNumber": "272",
+      "count": 86
+    },
+    {
+      "routeNumber": "430",
+      "count": 78
+    },
+    {
+      "routeNumber": "435",
+      "count": 77
+    },
+    {
+      "routeNumber": "229",
+      "count": 72
+    },
+    {
+      "routeNumber": "84",
+      "count": 68
+    },
+    {
+      "routeNumber": "159",
+      "count": 68
+    },
+    {
+      "routeNumber": "7",
+      "count": 67
+    },
+    {
+      "routeNumber": "704",
+      "count": 64
+    },
+    {
+      "routeNumber": "79",
+      "count": 62
+    },
+    {
+      "routeNumber": "270",
+      "count": 60
+    },
+    {
+      "routeNumber": "620",
+      "count": 57
+    },
+    {
+      "routeNumber": "H2B",
+      "count": 55
+    },
+    {
+      "routeNumber": "26A",
+      "count": 48
+    }
+  ],
+  "countsByOperatorTop25": [
+    {
+      "operator": "Go Ahead Luton Parkway",
+      "count": 1422
+    },
+    {
+      "operator": "Go Ahead London",
+      "count": 743
+    },
+    {
+      "operator": "Metrobus",
+      "count": 505
+    },
+    {
+      "operator": "Central Connect",
+      "count": 434
+    },
+    {
+      "operator": "Arriva North East",
+      "count": 400
+    },
+    {
+      "operator": "Arriva Midlands",
+      "count": 308
+    },
+    {
+      "operator": "Diamond Bus South East",
+      "count": 189
+    },
+    {
+      "operator": "Hodgsons",
+      "count": 146
+    },
+    {
+      "operator": "West Berkshire Council Transport Services",
+      "count": 94
+    },
+    {
+      "operator": "Carousel Buses",
+      "count": 94
+    },
+    {
+      "operator": "Regent Coaches",
+      "count": 90
+    },
+    {
+      "operator": "Diamond Bus",
+      "count": 81
+    },
+    {
+      "operator": "Arriva Beds and Bucks",
+      "count": 68
+    },
+    {
+      "operator": "Kirkby Lonsdale Coaches",
+      "count": 65
+    },
+    {
+      "operator": "Thames Valley Buses",
+      "count": 64
+    },
+    {
+      "operator": "Arriva North West",
+      "count": 24
+    },
+    {
+      "operator": "Redline",
+      "count": 24
+    },
+    {
+      "operator": "Link Network",
+      "count": 22
+    },
+    {
+      "operator": "Connexions Buses",
+      "count": 20
+    },
+    {
+      "operator": "Squarepeg",
+      "count": 19
+    },
+    {
+      "operator": "Bland's",
+      "count": 14
+    },
+    {
+      "operator": "Stanley Travel",
+      "count": 12
+    },
+    {
+      "operator": "Newport Bus",
+      "count": 11
+    },
+    {
+      "operator": "TLC Travel",
+      "count": 11
+    },
+    {
+      "operator": "Reays Coaches",
+      "count": 10
+    }
+  ],
+  "topStopNames": [
+    {
+      "stopName": "Brabham Court",
+      "count": 747
+    },
+    {
+      "stopName": "Stonecot Hill",
+      "count": 520
+    },
+    {
+      "stopName": "PSMWGH",
+      "count": 338
+    },
+    {
+      "stopName": "Greenfield Park",
+      "count": 334
+    },
+    {
+      "stopName": "Park Lane / Fairfield Halls",
+      "count": 270
+    },
+    {
+      "stopName": "Redhill Bus Station 4.",
+      "count": 155
+    },
+    {
+      "stopName": "Woodlands Grove, Rickman Hill",
+      "count": 154
+    },
+    {
+      "stopName": "WDCTGR",
+      "count": 140
+    },
+    {
+      "stopName": "Lodge Way Hail&Ride (26)",
+      "count": 96
+    },
+    {
+      "stopName": "Beaconsfield, Seeleys Road",
+      "count": 94
+    },
+    {
+      "stopName": "Shops",
+      "count": 77
+    },
+    {
+      "stopName": "Westbourne Rise",
+      "count": 77
+    },
+    {
+      "stopName": "Green Lane",
+      "count": 77
+    },
+    {
+      "stopName": "Glebe Road Junction",
+      "count": 77
+    },
+    {
+      "stopName": "Waterbeach, NHS Staff Accommodation",
+      "count": 73
+    },
+    {
+      "stopName": "Waterbeach, NHS Staff Accommodation (N)",
+      "count": 73
+    },
+    {
+      "stopName": "Heathrow Terminal 3 Departures (Set down only)",
+      "count": 72
+    },
+    {
+      "stopName": "Anchor Rd",
+      "count": 72
+    },
+    {
+      "stopName": "Mallow Gate",
+      "count": 68
+    },
+    {
+      "stopName": "Holiday Inn Staybridge",
+      "count": 67
+    },
+    {
+      "stopName": "Dover Road South, Dover Road South",
+      "count": 64
+    },
+    {
+      "stopName": "War Memorial, Hornby",
+      "count": 55
+    },
+    {
+      "stopName": "Stone Cross.",
+      "count": 52
+    },
+    {
+      "stopName": "Stone Cross",
+      "count": 51
+    },
+    {
+      "stopName": "Courtyard Marriott",
+      "count": 50
+    }
+  ],
+  "gtfsLineageJoin": {
+    "gtfs_stop_found": 4908,
+    "trip_found": 4908,
+    "trip_route_consistent": 4908
+  },
+  "lineageFields": {
+    "unresolved_stop_point_id": 4908
+  },
+  "uniqueTrips": 3255,
+  "diagnosticOnly": true,
+  "sourceSnapshotMutated": false,
+  "status": "PRIMARY_FORENSIC_LINEAGE_AVAILABLE",
+  "summarySha256": "05ecb614ca92861ce3c1413addf6f468be52e06e579e3f78eea3489541ff74fc"
+}

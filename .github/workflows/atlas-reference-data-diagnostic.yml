@@ -11,6 +11,14 @@ on:
         description: Workflow run that produced the exact source snapshot artifact
         required: true
         type: string
+      source_snapshot_artifact_id:
+        description: Immutable GitHub artifact ID returned by the source producer
+        required: true
+        type: string
+      producer_run_id:
+        description: Run that produced the exact source snapshot artifact
+        required: true
+        type: string
       expected_snapshot_id:
         description: Exact expected immutable source snapshot ID
         required: true
@@ -18,11 +26,11 @@ on:
       expected_source_count:
         description: Exact expected source count
         required: true
-        type: number
+        type: string
       expected_total_bytes:
         description: Exact expected total source bytes
         required: true
-        type: number
+        type: string
 
 permissions:
   actions: read
@@ -52,21 +60,58 @@ jobs:
         id: deterministic-tests
         continue-on-error: true
         run: node tests/atlas/run-all.mjs > "$RUNNER_TEMP/atlas-deterministic-tests.log" 2>&1
+      - name: Verify exact producer artifact identity
+        id: verify-producer-artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_ARTIFACT_ID: ${{ inputs.source_snapshot_artifact_id }}
+          SOURCE_ARTIFACT_NAME: ${{ inputs.source_snapshot_artifact }}
+          PRODUCER_RUN_ID: ${{ inputs.producer_run_id }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ARTIFACT_ID" > "$RUNNER_TEMP/source-artifact.json"
+          python - "$RUNNER_TEMP/source-artifact.json" <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          artifact = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          checks = {
+              'id': int(os.environ['SOURCE_ARTIFACT_ID']),
+              'name': os.environ['SOURCE_ARTIFACT_NAME'],
+              'expired': False,
+              'workflow_run': {'id': int(os.environ['PRODUCER_RUN_ID'])},
+          }
+          for key, expected in checks.items():
+              actual = artifact.get(key)
+              if isinstance(expected, dict):
+                  actual = actual or {}
+                  for nested_key, nested_expected in expected.items():
+                      if actual.get(nested_key) != nested_expected:
+                          raise SystemExit(f'Producer artifact {key}.{nested_key} mismatch: expected {nested_expected}, received {actual.get(nested_key)}')
+              elif actual != expected:
+                  raise SystemExit(f'Producer artifact {key} mismatch: expected {expected}, received {actual}')
+          print('Exact producer artifact ID, name, run, and availability verified.')
+          PY
       - name: Restore supplied source snapshot from exact producer run
         uses: actions/download-artifact@v4
         with:
-          name: ${{ inputs.source_snapshot_artifact }}
+          artifact-ids: ${{ inputs.source_snapshot_artifact_id }}
           run-id: ${{ inputs.source_snapshot_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           path: source-input
       - name: Verify snapshot before interpretation
         id: verify-snapshot
+        env:
+          EXPECTED_SNAPSHOT_ID: ${{ inputs.expected_snapshot_id }}
+          EXPECTED_SOURCE_COUNT: ${{ inputs.expected_source_count }}
+          EXPECTED_TOTAL_BYTES: ${{ inputs.expected_total_bytes }}
         run: |
           python tools/atlas-bus-data/source_snapshot.py --verify source-input/source-snapshot \
-            --expected-snapshot-id '${{ inputs.expected_snapshot_id }}' \
-            --expected-source-count '${{ inputs.expected_source_count }}' \
-            --expected-total-bytes '${{ inputs.expected_total_bytes }}' > source-input/verified-manifest.json
+            --expected-snapshot-id "$EXPECTED_SNAPSHOT_ID" \
+            --expected-source-count "$EXPECTED_SOURCE_COUNT" \
+            --expected-total-bytes "$EXPECTED_TOTAL_BYTES" > source-input/verified-manifest.json
           cp source-input/source-snapshot/manifest.json source-input/verified-snapshot-manifest.json
       - name: Restore last-known-good diagnostic comparison state
         id: restore-last-known-good
@@ -92,7 +137,7 @@ jobs:
           PY
       - name: Prepare Bus v2 with acquisition disabled
         id: prepare-v2
-        if: always() && steps.release-metadata.outcome == 'success'
+        if: always() && steps.verify-producer-artifact.outcome == 'success' && steps.verify-snapshot.outcome == 'success' && steps.restore-last-known-good.outcome == 'success' && steps.release-metadata.outcome == 'success'
         run: |
           python tools/atlas-bus-data/refresh_bus_data.py --site-root pages-site --previous-root last-known-good --prepared-schema v2 --bus-only-diagnostic --source-snapshot source-input/source-snapshot --acquisition-disabled
       - name: Run national coverage ledger gate

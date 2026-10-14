@@ -32,20 +32,20 @@ on:
         default: ''
         type: string
       v2_expected_snapshot_id:
-        description: Exact immutable snapshot ID required by the v2 diagnostic.
+        description: Optional exact snapshot ID to require for explicit frozen reuse; leave blank for fresh acquisition.
         required: false
-        default: cf0c64b980b0516378bb705843d428a74a797d19f527f79c6c43a5540f0b8bde
+        default: ''
         type: string
       v2_expected_source_count:
-        description: Exact expected source count for the v2 diagnostic.
+        description: Optional exact source count to require for explicit frozen reuse; leave blank for fresh acquisition.
         required: false
-        default: 11
-        type: number
+        default: ''
+        type: string
       v2_expected_total_bytes:
-        description: Exact expected total source bytes for the v2 diagnostic.
+        description: Optional exact total bytes to require for explicit frozen reuse; leave blank for fresh acquisition.
         required: false
-        default: 2244572632
-        type: number
+        default: ''
+        type: string
   schedule:
     - cron: '37 5 * * 1'
 
@@ -364,6 +364,9 @@ jobs:
     uses: ./.github/workflows/atlas-reference-data-source.yml
     with:
       v2_source_snapshot_run_id: ${{ inputs.v2_source_snapshot_run_id }}
+      expected_snapshot_id: ${{ inputs.v2_expected_snapshot_id }}
+      expected_source_count: ${{ inputs.v2_expected_source_count }}
+      expected_total_bytes: ${{ inputs.v2_expected_total_bytes }}
     secrets: inherit
     permissions:
       actions: read
@@ -376,10 +379,12 @@ jobs:
     uses: ./.github/workflows/atlas-reference-data-diagnostic.yml
     with:
       source_snapshot_artifact: ${{ needs.reference-source.outputs.snapshot_artifact }}
-      source_snapshot_run_id: ${{ github.run_id }}
-      expected_snapshot_id: ${{ inputs.v2_expected_snapshot_id }}
-      expected_source_count: ${{ inputs.v2_expected_source_count }}
-      expected_total_bytes: ${{ inputs.v2_expected_total_bytes }}
+      source_snapshot_artifact_id: ${{ needs.reference-source.outputs.snapshot_artifact_id }}
+      source_snapshot_run_id: ${{ needs.reference-source.outputs.producer_run_id }}
+      producer_run_id: ${{ needs.reference-source.outputs.producer_run_id }}
+      expected_snapshot_id: ${{ needs.reference-source.outputs.snapshot_id }}
+      expected_source_count: ${{ needs.reference-source.outputs.source_count }}
+      expected_total_bytes: ${{ needs.reference-source.outputs.total_bytes }}
     secrets: inherit
     permissions:
       actions: read

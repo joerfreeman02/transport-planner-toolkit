@@ -8,6 +8,21 @@ on:
         required: false
         default: ''
         type: string
+      expected_snapshot_id:
+        description: Optional snapshot ID to require when explicitly reusing a frozen snapshot
+        required: false
+        default: ''
+        type: string
+      expected_source_count:
+        description: Optional source count to require when explicitly reusing a frozen snapshot
+        required: false
+        default: ''
+        type: string
+      expected_total_bytes:
+        description: Optional total byte count to require when explicitly reusing a frozen snapshot
+        required: false
+        default: ''
+        type: string
     outputs:
       snapshot_artifact:
         description: Name of the verified source snapshot artifact
@@ -15,6 +30,18 @@ on:
       snapshot_artifact_id:
         description: ID of the verified source snapshot artifact
         value: ${{ jobs.acquire.outputs.snapshot_artifact_id }}
+      snapshot_id:
+        description: Snapshot ID read from the verified source manifest
+        value: ${{ jobs.acquire.outputs.snapshot_id }}
+      source_count:
+        description: Source count read from the verified source manifest
+        value: ${{ jobs.acquire.outputs.source_count }}
+      total_bytes:
+        description: Total source bytes read from the verified source manifest
+        value: ${{ jobs.acquire.outputs.total_bytes }}
+      producer_run_id:
+        description: Run that produced the verified immutable artifact
+        value: ${{ jobs.acquire.outputs.producer_run_id }}
 
 permissions:
   actions: read
@@ -28,6 +55,10 @@ jobs:
     outputs:
       snapshot_artifact: ${{ steps.snapshot-name.outputs.name }}
       snapshot_artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      snapshot_id: ${{ steps.verify.outputs.snapshot_id }}
+      source_count: ${{ steps.verify.outputs.source_count }}
+      total_bytes: ${{ steps.verify.outputs.total_bytes }}
+      producer_run_id: ${{ github.run_id }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -54,7 +85,33 @@ jobs:
         if: inputs.v2_source_snapshot_run_id == ''
         run: python tools/atlas-bus-data/source_snapshot.py --acquire --output source-snapshot
       - name: Verify source snapshot provenance and hashes
-        run: python tools/atlas-bus-data/source_snapshot.py --verify source-snapshot
+        id: verify
+        env:
+          EXPECTED_SNAPSHOT_ID: ${{ inputs.expected_snapshot_id }}
+          EXPECTED_SOURCE_COUNT: ${{ inputs.expected_source_count }}
+          EXPECTED_TOTAL_BYTES: ${{ inputs.expected_total_bytes }}
+        run: |
+          verify_args=(--verify source-snapshot)
+          [[ -z "$EXPECTED_SNAPSHOT_ID" ]] || verify_args+=(--expected-snapshot-id "$EXPECTED_SNAPSHOT_ID")
+          [[ -z "$EXPECTED_SOURCE_COUNT" ]] || verify_args+=(--expected-source-count "$EXPECTED_SOURCE_COUNT")
+          [[ -z "$EXPECTED_TOTAL_BYTES" ]] || verify_args+=(--expected-total-bytes "$EXPECTED_TOTAL_BYTES")
+          python tools/atlas-bus-data/source_snapshot.py "${verify_args[@]}" > "$RUNNER_TEMP/verified-source-manifest.json"
+          python - "$RUNNER_TEMP/verified-source-manifest.json" "$GITHUB_OUTPUT" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          manifest = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          sources = manifest['sources']
+          values = {
+              'snapshot_id': manifest['snapshotId'],
+              'source_count': len(sources),
+              'total_bytes': sum(int(source['bytes']) for source in sources),
+          }
+          with Path(sys.argv[2]).open('a', encoding='utf-8') as output:
+              for key, value in values.items():
+                  output.write(f'{key}={value}\n')
+          PY
       - name: Record exact snapshot artifact name
         id: snapshot-name
         run: echo "name=atlas-reference-source-snapshot-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
@@ -67,4 +124,5 @@ jobs:
             source-snapshot
             source-probe/freshness.json
           if-no-files-found: error
+          overwrite: false
           retention-days: 14

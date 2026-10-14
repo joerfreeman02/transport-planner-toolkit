@@ -11,6 +11,13 @@ export const TNDS_REGIONS = Object.freeze(['EA', 'EM', 'NE', 'NW', 'SE', 'SW', '
 export const TNDS_SERVICE_SHARD_KEY_LENGTH = 5;
 export const TNDS_XML_MAX_BYTES = 64 * 1024 * 1024;
 
+async function ensureDiskReserve(directory, upcomingBytes = 0) {
+  const required = Number(process.env.ATLAS_TNDS_DISK_RESERVE_BYTES || 0);
+  if (!required) return;
+  const { bavail, bsize } = await fs.statfs(directory);
+  if (bavail * bsize < required + upcomingBytes) throw new Error('TNDS disk reserve threshold reached; no source service was dropped.');
+}
+
 async function walk(root) {
   const result = [];
   async function visit(directory) {
@@ -30,6 +37,7 @@ function regionFrom(file) {
 }
 
 async function materializeShardRegion({ sourceFile, outputFile, shardKey, region, entries, stats }) {
+  await ensureDiskReserve(path.dirname(outputFile), (await fs.stat(sourceFile)).size);
   const temporaryOutput = `${outputFile}.part`;
   await fs.rm(temporaryOutput, { force: true });
   const sortedEntries = [...entries].sort((left, right) => left.id.localeCompare(right.id));
@@ -118,6 +126,7 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
           const shardKeys = [...new Set(ids.map(id => String(id).slice(0, TNDS_SERVICE_SHARD_KEY_LENGTH)).filter(Boolean))];
           if (!shardKeys.length) throw new Error(`TNDS service ${service.source.serviceCode || service.id} has no shardable StopPoint IDs.`);
           for (const shardKey of shardKeys) {
+            if (!/^[A-Za-z0-9_-]{1,5}$/.test(shardKey)) throw new Error(`TNDS service ${service.source.serviceCode || service.id} has an unsafe StopPoint shard key.`);
             const scheduled = Object.fromEntries(Object.entries(service.stopSchedules || {}).filter(([stopId]) => stopId.startsWith(shardKey)));
             const quarantine = service.tndsQuarantine ? {
               ...service.tndsQuarantine,
@@ -138,6 +147,7 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
             materialization.sourceBytes += serialized.byteLength;
             materialization.recordCount += 1;
             materialization.maxRecordBytes = Math.max(materialization.maxRecordBytes, serialized.byteLength);
+            await ensureDiskReserve(work, serialized.byteLength);
             await fs.appendFile(shardRegion.file, serialized);
           }
         }
@@ -194,6 +204,12 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const args = Object.fromEntries(process.argv.slice(2).map((value, index, values) => [value.replace(/^--/, ''), values[index + 1]]).filter(([key]) => key));
-  const result = await prepareTnds({ input: args.input, output: args.output, preparedAt: args.preparedAt || new Date().toISOString() });
-  console.log(JSON.stringify(result));
+  try {
+    const result = await prepareTnds({ input: args.input, output: args.output, preparedAt: args.preparedAt || new Date().toISOString() });
+    console.log(JSON.stringify(result));
+  } catch (error) {
+    // Keep diagnostics bounded and omit stack traces or source XML.
+    process.stderr.write(`TNDS preparation failed (${error.name || 'Error'}): ${String(error.message || '').slice(0, 512)}\n`);
+    process.exitCode = 1;
+  }
 }

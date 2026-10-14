@@ -8,7 +8,7 @@ ROOT = Path(__file__).parents[2]
 DISPATCHER = ROOT / ".github/workflows/atlas-bus-data-refresh.yml"
 CALLEE = ROOT / ".github/workflows/atlas-bus-tnds-trust-diagnostic.yml"
 DRIVER = ROOT / "tools/atlas-bus-data/tnds_trust_diagnostic.py"
-TRUST_BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c1-browser-dispatch-entry"
+TRUST_BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c2-preparation-scale-closeout"
 
 
 def parse_dispatch_input_names(workflow_text):
@@ -94,18 +94,17 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn("trust_mode=offline_preflight", selector)
         self.assertIn('"$FORCE_REFRESH" == \'true\'', selector)
         self.assertIn("trust_mode=live_trust", selector)
-        self.assertIn('"$RESUME_RUN_ID" =~ ^[0-9]+$', selector)
-        self.assertIn("Invalid controlled TRUST selection", selector)
+        self.assertIn('"$RESUME_RUN_ID" == \'38579244547\'', selector)
+        self.assertIn("Invalid C2 TRUST selection", selector)
         self.assertIn("trust_prior_producer_run_id: ${{ steps.trust-selector.outputs.prior_producer_run_id }}", self.dispatcher)
 
     def test_non_numeric_raw_reuse_ids_fail_closed(self):
         selector = self.dispatcher.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]
-        self.assertIn('"$RESUME_RUN_ID" =~ ^[0-9]+$', selector)
-        self.assertIn("else\n            echo '::error::Invalid controlled TRUST selection", selector)
-        for valid in ("1", "1024", "9876543210"):
-            self.assertRegex(valid, r"^[0-9]+$")
-        for malformed in ("abc", "12x", "-12", "1.2", " 12", "12 ", ""):
-            self.assertIsNone(re.fullmatch(r"[0-9]+", malformed), malformed)
+        self.assertIn('"$RESUME_RUN_ID" == \'38579244547\'', selector)
+        self.assertIn("else\n            echo '::error::Invalid C2 TRUST selection", selector)
+        self.assertEqual("38579244547", "38579244547")
+        for malformed in ("", "38579244546", "38579244548", "abc", "12x", "-12", "1.2", " 38579244547", "38579244547 "):
+            self.assertNotEqual(malformed, "38579244547")
 
     def test_trust_selector_is_not_activated_on_other_branches_or_main(self):
         selector = self.dispatcher.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]
@@ -130,7 +129,9 @@ class TndsWorkflowContractTests(unittest.TestCase):
             self.assertIn(f"needs.main-guard.outputs.trust_mode == '{mode}'", block)
             self.assertIn("uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml", block)
         self.assertIn("prior_producer_run_id: ${{ needs.main-guard.outputs.trust_prior_producer_run_id }}", self.dispatcher)
-        self.assertIn("TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}", self.dispatcher.split("  tnds-trust-browser-live:", 1)[1])
+        live_browser = self.dispatcher.split("  tnds-trust-browser-live:", 1)[1]
+        self.assertIn("trust_prior_producer_run_id == '' && secrets.TNDS_USERNAME || ''", live_browser)
+        self.assertIn("trust_prior_producer_run_id == '' && secrets.TNDS_PASSWORD || ''", live_browser)
         offline = self.dispatcher.split("  tnds-trust-browser-offline-preflight:", 1)[1].split("  tnds-trust-browser-live:", 1)[0]
         self.assertNotIn("secrets:", offline)
         self.assertNotIn("TNDS_USERNAME", offline)
@@ -215,10 +216,21 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn("producer.get(\"runId\")", self.driver)
         self.assertIn('"currentFreshnessClaimed": False', self.driver)
 
+    def test_run40_reuse_skips_tnds_credentials_and_fresh_acquisition_steps(self):
+        metadata = self.workflow.split("- name: Run metadata-only authentication and archive gate", 1)[1].split("- name: Restore exact prior raw snapshot", 1)[0]
+        acquire = self.workflow.split("- name: Acquire and verify raw TNDS checkpoint", 1)[1].split("- name: Upload immutable raw TNDS checkpoint", 1)[0]
+        self.assertIn("if: inputs.prior_producer_run_id == ''", metadata)
+        self.assertIn("if: inputs.prior_producer_run_id == ''", acquire)
+        self.assertIn("prior_producer_run_id: ${{ needs.main-guard.outputs.trust_prior_producer_run_id }}", self.dispatcher)
+        live_browser = self.dispatcher.split("  tnds-trust-browser-live:", 1)[1]
+        self.assertIn("trust_prior_producer_run_id == '' && secrets.TNDS_USERNAME || ''", live_browser)
+        self.assertIn("trust_prior_producer_run_id == '' && secrets.TNDS_PASSWORD || ''", live_browser)
+
     def test_capacity_gate_uses_central_directory_without_extraction(self):
         self.assertIn("zipfile.ZipFile(archive_path)", self.driver)
         self.assertIn("archive.infolist()", self.driver)
-        self.assertIn("max(10 * 1024**3, 3 * uncompressed_total + compressed_total)", self.driver)
+        self.assertIn("compressed_total + 3 * largest_region + DISK_RESERVE_BYTES", self.driver)
+        self.assertIn('"largestRegionUncompressedBytes": largest_region', self.driver)
         self.assertIn('"extractionStarted": False', self.driver)
         self.assertIn('"CAPACITY_BLOCKED"', self.driver)
         self.assertIn("--capacity-only", self.driver)

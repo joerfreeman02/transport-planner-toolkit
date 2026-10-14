@@ -19,7 +19,7 @@ PREPARED_AT = "2026-10-13T17:42:00.000Z"
 SERVICE_XML = '''<TransXChange SchemaVersion="2.5"><Operators><Operator><TradingName>Fixture Operator</TradingName></Operator></Operators><Services><Service><ServiceCode>FIXTURE</ServiceCode><LineName>F1</LineName><StandardService><Origin>EA001</Origin><Destination>EA002</Destination></StandardService></Service></Services><StopPoints><AnnotatedStopPointRef><StopPointRef>EA001</StopPointRef><CommonName>Origin</CommonName></AnnotatedStopPointRef><AnnotatedStopPointRef><StopPointRef>EA002</StopPointRef><CommonName>Destination</CommonName></AnnotatedStopPointRef></StopPoints><JourneyPatternSections><JourneyPatternSection id="JPS-FIXTURE"><JourneyPatternTimingLink><From><StopPointRef>EA001</StopPointRef></From><To><StopPointRef>EA002</StopPointRef></To><RunTime>PT10M</RunTime></JourneyPatternTimingLink></JourneyPatternSection></JourneyPatternSections><JourneyPatterns><JourneyPattern id="JP-FIXTURE"><Direction>outbound</Direction><DestinationDisplay>Destination</DestinationDisplay><JourneyPatternSectionRefs>JPS-FIXTURE</JourneyPatternSectionRefs></JourneyPattern></JourneyPatterns><VehicleJourneys><VehicleJourney><VehicleJourneyCode>V-FIXTURE</VehicleJourneyCode><JourneyPatternRef>JP-FIXTURE</JourneyPatternRef><DepartureTime>08:00:00</DepartureTime><OperatingProfile><MondayToFriday>true</MondayToFriday></OperatingProfile></VehicleJourney></VehicleJourneys></TransXChange>'''
 
 
-def make_snapshot(root: Path) -> Path:
+def make_snapshot(root: Path, services_per_region: int = 1) -> Path:
     snapshot = root / "snapshot"
     sources = snapshot / "sources"
     sources.mkdir(parents=True)
@@ -27,7 +27,13 @@ def make_snapshot(root: Path) -> Path:
     for region in TNDS_REGIONS:
         archive_path = sources / f"{region}.zip"
         with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as archive:
-            archive.writestr(f"{region}/service.xml", SERVICE_XML)
+            for index in range(services_per_region):
+                code = f"{region}-SERVICE-{index:04d}"
+                first_prefix = f"{region}X{index % 16:02d}" if region != "Y" else f"YXX{index % 16:02d}"
+                second_prefix = f"{region}Z{index % 16:02d}" if region != "Y" else f"YZZ{index % 16:02d}"
+                xml = (SERVICE_XML.replace("FIXTURE", code).replace("V-FIXTURE", f"V-{code}")
+                       .replace("EA001", first_prefix + "1").replace("EA002", second_prefix + "2"))
+                archive.writestr(f"{region}/service-{index:04d}.xml", xml)
         data = archive_path.read_bytes()
         entries.append({"path": f"sources/{region}.zip", "region": region,
                         "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
@@ -53,7 +59,8 @@ class QuarantinedExtractionTests(unittest.TestCase):
             self.assertEqual(report["memberCount"], 8)
             self.assertGreater(report["compressedSourceBytes"], 0)
             self.assertGreater(report["uncompressedMemberBytes"], 0)
-            self.assertGreaterEqual(report["requiredFreeBytes"], 10 * 1024**3)
+            self.assertEqual(report["diskReserveBytes"], diagnostic.DISK_RESERVE_BYTES)
+            self.assertGreaterEqual(report["requiredFreeBytes"], report["compressedSourceBytes"] + report["diskReserveBytes"])
             self.assertFalse((snapshot.parent / "tnds-extracted-input").exists())
             evidence = root / "evidence"
             with patch.object(diagnostic, "inspect_tnds_capacity", return_value=report):
@@ -72,9 +79,11 @@ class QuarantinedExtractionTests(unittest.TestCase):
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest["producer"] = {"runId": "12345", "repository": "owner/repo"}
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-            with patch.dict(os.environ, {"GITHUB_REPOSITORY": "owner/repo"}):
+            with patch.dict(os.environ, {"GITHUB_REPOSITORY": "owner/repo"}), \
+                 patch.object(diagnostic, "acquire_tnds_snapshot") as acquire:
                 verified = diagnostic.verify_reused_checkpoint(snapshot, root / "evidence",
                     producer_run_id="12345", artifact_name="atlas-tnds-quarantined-12345")
+                acquire.assert_not_called()
                 self.assertEqual(verified["snapshotId"], manifest["snapshotId"])
                 evidence = json.loads((root / "evidence/run-evidence.json").read_text(encoding="utf-8"))
                 self.assertFalse(evidence["currentFreshnessClaimed"])
@@ -84,6 +93,27 @@ class QuarantinedExtractionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 diagnostic.verify_reused_checkpoint(snapshot, root / "wrong-run-evidence",
                     producer_run_id="99999", artifact_name="atlas-tnds-quarantined-99999")
+            with patch.dict(os.environ, {"GITHUB_REPOSITORY": "different/repo"}):
+                with self.assertRaisesRegex(Exception, "repository"):
+                    diagnostic.verify_reused_checkpoint(snapshot, root / "wrong-repository-evidence",
+                        producer_run_id="12345", artifact_name="atlas-tnds-quarantined-12345")
+
+    def test_altered_archive_hash_and_duplicate_region_fail_closed(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
+            root = Path(tmp)
+            snapshot = make_snapshot(root)
+            archive = snapshot / "sources/EA.zip"
+            archive.write_bytes(archive.read_bytes() + b"tamper")
+            with self.assertRaisesRegex(Exception, "changed|hash|size|source"):
+                diagnostic.load_and_verify_tnds_snapshot(snapshot)
+            duplicate_root = root / "duplicate"
+            duplicate = make_snapshot(duplicate_root)
+            path = duplicate / "manifest.json"
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+            manifest["sources"][-1]["region"] = manifest["sources"][0]["region"]
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(Exception, "unexpected source path or region|duplicate region"):
+                diagnostic.load_and_verify_tnds_snapshot(duplicate)
 
     def test_raw_checkpoint_is_durable_before_a_later_preparation_failure(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
@@ -133,6 +163,15 @@ class QuarantinedExtractionTests(unittest.TestCase):
                 _extract_quarantined(root, root / "input", {"sources": [{"region": "EA", "path": "EA.zip"}]})
             self.assertFalse((root / "outside.xml").exists())
 
+    def test_duplicate_zip_target_is_rejected(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
+            root = Path(tmp); archive_path = root / "EA.zip"
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                archive.writestr("EA/service.xml", "first")
+                archive.writestr("EA/service.xml", "second")
+            with self.assertRaisesRegex(ValueError, "duplicate member paths"):
+                _extract_quarantined(root, root / "input", {"sources": [{"region": "EA", "path": "EA.zip"}]})
+
     def test_immutable_prepared_at_requires_timestamp_and_timezone(self):
         self.assertEqual(immutable_prepared_at(PREPARED_AT), PREPARED_AT)
         for value in (None, "", "2026-10-13T17:42:00"):
@@ -165,6 +204,33 @@ class QuarantinedExtractionTests(unittest.TestCase):
                 return hashlib.sha256(manifest).hexdigest(), shards
             self.assertEqual(file_hashes(outputs[0]), file_hashes(outputs[1]))
 
+    def test_national_scale_handoff_runs_one_region_at_a_time_and_retains_shards(self):
+        node = os.environ.get("ATLAS_NODE") or shutil.which("node")
+        if not node: self.fail("Node.js is required for the national preparation rehearsal")
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
+            root = Path(tmp)
+            snapshot = make_snapshot(root, services_per_region=36)
+            extracted, prepared = root / "regional-input", root / "prepared"
+            original_run = subprocess.run
+            calls = []
+            def recorded_run(command, **kwargs):
+                calls.append((command, kwargs))
+                return original_run(command, **kwargs)
+            with patch.object(diagnostic.subprocess, "run", side_effect=recorded_run):
+                handoff, manifest_path = prepare_tnds_handoff(snapshot, extracted, prepared, node=node)
+            self.assertEqual(manifest_path, prepared / "manifest.json")
+            self.assertEqual(handoff["regions"], list(TNDS_REGIONS))
+            self.assertEqual(handoff["preparedManifest"]["serviceCount"], 36 * len(TNDS_REGIONS))
+            self.assertEqual(set(handoff["regionServiceCounts"].values()), {36})
+            self.assertEqual(len(calls), len(TNDS_REGIONS), "each preparer process receives one region only")
+            for region, (command, kwargs) in zip(TNDS_REGIONS, calls):
+                input_index = command.index("--input") + 1
+                self.assertEqual(Path(command[input_index]).name, region)
+                self.assertIs(kwargs["stdout"], subprocess.DEVNULL, "preparer output is not buffered in Python memory")
+                self.assertFalse((extracted / region).exists(), "completed regional source files are released")
+            self.assertGreater(len(handoff["preparedManifest"]["serviceShards"]), 1)
+            self.assertGreater(sum(len(files) for files in handoff["preparedManifest"]["serviceShards"].values()), len(TNDS_REGIONS))
+
     def test_preparation_failure_preserves_raw_snapshot_and_secret_safe_evidence(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
             root = Path(tmp)
@@ -193,6 +259,8 @@ class QuarantinedExtractionTests(unittest.TestCase):
             evidence_text = " ".join(path.read_text(encoding="utf-8") for path in (run_root / "tnds-evidence").glob("*.json"))
             self.assertNotIn("test-user-secret", evidence_text)
             self.assertNotIn("test-password-secret", evidence_text)
+            self.assertNotIn(SERVICE_XML, evidence_text)
+            self.assertLess(len(evidence_text.encode("utf-8")), 16 * 1024, "failure evidence remains compact and bounded")
 
 
 if __name__ == "__main__": unittest.main()

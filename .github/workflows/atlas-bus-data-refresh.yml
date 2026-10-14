@@ -76,7 +76,7 @@ jobs:
           echo "::error::Only refs/heads/main or a manually dispatched diagnostic may run this workflow; refusing $GITHUB_REF."
           exit 1
       - name: Refuse checkpoint resume outside trusted production context
-        if: inputs.resume_checkpoint_run_id != '' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c1-browser-dispatch-entry'
+        if: inputs.resume_checkpoint_run_id != '' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c1-browser-dispatch-entry' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c2-preparation-scale-closeout'
         run: |
           echo '::error::Cross-run checkpoint resume is allowed only from refs/heads/main.'
           exit 1
@@ -108,7 +108,7 @@ jobs:
       - name: Resolve exact-branch TRUST browser selector
         id: trust-selector
         env:
-          TRUST_BRANCH: refs/heads/codex/atlas-bus-data-trust-1a-c1b-c1-browser-dispatch-entry
+          TRUST_BRANCH: refs/heads/codex/atlas-bus-data-trust-1a-c1b-c2-preparation-scale-closeout
           PREPARED_SCHEMA: ${{ inputs.prepared_schema }}
           MEASURE_ONLY: ${{ inputs.measure_only }}
           FORCE_REFRESH: ${{ inputs.force_refresh }}
@@ -128,14 +128,11 @@ jobs:
           if [[ "$FORCE_REFRESH" == 'false' && -z "$RESUME_RUN_ID" ]]; then
             echo 'trust_mode=offline_preflight' >> "$GITHUB_OUTPUT"
             echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
-          elif [[ "$FORCE_REFRESH" == 'true' && -z "$RESUME_RUN_ID" ]]; then
-            echo 'trust_mode=live_trust' >> "$GITHUB_OUTPUT"
-            echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
-          elif [[ "$FORCE_REFRESH" == 'true' && "$RESUME_RUN_ID" =~ ^[0-9]+$ ]]; then
+          elif [[ "$FORCE_REFRESH" == 'true' && "$RESUME_RUN_ID" == '38579244547' ]]; then
             echo 'trust_mode=live_trust' >> "$GITHUB_OUTPUT"
             echo "prior_producer_run_id=$RESUME_RUN_ID" >> "$GITHUB_OUTPUT"
           else
-            echo '::error::Invalid controlled TRUST selection. Use offline false/true/v2/blank or live true/true/v2 with a blank or numeric resume run ID.'
+            echo '::error::Invalid C2 TRUST selection. Live mode requires verified Run #40 raw reuse; fresh acquisition is disabled on this branch.'
             exit 1
           fi
       - name: Record safe execution mode
@@ -475,7 +472,7 @@ jobs:
   tnds-trust-browser-offline-preflight:
     name: Run default-branch-compatible TNDS TRUST offline preflight
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c1-browser-dispatch-entry' && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'offline_preflight'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c2-preparation-scale-closeout' && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'offline_preflight'
     uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml
     with:
       mode: offline_preflight
@@ -486,14 +483,14 @@ jobs:
   tnds-trust-browser-live:
     name: Run default-branch-compatible TNDS TRUST live diagnostic
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c1-browser-dispatch-entry' && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'live_trust'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c2-preparation-scale-closeout' && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'live_trust'
     uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml
     with:
       mode: live_trust
       prior_producer_run_id: ${{ needs.main-guard.outputs.trust_prior_producer_run_id }}
     secrets:
-      TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
-      TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
+      TNDS_USERNAME: ${{ needs.main-guard.outputs.trust_prior_producer_run_id == '' && secrets.TNDS_USERNAME || '' }}
+      TNDS_PASSWORD: ${{ needs.main-guard.outputs.trust_prior_producer_run_id == '' && secrets.TNDS_PASSWORD || '' }}
     permissions:
       actions: read
       contents: read

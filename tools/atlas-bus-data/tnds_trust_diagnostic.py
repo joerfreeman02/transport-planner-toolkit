@@ -8,6 +8,7 @@ from refresh_bus_data import (TNDS_REGIONS, acquire_tnds_snapshot, load_and_veri
 
 SCHEMA = "atlas-tnds-trust-run-evidence-v2"
 PREPARER = Path(__file__).with_name("prepare_tnds.mjs")
+DISK_RESERVE_BYTES = 3 * 1024**3
 
 
 def _write_output(name: str, value: str) -> None:
@@ -16,12 +17,12 @@ def _write_output(name: str, value: str) -> None:
         with open(output, "a", encoding="utf-8") as stream: stream.write(f"{name}={value}\n")
 
 
-def _extract_quarantined(snapshot: Path, destination: Path, manifest: dict) -> None:
+def _extract_quarantined(snapshot: Path, destination: Path, manifest: dict, *, only_region: str | None = None) -> None:
     destination.mkdir(parents=True, exist_ok=False)
-    extracted_paths = set()
     for entry in manifest.get("sources", []):
         region = str(entry.get("region") or "").upper()
         if region not in TNDS_REGIONS: raise ValueError("TNDS manifest contains an unexpected region")
+        if only_region is not None and region != only_region: continue
         archive_path = snapshot / str(entry.get("path", ""))
         region_root = destination / region
         region_root.mkdir(parents=True, exist_ok=True)
@@ -32,12 +33,16 @@ def _extract_quarantined(snapshot: Path, destination: Path, manifest: dict) -> N
                 if member.is_absolute() or ".." in member.parts or (member.parts and member.parts[0].endswith(":")):
                     raise ValueError("TNDS archive contains an unsafe path")
                 target = region_root.joinpath(*member.parts)
-                normalized_target = target.resolve()
-                if normalized_target in extracted_paths:
+                if target.exists():
                     raise ValueError("TNDS archive contains duplicate member paths")
-                extracted_paths.add(normalized_target)
                 target.parent.mkdir(parents=True, exist_ok=True)
-                with archive.open(info) as src, target.open("wb") as dst: shutil.copyfileobj(src, dst)
+                with archive.open(info) as src, target.open("xb") as dst:
+                    while True:
+                        chunk = src.read(1024 * 1024)
+                        if not chunk: break
+                        if shutil.disk_usage(destination).free - len(chunk) < DISK_RESERVE_BYTES:
+                            raise OSError("TNDS extraction stopped to preserve runner disk reserve")
+                        dst.write(chunk)
 
 
 def immutable_prepared_at(created_at: str) -> str:
@@ -64,10 +69,11 @@ def read_prepared_handoff(prepared_root: str | Path) -> tuple[Path, dict, list[s
     regions, counts = validate_tnds_region_coverage(manifest)
     if set(regions) != set(TNDS_REGIONS) or len(regions) != len(TNDS_REGIONS):
         raise RuntimeError("Prepared TNDS handoff does not contain exactly eight regions")
-    for relative in [item for files in manifest.get("serviceShards", {}).values() for item in files]:
-        target = (root / relative).resolve()
-        if root.resolve() not in target.parents or not target.is_file():
-            raise RuntimeError("Prepared TNDS manifest references a missing or unsafe service shard")
+    for files in manifest.get("serviceShards", {}).values():
+        for relative in files:
+            target = (root / relative).resolve()
+            if root.resolve() not in target.parents or not target.is_file():
+                raise RuntimeError("Prepared TNDS manifest references a missing or unsafe service shard")
     return manifest_path, manifest, regions, counts
 
 
@@ -77,17 +83,54 @@ def prepare_tnds_handoff(snapshot_root: str | Path, extracted_root: str | Path, 
     snapshot = Path(snapshot_root)
     source_manifest = load_and_verify_tnds_snapshot(snapshot)
     prepared_at = immutable_prepared_at(source_manifest.get("createdAt"))
-    _extract_quarantined(snapshot, Path(extracted_root), source_manifest)
-    if stage_callback: stage_callback("PREPARATION_STARTED")
-    command = [node]
-    if date_shim:
-        shim_path = Path(date_shim)
-        command.extend(["--import", shim_path.resolve().as_uri() if shim_path.is_absolute() else date_shim])
-    command.extend([str(PREPARER), "--input", str(extracted_root), "--output", str(prepared_root), "--preparedAt", prepared_at])
-    completed = subprocess.run(command, capture_output=True, text=True, check=False)
-    if completed.returncode != 0:
-        # Never forward parser output, which may contain source XML text.
-        raise RuntimeError("TNDS TransXChange preparation failed")
+    extracted_root, prepared_root = Path(extracted_root), Path(prepared_root)
+    extracted_root.mkdir(parents=True, exist_ok=False)
+    prepared_root.mkdir(parents=True, exist_ok=False)
+    (prepared_root / "services").mkdir()
+    merged = {"schema": "atlas-prepared-bus-tnds-v1", "generatedAt": prepared_at,
+              "source": "Traveline National Dataset v2.5", "expectedRegions": list(TNDS_REGIONS),
+              "regions": [], "regionServiceCounts": {}, "sourceFileCounts": {}, "parsedFileCounts": {},
+              "ignoredRegistrationFileCounts": {}, "quarantinedPatternCount": 0, "quarantinedServiceCount": 0,
+              "serviceCount": 0, "serviceShardKeyLength": 5, "serviceShards": {}}
+    for region in TNDS_REGIONS:
+        if stage_callback: stage_callback("EXTRACTION_STARTED_" + region)
+        region_input, region_output = extracted_root / region, prepared_root / f".region-{region}"
+        _extract_quarantined(snapshot, region_input, source_manifest, only_region=region)
+        if stage_callback: stage_callback("PREPARATION_STARTED_" + region)
+        command = [node]
+        if date_shim:
+            shim_path = Path(date_shim)
+            command.extend(["--import", shim_path.resolve().as_uri() if shim_path.is_absolute() else date_shim])
+        command.extend([str(PREPARER), "--input", str(region_input), "--output", str(region_output), "--preparedAt", prepared_at])
+        child_env = os.environ.copy()
+        child_env["ATLAS_TNDS_DISK_RESERVE_BYTES"] = str(DISK_RESERVE_BYTES)
+        completed = subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False, env=child_env)
+        if completed.returncode != 0:
+            detail = " ".join(completed.stderr[-4096:].decode("utf-8", errors="replace").split())[:512]
+            raise RuntimeError(f"TNDS TransXChange preparation failed for {region}: {detail}")
+        regional = json.loads((region_output / "manifest.json").read_text(encoding="utf-8"))
+        if regional.get("regions") != [region]:
+            raise RuntimeError(f"TNDS regional preparation did not produce exactly {region}")
+        for relative_files in regional.get("serviceShards", {}).values():
+            for relative in relative_files:
+                source = region_output / relative
+                target = prepared_root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if target.exists(): raise RuntimeError("Prepared TNDS regional shard collision")
+                shutil.move(str(source), str(target))
+        for key in ("regions",): merged[key].extend(regional[key])
+        for key in ("regionServiceCounts", "sourceFileCounts", "parsedFileCounts", "ignoredRegistrationFileCounts"):
+            merged[key].update(regional[key])
+        for key in ("quarantinedPatternCount", "quarantinedServiceCount", "serviceCount"):
+            merged[key] += regional[key]
+        for shard, paths in regional.get("serviceShards", {}).items():
+            merged["serviceShards"].setdefault(shard, []).extend(paths)
+        shutil.rmtree(region_input, ignore_errors=True)
+        shutil.rmtree(region_output, ignore_errors=True)
+    merged["regions"] = [region for region in TNDS_REGIONS if region in merged["regions"]]
+    if len(merged["regions"]) != len(TNDS_REGIONS): raise RuntimeError("Prepared TNDS handoff is missing a region")
+    for paths in merged["serviceShards"].values(): paths.sort()
+    (prepared_root / "manifest.json").write_text(json.dumps(merged, separators=(",", ":")) + "\n", encoding="utf-8")
     prepared_manifest_path, prepared_manifest, regions, counts = read_prepared_handoff(prepared_root)
     if prepared_manifest.get("generatedAt") != prepared_at:
         raise RuntimeError("Prepared TNDS generatedAt does not match immutable snapshot createdAt")
@@ -190,7 +233,7 @@ def verify_reused_checkpoint(snapshot: str | Path, evidence: str | Path, *, prod
 
 
 def inspect_tnds_capacity(snapshot: str | Path, *, free_bytes: int | None = None) -> dict:
-    """Measure ZIP central directories only and enforce conservative free-space headroom."""
+    """Measure ZIP central directories and gate the largest one-region working set."""
     root = Path(snapshot)
     manifest = load_and_verify_tnds_snapshot(root)
     per_region, member_count, uncompressed_total = [], 0, 0
@@ -206,13 +249,15 @@ def inspect_tnds_capacity(snapshot: str | Path, *, free_bytes: int | None = None
         per_region.append({"region": entry["region"], "compressedBytes": int(entry["bytes"]),
                            "uncompressedMemberBytes": uncompressed, "memberCount": members})
     available = shutil.disk_usage(root).free if free_bytes is None else int(free_bytes)
-    required = max(10 * 1024**3, 3 * uncompressed_total + compressed_total)
+    largest_region = max((item["uncompressedMemberBytes"] for item in per_region), default=0)
+    required = compressed_total + 3 * largest_region + DISK_RESERVE_BYTES
     report = {"schema": "atlas-tnds-capacity-preflight-v1", "snapshotId": manifest["snapshotId"],
               "compressedSourceBytes": compressed_total, "uncompressedMemberBytes": uncompressed_total,
-              "memberCount": member_count,
+              "largestRegionUncompressedBytes": largest_region, "memberCount": member_count,
+              "diskReserveBytes": DISK_RESERVE_BYTES,
               "expansionRatio": round(uncompressed_total / compressed_total, 6) if compressed_total else None,
               "perRegion": per_region, "runnerFreeBytes": available, "requiredFreeBytes": required,
-              "headroomRule": "runnerFreeBytes >= max(10 GiB, 3 * uncompressedMemberBytes + compressedSourceBytes)",
+              "headroomRule": "runnerFreeBytes >= compressedSourceBytes + 3 * largestRegionUncompressedBytes + 3 GiB reserve",
               "status": "CAPACITY_SUFFICIENT" if available >= required else "CAPACITY_BLOCKED",
               "extractionStarted": False}
     return report
@@ -289,9 +334,11 @@ def prepare_checkpoint(snapshot: str | Path, evidence: str | Path, *, node: str 
         return {"handoff": handoff, "preparedManifestPath": manifest_path}
     except Exception as error:
         if record.get("stage") != "CAPACITY_BLOCKED":
-            error_stage = "EXTRACTION_FAILED" if record.get("stage") == "EXTRACTION_STARTED" else "PREPARATION_FAILED"
+            error_stage = "EXTRACTION_FAILED" if str(record.get("stage", "")).startswith("EXTRACTION_STARTED") else "PREPARATION_FAILED"
             record.update({"stage": error_stage,
                            "result": "FAILED", "errorType": type(error).__name__,
+                           "failureCode": ("DISK_RESERVE_REACHED" if "disk reserve" in str(error).lower()
+                                           else "REGIONAL_PREPARATION_FAILED"),
                            "currentFreshnessClaimed": not reused, "sourceProducerRunId": source_producer_run_id})
             _persist_evidence(evidence, record)
         raise

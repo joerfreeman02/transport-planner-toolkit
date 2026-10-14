@@ -23,6 +23,9 @@ assert.match(top, /expected_source_count: \$\{\{ needs\.reference-source\.output
 assert.match(top, /expected_total_bytes: \$\{\{ needs\.reference-source\.outputs\.total_bytes \}\}/);
 assert.match(top, /default: ''\s+type: string/);
 assert.doesNotMatch(top, /default: cf0c64b980b0516378bb705843d428a74a797d19f527f79c6c43a5540f0b8bde/);
+assert.match(top, /expected_snapshot_id: \$\{\{ inputs\.v2_source_snapshot_run_id != '' && inputs\.v2_expected_snapshot_id \|\| '' \}\}/);
+assert.match(top, /expected_source_count: \$\{\{ inputs\.v2_source_snapshot_run_id != '' && inputs\.v2_expected_source_count \|\| '' \}\}/);
+assert.match(top, /expected_total_bytes: \$\{\{ inputs\.v2_source_snapshot_run_id != '' && inputs\.v2_expected_total_bytes \|\| '' \}\}/);
 assert.match(top, /secrets: inherit/);
 assert.match(top, /if: inputs\.prepared_schema != 'v2' && needs\.freshness\.result == 'success'/);
 
@@ -103,8 +106,8 @@ assert.match(top, /Legacy v1 shadow parity is deferred: no exact same-window fro
 assert.match(diagnostic, /verified-snapshot-manifest\.json/);
 assert.match(diagnostic, /atlas-reference-diagnostic-\$\{\{ github\.run_id \}\}/);
 
-// Fresh acquisition passes producer-measured metadata; only explicit frozen reuse can
-// check operator-supplied expectations, and no automatic latest-artifact lookup exists.
+// Fresh acquisition passes producer-measured metadata without applying optional
+// frozen-reuse expectations; no automatic latest-artifact lookup exists.
 assert.match(top, /expected_snapshot_id: \$\{\{ needs\.reference-source\.outputs\.snapshot_id \}\}/);
 assert.match(source, /inputs\.v2_source_snapshot_run_id != ''/);
 assert.doesNotMatch(source, /actions\/download-artifact@v4[\s\S]{0,160}pattern:/);

@@ -364,9 +364,9 @@ jobs:
     uses: ./.github/workflows/atlas-reference-data-source.yml
     with:
       v2_source_snapshot_run_id: ${{ inputs.v2_source_snapshot_run_id }}
-      expected_snapshot_id: ${{ inputs.v2_expected_snapshot_id }}
-      expected_source_count: ${{ inputs.v2_expected_source_count }}
-      expected_total_bytes: ${{ inputs.v2_expected_total_bytes }}
+      expected_snapshot_id: ${{ inputs.v2_source_snapshot_run_id != '' && inputs.v2_expected_snapshot_id || '' }}
+      expected_source_count: ${{ inputs.v2_source_snapshot_run_id != '' && inputs.v2_expected_source_count || '' }}
+      expected_total_bytes: ${{ inputs.v2_source_snapshot_run_id != '' && inputs.v2_expected_total_bytes || '' }}
     secrets: inherit
     permissions:
       actions: read

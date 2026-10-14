@@ -88,6 +88,14 @@ class SnapshotTests(unittest.TestCase):
         with self.assertRaisesRegex(SourceSnapshotError, "hash/size"):
             load_and_verify(self.root)
 
+    def test_raw_snapshot_verifier_requires_the_complete_nine_region_bods_set(self):
+        manifest = json.loads((self.root / "manifest.json").read_text(encoding="utf-8"))
+        manifest["sources"] = [item for item in manifest["sources"] if item["path"] != "sources/bods/london.zip"]
+        manifest["sourceCount"] = len(manifest["sources"])
+        write_manifest(self.root, manifest)
+        with self.assertRaisesRegex(SourceSnapshotError, "incomplete; missing: sources/bods/london.zip"):
+            load_and_verify(self.root)
+
     def test_preparation_materialises_verified_bytes_without_acquisition(self):
         staging = self.root / "staging"
         naptan, nptg, gtfs, _manifest = materialise_for_preparation(self.root, staging)

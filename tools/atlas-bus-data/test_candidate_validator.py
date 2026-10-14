@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from validate_candidate import validate
-from refresh_bus_data import RefreshError, TNDS_REGIONS
+from refresh_bus_data import BODS_REGIONS, RefreshError, TNDS_REGIONS
 
 
 class CandidateValidatorTests(unittest.TestCase):
@@ -68,6 +68,7 @@ class CandidateValidatorTests(unittest.TestCase):
         with gzip.open(bus / 'localities/e.json.gz', 'wt', encoding='utf-8') as stream:
             json.dump({'schema': 'atlas-prepared-nptg-localities-v1', 'localities': [{'id': 'nptg:E001', 'code': 'E001', 'name': 'Example', 'districtId': 'nptg:D1', 'districtName': 'District'}]}, stream)
         manifest.update({'schema': 'atlas-prepared-bus-data-v2', 'stopFields': v2_fields, 'groupShards': {'GRO': 'groups/g.json.gz'}, 'localityShards': {'E00': 'localities/e.json.gz'}, 'counts': {'activeStopPointCount': 1, 'logicalGroupCount': 1, 'localityCount': 1, 'districtCount': 1, 'stopShardCount': 1, 'serviceShardCount': 1, 'logicalGroupShardCount': 1, 'localityShardCount': 1}, 'qa': {'naptan': {}, 'nptg': {}}, 'sources': {**manifest['sources'], 'nptg': {'localityCount': 1, 'districtCount': 1}}})
+        manifest['sources']['bods']['regions'] = [{'region': region, 'serviceCount': 1000, 'sourceHash': f'hash-{region}'} for region in BODS_REGIONS]
         manifest_path.write_text(json.dumps(manifest))
 
     def test_v2_candidate_and_sidecars_pass_structural_validation(self):
@@ -77,6 +78,48 @@ class CandidateValidatorTests(unittest.TestCase):
         self.assertEqual(result['localityRecords'], 1)
         self.assertEqual(result['logicalGroupCount'], 1)
         self.assertEqual(result['districtCount'], 1)
+
+    def test_v2_exact_nine_bods_regions_pass(self):
+        self._convert_candidate_to_v2()
+        self.assertEqual(validate(self.root)['bodsRegionCount'], 9)
+
+    def test_v2_eight_of_nine_bods_regions_fail(self):
+        self._convert_candidate_to_v2()
+        self._set_v2_regions(BODS_REGIONS[:-1])
+        with self.assertRaisesRegex(RefreshError, 'exactly once'):
+            validate(self.root)
+
+    def test_v2_missing_london_fails(self):
+        self._convert_candidate_to_v2()
+        self._set_v2_regions([region for region in BODS_REGIONS if region != 'london'])
+        with self.assertRaisesRegex(RefreshError, 'exactly once'):
+            validate(self.root)
+
+    def test_v2_missing_each_non_london_region_fails(self):
+        self._convert_candidate_to_v2()
+        for missing in (region for region in BODS_REGIONS if region != 'london'):
+            with self.subTest(missing=missing):
+                self._set_v2_regions([region for region in BODS_REGIONS if region != missing])
+                with self.assertRaisesRegex(RefreshError, 'exactly once'):
+                    validate(self.root)
+
+    def test_v2_duplicate_region_replacing_expected_region_fails(self):
+        self._convert_candidate_to_v2()
+        self._set_v2_regions([*BODS_REGIONS[:-1], BODS_REGIONS[0]])
+        with self.assertRaisesRegex(RefreshError, 'exactly once'):
+            validate(self.root)
+
+    def test_v2_unexpected_bods_region_fails(self):
+        self._convert_candidate_to_v2()
+        self._set_v2_regions([*BODS_REGIONS[:-1], 'unexpected_region'])
+        with self.assertRaisesRegex(RefreshError, 'exactly once'):
+            validate(self.root)
+
+    def _set_v2_regions(self, names):
+        manifest_path = self.root / 'atlas/data/bus/manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        manifest['sources']['bods']['regions'] = [{'region': region, 'serviceCount': 1000, 'sourceHash': f'hash-{region}'} for region in names]
+        manifest_path.write_text(json.dumps(manifest))
 
     def test_v2_unresolved_authoritative_district_reference_is_retained(self):
         self._convert_candidate_to_v2()

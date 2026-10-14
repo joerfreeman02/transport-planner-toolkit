@@ -16,6 +16,7 @@ ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 import build_static_index as builder
 import refresh_bus_data as refresh
+from source_snapshot import BODS_REGIONS
 from tnds_capability_probe import probe
 from verify_prepared_handoff import verify
 
@@ -136,12 +137,20 @@ class PreparedHandoffTests(unittest.TestCase):
             status.mkdir(parents=True)
             diagnostics.mkdir(parents=True)
             (bus / "stops.json").write_text('{"schema":"atlas-prepared-bus-data-v2","stops":[]}', encoding="utf-8")
-            (bus / "manifest.json").write_text(json.dumps({"schema": "atlas-prepared-bus-data-v2", "stopShards": {"a": "stops.json"}, "serviceShards": {}, "groupShards": {}, "localityShards": {}, "referenceStopPointShards": {}}), encoding="utf-8")
+            (bus / "manifest.json").write_text(json.dumps({"schema": "atlas-prepared-bus-data-v2", "sources": {"bods": {"regions": [{"region": name} for name in BODS_REGIONS]}}, "stopShards": {"a": "stops.json"}, "serviceShards": {}, "groupShards": {}, "localityShards": {}, "referenceStopPointShards": {}}), encoding="utf-8")
             (status / "manifest.json").write_text(json.dumps({"schema": "atlas-bus-refresh-status-v1", "diagnosticOnly": True, "productionEligible": False, "validation": "diagnostic_only", "sources": {"sourceSnapshot": {"snapshotId": "snapshot-1"}}}), encoding="utf-8")
             (diagnostics / "coverage-ledger.json").write_text(json.dumps({"schema": "atlas-bus-national-coverage-ledger-v1", "snapshot": {"snapshotId": "snapshot-1"}, "preparedCandidate": {"schema": "atlas-prepared-bus-data-v2"}}), encoding="utf-8")
             (diagnostics / "gap-report.json").write_text(json.dumps({"schema": "atlas-bus-national-preparation-gap-report-v1"}), encoding="utf-8")
             (diagnostics / "0590B-forensic.json").write_text(json.dumps({"schema": "atlas-bus-0590b-forensic-v1", "snapshotId": "snapshot-1"}), encoding="utf-8")
             self.assertEqual(verify(site, "snapshot-1")["requiredShardCount"], 1)
+            bus_manifest_path = bus / "manifest.json"
+            bus_manifest = json.loads(bus_manifest_path.read_text(encoding="utf-8"))
+            bus_manifest["sources"]["bods"]["regions"].pop(2)
+            bus_manifest_path.write_text(json.dumps(bus_manifest), encoding="utf-8")
+            with self.assertRaisesRegex(SystemExit, "BODS regions"):
+                verify(site, "snapshot-1")
+            bus_manifest["sources"]["bods"]["regions"] = [{"region": name} for name in BODS_REGIONS]
+            bus_manifest_path.write_text(json.dumps(bus_manifest), encoding="utf-8")
             with self.assertRaisesRegex(SystemExit, "snapshot ID"):
                 verify(site, "different-snapshot")
 

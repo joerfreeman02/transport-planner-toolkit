@@ -6,6 +6,8 @@ import argparse
 import json
 from pathlib import Path
 
+from refresh_bus_data import BODS_REGIONS, bods_region_set_is_exact
+
 
 def read_json(path: Path) -> dict:
     try:
@@ -31,6 +33,12 @@ def verify(site: Path, expected_snapshot_id: str) -> dict:
 
     if bus.get("schema") != "atlas-prepared-bus-data-v2":
         raise SystemExit("Prepared handoff Bus manifest schema is not atlas-prepared-bus-data-v2")
+    sources = bus.get("sources") if isinstance(bus.get("sources"), dict) else {}
+    bods_source = sources.get("bods") if isinstance(sources.get("bods"), dict) else {}
+    bods_regions = bods_source.get("regions", [])
+    if not bods_region_set_is_exact(bods_regions):
+        received = [item.get("region") if isinstance(item, dict) else None for item in bods_regions] if isinstance(bods_regions, list) else []
+        raise SystemExit(f"Prepared handoff BODS regions must contain exactly once: {', '.join(BODS_REGIONS)}; received: {', '.join(str(name) for name in received)}")
     if status.get("schema") != "atlas-bus-refresh-status-v1" or status.get("diagnosticOnly") is not True or status.get("productionEligible") is not False or status.get("validation") != "diagnostic_only":
         raise SystemExit("Prepared handoff status does not identify a diagnostic-only Bus v2 preparation")
     snapshot_id = (status.get("sources") or {}).get("sourceSnapshot", {}).get("snapshotId")

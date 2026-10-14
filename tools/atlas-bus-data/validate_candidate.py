@@ -7,7 +7,7 @@ import gzip
 import json
 from pathlib import Path
 
-from refresh_bus_data import RefreshError, TNDS_REGIONS, bus_candidate_metrics, candidate_metrics, validate_tnds_region_coverage
+from refresh_bus_data import BODS_REGIONS, RefreshError, TNDS_REGIONS, bods_region_set_is_exact, bus_candidate_metrics, candidate_metrics, validate_tnds_region_coverage
 
 KNOWN_TNDS_QUARANTINE_REASONS = {"incomplete_runtime_sequence", "missing_timing_links"}
 BUS_SCHEMAS = {"atlas-prepared-bus-data-v1", "atlas-prepared-bus-data-v2"}
@@ -165,6 +165,13 @@ def validate(site: Path, bus_only: bool = False) -> dict:
     bus_schema = bus_manifest.get("schema")
     if bus_schema not in BUS_SCHEMAS:
         raise RefreshError("Candidate NaPTAN/BODS manifest schema is invalid")
+    sources = bus_manifest.get("sources") if isinstance(bus_manifest.get("sources"), dict) else {}
+    bods_source = sources.get("bods") if isinstance(sources.get("bods"), dict) else {}
+    bods_regions = bods_source.get("regions", [])
+    if bus_schema == "atlas-prepared-bus-data-v2":
+        if not bods_region_set_is_exact(bods_regions):
+            received = [item.get("region") if isinstance(item, dict) else None for item in bods_regions] if isinstance(bods_regions, list) else []
+            raise RefreshError(f"Candidate Bus v2 BODS regions must contain exactly once: {', '.join(BODS_REGIONS)}; received: {', '.join(str(name) for name in received)}")
     tnds_manifest = None
     if not bus_only:
         tnds = data / "bus-tnds"
@@ -184,7 +191,7 @@ def validate(site: Path, bus_only: bool = False) -> dict:
     metrics = bus_candidate_metrics(site) if bus_only else candidate_metrics(site)
     if metrics["naptanStopCount"] < 1000 or metrics["bodsServiceCount"] < 1000:
         raise RefreshError("Candidate is below the expected national stop/service scale")
-    if metrics["bodsRegionCount"] < 8:
+    if bus_schema == "atlas-prepared-bus-data-v1" and metrics["bodsRegionCount"] < 8:
         raise RefreshError("Candidate BODS regional coverage is incomplete")
     stop_ids = set()
     stop_records = []

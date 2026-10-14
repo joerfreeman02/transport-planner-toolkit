@@ -22,7 +22,9 @@ from pathlib import Path
 SNAPSHOT_SCHEMA = "atlas-bus-source-snapshot-v1"
 SNAPSHOT_STATE = "ACQUIRED / UNINTERPRETED / VERIFIED"
 ACQUIRING_STATE = "ACQUIRING / UNINTERPRETED"
-REGIONS = ("east_anglia", "east_midlands", "london", "north_east", "north_west", "south_east", "south_west", "west_midlands", "yorkshire")
+BODS_REGIONS = ("east_anglia", "east_midlands", "london", "north_east", "north_west", "south_east", "south_west", "west_midlands", "yorkshire")
+# Backward-compatible public alias; BODS_REGIONS is the canonical enumeration.
+REGIONS = BODS_REGIONS
 GTFS_REQUIRED_MEMBERS = {"agency.txt", "stops.txt", "routes.txt", "calendar.txt", "trips.txt", "stop_times.txt"}
 
 
@@ -156,6 +158,8 @@ def load_and_verify(root: str | Path, *, require_bods: bool = True, expected_sna
     entries = manifest.get("sources")
     if not isinstance(entries, list) or not entries:
         raise SourceSnapshotError("Source snapshot contains no source entries")
+    if manifest.get("sourceCount") != len(entries):
+        raise SourceSnapshotError(f"Source snapshot manifest sourceCount mismatch: expected {len(entries)}, received {manifest.get('sourceCount')}")
     if any(path.name.endswith(".part") for path in base.rglob("*")):
         raise SourceSnapshotError("Source snapshot contains unexpected .part files")
     seen = set()
@@ -168,10 +172,17 @@ def load_and_verify(root: str | Path, *, require_bods: bool = True, expected_sna
         seen.add(str(item["path"]).replace("\\", "/"))
     required = {"sources/naptan.xml", "sources/nptg.xml"}
     if require_bods:
-        required |= {f"sources/bods/{region}.zip" for region in REGIONS}
+        required |= {f"sources/bods/{region}.zip" for region in BODS_REGIONS}
     missing = sorted(required - seen)
     if missing:
         raise SourceSnapshotError(f"Source snapshot is incomplete; missing: {', '.join(missing)}")
+    if len(seen) != len(entries):
+        raise SourceSnapshotError("Source snapshot contains duplicate source paths")
+    unexpected = sorted(seen - required)
+    if unexpected:
+        raise SourceSnapshotError(f"Source snapshot contains unexpected sources: {', '.join(unexpected)}")
+    if require_bods and len(entries) != len(required):
+        raise SourceSnapshotError(f"Source snapshot source count mismatch: expected {len(required)}, received {len(entries)}")
     if any("tnds" in str(item.get("path", "")).lower() for item in entries):
         raise SourceSnapshotError("TNDS raw archives are not permitted in a Bus source snapshot")
     calculated_snapshot_id = hashlib.sha256("".join(item["sha256"] for item in entries).encode("ascii")).hexdigest()
@@ -240,7 +251,7 @@ def _primary_manifest(root: Path, *, remote_freshness: dict | None = None) -> di
         "currentSourceFreshnessClaimed": False,
         "remoteFreshness": remote_freshness or {},
         "sources": [],
-        "sourceCount": 11,
+        "sourceCount": 2 + len(BODS_REGIONS),
         "completedSourceCount": 0,
         "progress": [],
         "regions": list(REGIONS),

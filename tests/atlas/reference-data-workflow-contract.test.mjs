@@ -12,6 +12,8 @@ const snapshotTool = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/sourc
 const integrity = fs.readFileSync(path.join(root, 'tests/atlas/prepared-bus-data-integrity.test.mjs'), 'utf8');
 const tndsProbe = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/tnds_capability_probe.py'), 'utf8');
 const handoff = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/verify_prepared_handoff.py'), 'utf8');
+const candidateValidator = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/validate_candidate.py'), 'utf8');
+const sourceSnapshot = fs.readFileSync(path.join(root, 'tools/atlas-bus-data/source_snapshot.py'), 'utf8');
 
 assert.match(top, /uses: \.\/\.github\/workflows\/atlas-reference-data-source\.yml/);
 assert.match(top, /uses: \.\/\.github\/workflows\/atlas-reference-data-diagnostic\.yml/);
@@ -122,6 +124,17 @@ assert.match(handoff, /atlas-prepared-bus-data-v2/);
 assert.match(handoff, /atlas-bus-refresh-status-v1/);
 assert.match(handoff, /atlas-bus-national-coverage-ledger-v1/);
 assert.match(handoff, /source snapshot ID does not match/);
+assert.match(handoff, /bods_region_set_is_exact/);
+assert.match(candidateValidator, /bus_schema == "atlas-prepared-bus-data-v2"[\s\S]*?bods_region_set_is_exact/);
+assert.match(candidateValidator, /bus_schema == "atlas-prepared-bus-data-v1" and metrics\["bodsRegionCount"\] < 8/);
+assert.match(sourceSnapshot, /BODS_REGIONS = \([\s\S]*?"yorkshire"\)/);
+assert.match(sourceSnapshot, /REGIONS = BODS_REGIONS/);
+assert.match(sourceSnapshot, /2 \+ len\(BODS_REGIONS\)/);
+assert.match(sourceSnapshot, /unexpected sources/);
+assert.match(tndsProbe, /tnds_region_from_filename\(name\)/);
+assert.match(tndsProbe, /"classification": "AMBIGUOUS"/);
+assert.match(tndsProbe, /_valid_mdtm/);
+assert.doesNotMatch(tndsProbe, /region in name\.upper\(\)/);
 assert.match(diagnostic, /id: coverage-gate\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success' && steps\.prepared-output-handoff\.outcome == 'success'/);
 assert.match(diagnostic, /id: structural-scan\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success' && steps\.prepared-output-handoff\.outcome == 'success'/);
 assert.match(diagnostic, /id: hard-validator\s+if: always\(\) && steps\.prepare-v2\.outcome == 'success' && steps\.prepared-output-handoff\.outcome == 'success'/);
@@ -176,4 +189,4 @@ assert.match(tndsProbe, /retrievalPerformed": False/);
 assert.doesNotMatch(tndsProbe, /retrbinary|retrlines|RETR /);
 assert.match(snapshotTool, /TNDS raw archives are not permitted in a Bus source snapshot/);
 
-console.log('PASS REMOTE-1B source/diagnostic contract: immutable producer identity, exact frozen reuse, manifest-anchored dates, prepared-output handoff, candidate-gate sequencing, evidence retention, metadata-only TNDS probe, and no publication.');
+console.log('PASS REMOTE-1C source/diagnostic contract: immutable producer identity, frozen reuse, manifest-anchored dates, exact BODS regions, prepared-output handoff, conservative TNDS metadata, failure evidence, and no publication.');

@@ -22,7 +22,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from source_snapshot import materialise_for_preparation, snapshot_from_staging
+from source_snapshot import BODS_REGIONS, materialise_for_preparation, snapshot_from_staging
 
 TNDS_REGIONS = ("EA", "EM", "NE", "NW", "SE", "SW", "WM", "Y")
 NAPTAN_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=csv"
@@ -30,7 +30,6 @@ NAPTAN_XML_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=xml"
 NPTG_XML_URL = "https://naptan.api.dft.gov.uk/v1/nptg"
 BODS_URL = "https://data.bus-data.dft.gov.uk/timetable/download/"
 BODS_DOWNLOAD_ROOT = "https://data.bus-data.dft.gov.uk/timetable/download/gtfs-file/"
-BODS_REGIONS = ("east_anglia", "east_midlands", "london", "north_east", "north_west", "south_east", "south_west", "west_midlands", "yorkshire")
 TNDS_HOST = "ftp.tnds.basemap.co.uk"
 TNDS_PATH = "/TNDSV2.5/"
 TNDS_TRANSFER_ATTEMPTS = 3
@@ -39,6 +38,17 @@ TNDS_TRANSFER_BACKOFF_SECONDS = (1, 2)
 
 class RefreshError(RuntimeError):
     pass
+
+
+def bods_region_set_is_exact(regions: object) -> bool:
+    if not isinstance(regions, list) or len(regions) != len(BODS_REGIONS):
+        return False
+    names = [item.get("region") if isinstance(item, dict) else None for item in regions]
+    return (
+        all(isinstance(name, str) for name in names)
+        and len(set(names)) == len(BODS_REGIONS)
+        and set(names) == set(BODS_REGIONS)
+    )
 
 
 def load_release_metadata(site: Path) -> dict[str, str]:
@@ -519,6 +529,10 @@ def bus_candidate_metrics(site: Path) -> dict:
         raise RefreshError("Prepared Bus v2 manifest is missing or invalid") from error
     if bus.get("schema") != "atlas-prepared-bus-data-v2":
         raise RefreshError("Bus-only diagnostic requires the prepared Bus v2 schema")
+    bods_regions = bus.get("sources", {}).get("bods", {}).get("regions", [])
+    if not bods_region_set_is_exact(bods_regions):
+        received = [item.get("region") if isinstance(item, dict) else None for item in bods_regions] if isinstance(bods_regions, list) else []
+        raise RefreshError(f"Candidate Bus v2 BODS regions must contain exactly once: {', '.join(BODS_REGIONS)}; received: {', '.join(str(name) for name in received)}")
     if not bus.get("stopShards") or not bus.get("serviceShards"):
         raise RefreshError("Prepared Bus v2 candidate is empty")
     roots = site / "atlas" / "data" / "bus"

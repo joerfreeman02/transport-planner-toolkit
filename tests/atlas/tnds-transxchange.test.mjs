@@ -8,6 +8,7 @@ const parsed = parseTndsTransXchange(xml, { region: 'SE', sourceArchive: 'TNDS-S
 assert.equal(parsed.routeNumber, '231'); assert.equal(parsed.operator, 'Example'); assert.equal(parsed.validFrom, '2026-08-31'); assert.equal(parsed.stopSchedules['021013518'].monday[0], 1510); assert.equal(parsed.source.schemaVersion, '2.5');
 assert.deepEqual(parsed.calendarEvidence[0].daysOfWeek, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
 assert.equal(parsed.serviceNotes.length, 0, 'ordinary weekday service does not acquire a school-day qualification');
+assert.throws(() => parseTndsTransXchangeServices('<TransXChange SchemaVersion="2.5"><Services><Service>', { region: 'SE' }), /no Service record|not TransXChange schema 2\.5/, 'truncated TransXChange input is rejected instead of becoming evidence');
 const schoolProfile = parseTndsOperatingProfile('<OperatingProfile><ServicedOrganisationDayType>Schooldays</ServicedOrganisationDayType><DaysOfOperation>Monday, Tuesday, Wednesday, Thursday, Friday</DaysOfOperation></OperatingProfile>');
 assert.deepEqual(schoolProfile.daysOfWeek, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
 assert.equal(schoolProfile.schoolDayOnly, true);

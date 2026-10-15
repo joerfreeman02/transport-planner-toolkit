@@ -4,7 +4,7 @@
 
 - Starting SHA: `0cc275f1646c16284f12e19397a92896da92ba9f`
 - Branch: `codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-hosted-shard-closeout`
-- Final implementation SHA: recorded after the closeout commit below
+- Final implementation SHA: `dbb204f580e8bcb3b6461fa7b169eaab6d191d60`
 - Version/build: `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`
 - Recommendation: suitable for Technical Director hosted-preflight review only. No hosted preflight or national run was performed.
 
@@ -92,5 +92,5 @@ This sprint creates no new installation milestone.
 - Run #42 three-stop scale rehearsal: passed with exact loaded-row maxima of 5,908 primary, 5,908 TNDS, and 11,816 combined.
 - Node suite passed with `ATLAS Alpha.15 deterministic suite passed.` The in-sandbox attempt hit Windows `EPERM` on the updater test's temporary-directory rename; the required rerun outside the sandbox passed.
 - `git diff --check`: passed.
-- Final implementation/pushed SHA and clean local/origin parity are recorded in the final handover.
+- The final pushed branch tip and local/origin parity are reported with this handover.
 - No Actions dispatch, source acquisition, PR, merge, publication, or deployment occurred.

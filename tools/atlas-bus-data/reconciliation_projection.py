@@ -173,7 +173,9 @@ def build_service_projection(prepared_root: str | Path, side: str, *, source_sna
 def projection_compatibility_fingerprint() -> str:
     """Fingerprint only code and constants that determine checkpoint projection bytes."""
     from region_contract import normalize_primary_region, normalize_tnds_region, PRIMARY_SOURCE_REGIONS
-    from reconciliation_checkpoint import create_streaming_checkpoint as checkpoint_writer, verify_streaming_checkpoint as checkpoint_verifier
+    from reconciliation_checkpoint import (create_streaming_checkpoint as checkpoint_writer,
+        verify_streaming_checkpoint as checkpoint_verifier, normalized_stop_identity,
+        stop_comparison_bucket, iter_checkpoint_bucket)
     from tnds_reconciliation import validate_region_manifest, _region_valid
     contract = {
         "schema": STREAM_PROJECTION_SCHEMA,
@@ -185,6 +187,11 @@ def projection_compatibility_fingerprint() -> str:
         "sourceRowBuilder": inspect.getsource(_iter_prepared_evidence),
         "checkpointWriter": inspect.getsource(checkpoint_writer),
         "checkpointVerifier": inspect.getsource(checkpoint_verifier),
+        "stopIdentityNormalizer": inspect.getsource(normalized_stop_identity),
+        "stopBucketFunction": inspect.getsource(stop_comparison_bucket),
+        "bucketIterator": inspect.getsource(iter_checkpoint_bucket),
+        "stopBucketHexChars": __import__("reconciliation_checkpoint").STOP_BUCKET_HEX_CHARS,
+        "projectionChunkRows": __import__("reconciliation_checkpoint").PROJECTION_CHUNK_ROWS,
         "regionalEvidenceValidator": inspect.getsource(validate_region_manifest),
         "regionalRowValidator": inspect.getsource(_region_valid),
     }

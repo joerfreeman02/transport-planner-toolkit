@@ -1,18 +1,55 @@
 """Synthetic control and prepared-shard projection contracts."""
 import gzip
 import json
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
 
 from reconciliation_projection import (build_controls, build_service_projection,
     write_prepared_projection_checkpoint, projection_compatibility_fingerprint)
-from reconciliation_checkpoint import iter_checkpoint_region, verify_streaming_checkpoint
+from reconciliation_checkpoint import (create_streaming_checkpoint, iter_checkpoint_region,
+    iter_checkpoint_buckets, iter_checkpoint_bucket, verify_streaming_checkpoint)
 from region_contract import normalize_primary_region
 from tnds_reconciliation import EXPECTED_REGIONS, fixture_region_manifest, reconcile, State
 
 
 class ReconciliationProjectionTests(unittest.TestCase):
+    def test_stop_bucket_shards_obey_row_target_and_keep_normalized_identity_together(self):
+        fingerprint = "d" * 64
+        base = {"sourceSnapshotId": "synthetic", "sourceProducerRunId": "1", "sourceArtifactName": "source",
+            "repository": "test/repo", "preparationCodeCommit": "1" * 40,
+            "checkpointProducerCommit": "1" * 40, "checkpointProducerRunId": "2",
+            "checkpointBranch": "refs/heads/c3-test", "preparedSchema": "v2",
+            "sourceWindowBasis": "2026-10-13", "projectionCompatibilityFingerprint": fingerprint}
+        primary_rows = [{"region": "EA", "stopId": value, "evidenceId": f"p-{index}"}
+            for index, value in enumerate(("aa 1", "AA1", "A A1", "BB2", "CC3"))]
+        tnds_rows = [{"region": "EA", "stopId": " aA 1 ", "evidenceId": "t-1"}]
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary:
+            root = Path(temporary)
+            first = create_streaming_checkpoint("PRIMARY", primary_rows, base, root / "primary", chunk_rows=2)
+            repeated = create_streaming_checkpoint("PRIMARY", primary_rows, base, root / "primary-repeat", chunk_rows=2)
+            second = create_streaming_checkpoint("TNDS", tnds_rows,
+                {**base, "sourceSnapshotId": "76ee662a30e5bcb0072c93f4dd3a8efe85c41446ca318a1d6f5700070f5bf058"},
+                root / "tnds", chunk_rows=2)
+            p_manifest = verify_streaming_checkpoint(root / "primary", {"side": "PRIMARY"})
+            t_manifest = verify_streaming_checkpoint(root / "tnds", {"side": "TNDS"})
+            self.assertGreater(first["projectionShardCount"], 1)
+            self.assertEqual(first["aggregateProjectionSha256"], repeated["aggregateProjectionSha256"])
+            self.assertEqual(first["comparisonUnitRowTarget"], 2)
+            self.assertEqual(first["oversizedStopIdentityBucketCount"], 1)
+            oversize = next(item for item in first["shards"] if item["oversizedIdentityBucket"])
+            self.assertEqual(oversize["rowCount"], 3)
+            self.assertEqual(oversize["oversizedStopIdentitySha256"], hashlib.sha256(b"AA1").hexdigest())
+            common = set(iter_checkpoint_buckets(p_manifest)) & set(iter_checkpoint_buckets(t_manifest))
+            self.assertTrue(common)
+            shared_bucket = common.pop()[1]
+            p_rows = list(iter_checkpoint_bucket(root / "primary", p_manifest, "EA", shared_bucket))
+            t_rows = list(iter_checkpoint_bucket(root / "tnds", t_manifest, "EA", shared_bucket))
+            self.assertEqual(sum(row["stopId"].replace(" ", "").upper() == "AA1" for row in p_rows), 3)
+            self.assertEqual(sum(row["stopId"].replace(" ", "").upper() == "AA1" for row in t_rows), 1)
+            self.assertTrue(second["incrementalHashing"])
+
     def test_real_nine_region_manifest_maps_to_comparator_codes_and_preserves_london(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary:
             root = Path(temporary); (root / "services").mkdir()

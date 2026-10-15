@@ -3,6 +3,7 @@ import gzip
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from reconciliation_checkpoint import create_streaming_checkpoint
@@ -60,6 +61,15 @@ def make_checkpoints(root: Path):
 
 
 class RunReconciliationTests(unittest.TestCase):
+    def test_blank_branch_is_refused_before_reconciliation(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary:
+            root = Path(temporary)
+            with patch("run_reconciliation.reconcile") as comparator:
+                with self.assertRaisesRegex(ValueError, "branch"):
+                    run(root, root, {}, {}, root / "output", producer_run_id="200",
+                        branch="", commit=BASE_COMMIT, repository="org/repo")
+                comparator.assert_not_called()
+
     def test_streams_regional_ledger_and_emits_pipers_per_route_findings(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary:
             root = Path(temporary); primary, tnds = make_checkpoints(root)

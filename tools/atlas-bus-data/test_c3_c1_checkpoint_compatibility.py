@@ -70,8 +70,8 @@ class CheckpointCompatibilityTests(unittest.TestCase):
 
     def test_corrupt_projection_shard_and_missing_checkpoint_are_rejected(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary:
-            root = Path(temporary); create(root / "checkpoint", commit="1" * 40)
-            shard = root / "checkpoint" / "projection" / "EA.jsonl.gz"
+            root = Path(temporary); manifest = create(root / "checkpoint", commit="1" * 40)
+            shard = root / "checkpoint" / manifest["shards"][0]["path"]
             shard.write_text('{"region":"EA","stopId":"CORRUPT"}\n')
             with self.assertRaisesRegex(ValueError, "shard digest"):
                 verify_streaming_checkpoint(root / "checkpoint", {})

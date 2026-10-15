@@ -7,6 +7,8 @@ import hashlib
 import json
 import os
 import re
+import sqlite3
+import tempfile
 from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
@@ -14,9 +16,10 @@ from typing import Any, Iterable
 SCHEMA = "atlas-bus-reconciliation-input-checkpoint-v1"
 PROJECTION_SCHEMA = "atlas-bus-reconciliation-projection-v1"
 SIDES = {"PRIMARY", "TNDS"}
-STREAM_SCHEMA = "atlas-bus-reconciliation-stream-checkpoint-v2"
-STREAM_PROJECTION_SCHEMA = "atlas-bus-reconciliation-projection-v2"
+STREAM_SCHEMA = "atlas-bus-reconciliation-stream-checkpoint-v3"
+STREAM_PROJECTION_SCHEMA = "atlas-bus-reconciliation-projection-v3"
 PROJECTION_CHUNK_ROWS = 25000
+STOP_BUCKET_HEX_CHARS = 2
 DIAGNOSTIC_FLAGS = {"currentFreshnessClaimed": False, "diagnosticOnly": True,
                     "plannerEligible": False, "sourceAuthorityChanged": False,
                     "plannerOutputChanged": False, "publicationEligible": False}
@@ -35,11 +38,20 @@ def file_sha256(path: Path, chunk_size: int = 1024 * 1024) -> str:
     return digest.hexdigest()
 
 
+def normalized_stop_identity(value: Any) -> str:
+    """Use the comparator's StopPoint normalization for shard assignment."""
+    return re.sub(r"\s+", "", str(value or "")).upper()
+
+
+def stop_comparison_bucket(region: str, normalized_stop_id: str) -> str:
+    return hashlib.sha256(normalized_stop_id.encode("utf-8")).hexdigest()[:STOP_BUCKET_HEX_CHARS]
+
+
 def create_streaming_checkpoint(side: str, rows: Iterable[dict[str, Any]], provenance: dict[str, Any],
                                 destination: str | Path, *, projection_metadata: dict[str, Any] | None = None,
                                 projection_metrics: dict[str, Any] | None = None,
                                 chunk_rows: int = PROJECTION_CHUNK_ROWS) -> dict[str, Any]:
-    """Write ordered JSONL shards incrementally; never serialize a national rows list."""
+    """Write stop-bucket shards incrementally without materializing projection rows."""
     side = str(side).upper()
     if side not in SIDES:
         raise ValueError("Checkpoint side must be PRIMARY or TNDS")
@@ -64,32 +76,103 @@ def create_streaming_checkpoint(side: str, rows: Iterable[dict[str, Any]], prove
             raise ValueError("Run #37 primary artifact name, ID, digest, or snapshot does not match the verified frozen input")
     if not re.fullmatch(r"[a-fA-F0-9]{64}", provenance["projectionCompatibilityFingerprint"]):
         raise ValueError("Projection compatibility fingerprint must be a SHA-256 digest")
+    if chunk_rows < 1:
+        raise ValueError("Projection chunk row target must be positive")
     root = Path(destination)
     root.mkdir(parents=True, exist_ok=False)
     projection_root = root / "projection"
     projection_root.mkdir()
     counts: Counter[str] = Counter()
     total = 0
-    open_files: dict[str, Any] = {}
-    try:
-        for row in rows:
-            region = str(row.get("region", "")).upper()
-            if region not in KNOWN_REGION_CODES:
-                raise ValueError(f"Projected evidence has invalid canonical region {region!r}")
-            if region not in open_files:
-                path = projection_root / f"{region}.jsonl.gz"
-                open_files[region] = gzip.GzipFile(filename=str(path), mode="wb", compresslevel=6, mtime=0)
-            open_files[region].write(canonical_bytes(row) + b"\n")
-            counts[region] += 1
-            total += 1
-    finally:
-        for stream in open_files.values():
-            stream.close()
     ordered_shards = []
-    for region in sorted(open_files):
-        path = projection_root / f"{region}.jsonl.gz"
-        ordered_shards.append({"path": f"projection/{path.name}", "region": region,
-                               "rowCount": counts[region], "sha256": file_sha256(path)})
+    bucket_counts: Counter[tuple[str, str]] = Counter()
+    largest_identity_bucket = 0
+    oversized_identity_bucket_count = 0
+    with tempfile.TemporaryDirectory(prefix="atlas-projection-spool-") as temporary:
+        db = sqlite3.connect(str(Path(temporary) / "projection.sqlite"))
+        db.execute("PRAGMA journal_mode=OFF")
+        db.execute("PRAGMA synchronous=OFF")
+        db.execute("PRAGMA temp_store=FILE")
+        db.execute("CREATE TABLE evidence (region TEXT NOT NULL, bucket TEXT NOT NULL, stop_norm TEXT NOT NULL, evidence_id TEXT NOT NULL, payload BLOB NOT NULL)")
+        batch = []
+        try:
+            for row in rows:
+                region = str(row.get("region", "")).upper()
+                if region not in KNOWN_REGION_CODES:
+                    raise ValueError(f"Projected evidence has invalid canonical region {region!r}")
+                stop_norm = normalized_stop_identity(row.get("stopId"))
+                bucket = stop_comparison_bucket(region, stop_norm)
+                evidence_id = str(row.get("evidenceId") or "")
+                batch.append((region, bucket, stop_norm, evidence_id, canonical_bytes(row)))
+                counts[region] += 1
+                bucket_counts[(region, bucket)] += 1
+                total += 1
+                if len(batch) >= 1000:
+                    db.executemany("INSERT INTO evidence VALUES (?,?,?,?,?)", batch)
+                    db.commit(); batch.clear()
+            if batch:
+                db.executemany("INSERT INTO evidence VALUES (?,?,?,?,?)", batch)
+                db.commit(); batch.clear()
+            db.execute("CREATE INDEX evidence_bucket_stop ON evidence(region,bucket,stop_norm,evidence_id)")
+            db.commit()
+            bucket_keys = db.execute("SELECT DISTINCT region,bucket FROM evidence ORDER BY region,bucket")
+            for region, bucket in bucket_keys:
+                shard_index = 0
+                shard_rows = 0
+                stream = None
+                path = None
+                first_stop_norm = None
+                last_stop_norm = None
+                def open_shard():
+                    nonlocal shard_index, shard_rows, stream, path, first_stop_norm, last_stop_norm
+                    shard_index += 1
+                    shard_rows = 0
+                    first_stop_norm = last_stop_norm = None
+                    path = projection_root / f"{region}-{bucket}-{shard_index:05d}.jsonl.gz"
+                    stream = gzip.GzipFile(filename=str(path), mode="wb", compresslevel=6, mtime=0)
+                def close_shard(oversized: bool = False, stop_norm: str | None = None):
+                    nonlocal stream, path, shard_rows, first_stop_norm, last_stop_norm
+                    if stream is None:
+                        return
+                    stream.close()
+                    record = {"path": f"projection/{path.name}", "region": region,
+                        "comparisonBucket": bucket, "shardIndex": shard_index,
+                        "rowCount": shard_rows, "sha256": file_sha256(path),
+                        "oversizedIdentityBucket": oversized,
+                        "firstStopIdentitySha256": hashlib.sha256(first_stop_norm.encode("utf-8")).hexdigest(),
+                        "lastStopIdentitySha256": hashlib.sha256(last_stop_norm.encode("utf-8")).hexdigest()}
+                    if stop_norm is not None:
+                        record["oversizedStopIdentitySha256"] = hashlib.sha256(stop_norm.encode("utf-8")).hexdigest()
+                    ordered_shards.append(record)
+                    stream = None; path = None; shard_rows = 0
+                groups = db.execute("SELECT stop_norm,COUNT(*) FROM evidence WHERE region=? AND bucket=? GROUP BY stop_norm ORDER BY stop_norm", (region, bucket))
+                for stop_norm, identity_count in groups:
+                    identity_count = int(identity_count)
+                    largest_identity_bucket = max(largest_identity_bucket, identity_count)
+                    oversized = identity_count > chunk_rows
+                    if oversized:
+                        close_shard()
+                        open_shard()
+                        first_stop_norm = last_stop_norm = stop_norm
+                        row_cursor = db.execute("SELECT payload FROM evidence WHERE region=? AND bucket=? AND stop_norm=? ORDER BY evidence_id,payload", (region, bucket, stop_norm))
+                        for (payload,) in row_cursor:
+                            stream.write(payload + b"\n"); shard_rows += 1
+                        close_shard(True, stop_norm)
+                        oversized_identity_bucket_count += 1
+                        continue
+                    if stream is None or shard_rows + identity_count > chunk_rows:
+                        close_shard()
+                        open_shard()
+                    if shard_rows == 0:
+                        first_stop_norm = stop_norm
+                    last_stop_norm = stop_norm
+                    row_cursor = db.execute("SELECT payload FROM evidence WHERE region=? AND bucket=? AND stop_norm=? ORDER BY evidence_id,payload", (region, bucket, stop_norm))
+                    for (payload,) in row_cursor:
+                        stream.write(payload + b"\n"); shard_rows += 1
+                close_shard()
+        finally:
+            db.close()
+    ordered_shards.sort(key=lambda item: (item["region"], item["comparisonBucket"], item["shardIndex"]))
     aggregate = hashlib.sha256(canonical_bytes(ordered_shards)).hexdigest()
     metadata = dict(projection_metadata or {})
     (root / "projection-metadata.json").write_bytes(canonical_bytes(metadata) + b"\n")
@@ -112,11 +195,15 @@ def create_streaming_checkpoint(side: str, rows: Iterable[dict[str, Any]], prove
         "regionEvidenceCounts": {region: counts.get(region, 0) for region in KNOWN_REGION_CODES},
         "regionServiceCounts": provenance.get("regionServiceCounts", {}),
         "projectionShardCount": len(ordered_shards), "shardCount": len(ordered_shards), "shards": ordered_shards,
+        "comparisonBucketCount": len(bucket_counts), "stopBucketCount": len(bucket_counts),
+        "largestStopIdentityBucket": largest_identity_bucket,
+        "oversizedStopIdentityBucketCount": oversized_identity_bucket_count,
         "aggregateProjectionSha256": aggregate, "projectionMetadataSha256": file_sha256(root / "projection-metadata.json"),
         "maximumProjectionRowsLoadedSimultaneously": 1,
         **(projection_metrics or {}),
         "incrementalHashing": True, "incrementalProjectionWriting": True,
-        "peakLogicalWorkingSetUnit": "one projected evidence row plus buffered filesystem blocks; consumer reads one region at a time",
+        "comparisonUnitRowTarget": chunk_rows,
+        "peakLogicalWorkingSetUnit": "one stop identity group plus a comparison shard capped at the configured row target; oversized stop identities are streamed",
         **DIAGNOSTIC_FLAGS,
     }
     (root / "manifest.json").write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
@@ -143,10 +230,12 @@ def verify_streaming_checkpoint(root: str | Path, expected: dict[str, Any]) -> d
         raise ValueError("TNDS checkpoint snapshot is not the verified Run #40 snapshot")
     if not isinstance(manifest.get("shards"), list) or manifest.get("shardCount") != len(manifest["shards"]):
         raise ValueError("Checkpoint shard manifest is missing or inconsistent")
-    shard_regions = [str(item.get("region", "")) for item in manifest["shards"]]
-    if shard_regions != sorted(set(shard_regions)):
-        raise ValueError("Checkpoint shards are not uniquely ordered by canonical region")
+    shard_keys = [(str(item.get("region", "")), str(item.get("comparisonBucket", "")), int(item.get("shardIndex", 0)))
+                  for item in manifest["shards"]]
+    if shard_keys != sorted(set(shard_keys)):
+        raise ValueError("Checkpoint shards are not uniquely ordered by region, comparison bucket, and shard index")
     actual_counts: Counter[str] = Counter()
+    previous_stop_boundary: dict[tuple[str, str], str] = {}
     for shard in manifest["shards"]:
         path = (root / str(shard.get("path", ""))).resolve()
         if root not in path.parents or not path.is_file():
@@ -154,14 +243,34 @@ def verify_streaming_checkpoint(root: str | Path, expected: dict[str, Any]) -> d
         if file_sha256(path) != shard.get("sha256"):
             raise ValueError("Checkpoint shard digest mismatch")
         count = 0
+        first_stop_norm = last_stop_norm = None
         with gzip.open(path, "rt", encoding="utf-8") as stream:
             for line in stream:
                 row = json.loads(line)
-                if str(row.get("region", "")).upper() != shard.get("region"):
-                    raise ValueError("Checkpoint shard row region mismatch")
+                stop_norm = normalized_stop_identity(row.get("stopId"))
+                if (str(row.get("region", "")).upper() != shard.get("region")
+                        or stop_comparison_bucket(shard["region"], stop_norm) != shard.get("comparisonBucket")):
+                    raise ValueError("Checkpoint shard row region or stop comparison bucket mismatch")
+                if first_stop_norm is None:
+                    first_stop_norm = stop_norm
+                last_stop_norm = stop_norm
                 count += 1
         if count != shard.get("rowCount"):
             raise ValueError("Checkpoint shard row count mismatch")
+        target = int(manifest.get("comparisonUnitRowTarget", PROJECTION_CHUNK_ROWS))
+        bucket_key = (shard["region"], shard["comparisonBucket"])
+        first_hash = hashlib.sha256((first_stop_norm or "").encode("utf-8")).hexdigest()
+        last_hash = hashlib.sha256((last_stop_norm or "").encode("utf-8")).hexdigest()
+        if shard.get("firstStopIdentitySha256") != first_hash or shard.get("lastStopIdentitySha256") != last_hash:
+            raise ValueError("Checkpoint shard stop identity boundaries are invalid")
+        if previous_stop_boundary.get(bucket_key) == first_hash:
+            raise ValueError("Checkpoint comparison unit splits one StopPoint identity across shards")
+        previous_stop_boundary[bucket_key] = last_hash
+        if shard.get("oversizedIdentityBucket"):
+            if count <= target or first_stop_norm != last_stop_norm or shard.get("oversizedStopIdentitySha256") != first_hash:
+                raise ValueError("Checkpoint marks a non-oversized identity shard as oversized")
+        elif count > target:
+            raise ValueError("Checkpoint comparison shard exceeds its row target")
         actual_counts[shard["region"]] += count
     if sum(actual_counts.values()) != manifest.get("evidenceRowCount"):
         raise ValueError("Checkpoint evidence row count mismatch")
@@ -176,7 +285,22 @@ def verify_streaming_checkpoint(root: str | Path, expected: dict[str, Any]) -> d
     return manifest
 
 
+def iter_checkpoint_bucket(root: str | Path, manifest: dict[str, Any], region: str, bucket: str) -> Iterable[dict[str, Any]]:
+    root = Path(root)
+    for shard in manifest["shards"]:
+        if shard["region"] != region or shard["comparisonBucket"] != bucket:
+            continue
+        with gzip.open(root / shard["path"], "rt", encoding="utf-8") as stream:
+            for line in stream:
+                yield json.loads(line)
+
+
+def iter_checkpoint_buckets(manifest: dict[str, Any]) -> list[tuple[str, str]]:
+    return sorted({(str(item["region"]), str(item["comparisonBucket"])) for item in manifest["shards"]})
+
+
 def iter_checkpoint_region(root: str | Path, manifest: dict[str, Any], region: str) -> Iterable[dict[str, Any]]:
+    """Compatibility iterator for small diagnostics; national runner uses stop buckets."""
     root = Path(root)
     for shard in manifest["shards"]:
         if shard["region"] != region:

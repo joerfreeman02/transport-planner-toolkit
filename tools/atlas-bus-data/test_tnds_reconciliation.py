@@ -55,6 +55,23 @@ class ReconciliationContractTests(unittest.TestCase):
     def test_eight_validated_regions_are_complete(self):
         self.assertEqual(validate_region_manifest(fixture_region_manifest())["state"], "NATIONAL_COMPLETE")
 
+    def test_london_primary_and_hypothetical_tnds_rows_keep_their_source_side(self):
+        primary = row(region="LONDON", side="bods", nativeIds={"primaryService": "p-46"})
+        tnds = row(region="LONDON", side="tnds", nativeIds={"tndsService": "t-46"})
+        result = compare([primary], [tnds])
+        p_row = next(item for item in result["rows"] if item["primaryEvidenceId"])
+        t_row = next(item for item in result["rows"] if item["tndsEvidenceId"])
+        self.assertEqual(p_row["category"], "OUTSIDE_TNDS_COMPARATOR_SCOPE")
+        self.assertEqual(p_row["primaryEvidenceId"], primary["evidenceId"])
+        self.assertEqual(p_row["primaryNativeIds"], primary["nativeIds"])
+        self.assertIsNone(p_row["tndsEvidenceId"])
+        self.assertEqual(p_row["tndsNativeIds"], {})
+        self.assertFalse(p_row["plannerEligible"])
+        self.assertFalse(p_row["sourceAuthorityChanged"])
+        self.assertIsNone(t_row["primaryEvidenceId"])
+        self.assertEqual(t_row["tndsEvidenceId"], tnds["evidenceId"])
+        self.assertEqual(t_row["tndsNativeIds"], tnds["nativeIds"])
+
     def test_seven_validated_regions_are_partial(self):
         result = validate_region_manifest(fixture_region_manifest(EXPECTED_REGIONS[:-1]))
         self.assertEqual(result["state"], "PARTIAL")

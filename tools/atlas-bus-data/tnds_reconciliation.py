@@ -279,7 +279,7 @@ def reconcile(primary: Iterable[dict[str, Any]], tnds: Iterable[dict[str, Any]],
                 continue
             if region == "LONDON":
                 if not _current(row, day): excluded["not_current"] += 1; continue
-                (london_primary if side == "primary" else london_tnds).append(row)
+                (london_primary if side == "PRIMARY" else london_tnds).append(row)
                 continue
             if region not in EXPECTED_REGIONS or not row.get("stopId"):
                 excluded["invalid_identity"] += 1; continue
@@ -390,7 +390,7 @@ def _ledger_row(region: str, p: dict[str, Any] | None, t: dict[str, Any] | None,
             "semanticState": semantic, "comparableAttributes": comparable or [],
             "agreementAttributes": agreements or [], "conflictAttributes": conflicts or [],
             "unknownAttributes": unknown or [], "sourceWindows": {"primary": _window(p), "tnds": _window(t)},
-            "plannerEligible": False, "diagnosticOnly": True}
+            "plannerEligible": False, "diagnosticOnly": True, "sourceAuthorityChanged": False}
 
 
 def _ambiguous_group_ledger(region: str, stop_id: str, group: dict[str, Any]) -> dict[str, Any]:

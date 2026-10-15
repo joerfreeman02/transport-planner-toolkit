@@ -76,6 +76,7 @@ jobs:
       - name: Validate immutable source and checkpoint provenance, then reconcile
         env:
           CHECKPOINT_RUN_ID: ${{ inputs.checkpoint_run_id }}
+          CHECKPOINT_BRANCH: ${{ github.ref }}
           CHECKPOINT_COMMIT: ${{ github.sha }}
           CHECKPOINT_REPOSITORY: ${{ github.repository }}
         run: |

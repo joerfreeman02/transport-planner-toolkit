@@ -83,27 +83,30 @@ class C3WorkflowContractTests(unittest.TestCase):
             self.assertIn(name, Path(ROOT / "tools/atlas-bus-data/run_reconciliation.py").read_text())
         self.assertIn('"plannerOutputChanged": False', Path(ROOT / "tools/atlas-bus-data/run_reconciliation.py").read_text())
 
-    def test_checkpoint_uses_shards_streaming_and_projection_fingerprint(self):
-        checkpoint = Path(ROOT / "tools/atlas-bus-data/reconciliation_checkpoint.py").read_text()
-        runner = Path(ROOT / "tools/atlas-bus-data/run_reconciliation.py").read_text()
-        self.assertIn("projectionCompatibilityFingerprint", checkpoint)
-        self.assertIn("file_sha256(path)", checkpoint)
-        self.assertIn("iter_checkpoint_region", runner)
-        self.assertIn("gzip.GzipFile", runner)
-        self.assertNotIn("json.dumps(ledger", runner)
-        self.assertIn("referenceServiceFindings", runner)
-        self.assertIn("manualAcceptancePending", runner)
+    def test_reconciliation_step_supplies_every_provenance_variable_before_invocation(self):
+        step = RECONCILE.split("- name: Validate immutable source and checkpoint provenance, then reconcile", 1)[1].split(
+            "- name: Upload bounded C3 trust evidence", 1)[0]
+        env = step.split("        env:", 1)[1].split("        run:", 1)[0]
+        invocation = step.split("PYTHONPATH=tools/atlas-bus-data", 1)[1]
+        expected = {"CHECKPOINT_RUN_ID": "${{ inputs.checkpoint_run_id }}",
+            "CHECKPOINT_BRANCH": "${{ github.ref }}", "CHECKPOINT_COMMIT": "${{ github.sha }}",
+            "CHECKPOINT_REPOSITORY": "${{ github.repository }}"}
+        for name, value in expected.items():
+            with self.subTest(name=name):
+                self.assertRegex(env, rf"(?m)^\s*{name}:\s*{re.escape(value)}\s*$")
+                self.assertIn(f'"${name}"', invocation)
 
     def test_checkpoint_uses_shards_streaming_and_projection_fingerprint(self):
         checkpoint = Path(ROOT / "tools/atlas-bus-data/reconciliation_checkpoint.py").read_text()
         runner = Path(ROOT / "tools/atlas-bus-data/run_reconciliation.py").read_text()
         self.assertIn("projectionCompatibilityFingerprint", checkpoint)
         self.assertIn("file_sha256(path)", checkpoint)
-        self.assertIn("iter_checkpoint_region", runner)
+        self.assertIn("iter_checkpoint_bucket", runner)
+        self.assertIn("maxCombinedComparisonUnitRows", runner)
+        self.assertNotIn("list(iter_checkpoint_region", runner)
         self.assertIn("gzip.GzipFile", runner)
         self.assertNotIn("json.dumps(ledger", runner)
         self.assertIn("referenceServiceFindings", runner)
         self.assertIn("manualAcceptancePending", runner)
-
 
 if __name__ == "__main__": unittest.main()

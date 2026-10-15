@@ -15,8 +15,10 @@ from datetime import date
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Iterable
+from region_contract import normalize_primary_region, normalize_tnds_region
 
 EXPECTED_REGIONS = ("EA", "EM", "NE", "NW", "SE", "SW", "WM", "Y")
+MAX_AMBIGUOUS_PAIR_MATERIALIZATION = 4096
 SCHEMA = "atlas-tnds-reconciliation-ledger-v2"
 FORENSIC_SCHEMA = "atlas-primary-unresolved-forensic-v1"
 
@@ -189,7 +191,7 @@ def _semantic(p: dict[str, Any], t: dict[str, Any]) -> tuple[str, list[str], lis
     return state, comparable, agreements, conflicts, sorted(set(unknown + not_comparable))
 
 
-def _pair_rows(p_rows: list[dict[str, Any]], t_rows: list[dict[str, Any]]) -> list[tuple[dict[str, Any], dict[str, Any], str, str]]:
+def _pair_rows(p_rows: list[dict[str, Any]], t_rows: list[dict[str, Any]]) -> tuple[list[tuple[dict[str, Any], dict[str, Any], str, str]], list[dict[str, Any]]]:
     """Return identity-supported candidate pairs without scanning a stop's product.
 
     Shared validated bridges and strong composites are the only keys that can
@@ -198,6 +200,8 @@ def _pair_rows(p_rows: list[dict[str, Any]], t_rows: list[dict[str, Any]]) -> li
     still produce multiple pairs; those remain visible as ambiguity.
     """
     paired: dict[tuple[int, int], tuple[dict[str, Any], dict[str, Any], str, str]] = {}
+    overflow: list[dict[str, Any]] = []
+    overflow_signatures: set[tuple[tuple[int, ...], tuple[int, ...]]] = set()
 
     def groups(rows: list[dict[str, Any]], key_for: Any) -> dict[tuple[Any, ...], list[dict[str, Any]]]:
         result: dict[tuple[Any, ...], list[dict[str, Any]]] = defaultdict(list)
@@ -229,15 +233,23 @@ def _pair_rows(p_rows: list[dict[str, Any]], t_rows: list[dict[str, Any]]) -> li
                                          (composite_key, "STRONG_COMPOSITE_CANDIDATE", "medium")):
         p_groups, t_groups = groups(p_rows, key_fn), groups(t_rows, key_fn)
         for key in sorted(p_groups.keys() & t_groups.keys(), key=lambda value: tuple(map(str, value))):
-            for p in p_groups[key]:
-                for t in t_groups[key]:
+            p_group, t_group = p_groups[key], t_groups[key]
+            if len(p_group) * len(t_group) > MAX_AMBIGUOUS_PAIR_MATERIALIZATION:
+                signature = (tuple(sorted(id(row) for row in p_group)), tuple(sorted(id(row) for row in t_group)))
+                if signature not in overflow_signatures:
+                    overflow_signatures.add(signature)
+                    overflow.append({"identityKind": identity, "primaryRows": p_group, "tndsRows": t_group,
+                                     "candidatePairCount": len(p_group) * len(t_group)})
+                continue
+            for p in p_group:
+                for t in t_group:
                     pair_key = (id(p), id(t))
                     existing = paired.get(pair_key)
                     # A real validated bridge has precedence if a pair also
                     # satisfies the weaker descriptive composite.
                     if existing is None or identity == "EXACT_SHARED_IDENTITY":
                         paired[pair_key] = (p, t, identity, confidence)
-    return list(paired.values())
+    return list(paired.values()), overflow
 
 
 def reconcile(primary: Iterable[dict[str, Any]], tnds: Iterable[dict[str, Any]], *, as_of: str,
@@ -257,10 +269,14 @@ def reconcile(primary: Iterable[dict[str, Any]], tnds: Iterable[dict[str, Any]],
     london_tnds: list[dict[str, Any]] = []
     excluded = Counter()
     input_rows = Counter()
-    for side, source, target in (("primary", primary, pby), ("tnds", tnds, tby)):
+    for side, source, target in (("PRIMARY", primary, pby), ("TNDS", tnds, tby)):
         for row in source:
-            input_rows[side] += 1
-            region = str(row.get("region") or "").upper()
+            input_rows[side.casefold()] += 1
+            try:
+                region = normalize_primary_region(row.get("region")) if side == "PRIMARY" else normalize_tnds_region(row.get("region"))
+            except ValueError:
+                excluded["invalid_identity"] += 1
+                continue
             if region == "LONDON":
                 if not _current(row, day): excluded["not_current"] += 1; continue
                 (london_primary if side == "primary" else london_tnds).append(row)
@@ -272,7 +288,8 @@ def reconcile(primary: Iterable[dict[str, Any]], tnds: Iterable[dict[str, Any]],
     rows = []
     match_stats = {"indexedStopBuckets": 0, "candidateComparisons": 0, "exactIdentityPairs": 0,
                    "compositeCandidatePairs": 0, "ambiguousGroups": 0, "unmatchedPrimary": 0,
-                   "unmatchedTnds": 0}
+                   "unmatchedTnds": 0, "maxCandidateBucketSize": 0,
+                   "boundedAmbiguousGroups": 0, "omittedAmbiguousCandidatePairs": 0}
     for region in EXPECTED_REGIONS:
         ps, ts = pby.get(region, []), tby.get(region, []) if region in verified else []
         p_stops: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -289,18 +306,31 @@ def reconcile(primary: Iterable[dict[str, Any]], tnds: Iterable[dict[str, Any]],
             continue
         # Only rows in a shared normalized stop bucket can be candidates.
         paired = []
+        matched_p, matched_t = set(), set()
+        overflow_p, overflow_t = set(), set()
         for stop in sorted(p_stops.keys() & t_stops.keys()):
-            stop_pairs = _pair_rows(p_stops[stop], t_stops[stop])
+            stop_pairs, overflow_groups = _pair_rows(p_stops[stop], t_stops[stop])
             # Count actual key-supported pair materializations, not all
             # possible primary x TNDS combinations.
             match_stats["candidateComparisons"] += len(stop_pairs)
             paired.extend(stop_pairs)
-        matched_p, matched_t = set(), set()
+            for group in overflow_groups:
+                p_group, t_group = group["primaryRows"], group["tndsRows"]
+                matched_p.update(id(row) for row in p_group); matched_t.update(id(row) for row in t_group)
+                overflow_p.update(id(row) for row in p_group); overflow_t.update(id(row) for row in t_group)
+                match_stats["ambiguousGroups"] += 1
+                match_stats["boundedAmbiguousGroups"] += 1
+                match_stats["omittedAmbiguousCandidatePairs"] += group["candidatePairCount"]
+                match_stats["maxCandidateBucketSize"] = max(match_stats["maxCandidateBucketSize"], len(p_group), len(t_group))
+                rows.append(_ambiguous_group_ledger(region, stop, group))
         p_degree: Counter[int] = Counter()
         t_degree: Counter[int] = Counter()
         for p, t, _, _ in paired:
             p_degree[id(p)] += 1; t_degree[id(t)] += 1
-        ambiguous_ids = {row_id for row_id, degree in p_degree.items() if degree > 1} | {row_id for row_id, degree in t_degree.items() if degree > 1}
+            match_stats["maxCandidateBucketSize"] = max(match_stats["maxCandidateBucketSize"], p_degree[id(p)], t_degree[id(t)])
+        ambiguous_ids = ({row_id for row_id, degree in p_degree.items() if degree > 1}
+                         | {row_id for row_id, degree in t_degree.items() if degree > 1}
+                         | overflow_p | overflow_t)
         match_stats["ambiguousGroups"] += len({normalize_stop_id(p.get("stopId")) for p, t, _, _ in paired
                                                   if id(p) in ambiguous_ids or id(t) in ambiguous_ids})
         for p, t, identity, confidence in paired:
@@ -361,6 +391,21 @@ def _ledger_row(region: str, p: dict[str, Any] | None, t: dict[str, Any] | None,
             "agreementAttributes": agreements or [], "conflictAttributes": conflicts or [],
             "unknownAttributes": unknown or [], "sourceWindows": {"primary": _window(p), "tnds": _window(t)},
             "plannerEligible": False, "diagnosticOnly": True}
+
+
+def _ambiguous_group_ledger(region: str, stop_id: str, group: dict[str, Any]) -> dict[str, Any]:
+    """Represent oversized duplicate identity groups without expanding their product."""
+    primary, tnds = group["primaryRows"], group["tndsRows"]
+    return {"region": region, "category": "AMBIGUOUS_IDENTITY_GROUP",
+        "regionalState": State.COMPARATOR_VALIDATED, "stopIdNormalized": stop_id,
+        "identityKind": group["identityKind"], "primaryEvidenceCount": len(primary),
+        "tndsEvidenceCount": len(tnds), "candidatePairCount": group["candidatePairCount"],
+        "primaryEvidenceIdSample": sorted(str(row.get("evidenceId", "")) for row in primary)[:20],
+        "tndsEvidenceIdSample": sorted(str(row.get("evidenceId", "")) for row in tnds)[:20],
+        "primaryRouteNumberSample": sorted({str(row.get("routeNumber", "")) for row in primary if row.get("routeNumber")})[:20],
+        "tndsRouteNumberSample": sorted({str(row.get("routeNumber", "")) for row in tnds if row.get("routeNumber")})[:20],
+        "sampleLimit": 20, "identityCorroborated": False,
+        "plannerEligible": False, "diagnosticOnly": True}
 
 
 def primary_unresolved_forensic(records: Iterable[dict[str, Any]], *, snapshot_id: str, source_window: str) -> dict[str, Any]:

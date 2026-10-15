@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import os
 import shutil
 import uuid
 import xml.etree.ElementTree as ET
@@ -14,7 +15,8 @@ from unittest.mock import patch
 import national_v2_diagnostic as diagnostic
 
 
-TEST_TMP_ROOT = Path(__file__).resolve().parents[2] / ".national-v2-diagnostic-test-tmp"
+TEST_TMP_ROOT = Path(os.environ.get("ATLAS_NATIONAL_V2_TEST_TMP",
+    str(Path(__file__).resolve().parents[2] / ".national-v2-diagnostic-test-tmp")))
 TEST_TMP_ROOT.mkdir(parents=True, exist_ok=True)
 
 

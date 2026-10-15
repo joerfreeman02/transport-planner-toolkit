@@ -29,7 +29,7 @@ jobs:
           GH_REPOSITORY: ${{ github.repository }}
           GH_API_URL: ${{ github.api_url }}
           CHECKPOINT_RUN_ID: ${{ inputs.checkpoint_run_id }}
-          EXPECTED_BRANCH: codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation
+          CONTROLLED_BRANCHES: codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation,codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           python - <<'PY'
@@ -42,12 +42,15 @@ jobs:
               request = urllib.request.Request(base + path, headers=headers)
               with urllib.request.urlopen(request, timeout=30) as response: return json.loads(response.read())
           run = get(f'/repos/{repo}/actions/runs/{run_id}')
+          controlled = set(os.environ['CONTROLLED_BRANCHES'].split(','))
           if (run.get('repository', {}).get('full_name') != os.environ['GH_REPOSITORY']
-                  or run.get('head_branch') != os.environ['EXPECTED_BRANCH']
-                  or run.get('head_sha') != os.environ['EXPECTED_SHA']
+                  or run.get('head_branch') not in controlled
                   or run.get('event') != 'workflow_dispatch'
                   or '.github/workflows/atlas-bus-data-refresh.yml' not in run.get('path', '')):
-              raise SystemExit('Checkpoint producer repository, workflow, event, branch, or compatible commit mismatch.')
+              raise SystemExit('Checkpoint producer repository, workflow, event, or controlled branch lineage mismatch.')
+          ancestor = __import__('subprocess').run(['git', 'merge-base', '--is-ancestor', run.get('head_sha', ''), os.environ['EXPECTED_SHA']], check=False)
+          if ancestor.returncode != 0:
+              raise SystemExit('Checkpoint producer commit is not an ancestor of the current controlled branch commit.')
           artifacts = get(f'/repos/{repo}/actions/runs/{run_id}/artifacts?per_page=100').get('artifacts', [])
           required = {f'atlas-primary-reconciliation-checkpoint-{run_id}', f'atlas-tnds-reconciliation-checkpoint-{run_id}'}
           available = {item.get('name') for item in artifacts if item.get('expired') is False and str(item.get('workflow_run', {}).get('id')) == run_id}
@@ -73,20 +76,19 @@ jobs:
       - name: Validate immutable source and checkpoint provenance, then reconcile
         env:
           CHECKPOINT_RUN_ID: ${{ inputs.checkpoint_run_id }}
-          CHECKPOINT_BRANCH: ${{ github.ref }}
           CHECKPOINT_COMMIT: ${{ github.sha }}
           CHECKPOINT_REPOSITORY: ${{ github.repository }}
         run: |
           mkdir -p "$RUNNER_TEMP/c3-reconciliation-evidence"
           cat > "$RUNNER_TEMP/primary-expected.json" <<'JSON'
-          {"side":"PRIMARY","sourceSnapshotId":"13e2895be61c5bb5adaf8adec9896520b8224ff243766818d3ca920f0eae71e1","sourceProducerRunId":"38533475680","repository":"${{ github.repository }}","preparationCodeCommit":"${{ github.sha }}","checkpointProducerRunId":"${{ inputs.checkpoint_run_id }}","checkpointBranch":"${{ github.ref }}","preparedSchema":"atlas-prepared-bus-data-v2"}
+          {"side":"PRIMARY","sourceSnapshotId":"13e2895be61c5bb5adaf8adec9896520b8224ff243766818d3ca920f0eae71e1","sourceProducerRunId":"38533475680","sourceArtifactName":"atlas-reference-source-snapshot-38533475680","sourceArtifactId":"11878857366","sourceArtifactDigest":"sha256:01018c145646fdf041ba0c91cbd91b842994f62a292815438a6866ed358db658","repository":"${{ github.repository }}","checkpointProducerRunId":"${{ inputs.checkpoint_run_id }}","preparedSchema":"atlas-prepared-bus-data-v2"}
           JSON
           cat > "$RUNNER_TEMP/tnds-expected.json" <<'JSON'
-          {"side":"TNDS","sourceProducerRunId":"38579244547","sourceArtifactName":"atlas-tnds-quarantined-38579244547","repository":"${{ github.repository }}","preparationCodeCommit":"${{ github.sha }}","checkpointProducerRunId":"${{ inputs.checkpoint_run_id }}","checkpointBranch":"${{ github.ref }}","preparedSchema":"atlas-prepared-bus-tnds-v1"}
+          {"side":"TNDS","sourceSnapshotId":"76ee662a30e5bcb0072c93f4dd3a8efe85c41446ca318a1d6f5700070f5bf058","sourceProducerRunId":"38579244547","sourceArtifactName":"atlas-tnds-quarantined-38579244547","sourceArtifactId":"11903662011","sourceArtifactDigest":"sha256:7783327324f160b1bb3dfbd156bede32c57ababc4c790864d6bf9efe175b6f8e","repository":"${{ github.repository }}","checkpointProducerRunId":"${{ inputs.checkpoint_run_id }}","preparedSchema":"atlas-prepared-bus-tnds-v1"}
           JSON
           PYTHONPATH=tools/atlas-bus-data python tools/atlas-bus-data/run_reconciliation.py \
-            --primary-checkpoint "$RUNNER_TEMP/primary-checkpoint/checkpoint.json.gz" \
-            --tnds-checkpoint "$RUNNER_TEMP/tnds-checkpoint/checkpoint.json.gz" \
+            --primary-checkpoint "$RUNNER_TEMP/primary-checkpoint" \
+            --tnds-checkpoint "$RUNNER_TEMP/tnds-checkpoint" \
             --primary-expected "$RUNNER_TEMP/primary-expected.json" \
             --tnds-expected "$RUNNER_TEMP/tnds-expected.json" \
             --output "$RUNNER_TEMP/c3-reconciliation-evidence" \

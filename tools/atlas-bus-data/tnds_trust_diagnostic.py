@@ -5,9 +5,7 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from refresh_bus_data import (TNDS_REGIONS, acquire_tnds_snapshot, load_and_verify_tnds_snapshot,
                               validate_tnds_region_coverage)
-from reconciliation_checkpoint import create_checkpoint, canonical_bytes
-from reconciliation_projection import build_service_projection
-import gzip
+from reconciliation_projection import write_prepared_projection_checkpoint
 
 SCHEMA = "atlas-tnds-trust-run-evidence-v2"
 PREPARER = Path(__file__).with_name("prepare_tnds.mjs")
@@ -218,6 +216,8 @@ def verify_reused_checkpoint(snapshot: str | Path, evidence: str | Path, *, prod
         producer = verified.get("producer") or {}
         if str(producer.get("runId") or "") != producer_run_id:
             raise ValueError("TNDS snapshot producer run does not match selected artifact run")
+        if producer_run_id == "38579244547" and verified.get("snapshotId") != "76ee662a30e5bcb0072c93f4dd3a8efe85c41446ca318a1d6f5700070f5bf058":
+            raise ValueError("Run #40 TNDS snapshot ID differs from the independently verified identity")
         expected_repository = os.environ.get("GITHUB_REPOSITORY")
         if expected_repository and producer.get("repository") != expected_repository:
             raise ValueError("TNDS snapshot repository does not match this workflow")
@@ -313,8 +313,9 @@ def prepare_checkpoint(snapshot: str | Path, evidence: str | Path, *, node: str 
         handoff, manifest_path = prepare_tnds_handoff(snapshot, extracted, prepared, node=node, stage_callback=set_stage)
         if str(source_producer_run_id or "") == "38579244547" and handoff["regionServiceCounts"] != RUN_42_EXPECTED_COUNTS:
             raise RuntimeError("TNDS regional service counts differ from verified Run #42 preparation reference")
-        projection = build_service_projection(prepared, "TNDS", source_snapshot_id=handoff["sourceManifest"]["snapshotId"])
-        projection["regionalEvidence"] = {"schema": "atlas-tnds-region-evidence-v1", "fixtureOnly": False, "regions": {
+        if str(source_producer_run_id or "") == "38579244547" and handoff["sourceManifest"]["snapshotId"] != "76ee662a30e5bcb0072c93f4dd3a8efe85c41446ca318a1d6f5700070f5bf058":
+            raise RuntimeError("Refusing Run #40 checkpoint with an unexpected TNDS snapshot identity")
+        regional_evidence = {"schema": "atlas-tnds-region-evidence-v1", "fixtureOnly": False, "regions": {
             region: {"region": region, "acquisitionId": handoff["sourceManifest"]["snapshotId"],
                 "archiveSha256": next(item["sha256"] for item in handoff["sourceManifest"]["sources"] if str(item.get("region", "")).upper() == region),
                 "sourceBytes": next(item["bytes"] for item in handoff["sourceManifest"]["sources"] if str(item.get("region", "")).upper() == region),
@@ -332,26 +333,25 @@ def prepare_checkpoint(snapshot: str | Path, evidence: str | Path, *, node: str 
             "sourceArtifactDigest": os.environ.get("TNDS_SOURCE_ARTIFACT_DIGEST") or None,
             "repository": os.environ.get("GITHUB_REPOSITORY") or source_producer.get("repository") or "unknown",
             "preparationCodeCommit": os.environ.get("GITHUB_SHA") or "local-fixture",
+            "checkpointProducerCommit": os.environ.get("GITHUB_SHA") or "local-fixture",
             "checkpointProducerRunId": os.environ.get("GITHUB_RUN_ID") or "local-fixture",
             "checkpointBranch": os.environ.get("GITHUB_REF") or "local-fixture",
             "preparedSchema": handoff["preparedManifest"]["schema"],
             "sourceWindowBasis": immutable_prepared_at(handoff["sourceManifest"].get("createdAt")),
+            "regionalEvidence": regional_evidence,
         }
-        checkpoint = create_checkpoint("TNDS", projection, provenance)
         checkpoint_root = evidence / "tnds-reconciliation-checkpoint"
-        checkpoint_root.mkdir(parents=True, exist_ok=True)
-        checkpoint_path = checkpoint_root / "checkpoint.json.gz"
-        with gzip.open(checkpoint_path, "wb", compresslevel=9) as stream:
-            stream.write(canonical_bytes(checkpoint) + b"\n")
-        (checkpoint_root / "manifest.json").write_text(json.dumps(checkpoint["manifest"], indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        checkpoint_manifest = write_prepared_projection_checkpoint(prepared, "TNDS",
+            source_snapshot_id=handoff["sourceManifest"]["snapshotId"], provenance=provenance,
+            destination=checkpoint_root)
         record.update({"stage": "PREPARED_HANDOFF_SUCCEEDED", "result": "PREPARED_HANDOFF_SUCCEEDED",
                        "snapshotId": handoff["sourceManifest"]["snapshotId"], "completedRegions": list(TNDS_REGIONS),
                        "preparedManifestPresent": manifest_path.is_file(), "preparedAt": handoff["preparedAt"],
                        "currentFreshnessClaimed": not reused, "sourceProducerRunId": source_producer_run_id,
                        "acquisitionMode": "VERIFIED_REUSE" if reused else "FRESH",
                        "reconciliationCheckpointReady": True,
-                       "reconciliationProjectionSha256": checkpoint["manifest"]["canonicalProjectionSha256"],
-                       "reconciliationProjectionRowCount": checkpoint["manifest"]["rowCount"]})
+                       "reconciliationProjectionSha256": checkpoint_manifest["aggregateProjectionSha256"],
+                       "reconciliationProjectionRowCount": checkpoint_manifest["evidenceRowCount"]})
         _persist_evidence(evidence, record)
         verified = handoff["sourceManifest"]
         prepared_manifest = handoff["preparedManifest"]
@@ -359,7 +359,7 @@ def prepare_checkpoint(snapshot: str | Path, evidence: str | Path, *, node: str 
             "snapshotState": verified["state"], "createdAt": verified["createdAt"], "producer": verified.get("producer", {}),
             "quarantined": True, "preparedAt": handoff["preparedAt"], "preparedRegions": handoff["regions"],
             "regionServiceCounts": handoff["regionServiceCounts"], "serviceCount": prepared_manifest.get("serviceCount"),
-            "reconciliationCheckpoint": checkpoint["manifest"],
+            "reconciliationCheckpoint": checkpoint_manifest,
             "reconciliationStatus": "PRIMARY_INPUT_NOT_RESTORED", "plannerEligible": False,
             "runtimeActive": False, "publicationAttempted": False, "deploymentAttempted": False,
             "diagnosticOnly": True, "secretValuesIncluded": False,

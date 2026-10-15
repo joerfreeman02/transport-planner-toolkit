@@ -9,6 +9,7 @@ TNDS = (ROOT / ".github/workflows/atlas-bus-tnds-trust-diagnostic.yml").read_tex
 PRIMARY = (ROOT / ".github/workflows/atlas-reference-data-diagnostic.yml").read_text(encoding="utf-8")
 RECONCILE = (ROOT / ".github/workflows/atlas-bus-data-c3-reconcile.yml").read_text(encoding="utf-8")
 BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation"
+C1_BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout"
 
 
 def block(text, name):
@@ -20,7 +21,8 @@ def block(text, name):
 class C3WorkflowContractTests(unittest.TestCase):
     def test_exact_branch_dispatch_uses_only_the_four_default_branch_controls(self):
         selector = DISPATCH.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]
-        self.assertIn(f"TRUST_BRANCH: {BRANCH}", selector)
+        self.assertIn(f"TRUST_BRANCH_C3: {BRANCH}", selector)
+        self.assertIn(f"TRUST_BRANCH_C3_C1: {C1_BRANCH}", selector)
         self.assertNotIn("v2_", selector)
         for mode in ("offline_preflight", "c3_live_trust", "c3_checkpoint_retry"):
             self.assertIn(f"trust_mode={mode}", selector)
@@ -43,6 +45,8 @@ class C3WorkflowContractTests(unittest.TestCase):
         self.assertIn("expected_raw_artifact_id: '11903662011'", DISPATCH)
         self.assertIn("01018c145646fdf041ba0c91cbd91b842994f62a292815438a6866ed358db658", DISPATCH)
         self.assertIn("7783327324f160b1bb3dfbd156bede32c57ababc4c790864d6bf9efe175b6f8e", DISPATCH)
+        self.assertIn("76ee662a30e5bcb0072c93f4dd3a8efe85c41446ca318a1d6f5700070f5bf058", RECONCILE)
+        self.assertIn("76ee662a30e5bcb0072c93f4dd3a8efe85c41446ca318a1d6f5700070f5bf058", RECONCILE)
         self.assertIn("Verify exact raw TNDS artifact ID and digest", TNDS)
         self.assertIn("Verify exact frozen-source artifact ID and digest", Path(ROOT / ".github/workflows/atlas-reference-data-source.yml").read_text())
         self.assertIn("coverage_ledger_path='pages-site/diagnostic-output/coverage-ledger.json'", PRIMARY)
@@ -64,6 +68,10 @@ class C3WorkflowContractTests(unittest.TestCase):
         verification = RECONCILE.split("- name: Verify checkpoint producer run", 1)[1].split("- name: Restore primary checkpoint", 1)[0]
         self.assertIn("head_branch", verification)
         self.assertIn("head_sha", verification)
+        self.assertIn("merge-base', '--is-ancestor", verification)
+        self.assertIn("CONTROLLED_BRANCHES", verification)
+        self.assertIn("merge-base', '--is-ancestor", verification)
+        self.assertIn("CONTROLLED_BRANCHES", verification)
         self.assertIn("required <= available", verification)
         self.assertLess(RECONCILE.index("Verify checkpoint producer run"), RECONCILE.index("Restore primary checkpoint"))
 
@@ -74,6 +82,28 @@ class C3WorkflowContractTests(unittest.TestCase):
                      "tnds-checkpoint-manifest.json", "run-evidence.json"):
             self.assertIn(name, Path(ROOT / "tools/atlas-bus-data/run_reconciliation.py").read_text())
         self.assertIn('"plannerOutputChanged": False', Path(ROOT / "tools/atlas-bus-data/run_reconciliation.py").read_text())
+
+    def test_checkpoint_uses_shards_streaming_and_projection_fingerprint(self):
+        checkpoint = Path(ROOT / "tools/atlas-bus-data/reconciliation_checkpoint.py").read_text()
+        runner = Path(ROOT / "tools/atlas-bus-data/run_reconciliation.py").read_text()
+        self.assertIn("projectionCompatibilityFingerprint", checkpoint)
+        self.assertIn("file_sha256(path)", checkpoint)
+        self.assertIn("iter_checkpoint_region", runner)
+        self.assertIn("gzip.GzipFile", runner)
+        self.assertNotIn("json.dumps(ledger", runner)
+        self.assertIn("referenceServiceFindings", runner)
+        self.assertIn("manualAcceptancePending", runner)
+
+    def test_checkpoint_uses_shards_streaming_and_projection_fingerprint(self):
+        checkpoint = Path(ROOT / "tools/atlas-bus-data/reconciliation_checkpoint.py").read_text()
+        runner = Path(ROOT / "tools/atlas-bus-data/run_reconciliation.py").read_text()
+        self.assertIn("projectionCompatibilityFingerprint", checkpoint)
+        self.assertIn("file_sha256(path)", checkpoint)
+        self.assertIn("iter_checkpoint_region", runner)
+        self.assertIn("gzip.GzipFile", runner)
+        self.assertNotIn("json.dumps(ledger", runner)
+        self.assertIn("referenceServiceFindings", runner)
+        self.assertIn("manualAcceptancePending", runner)
 
 
 if __name__ == "__main__": unittest.main()

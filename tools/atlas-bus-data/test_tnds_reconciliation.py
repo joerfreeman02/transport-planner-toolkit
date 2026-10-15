@@ -276,6 +276,19 @@ class ReconciliationContractTests(unittest.TestCase):
         self.assertIn("SOURCE_WINDOW_DIFFERENCE", result["categoryCounts"])
         self.assertIn("CONFLICTING_CURRENT_EVIDENCE", result["categoryCounts"])
 
+    def test_huge_duplicate_identity_group_is_bounded_and_remains_ambiguous(self):
+        primary = [row(stop="DUP", identityBridge="same", evidenceId=f"p-{index}") for index in range(100)]
+        tnds = [row(stop="DUP", side="tnds", identityBridge="same", evidenceId=f"t-{index}") for index in range(100)]
+        result = compare(primary, tnds, tnds_status=State.COMPARATOR_VALIDATED)
+        groups = [item for item in result["rows"] if item["category"] == "AMBIGUOUS_IDENTITY_GROUP"]
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(groups[0]["candidatePairCount"], 10000)
+        self.assertEqual(len(groups[0]["primaryEvidenceIdSample"]), 20)
+        self.assertEqual(result["matchingInstrumentation"]["candidateComparisons"], 0)
+        self.assertEqual(result["matchingInstrumentation"]["omittedAmbiguousCandidatePairs"], 10000)
+        self.assertEqual(result["matchingInstrumentation"]["unmatchedPrimary"], 0)
+        self.assertEqual(result["matchingInstrumentation"]["unmatchedTnds"], 0)
+
     def test_source_windows_are_reported_and_mismatch_conflicts(self):
         result = compare([row(validTo="2026-11-01")], [row(side="tnds", validTo="2026-12-01")])
         self.assertEqual(result["rows"][0]["category"], "SOURCE_WINDOW_DIFFERENCE")

@@ -164,14 +164,11 @@ jobs:
           CHECKPOINT_BRANCH: ${{ github.ref }}
         run: |
           PYTHONPATH=tools/atlas-bus-data python - <<'PY'
-          import gzip, json, os
+          import json, os
           from pathlib import Path
-          from reconciliation_checkpoint import create_checkpoint
-          from reconciliation_projection import build_service_projection
+          from reconciliation_projection import write_prepared_projection_checkpoint
           site = Path('pages-site/atlas/data/bus')
           verified = json.loads(Path('source-input/verified-snapshot-manifest.json').read_text())
-          projection = build_service_projection(site, 'PRIMARY', source_snapshot_id=verified['snapshotId'],
-              coverage_ledger_path='pages-site/diagnostic-output/coverage-ledger.json')
           artifact_metadata = json.loads(Path(os.environ['RUNNER_TEMP'], 'source-artifact.json').read_text())
           original_artifact = verified.get('frozenReuseArtifact') or {}
           provenance = {
@@ -183,18 +180,18 @@ jobs:
               'sourceArtifactDigest': original_artifact.get('digest') or artifact_metadata.get('digest'),
               'repository': os.environ['REPOSITORY'],
               'preparationCodeCommit': os.environ['PREPARATION_COMMIT'],
+              'checkpointProducerCommit': os.environ['PREPARATION_COMMIT'],
               'checkpointProducerRunId': os.environ['CHECKPOINT_PRODUCER_RUN_ID'],
               'checkpointBranch': os.environ['CHECKPOINT_BRANCH'],
               'preparedSchema': 'atlas-prepared-bus-data-v2',
-              'sourceWindowBasis': projection['sourceWindowBasis'],
           }
-          checkpoint = create_checkpoint('PRIMARY', projection, provenance)
           destination = Path('diagnostic-output/primary-reconciliation-checkpoint')
-          destination.mkdir(parents=True, exist_ok=True)
-          with gzip.open(destination / 'checkpoint.json.gz', 'wb', compresslevel=9) as stream:
-              stream.write(json.dumps(checkpoint, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode() + b'\n')
-          (destination / 'manifest.json').write_text(json.dumps(checkpoint['manifest'], indent=2, sort_keys=True) + '\n')
-          print(json.dumps({'rowCount': checkpoint['manifest']['rowCount'], 'projectionSha256': checkpoint['manifest']['canonicalProjectionSha256']}))
+          checkpoint = write_prepared_projection_checkpoint(site, 'PRIMARY', source_snapshot_id=verified['snapshotId'],
+              provenance=provenance, destination=destination,
+              coverage_ledger_path='pages-site/diagnostic-output/coverage-ledger.json')
+          print(json.dumps({'evidenceRowCount': checkpoint['evidenceRowCount'],
+              'projectionSha256': checkpoint['aggregateProjectionSha256'],
+              'projectionShardCount': checkpoint['shardCount']}))
           PY
       - name: Upload verified primary reconciliation-input checkpoint
         if: always() && steps.primary-reconciliation-checkpoint.outcome == 'success'
@@ -218,7 +215,7 @@ jobs:
         run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site --bus-only
       - name: Probe TNDS metadata without archive transfer
         id: tnds-probe
-        if: always() && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation'
+        if: always() && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout'
         continue-on-error: true
         env:
           TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
@@ -253,7 +250,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       - name: Preserve fail-closed conclusions
-        if: always() && (steps.verify-snapshot.outcome != 'success' || steps.release-metadata.outcome != 'success' || steps.prepare-v2.outcome != 'success' || steps.prepared-output-handoff.outcome != 'success' || steps.primary-reconciliation-checkpoint.outcome != 'success' || steps.coverage-gate.outcome != 'success' || steps.structural-scan.outcome != 'success' || steps.hard-validator.outcome != 'success' || steps.deterministic-tests.outcome != 'success' || (github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' && steps.tnds-probe.outcome != 'success') || steps.capacity.outcome != 'success')
+        if: always() && (steps.verify-snapshot.outcome != 'success' || steps.release-metadata.outcome != 'success' || steps.prepare-v2.outcome != 'success' || steps.prepared-output-handoff.outcome != 'success' || steps.primary-reconciliation-checkpoint.outcome != 'success' || steps.coverage-gate.outcome != 'success' || steps.structural-scan.outcome != 'success' || steps.hard-validator.outcome != 'success' || steps.deterministic-tests.outcome != 'success' || ((github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout') && steps.tnds-probe.outcome != 'success') || steps.capacity.outcome != 'success')
         run: |
           echo 'A required diagnostic conclusion failed, including preparation or a downstream gate; evidence was uploaded and this run remains non-publishable.'
           exit 1

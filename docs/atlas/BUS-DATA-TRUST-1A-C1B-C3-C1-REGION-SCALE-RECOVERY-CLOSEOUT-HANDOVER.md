@@ -6,7 +6,7 @@ This corrective branch addresses the C3 findings for region identity, checkpoint
 
 - Starting baseline: `39e142767946aa31ecf0f87544e6d7491ca90297`
 - Branch: `codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout`
-- Final commit: recorded after commit in this handover
+- Closeout implementation commit: `0389db1` (`Fix C3 region identity and bounded checkpoint recovery`)
 - Version/build: `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`
 - `plannerEligible=false`, `plannerOutputChanged=false`, `sourceAuthorityChanged=false`
 
@@ -82,4 +82,4 @@ This corrective sprint creates no new installation milestone.
 
 ## Handover status
 
-Final pushed SHA, local/remote equality, clean worktree, and changed-file inventory are recorded after the closeout commit and push. No Actions dispatch, source acquisition, PR, merge, publication, or deployment occurred.
+The closeout implementation commit above is the reviewed change set. The pushed branch tip, local/remote equality, clean worktree, and changed-file inventory are reported in the final handover. No Actions dispatch, source acquisition, PR, merge, publication, or deployment occurred.

@@ -14,6 +14,8 @@ from run_reconciliation import validate_checkpoint_lineage
 C3 = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation"
 C1 = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout"
 CURRENT = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout"
+R45_C1 = "refs/heads/codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout"
+RUN45_FINGERPRINT = "74a75bdb3da404f401521e21bafd430aafb7076e21186e634e615e7878404a66"
 
 
 def create(root: Path, *, commit: str, fingerprint: str = "a" * 64):
@@ -47,9 +49,15 @@ class CheckpointCompatibilityTests(unittest.TestCase):
                 repository="org/repo", repository_root=repo)
             validate_checkpoint_lineage(checkpoint, branch=CURRENT, commit=later_commit,
                 repository="org/repo", repository_root=repo)
+            validate_checkpoint_lineage(checkpoint, branch=R45_C1, commit=later_commit,
+                repository="org/repo", repository_root=repo)
             self.assertEqual(checkpoint["projectionCompatibilityFingerprint"], "b" * 64)
             self.assertEqual(checkpoint["preparationCodeCommit"], producer_commit)
             self.assertNotEqual(producer_commit, later_commit)
+
+    def test_projection_fingerprint_remains_compatible_with_run45_checkpoints(self):
+        from reconciliation_projection import projection_compatibility_fingerprint
+        self.assertEqual(projection_compatibility_fingerprint(), RUN45_FINGERPRINT)
 
     def test_projection_change_invalidates_reuse(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary:

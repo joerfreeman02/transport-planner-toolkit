@@ -11,6 +11,7 @@ RECONCILE = (ROOT / ".github/workflows/atlas-bus-data-c3-reconcile.yml").read_te
 BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation"
 C1_BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout"
 CURRENT_BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout"
+R45_C1_BRANCH = "refs/heads/codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout"
 
 
 def block(text, name):
@@ -25,6 +26,8 @@ class C3WorkflowContractTests(unittest.TestCase):
         self.assertIn(f"TRUST_BRANCH_C3: {BRANCH}", selector)
         self.assertIn(f"TRUST_BRANCH_C3_C1: {C1_BRANCH}", selector)
         self.assertIn(f"TRUST_BRANCH_C3_C1_C1: {CURRENT_BRANCH}", selector)
+        self.assertIn(f"TRUST_BRANCH_R45_C1: {R45_C1_BRANCH}", selector)
+        self.assertIn("R45-C1 closeout branch accepts only the Run #45 checkpoint-only retry selector", selector)
         self.assertNotIn("v2_", selector)
         for mode in ("offline_preflight", "c3_live_trust", "c3_checkpoint_retry"):
             self.assertIn(f"trust_mode={mode}", selector)
@@ -34,13 +37,15 @@ class C3WorkflowContractTests(unittest.TestCase):
 
     def test_current_branch_gate_a_and_gate_b_dispatch_contracts(self):
         selector = DISPATCH.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]
-        allowed = {BRANCH, C1_BRANCH, CURRENT_BRANCH}
+        allowed = {BRANCH, C1_BRANCH, CURRENT_BRANCH, R45_C1_BRANCH}
 
         def resolve(branch, *, event, prepared_schema, measure_only, force_refresh, resume_run_id):
             if branch not in allowed:
                 return "", ""
             if event != "workflow_dispatch" or prepared_schema != "v2" or not measure_only:
                 return "invalid", ""
+            if branch == R45_C1_BRANCH:
+                return ("c3_checkpoint_retry", resume_run_id) if force_refresh and resume_run_id == "38731043427" else ("invalid", "")
             if not force_refresh and not resume_run_id:
                 return "offline_preflight", ""
             if force_refresh and resume_run_id == "38579244547":
@@ -50,7 +55,7 @@ class C3WorkflowContractTests(unittest.TestCase):
             return "invalid", ""
 
         self.assertIn(f"TRUST_BRANCH_C3_C1_C1: {CURRENT_BRANCH}", selector)
-        self.assertIn('[[ "$GITHUB_REF" != "$TRUST_BRANCH_C3" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1_C1" ]]', selector)
+        self.assertIn('[[ "$GITHUB_REF" != "$TRUST_BRANCH_C3" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_R45_C1" ]]', selector)
         gate_a = resolve(CURRENT_BRANCH, event="workflow_dispatch", prepared_schema="v2",
                          measure_only=True, force_refresh=False, resume_run_id="")
         self.assertEqual(gate_a, ("offline_preflight", ""))
@@ -63,6 +68,11 @@ class C3WorkflowContractTests(unittest.TestCase):
         self.assertEqual(resolve("refs/heads/codex/unrelated", event="workflow_dispatch",
                                  prepared_schema="v2", measure_only=True,
                                  force_refresh=False, resume_run_id=""), ("", ""))
+        self.assertEqual(resolve(R45_C1_BRANCH, event="workflow_dispatch", prepared_schema="v2",
+            measure_only=True, force_refresh=True, resume_run_id="38731043427"),
+            ("c3_checkpoint_retry", "38731043427"))
+        self.assertEqual(resolve(R45_C1_BRANCH, event="workflow_dispatch", prepared_schema="v2",
+            measure_only=True, force_refresh=True, resume_run_id="999"), ("invalid", ""))
 
     def test_current_branch_reaches_all_controlled_hosted_jobs_and_retry(self):
         selector = DISPATCH.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]
@@ -73,7 +83,11 @@ class C3WorkflowContractTests(unittest.TestCase):
                 self.assertIn(f"github.ref == '{CURRENT_BRANCH}'", block(DISPATCH, job))
         resume = DISPATCH.split("- name: Refuse checkpoint resume outside trusted production context", 1)[1].split("- name:", 1)[0]
         self.assertIn(f"github.ref != '{CURRENT_BRANCH}'", resume)
+        self.assertIn(f"github.ref != '{R45_C1_BRANCH}'", resume)
         self.assertIn("codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout", RECONCILE)
+        retry = block(DISPATCH, "c3-checkpoint-retry")
+        self.assertIn(f"github.ref == '{R45_C1_BRANCH}'", retry)
+        self.assertNotIn(f"github.ref == '{R45_C1_BRANCH}'", block(DISPATCH, "c3-live-reconciliation"))
 
     def test_primary_and_tnds_preparations_are_independent_frozen_restores(self):
         source = block(DISPATCH, "c3-primary-source")
@@ -119,6 +133,7 @@ class C3WorkflowContractTests(unittest.TestCase):
                        "codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout",
                        "codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout"):
             self.assertIn(branch, verification)
+        self.assertIn("codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout", verification)
         self.assertIn("merge-base', '--is-ancestor", verification)
         self.assertIn("CONTROLLED_BRANCHES", verification)
         self.assertIn("required <= available", verification)

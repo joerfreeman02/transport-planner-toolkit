@@ -29,7 +29,7 @@ jobs:
           GH_REPOSITORY: ${{ github.repository }}
           GH_API_URL: ${{ github.api_url }}
           CHECKPOINT_RUN_ID: ${{ inputs.checkpoint_run_id }}
-          CONTROLLED_BRANCHES: codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation,codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout,codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout
+          CONTROLLED_BRANCHES: codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation,codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout,codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout,codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           python - <<'PY'

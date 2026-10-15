@@ -11,6 +11,7 @@ DRIVER = ROOT / "tools/atlas-bus-data/tnds_trust_diagnostic.py"
 TRUST_BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation"
 TRUST_BRANCH_C1 = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout"
 TRUST_BRANCH_CURRENT = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout"
+TRUST_BRANCH_R45_C1 = "refs/heads/codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout"
 
 
 def parse_dispatch_input_names(workflow_text):
@@ -90,7 +91,10 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn(f"TRUST_BRANCH_C3: {TRUST_BRANCH}", selector)
         self.assertIn(f"TRUST_BRANCH_C3_C1: {TRUST_BRANCH_C1}", selector)
         self.assertIn(f"TRUST_BRANCH_C3_C1_C1: {TRUST_BRANCH_CURRENT}", selector)
-        self.assertIn('[[ "$GITHUB_REF" != "$TRUST_BRANCH_C3" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1_C1" ]]', selector)
+        self.assertIn(f"TRUST_BRANCH_R45_C1: {TRUST_BRANCH_R45_C1}", selector)
+        self.assertIn('[[ "$GITHUB_REF" != "$TRUST_BRANCH_C3" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_R45_C1" ]]', selector)
+        self.assertIn("R45-C1 closeout branch accepts only the Run #45 checkpoint-only retry selector", selector)
+        self.assertIn('"$RESUME_RUN_ID" != \'38731043427\'', selector)
         self.assertIn('"$PREPARED_SCHEMA" != \'v2\'', selector)
         self.assertIn('"$MEASURE_ONLY" != \'true\'', selector)
         self.assertIn('"$FORCE_REFRESH" == \'false\'', selector)
@@ -113,7 +117,7 @@ class TndsWorkflowContractTests(unittest.TestCase):
 
     def test_trust_selector_is_not_activated_on_other_branches_or_main(self):
         selector = self.dispatcher.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]
-        self.assertIn('if [[ "$GITHUB_REF" != "$TRUST_BRANCH_C3" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1_C1" ]]; then', selector)
+        self.assertIn('if [[ "$GITHUB_REF" != "$TRUST_BRANCH_C3" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_R45_C1" ]]; then', selector)
         self.assertIn("echo 'trust_mode='", selector)
         self.assertIn("echo 'prior_producer_run_id='", selector)
         self.assertGreaterEqual(self.dispatcher.count(TRUST_BRANCH), 4)
@@ -122,6 +126,7 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn(f"github.ref != '{TRUST_BRANCH}'", generic_resume_guard)
         self.assertIn(f"github.ref != '{TRUST_BRANCH_C1}'", generic_resume_guard)
         self.assertIn(f"github.ref != '{TRUST_BRANCH_CURRENT}'", generic_resume_guard)
+        self.assertIn(f"github.ref != '{TRUST_BRANCH_R45_C1}'", generic_resume_guard)
         self.assertIn("Cross-run checkpoint resume is allowed only from refs/heads/main", generic_resume_guard)
 
     def test_all_trust_modes_skip_primary_acquisition_and_production_jobs(self):

@@ -26,6 +26,8 @@ CONTROLLED_BRANCHES = {
     "codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout",
     "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout",
     "codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout",
+    "refs/heads/codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout",
+    "codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout",
 }
 PRIMARY_SNAPSHOT = "13e2895be61c5bb5adaf8adec9896520b8224ff243766818d3ca920f0eae71e1"
 TNDS_SNAPSHOT = "76ee662a30e5bcb0072c93f4dd3a8efe85c41446ca318a1d6f5700070f5bf058"
@@ -64,7 +66,7 @@ def validate_checkpoint_lineage(manifest: dict[str, Any], *, branch: str, commit
     if manifest.get("repository") != repository:
         raise ValueError("Checkpoint repository mismatch")
     if branch not in CONTROLLED_BRANCHES or manifest.get("checkpointBranch") not in CONTROLLED_BRANCHES:
-        raise ValueError("Checkpoint branch is outside the controlled C3/C3-C1 lineage")
+        raise ValueError("Checkpoint branch is outside the controlled C3/C3-C1/R45-C1 lineage")
     if manifest.get("preparationCodeCommit") != manifest.get("checkpointProducerCommit"):
         raise ValueError("Checkpoint preparation and producer commit provenance disagree")
     _assert_commit_ancestor(str(manifest.get("checkpointProducerCommit", "")), commit, repository_root)
@@ -80,6 +82,29 @@ def _append_bounded(target: list, items: list, limit: int = CONTROL_EVIDENCE_LIM
     remaining = max(0, limit - len(target))
     if remaining:
         target.extend(items[:remaining])
+
+
+def _unresolved_identity_metrics(records: list[dict[str, Any]],
+                                 tnds_referenced_keys: set[tuple[str, str]]) -> dict[str, Any]:
+    """Count raw IDs globally and normalized region keys only within TNDS scope."""
+    keys = {(str(item.get("region", "")).upper(), normalize_stop_id(item.get("gtfsStopId", "")))
+        for item in records if item.get("gtfsStopId") and normalize_stop_id(item.get("gtfsStopId", ""))}
+    in_scope = {key for key in keys if key[0] in EXPECTED_REGIONS}
+    referenced = in_scope & {key for key in tnds_referenced_keys if key[0] in EXPECTED_REGIONS}
+    london = {key for key in keys if key[0] == "LONDON"}
+    return {
+        "uniqueRawGtfsStopIdCount": len({str(item.get("gtfsStopId", "")).strip()
+            for item in records if str(item.get("gtfsStopId", "")).strip()}),
+        "uniqueRegionScopedStopIdentityKeyCount": len(keys),
+        "tndsComparatorScopeRegions": list(EXPECTED_REGIONS),
+        "tndsComparatorScopeUniqueRegionScopedKeyCount": len(in_scope),
+        "tndsComparatorScopeKeysReferencedByTndsCount": len(referenced),
+        "tndsComparatorScopeKeysAbsentFromTndsCount": len(in_scope - referenced),
+        "londonOutsideTndsComparatorScopeUniqueRegionScopedKeyCount": len(london),
+        "londonOutsideTndsComparatorScopeUnresolvedCallCount": sum(
+            1 for item in records if str(item.get("region", "")).upper() == "LONDON"),
+        "regionScopeRule": "normalized GTFS stop identity is matched only within the same canonical region and only for the eight TNDS comparator regions; London is outside scope",
+    }
 
 
 def _reference_findings(site: dict[str, Any], source_windows: dict[str, Any]) -> list[dict[str, Any]]:
@@ -144,9 +169,12 @@ def _oversized_identity_row(region: str, stop_norm: str, db: sqlite3.Connection,
 
 
 def _process_comparison_units(primary_path: Path, tnds_path: Path, primary_manifest: dict[str, Any],
-                              tnds_manifest: dict[str, Any], p_meta: dict[str, Any], regional: dict[str, Any],
+                              tnds_manifest: dict[str, Any], p_meta: dict[str, Any], regional_manifest: dict[str, Any],
+                              coverage: dict[str, Any],
                               as_of: date, source_windows: dict[str, Any], output: Path):
     """Spool rows to disk, then reconcile one normalized stop identity at a time."""
+    if not isinstance(regional_manifest.get("regions"), dict):
+        raise ValueError("Reconciliation requires the raw TNDS regional evidence manifest, not a coverage summary")
     counts: Counter[str] = Counter()
     regional_counts: dict[str, Counter] = {region: Counter() for region in (*EXPECTED_REGIONS, "LONDON")}
     matching: Counter = Counter()
@@ -167,14 +195,14 @@ def _process_comparison_units(primary_path: Path, tnds_path: Path, primary_manif
     unresolved_records = p_meta.get("unresolvedPrimaryIdentityRecords", [])
     unresolved_counts = Counter()
     unresolved_unique_matches: set[tuple[str, str]] = set()
-    unresolved_unique_keys = {(str(item.get("region", "")), normalize_stop_id(item.get("gtfsStopId", "")))
-        for item in unresolved_records if item.get("gtfsStopId")}
+    primary_service_count_missing_identity_rows = 0
     comparison_buckets = sorted(set(iter_checkpoint_buckets(primary_manifest)) | set(iter_checkpoint_buckets(tnds_manifest)))
 
     with tempfile.TemporaryDirectory(prefix="atlas-reconciliation-spool-") as temporary:
         db = sqlite3.connect(str(Path(temporary) / "comparison.sqlite"))
         db.execute("PRAGMA journal_mode=OFF"); db.execute("PRAGMA synchronous=OFF"); db.execute("PRAGMA temp_store=FILE")
         db.execute("CREATE TABLE evidence (side TEXT NOT NULL, region TEXT NOT NULL, bucket TEXT NOT NULL, stop_norm TEXT NOT NULL, evidence_id TEXT, route_number TEXT, payload BLOB NOT NULL)")
+        db.execute("CREATE TABLE primary_services (region TEXT NOT NULL, service_id TEXT NOT NULL, PRIMARY KEY(region, service_id))")
         for side, root, manifest in (("PRIMARY", primary_path, primary_manifest), ("TNDS", tnds_path, tnds_manifest)):
             for region, bucket in iter_checkpoint_buckets(manifest):
                 batch = []
@@ -184,6 +212,18 @@ def _process_comparison_units(primary_path: Path, tnds_path: Path, primary_manif
                         raise ValueError("Checkpoint stop identity was assigned to an incompatible comparison bucket")
                     batch.append((side, region, bucket, stop_norm, str(row.get("evidenceId") or ""),
                         str(row.get("routeNumber") or ""), canonical_bytes(row)))
+                    if side == "PRIMARY":
+                        native = row.get("nativeIds") if isinstance(row.get("nativeIds"), dict) else {}
+                        service_id = str(native.get("preparedServiceId") or "").strip()
+                        if not service_id:
+                            source_service_id = str(native.get("sourceServiceId") or "").strip()
+                            source_archive = str(native.get("sourceArchive") or "").strip()
+                            if source_service_id and source_archive:
+                                service_id = f"{source_archive}:{source_service_id}"
+                        if service_id:
+                            db.execute("INSERT OR IGNORE INTO primary_services VALUES (?,?)", (region, service_id))
+                        else:
+                            primary_service_count_missing_identity_rows += 1
                     if len(batch) >= 1000:
                         db.executemany("INSERT INTO evidence VALUES (?,?,?,?,?,?,?)", batch); db.commit(); batch.clear()
                 if batch:
@@ -204,7 +244,7 @@ def _process_comparison_units(primary_path: Path, tnds_path: Path, primary_manif
         with ledger_path.open("wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=6, mtime=0) as compressed:
             compressed.write(b'{"schema":"atlas-tnds-reconciliation-ledger-c3c1-v1","asOf":')
             compressed.write(json.dumps(as_of.isoformat()).encode())
-            compressed.write(b',"regionalCoverage":'); compressed.write(canonical_bytes(regional)); compressed.write(b',"rows":[')
+            compressed.write(b',"regionalCoverage":'); compressed.write(canonical_bytes(coverage)); compressed.write(b',"rows":[')
             first = True
             for region, bucket in comparison_buckets:
                 stop_cursor = db.execute("SELECT DISTINCT stop_norm FROM evidence WHERE region=? AND bucket=? ORDER BY stop_norm", (region, bucket))
@@ -239,7 +279,7 @@ def _process_comparison_units(primary_path: Path, tnds_path: Path, primary_manif
                     maximum_tnds_rows = max(maximum_tnds_rows, len(tnds_rows))
                     maximum_combined_rows = max(maximum_combined_rows, len(primary_rows) + len(tnds_rows))
                     result = reconcile(primary_rows, tnds_rows, as_of=as_of.isoformat(),
-                        tnds_status=State.COMPARATOR_VALIDATED, region_manifest=regional)
+                        tnds_status=State.COMPARATOR_VALIDATED, region_manifest=regional_manifest)
                     for row in result["rows"]:
                         first = append_row(compressed, row, first)
                     maximum_candidate_bucket = max(maximum_candidate_bucket,
@@ -267,11 +307,17 @@ def _process_comparison_units(primary_path: Path, tnds_path: Path, primary_manif
         for item in unresolved_records:
             region, raw_stop = str(item.get("region", "")), normalize_stop_id(item.get("gtfsStopId", ""))
             if not raw_stop: continue
+            if region not in EXPECTED_REGIONS: continue
             bucket = stop_comparison_bucket(region, raw_stop)
             found = db.execute("SELECT 1 FROM evidence WHERE side='TNDS' AND region=? AND bucket=? AND stop_norm=? LIMIT 1", (region, bucket, raw_stop)).fetchone()
             if found: unresolved_unique_matches.add((region, raw_stop))
         unresolved_counts["exactRegionScopedMatches"] = sum(1 for item in unresolved_records
-            if item.get("gtfsStopId") and (str(item.get("region", "")), normalize_stop_id(item["gtfsStopId"])) in unresolved_unique_matches)
+            if item.get("gtfsStopId") and str(item.get("region", "")) in EXPECTED_REGIONS
+            and (str(item.get("region", "")), normalize_stop_id(item["gtfsStopId"])) in unresolved_unique_matches)
+        primary_service_region_counts = dict.fromkeys((*EXPECTED_REGIONS, "LONDON"), 0)
+        primary_service_region_counts.update(dict(db.execute(
+            "SELECT region, COUNT(*) FROM primary_services GROUP BY region ORDER BY region")))
+        primary_service_count = sum(int(value) for value in primary_service_region_counts.values())
         db.close()
 
     matching["maxPrimaryRowsLoadedForComparisonUnit"] = maximum_primary_rows
@@ -281,17 +327,16 @@ def _process_comparison_units(primary_path: Path, tnds_path: Path, primary_manif
     matching["comparisonBucketCount"] = len(comparison_buckets)
     matching["largestStopIdentityBucket"] = largest_stop_bucket
     matching["oversizedStopIdentityBucketCount"] = oversized_groups
-    unresolved_summary = {"schema": "atlas-primary-unresolved-reconciliation-summary-v2",
+    identity_metrics = _unresolved_identity_metrics(unresolved_records, unresolved_unique_matches)
+    unresolved_summary = {"schema": "atlas-primary-unresolved-reconciliation-summary-v3",
         "snapshotId": primary_manifest["sourceSnapshotId"], "sourceWindow": primary_manifest["sourceWindowBasis"],
         "unresolvedScheduledCallCount": unresolved_counts["calls"],
-        "uniqueRawGtfsStopIdentityCount": len({normalize_stop_id(item.get("gtfsStopId")) for item in unresolved_records if item.get("gtfsStopId")}),
+        **identity_metrics,
         "uniqueRouteCount": len({str(item.get("routeId")) for item in unresolved_records if item.get("routeId")}),
         "uniqueOperatorCount": None, "operatorLineageStatus": "NOT_PRESENT_IN_COVERAGE_LEDGER_UNRESOLVED_RECORDS",
-        "countsByRegion": dict(sorted(Counter(str(item.get("region", "unknown")) for item in unresolved_records).items())),
+        "countsByRegion": dict(sorted(Counter(str(item.get("region", "unknown")).upper() for item in unresolved_records).items())),
         "exactRegionScopedTndsStopReferenceCount": unresolved_counts["exactRegionScopedMatches"],
         "exactRegionScopedTndsStopReferenceUniqueIdentityCount": len(unresolved_unique_matches),
-        "tndsAbsentUniqueGtfsStopIdentityCount": len(unresolved_unique_keys - unresolved_unique_matches),
-        "regionScopeRule": "raw GTFS stop identity must match a TNDS stop ID in the same canonical comparator region",
         "exactServiceIdentityCorroborationCount": 0, "strongCompositeCandidateCount": None,
         "ambiguousIdentityCount": None, "lineageInsufficientCount": sum(1 for item in unresolved_records
             if not item.get("tripId") or not item.get("routeId") or not item.get("gtfsStopId")),
@@ -303,7 +348,8 @@ def _process_comparison_units(primary_path: Path, tnds_path: Path, primary_manif
     return (counts, regional_counts, matching, maximum_primary_rows, maximum_tnds_rows,
         maximum_combined_rows, maximum_candidate_bucket, largest_stop_bucket, oversized_groups,
         ledger_rows, ledger_row_digest, ledger_path, samples_by_category, samples_by_region,
-        controls, unresolved_summary, len(comparison_buckets))
+        controls, unresolved_summary, len(comparison_buckets), primary_service_count,
+        primary_service_region_counts, primary_service_count_missing_identity_rows)
 
 
 def run(primary_path: Path, tnds_path: Path, primary_expected: dict, tnds_expected: dict,
@@ -346,9 +392,17 @@ def run(primary_path: Path, tnds_path: Path, primary_expected: dict, tnds_expect
     (counts, regional_counts, matching, maximum_primary_rows, maximum_tnds_rows,
      maximum_combined_rows, maximum_candidate_bucket, largest_stop_bucket, oversized_groups,
      ledger_rows, ledger_row_digest, ledger_path, samples_by_category, samples_by_region,
-     controls, unresolved_summary, comparison_bucket_count) = _process_comparison_units(
-        primary_path, tnds_path, primary_manifest, tnds_manifest, p_meta, coverage,
+     controls, unresolved_summary, comparison_bucket_count, primary_service_count,
+     primary_service_region_counts, primary_service_count_missing_identity_rows) = _process_comparison_units(
+        primary_path, tnds_path, primary_manifest, tnds_manifest, p_meta, regional, coverage,
         as_of, source_windows, output)
+    if coverage["state"] == "NATIONAL_COMPLETE":
+        unavailable = sum(regional_counts[region][State.COMPARATOR_UNAVAILABLE] for region in EXPECTED_REGIONS)
+        if unavailable:
+            ledger_path.unlink(missing_ok=True)
+            raise ValueError(
+                "TNDS regional evidence validated NATIONAL_COMPLETE, but reconciliation produced "
+                f"{unavailable} COMPARATOR_UNAVAILABLE rows inside comparator scope; refusing to emit trust evidence")
     ledger_file_sha = file_sha256(ledger_path)
     counts_out = dict(sorted(counts.items()))
     regional_summary = {region: dict(sorted(regional_counts[region].items())) for region in (*EXPECTED_REGIONS, "LONDON")}
@@ -379,7 +433,9 @@ def run(primary_path: Path, tnds_path: Path, primary_expected: dict, tnds_expect
     matching["comparisonUnitRowTarget"] = PROJECTION_CHUNK_ROWS
     matching["ledgerIncrementalWriting"] = True
     matching["ledgerRowsWritten"] = ledger_rows
-    matching["primaryInputServices"] = primary_manifest["inputServiceCount"]
+    matching["primaryInputServices"] = primary_service_count
+    matching["legacyCheckpointReportedPrimaryInputServices"] = int(primary_manifest.get("inputServiceCount", 0) or 0)
+    matching["legacyCheckpointReportedPrimaryServiceCount"] = int(primary_manifest.get("serviceCount", 0) or 0)
     matching["tndsInputServices"] = tnds_manifest["inputServiceCount"]
     matching["primaryProjectedEvidenceCount"] = primary_manifest["projectedEvidenceCount"]
     matching["tndsProjectedEvidenceCount"] = tnds_manifest["projectedEvidenceCount"]
@@ -391,7 +447,13 @@ def run(primary_path: Path, tnds_path: Path, primary_expected: dict, tnds_expect
     summary = {"schema": "atlas-tnds-reconciliation-summary-c4-v1", "asOf": as_of.isoformat(),
         "asOfBasis": source_windows, "sourceSnapshots": {"primary": primary_manifest["sourceSnapshotId"], "tnds": tnds_manifest["sourceSnapshotId"]},
         "primaryEvidenceRowCount": primary_manifest["evidenceRowCount"], "tndsEvidenceRowCount": tnds_manifest["evidenceRowCount"],
-        "primaryServiceCount": primary_manifest["serviceCount"], "tndsServiceCount": tnds_manifest["serviceCount"],
+        "primaryServiceCount": primary_service_count, "tndsServiceCount": tnds_manifest["serviceCount"],
+        "primaryServiceCountDerivation": {"basis": "distinct (canonical region, nativeIds.preparedServiceId), with sourceArchive:sourceServiceId fallback",
+            "derivedTotal": primary_service_count, "derivedByCanonicalRegion": primary_service_region_counts,
+            "legacyCheckpointReportedServiceCount": int(primary_manifest.get("serviceCount", 0) or 0),
+            "legacyCheckpointReportedInputServiceCount": int(primary_manifest.get("inputServiceCount", 0) or 0),
+            "legacyCheckpointReportedRegionServiceCounts": primary_manifest.get("regionServiceCounts", {}),
+            "rowsMissingStableServiceIdentity": primary_service_count_missing_identity_rows},
         "categoryCounts": counts_out, "regionalCoverage": coverage, "matchingInstrumentation": dict(matching),
         "ledgerRowsWritten": ledger_rows, "ledgerRowsSha256": ledger_row_digest.hexdigest(), "compressedLedgerSha256": ledger_file_sha,
         "diagnosticOnly": True, "plannerEligible": False, "plannerOutputChanged": False,

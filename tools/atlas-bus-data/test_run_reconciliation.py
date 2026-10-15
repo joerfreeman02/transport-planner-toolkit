@@ -8,18 +8,20 @@ from pathlib import Path
 
 from reconciliation_checkpoint import create_streaming_checkpoint
 from reconciliation_projection import projection_compatibility_fingerprint
-from run_reconciliation import run, PRIMARY_SNAPSHOT, TNDS_SNAPSHOT, CONTROLLED_BRANCHES
+from run_reconciliation import (run, PRIMARY_SNAPSHOT, TNDS_SNAPSHOT, CONTROLLED_BRANCHES,
+    _unresolved_identity_metrics)
 from tnds_reconciliation import EXPECTED_REGIONS
 
 BASE_COMMIT = "39e142767946aa31ecf0f87544e6d7491ca90297"
-CURRENT_BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout"
+CURRENT_BRANCH = "refs/heads/codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout"
 
 
 def row(region, side, bridge="bridge-1", stop="0100A", route="46"):
     return {"region": region, "sourceRegion": region.lower(), "stopId": stop, "routeNumber": route,
         "operator": "Operator", "origin": "Origin", "destination": "Destination", "stopSequence": [stop, "0100B"],
         "operatingDays": ["monday"], "schoolTermQualifier": "ordinary", "validFrom": "2026-01-01", "validTo": "2027-01-01",
-        "nativeIds": {"service": side}, "evidenceId": side + "-" + region + "-" + stop,
+        "nativeIds": {"preparedServiceId": f"{region}-{route}-service", "sourceServiceId": f"{route}-source",
+            "sourceArchive": region}, "evidenceId": side + "-" + region + "-" + stop,
         "sourceSnapshotId": PRIMARY_SNAPSHOT if side == "p" else TNDS_SNAPSHOT,
         "sourceRegionArchive": {"region": region}, "unresolved": False, "identityBridge": bridge,
         "identityBridgeValidated": bool(bridge), "stopLatitude": 51.8527, "stopLongitude": -0.454343,
@@ -49,7 +51,8 @@ def make_checkpoints(root: Path):
             {"stopId": "0590BCE01L", "latitude": 52.577554, "longitude": -0.242489,
              "timetableCallEligible": False, "busStopType": "BCE", "stopType": "station"}],
         "unresolvedPrimaryIdentityRecords": [{"region": "EA", "gtfsStopId": "RAW-EA", "tripId": "T1"}]}
-    primary = create_streaming_checkpoint("PRIMARY", [row("EA", "p"), row("EA", "p", stop="0590BCE01L", route="X"),
+    primary = create_streaming_checkpoint("PRIMARY", [row("EA", "p"), row("EA", "p", stop="0100B", route="46"),
+        row("EA", "p", stop="0590BCE01L", route="X"),
         row("LONDON", "p", stop="L001")],
         primary_provenance, root / "primary", projection_metadata=p_meta)
     tnds_provenance = {**common, "sourceSnapshotId": TNDS_SNAPSHOT, "sourceProducerRunId": "38579244547",
@@ -94,8 +97,21 @@ class RunReconciliationTests(unittest.TestCase):
             self.assertFalse(summary["plannerOutputChanged"])
             self.assertFalse(summary["sourceAuthorityChanged"])
             self.assertEqual(summary["regionalCoverage"]["state"], "NATIONAL_COMPLETE")
+            matching = summary["matchingInstrumentation"]
+            self.assertGreater(matching["candidateComparisons"], 0)
+            self.assertGreater(matching["exactIdentityPairs"], 0)
+            self.assertGreater(summary["categoryCounts"].get("EVIDENCE_AGREEMENT", 0), 0)
+            self.assertFalse(any(summary["regionalCoverage"]["regionalStates"][region] == "COMPARATOR_UNAVAILABLE"
+                for region in summary["regionalCoverage"]["expectedRegions"]))
+            self.assertEqual(summary["categoryCounts"].get("COMPARATOR_UNAVAILABLE", 0), 0)
+            self.assertEqual(summary["primaryServiceCount"], 3)
+            self.assertEqual(summary["primaryServiceCountDerivation"]["derivedByCanonicalRegion"],
+                {"EA": 2, "EM": 0, "NE": 0, "NW": 0, "SE": 0, "SW": 0, "WM": 0, "Y": 0, "LONDON": 1})
+            self.assertEqual(summary["primaryServiceCountDerivation"]["legacyCheckpointReportedServiceCount"], 0)
+            self.assertEqual(matching["primaryInputServices"], 3)
             unresolved = json.loads((output / "unresolved-primary-summary.json").read_text())
             self.assertEqual(unresolved["exactRegionScopedTndsStopReferenceCount"], 0)
+            self.assertEqual(unresolved["tndsComparatorScopeKeysAbsentFromTndsCount"], 1)
             control = json.loads((output / "pipers-lane-control.json").read_text())
             findings = {item["referenceService"]: item for item in control["referenceServiceFindings"]}
             self.assertEqual(set(findings), {"46", "230", "231", "C"})
@@ -136,6 +152,53 @@ class RunReconciliationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "partial"):
                 run(root / "primary", root / "tnds", {}, {}, root / "out", producer_run_id="200",
                     branch="refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout", commit=BASE_COMMIT, repository="org/repo")
+
+    def test_coverage_summary_cannot_masquerade_as_raw_manifest(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary:
+            root = Path(temporary); make_checkpoints(root)
+            meta_path = root / "tnds" / "projection-metadata.json"
+            meta = json.loads(meta_path.read_text())
+            meta["regionalEvidence"] = {"fixtureOnly": False, "state": "NATIONAL_COMPLETE",
+                "verifiedRegions": list(EXPECTED_REGIONS)}
+            meta_path.write_text(json.dumps(meta, sort_keys=True, separators=(",", ":")) + "\n")
+            from reconciliation_checkpoint import file_sha256
+            manifest_path = root / "tnds" / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["projectionMetadataSha256"] = file_sha256(meta_path)
+            manifest_path.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n")
+            with self.assertRaisesRegex(ValueError, "partial"):
+                run(root / "primary", root / "tnds", {}, {}, root / "out", producer_run_id="200",
+                    branch=CURRENT_BRANCH, commit=BASE_COMMIT, repository="org/repo")
+
+    def test_national_complete_with_unavailable_comparator_rows_fails_and_removes_ledger(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary:
+            root = Path(temporary); make_checkpoints(root)
+            out = root / "out"
+            unavailable = {"rows": [{"category": "COMPARATOR_UNAVAILABLE", "region": "EA"}],
+                "matchingInstrumentation": {}}
+            with patch("run_reconciliation.reconcile", return_value=unavailable):
+                with self.assertRaisesRegex(ValueError, "NATIONAL_COMPLETE.*COMPARATOR_UNAVAILABLE"):
+                    run(root / "primary", root / "tnds", {}, {}, out, producer_run_id="200",
+                        branch=CURRENT_BRANCH, commit=BASE_COMMIT, repository="org/repo")
+            self.assertFalse((out / "reconciliation-ledger.json.gz").exists())
+
+    def test_unresolved_metrics_are_region_scoped_and_exclude_london_from_absence(self):
+        records = [
+            {"region": "EA", "gtfsStopId": "DUP"},
+            {"region": "NW", "gtfsStopId": "DUP"},
+            {"region": "EA", "gtfsStopId": "FOUND"},
+            {"region": "Y", "gtfsStopId": "ABSENT"},
+            {"region": "LONDON", "gtfsStopId": "LON-ONLY"},
+        ]
+        metrics = _unresolved_identity_metrics(records, {
+            ("EA", "DUP"), ("EA", "FOUND"), ("LONDON", "LON-ONLY")})
+        self.assertEqual(metrics["uniqueRawGtfsStopIdCount"], 4)
+        self.assertEqual(metrics["uniqueRegionScopedStopIdentityKeyCount"], 5)
+        self.assertEqual(metrics["tndsComparatorScopeUniqueRegionScopedKeyCount"], 4)
+        self.assertEqual(metrics["tndsComparatorScopeKeysReferencedByTndsCount"], 2)
+        self.assertEqual(metrics["tndsComparatorScopeKeysAbsentFromTndsCount"], 2)
+        self.assertEqual(metrics["londonOutsideTndsComparatorScopeUniqueRegionScopedKeyCount"], 1)
+        self.assertEqual(metrics["londonOutsideTndsComparatorScopeUnresolvedCallCount"], 1)
 
 
 if __name__ == "__main__": unittest.main()

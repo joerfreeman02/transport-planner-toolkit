@@ -76,7 +76,7 @@ jobs:
           echo "::error::Only refs/heads/main or a manually dispatched diagnostic may run this workflow; refusing $GITHUB_REF."
           exit 1
       - name: Refuse checkpoint resume outside trusted production context
-        if: inputs.resume_checkpoint_run_id != '' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c1-browser-dispatch-entry' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c2-preparation-scale-closeout' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout'
+        if: inputs.resume_checkpoint_run_id != '' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c1-browser-dispatch-entry' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c2-preparation-scale-closeout' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout'
         run: |
           echo '::error::Cross-run checkpoint resume is allowed only from refs/heads/main.'
           exit 1
@@ -111,12 +111,13 @@ jobs:
           TRUST_BRANCH_C3: refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation
           TRUST_BRANCH_C3_C1: refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout
           TRUST_BRANCH_C3_C1_C1: refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout
+          TRUST_BRANCH_R45_C1: refs/heads/codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout
           PREPARED_SCHEMA: ${{ inputs.prepared_schema }}
           MEASURE_ONLY: ${{ inputs.measure_only }}
           FORCE_REFRESH: ${{ inputs.force_refresh }}
           RESUME_RUN_ID: ${{ inputs.resume_checkpoint_run_id }}
         run: |
-          if [[ "$GITHUB_REF" != "$TRUST_BRANCH_C3" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1_C1" ]]; then
+          if [[ "$GITHUB_REF" != "$TRUST_BRANCH_C3" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_R45_C1" ]]; then
             echo 'trust_mode=' >> "$GITHUB_OUTPUT"
             echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
             exit 0
@@ -125,6 +126,16 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" != 'workflow_dispatch' || "$PREPARED_SCHEMA" != 'v2' || "$MEASURE_ONLY" != 'true' ]]; then
             echo '::error::The controlled TRUST branch accepts only workflow_dispatch with prepared_schema=v2 and measure_only=true.'
             exit 1
+          fi
+
+          if [[ "$GITHUB_REF" == "$TRUST_BRANCH_R45_C1" ]]; then
+            if [[ "$FORCE_REFRESH" != 'true' || "$RESUME_RUN_ID" != '38731043427' ]]; then
+              echo '::error::The R45-C1 closeout branch accepts only the Run #45 checkpoint-only retry selector.'
+              exit 1
+            fi
+            echo 'trust_mode=c3_checkpoint_retry' >> "$GITHUB_OUTPUT"
+            echo "prior_producer_run_id=$RESUME_RUN_ID" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           if [[ "$FORCE_REFRESH" == 'false' && -z "$RESUME_RUN_ID" ]]; then
@@ -549,7 +560,7 @@ jobs:
   c3-checkpoint-retry:
     name: Verify and reconcile restored C3 checkpoints without national preparation
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'c3_checkpoint_retry'
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'c3_checkpoint_retry'
     uses: ./.github/workflows/atlas-bus-data-c3-reconcile.yml
     with:
       checkpoint_run_id: ${{ needs.main-guard.outputs.trust_prior_producer_run_id }}

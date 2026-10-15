@@ -12,6 +12,7 @@ from run_reconciliation import run, PRIMARY_SNAPSHOT, TNDS_SNAPSHOT, CONTROLLED_
 from tnds_reconciliation import EXPECTED_REGIONS
 
 BASE_COMMIT = "39e142767946aa31ecf0f87544e6d7491ca90297"
+CURRENT_BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout"
 
 
 def row(region, side, bridge="bridge-1", stop="0100A", route="46"):
@@ -83,7 +84,7 @@ class RunReconciliationTests(unittest.TestCase):
                  "sourceArtifactName": "atlas-tnds-quarantined-38579244547", "sourceArtifactId": "11903662011",
                  "sourceArtifactDigest": "sha256:7783327324f160b1bb3dfbd156bede32c57ababc4c790864d6bf9efe175b6f8e",
                  "repository": "org/repo", "preparedSchema": "atlas-prepared-bus-tnds-v1"},
-                output, producer_run_id="200", branch="refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout", commit=BASE_COMMIT, repository="org/repo")
+                output, producer_run_id="200", branch=CURRENT_BRANCH, commit=BASE_COMMIT, repository="org/repo")
             ledger_path = output / "reconciliation-ledger.json.gz"
             with gzip.open(ledger_path, "rt", encoding="utf-8") as stream:
                 ledger = json.load(stream)
@@ -108,6 +109,15 @@ class RunReconciliationTests(unittest.TestCase):
             self.assertFalse(bce["timetableCallEligible"])
             self.assertEqual(bce["infrastructureClass"], "NON_CALL_INFRASTRUCTURE")
             self.assertTrue(peterborough["manualAcceptancePending"])
+
+    def test_unknown_branch_is_rejected_before_reconciliation(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary:
+            root = Path(temporary)
+            with patch("run_reconciliation.reconcile") as comparator:
+                with self.assertRaisesRegex(ValueError, "branch"):
+                    run(root, root, {}, {}, root / "output", producer_run_id="200",
+                        branch="refs/heads/codex/unrelated", commit=BASE_COMMIT, repository="org/repo")
+                comparator.assert_not_called()
 
     def test_partial_live_region_fails_before_ledger_creation(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as temporary:

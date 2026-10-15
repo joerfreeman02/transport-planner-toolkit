@@ -24,6 +24,8 @@ CONTROLLED_BRANCHES = {
     "codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation",
     "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout",
     "codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout",
+    "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout",
+    "codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout",
 }
 PRIMARY_SNAPSHOT = "13e2895be61c5bb5adaf8adec9896520b8224ff243766818d3ca920f0eae71e1"
 TNDS_SNAPSHOT = "76ee662a30e5bcb0072c93f4dd3a8efe85c41446ca318a1d6f5700070f5bf058"

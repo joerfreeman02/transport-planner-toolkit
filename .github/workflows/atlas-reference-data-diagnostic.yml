@@ -215,7 +215,7 @@ jobs:
         run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site --bus-only
       - name: Probe TNDS metadata without archive transfer
         id: tnds-probe
-        if: always() && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout'
+        if: always() && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout'
         continue-on-error: true
         env:
           TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
@@ -250,7 +250,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
       - name: Preserve fail-closed conclusions
-        if: always() && (steps.verify-snapshot.outcome != 'success' || steps.release-metadata.outcome != 'success' || steps.prepare-v2.outcome != 'success' || steps.prepared-output-handoff.outcome != 'success' || steps.primary-reconciliation-checkpoint.outcome != 'success' || steps.coverage-gate.outcome != 'success' || steps.structural-scan.outcome != 'success' || steps.hard-validator.outcome != 'success' || steps.deterministic-tests.outcome != 'success' || ((github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout') && steps.tnds-probe.outcome != 'success') || steps.capacity.outcome != 'success')
+        if: always() && (steps.verify-snapshot.outcome != 'success' || steps.release-metadata.outcome != 'success' || steps.prepare-v2.outcome != 'success' || steps.prepared-output-handoff.outcome != 'success' || steps.primary-reconciliation-checkpoint.outcome != 'success' || steps.coverage-gate.outcome != 'success' || steps.structural-scan.outcome != 'success' || steps.hard-validator.outcome != 'success' || steps.deterministic-tests.outcome != 'success' || ((github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' && github.ref != 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout') && steps.tnds-probe.outcome != 'success') || steps.capacity.outcome != 'success')
         run: |
           echo 'A required diagnostic conclusion failed, including preparation or a downstream gate; evidence was uploaded and this run remains non-publishable.'
           exit 1

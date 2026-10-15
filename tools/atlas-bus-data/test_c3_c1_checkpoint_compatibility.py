@@ -13,6 +13,7 @@ from run_reconciliation import validate_checkpoint_lineage
 
 C3 = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation"
 C1 = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout"
+CURRENT = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout"
 
 
 def create(root: Path, *, commit: str, fingerprint: str = "a" * 64):
@@ -43,6 +44,8 @@ class CheckpointCompatibilityTests(unittest.TestCase):
             (repo / "report.py").write_text("reconciliation-only-change\n"); git("add", "."); git("commit", "-qm", "downstream fix")
             later_commit = git("rev-parse", "HEAD")
             validate_checkpoint_lineage(checkpoint, branch=C1, commit=later_commit,
+                repository="org/repo", repository_root=repo)
+            validate_checkpoint_lineage(checkpoint, branch=CURRENT, commit=later_commit,
                 repository="org/repo", repository_root=repo)
             self.assertEqual(checkpoint["projectionCompatibilityFingerprint"], "b" * 64)
             self.assertEqual(checkpoint["preparationCodeCommit"], producer_commit)

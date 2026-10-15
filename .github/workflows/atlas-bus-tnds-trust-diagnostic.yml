@@ -12,6 +12,16 @@ on:
         required: false
         type: string
         default: ''
+      expected_raw_artifact_id:
+        description: Optional exact immutable Run #40 raw artifact ID
+        required: false
+        type: string
+        default: ''
+      expected_raw_artifact_digest:
+        description: Optional exact immutable Run #40 raw artifact digest
+        required: false
+        type: string
+        default: ''
     secrets:
       TNDS_USERNAME:
         required: false
@@ -156,6 +166,31 @@ jobs:
         run: |
           python tools/atlas-bus-data/tnds_capability_probe.py --output "$RUNNER_TEMP/tnds-capability-probe.json"
           PYTHONPATH=tools/atlas-bus-data python -c "import json, os; from pathlib import Path; from tnds_capability_probe import validate_metadata_probe; validate_metadata_probe(json.loads(Path(os.environ['RUNNER_TEMP'], 'tnds-capability-probe.json').read_text()))"
+      - name: Verify exact raw TNDS artifact ID and digest
+        if: inputs.prior_producer_run_id != '' && inputs.expected_raw_artifact_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_ARTIFACT_ID: ${{ inputs.expected_raw_artifact_id }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ inputs.expected_raw_artifact_digest }}
+          EXPECTED_PRODUCER_RUN_ID: ${{ inputs.prior_producer_run_id }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$EXPECTED_ARTIFACT_ID" > "$RUNNER_TEMP/expected-tnds-artifact.json"
+          python - "$RUNNER_TEMP/expected-tnds-artifact.json" <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          artifact = json.loads(Path(sys.argv[1]).read_text())
+          expected = {'id': int(os.environ['EXPECTED_ARTIFACT_ID']),
+                      'name': f"atlas-tnds-quarantined-{os.environ['EXPECTED_PRODUCER_RUN_ID']}",
+                      'digest': os.environ['EXPECTED_ARTIFACT_DIGEST'], 'expired': False,
+                      'workflow_run': {'id': int(os.environ['EXPECTED_PRODUCER_RUN_ID'])}}
+          for key, value in expected.items():
+              actual = artifact.get(key)
+              if isinstance(value, dict):
+                  actual = actual or {}
+                  for nested, nested_value in value.items():
+                      if actual.get(nested) != nested_value: raise SystemExit(f'TNDS raw artifact {key}.{nested} mismatch')
+              elif actual != value: raise SystemExit(f'TNDS raw artifact {key} mismatch')
+          PY
       - name: Restore exact prior raw snapshot artifact from selected producer run
         id: restore
         if: inputs.prior_producer_run_id != ''
@@ -203,9 +238,19 @@ jobs:
         env:
           ATLAS_NODE: node
           PRODUCER_RUN_ID: ${{ inputs.prior_producer_run_id || github.run_id }}
+          TNDS_SOURCE_ARTIFACT_ID: ${{ inputs.expected_raw_artifact_id }}
+          TNDS_SOURCE_ARTIFACT_DIGEST: ${{ inputs.expected_raw_artifact_digest }}
         run: >-
           python tools/atlas-bus-data/tnds_trust_diagnostic.py --prepare-only
           --producer-run-id "$PRODUCER_RUN_ID"
+      - name: Upload verified TNDS reconciliation-input checkpoint
+        if: always() && steps.prepare.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-tnds-reconciliation-checkpoint-${{ github.run_id }}
+          path: ${{ runner.temp }}/tnds-evidence/tnds-reconciliation-checkpoint
+          if-no-files-found: error
+          retention-days: 90
       - name: Ensure secret-safe failure evidence exists
         if: always()
         env:

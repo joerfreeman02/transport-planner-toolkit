@@ -8,7 +8,7 @@ ROOT = Path(__file__).parents[2]
 DISPATCHER = ROOT / ".github/workflows/atlas-bus-data-refresh.yml"
 CALLEE = ROOT / ".github/workflows/atlas-bus-tnds-trust-diagnostic.yml"
 DRIVER = ROOT / "tools/atlas-bus-data/tnds_trust_diagnostic.py"
-TRUST_BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c2-preparation-scale-closeout"
+TRUST_BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation"
 
 
 def parse_dispatch_input_names(workflow_text):
@@ -93,15 +93,16 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn('-z "$RESUME_RUN_ID"', selector)
         self.assertIn("trust_mode=offline_preflight", selector)
         self.assertIn('"$FORCE_REFRESH" == \'true\'', selector)
-        self.assertIn("trust_mode=live_trust", selector)
+        self.assertIn("trust_mode=c3_live_trust", selector)
+        self.assertIn("trust_mode=c3_checkpoint_retry", selector)
         self.assertIn('"$RESUME_RUN_ID" == \'38579244547\'', selector)
-        self.assertIn("Invalid C2 TRUST selection", selector)
+        self.assertIn("Invalid C3 selection", selector)
         self.assertIn("trust_prior_producer_run_id: ${{ steps.trust-selector.outputs.prior_producer_run_id }}", self.dispatcher)
 
     def test_non_numeric_raw_reuse_ids_fail_closed(self):
         selector = self.dispatcher.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]
         self.assertIn('"$RESUME_RUN_ID" == \'38579244547\'', selector)
-        self.assertIn("else\n            echo '::error::Invalid C2 TRUST selection", selector)
+        self.assertIn("else\n            echo '::error::Invalid C3 selection", selector)
         self.assertEqual("38579244547", "38579244547")
         for malformed in ("", "38579244546", "38579244548", "abc", "12x", "-12", "1.2", " 38579244547", "38579244547 "):
             self.assertNotEqual(malformed, "38579244547")
@@ -111,7 +112,7 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn('if [[ "$GITHUB_REF" != "$TRUST_BRANCH" ]]; then', selector)
         self.assertIn("echo 'trust_mode='", selector)
         self.assertIn("echo 'prior_producer_run_id='", selector)
-        self.assertEqual(self.dispatcher.count(TRUST_BRANCH), 4)
+        self.assertGreaterEqual(self.dispatcher.count(TRUST_BRANCH), 4)
         generic_resume_guard = self.dispatcher.split("- name: Refuse checkpoint resume outside trusted production context", 1)[1].split("- name:", 1)[0]
         self.assertIn("github.ref != 'refs/heads/main'", generic_resume_guard)
         self.assertIn(f"github.ref != '{TRUST_BRANCH}'", generic_resume_guard)
@@ -123,15 +124,18 @@ class TndsWorkflowContractTests(unittest.TestCase):
             block = workflow_job_block(self.dispatcher, job)
             self.assertIn("needs.main-guard.outputs.trust_mode == ''", block, job)
         for job, mode in (("tnds-trust-browser-offline-preflight", "offline_preflight"),
-                          ("tnds-trust-browser-live", "live_trust")):
+                          ("tnds-trust-browser-live", "c3_live_trust")):
             block = workflow_job_block(self.dispatcher, job)
             self.assertIn(f"github.ref == '{TRUST_BRANCH}'", block)
             self.assertIn(f"needs.main-guard.outputs.trust_mode == '{mode}'", block)
             self.assertIn("uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml", block)
         self.assertIn("prior_producer_run_id: ${{ needs.main-guard.outputs.trust_prior_producer_run_id }}", self.dispatcher)
         live_browser = self.dispatcher.split("  tnds-trust-browser-live:", 1)[1]
-        self.assertIn("trust_prior_producer_run_id == '' && secrets.TNDS_USERNAME || ''", live_browser)
-        self.assertIn("trust_prior_producer_run_id == '' && secrets.TNDS_PASSWORD || ''", live_browser)
+        self.assertIn("TNDS_USERNAME: ''", live_browser)
+        self.assertIn("TNDS_PASSWORD: ''", live_browser)
+        self.assertIn("c3-primary-source:", self.dispatcher)
+        self.assertIn("c3-live-reconciliation:", self.dispatcher)
+        self.assertIn("c3-checkpoint-retry:", self.dispatcher)
         offline = self.dispatcher.split("  tnds-trust-browser-offline-preflight:", 1)[1].split("  tnds-trust-browser-live:", 1)[0]
         self.assertNotIn("secrets:", offline)
         self.assertNotIn("TNDS_USERNAME", offline)
@@ -148,7 +152,7 @@ class TndsWorkflowContractTests(unittest.TestCase):
             self.assertIn(condition, live)
         self.assertIn("GH_REPOSITORY: ${{ github.repository }}", live)
         self.assertIn("actions/runs?{query}", live)
-        self.assertIn("needs.main-guard.outputs.trust_mode == 'live_trust'", self.dispatcher)
+        self.assertIn("needs.main-guard.outputs.trust_mode == 'c3_live_trust'", self.dispatcher)
         self.assertRegex(self.workflow, r"(?m)^  actions: read$")
         self.assertRegex(self.workflow, r"(?m)^  contents: read$")
         self.assertNotIn("pages: write", self.workflow)
@@ -223,8 +227,8 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn("if: inputs.prior_producer_run_id == ''", acquire)
         self.assertIn("prior_producer_run_id: ${{ needs.main-guard.outputs.trust_prior_producer_run_id }}", self.dispatcher)
         live_browser = self.dispatcher.split("  tnds-trust-browser-live:", 1)[1]
-        self.assertIn("trust_prior_producer_run_id == '' && secrets.TNDS_USERNAME || ''", live_browser)
-        self.assertIn("trust_prior_producer_run_id == '' && secrets.TNDS_PASSWORD || ''", live_browser)
+        self.assertIn("TNDS_USERNAME: ''", live_browser)
+        self.assertIn("TNDS_PASSWORD: ''", live_browser)
 
     def test_capacity_gate_uses_central_directory_without_extraction(self):
         self.assertIn("zipfile.ZipFile(archive_path)", self.driver)

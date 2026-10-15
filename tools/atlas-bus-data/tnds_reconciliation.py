@@ -190,12 +190,54 @@ def _semantic(p: dict[str, Any], t: dict[str, Any]) -> tuple[str, list[str], lis
 
 
 def _pair_rows(p_rows: list[dict[str, Any]], t_rows: list[dict[str, Any]]) -> list[tuple[dict[str, Any], dict[str, Any], str, str]]:
-    result = []
-    for p in p_rows:
-        for t in t_rows:
-            decision, confidence = _identity_decision(p, t)
-            if decision != "NO_IDENTITY_BRIDGE": result.append((p, t, decision, confidence))
-    return result
+    """Return identity-supported candidate pairs without scanning a stop's product.
+
+    Shared validated bridges and strong composites are the only keys that can
+    produce a candidate. The key includes the normalized StopPoint, so records
+    at unrelated stops are never compared. A genuinely duplicated key can
+    still produce multiple pairs; those remain visible as ambiguity.
+    """
+    paired: dict[tuple[int, int], tuple[dict[str, Any], dict[str, Any], str, str]] = {}
+
+    def groups(rows: list[dict[str, Any]], key_for: Any) -> dict[tuple[Any, ...], list[dict[str, Any]]]:
+        result: dict[tuple[Any, ...], list[dict[str, Any]]] = defaultdict(list)
+        for row in rows:
+            key = key_for(row)
+            if key is not None:
+                result[key].append(row)
+        return result
+
+    def bridge_key(row: dict[str, Any]) -> tuple[str, str] | None:
+        stop = normalize_stop_id(row.get("stopId")); bridge = _bridge(row)
+        if stop and bridge and row.get("identityBridgeValidated") is True:
+            return stop, bridge
+        return None
+
+    def composite_key(row: dict[str, Any]) -> tuple[Any, ...] | None:
+        stop = normalize_stop_id(row.get("stopId"))
+        values = [str(row.get(key) or "").strip().casefold() for key in ("operator", "origin", "destination")]
+        sequence = row.get("stopSequence")
+        if stop and all(values) and sequence:
+            if isinstance(sequence, (list, tuple)):
+                sequence_key: Any = (type(sequence).__name__, *sequence)
+            else:
+                sequence_key = str(sequence).strip().casefold()
+            return (stop, *values, sequence_key)
+        return None
+
+    for key_fn, identity, confidence in ((bridge_key, "EXACT_SHARED_IDENTITY", "high"),
+                                         (composite_key, "STRONG_COMPOSITE_CANDIDATE", "medium")):
+        p_groups, t_groups = groups(p_rows, key_fn), groups(t_rows, key_fn)
+        for key in sorted(p_groups.keys() & t_groups.keys(), key=lambda value: tuple(map(str, value))):
+            for p in p_groups[key]:
+                for t in t_groups[key]:
+                    pair_key = (id(p), id(t))
+                    existing = paired.get(pair_key)
+                    # A real validated bridge has precedence if a pair also
+                    # satisfies the weaker descriptive composite.
+                    if existing is None or identity == "EXACT_SHARED_IDENTITY":
+                        paired[pair_key] = (p, t, identity, confidence)
+    return list(paired.values())
 
 
 def reconcile(primary: Iterable[dict[str, Any]], tnds: Iterable[dict[str, Any]], *, as_of: str,
@@ -211,42 +253,87 @@ def reconcile(primary: Iterable[dict[str, Any]], tnds: Iterable[dict[str, Any]],
     credential_ok = status in {State.CREDENTIALS_AVAILABLE, State.SOURCE_ACQUIRED, State.ARCHIVE_VALIDATED, State.SEMANTIC_VALIDATED, State.NORMALIZATION_VALIDATED, State.COMPARATOR_VALIDATED}
     verified = set(coverage["verifiedRegions"] if credential_ok else ())
     pby: dict[str, list[dict[str, Any]]] = defaultdict(list); tby: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    london_primary: list[dict[str, Any]] = []
+    london_tnds: list[dict[str, Any]] = []
     excluded = Counter()
-    for source, target in ((primary, pby), (tnds, tby)):
+    input_rows = Counter()
+    for side, source, target in (("primary", primary, pby), ("tnds", tnds, tby)):
         for row in source:
+            input_rows[side] += 1
             region = str(row.get("region") or "").upper()
+            if region == "LONDON":
+                if not _current(row, day): excluded["not_current"] += 1; continue
+                (london_primary if side == "primary" else london_tnds).append(row)
+                continue
             if region not in EXPECTED_REGIONS or not row.get("stopId"):
                 excluded["invalid_identity"] += 1; continue
             if not _current(row, day): excluded["not_current"] += 1; continue
             target[region].append(row)
     rows = []
+    match_stats = {"indexedStopBuckets": 0, "candidateComparisons": 0, "exactIdentityPairs": 0,
+                   "compositeCandidatePairs": 0, "ambiguousGroups": 0, "unmatchedPrimary": 0,
+                   "unmatchedTnds": 0}
     for region in EXPECTED_REGIONS:
         ps, ts = pby.get(region, []), tby.get(region, []) if region in verified else []
+        p_stops: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        t_stops: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for row in ps: p_stops[normalize_stop_id(row.get("stopId"))].append(row)
+        for row in ts: t_stops[normalize_stop_id(row.get("stopId"))].append(row)
+        match_stats["indexedStopBuckets"] += len(p_stops.keys() | t_stops.keys())
         if region not in verified:
             for p in ps:
                 rows.append(_ledger_row(region, p, None, "COMPARATOR_UNAVAILABLE", State.COMPARATOR_UNAVAILABLE, None, "none"))
+            for t in tby.get(region, []):
+                if _current(t, day):
+                    rows.append(_ledger_row(region, None, t, "COMPARATOR_UNAVAILABLE", State.COMPARATOR_UNAVAILABLE, None, "none"))
             continue
-        paired = _pair_rows(ps, ts)
+        # Only rows in a shared normalized stop bucket can be candidates.
+        paired = []
+        for stop in sorted(p_stops.keys() & t_stops.keys()):
+            stop_pairs = _pair_rows(p_stops[stop], t_stops[stop])
+            # Count actual key-supported pair materializations, not all
+            # possible primary x TNDS combinations.
+            match_stats["candidateComparisons"] += len(stop_pairs)
+            paired.extend(stop_pairs)
         matched_p, matched_t = set(), set()
+        p_degree: Counter[int] = Counter()
+        t_degree: Counter[int] = Counter()
+        for p, t, _, _ in paired:
+            p_degree[id(p)] += 1; t_degree[id(t)] += 1
+        ambiguous_ids = {row_id for row_id, degree in p_degree.items() if degree > 1} | {row_id for row_id, degree in t_degree.items() if degree > 1}
+        match_stats["ambiguousGroups"] += len({normalize_stop_id(p.get("stopId")) for p, t, _, _ in paired
+                                                  if id(p) in ambiguous_ids or id(t) in ambiguous_ids})
         for p, t, identity, confidence in paired:
             matched_p.add(id(p)); matched_t.add(id(t))
+            if identity == "EXACT_SHARED_IDENTITY": match_stats["exactIdentityPairs"] += 1
+            elif identity == "STRONG_COMPOSITE_CANDIDATE": match_stats["compositeCandidatePairs"] += 1
             if identity == "EXACT_SHARED_IDENTITY":
                 semantic, comparable, agree, conflict, unknown = _semantic(p, t)
             else:
                 semantic, comparable, agree, conflict, unknown = "NOT_COMPARABLE_IDENTITY_UNPROVEN", [], [], [], ["serviceIdentity"]
-            category = "AMBIGUOUS" if identity == "AMBIGUOUS_IDENTITY" or sum(1 for x in paired if x[0] is p or x[1] is t) > 1 else semantic
+            category = "AMBIGUOUS" if id(p) in ambiguous_ids or id(t) in ambiguous_ids else semantic
             if category != "AMBIGUOUS" and "validityWindow" in conflict: category = "SOURCE_WINDOW_DIFFERENCE"
             if category != "AMBIGUOUS" and identity == "STRONG_COMPOSITE_CANDIDATE": category = "STRONG_COMPOSITE_CANDIDATE"
             if p.get("unresolved") and identity == "EXACT_SHARED_IDENTITY" and category != "SOURCE_WINDOW_DIFFERENCE": category = "IDENTITY_CORROBORATED" if semantic != "EVIDENCE_AGREEMENT" else "UNRESOLVED_PRIMARY_CORROBORATED"
             rows.append(_ledger_row(region, p, t, category, State.COMPARATOR_VALIDATED, identity, confidence,
                                     semantic, comparable, agree, conflict, unknown))
         for p in ps:
-            if id(p) not in matched_p: rows.append(_ledger_row(region, p, None, "PRIMARY_ONLY", State.COMPARATOR_VALIDATED, "NO_IDENTITY_BRIDGE", "none"))
+            if id(p) not in matched_p:
+                match_stats["unmatchedPrimary"] += 1
+                rows.append(_ledger_row(region, p, None, "PRIMARY_ONLY", State.COMPARATOR_VALIDATED, "NO_IDENTITY_BRIDGE", "none"))
         for t in ts:
-            if id(t) not in matched_t: rows.append(_ledger_row(region, None, t, "TNDS_ONLY_CANDIDATE", State.COMPARATOR_VALIDATED, "NO_IDENTITY_BRIDGE", "none"))
+            if id(t) not in matched_t:
+                match_stats["unmatchedTnds"] += 1
+                rows.append(_ledger_row(region, None, t, "TNDS_ONLY_CANDIDATE", State.COMPARATOR_VALIDATED, "NO_IDENTITY_BRIDGE", "none"))
+    for row in london_primary:
+        rows.append(_ledger_row("LONDON", row, None, "OUTSIDE_TNDS_COMPARATOR_SCOPE", State.COMPARATOR_UNAVAILABLE, None, "none"))
+    for row in london_tnds:
+        rows.append(_ledger_row("LONDON", None, row, "OUTSIDE_TNDS_COMPARATOR_SCOPE", State.COMPARATOR_UNAVAILABLE, None, "none"))
     rows.sort(key=lambda r: (r["region"], json.dumps(r.get("primaryNativeIds", {}), sort_keys=True), json.dumps(r.get("tndsNativeIds", {}), sort_keys=True), r["category"]))
     counts = dict(sorted(Counter(row["category"] for row in rows).items()))
     body = {"schema": SCHEMA, "asOf": day.isoformat(), "tndsState": status, "regionalCoverage": coverage,
+            "inputRows": dict(sorted(input_rows.items())), "matchingInstrumentation": match_stats,
+            "comparatorScopeNote": "London is outside TNDS comparator scope and does not affect eight-region completeness.",
             "comparatorScope": coverage["state"], "plannerOutputChanged": False, "sourceAuthorityChanged": False,
             "rows": rows, "categoryCounts": counts, "excluded": dict(sorted(excluded.items()))}
     digest = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()

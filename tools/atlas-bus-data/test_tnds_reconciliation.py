@@ -69,6 +69,9 @@ class ReconciliationContractTests(unittest.TestCase):
     def test_y_row_explicitly_says_comparator_unavailable(self):
         result = compare([row(region="Y")], [row(region="Y", side="tnds")], regions=EXPECTED_REGIONS[:-1])
         self.assertEqual(result["rows"][0]["regionalState"], State.COMPARATOR_UNAVAILABLE)
+        self.assertEqual(sum(item["region"] == "Y" for item in result["rows"]), 2)
+        tnds_only = next(item for item in result["rows"] if item["tndsEvidenceId"])
+        self.assertEqual(tnds_only["category"], "COMPARATOR_UNAVAILABLE")
 
     def test_unexpected_region_is_rejected_from_national_completeness(self):
         manifest = fixture_region_manifest(); manifest["regions"]["ZZ"] = dict(manifest["regions"]["EA"], region="ZZ")
@@ -225,6 +228,53 @@ class ReconciliationContractTests(unittest.TestCase):
         result = compare([row()], [row(side="tnds")])
         self.assertFalse(result["sourceAuthorityChanged"])
         self.assertFalse(result["plannerOutputChanged"])
+
+    def test_london_is_explicitly_outside_comparator_not_invalid_identity(self):
+        result = compare([row(region="LONDON")], [row(region="LONDON", side="tnds")])
+        self.assertEqual(result["categoryCounts"], {"OUTSIDE_TNDS_COMPARATOR_SCOPE": 2})
+        self.assertEqual(result["excluded"].get("invalid_identity", 0), 0)
+        self.assertEqual(result["regionalCoverage"]["state"], "NATIONAL_COMPLETE")
+        self.assertTrue(all(item["regionalState"] == State.COMPARATOR_UNAVAILABLE for item in result["rows"]))
+
+    def test_indexed_rehearsal_scales_with_candidate_buckets_not_national_product(self):
+        primary, tnds = [], []
+        for region in EXPECTED_REGIONS:
+            for n in range(500):
+                # Same route/operator across the national data is not identity.
+                primary.append(row(region=region, stop=f"P{n:04d}", identityBridge=None,
+                                   stopSequence=None, unresolved=(n == 0), evidenceId=f"p-{region}-{n}"))
+                tnds.append(row(region=region, stop=f"T{n:04d}", side="tnds", identityBridge=None,
+                                stopSequence=None, evidenceId=f"t-{region}-{n}"))
+            # A single validated bridge, a composite-only pair, and an ambiguous
+            # pair exercise the three indexed outcomes.
+            primary.extend([
+                row(region=region, stop=f"X{region}", identityBridge="exact", evidenceId=f"px-{region}",
+                    schoolTermQualifier="schooldays" if region == "NE" else "ordinary"),
+                row(region=region, stop=f"C{region}", identityBridge=None, evidenceId=f"pc-{region}"),
+                row(region=region, stop=f"A{region}", identityBridge="amb", evidenceId=f"pa1-{region}"),
+                row(region=region, stop=f"A{region}", identityBridge="amb", evidenceId=f"pa2-{region}"),
+            ])
+            tnds.extend([
+                row(region=region, stop=f"X{region}", side="tnds", identityBridge="exact", evidenceId=f"tx-{region}",
+                    validTo="2026-12-31" if region == "EA" else "2027-01-01",
+                    operatingDays=["Saturday"] if region == "EM" else ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+                    schoolTermQualifier="ordinary"),
+                row(region=region, stop=f"C{region}", side="tnds", identityBridge=None, evidenceId=f"tc-{region}"),
+                row(region=region, stop=f"A{region}", side="tnds", identityBridge="amb", evidenceId=f"ta-{region}"),
+            ])
+        result = compare(primary, tnds, tnds_status=State.COMPARATOR_VALIDATED)
+        stats = result["matchingInstrumentation"]
+        product = sum(500 + 4 for _ in EXPECTED_REGIONS) * sum(500 + 3 for _ in EXPECTED_REGIONS)
+        self.assertEqual(result["inputRows"], {"primary": len(primary), "tnds": len(tnds)})
+        self.assertEqual(stats["exactIdentityPairs"], 24)  # exact plus two-to-one ambiguous bridge pairs
+        self.assertEqual(stats["compositeCandidatePairs"], 8)
+        self.assertEqual(stats["candidateComparisons"], 32)
+        self.assertLess(stats["candidateComparisons"] * 1000, product)
+        self.assertEqual(stats["unmatchedPrimary"], 4000)
+        self.assertEqual(stats["unmatchedTnds"], 4000)
+        self.assertGreater(stats["ambiguousGroups"], 0)
+        self.assertIn("SOURCE_WINDOW_DIFFERENCE", result["categoryCounts"])
+        self.assertIn("CONFLICTING_CURRENT_EVIDENCE", result["categoryCounts"])
 
     def test_source_windows_are_reported_and_mismatch_conflicts(self):
         result = compare([row(validTo="2026-11-01")], [row(side="tnds", validTo="2026-12-01")])

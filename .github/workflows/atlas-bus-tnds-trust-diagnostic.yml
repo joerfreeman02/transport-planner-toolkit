@@ -59,6 +59,8 @@ jobs:
           set -o pipefail
           node tests/atlas/run-all.mjs | tee "$RUNNER_TEMP/atlas-alpha15-suite.log"
           grep -Fx 'ATLAS Alpha.15 deterministic suite passed.' "$RUNNER_TEMP/atlas-alpha15-suite.log"
+      - name: Check exact commit diff for whitespace errors
+        run: git diff --check "${GITHUB_SHA}^" "$GITHUB_SHA"
       - name: Record offline preflight evidence
         if: always()
         run: |
@@ -260,6 +262,8 @@ jobs:
           RAW_ARTIFACT_OUTCOME: ${{ steps.raw-artifact.outcome }}
           CAPACITY_OUTCOME: ${{ steps.capacity.outcome }}
           PREPARE_OUTCOME: ${{ steps.prepare.outcome }}
+          RAW_ARTIFACT_ID: ${{ steps.raw-artifact.outputs.artifact-id }}
+          RAW_ARTIFACT_DIGEST: ${{ steps.raw-artifact.outputs.artifact-digest }}
         run: |
           mkdir -p "$RUNNER_TEMP/tnds-evidence"
           python - <<'PY'
@@ -288,6 +292,13 @@ jobs:
           record['stageOutcomes'] = outcomes
           record['rawArtifactUploaded'] = outcomes['RAW_ARTIFACT_OUTCOME'] == 'success'
           record['sourceArtifactRestored'] = outcomes['RESTORE_OUTCOME'] == 'success'
+          if record['rawArtifactUploaded']:
+              record['rawArtifact'] = {
+                  'producerRunId': os.environ.get('GITHUB_RUN_ID'),
+                  'name': f"atlas-tnds-quarantined-{os.environ.get('GITHUB_RUN_ID')}",
+                  'id': os.environ.get('RAW_ARTIFACT_ID') or None,
+                  'digest': os.environ.get('RAW_ARTIFACT_DIGEST') or None,
+              }
           if outcomes['RAW_ARTIFACT_OUTCOME'] == 'failure':
               record['stage'] = 'RAW_CHECKPOINT_UPLOAD_FAILED'
               record['result'] = 'FAILED'

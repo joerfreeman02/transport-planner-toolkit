@@ -112,11 +112,22 @@ jobs:
           TRUST_BRANCH_C3_C1: refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout
           TRUST_BRANCH_C3_C1_C1: refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout
           TRUST_BRANCH_R45_C1: refs/heads/codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout
+          S2A_BRANCH: refs/heads/codex/atlas-bus-beta-s2a-refresh-checkpoint-readiness
           PREPARED_SCHEMA: ${{ inputs.prepared_schema }}
           MEASURE_ONLY: ${{ inputs.measure_only }}
           FORCE_REFRESH: ${{ inputs.force_refresh }}
           RESUME_RUN_ID: ${{ inputs.resume_checkpoint_run_id }}
         run: |
+          if [[ "$GITHUB_REF" == "$S2A_BRANCH" ]]; then
+            if [[ "$GITHUB_EVENT_NAME" != 'workflow_dispatch' || "$PREPARED_SCHEMA" != 'v2' || "$MEASURE_ONLY" != 'true' || "$FORCE_REFRESH" != 'true' || -n "$RESUME_RUN_ID" ]]; then
+              echo '::error::The S2A branch accepts only the forced, measure-only v2 offline-preflight selection.'
+              exit 1
+            fi
+            echo 'trust_mode=offline_preflight' >> "$GITHUB_OUTPUT"
+            echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if [[ "$GITHUB_REF" != "$TRUST_BRANCH_C3" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_R45_C1" ]]; then
             echo 'trust_mode=' >> "$GITHUB_OUTPUT"
             echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
@@ -488,7 +499,7 @@ jobs:
   tnds-trust-browser-offline-preflight:
     name: Run default-branch-compatible TNDS TRUST offline preflight
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'offline_preflight'
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-refresh-checkpoint-readiness') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'offline_preflight'
     uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml
     with:
       mode: offline_preflight

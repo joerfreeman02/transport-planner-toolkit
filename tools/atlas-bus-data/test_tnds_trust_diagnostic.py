@@ -138,6 +138,7 @@ class QuarantinedExtractionTests(unittest.TestCase):
                 diagnostic.acquire_raw_checkpoint(raw, evidence)
                 self.assertTrue((raw / "manifest.json").is_file())
                 self.assertEqual(json.loads((evidence / "run-evidence.json").read_text())["stage"], "RAW_SNAPSHOT_VERIFIED")
+                self.assertIn("snapshot_available=true", (root / "outputs").read_text(encoding="utf-8"))
                 with self.assertRaisesRegex(RuntimeError, "fixture prepare failure"):
                     diagnostic.prepare_checkpoint(raw, evidence, source_producer_run_id="current-run")
             self.assertTrue((raw / "manifest.json").is_file())
@@ -146,6 +147,17 @@ class QuarantinedExtractionTests(unittest.TestCase):
             self.assertEqual(final_evidence["stage"], "PREPARATION_FAILED")
             self.assertFalse(final_evidence["publicationAttempted"])
             self.assertFalse(final_evidence["deploymentAttempted"])
+
+    def test_incomplete_raw_acquisition_never_marks_snapshot_available_for_upload(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:
+            root = Path(tmp)
+            outputs = []
+            with patch.object(diagnostic, "acquire_tnds_snapshot", side_effect=RuntimeError("interrupted transfer")), \
+                 patch.object(diagnostic, "_write_output", side_effect=lambda name, value: outputs.append((name, value))), \
+                 patch.dict(os.environ, {"TNDS_USERNAME": "masked-user", "TNDS_PASSWORD": "masked-password"}):
+                with self.assertRaisesRegex(RuntimeError, "interrupted transfer"):
+                    diagnostic.acquire_raw_checkpoint(root / "raw", root / "evidence")
+            self.assertNotIn(("snapshot_available", "true"), outputs)
 
     def test_archive_members_are_scoped_under_region_and_extractable(self):
         with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as tmp:

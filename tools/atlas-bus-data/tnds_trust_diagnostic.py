@@ -182,7 +182,6 @@ def acquire_raw_checkpoint(snapshot: str | Path, evidence: str | Path) -> dict:
     snapshot, evidence = Path(snapshot), Path(evidence)
     if snapshot.exists(): raise RuntimeError("Raw TNDS checkpoint workspace already exists")
     snapshot.mkdir(parents=True)
-    _write_output("snapshot_available", "true")
     record = _new_record(evidence, "ACQUISITION_STARTED")
     try:
         manifest = acquire_tnds_snapshot(snapshot, os.environ.get("TNDS_USERNAME", ""), os.environ.get("TNDS_PASSWORD", ""))

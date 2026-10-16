@@ -140,6 +140,12 @@ class SnapshotTests(unittest.TestCase):
         self.assertFalse(result["retrievalPerformed"])
         self.assertEqual(result["classification"], "AUTH_REQUIRED")
 
+    def test_authoritative_source_snapshot_artifact_is_retained_for_90_days(self):
+        workflow = (Path(__file__).parents[2] / ".github/workflows/atlas-reference-data-source.yml").read_text(encoding="utf-8")
+        upload = workflow.split("- name: Upload immutable source snapshot for preparation reuse", 1)[1]
+        self.assertIn("retention-days: 90", upload)
+        self.assertIn("overwrite: false", upload)
+
 
 if __name__ == "__main__":
     unittest.main()

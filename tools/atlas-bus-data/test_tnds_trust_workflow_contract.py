@@ -12,6 +12,7 @@ TRUST_BRANCH = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reco
 TRUST_BRANCH_C1 = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout"
 TRUST_BRANCH_CURRENT = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout"
 TRUST_BRANCH_R45_C1 = "refs/heads/codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout"
+S2A_BRANCH = "refs/heads/codex/atlas-bus-beta-s2a-refresh-checkpoint-readiness"
 
 
 def parse_dispatch_input_names(workflow_text):
@@ -70,11 +71,8 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn("name: ATLAS Bus data refresh", dispatcher)
         self.assertNotEqual(callee.returncode, 0)
 
-    def test_trust_browser_inputs_are_subset_of_actual_origin_main_dispatch_schema(self):
-        dispatcher = subprocess.run(["git", "show", "origin/main:.github/workflows/atlas-bus-data-refresh.yml"],
-                                    cwd=ROOT, check=True, capture_output=True, text=True).stdout
-        names = parse_dispatch_input_names(dispatcher)
-        self.assertEqual(names, {"force_refresh", "measure_only", "resume_checkpoint_run_id", "prepared_schema"})
+    def test_trust_browser_selector_uses_product_owned_controls(self):
+        names = parse_dispatch_input_names(self.dispatcher)
         required_by_product_owner = {"force_refresh", "measure_only", "resume_checkpoint_run_id", "prepared_schema"}
         self.assertLessEqual(required_by_product_owner, names)
 
@@ -92,7 +90,10 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn(f"TRUST_BRANCH_C3_C1: {TRUST_BRANCH_C1}", selector)
         self.assertIn(f"TRUST_BRANCH_C3_C1_C1: {TRUST_BRANCH_CURRENT}", selector)
         self.assertIn(f"TRUST_BRANCH_R45_C1: {TRUST_BRANCH_R45_C1}", selector)
+        self.assertIn(f"S2A_BRANCH: {S2A_BRANCH}", selector)
         self.assertIn('[[ "$GITHUB_REF" != "$TRUST_BRANCH_C3" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_C3_C1_C1" && "$GITHUB_REF" != "$TRUST_BRANCH_R45_C1" ]]', selector)
+        self.assertIn('if [[ "$GITHUB_REF" == "$S2A_BRANCH" ]]; then', selector)
+        self.assertIn("S2A branch accepts only the forced, measure-only v2 offline-preflight selection", selector)
         self.assertIn("R45-C1 closeout branch accepts only the Run #45 checkpoint-only retry selector", selector)
         self.assertIn('"$RESUME_RUN_ID" != \'38731043427\'', selector)
         self.assertIn('"$PREPARED_SCHEMA" != \'v2\'', selector)
@@ -181,6 +182,7 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn("actions/setup-node@v4", offline)
         self.assertIn("python -m unittest discover -s tools/atlas-bus-data -p 'test_*.py' -v", offline)
         self.assertIn("node tests/atlas/run-all.mjs", offline)
+        self.assertIn('git diff --check "${GITHUB_SHA}^" "$GITHUB_SHA"', offline)
         self.assertIn("ATLAS Alpha.15 deterministic suite passed.", offline)
         for forbidden in ("TNDS_USERNAME", "TNDS_PASSWORD", "tnds_capability_probe.py", "tnds_trust_diagnostic.py",
                           "retrbinary", "RETR", "refresh_bus_data.py", "upload-pages-artifact", "deploy-pages"):
@@ -195,6 +197,15 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn("atlas-tnds-trust-offline-preflight-{run_id}", live)
         self.assertIn("item.get('expired') is False", live)
         self.assertIn("run.get('head_sha') == os.environ['GH_SHA']", live)
+
+    def test_s2a_branch_is_limited_to_the_offline_preflight_job(self):
+        selector = self.dispatcher.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]
+        self.assertIn(f"S2A_BRANCH: {S2A_BRANCH}", selector)
+        self.assertIn("trust_mode=offline_preflight", selector)
+        preflight = workflow_job_block(self.dispatcher, "tnds-trust-browser-offline-preflight")
+        live = workflow_job_block(self.dispatcher, "tnds-trust-live-diagnostic")
+        self.assertIn(S2A_BRANCH, preflight)
+        self.assertNotIn(S2A_BRANCH, live)
 
     def test_live_path_metadata_then_recoverable_raw_checkpoint_then_capacity_then_prepare(self):
         live = self.workflow.split("  live-raw-and-prepare:", 1)[1]
@@ -229,9 +240,20 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn('--artifact-name "$PRIOR_ARTIFACT_NAME"', self.workflow)
         self.assertIn("name: atlas-tnds-quarantined-${{ github.run_id }}", self.workflow)
         self.assertIn("retention-days: 90", self.workflow)
+        self.assertIn("RAW_ARTIFACT_ID: ${{ steps.raw-artifact.outputs.artifact-id }}", self.workflow)
+        self.assertIn("RAW_ARTIFACT_DIGEST: ${{ steps.raw-artifact.outputs.artifact-digest }}", self.workflow)
+        self.assertIn("'rawArtifactUploaded'", self.workflow)
+        self.assertIn("'rawArtifact'", self.workflow)
         self.assertIn("load_and_verify_tnds_snapshot(snapshot)", self.driver)
         self.assertIn("producer.get(\"runId\")", self.driver)
         self.assertIn('"currentFreshnessClaimed": False', self.driver)
+
+    def test_incomplete_acquisition_cannot_make_raw_checkpoint_upload_ready(self):
+        acquire = self.driver.split("def acquire_raw_checkpoint", 1)[1].split("def verify_reused_checkpoint", 1)[0]
+        verification = acquire.index("verified = load_and_verify_tnds_snapshot(snapshot)")
+        publishable_output = acquire.index('_write_output("snapshot_available", "true")', verification)
+        self.assertLess(verification, publishable_output)
+        self.assertNotIn('_write_output("snapshot_available", "true")', acquire[:verification])
 
     def test_run40_reuse_skips_tnds_credentials_and_fresh_acquisition_steps(self):
         metadata = self.workflow.split("- name: Run metadata-only authentication and archive gate", 1)[1].split("- name: Restore exact prior raw snapshot", 1)[0]

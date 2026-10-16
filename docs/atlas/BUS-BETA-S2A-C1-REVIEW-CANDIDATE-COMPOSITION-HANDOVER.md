@@ -34,9 +34,16 @@ Local verification on the implementation before hosted preflight:
 - Source snapshot tests: **11 passed**; TRUST workflow contract tests: **19 passed**; C3 workflow contract tests: **9 passed** in the earlier isolated runs.
 - Candidate checkpoint test: **passed** in the Node suite and direct run.
 - Python bytecode compilation: **passed** for changed Python modules.
-- `git diff --check`: pending final pre-commit check.
+- `git diff --check`: **passed** before commit.
 
-Hosted offline preflight evidence for the final C1 SHA will be recorded after push. It must show the same exact commit/ref, passing Python and Alpha.15 suites, a retained evidence artifact, and skipped live source/build/publication/deployment jobs.
+Hosted exact-SHA offline preflight on implementation commit `6ea1569e44d2fd21217dba2e46420e236634c895`:
+
+- Run `38921194226`: **success** on `codex/atlas-bus-beta-s2a-c1-review-candidate-composition` at that exact SHA.
+- Evidence artifact `atlas-tnds-trust-offline-preflight-38921194226`, ID `12054761221`, digest `sha256:3a3cbbe93e523bd7ceb70ceecd711767126c01922b5c7ba8c2784094451ab866`, retained through 2027-01-14.
+- Hosted Python and deterministic Alpha.15 steps passed; exact-commit `git diff --check` passed.
+- Primary-source acquisition, live TNDS, candidate composition, legacy build, publication, and deployment jobs were skipped.
+
+The hosted result became available after the implementation commit. This evidence is exact for the implementation SHA above. The handover evidence update itself is documentation-only and receives a separate commit; a final offline preflight is required on that resulting branch head before any S2B dispatch. Its run metadata is returned in the final handover so the validated SHA is not changed after dispatch.
 
 No fresh NaPTAN/NPTG/BODS or TNDS acquisition, source download, candidate composition, publication, or deployment was performed during S2A-C1.
 
@@ -91,9 +98,9 @@ The existing successful offline-preflight evidence must still be unexpired and m
 ## Final handover
 
 - Starting SHA: `c6251116abb1da5ebce12fe200a15d124c99eab0`.
-- Final SHA: pending commit and push.
-- Hosted exact-SHA preflight run/artifact: pending.
-- Branch/local-origin parity and clean worktree: pending final push.
+- Validated implementation SHA: `6ea1569e44d2fd21217dba2e46420e236634c895`.
+- Handover update commit, final branch SHA, and its exact-SHA preflight: pending.
+- Branch/local-origin parity and clean worktree: confirmed for the implementation commit; recheck after the handover update.
 - Live source downloads: none.
 - Publication/deployment: none.
-- S2B safe to dispatch: pending successful final tests, hosted preflight, and artifact verification.
+- S2B safe to dispatch: **not yet**; repeat the offline preflight after the handover-only commit so its evidence matches the final branch SHA.

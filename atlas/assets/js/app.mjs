@@ -608,14 +608,14 @@ function renderAssessment(result) {
   }
   if (presentedServices.some(service => service.plannerNotes?.terminus)) {
     const noteRow = document.createElement('tr'); noteRow.className = 'service-note semantic-annotation annotation-terminus-presentation';
-    const noteCell = document.createElement('td'); noteCell.colSpan = 8; noteCell.setAttribute('role', 'note');
+    const noteCell = document.createElement('td'); noteCell.colSpan = 9; noteCell.setAttribute('role', 'note');
     const label = document.createElement('strong'); label.textContent = 'Presentation note: ';
     noteCell.append(label, PLANNER_TERMINUS_PRESENTATION_NOTE); noteRow.append(noteCell); serviceRows.append(noteRow);
   }
   const timetableNote = buildBusTimetablePresentationNote(result, presentedServices);
   if (timetableNote) {
     const noteRow = document.createElement('tr'); noteRow.className = 'service-note semantic-annotation annotation-presentation-note annotation-timetable-variation';
-    const noteCell = document.createElement('td'); noteCell.colSpan = 8; noteCell.setAttribute('role', 'note');
+    const noteCell = document.createElement('td'); noteCell.colSpan = 9; noteCell.setAttribute('role', 'note');
     const label = document.createElement('strong'); label.textContent = 'Timetable note: ';
     noteCell.append(label, timetableNote); noteRow.append(noteCell); serviceRows.append(noteRow);
   }
@@ -626,6 +626,10 @@ function renderAssessment(result) {
     include.addEventListener('change', () => { if (include.checked) selectedServiceIds.add(serviceKey(service)); else selectedServiceIds.delete(serviceKey(service)); renderAssessment(result); });
     appendCell(row, 'Include', include);
     appendCell(row, 'Route', plannerRouteDisplayNumber(service));
+    const sourceBadge = document.createElement('span');
+    sourceBadge.className = 'timetable-source-badge';
+    sourceBadge.textContent = service.timetableSource || '';
+    appendCell(row, 'Source', sourceBadge);
     appendCell(row, 'Operator', service.operator);
     appendCell(row, 'Direction / main service pattern', service.directionPatternText || formatServiceOriginDestination(service));
     appendCell(row, 'Stops', service.servedAtText || service.frequencyBasisStopName || 'Representative stop not supplied');
@@ -642,7 +646,7 @@ function renderAssessment(result) {
     const visibleServiceNote = plannerFacingServiceNote(service.serviceNote);
     if (visibleServiceNote && !duplicateTerminusNote && !structuredQualificationNote) {
       const noteRow = document.createElement('tr'); noteRow.className = 'service-note';
-      const noteCell = document.createElement('td'); noteCell.colSpan = 8;
+      const noteCell = document.createElement('td'); noteCell.colSpan = 9;
       const label = document.createElement('strong'); label.textContent = 'Service note: ';
       noteCell.append(label, visibleServiceNote); noteRow.append(noteCell); serviceRows.append(noteRow);
     }
@@ -652,21 +656,21 @@ function renderAssessment(result) {
       if (annotations.length) {
         for (const [labelText, value] of annotations) {
           const noteRow = document.createElement('tr'); noteRow.className = `service-note route-group-note semantic-annotation annotation-${plannerAnnotationClass(labelText)}`;
-          const noteCell = document.createElement('td'); noteCell.colSpan = 8;
+          const noteCell = document.createElement('td'); noteCell.colSpan = 9;
           noteCell.setAttribute('role', 'note');
           const label = document.createElement('strong'); label.textContent = `${labelText}: `;
           noteCell.append(label, value); noteRow.append(noteCell); serviceRows.append(noteRow);
         }
       } else if (plannerFacingServiceNote(service.routeGroupNote)) {
         const noteRow = document.createElement('tr'); noteRow.className = 'service-note route-group-note';
-        const noteCell = document.createElement('td'); noteCell.colSpan = 8;
+        const noteCell = document.createElement('td'); noteCell.colSpan = 9;
         const label = document.createElement('strong'); label.textContent = 'Service note: ';
         noteCell.append(label, plannerFacingServiceNote(service.routeGroupNote)); noteRow.append(noteCell); serviceRows.append(noteRow);
       }
     }
   });
   if (!presentedServices.length) {
-    const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 8; cell.textContent = 'No matched timetable summary is available. Review Sources and checks before using the stop information.'; row.append(cell); serviceRows.append(row);
+    const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 9; cell.textContent = 'No matched timetable summary is available. Review Sources and checks before using the stop information.'; row.append(cell); serviceRows.append(row);
   }
   if (detailPanel && detailRows) {
     detailPanel.hidden = !detailedEvidenceVisible;

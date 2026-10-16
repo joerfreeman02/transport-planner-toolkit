@@ -17,6 +17,7 @@ const result = {
     principalLocations: ['Stratford City', 'Stratford', 'Plaistow', 'Custom House'],
     stopDirection: 'Southbound',
     typicalFrequencyText: 'Wednesday: Approx. 4 buses/hour (every 15 mins)',
+    timetableSource: 'BODS',
     operatingPeriodLines: ['Mon-Fri: Approx. 05:11–01:29 (next day)', 'Saturday: Approx. 05:09–01:29 (next day)', 'Sunday: Approx. 06:19–01:29 (next day)'],
     serviceNote: ''
   }]
@@ -24,6 +25,7 @@ const result = {
 
 const tables = buildBusWordTables(result);
 assert.equal(tables.length, 2);
+assert.doesNotMatch(JSON.stringify(tables[1]), /BODS|TNDS|TfL/, 'Word summary remains source-neutral when planner provenance is present');
 assert.equal(tables[0].caption, 'Table 3.2 - Bus Stop Summary');
 assert.deepEqual(tables[0].headers, ['Map reference', 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop']);
 assert.equal(tables[0].rows[0][0], '?');

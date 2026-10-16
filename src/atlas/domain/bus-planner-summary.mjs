@@ -51,6 +51,23 @@ function numeric(values) { return unique(values).map(Number).filter(Number.isFin
 function stopId(stop) { return text(stop?.id || stop?.sourceId); }
 function emptySchedule() { return Object.fromEntries(DAY_ORDER.map(day => [day, []])); }
 
+function plannerTimetableSource(services = []) {
+  const providers = unique(services.flatMap(service => [
+    service?.source?.primaryAuthority,
+    service?.primaryAuthority,
+    service?.source?.provider,
+    service?.provider,
+    service?.timetableSource
+  ]).map(value => {
+    const label = text(value);
+    if (/tfl/i.test(label)) return 'TfL';
+    if (/\btnds\b|traveline national dataset/i.test(label)) return 'TNDS';
+    if (/\bbods\b|bus open data/i.test(label)) return 'BODS';
+    return '';
+  }));
+  return ['TfL', 'BODS', 'TNDS'].find(provider => providers.includes(provider)) || null;
+}
+
 function calendarProfileFromService(service) {
   const explicit = text(service?.calendarProfileId || service?.source?.calendarProfileId).toLowerCase();
   if (explicit) return explicit;
@@ -1663,6 +1680,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const row = {
     id: 'planner:' + plannerServiceGroup.serviceIdentity + '|' + (componentIndex + 1),
     routeNumber: text(main.routeNumber) || 'Not supplied',
+    timetableSource: plannerTimetableSource(component),
     // A planner-facing row must never expose the adapter's unresolved
     // operator placeholder.  The source-level warning remains available in
     // Detailed Evidence; a genuinely unresolved public operator is blank.

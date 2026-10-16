@@ -310,3 +310,4 @@ footer { max-width: 1600px; margin: auto; padding: 0 24px 34px; color: var(--atl
 .data-status dd { margin: 0; }
 .status-message.success { color: var(--atlas-good); }
 .status-message.warning { color: #7b5500; }
+.timetable-source-badge { display: inline-block; padding: 2px 7px; border: 1px solid #c8d6e4; border-radius: 999px; color: #244765; background: #f2f7fb; font-size: .78rem; font-weight: 700; white-space: nowrap; }

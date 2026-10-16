@@ -26,6 +26,7 @@ import {
   plannerCircularWording,
   resolveCircularServiceDecision
 } from './circular-service-decision.mjs';
+import { operatorFamilyCompatible, operatorTokens } from './operator-family.mjs';
 
 export const PLANNER_METHODOLOGY_NOTE = '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence. Additional source evidence remains available in the ATLAS assessment workspace.';
 export const PLANNER_TERMINUS_PRESENTATION_NOTE = 'Where an assessed stop is the route terminus, ATLAS shows the useful departing direction only; arriving journeys terminating at that stop are not listed separately.';
@@ -193,21 +194,6 @@ function explicitDirectionMarker(service) {
 
 function sourceDirectionMarker(value) {
   return /^(?:inbound|outbound|northbound|southbound|eastbound|westbound|clockwise|anticlockwise|north|south|east|west)$/i.test(text(value));
-}
-
-function operatorTokens(value) {
-  return new Set(normal(value).split(' ').filter(token => token && !['and', 'the', 'bus', 'buses', 'company', 'co', 'ltd', 'limited', 'travel', 'transport', 'in', 'of'].includes(token)));
-}
-
-function operatorFamilyCompatible(first, second) {
-  if (isUnspecifiedOperator(first?.operator) || isUnspecifiedOperator(second?.operator)) return true;
-  const left = normal(first?.operator);
-  const right = normal(second?.operator);
-  if (!left || !right) return true;
-  if (left === right) return true;
-  const leftTokens = operatorTokens(left), rightTokens = operatorTokens(right);
-  const subset = (small, large) => small.size > 0 && [...small].every(token => large.has(token));
-  return subset(leftTokens, rightTokens) || subset(rightTokens, leftTokens);
 }
 
 function operatorIdentityKey(value) {

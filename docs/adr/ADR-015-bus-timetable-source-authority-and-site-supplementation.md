@@ -20,7 +20,7 @@ Option 3 is adopted.
 
 - Direct TfL timetable evidence remains the authority for TfL services. Existing iBus lineage/enrichment rules remain in force; national evidence does not displace a usable TfL timetable.
 - Outside TfL authority, BODS is primary when its local scheduled evidence is usable. Current prepared TNDS evidence may supplement it.
-- The prepared-data boundary scopes both feeds to the selected eligible StopPoints. BODS/TNDS equivalence requires the normalized public route number, exact non-empty local called StopPoint set, exact normalized operator, compatible positive direction/corridor evidence, and no conflicting circular classification. Endpoint pairs are ordered. If the evidence is insufficient or conflicts, the records remain separate; route number alone never suppresses a service.
+- The prepared-data boundary scopes both feeds to the selected eligible StopPoints. BODS/TNDS equivalence requires the normalized public route number, exact non-empty local called StopPoint set, compatible operator-family evidence using the existing planner grouping rule, exact normalized ordered physical StopPoint pattern (or that pattern with one repeated terminal StopPoint removed when it closes a loop), and no conflicting circular classification. Explicit opposite direction markers and different published pattern variants remain separate. Endpoint wording may differ only when the strong physical corridor evidence agrees; endpoint labels alone are not an equivalence key. If the evidence is insufficient or conflicts, the records remain separate; route number alone never suppresses a service.
 - An equivalent TNDS copy is omitted from planner input and BODS retains timetable provenance and departures, preventing duplicate rows and frequency inflation. A distinct exact local TNDS service remains available to the existing planner intelligence. It is not promoted into a global BODS identity graph.
 - Provenance is retained in service records and planner summaries. The browser planner may show the primary source (`TfL`, `BODS` or `TNDS`) as a compact source label. Word output remains source-neutral.
 - Existing shard/request completeness and review state remains machine-readable. Failed acquisition, missing shards and unprocessed requests are not converted to a zero-service conclusion. No technical source warning is added to the planner summary.
@@ -31,7 +31,7 @@ Option 3 is adopted.
 
 - `mergeBusTimetableSources` is the isolated site-scoped arbitration boundary after the prepared BODS and TNDS records are scoped to the assessment StopPoints.
 - A TNDS service calling an exact eligible local StopPoint can supply local timetable evidence when BODS has no usable local schedule for that service.
-- Distinct operators, directions, stop sets, endpoint pairs, circular classifications and under-specified records are preserved rather than guessed equivalent.
+- Unrelated operator families, reversed or otherwise different ordered corridors, explicit opposite directions, stop sets, published variants, conflicting circular classifications and under-specified records are preserved rather than guessed equivalent. Compatible family labels such as Centrebus and Centrebus South may arbitrate only with the exact local stop set and strong ordered physical corridor evidence.
 - Browser source provenance does not change the Word export schema or service content.
 - Deterministic tests cover the local equivalence contract and browser/Word provenance boundary; existing production-fidelity and control tests remain the regression gate.
 

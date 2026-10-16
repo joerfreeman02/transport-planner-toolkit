@@ -1,0 +1,394 @@
+name: ATLAS Bus Beta review candidate
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        description: Compose from raw snapshots or explicitly restore a complete review candidate
+        required: true
+        type: string
+      primary_source_run_id:
+        description: Blank acquires fresh sources; otherwise restores this exact primary snapshot producer run
+        required: false
+        type: string
+      primary_artifact_id:
+        description: Exact original primary artifact ID for restore
+        required: false
+        type: string
+      primary_artifact_digest:
+        description: Exact original primary artifact digest for restore
+        required: false
+        type: string
+      tnds_source_run_id:
+        description: Blank acquires fresh TNDS; otherwise restores this exact raw snapshot producer run
+        required: false
+        type: string
+      tnds_artifact_id:
+        description: Exact original raw TNDS artifact ID for restore
+        required: false
+        type: string
+      tnds_artifact_digest:
+        description: Exact original raw TNDS artifact digest for restore
+        required: false
+        type: string
+      candidate_checkpoint_run_id:
+        description: For restore_candidate, exact complete-candidate producer run
+        required: false
+        type: string
+      candidate_artifact_id:
+        description: For restore_candidate, exact review candidate artifact ID
+        required: false
+        type: string
+      candidate_artifact_digest:
+        description: For restore_candidate, exact review candidate artifact digest
+        required: false
+        type: string
+    secrets:
+      TNDS_USERNAME:
+        required: false
+      TNDS_PASSWORD:
+        required: false
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: atlas-bus-beta-review-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  review-candidate:
+    name: Compose or restore immutable review candidate
+    if: startsWith(github.ref, 'refs/heads/codex/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Check out exact feature commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Require successful unexpired exact-SHA offline preflight before source acquisition
+        if: inputs.mode == 'compose'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+          GH_REF_NAME: ${{ github.ref_name }}
+          GH_API_URL: ${{ github.api_url }}
+          GH_CURRENT_RUN_ID: ${{ github.run_id }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.parse, urllib.request
+          base = os.environ['GH_API_URL'].rstrip('/')
+          repo = urllib.parse.quote(os.environ['GH_REPOSITORY'], safe='/')
+          headers = {'Accept':'application/vnd.github+json','Authorization':'Bearer '+os.environ['GH_TOKEN'],'X-GitHub-Api-Version':'2022-11-28'}
+          def get(path):
+              request=urllib.request.Request(base+path,headers=headers)
+              with urllib.request.urlopen(request,timeout=30) as response: return json.loads(response.read())
+          query=urllib.parse.urlencode({'head_sha':os.environ['GH_SHA'],'event':'workflow_dispatch','per_page':100})
+          runs=get(f'/repos/{repo}/actions/runs?{query}').get('workflow_runs',[])
+          for run in runs:
+              if (run.get('head_sha') != os.environ['GH_SHA'] or run.get('head_branch') != os.environ['GH_REF_NAME']
+                  or run.get('event') != 'workflow_dispatch' or '.github/workflows/atlas-bus-data-refresh.yml' not in run.get('path','')
+                  or run.get('conclusion') != 'success' or str(run.get('id')) == os.environ['GH_CURRENT_RUN_ID']): continue
+              rid=str(run['id']); name=f'atlas-tnds-trust-offline-preflight-{rid}'
+              artifacts=get(f'/repos/{repo}/actions/runs/{rid}/artifacts?per_page=100').get('artifacts',[])
+              if any(item.get('name') == name and item.get('expired') is False for item in artifacts):
+                  print(f'Exact-SHA/ref preflight verified: run {rid}, artifact {name}.'); raise SystemExit(0)
+          raise SystemExit('No successful unexpired offline-preflight artifact exists for this exact SHA, branch, and expected workflow.')
+
+      - name: Validate explicit raw restore parameters
+        if: inputs.mode == 'compose' || inputs.mode == 'restore_candidate'
+        env:
+          INPUT_MODE: ${{ inputs.mode }}
+          PRIMARY_RUN: ${{ inputs.primary_source_run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          PRIMARY_ID: ${{ inputs.primary_artifact_id }}
+          PRIMARY_DIGEST: ${{ inputs.primary_artifact_digest }}
+          TNDS_RUN: ${{ inputs.tnds_source_run_id }}
+          TNDS_ID: ${{ inputs.tnds_artifact_id }}
+          TNDS_DIGEST: ${{ inputs.tnds_artifact_digest }}
+          CANDIDATE_RUN: ${{ inputs.candidate_checkpoint_run_id }}
+          CANDIDATE_ID: ${{ inputs.candidate_artifact_id }}
+          CANDIDATE_DIGEST: ${{ inputs.candidate_artifact_digest }}
+        run: |
+          python - <<'PY'
+          import os
+          for family in ('PRIMARY','TNDS'):
+              run=os.environ[family+'_RUN']
+              values=(os.environ[family+'_ID'],os.environ[family+'_DIGEST'])
+              if run and (not all(values) or not run.isdigit()): raise SystemExit(f'Explicit {family} restore requires numeric producer run, artifact ID, and digest.')
+              if not run and any(values): raise SystemExit(f'{family} artifact ID/digest cannot be supplied without its explicit producer run.')
+          if os.environ['INPUT_MODE'] == 'compose' and any(os.environ[name] for name in ('CANDIDATE_RUN','CANDIDATE_ID','CANDIDATE_DIGEST')):
+              raise SystemExit('Candidate checkpoint restore inputs are valid only in restore_candidate mode.')
+          if os.environ['INPUT_MODE'] == 'restore_candidate':
+              values=(os.environ['CANDIDATE_RUN'],os.environ['CANDIDATE_ID'],os.environ['CANDIDATE_DIGEST'])
+              if not all(values) or not values[0].isdigit(): raise SystemExit('Candidate restore requires numeric producer run, artifact ID, and digest.')
+              if any(os.environ[name] for name in ('PRIMARY_RUN','PRIMARY_ID','PRIMARY_DIGEST','TNDS_RUN','TNDS_ID','TNDS_DIGEST')):
+                  raise SystemExit('Raw source restore inputs are not used when restoring a complete candidate.')
+          PY
+
+      - name: Verify exact primary restore artifact metadata
+        if: inputs.mode == 'compose' && inputs.primary_source_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ inputs.primary_artifact_id }}
+          ARTIFACT_DIGEST: ${{ inputs.primary_artifact_digest }}
+          PRODUCER_RUN: ${{ inputs.primary_source_run_id }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" > "$RUNNER_TEMP/source-artifact.json"
+          python - "$RUNNER_TEMP/source-artifact.json" <<'PY'
+          import json,os,sys
+          a=json.load(open(sys.argv[1])); expected={'id':int(os.environ['ARTIFACT_ID']),'name':'atlas-reference-source-snapshot-'+os.environ['PRODUCER_RUN'],'digest':os.environ['ARTIFACT_DIGEST'],'expired':False,'workflow_run':{'id':int(os.environ['PRODUCER_RUN'])}}
+          for k,v in expected.items():
+              actual=a.get(k) or {} if isinstance(v,dict) else a.get(k)
+              if isinstance(v,dict):
+                  for nk,nv in v.items():
+                      if actual.get(nk)!=nv: raise SystemExit(f'Primary artifact {k}.{nk} mismatch')
+              elif actual!=v: raise SystemExit(f'Primary artifact {k} mismatch')
+          PY
+      - name: Restore exact primary raw snapshot
+        if: inputs.mode == 'compose' && inputs.primary_source_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: atlas-reference-source-snapshot-${{ inputs.primary_source_run_id }}
+          run-id: ${{ inputs.primary_source_run_id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: primary-restore
+      - name: Verify explicit primary snapshot or acquire fresh eleven-source snapshot
+        if: inputs.mode == 'compose'
+        env:
+          PRIMARY_RUN: ${{ inputs.primary_source_run_id || github.run_id }}
+          PRIMARY_RUN_INPUT: ${{ inputs.primary_source_run_id }}
+        run: |
+          if [[ -n "$PRIMARY_RUN" ]]; then
+            test -d primary-restore/source-snapshot
+            python tools/atlas-bus-data/source_snapshot.py --mark-frozen-reuse primary-restore/source-snapshot --source-run-id "$PRIMARY_RUN" --output source-snapshot
+          else
+            python tools/atlas-bus-data/source_snapshot.py --acquire --output source-snapshot
+          fi
+          python tools/atlas-bus-data/source_snapshot.py --verify source-snapshot --expected-source-count 11 > "$RUNNER_TEMP/primary-verified.json"
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          manifest=json.loads(Path('source-snapshot/manifest.json').read_text())
+          producer=manifest.get('producer') or {}
+          expected=os.environ['PRIMARY_RUN']
+          if str(producer.get('runId') or '') != expected: raise SystemExit('Primary snapshot producer run does not match the explicit producer.')
+          if not producer.get('workflow'): raise SystemExit('Primary snapshot producer workflow is missing.')
+          if producer.get('repository') not in (None,os.environ['GITHUB_REPOSITORY']): raise SystemExit('Primary snapshot producer repository mismatch.')
+          if not os.environ['PRIMARY_RUN_INPUT'] and producer.get('repositoryCommitSha') != os.environ['GITHUB_SHA']: raise SystemExit('Fresh primary snapshot commit does not match this workflow commit.')
+          PY
+      - name: Preserve verified primary snapshot before preparation
+        id: primary-artifact
+        if: inputs.mode == 'compose' && inputs.primary_source_run_id == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-reference-source-snapshot-${{ github.run_id }}
+          path: source-snapshot
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+
+      - name: Verify exact TNDS restore artifact metadata
+        if: inputs.mode == 'compose' && inputs.tnds_source_run_id != ''
+        env:
+          ARTIFACT_ID: ${{ inputs.tnds_artifact_id }}
+          ARTIFACT_DIGEST: ${{ inputs.tnds_artifact_digest }}
+          PRODUCER_RUN: ${{ inputs.tnds_source_run_id }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" > "$RUNNER_TEMP/tnds-artifact.json"
+          python - "$RUNNER_TEMP/tnds-artifact.json" <<'PY'
+          import json,os,sys
+          a=json.load(open(sys.argv[1])); expected={'id':int(os.environ['ARTIFACT_ID']),'name':'atlas-tnds-quarantined-'+os.environ['PRODUCER_RUN'],'digest':os.environ['ARTIFACT_DIGEST'],'expired':False,'workflow_run':{'id':int(os.environ['PRODUCER_RUN'])}}
+          for k,v in expected.items():
+              actual=a.get(k) or {} if isinstance(v,dict) else a.get(k)
+              if isinstance(v,dict):
+                  for nk,nv in v.items():
+                      if actual.get(nk)!=nv: raise SystemExit(f'TNDS artifact {k}.{nk} mismatch')
+              elif actual!=v: raise SystemExit(f'TNDS artifact {k} mismatch')
+          PY
+      - name: Restore exact raw TNDS artifact
+        if: inputs.mode == 'compose' && inputs.tnds_source_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: atlas-tnds-quarantined-${{ inputs.tnds_source_run_id }}
+          run-id: ${{ inputs.tnds_source_run_id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: tnds-restore
+      - name: Acquire fresh TNDS raw snapshot or verify exact restored snapshot
+        id: tnds-raw
+        if: inputs.mode == 'compose'
+        env:
+          TNDS_RUN: ${{ inputs.tnds_source_run_id }}
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          if [[ -n "$TNDS_RUN" ]]; then
+            python tools/atlas-bus-data/tnds_trust_diagnostic.py --verify-reused --snapshot tnds-restore --evidence "$RUNNER_TEMP/tnds-evidence" --producer-run-id "$TNDS_RUN" --artifact-name "atlas-tnds-quarantined-$TNDS_RUN"
+            cp -R tnds-restore "$RUNNER_TEMP/tnds-quarantined-snapshot"
+          fi
+      - name: Run metadata-only TNDS authentication and archive gate
+        if: inputs.mode == 'compose' && inputs.tnds_source_run_id == ''
+        env:
+          TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
+          TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          python tools/atlas-bus-data/tnds_capability_probe.py --output "$RUNNER_TEMP/tnds-capability-probe.json"
+          PYTHONPATH=tools/atlas-bus-data python -c "import json, os; from pathlib import Path; from tnds_capability_probe import validate_metadata_probe; validate_metadata_probe(json.loads(Path(os.environ['RUNNER_TEMP'], 'tnds-capability-probe.json').read_text()))"
+      - name: Acquire and verify the fresh eight-region raw TNDS snapshot
+        if: inputs.mode == 'compose' && inputs.tnds_source_run_id == ''
+        env:
+          TNDS_USERNAME: ${{ secrets.TNDS_USERNAME }}
+          TNDS_PASSWORD: ${{ secrets.TNDS_PASSWORD }}
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: python tools/atlas-bus-data/tnds_trust_diagnostic.py --acquire-only --snapshot "$RUNNER_TEMP/tnds-quarantined-snapshot" --evidence "$RUNNER_TEMP/tnds-evidence"
+      - name: Preserve fresh raw TNDS snapshot before capacity, extraction, or preparation
+        id: tnds-artifact
+        if: inputs.mode == 'compose' && inputs.tnds_source_run_id == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-tnds-quarantined-${{ github.run_id }}
+          path: ${{ runner.temp }}/tnds-quarantined-snapshot
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+      - name: Check TNDS central-directory expansion and runner capacity
+        if: inputs.mode == 'compose'
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: python tools/atlas-bus-data/tnds_trust_diagnostic.py --capacity-only --snapshot "$RUNNER_TEMP/tnds-quarantined-snapshot" --evidence "$RUNNER_TEMP/tnds-evidence"
+      - name: Seed isolated candidate from the checked-out Alpha.15 site and baseline
+        if: inputs.mode == 'compose'
+        run: |
+          mkdir -p candidate-site
+          cp -R atlas candidate-site/atlas
+      - name: Build complete review-only Bus and TNDS candidate with production builders
+        if: inputs.mode == 'compose'
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: >-
+          python tools/atlas-bus-data/refresh_bus_data.py
+          --site-root candidate-site --prepared-schema v2 --review-only --acquisition-disabled
+          --source-snapshot source-snapshot
+          --tnds-source-snapshot "$RUNNER_TEMP/tnds-quarantined-snapshot"
+
+      - name: Structurally validate prepared Bus and TNDS manifests and shards
+        if: inputs.mode == 'compose'
+        run: python tools/atlas-bus-data/validate_candidate.py --site-root candidate-site
+
+      - name: Bind raw artifact identities to the built candidate
+        if: inputs.mode == 'compose'
+        env:
+          PRIMARY_RUN: ${{ inputs.primary_source_run_id || github.run_id }}
+          PRIMARY_ID: ${{ inputs.primary_artifact_id || steps.primary-artifact.outputs.artifact-id }}
+          PRIMARY_DIGEST: ${{ inputs.primary_artifact_digest || steps.primary-artifact.outputs.artifact-digest }}
+          TNDS_RUN: ${{ inputs.tnds_source_run_id || github.run_id }}
+          TNDS_ID: ${{ inputs.tnds_artifact_id || steps.tnds-artifact.outputs.artifact-id }}
+          TNDS_DIGEST: ${{ inputs.tnds_artifact_digest || steps.tnds-artifact.outputs.artifact-digest }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          primary=json.loads(Path('source-snapshot/manifest.json').read_text())
+          tnds=json.loads(Path(os.environ['RUNNER_TEMP'],'tnds-quarantined-snapshot','manifest.json').read_text())
+          pp=primary.get('producer') or {}; tp=tnds.get('producer') or {}
+          if not pp.get('workflow') or not tp.get('workflow') or not tp.get('repository'): raise SystemExit('Raw snapshot producer workflow or repository identity is missing.')
+          def digest(value): return value if value.startswith('sha256:') else 'sha256:'+value
+          value={'repository':os.environ['GITHUB_REPOSITORY'],'workflow':os.environ['GITHUB_WORKFLOW'],'primary':{'snapshotId':primary['snapshotId'],'producerRunId':str(pp.get('runId') or os.environ['PRIMARY_RUN']),'producerWorkflow':pp['workflow'],'producerCommitSha':pp.get('repositoryCommitSha'),'producerRef':pp.get('ref'),'artifactId':os.environ['PRIMARY_ID'],'artifactDigest':digest(os.environ['PRIMARY_DIGEST']),'artifactName':'atlas-reference-source-snapshot-'+os.environ['PRIMARY_RUN']},'tnds':{'snapshotId':tnds['snapshotId'],'producerRunId':str(tp.get('runId') or os.environ['TNDS_RUN']),'producerWorkflow':tp['workflow'],'producerCommitSha':tp.get('repositoryCommitSha'),'producerRef':tp.get('ref'),'artifactId':os.environ['TNDS_ID'],'artifactDigest':digest(os.environ['TNDS_DIGEST']),'artifactName':'atlas-tnds-quarantined-'+os.environ['TNDS_RUN']}}
+          if not all(value[k]['artifactId'] and value[k]['artifactDigest'] for k in ('primary','tnds')): raise SystemExit('Raw artifact identity outputs are missing.')
+          Path('candidate-site/atlas/data/status/review-source-provenance.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Save full structurally verified review candidate checkpoint before deterministic acceptance
+        if: inputs.mode == 'compose'
+        run: node tools/atlas-data-publication/review-candidate-checkpoint.mjs create --candidate-root candidate-site --checkpoint-root review-checkpoint --provenance candidate-site/atlas/data/status/review-source-provenance.json --commit-sha "${GITHUB_SHA}" --run-id "${GITHUB_RUN_ID}"
+      - name: Upload immutable full candidate checkpoint
+        id: candidate-artifact
+        if: inputs.mode == 'compose'
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-bus-beta-review-candidate-${{ github.run_id }}
+          path: |
+            candidate-site
+            review-checkpoint
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+
+      - name: Verify exact candidate restore artifact metadata
+        if: inputs.mode == 'restore_candidate'
+        env:
+          ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
+          ARTIFACT_DIGEST: ${{ inputs.candidate_artifact_digest }}
+          PRODUCER_RUN: ${{ inputs.candidate_checkpoint_run_id }}
+        run: |
+          test -n "$ARTIFACT_ID" && test -n "$ARTIFACT_DIGEST" && test -n "$PRODUCER_RUN"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" > "$RUNNER_TEMP/candidate-artifact.json"
+          python - "$RUNNER_TEMP/candidate-artifact.json" <<'PY'
+          import json,os,sys
+          a=json.load(open(sys.argv[1])); exp={'id':int(os.environ['ARTIFACT_ID']),'name':'atlas-bus-beta-review-candidate-'+os.environ['PRODUCER_RUN'],'digest':os.environ['ARTIFACT_DIGEST'],'expired':False,'workflow_run':{'id':int(os.environ['PRODUCER_RUN'])}}
+          for k,v in exp.items():
+              actual=a.get(k) or {} if isinstance(v,dict) else a.get(k)
+              if isinstance(v,dict):
+                  for nk,nv in v.items():
+                      if actual.get(nk)!=nv: raise SystemExit(f'Candidate artifact {k}.{nk} mismatch')
+              elif actual!=v: raise SystemExit(f'Candidate artifact {k} mismatch')
+          PY
+      - name: Restore exact full candidate checkpoint
+        id: candidate-restore
+        if: inputs.mode == 'restore_candidate'
+        uses: actions/download-artifact@v4
+        with:
+          name: atlas-bus-beta-review-candidate-${{ inputs.candidate_checkpoint_run_id }}
+          run-id: ${{ inputs.candidate_checkpoint_run_id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: restored
+      - name: Verify candidate checkpoint integrity and exact producer identity
+        if: inputs.mode == 'restore_candidate'
+        run: node tools/atlas-data-publication/review-candidate-checkpoint.mjs verify --candidate-root restored/candidate-site --checkpoint-root restored/review-checkpoint --expected-run-id "${{ inputs.candidate_checkpoint_run_id }}" --expected-commit-sha "${GITHUB_SHA}"
+      - name: Recheck restored candidate structure without source acquisition
+        if: inputs.mode == 'restore_candidate'
+        run: python tools/atlas-bus-data/validate_candidate.py --site-root restored/candidate-site
+
+      - name: Run deterministic Alpha.15 and Bus control tests after checkpoint save
+        id: deterministic-suite
+        if: inputs.mode == 'compose' || inputs.mode == 'restore_candidate'
+        run: node tests/atlas/run-all.mjs
+      - name: Record downstream review validation outcome
+        if: always() && steps.deterministic-suite.outcome == 'success' && (steps.candidate-artifact.outcome == 'success' || steps.candidate-artifact.outcome == 'skipped') && (steps.candidate-restore.outcome == 'success' || steps.candidate-restore.outcome == 'skipped')
+        id: downstream-validation
+        env:
+          CANDIDATE_RUN_ID: ${{ inputs.candidate_checkpoint_run_id || github.run_id }}
+        run: |
+          mkdir -p review-validation
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          Path('review-validation/validation.json').write_text(json.dumps({'schema':'atlas-review-candidate-downstream-validation-v1','candidateRunId':os.environ['CANDIDATE_RUN_ID'],'validationRunId':os.environ['GITHUB_RUN_ID'],'commitSha':os.environ['GITHUB_SHA'],'state':'FULLY_VALIDATED_REVIEW_ONLY','plannerEligible':False,'publicationEligible':False,'deploymentAttempted':False},indent=2)+'\n')
+          PY
+      - name: Upload downstream validation result
+        if: always() && steps.downstream-validation.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-bus-beta-review-validation-${{ github.run_id }}
+          path: review-validation
+          if-no-files-found: warn
+          retention-days: 90

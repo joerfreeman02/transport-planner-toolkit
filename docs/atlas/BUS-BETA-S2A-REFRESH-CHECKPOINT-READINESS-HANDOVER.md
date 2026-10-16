@@ -70,7 +70,7 @@ For this branch, the offline-only dispatch selection is:
 | `v2_expected_source_count` | blank |
 | `v2_expected_total_bytes` | blank |
 
-The exact final commit still needs a successful GitHub Actions preflight artifact before it can satisfy the remote-artifact portion of the acceptance criteria. A later code change changes the SHA and requires a new preflight.
+The original run recorded below (`38916353211`) validated commit `93289598c7792967fbd4a54bd0363ccf4899c50b`; it remains historical evidence for that commit. The final S2A SHA `c6251116abb1da5ebce12fe200a15d124c99eab0` subsequently passed the hosted exact-SHA preflight in run `38916775248`. Its unexpired evidence artifact is `atlas-tnds-trust-offline-preflight-38916775248` (artifact ID `12053255575`, digest `sha256:fd9406dd999201abd0cf486fd7bf1513c6bfa32f46dc7b3fb6513fea0876b5a5`). Live TNDS and primary-source acquisition, candidate build, publication, and deployment were skipped. The original run evidence is retained unchanged; later code changes still require a new exact-SHA preflight.
 
 ## S2B readiness and recommended sequence
 
@@ -103,6 +103,7 @@ The next implementation must connect the exact-preflight gate to a review-only c
 - Deterministic Alpha.15 suite: `node tests/atlas/run-all.mjs` — **passed**, including Pipers and candidate-checkpoint coverage.
 - `git diff --check`: **passed**.
 - Exact-SHA GitHub Actions offline-preflight run `38916353211`: **success** on commit `93289598c7792967fbd4a54bd0363ccf4899c50b`. Evidence artifact `atlas-tnds-trust-offline-preflight-38916353211` (artifact ID `12051714796`, digest `sha256:895e34b52763efe3171c5fd5dbf5be69308d295070d029944d8b37a86154a770`) was present and unexpired. Its record confirms success, the matching branch/SHA, no source acquisition, no TNDS credentials or FTP, and no publication/deployment.
+- Final S2A SHA `c6251116abb1da5ebce12fe200a15d124c99eab0` exact-SHA hosted offline-preflight run `38916775248`: **success**. Evidence artifact `atlas-tnds-trust-offline-preflight-38916775248` (artifact ID `12053255575`, digest `sha256:fd9406dd999201abd0cf486fd7bf1513c6bfa32f46dc7b3fb6513fea0876b5a5`); live/source/build/publication/deployment jobs were skipped.
 - A documentation-only handover update follows that run; the exact SHA of the final documentation commit is preflighted separately and recorded in the final response.
 - Live downloads / TNDS FTP: none performed.
 - Publication / deployment: none performed.

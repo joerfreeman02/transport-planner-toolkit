@@ -28,7 +28,8 @@ class C3WorkflowContractTests(unittest.TestCase):
         self.assertIn(f"TRUST_BRANCH_C3_C1_C1: {CURRENT_BRANCH}", selector)
         self.assertIn(f"TRUST_BRANCH_R45_C1: {R45_C1_BRANCH}", selector)
         self.assertIn("R45-C1 closeout branch accepts only the Run #45 checkpoint-only retry selector", selector)
-        self.assertNotIn("v2_", selector)
+        c3_controls = selector.split('if [[ "$GITHUB_REF" != "$TRUST_BRANCH_C3"', 1)[1]
+        self.assertNotIn("v2_", c3_controls)
         for mode in ("offline_preflight", "c3_live_trust", "c3_checkpoint_retry"):
             self.assertIn(f"trust_mode={mode}", selector)
         self.assertIn("38579244547", selector)

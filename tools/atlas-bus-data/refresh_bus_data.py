@@ -22,7 +22,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from source_snapshot import BODS_REGIONS, materialise_for_preparation, snapshot_from_staging
+from source_snapshot import BODS_REGIONS, load_and_verify as load_and_verify_source_snapshot, materialise_for_preparation, snapshot_from_staging
 
 TNDS_REGIONS = ("EA", "EM", "NE", "NW", "SE", "SW", "WM", "Y")
 NAPTAN_URL = "https://naptan.api.dft.gov.uk/v1/access-nodes?dataFormat=csv"
@@ -700,6 +700,7 @@ def source_snapshot_status(manifest: dict) -> dict:
         "reused": bool(reuse.get("reused", False)),
         "reuseMode": manifest.get("reuseMode"),
         "reuse": reuse,
+        "producer": manifest.get("producer", {}),
         "currentSourceFreshnessClaimed": manifest.get("currentSourceFreshnessClaimed"),
         "diagnosticOnly": manifest["diagnosticOnly"],
         "productionEligible": manifest["productionEligible"],
@@ -719,21 +720,30 @@ def run(args: argparse.Namespace) -> dict:
     baseline = deployed_baseline if deployed_baseline else baseline_metrics(site)
     prepared_schema = getattr(args, "prepared_schema", "v1")
     bus_only = bool(getattr(args, "bus_only_diagnostic", False))
+    review_only = bool(getattr(args, "review_only", False))
     if bus_only and prepared_schema != "v2":
         raise RefreshError("Bus-only diagnostic requires prepared schema v2")
     if prepared_schema not in {"v1", "v2"}:
         raise RefreshError("prepared schema must be v1 or v2")
+    if review_only and (prepared_schema != "v2" or bus_only):
+        raise RefreshError("Review-only complete candidates require prepared schema v2")
     staging = site.parent / f"atlas-bus-refresh-staging-{os.getpid()}"
     shutil.rmtree(staging, ignore_errors=True)
     staging.mkdir(parents=True)
     try:
         snapshot_root = Path(args.source_snapshot).resolve() if getattr(args, "source_snapshot", None) else None
-        if getattr(args, "acquisition_disabled", False) and not snapshot_root:
-            raise RefreshError("--acquisition-disabled requires --source-snapshot")
+        tnds_snapshot_root = Path(getattr(args, "tnds_source_snapshot", None)).resolve() if getattr(args, "tnds_source_snapshot", None) else None
+        if getattr(args, "acquisition_disabled", False) and (not snapshot_root or (not bus_only and not tnds_snapshot_root)):
+            raise RefreshError("--acquisition-disabled requires --source-snapshot and, for a complete candidate, --tnds-source-snapshot")
         snapshot_manifest = None
         if snapshot_root:
-            if prepared_schema != "v2" or not bus_only:
-                raise RefreshError("--source-snapshot is supported only for the Bus-only prepared-data v2 path")
+            if prepared_schema != "v2":
+                raise RefreshError("--source-snapshot requires prepared schema v2")
+            verified_source_manifest = load_and_verify_source_snapshot(snapshot_root, expected_source_count=11)
+            source_bytes = sum(int(item.get("bytes", 0)) for item in verified_source_manifest.get("sources", []))
+            primary_required = source_bytes * 2 + 1024**3
+            if shutil.disk_usage(staging).free < primary_required:
+                raise RefreshError("Primary source materialisation capacity gate blocked preparation")
             naptan, nptg, gtfs, snapshot_manifest = materialise_for_preparation(snapshot_root, staging)
             entries = {item["path"]: item for item in snapshot_manifest["sources"]}
             naptan_entry = entries["sources/naptan.xml"]
@@ -760,7 +770,39 @@ def run(args: argparse.Namespace) -> dict:
         tnds_xml = None
         tnds = None
         if not bus_only:
-            tnds_xml, tnds = acquire_tnds(staging, os.environ.get("TNDS_USERNAME", ""), os.environ.get("TNDS_PASSWORD", ""))
+            if tnds_snapshot_root:
+                # Reuse the quarantined raw verifier, capacity gate, and existing
+                # production TNDS preparer. The review path never calls FTP.
+                from tnds_trust_diagnostic import capacity_checkpoint, prepare_tnds_handoff
+
+                tnds_evidence = staging / "tnds-evidence"
+                tnds_capacity = capacity_checkpoint(tnds_snapshot_root, tnds_evidence)
+                if tnds_capacity.get("status") != "CAPACITY_SUFFICIENT":
+                    raise RefreshError("TNDS capacity gate blocked preparation")
+                site_tnds = site / "atlas" / "data" / "bus-tnds"
+                shutil.rmtree(site_tnds, ignore_errors=True)
+                tnds_handoff, _ = prepare_tnds_handoff(
+                    tnds_snapshot_root,
+                    staging / "tnds-extracted-input",
+                    site_tnds,
+                    node=os.environ.get("ATLAS_NODE", "node"),
+                )
+                raw_manifest = tnds_handoff["sourceManifest"]
+                tnds_entries = sorted(raw_manifest["sources"], key=lambda item: item["path"])
+                tnds_hashes = {str(item["region"]).upper(): item["sha256"] for item in tnds_entries}
+                tnds = {
+                    "identity": "verified quarantined TNDS source snapshot",
+                    "regions": list(TNDS_REGIONS),
+                    "regionHashes": tnds_hashes,
+                    "sourceHash": hashlib.sha256("".join(f"{region}:{tnds_hashes[region]}" for region in sorted(tnds_hashes)).encode("ascii")).hexdigest(),
+                    "snapshotId": raw_manifest["snapshotId"],
+                    "producer": raw_manifest.get("producer", {}),
+                    "preparedManifest": tnds_handoff["preparedManifest"],
+                }
+            else:
+                if review_only or getattr(args, "acquisition_disabled", False):
+                    raise RefreshError("Review-only complete candidate requires an explicit TNDS source snapshot")
+                tnds_xml, tnds = acquire_tnds(staging, os.environ.get("TNDS_USERNAME", ""), os.environ.get("TNDS_PASSWORD", ""))
         site_bus = site / "atlas" / "data" / "bus"
         site_tnds = site / "atlas" / "data" / "bus-tnds"
         site_bus.parent.mkdir(parents=True, exist_ok=True)
@@ -798,8 +840,9 @@ def run(args: argparse.Namespace) -> dict:
                 except json.JSONDecodeError as error:
                     raise RefreshError("Coverage ledger did not return valid JSON") from error
         if not bus_only:
-            node = os.environ.get("ATLAS_NODE", "node")
-            subprocess.run([node, str(Path(__file__).with_name("prepare_tnds.mjs")), "--input", str(tnds_xml), "--output", str(site_tnds), "--preparedAt", started], check=True)
+            if not tnds_snapshot_root:
+                node = os.environ.get("ATLAS_NODE", "node")
+                subprocess.run([node, str(Path(__file__).with_name("prepare_tnds.mjs")), "--input", str(tnds_xml), "--output", str(site_tnds), "--preparedAt", started], check=True)
         counts = validate_candidate(site, baseline, bus_only=bus_only)
         naptan_hash = sha256(naptan)
         naptan_outcome, naptan_note = source_outcome(naptan_hash, previous_status.get("sources", {}).get("naptan"))
@@ -811,7 +854,11 @@ def run(args: argparse.Namespace) -> dict:
         }
         if not bus_only:
             tnds_outcome, tnds_note = source_outcome(tnds["sourceHash"], previous_status.get("sources", {}).get("tnds"))
-            sources["tnds"] = {"identity": tnds["identity"], "checkedAt": started, "sourceHash": tnds["sourceHash"], "regionHashes": tnds["regionHashes"], "regionsChecked": tnds["regions"], "outcome": tnds_outcome, "preparedCount": counts["tndsServiceCount"], "processedRegions": counts["tndsProcessedRegions"], "regionServiceCounts": counts["tndsRegionServiceCounts"], "sourceFileCounts": counts["tndsSourceFileCounts"], "parsedFileCounts": counts["tndsParsedFileCounts"], "ignoredRegistrationFileCounts": counts["tndsIgnoredRegistrationFileCounts"], "transport": "legacy FTP; credentials supplied only to the runner"}
+            sources["tnds"] = {"identity": tnds["identity"], "checkedAt": started, "sourceHash": tnds["sourceHash"], "regionHashes": tnds["regionHashes"], "regionsChecked": tnds["regions"], "outcome": tnds_outcome, "preparedCount": counts["tndsServiceCount"], "processedRegions": counts["tndsProcessedRegions"], "regionServiceCounts": counts["tndsRegionServiceCounts"], "sourceFileCounts": counts["tndsSourceFileCounts"], "parsedFileCounts": counts["tndsParsedFileCounts"], "ignoredRegistrationFileCounts": counts["tndsIgnoredRegistrationFileCounts"]}
+            if tnds.get("snapshotId"):
+                sources["tnds"]["sourceSnapshot"] = {"schema": "atlas-bus-tnds-source-snapshot-v1", "snapshotId": tnds["snapshotId"], "producer": tnds["producer"], "state": "ACQUIRED / UNINTERPRETED / VERIFIED / QUARANTINED", "diagnosticOnly": True, "productionEligible": False}
+            else:
+                sources["tnds"]["transport"] = "legacy FTP; credentials supplied only to the runner"
         if prepared_schema == "v2":
             nptg_hash = sha256(nptg)
             nptg_outcome, nptg_note = source_outcome(nptg_hash, previous_status.get("sources", {}).get("nptg"))
@@ -825,7 +872,7 @@ def run(args: argparse.Namespace) -> dict:
         for source, note in notes:
             if note: sources[source]["note"] = note
         release = load_release_metadata(site)
-        status = {"schema": "atlas-bus-refresh-status-v1", "status": "sanity_checked" if bus_only else "validated", "candidateGeneratedAt": started, "version": release["version"], "build": release["build"], "repositoryCommit": os.environ.get("GITHUB_SHA"), "workflowRun": os.environ.get("GITHUB_RUN_ID"), "sources": sources, "preparedCounts": counts, "validation": "diagnostic_only" if bus_only else "passed", "diagnosticOnly": bus_only, "productionEligible": not bus_only, "coverageLedger": coverage_result, "sanityThresholds": {"collapseMinimum": 0.5, "description": "Existing meaningful baselines must retain at least 50% of stop/service counts; BODS region count may not decrease."}}
+        status = {"schema": "atlas-bus-refresh-status-v1", "status": "sanity_checked" if bus_only else "validated", "candidateGeneratedAt": started, "version": release["version"], "build": release["build"], "repositoryCommit": os.environ.get("GITHUB_SHA"), "workflowRun": os.environ.get("GITHUB_RUN_ID"), "sources": sources, "preparedCounts": counts, "validation": "diagnostic_only" if bus_only else "passed", "diagnosticOnly": bus_only or review_only, "productionEligible": not bus_only and not review_only, "reviewOnly": review_only, "plannerEligible": False if (bus_only or review_only) else None, "publicationEligible": not (bus_only or review_only), "coverageLedger": coverage_result, "sanityThresholds": {"collapseMinimum": 0.5, "description": "Existing meaningful baselines must retain at least 50% of stop/service counts; BODS region count may not decrease."}}
         status_path = site / "atlas" / "data" / "status" / "manifest.json"
         status_path.parent.mkdir(parents=True, exist_ok=True)
         status_path.write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")
@@ -842,7 +889,9 @@ def main() -> None:
     parser.add_argument("--bus-only-diagnostic", action="store_true", help="Acquire and validate only the Bus v2 diagnostic; never contact TNDS FTP")
     parser.add_argument("--source-snapshot", help="Verified ACQUIRED / UNINTERPRETED source snapshot to prepare without acquisition")
     parser.add_argument("--source-snapshot-output", help="Write the freshly acquired v2 Bus sources as a reusable snapshot")
+    parser.add_argument("--tnds-source-snapshot", help="Verified raw TNDS quarantine snapshot for offline review-candidate preparation")
     parser.add_argument("--acquisition-disabled", action="store_true", help="Fail closed unless an explicit verified source snapshot is supplied")
+    parser.add_argument("--review-only", action="store_true", help="Mark the resulting full candidate ineligible for planner, publication, and production use")
     args = parser.parse_args()
     try:
         print(json.dumps(run(args), indent=2))

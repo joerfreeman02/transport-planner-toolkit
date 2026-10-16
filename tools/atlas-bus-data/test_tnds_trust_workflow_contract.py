@@ -13,6 +13,7 @@ TRUST_BRANCH_C1 = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-sca
 TRUST_BRANCH_CURRENT = "refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout"
 TRUST_BRANCH_R45_C1 = "refs/heads/codex/atlas-bus-data-trust-r45-c1-reconciliation-contract-closeout"
 S2A_BRANCH = "refs/heads/codex/atlas-bus-beta-s2a-refresh-checkpoint-readiness"
+S2A_C1_BRANCH = "refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition"
 
 
 def parse_dispatch_input_names(workflow_text):
@@ -106,7 +107,7 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn("trust_mode=c3_checkpoint_retry", selector)
         self.assertIn('"$RESUME_RUN_ID" == \'38579244547\'', selector)
         self.assertIn("Invalid C3 selection", selector)
-        self.assertIn("trust_prior_producer_run_id: ${{ steps.trust-selector.outputs.prior_producer_run_id }}", self.dispatcher)
+        self.assertIn("trust_prior_producer_run_id: ${{ steps.s2a-c1-selector.outputs.prior_producer_run_id || steps.trust-selector.outputs.prior_producer_run_id }}", self.dispatcher)
 
     def test_non_numeric_raw_reuse_ids_fail_closed(self):
         selector = self.dispatcher.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]
@@ -206,6 +207,19 @@ class TndsWorkflowContractTests(unittest.TestCase):
         live = workflow_job_block(self.dispatcher, "tnds-trust-live-diagnostic")
         self.assertIn(S2A_BRANCH, preflight)
         self.assertNotIn(S2A_BRANCH, live)
+
+    def test_s2a_c1_branch_is_limited_to_exact_preflight_or_review_candidate_selector(self):
+        selector = self.dispatcher.split("- name: Resolve S2A-C1 offline preflight selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
+        self.assertIn(f"if: github.ref == '{S2A_C1_BRANCH}'", selector)
+        self.assertIn("The S2A-C1 branch accepts only the exact offline-preflight selector or the isolated review-candidate selector", selector)
+        self.assertIn("TNDS-TRUST-PREFLIGHT-C1B", selector)
+        preflight = workflow_job_block(self.dispatcher, "tnds-trust-browser-offline-preflight")
+        live = workflow_job_block(self.dispatcher, "tnds-trust-live-diagnostic")
+        candidate = workflow_job_block(self.dispatcher, "s2a-c1-review-candidate")
+        self.assertIn(S2A_C1_BRANCH, preflight)
+        self.assertNotIn(S2A_C1_BRANCH, live)
+        self.assertIn(S2A_C1_BRANCH, candidate)
+        self.assertIn("review_candidate_mode", candidate)
 
     def test_live_path_metadata_then_recoverable_raw_checkpoint_then_capacity_then_prepare(self):
         live = self.workflow.split("  live-raw-and-prepare:", 1)[1]

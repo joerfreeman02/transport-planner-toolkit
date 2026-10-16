@@ -12,6 +12,7 @@ import tempfile
 import unittest
 import zipfile
 import xml.etree.ElementTree as ET
+from datetime import date
 from pathlib import Path
 
 
@@ -28,9 +29,61 @@ assert V2_SPEC and V2_SPEC.loader
 sys.modules[V2_SPEC.name] = V2
 V2_SPEC.loader.exec_module(V2)
 FIXTURES = Path(__file__).parents[2] / "tests" / "fixtures" / "atlas-bus-data-v2"
+PIPERS_PATTERN = [
+    "021024595", "021013509", "021013508", "021013510", "021013512", "021013513", "021013515", "021013516",
+    "021028151", "021013517", "021013518", "021013534", "021013537", "021013540", "021013541", "210021400211",
+    "021012009", "021012007", "02900202", "02901244", "02901616", "02903800", "02903622", "02900043",
+    "02903722", "02903032", "02903034", "02903037", "02903006", "02903038", "02903040", "02903047",
+    "021028168", "021024595",
+]
+
+
+def build_pipers_prepared_record() -> dict:
+    """Build a bounded Pipers-shaped prepared shard record through production GTFS preparation."""
+    naptan_stops = {}
+    atco = {}
+    stops_csv = ["stop_id,stop_code,stop_name"]
+    for stop_id in PIPERS_PATTERN:
+        name = "Lyons Community Centre" if stop_id == "021024595" else ("Woodside Road" if stop_id == "021013518" else stop_id)
+        stops_csv.append(f"{stop_id},{stop_id},{name}")
+        atco[stop_id] = stop_id
+        naptan_stops[stop_id] = {"id": stop_id, "name": name, "locality": "Caddington", "routes": set(), "timetableCallEligible": True}
+
+    with tempfile.TemporaryDirectory(dir=Path(__file__).parents[2]) as temporary:
+        archive_path = Path(temporary) / "south-east.zip"
+        with zipfile.ZipFile(archive_path, "w") as archive:
+            archive.writestr("agency.txt", "agency_id,agency_name\npipers-agency,Centrebus\n")
+            archive.writestr("routes.txt", "route_id,route_short_name,route_type,agency_id\n118723,230,3,pipers-agency\n")
+            archive.writestr("stops.txt", "\n".join(stops_csv) + "\n")
+            archive.writestr("calendar.txt", "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date\npipers-weekday,1,1,1,1,1,0,0,20260831,20270731\n")
+            trips_csv = ["route_id,service_id,trip_id,direction_id,trip_headsign"]
+            stop_times_csv = ["trip_id,arrival_time,departure_time,stop_id,stop_sequence"]
+            for trip_index in range(15):
+                trip_id = f"pipers-230-loop-{trip_index:02d}"
+                trips_csv.append(f"118723,pipers-weekday,{trip_id},0,Caddington Woods Lyons Community Centre")
+                for sequence, stop_id in enumerate(PIPERS_PATTERN, start=1):
+                    minute = 6 * 60 + 1 + trip_index * 60 + sequence - 1
+                    hhmm = f"{minute // 60:02d}:{minute % 60:02d}:00"
+                    stop_times_csv.append(f"{trip_id},{hhmm},{hhmm},{stop_id},{sequence}")
+            archive.writestr("trips.txt", "\n".join(trips_csv) + "\n")
+            archive.writestr("stop_times.txt", "\n".join(stop_times_csv) + "\n")
+
+        dates = BUILDER.representative_dates(date(2026, 9, 7))
+        _, by_area, _ = BUILDER.process_region(archive_path, dates, naptan_stops, {"atco": atco, "naptan": {}}, 5)
+        return next(record for record in by_area["02101"] if record["routeNumber"] == "230")
 
 
 class CircularIdentityTests(unittest.TestCase):
+    def test_pipers_bods_prepared_pattern_fixture_is_emitted_by_production_gtfs_builder(self):
+        fixture_path = Path(__file__).parents[2] / "tests" / "atlas" / "fixtures" / "pipers-bods-prepared-service.json"
+        prepared = json.loads(fixture_path.read_text(encoding="utf-8"))
+        self.assertEqual(prepared, build_pipers_prepared_record())
+        self.assertEqual(prepared["routeNumber"], "230")
+        self.assertEqual(prepared["operator"], "Centrebus")
+        self.assertEqual(prepared["circularPatternStopIds"], PIPERS_PATTERN)
+        self.assertEqual(prepared["circularPatternStopIds"][0], prepared["circularPatternStopIds"][-1])
+        self.assertNotIn("routePatternStopIds", prepared, "the test consumes the existing BODS prepared-field contract")
+
     def test_authoritative_bus_types_separate_domain_from_call_expectation(self):
         for code in ("BCT", "BCS", "BCQ", "BST", "BCE", "BCP"):
             self.assertTrue(V2.stop_type_semantics(code)["busDomainEligible"], code)

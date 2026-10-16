@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { gunzipSync } from 'node:zlib';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
 import { mergeBusTimetableSources } from '../../src/atlas/domain/bus-timetable-merge.mjs';
 import { buildPlannerBusServiceSummaries } from '../../src/atlas/domain/bus-planner-summary.mjs';
+import { normalisePreparedService } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
+import { scopedScheduledService } from '../../src/atlas/domain/scheduled-evidence.mjs';
 
 const schedule = times => ({ monday: times, tuesday: times, wednesday: times, thursday: times, friday: times, saturday: [], sunday: [] });
 const pipersPattern = [
@@ -20,19 +21,16 @@ const service = (id, overrides = {}) => ({
   timetableSource: id.startsWith('tnds:') ? 'TNDS' : 'BODS', ...overrides
 });
 
-// Governed Pipers shape: actual prepared BODS loop/pattern and the preserved
+// Governed Pipers shape: builder-prepared BODS loop/pattern and the preserved
 // R46-I1 TNDS account that differs only by omitting the loop-closing StopPoint.
-const preparedBodsShard = JSON.parse(gunzipSync(fs.readFileSync(new URL('../../atlas/data/bus/services/02101-south_east.json.gz', import.meta.url))));
-const preparedPipersBods = preparedBodsShard.services.find(record => record.id === 'south_east:118723:0:b7eada5524c4');
-assert.ok(preparedPipersBods, 'prepared BODS data contains the governed Pipers 230 service');
-assert.deepEqual(preparedPipersBods.stopSchedules['021013518'].monday.slice(0, 3), [371, 431, 491]);
-const pipersBods = {
-  ...preparedPipersBods,
-  // The complete ordered pattern is governed in BUS-CIRC-1B-HANDOVER; the
-  // prepared timetable shard intentionally stores departures, not pattern IDs.
-  routePatternStopIds: pipersPattern,
-  stopSchedules: { '021013518': preparedPipersBods.stopSchedules['021013518'] }
-};
+const preparedPipersBods = JSON.parse(fs.readFileSync(new URL('./fixtures/pipers-bods-prepared-service.json', import.meta.url), 'utf8'));
+assert.equal(preparedPipersBods.routeNumber, '230');
+assert.equal(preparedPipersBods.operator, 'Centrebus');
+assert.deepEqual(preparedPipersBods.circularPatternStopIds, pipersPattern, 'the BODS pattern comes from the production preparation fixture');
+assert.equal(Object.hasOwn(preparedPipersBods, 'routePatternStopIds'), false, 'the BODS preparation contract supplies its existing ordered-pattern field');
+const normalizedPipersBods = normalisePreparedService(preparedPipersBods);
+const pipersBods = scopedScheduledService(normalizedPipersBods, ['021013518']);
+assert.deepEqual(pipersBods.circularPatternStopIds, preparedPipersBods.circularPatternStopIds, 'prepared adapter normalization carries the ordered BODS pattern into runtime');
 const pipersTnds = service('tnds:230-pipers-r46-shape', {
   operator: 'Centrebus South', origin: 'Lyons Community Centre', destination: 'Caddington Woods',
   direction: 'outbound', circular: undefined, routePatternStopIds: pipersPattern.slice(0, -1),
@@ -42,7 +40,7 @@ const pipers230 = mergeBusTimetableSources({ bods: [pipersBods], tnds: [pipersTn
 assert.equal(pipers230.length, 1, 'Pipers 230 BODS/TNDS loop forms one local service family');
 assert.equal(pipers230[0].id, pipersBods.id);
 assert.equal(pipers230[0].timetableSource, 'BODS', 'BODS remains the timetable authority and browser provenance');
-assert.deepEqual(pipers230[0].stopSchedules['021013518'].monday, preparedPipersBods.stopSchedules['021013518'].monday, 'TNDS copy cannot inflate prepared BODS departures/frequency');
+assert.deepEqual(pipers230[0].stopSchedules['021013518'].monday, pipersBods.stopSchedules['021013518'].monday, 'TNDS copy cannot inflate prepared BODS departures/frequency');
 const pipersPlanner = buildPlannerBusServiceSummaries([{
   id: pipers230[0].id, routeNumber: '230', operator: pipers230[0].operator, origin: pipers230[0].origin,
   destination: pipers230[0].destination, direction: pipers230[0].direction, timetableSource: pipers230[0].timetableSource,

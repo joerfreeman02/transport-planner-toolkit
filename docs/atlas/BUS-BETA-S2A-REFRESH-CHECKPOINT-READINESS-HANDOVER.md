@@ -102,7 +102,8 @@ The next implementation must connect the exact-preflight gate to a review-only c
 - Python Bus-data suite: `python -m unittest discover -s tools/atlas-bus-data -p 'test_*.py' -v` — **267 tests passed**.
 - Deterministic Alpha.15 suite: `node tests/atlas/run-all.mjs` — **passed**, including Pipers and candidate-checkpoint coverage.
 - `git diff --check`: **passed**.
-- Exact-SHA GitHub Actions offline-preflight run/artifact: pending remote run after push.
+- Exact-SHA GitHub Actions offline-preflight run `38916353211`: **success** on commit `93289598c7792967fbd4a54bd0363ccf4899c50b`. Evidence artifact `atlas-tnds-trust-offline-preflight-38916353211` (artifact ID `12051714796`, digest `sha256:895e34b52763efe3171c5fd5dbf5be69308d295070d029944d8b37a86154a770`) was present and unexpired. Its record confirms success, the matching branch/SHA, no source acquisition, no TNDS credentials or FTP, and no publication/deployment.
+- A documentation-only handover update follows that run; the exact SHA of the final documentation commit is preflighted separately and recorded in the final response.
 - Live downloads / TNDS FTP: none performed.
 - Publication / deployment: none performed.
 - Final SHA, local/origin parity, and clean status: reported after the final handover commit and push.

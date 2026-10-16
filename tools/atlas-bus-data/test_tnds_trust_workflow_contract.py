@@ -107,7 +107,7 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn("trust_mode=c3_checkpoint_retry", selector)
         self.assertIn('"$RESUME_RUN_ID" == \'38579244547\'', selector)
         self.assertIn("Invalid C3 selection", selector)
-        self.assertIn("trust_prior_producer_run_id: ${{ steps.s2a-c1-selector.outputs.prior_producer_run_id || steps.trust-selector.outputs.prior_producer_run_id }}", self.dispatcher)
+        self.assertIn("trust_prior_producer_run_id: ${{ steps.s2a-c2-selector.outputs.prior_producer_run_id || steps.s2a-c1-selector.outputs.prior_producer_run_id || steps.trust-selector.outputs.prior_producer_run_id }}", self.dispatcher)
 
     def test_non_numeric_raw_reuse_ids_fail_closed(self):
         selector = self.dispatcher.split("- name: Resolve exact-branch TRUST browser selector", 1)[1].split("- name: Record safe execution mode", 1)[0]

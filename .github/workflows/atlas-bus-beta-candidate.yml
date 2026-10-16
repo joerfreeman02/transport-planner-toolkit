@@ -172,7 +172,7 @@ jobs:
           PRIMARY_RUN: ${{ inputs.primary_source_run_id || github.run_id }}
           PRIMARY_RUN_INPUT: ${{ inputs.primary_source_run_id }}
         run: |
-          if [[ -n "$PRIMARY_RUN" ]]; then
+          if [[ -n "$PRIMARY_RUN_INPUT" ]]; then
             test -d primary-restore/source-snapshot
             python tools/atlas-bus-data/source_snapshot.py --mark-frozen-reuse primary-restore/source-snapshot --source-run-id "$PRIMARY_RUN" --output source-snapshot
           else

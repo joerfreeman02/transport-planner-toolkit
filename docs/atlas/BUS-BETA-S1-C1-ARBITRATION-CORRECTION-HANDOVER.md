@@ -5,7 +5,7 @@ Status: Engineering correction complete; Product Owner manual acceptance recomme
 Branch: `codex/atlas-bus-beta-s1-c1-local-family-arbitration`  
 Starting SHA: `988a5c6c30986d744957bea2ae57ff20a1f97358`  
 Version/build: `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`  
-Final SHA: recorded in the completion message after push; this handover is part of that branch.
+Final implementation SHA: `02eec7e128bbb1e1de4283bd5057e93a646668ba` (pushed and verified; this is the source-and-ADR implementation commit).
 
 ## Correction
 
@@ -45,4 +45,4 @@ Negative coverage retains unrelated operators, different corridors, same-number 
 
 ## Git and disposition
 
-No release, Beta declaration, merge, or PR was created. The pushed branch HEAD and worktree cleanliness are verified in the completion record. Recommend Product Owner manual acceptance of this bounded correction before any further BUS-BETA work.
+No release, Beta declaration, merge, or PR was created. The branch HEAD and worktree cleanliness are verified in the completion record. Recommend Product Owner manual acceptance of this bounded correction before any further BUS-BETA work.

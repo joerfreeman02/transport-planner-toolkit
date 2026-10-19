@@ -55,11 +55,11 @@ class ReviewCandidateWorkflowContractTests(unittest.TestCase):
         self.assertNotIn("refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector", self.dispatcher.split("  tnds-trust-browser-live:", 1)[1].split("  ", 1)[0])
 
     def test_s2b_c2_branch_is_offline_preflight_only_and_has_no_candidate_or_publication_route(self):
-        selector = self.dispatcher.split("- name: Resolve S2B-C2 exact zero-download offline preflight selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
+        selector = self.dispatcher.split("- name: Resolve S2B-C2 exact zero-download offline preflight selector", 1)[1].split("- name: Resolve S2B-C3 exact offline preflight or Run #53 compose selector", 1)[0]
         self.assertIn("id: s2b-c2-selector", selector)
         self.assertIn("github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology'", selector)
         self.assertIn("trust_mode=offline_preflight", selector)
-        self.assertIn("CANDIDATE_MODE\" != 'disabled'", selector)
+        self.assertIn("$CANDIDATE_MODE\" != 'disabled'", selector)
         self.assertNotIn("trust_mode=review_candidate", selector)
         self.assertIn("steps.s2b-c2-selector.outputs.trust_mode", self.dispatcher)
         offline = self.dispatcher.split("  tnds-trust-browser-offline-preflight:", 1)[1].split("  tnds-trust-browser-live:", 1)[0]
@@ -68,6 +68,73 @@ class ReviewCandidateWorkflowContractTests(unittest.TestCase):
         self.assertNotIn("refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology", candidate_job)
         for marker, next_marker in (("freshness", "build-validate"), ("build-validate", "deploy"), ("deploy", "freshness-no-op")):
             self.assertIn("needs.main-guard.outputs.trust_mode == ''", self.dispatcher.split(f"\n  {marker}:\n", 1)[1].split(f"\n  {next_marker}:\n", 1)[0])
+
+    def test_s2b_c3_accepts_only_exact_offline_preflight_or_pinned_run53_compose(self):
+        selector = self.dispatcher.split("- name: Resolve S2B-C3 exact offline preflight or Run #53 compose selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
+        offline = selector.split('if [[ "$CANDIDATE_MODE" == \'disabled\' ]]; then', 1)[1].split("elif [[ \"$CANDIDATE_MODE\" == 'compose' ]]", 1)[0]
+        compose = selector.split("elif [[ \"$CANDIDATE_MODE\" == 'compose' ]]", 1)[1].split("else\n            echo '::error::S2B-C3 accepts only", 1)[0]
+        self.assertIn("id: s2b-c3-selector", selector)
+        self.assertIn("github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority'", selector)
+        self.assertIn("EXPECTED_SNAPSHOT_ID\" != 'TNDS-TRUST-PREFLIGHT-C1B'", offline)
+        self.assertIn("trust_mode=offline_preflight", offline)
+        self.assertIn("PREPARED_SCHEMA\" != 'v2'", offline)
+        self.assertIn("MEASURE_ONLY\" != 'true'", offline)
+        self.assertIn("FORCE_REFRESH\" != 'true'", offline)
+        self.assertIn('if [[ "$CANDIDATE_MODE" == \'disabled\' ]]', selector)
+        self.assertIn('elif [[ "$CANDIDATE_MODE" == \'compose\' ]]', selector)
+        self.assertIn("PREPARED_SCHEMA\" != 'v1'", compose)
+        self.assertIn("MEASURE_ONLY\" != 'false'", compose)
+        self.assertIn("FORCE_REFRESH\" != 'false'", compose)
+        self.assertIn("RESUME_RUN_ID$EXPECTED_SNAPSHOT_ID$SOURCE_RUN_ID$EXPECTED_SOURCE_COUNT$EXPECTED_TOTAL_BYTES", compose)
+        for fragment in (
+            'PRIMARY_RUN" != \'39217550518\'', 'PRIMARY_ID" != \'12169814614\'',
+            'PRIMARY_DIGEST" != \'sha256:2d6e925559a90f261d3c4f02490be271356c6fd57c6730a90aa2a1424b194ceb\'',
+            'TNDS_RUN" != \'39217550518\'', 'TNDS_ID" != \'12171771295\'',
+            'TNDS_DIGEST" != \'sha256:cd4e3b83a969eab66529ca59cbacb8a3f02ec9fd8e558b8edd7da2044e9ef7a1\'',
+            '-n "$CANDIDATE_RUN$CANDIDATE_ID$CANDIDATE_DIGEST"',
+        ):
+            self.assertIn(fragment, compose)
+        self.assertIn("trust_mode=review_candidate", compose)
+        self.assertIn("review_candidate_mode=compose", compose)
+        self.assertIn("restore_candidate is not enabled", selector)
+        self.assertIn("S2B-C3 accepts only disabled offline preflight or exact Run #53 compose", selector)
+
+    def test_s2b_c3_review_candidate_route_stays_isolated_and_cannot_reach_live_or_legacy_jobs(self):
+        selector = self.dispatcher.split("- name: Resolve S2B-C3 exact offline preflight or Run #53 compose selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
+        candidate_job = self.dispatcher.split("\n  s2a-c1-review-candidate:\n", 1)[1]
+        self.assertIn("steps.s2b-c3-selector.outputs.trust_mode", self.dispatcher)
+        self.assertIn("steps.s2b-c3-selector.outputs.review_candidate_mode", self.dispatcher)
+        self.assertIn("refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority", candidate_job)
+        self.assertIn("needs.main-guard.outputs.trust_mode == 'review_candidate'", candidate_job)
+        self.assertIn("review_candidate_mode != ''", candidate_job)
+        offline = self.dispatcher.split("  tnds-trust-browser-offline-preflight:", 1)[1].split("  tnds-trust-browser-live:", 1)[0]
+        self.assertIn("refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority", offline)
+        live = self.dispatcher.split("  tnds-trust-browser-live:", 1)[1].split("\n  c3-primary-source:", 1)[0]
+        self.assertNotIn("refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority", live)
+        for marker, next_marker in (("freshness", "build-validate"), ("build-validate", "deploy"), ("deploy", "freshness-no-op")):
+            block = self.dispatcher.split(f"\n  {marker}:\n", 1)[1].split(f"\n  {next_marker}:\n", 1)[0]
+            self.assertIn("needs.main-guard.outputs.trust_mode == ''", block)
+        compose_branch = selector.split("elif [[ \"$CANDIDATE_MODE\" == 'compose' ]]", 1)[1].split("else\n            echo '::error::S2B-C3 accepts only", 1)[0]
+        self.assertNotIn("review_candidate_mode=restore_candidate", compose_branch)
+        self.assertIn("actions: read", self.workflow)
+        self.assertIn("contents: read", self.workflow)
+        self.assertNotIn("pages: write", self.workflow)
+        self.assertNotIn("deployments: write", self.workflow)
+
+    def test_s2b_c3_pinned_sources_skip_all_fresh_acquisition_paths_and_keep_preflight_gate(self):
+        selector = self.dispatcher.split("- name: Resolve S2B-C3 exact offline preflight or Run #53 compose selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
+        compose = selector.split("elif [[ \"$CANDIDATE_MODE\" == 'compose' ]]", 1)[1].split("else\n            echo '::error::S2B-C3 accepts only", 1)[0]
+        self.assertIn('PRIMARY_RUN" != \'39217550518\'', compose)
+        self.assertIn('TNDS_RUN" != \'39217550518\'', compose)
+        primary = self.workflow.split("- name: Verify explicit primary snapshot or acquire fresh eleven-source snapshot", 1)[1].split("- name:", 1)[0]
+        self.assertIn('if [[ -n "$PRIMARY_RUN_INPUT" ]]; then', primary)
+        self.assertIn("source_snapshot.py --acquire --output source-snapshot", primary)
+        fresh_upload = self.workflow.split("- name: Preserve verified primary snapshot before preparation", 1)[1].split("- name:", 1)[0]
+        self.assertIn("inputs.primary_source_run_id == ''", fresh_upload)
+        for name in ("Run metadata-only TNDS authentication and archive gate", "Acquire and verify the fresh eight-region raw TNDS snapshot", "Preserve fresh raw TNDS snapshot before capacity, extraction, or preparation"):
+            block = self.workflow.split(f"- name: {name}", 1)[1].split("- name:", 1)[0]
+            self.assertIn("inputs.tnds_source_run_id == ''", block)
+        self.assertIn("Require successful unexpired exact-SHA offline preflight before source acquisition", self.workflow)
 
     def test_c3_accepts_only_exact_offline_preflight_or_valid_isolated_candidate_modes(self):
         selector = self.dispatcher.split("- name: Resolve S2A-C3 offline preflight or isolated review-candidate selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]

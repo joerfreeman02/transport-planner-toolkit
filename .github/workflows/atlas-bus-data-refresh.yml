@@ -122,9 +122,9 @@ jobs:
     name: Check refresh execution context
     runs-on: ubuntu-latest
     outputs:
-      trust_mode: ${{ steps.s2b-c2-selector.outputs.trust_mode || steps.s2b-c1-selector.outputs.trust_mode || steps.s2a-c3-selector.outputs.trust_mode || steps.s2a-c2-selector.outputs.trust_mode || steps.s2a-c1-selector.outputs.trust_mode || steps.trust-selector.outputs.trust_mode }}
+      trust_mode: ${{ steps.s2b-c3-selector.outputs.trust_mode || steps.s2b-c2-selector.outputs.trust_mode || steps.s2b-c1-selector.outputs.trust_mode || steps.s2a-c3-selector.outputs.trust_mode || steps.s2a-c2-selector.outputs.trust_mode || steps.s2a-c1-selector.outputs.trust_mode || steps.trust-selector.outputs.trust_mode }}
       trust_prior_producer_run_id: ${{ steps.s2a-c3-selector.outputs.prior_producer_run_id || steps.s2a-c2-selector.outputs.prior_producer_run_id || steps.s2a-c1-selector.outputs.prior_producer_run_id || steps.trust-selector.outputs.prior_producer_run_id }}
-      review_candidate_mode: ${{ steps.s2b-c1-selector.outputs.review_candidate_mode || steps.s2a-c3-selector.outputs.review_candidate_mode || steps.s2a-c1-selector.outputs.review_candidate_mode }}
+      review_candidate_mode: ${{ steps.s2b-c3-selector.outputs.review_candidate_mode || steps.s2b-c1-selector.outputs.review_candidate_mode || steps.s2a-c3-selector.outputs.review_candidate_mode || steps.s2a-c1-selector.outputs.review_candidate_mode }}
     steps:
       - name: Refuse non-manual non-main execution
         if: github.ref != 'refs/heads/main' && github.event_name != 'workflow_dispatch'
@@ -369,9 +369,57 @@ jobs:
           echo 'trust_mode=offline_preflight' >> "$GITHUB_OUTPUT"
           echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
 
+      - name: Resolve S2B-C3 exact offline preflight or Run #53 compose selector
+        id: s2b-c3-selector
+        if: github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority'
+        env:
+          PREPARED_SCHEMA: ${{ inputs.prepared_schema }}
+          MEASURE_ONLY: ${{ inputs.measure_only }}
+          FORCE_REFRESH: ${{ inputs.force_refresh }}
+          RESUME_RUN_ID: ${{ inputs.resume_checkpoint_run_id }}
+          EXPECTED_SNAPSHOT_ID: ${{ inputs.v2_expected_snapshot_id }}
+          SOURCE_RUN_ID: ${{ inputs.v2_source_snapshot_run_id }}
+          EXPECTED_SOURCE_COUNT: ${{ inputs.v2_expected_source_count }}
+          EXPECTED_TOTAL_BYTES: ${{ inputs.v2_expected_total_bytes }}
+          CANDIDATE_MODE: ${{ inputs.review_candidate_mode }}
+          PRIMARY_RUN: ${{ inputs.primary_source_run_id }}
+          PRIMARY_ID: ${{ inputs.primary_artifact_id }}
+          PRIMARY_DIGEST: ${{ inputs.primary_artifact_digest }}
+          TNDS_RUN: ${{ inputs.tnds_source_run_id }}
+          TNDS_ID: ${{ inputs.tnds_artifact_id }}
+          TNDS_DIGEST: ${{ inputs.tnds_artifact_digest }}
+          CANDIDATE_RUN: ${{ inputs.candidate_checkpoint_run_id }}
+          CANDIDATE_ID: ${{ inputs.candidate_artifact_id }}
+          CANDIDATE_DIGEST: ${{ inputs.candidate_artifact_digest }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" != 'workflow_dispatch' ]]; then
+            echo '::error::The S2B-C3 selector accepts only manual dispatches.'
+            exit 1
+          fi
+          if [[ "$CANDIDATE_MODE" == 'disabled' ]]; then
+            if [[ "$PREPARED_SCHEMA" != 'v2' || "$MEASURE_ONLY" != 'true' || "$FORCE_REFRESH" != 'true' || -n "$RESUME_RUN_ID" || "$EXPECTED_SNAPSHOT_ID" != 'TNDS-TRUST-PREFLIGHT-C1B' || -n "$SOURCE_RUN_ID$EXPECTED_SOURCE_COUNT$EXPECTED_TOTAL_BYTES" || -n "$PRIMARY_RUN$PRIMARY_ID$PRIMARY_DIGEST$TNDS_RUN$TNDS_ID$TNDS_DIGEST$CANDIDATE_RUN$CANDIDATE_ID$CANDIDATE_DIGEST" ]]; then
+              echo '::error::The S2B-C3 offline selector accepts only the exact zero-download preflight inputs.'
+              exit 1
+            fi
+            echo 'trust_mode=offline_preflight' >> "$GITHUB_OUTPUT"
+            echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
+            echo 'review_candidate_mode=' >> "$GITHUB_OUTPUT"
+          elif [[ "$CANDIDATE_MODE" == 'compose' ]]; then
+            if [[ "$PREPARED_SCHEMA" != 'v1' || "$MEASURE_ONLY" != 'false' || "$FORCE_REFRESH" != 'false' || -n "$RESUME_RUN_ID$EXPECTED_SNAPSHOT_ID$SOURCE_RUN_ID$EXPECTED_SOURCE_COUNT$EXPECTED_TOTAL_BYTES" || "$PRIMARY_RUN" != '39217550518' || "$PRIMARY_ID" != '12169814614' || "$PRIMARY_DIGEST" != 'sha256:2d6e925559a90f261d3c4f02490be271356c6fd57c6730a90aa2a1424b194ceb' || "$TNDS_RUN" != '39217550518' || "$TNDS_ID" != '12171771295' || "$TNDS_DIGEST" != 'sha256:cd4e3b83a969eab66529ca59cbacb8a3f02ec9fd8e558b8edd7da2044e9ef7a1' || -n "$CANDIDATE_RUN$CANDIDATE_ID$CANDIDATE_DIGEST" ]]; then
+              echo '::error::S2B-C3 compose accepts only the pinned Run #53 primary and TNDS artifacts with every other selector disabled.'
+              exit 1
+            fi
+            echo 'trust_mode=review_candidate' >> "$GITHUB_OUTPUT"
+            echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
+            echo 'review_candidate_mode=compose' >> "$GITHUB_OUTPUT"
+          else
+            echo '::error::S2B-C3 accepts only disabled offline preflight or exact Run #53 compose; restore_candidate is not enabled.'
+            exit 1
+          fi
+
       - name: Resolve exact-branch TRUST browser selector
         id: trust-selector
-        if: github.ref != 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology'
+        if: github.ref != 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority'
         env:
           TRUST_BRANCH_C3: refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation
           TRUST_BRANCH_C3_C1: refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout
@@ -764,7 +812,7 @@ jobs:
   tnds-trust-browser-offline-preflight:
     name: Run default-branch-compatible TNDS TRUST offline preflight
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-refresh-checkpoint-readiness' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'offline_preflight'
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-refresh-checkpoint-readiness' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'offline_preflight'
     uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml
     with:
       mode: offline_preflight
@@ -847,7 +895,7 @@ jobs:
   s2a-c1-review-candidate:
     name: Compose or restore isolated S2A review candidate
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'review_candidate' && needs.main-guard.outputs.review_candidate_mode != ''
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'review_candidate' && needs.main-guard.outputs.review_candidate_mode != ''
     uses: ./.github/workflows/atlas-bus-beta-candidate.yml
     with:
       mode: ${{ needs.main-guard.outputs.review_candidate_mode }}

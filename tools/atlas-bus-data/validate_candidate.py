@@ -13,6 +13,7 @@ KNOWN_TNDS_QUARANTINE_REASONS = {"incomplete_runtime_sequence", "missing_timing_
 BUS_SCHEMAS = {"atlas-prepared-bus-data-v1", "atlas-prepared-bus-data-v2"}
 V2_GROUP_SCHEMA = "atlas-prepared-logical-groups-v1"
 V2_LOCALITY_SCHEMA = "atlas-prepared-nptg-localities-v1"
+TNDS_RUNTIME_SHARD_MAX_BYTES = 8 * 1024 * 1024
 ENDPOINT_MATCH_METHODS = {"gtfs-stop-id-equals-atco-code", "gtfs-stop-code-equals-naptan-code", "unresolved"}
 
 
@@ -24,6 +25,26 @@ def read_json(path: Path):
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, gzip.BadGzipFile, json.JSONDecodeError) as error:
         raise RefreshError(f"Candidate data file is unreadable: {path}") from error
+
+
+def read_bounded_tnds_json(path: Path, max_bytes: int) -> tuple[dict, int]:
+    chunks = []
+    total = 0
+    try:
+        with gzip.open(path, "rb") as stream:
+            while True:
+                chunk = stream.read(64 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_bytes:
+                    raise RefreshError(f"Candidate TNDS runtime shard exceeds the bounded {max_bytes}-byte limit: {path.name}")
+                chunks.append(chunk)
+        return json.loads(b"".join(chunks).decode("utf-8")), total
+    except RefreshError:
+        raise
+    except (OSError, gzip.BadGzipFile, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RefreshError(f"Candidate TNDS runtime shard is unreadable: {path.name}") from error
 
 
 def validate_tnds_service(service: dict, relative: str) -> None:
@@ -176,8 +197,16 @@ def validate(site: Path, bus_only: bool = False) -> dict:
     if not bus_only:
         tnds = data / "bus-tnds"
         tnds_manifest = read_json(tnds / "manifest.json")
-        if tnds_manifest.get("schema") != "atlas-prepared-bus-tnds-v1":
+        tnds_schema = tnds_manifest.get("schema")
+        if tnds_schema not in {"atlas-prepared-bus-tnds-v1", "atlas-prepared-bus-tnds-v2"}:
             raise RefreshError("Candidate TNDS manifest schema is invalid")
+        bounded_tnds = tnds_schema == "atlas-prepared-bus-tnds-v2"
+        if bounded_tnds:
+            runtime_limit = tnds_manifest.get("runtimeShardMaxBytes")
+            if not isinstance(runtime_limit, int) or isinstance(runtime_limit, bool) or runtime_limit < 1 or runtime_limit > TNDS_RUNTIME_SHARD_MAX_BYTES:
+                raise RefreshError(f"Candidate TNDS runtime shard ceiling must be between 1 and {TNDS_RUNTIME_SHARD_MAX_BYTES} bytes")
+            if not isinstance(tnds_manifest.get("runtimeShardCount"), int) or not isinstance(tnds_manifest.get("runtimeShardTotalBytes"), int):
+                raise RefreshError("Candidate TNDS runtime shard measurements are missing or malformed")
         if "services" in tnds_manifest:
             raise RefreshError("Candidate TNDS manifest contains obsolete inline services; expected five-character stop-prefix service shards")
         if tnds_manifest.get("serviceShardKeyLength") != 5:
@@ -241,26 +270,53 @@ def validate(site: Path, bus_only: bool = False) -> dict:
     if service_count == 0:
         raise RefreshError("Candidate contains no prepared services")
     tnds_service_count = 0
+    tnds_service_ids: set[str] = set()
+    measured_tnds_shards = []
     for prefix, relative_paths in service_shards.items():
         if not isinstance(prefix, str) or len(prefix) != tnds_manifest["serviceShardKeyLength"] or not isinstance(relative_paths, list) or not relative_paths:
             raise RefreshError("Candidate TNDS serviceShards are malformed")
         identities = set()
-        for relative in relative_paths:
-            payload = read_json(tnds / relative)
-            if payload.get("schema") != "atlas-prepared-bus-tnds-v1" or payload.get("stopPrefix") != prefix or not isinstance(payload.get("services"), list) or not payload["services"]:
+        for configured in relative_paths:
+            descriptor = configured if bounded_tnds else None
+            relative = descriptor.get("path") if descriptor else configured
+            if not isinstance(relative, str) or not relative:
+                raise RefreshError("Candidate TNDS shard path is malformed")
+            if bounded_tnds:
+                stop_index = descriptor.get("stopIds")
+                if not isinstance(stop_index, list) or not stop_index or any(not isinstance(stop_id, str) or not stop_id for stop_id in stop_index) or stop_index != sorted(set(stop_index)):
+                    raise RefreshError(f"Candidate TNDS shard stop index is malformed: {relative}")
+                payload, uncompressed_bytes = read_bounded_tnds_json(tnds / relative, tnds_manifest["runtimeShardMaxBytes"])
+                compressed_bytes = (tnds / relative).stat().st_size
+                if descriptor.get("uncompressedBytes") != uncompressed_bytes or descriptor.get("compressedBytes") != compressed_bytes:
+                    raise RefreshError(f"Candidate TNDS shard size index does not match its file: {relative}")
+                measured_tnds_shards.append(uncompressed_bytes)
+            else:
+                payload = read_json(tnds / relative)
+            expected_schema = "atlas-prepared-bus-tnds-v2" if bounded_tnds else "atlas-prepared-bus-tnds-v1"
+            if payload.get("schema") != expected_schema or payload.get("stopPrefix") != prefix or not isinstance(payload.get("services"), list) or not payload["services"]:
                 raise RefreshError(f"Candidate TNDS shard is empty or malformed: {relative}")
+            shard_stop_ids = set()
             for service in payload["services"]:
                 identity = service.get("id") or service.get("source", {}).get("serviceCode")
                 if not identity or identity in identities:
                     raise RefreshError(f"Candidate TNDS shard contains a duplicate or missing service identity: {relative}")
                 identities.add(identity)
+                tnds_service_ids.add(str(identity))
                 validate_tnds_service(service, relative)
                 relevant_ids = set(service.get("stopSchedules", {})) | set(service.get("tndsQuarantine", {}).get("affectedStopIds", []) if service.get("tndsQuarantine") else [])
                 if not any(str(stop_id).startswith(prefix) for stop_id in relevant_ids):
                     raise RefreshError(f"Candidate TNDS shard contains a service unrelated to prefix {prefix}: {relative}")
+                shard_stop_ids.update(str(stop_id) for stop_id in relevant_ids if str(stop_id).startswith(prefix))
                 tnds_service_count += 1
+            if bounded_tnds and sorted(shard_stop_ids) != descriptor["stopIds"]:
+                raise RefreshError(f"Candidate TNDS shard stop index does not match its records: {relative}")
     if not bus_only and (not tnds_service_count or int(tnds_manifest.get("serviceCount", 0) or 0) < 1):
         raise RefreshError("Candidate contains no prepared TNDS services")
+    if bounded_tnds:
+        if len(measured_tnds_shards) != tnds_manifest["runtimeShardCount"] or sum(measured_tnds_shards) != tnds_manifest["runtimeShardTotalBytes"] or max(measured_tnds_shards, default=0) != tnds_manifest.get("runtimeShardMaxObservedBytes"):
+            raise RefreshError("Candidate TNDS runtime shard measurements do not match the packaged files")
+        if len(tnds_service_ids) != tnds_manifest.get("serviceCount"):
+            raise RefreshError("Candidate TNDS service identity count does not match the manifest; a service may have been lost")
     forbidden = [path for path in data.rglob("*") if path.is_file() and path.suffix.lower() in {".csv", ".zip", ".xml"}]
     if forbidden:
         raise RefreshError(f"Raw source file leaked into public data: {forbidden[0].name}")

@@ -17,7 +17,7 @@ assert.equal(result.services, 2);
 const manifest = JSON.parse(await fs.readFile(path.join(output, 'manifest.json'), 'utf8'));
 assert.equal(manifest.serviceCount, 2);
 assert.equal(manifest.serviceShardKeyLength, 5);
-const manifestPaths = Object.values(manifest.serviceShards).flat();
+const manifestPaths = Object.values(manifest.serviceShards).flat().map(item => typeof item === 'string' ? item : item.path);
 assert.equal(manifestPaths.length, 4);
 const prepared = (await Promise.all(manifestPaths.map(relative => fs.readFile(path.join(output, relative)).then(bytes => JSON.parse(gunzipSync(bytes).toString('utf8')).services)))).flat();
 assert.equal(new Set(prepared.map(service => service.id)).size, 2);
@@ -48,7 +48,7 @@ const quarantineResult = await prepareTnds({ input: quarantineInput, output: qua
 assert.equal(quarantineResult.services, 2);
 assert.equal(quarantineResult.quarantinedPatterns, 1);
 const quarantineManifest = JSON.parse(await fs.readFile(path.join(quarantineOutput, 'manifest.json'), 'utf8'));
-const quarantinePaths = Object.values(quarantineManifest.serviceShards).flat();
+const quarantinePaths = Object.values(quarantineManifest.serviceShards).flat().map(item => typeof item === 'string' ? item : item.path);
 const quarantineServices = (await Promise.all(quarantinePaths.map(relative => fs.readFile(path.join(quarantineOutput, relative)).then(bytes => JSON.parse(gunzipSync(bytes).toString('utf8')).services)))).flat();
 const quarantinedService = quarantineServices.find(service => service.source.serviceCode === 'SB');
 assert.ok(quarantinedService);

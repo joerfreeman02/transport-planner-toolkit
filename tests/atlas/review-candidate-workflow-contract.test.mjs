@@ -4,8 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const dispatcher = fs.readFileSync(path.join(root, '.github/workflows/atlas-bus-data-refresh.yml'), 'utf8');
-const candidate = fs.readFileSync(path.join(root, '.github/workflows/atlas-bus-beta-candidate.yml'), 'utf8');
+const dispatcher = fs.readFileSync(path.join(root, '.github/workflows/atlas-bus-data-refresh.yml'), 'utf8').replace(/\r\n/g, '\n');
+const candidate = fs.readFileSync(path.join(root, '.github/workflows/atlas-bus-beta-candidate.yml'), 'utf8').replace(/\r\n/g, '\n');
 
 const steps = candidate.split(/(?=^      - name: )/m).filter((block) => block.startsWith('      - name: '));
 const step = (name) => {
@@ -69,8 +69,23 @@ assert.match(c4Selector, /-n "\$CANDIDATE_RUN\$CANDIDATE_ID\$CANDIDATE_DIGEST"/)
 assert.match(c4Selector, /accepts only disabled offline preflight or exact Run #53 compose; restore_candidate is not enabled/);
 assert.match(dispatcher, /steps\.s2b-c4-selector\.outputs\.trust_mode/);
 assert.match(dispatcher, /steps\.s2b-c4-selector\.outputs\.review_candidate_mode/);
-assert.match(dispatcher, /refs\/heads\/codex\/atlas-bus-beta-s2b-c4-restore-auth-closeout'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'offline_preflight'/);
+assert.match(dispatcher, /refs\/heads\/codex\/atlas-bus-beta-s2b-c4-restore-auth-closeout' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-1-national-runtime-scale'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'offline_preflight'/);
 assert.match(dispatcher, /refs\/heads\/codex\/atlas-bus-beta-s2b-c4-restore-auth-closeout'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'review_candidate'/);
+
+const s2c1Selector = dispatcher.slice(
+  dispatcher.indexOf('      - name: Resolve S2C-1 exact zero-download offline preflight selector'),
+  dispatcher.indexOf('      - name: Resolve exact-branch TRUST browser selector'),
+);
+assert.match(s2c1Selector, /if: github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-1-national-runtime-scale'/);
+assert.match(s2c1Selector, /PREPARED_SCHEMA" != 'v2'.*MEASURE_ONLY" != 'true'.*FORCE_REFRESH" != 'true'.*EXPECTED_SNAPSHOT_ID" != 'TNDS-TRUST-PREFLIGHT-C1B'/);
+assert.match(s2c1Selector, /-n "\$SOURCE_RUN_ID\$EXPECTED_SOURCE_COUNT\$EXPECTED_TOTAL_BYTES\$PRIMARY_RUN\$PRIMARY_ID\$PRIMARY_DIGEST\$TNDS_RUN\$TNDS_ID\$TNDS_DIGEST\$CANDIDATE_RUN\$CANDIDATE_ID\$CANDIDATE_DIGEST"/);
+assert.match(s2c1Selector, /trust_mode=offline_preflight/);
+assert.doesNotMatch(s2c1Selector, /trust_mode=review_candidate/);
+assert.match(dispatcher, /steps\.s2c-1-selector\.outputs\.trust_mode/);
+const offlinePreflight = dispatcher.slice(dispatcher.indexOf('  tnds-trust-browser-offline-preflight:'), dispatcher.indexOf('  tnds-trust-browser-live:'));
+assert.match(offlinePreflight, /refs\/heads\/codex\/atlas-bus-beta-s2c-1-national-runtime-scale/);
+assert.doesNotMatch(dispatcher.slice(dispatcher.indexOf('  tnds-trust-browser-live:'), dispatcher.indexOf('\n  c3-primary-source:')), /atlas-bus-beta-s2c-1-national-runtime-scale/);
+assert.doesNotMatch(dispatcher.slice(dispatcher.indexOf('\n  s2a-c1-review-candidate:\n')), /atlas-bus-beta-s2c-1-national-runtime-scale/);
 
 const primaryVerify = step('Verify explicit primary snapshot or acquire fresh eleven-source snapshot');
 assert.match(primaryVerify, /PRIMARY_RUN: \$\{\{ inputs\.primary_source_run_id \|\| github\.run_id \}\}/);

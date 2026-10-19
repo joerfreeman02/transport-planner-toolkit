@@ -71,6 +71,22 @@ test('timetable source warnings reach the assessment without raw parser diagnost
   assert.doesNotMatch(result.warnings.join(' '), /JP-|\.xml|RunTime/);
 });
 
+test('BODS survives unresolved supplementary TNDS without a complete assessment', async () => {
+  const bods = { ...service, id: 'bods-primary-10', timetableSource: 'BODS', operator: 'BODS Primary', stopSchedules: { '2100A': { monday: [360], tuesday: [360], wednesday: [360], thursday: [360], friday: [360], saturday: [], sunday: [] } } };
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [{ ...stop, routeAuthorities: { '10': ['BODS'] } }], evidence: [], warnings: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [bods], warnings: ['Supplementary TNDS evidence remains unresolved; successfully loaded BODS-primary services were retained.'], provenance: { sourceCompleteness: 'PARTIAL', timetableConclusion: 'UNRESOLVED', supplementarySourceCondition: 'UNRESOLVED', unresolvedRequestIdentities: ['10|2100A'], nationalUnresolvedRequestIdentities: ['10|2100A'], nationalUnresolvedRoutes: ['10'], unresolvedRequests: 1, failedRequests: 1 } }) },
+    accessRouting: { matrix: async (_site, stops) => ({ ok: true, routes: stops.map(() => ({ status: 'routed', distanceMetres: 100, durationSeconds: 60 })), warnings: [], provenance: { source: 'OSRM' } }) }
+  });
+  const result = await assessment.assess({});
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 'partial', 'unresolved TNDS cannot pass the Bus completeness gate');
+  assert.ok(result.services.some(row => row.id === bods.id), 'valid BODS-primary service remains usable');
+  assert.ok(result.plannerServiceSummaries.some(row => row.routeNumber === '10'));
+  assert.deepEqual(result.provenance.timetables.unresolvedRequestIdentities, ['10|2100A']);
+  assert.ok(result.reviewItems.length > 0, 'supplementary uncertainty remains visible for review');
+});
+
 test('all assessment review paths carry deterministic taxonomy categories', async () => {
   const normalAssessment = createBusAssessment({
     stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], evidence: [], warnings: [], provenance: {} }) },

@@ -38,6 +38,73 @@ class CandidateValidatorTests(unittest.TestCase):
         target = self.root / 'atlas/data/bus-tnds/services/0-ea.json'
         target.write_text(json.dumps({'schema': 'atlas-prepared-bus-tnds-v1', 'stopPrefix': 'STOP-', 'services': [payload]}))
 
+    def _convert_tnds_to_v2(self, max_bytes=8 * 1024 * 1024):
+        root = self.root / 'atlas/data/bus-tnds'
+        manifest_path = root / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        shards = {}
+        measurements = []
+        for prefix, relative_paths in manifest['serviceShards'].items():
+            descriptors = []
+            for relative in relative_paths:
+                old_path = root / relative
+                payload = json.loads(old_path.read_text())
+                payload['schema'] = 'atlas-prepared-bus-tnds-v2'
+                content = json.dumps(payload, separators=(',', ':')).encode()
+                compressed = gzip.compress(content, mtime=0)
+                new_relative = relative.removesuffix('.json') + '-0001.json.gz'
+                target = root / new_relative
+                target.write_bytes(compressed)
+                old_path.unlink()
+                descriptor = {'path': new_relative, 'stopIds': ['STOP-1'], 'uncompressedBytes': len(content), 'compressedBytes': len(compressed)}
+                descriptors.append(descriptor)
+                measurements.append(len(content))
+            shards[prefix] = descriptors
+        manifest.update({'schema': 'atlas-prepared-bus-tnds-v2', 'runtimeShardMaxBytes': max_bytes,
+                         'runtimeShardCount': len(measurements), 'runtimeShardMaxObservedBytes': max(measurements),
+                         'runtimeShardTotalBytes': sum(measurements), 'serviceShards': shards})
+        manifest_path.write_text(json.dumps(manifest))
+
+    def test_bounded_tnds_v2_candidate_passes_runtime_package_validation(self):
+        self._convert_tnds_to_v2()
+        result = validate(self.root)
+        self.assertEqual(result['tndsShardRecords'], len(TNDS_REGIONS))
+
+    def test_bounded_tnds_v2_rejects_actual_shard_over_limit(self):
+        self._convert_tnds_to_v2(max_bytes=64)
+        with self.assertRaisesRegex(RefreshError, 'exceeds the bounded 64-byte limit'):
+            validate(self.root)
+
+    def test_bounded_tnds_v2_rejects_mismatched_stop_index(self):
+        self._convert_tnds_to_v2()
+        manifest_path = self.root / 'atlas/data/bus-tnds/manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        manifest['serviceShards']['STOP-'][0]['stopIds'] = ['OTHER']
+        manifest_path.write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(RefreshError, 'stop index does not match'):
+            validate(self.root)
+
+    def test_bounded_tnds_v2_rejects_missing_service_identity(self):
+        self._convert_tnds_to_v2()
+        manifest_path = self.root / 'atlas/data/bus-tnds/manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        first = manifest['serviceShards']['STOP-'][0]
+        path = self.root / 'atlas/data/bus-tnds' / first['path']
+        payload = json.loads(gzip.decompress(path.read_bytes()))
+        old_size = first['uncompressedBytes']
+        payload['services'][0].pop('id')
+        payload['services'][0]['source'].pop('serviceCode')
+        content = json.dumps(payload, separators=(',', ':')).encode()
+        compressed = gzip.compress(content, mtime=0)
+        path.write_bytes(compressed)
+        first['uncompressedBytes'] = len(content)
+        first['compressedBytes'] = len(compressed)
+        manifest['runtimeShardTotalBytes'] += len(content) - old_size
+        manifest['runtimeShardMaxObservedBytes'] = max(item['uncompressedBytes'] for values in manifest['serviceShards'].values() for item in values)
+        manifest_path.write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(RefreshError, 'duplicate or missing service identity'):
+            validate(self.root)
+
     def test_generated_candidate_passes_structural_validation(self):
         result = validate(self.root)
         self.assertEqual(result['serviceShardRecords'], 1)

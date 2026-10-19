@@ -68,12 +68,15 @@ def read_prepared_handoff(prepared_root: str | Path) -> tuple[Path, dict, list[s
     manifest_path = root / "manifest.json"
     if not manifest_path.is_file(): raise RuntimeError("Prepared TNDS manifest missing")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("schema") != "atlas-prepared-bus-tnds-v1": raise RuntimeError("Prepared TNDS manifest schema mismatch")
+    if manifest.get("schema") != "atlas-prepared-bus-tnds-v2": raise RuntimeError("Prepared TNDS manifest schema mismatch")
     regions, counts = validate_tnds_region_coverage(manifest)
     if set(regions) != set(TNDS_REGIONS) or len(regions) != len(TNDS_REGIONS):
         raise RuntimeError("Prepared TNDS handoff does not contain exactly eight regions")
     for files in manifest.get("serviceShards", {}).values():
-        for relative in files:
+        for descriptor in files:
+            relative = descriptor.get("path") if isinstance(descriptor, dict) else None
+            if not relative or not isinstance(descriptor.get("stopIds"), list):
+                raise RuntimeError("Prepared TNDS service shard descriptor is malformed")
             target = (root / relative).resolve()
             if root.resolve() not in target.parents or not target.is_file():
                 raise RuntimeError("Prepared TNDS manifest references a missing or unsafe service shard")
@@ -90,11 +93,13 @@ def prepare_tnds_handoff(snapshot_root: str | Path, extracted_root: str | Path, 
     extracted_root.mkdir(parents=True, exist_ok=False)
     prepared_root.mkdir(parents=True, exist_ok=False)
     (prepared_root / "services").mkdir()
-    merged = {"schema": "atlas-prepared-bus-tnds-v1", "generatedAt": prepared_at,
+    merged = {"schema": "atlas-prepared-bus-tnds-v2", "generatedAt": prepared_at,
               "source": "Traveline National Dataset v2.5", "expectedRegions": list(TNDS_REGIONS),
               "regions": [], "regionServiceCounts": {}, "sourceFileCounts": {}, "parsedFileCounts": {},
               "ignoredRegistrationFileCounts": {}, "quarantinedPatternCount": 0, "quarantinedServiceCount": 0,
-              "serviceCount": 0, "serviceShardKeyLength": 5, "serviceShards": {}}
+              "serviceCount": 0, "serviceShardKeyLength": 5, "runtimeShardMaxBytes": 8 * 1024 * 1024,
+              "runtimeShardCount": 0, "runtimeShardMaxObservedBytes": 0, "runtimeShardTotalBytes": 0,
+              "serviceShards": {}}
     for region in TNDS_REGIONS:
         if stage_callback: stage_callback("EXTRACTION_STARTED_" + region)
         region_input, region_output = extracted_root / region, prepared_root / f".region-{region}"
@@ -114,8 +119,9 @@ def prepare_tnds_handoff(snapshot_root: str | Path, extracted_root: str | Path, 
         regional = json.loads((region_output / "manifest.json").read_text(encoding="utf-8"))
         if regional.get("regions") != [region]:
             raise RuntimeError(f"TNDS regional preparation did not produce exactly {region}")
-        for relative_files in regional.get("serviceShards", {}).values():
-            for relative in relative_files:
+        for descriptors in regional.get("serviceShards", {}).values():
+            for descriptor in descriptors:
+                relative = descriptor.get("path")
                 source = region_output / relative
                 target = prepared_root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -126,13 +132,16 @@ def prepare_tnds_handoff(snapshot_root: str | Path, extracted_root: str | Path, 
             merged[key].update(regional[key])
         for key in ("quarantinedPatternCount", "quarantinedServiceCount", "serviceCount"):
             merged[key] += regional[key]
+        merged["runtimeShardCount"] += regional["runtimeShardCount"]
+        merged["runtimeShardMaxObservedBytes"] = max(merged["runtimeShardMaxObservedBytes"], regional["runtimeShardMaxObservedBytes"])
+        merged["runtimeShardTotalBytes"] += regional["runtimeShardTotalBytes"]
         for shard, paths in regional.get("serviceShards", {}).items():
             merged["serviceShards"].setdefault(shard, []).extend(paths)
         shutil.rmtree(region_input, ignore_errors=True)
         shutil.rmtree(region_output, ignore_errors=True)
     merged["regions"] = [region for region in TNDS_REGIONS if region in merged["regions"]]
     if len(merged["regions"]) != len(TNDS_REGIONS): raise RuntimeError("Prepared TNDS handoff is missing a region")
-    for paths in merged["serviceShards"].values(): paths.sort()
+    for paths in merged["serviceShards"].values(): paths.sort(key=lambda descriptor: descriptor["path"])
     (prepared_root / "manifest.json").write_text(json.dumps(merged, separators=(",", ":")) + "\n", encoding="utf-8")
     prepared_manifest_path, prepared_manifest, regions, counts = read_prepared_handoff(prepared_root)
     if prepared_manifest.get("generatedAt") != prepared_at:

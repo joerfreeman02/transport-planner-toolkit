@@ -562,7 +562,14 @@ def candidate_metrics(site: Path) -> dict:
     if not isinstance(tnds_shards, dict) or not tnds_shards:
         raise RefreshError("Prepared TNDS candidate serviceShards are missing or malformed")
     received_regions, region_service_counts = validate_tnds_region_coverage(tnds)
-    tnds_paths = [item for values in tnds_shards.values() for item in values] if all(isinstance(values, list) for values in tnds_shards.values()) else []
+    tnds_bounded = tnds.get("schema") == "atlas-prepared-bus-tnds-v2"
+    tnds_paths = []
+    if all(isinstance(values, list) for values in tnds_shards.values()):
+        for values in tnds_shards.values():
+            for item in values:
+                relative = item.get("path") if tnds_bounded and isinstance(item, dict) else item
+                if isinstance(relative, str):
+                    tnds_paths.append(relative)
     if not tnds_paths or not isinstance(tnds.get("serviceShardKeyLength"), int) or tnds["serviceShardKeyLength"] < 1:
         raise RefreshError("Prepared TNDS candidate does not contain valid stop-prefix shards")
     for relative in list(bus["stopShards"].values()) + [item for values in bus["serviceShards"].values() for item in values] + tnds_paths:

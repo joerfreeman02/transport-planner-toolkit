@@ -69,6 +69,28 @@ class ReviewCandidateWorkflowContractTests(unittest.TestCase):
         for marker, next_marker in (("freshness", "build-validate"), ("build-validate", "deploy"), ("deploy", "freshness-no-op")):
             self.assertIn("needs.main-guard.outputs.trust_mode == ''", self.dispatcher.split(f"\n  {marker}:\n", 1)[1].split(f"\n  {next_marker}:\n", 1)[0])
 
+    def test_s2c1_branch_accepts_only_exact_zero_download_final_sha_preflight(self):
+        selector = self.dispatcher.split("- name: Resolve S2C-1 exact zero-download offline preflight selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
+        self.assertIn("id: s2c-1-selector", selector)
+        self.assertIn("github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-1-national-runtime-scale'", selector)
+        self.assertIn("\"$PREPARED_SCHEMA\" != 'v2'", selector)
+        self.assertIn("\"$MEASURE_ONLY\" != 'true'", selector)
+        self.assertIn("\"$FORCE_REFRESH\" != 'true'", selector)
+        self.assertIn("\"$EXPECTED_SNAPSHOT_ID\" != 'TNDS-TRUST-PREFLIGHT-C1B'", selector)
+        self.assertIn("trust_mode=offline_preflight", selector)
+        self.assertNotIn("trust_mode=review_candidate", selector)
+        self.assertIn("steps.s2c-1-selector.outputs.trust_mode", self.dispatcher)
+        offline = self.dispatcher.split("  tnds-trust-browser-offline-preflight:", 1)[1].split("  tnds-trust-browser-live:", 1)[0]
+        self.assertIn("refs/heads/codex/atlas-bus-beta-s2c-1-national-runtime-scale", offline)
+        self.assertIn("needs.main-guard.outputs.trust_mode == 'offline_preflight'", offline)
+        live = self.dispatcher.split("  tnds-trust-browser-live:", 1)[1].split("\n  c3-primary-source:", 1)[0]
+        self.assertNotIn("refs/heads/codex/atlas-bus-beta-s2c-1-national-runtime-scale", live)
+        candidate = self.dispatcher.split("\n  s2a-c1-review-candidate:\n", 1)[1]
+        self.assertNotIn("refs/heads/codex/atlas-bus-beta-s2c-1-national-runtime-scale", candidate)
+        for marker, next_marker in (("freshness", "build-validate"), ("build-validate", "deploy"), ("deploy", "freshness-no-op")):
+            block = self.dispatcher.split(f"\n  {marker}:\n", 1)[1].split(f"\n  {next_marker}:\n", 1)[0]
+            self.assertIn("needs.main-guard.outputs.trust_mode == ''", block)
+
     def test_s2b_c3_accepts_only_exact_offline_preflight_or_pinned_run53_compose(self):
         selector = self.dispatcher.split("- name: Resolve S2B-C3 exact offline preflight or Run #53 compose selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
         offline = selector.split('if [[ "$CANDIDATE_MODE" == \'disabled\' ]]; then', 1)[1].split("elif [[ \"$CANDIDATE_MODE\" == 'compose' ]]", 1)[0]

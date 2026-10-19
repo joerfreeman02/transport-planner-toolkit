@@ -38,10 +38,10 @@ try {
   assert.deepEqual(manifest.regionServiceCounts, result.regionServiceCounts);
   assert.deepEqual(manifest.sourceFileCounts, result.sourceFileCounts);
   assert.deepEqual(manifest.ignoredRegistrationFileCounts, result.ignoredRegistrationFileCounts);
-  const paths = Object.values(manifest.serviceShards).flat();
+  const paths = Object.values(manifest.serviceShards).flat().map(item => typeof item === 'string' ? item : item.path);
   const prepared = (await Promise.all(paths.map(async relative => {
     const payload = JSON.parse(gunzipSync(await fs.readFile(path.join(output, relative))).toString('utf8'));
-    assert.equal(payload.schema, 'atlas-prepared-bus-tnds-v1');
+    assert.equal(payload.schema, 'atlas-prepared-bus-tnds-v2');
     assert.equal(payload.stopPrefix.length, 5);
     return payload.services;
   }))).flat();

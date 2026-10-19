@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { gunzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { parseTndsTransXchangeServices } from '../../src/atlas/adapters/tnds-transxchange-adapter.mjs';
 import { prepareTnds, TNDS_XML_MAX_BYTES } from '../../tools/atlas-bus-data/prepare_tnds.mjs';
 
@@ -17,7 +17,8 @@ function serviceXml(code, stopPrefix = 'EA000') {
 async function readServices(output) {
   const manifest = JSON.parse(await fs.readFile(path.join(output, 'manifest.json'), 'utf8'));
   const services = [];
-  for (const relative of Object.values(manifest.serviceShards).flat()) {
+  for (const item of Object.values(manifest.serviceShards).flat()) {
+    const relative = typeof item === 'string' ? item : item.path;
     const payload = JSON.parse(gunzipSync(await fs.readFile(path.join(output, relative))).toString('utf8'));
     services.push(...payload.services);
   }
@@ -78,7 +79,8 @@ try {
     const code = `scale-${String(index).padStart(4, '0')}`;
     return fs.writeFile(path.join(scaleInput, `EA-${String(serviceCount - index).padStart(5, '0')}.xml`), serviceXml(code));
   }));
-  const scaleResult = await prepareTnds({ input: scaleInput, output: scaleOutput, preparedAt });
+  const runtimeLimit = 32 * 1024;
+  const scaleResult = await prepareTnds({ input: scaleInput, output: scaleOutput, preparedAt, maxRuntimeShardBytes: runtimeLimit });
   const scaleServices = await readServices(scaleOutput);
   assert.equal(scaleResult.services, serviceCount);
   assert.equal(scaleResult.materialization.recordCount, serviceCount);
@@ -86,7 +88,22 @@ try {
   assert.deepEqual(scaleServices.map(service => service.id), [...scaleServices].sort((left, right) => left.id.localeCompare(right.id)).map(service => service.id), 'scale output remains deterministically sorted');
   assert.ok(scaleResult.materialization.sourceBytes > scaleResult.materialization.maxRecordBytes * 1000, 'stress input exceeds one-record memory scale');
   assert.equal(scaleResult.materialization.maxBufferedRecordBytes, scaleResult.materialization.maxRecordBytes, 'materialisation buffers one indexed record at a time');
-  assert.equal(scaleResult.materialization.shardRegionCount, 1);
+  const scaleManifest = JSON.parse(await fs.readFile(path.join(scaleOutput, 'manifest.json'), 'utf8'));
+  assert.equal(scaleManifest.schema, 'atlas-prepared-bus-tnds-v2');
+  assert.equal(scaleManifest.runtimeShardMaxBytes, runtimeLimit);
+  assert.ok(scaleManifest.runtimeShardCount > 1, 'large stop-prefix output is split into deterministic bounded subshards');
+  assert.ok(scaleManifest.runtimeShardMaxObservedBytes <= runtimeLimit);
+  assert.ok(scaleManifest.serviceShards[Object.keys(scaleManifest.serviceShards)[0]].every(shard => shard.stopIds.length > 0 && shard.uncompressedBytes <= runtimeLimit && shard.compressedBytes > 0));
+  assert.equal(scaleResult.materialization.shardRegionCount, scaleManifest.runtimeShardCount);
+  assert.equal(scaleServices.length, serviceCount, 'multi-shard materialisation preserves every service');
+  assert.ok(scaleServices.every(service => service.operator === 'Scale Fixture' && service.calendarEvidence.length && Object.values(service.stopSchedules).some(schedule => schedule.monday.length)), 'multi-shard materialisation preserves operators, calendars and schedules');
+  const repeatedOutput = path.join(root, 'scale-output-repeat');
+  await prepareTnds({ input: scaleInput, output: repeatedOutput, preparedAt, maxRuntimeShardBytes: runtimeLimit });
+  const repeatedManifest = JSON.parse(await fs.readFile(path.join(repeatedOutput, 'manifest.json'), 'utf8'));
+  assert.deepEqual(repeatedManifest, scaleManifest, 'same source and preparedAt yield byte-identical shard index metadata');
+  for (const shard of Object.values(scaleManifest.serviceShards).flat()) {
+    assert.deepEqual(await fs.readFile(path.join(repeatedOutput, shard.path)), await fs.readFile(path.join(scaleOutput, shard.path)), 'gzip subshards are deterministic');
+  }
 
   const oversizedInput = path.join(root, 'oversized-input');
   await fs.mkdir(oversizedInput, { recursive: true });
@@ -94,6 +111,11 @@ try {
   await assert.rejects(
     () => prepareTnds({ input: oversizedInput, output: path.join(root, 'oversized-output'), preparedAt, maxXmlBytes: 1024 }),
     /exceeds the bounded 1024-byte limit; no data was dropped/
+  );
+
+  await assert.rejects(
+    () => prepareTnds({ input: ordinaryInput, output: path.join(root, 'runtime-oversized-output'), preparedAt, maxRuntimeShardBytes: 256 }),
+    /exceeds the bounded 256-byte ceiling; no service was dropped/
   );
 
   const source = await fs.readFile(new URL('../../tools/atlas-bus-data/prepare_tnds.mjs', import.meta.url), 'utf8');

@@ -223,6 +223,48 @@ test('TNDS stop-prefix shards bound requests and preserve quarantine impact', as
   assert.equal((await malformed.servicesForStops([stop])).ok, false);
 });
 
+test('TNDS bounded subshards fetch only matching StopPoints and decode through the adapter', async () => {
+  const calls = [];
+  const tndsService = { id: 'tnds:SE:fixture:10', routeNumber: '10', operator: 'Example TNDS', stopSchedules: { '2100A': { monday: [420] } }, source: { region: 'SE', serviceCode: '10' } };
+  const payload = { schema: 'atlas-prepared-bus-tnds-v2', stopPrefix: '2100A', services: [tndsService] };
+  const compressed = gzipSync(JSON.stringify(payload));
+  const tndsManifestV2 = { schema: 'atlas-prepared-bus-tnds-v2', generatedAt: '2026-10-14T00:00:00Z', regions: ['SE'], serviceCount: 1, serviceShardKeyLength: 5, runtimeShardMaxBytes: 8 * 1024 * 1024, serviceShards: { '2100A': [{ path: 'services/2100A-se-0001.json.gz', stopIds: ['2100A'], uncompressedBytes: Buffer.byteLength(JSON.stringify(payload)), compressedBytes: compressed.length }], Q0000: [{ path: 'services/Q0000-se-0001.json.gz', stopIds: ['Q0000'], uncompressedBytes: 200, compressedBytes: 100 }] } };
+  const fetchBounded = async url => {
+    const pathname = new URL(url).pathname;
+    calls.push(pathname);
+    if (pathname === '/tnds/manifest.json') return new Response(JSON.stringify(tndsManifestV2), { status: 200 });
+    if (pathname.endsWith('/services/2100A-se-0001.json.gz')) return new Response(compressed, { status: 200, headers: { 'content-type': 'application/gzip' } });
+    return fetchFixture(url);
+  };
+  const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchBounded, baseUrl: 'https://atlas.example/data/', tndsBaseUrl: 'https://atlas.example/tnds/' });
+  const result = await adapter.servicesForStops([stop]);
+  assert.equal(result.ok, true);
+  assert.ok(result.data.some(row => row.id === tndsService.id && row.operator === 'Example TNDS'));
+  assert.ok(calls.includes('/tnds/services/2100A-se-0001.json.gz'));
+  assert.equal(calls.includes('/tnds/services/Q0000-se-0001.json.gz'), false, 'unrequested stop subshards are not fetched');
+  assert.equal(result.provenance.tndsServing, 'stop-prefix-subshards');
+});
+
+test('supplementary TNDS failure preserves BODS services and remains unresolved', async () => {
+  const fetchWithBrokenTnds = async url => {
+    const pathname = new URL(url).pathname;
+    if (pathname === '/tnds/manifest.json') return new Response(JSON.stringify({ schema: 'atlas-prepared-bus-tnds-v2', generatedAt: '2026-10-14T00:00:00Z', regions: ['SE'], serviceCount: 1, serviceShardKeyLength: 5, runtimeShardMaxBytes: 8 * 1024 * 1024, serviceShards: { '2100A': [{ path: 'services/2100A-se-0001.json.gz', stopIds: ['2100A'], uncompressedBytes: 100, compressedBytes: 40 }] } }), { status: 200 });
+    if (pathname.endsWith('/services/2100A-se-0001.json.gz')) return new Response('', { status: 503 });
+    if (pathname.endsWith('/services/2100A-south-east.json.gz')) return new Response(JSON.stringify({ schema: 'atlas-prepared-bus-data-v1', services: [service] }), { status: 200 });
+    return fetchFixture(url);
+  };
+  const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchWithBrokenTnds, baseUrl: 'https://atlas.example/data/', tndsBaseUrl: 'https://atlas.example/tnds/' });
+  const result = await adapter.servicesForStops([stop]);
+  assert.equal(result.ok, true, 'valid BODS remains available to the planner');
+  assert.ok(result.data.some(row => row.id === service.id && row.operator === service.operator));
+  assert.equal(result.provenance.supplementarySourceCondition, 'UNRESOLVED');
+  assert.equal(result.provenance.sourceCompleteness, 'PARTIAL');
+  assert.equal(result.provenance.timetableConclusion, 'UNRESOLVED');
+  assert.deepEqual(result.provenance.unresolvedRequestIdentities, ['10|2100A']);
+  assert.ok(result.provenance.unresolvedRequests > 0);
+  assert.match(result.warnings.join(' '), /Successfully loaded BODS-primary services were retained/);
+});
+
 test('non-call bus-domain infrastructure does not request a missing timetable shard', async () => {
   const access = { id: '0590BCE01L', routes: [], timetableCallEligible: false, transportMode: 'bus_coach' };
   const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchFixture, baseUrl: 'https://atlas.example/data/' });

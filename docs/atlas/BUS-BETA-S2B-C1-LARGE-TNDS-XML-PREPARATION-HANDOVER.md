@@ -93,9 +93,8 @@ Results and hosted evidence are recorded below after exact-SHA preflight.
 
 The S2B-C1 branch has a branch-specific selector that accepts only the exact forced, measure-only, v2 `TNDS-TRUST-PREFLIGHT-C1B` offline-preflight form. Candidate compose/restore selectors remain disabled on this branch. The hosted preflight runs Python Bus-data tests and the deterministic Node suite, emits evidence with acquisition, FTP, retrieval, publication, and deployment all marked false, and does not inject TNDS credentials.
 
-- Final SHA: pending commit.
-- Hosted zero-download offline preflight run ID: pending.
-- Preflight artifact ID and digest: pending.
+- Final SHA: the commit containing this handover on the named branch; the exact hash is reported in the final closeout.
+- Hosted zero-download offline preflight run ID, artifact ID, and artifact digest: reported in the final closeout for the exact final SHA. The evidence artifact is named `atlas-tnds-trust-offline-preflight-<run-id>`.
 - Source downloads: none.
 - Publication/deployment: none.
 
@@ -125,7 +124,7 @@ Leave candidate checkpoint restore selectors, checkpoint resume, v2/TRUST select
 
 - Branch: `codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation`.
 - Starting SHA: `796e1e826e9f85ddd96160089c32a91128878e4d`.
-- Final SHA: pending commit.
+- Final SHA: the commit containing this handover on the named branch; the exact hash is reported in the final closeout.
 - Exact changed files: `.github/workflows/atlas-bus-data-refresh.yml`; `docs/atlas/BUS-BETA-S2B-C1-LARGE-TNDS-XML-PREPARATION-HANDOVER.md`; `tests/atlas/automated-refresh-contract.test.mjs`; `tests/atlas/tnds-preparation-scale.test.mjs`; `tools/atlas-bus-data/prepare_tnds.mjs`.
-- Worktree clean and branch/origin parity: pending push.
-- Run #53 frozen sources safe to replay without reacquisition: pending exact-SHA preflight; replay still requires Technical Director authorization.
+- Worktree clean and branch/origin parity: verified in the final closeout.
+- Run #53 frozen sources safe to replay without reacquisition: reported in the final closeout after exact-SHA preflight; replay still requires Technical Director authorization.

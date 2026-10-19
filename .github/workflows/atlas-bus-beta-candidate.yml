@@ -158,6 +158,25 @@ jobs:
                       if actual.get(nk)!=nv: raise SystemExit(f'Primary artifact {k}.{nk} mismatch')
               elif actual!=v: raise SystemExit(f'Primary artifact {k} mismatch')
           PY
+      - name: Verify exact TNDS restore artifact metadata
+        if: inputs.mode == 'compose' && inputs.tnds_source_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ inputs.tnds_artifact_id }}
+          ARTIFACT_DIGEST: ${{ inputs.tnds_artifact_digest }}
+          PRODUCER_RUN: ${{ inputs.tnds_source_run_id }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" > "$RUNNER_TEMP/tnds-artifact.json"
+          python - "$RUNNER_TEMP/tnds-artifact.json" <<'PY'
+          import json,os,sys
+          a=json.load(open(sys.argv[1])); expected={'id':int(os.environ['ARTIFACT_ID']),'name':'atlas-tnds-quarantined-'+os.environ['PRODUCER_RUN'],'digest':os.environ['ARTIFACT_DIGEST'],'expired':False,'workflow_run':{'id':int(os.environ['PRODUCER_RUN'])}}
+          for k,v in expected.items():
+              actual=a.get(k) or {} if isinstance(v,dict) else a.get(k)
+              if isinstance(v,dict):
+                  for nk,nv in v.items():
+                      if actual.get(nk)!=nv: raise SystemExit(f'TNDS artifact {k}.{nk} mismatch')
+              elif actual!=v: raise SystemExit(f'TNDS artifact {k} mismatch')
+          PY
       - name: Restore exact primary raw snapshot
         if: inputs.mode == 'compose' && inputs.primary_source_run_id != ''
         uses: actions/download-artifact@v4
@@ -201,25 +220,6 @@ jobs:
           if-no-files-found: error
           overwrite: false
           retention-days: 90
-
-      - name: Verify exact TNDS restore artifact metadata
-        if: inputs.mode == 'compose' && inputs.tnds_source_run_id != ''
-        env:
-          ARTIFACT_ID: ${{ inputs.tnds_artifact_id }}
-          ARTIFACT_DIGEST: ${{ inputs.tnds_artifact_digest }}
-          PRODUCER_RUN: ${{ inputs.tnds_source_run_id }}
-        run: |
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID" > "$RUNNER_TEMP/tnds-artifact.json"
-          python - "$RUNNER_TEMP/tnds-artifact.json" <<'PY'
-          import json,os,sys
-          a=json.load(open(sys.argv[1])); expected={'id':int(os.environ['ARTIFACT_ID']),'name':'atlas-tnds-quarantined-'+os.environ['PRODUCER_RUN'],'digest':os.environ['ARTIFACT_DIGEST'],'expired':False,'workflow_run':{'id':int(os.environ['PRODUCER_RUN'])}}
-          for k,v in expected.items():
-              actual=a.get(k) or {} if isinstance(v,dict) else a.get(k)
-              if isinstance(v,dict):
-                  for nk,nv in v.items():
-                      if actual.get(nk)!=nv: raise SystemExit(f'TNDS artifact {k}.{nk} mismatch')
-              elif actual!=v: raise SystemExit(f'TNDS artifact {k} mismatch')
-          PY
       - name: Restore exact raw TNDS artifact
         if: inputs.mode == 'compose' && inputs.tnds_source_run_id != ''
         uses: actions/download-artifact@v4
@@ -336,6 +336,7 @@ jobs:
       - name: Verify exact candidate restore artifact metadata
         if: inputs.mode == 'restore_candidate'
         env:
+          GH_TOKEN: ${{ github.token }}
           ARTIFACT_ID: ${{ inputs.candidate_artifact_id }}
           ARTIFACT_DIGEST: ${{ inputs.candidate_artifact_digest }}
           PRODUCER_RUN: ${{ inputs.candidate_checkpoint_run_id }}

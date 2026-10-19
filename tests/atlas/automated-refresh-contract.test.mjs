@@ -72,7 +72,7 @@ assert.match(s2bC3Selector, /FORCE_REFRESH" != 'false'/);
 assert.match(s2bC3Selector, /PRIMARY_ID" != '12169814614'/);
 assert.match(s2bC3Selector, /TNDS_ID" != '12171771295'/);
 assert.match(s2bC3Selector, /review_candidate_mode=compose/);
-assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2b-c3-run53-replay-authority'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'review_candidate'/);
+assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2b-c3-run53-replay-authority' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2b-c4-restore-auth-closeout'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'review_candidate'/);
 assert.match(workflow, /ATLAS_TNDS_BANKS_JSON/);
 assert.match(workflow, /select-bank\.mjs/);
 assert.match(workflow, /checkout-bank\.mjs/);

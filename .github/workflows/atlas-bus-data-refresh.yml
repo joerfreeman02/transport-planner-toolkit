@@ -124,7 +124,7 @@ jobs:
     outputs:
       trust_mode: ${{ steps.s2b-c1-selector.outputs.trust_mode || steps.s2a-c3-selector.outputs.trust_mode || steps.s2a-c2-selector.outputs.trust_mode || steps.s2a-c1-selector.outputs.trust_mode || steps.trust-selector.outputs.trust_mode }}
       trust_prior_producer_run_id: ${{ steps.s2a-c3-selector.outputs.prior_producer_run_id || steps.s2a-c2-selector.outputs.prior_producer_run_id || steps.s2a-c1-selector.outputs.prior_producer_run_id || steps.trust-selector.outputs.prior_producer_run_id }}
-      review_candidate_mode: ${{ steps.s2a-c3-selector.outputs.review_candidate_mode || steps.s2a-c1-selector.outputs.review_candidate_mode }}
+      review_candidate_mode: ${{ steps.s2b-c1-selector.outputs.review_candidate_mode || steps.s2a-c3-selector.outputs.review_candidate_mode || steps.s2a-c1-selector.outputs.review_candidate_mode }}
     steps:
       - name: Refuse non-manual non-main execution
         if: github.ref != 'refs/heads/main' && github.event_name != 'workflow_dispatch'
@@ -312,13 +312,32 @@ jobs:
           CANDIDATE_RUN: ${{ inputs.candidate_checkpoint_run_id }}
           CANDIDATE_ID: ${{ inputs.candidate_artifact_id }}
           CANDIDATE_DIGEST: ${{ inputs.candidate_artifact_digest }}
+          SCHEMA: ${{ inputs.prepared_schema }}
         run: |
-          if [[ "$GITHUB_EVENT_NAME" != 'workflow_dispatch' || "$PREPARED_SCHEMA" != 'v2' || "$MEASURE_ONLY" != 'true' || "$FORCE_REFRESH" != 'true' || -n "$RESUME_RUN_ID" || "$EXPECTED_SNAPSHOT_ID" != 'TNDS-TRUST-PREFLIGHT-C1B' || -n "$SOURCE_RUN_ID$EXPECTED_SOURCE_COUNT$EXPECTED_TOTAL_BYTES" || "$CANDIDATE_MODE" != 'disabled' || -n "$PRIMARY_RUN$PRIMARY_ID$PRIMARY_DIGEST$TNDS_RUN$TNDS_ID$TNDS_DIGEST$CANDIDATE_RUN$CANDIDATE_ID$CANDIDATE_DIGEST" ]]; then
-            echo '::error::The S2B-C1 branch accepts only the exact zero-download offline-preflight selector.'
+          if [[ "$GITHUB_EVENT_NAME" != 'workflow_dispatch' ]]; then
+            echo '::error::The S2B-C1 selector accepts only manual dispatches.'
             exit 1
           fi
-          echo 'trust_mode=offline_preflight' >> "$GITHUB_OUTPUT"
-          echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
+          if [[ "$CANDIDATE_MODE" == 'disabled' ]]; then
+            if [[ "$PREPARED_SCHEMA" != 'v2' || "$MEASURE_ONLY" != 'true' || "$FORCE_REFRESH" != 'true' || -n "$RESUME_RUN_ID" || "$EXPECTED_SNAPSHOT_ID" != 'TNDS-TRUST-PREFLIGHT-C1B' || -n "$SOURCE_RUN_ID$EXPECTED_SOURCE_COUNT$EXPECTED_TOTAL_BYTES" || -n "$PRIMARY_RUN$PRIMARY_ID$PRIMARY_DIGEST$TNDS_RUN$TNDS_ID$TNDS_DIGEST$CANDIDATE_RUN$CANDIDATE_ID$CANDIDATE_DIGEST" ]]; then
+              echo '::error::The S2B-C1 branch accepts only the exact zero-download offline-preflight selector or pinned Run #53 artifact restoration.'
+              exit 1
+            fi
+            echo 'trust_mode=offline_preflight' >> "$GITHUB_OUTPUT"
+            echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
+            echo 'review_candidate_mode=' >> "$GITHUB_OUTPUT"
+          elif [[ "$CANDIDATE_MODE" == 'compose' ]]; then
+            if [[ "$SCHEMA" != 'v1' || "$MEASURE_ONLY" != 'false' || "$FORCE_REFRESH" != 'false' || -n "$RESUME_RUN_ID$EXPECTED_SNAPSHOT_ID$SOURCE_RUN_ID$EXPECTED_SOURCE_COUNT$EXPECTED_TOTAL_BYTES" || "$PRIMARY_RUN" != '39217550518' || "$PRIMARY_ID" != '12169814614' || "$PRIMARY_DIGEST" != 'sha256:2d6e925559a90f261d3c4f02490be271356c6fd57c6730a90aa2a1424b194ceb' || "$TNDS_RUN" != '39217550518' || "$TNDS_ID" != '12171771295' || "$TNDS_DIGEST" != 'sha256:cd4e3b83a969eab66529ca59cbacb8a3f02ec9fd8e558b8edd7da2044e9ef7a1' || -n "$CANDIDATE_RUN$CANDIDATE_ID$CANDIDATE_DIGEST" ]]; then
+              echo '::error::S2B-C1 review-candidate mode accepts only the exact Run #53 primary and TNDS artifact restore selectors with every acquisition and candidate-restore selector disabled.'
+              exit 1
+            fi
+            echo 'trust_mode=review_candidate' >> "$GITHUB_OUTPUT"
+            echo 'prior_producer_run_id=' >> "$GITHUB_OUTPUT"
+            echo 'review_candidate_mode=compose' >> "$GITHUB_OUTPUT"
+          else
+            echo '::error::Unknown S2B-C1 review-candidate mode.'
+            exit 1
+          fi
 
       - name: Resolve exact-branch TRUST browser selector
         id: trust-selector
@@ -798,7 +817,7 @@ jobs:
   s2a-c1-review-candidate:
     name: Compose or restore isolated S2A review candidate
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'review_candidate' && needs.main-guard.outputs.review_candidate_mode != ''
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'review_candidate' && needs.main-guard.outputs.review_candidate_mode != ''
     uses: ./.github/workflows/atlas-bus-beta-candidate.yml
     with:
       mode: ${{ needs.main-guard.outputs.review_candidate_mode }}

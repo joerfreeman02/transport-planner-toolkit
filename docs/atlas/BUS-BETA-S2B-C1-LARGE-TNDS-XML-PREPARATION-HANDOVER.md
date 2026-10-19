@@ -91,7 +91,7 @@ Results and hosted evidence are recorded below after exact-SHA preflight.
 
 ## Hosted preflight and replay boundary
 
-The S2B-C1 branch has a branch-specific selector that accepts only the exact forced, measure-only, v2 `TNDS-TRUST-PREFLIGHT-C1B` offline-preflight form. Candidate compose/restore selectors remain disabled on this branch. The hosted preflight runs Python Bus-data tests and the deterministic Node suite, emits evidence with acquisition, FTP, retrieval, publication, and deployment all marked false, and does not inject TNDS credentials.
+The S2B-C1 branch selector accepts the exact forced, measure-only, v2 `TNDS-TRUST-PREFLIGHT-C1B` offline-preflight form, or a later compose request pinned to both exact Run #53 artifact IDs and digests. The branch rejects fresh source acquisition, candidate-checkpoint restore, and all other selector combinations. The hosted preflight runs Python Bus-data tests and the deterministic Node suite, emits evidence with acquisition, FTP, retrieval, publication, and deployment all marked false, and does not inject TNDS credentials.
 
 - Final SHA: the commit containing this handover on the named branch; the exact hash is reported in the final closeout.
 - Hosted zero-download offline preflight run ID, artifact ID, and artifact digest: reported in the final closeout for the exact final SHA. The evidence artifact is named `atlas-tnds-trust-offline-preflight-<run-id>`.
@@ -106,7 +106,6 @@ After that authorization, use the `ATLAS Bus Beta review-candidate` workflow on 
 
 | Input | Value |
 | --- | --- |
-| `mode` | `compose` |
 | `review_candidate_mode` | `compose` |
 | `prepared_schema` | `v1` |
 | `measure_only` | `false` |
@@ -118,7 +117,7 @@ After that authorization, use the `ATLAS Bus Beta review-candidate` workflow on 
 | `tnds_artifact_id` | `12171771295` |
 | `tnds_artifact_digest` | `sha256:cd4e3b83a969eab66529ca59cbacb8a3f02ec9fd8e558b8edd7da2044e9ef7a1` |
 
-Leave candidate checkpoint restore selectors, checkpoint resume, v2/TRUST selectors, and all other acquisition selectors blank/default. This recovery contract restores exactly the two immutable Run #53 artifacts and does not contact TNDS FTP or BODS/NaPTAN/NPTG acquisition endpoints. Do not dispatch it as part of S2B-C1.
+Leave candidate checkpoint restore selectors, checkpoint resume, v2/TRUST selectors, and all other acquisition selectors blank/default. This recovery contract restores exactly the two immutable Run #53 artifacts and does not contact TNDS FTP or BODS/NaPTAN/NPTG acquisition endpoints. Do not dispatch it as part of S2B-C1; the exact-SHA offline preflight is the only dispatch in this coding sprint.
 
 ## Final handover
 

@@ -135,6 +135,26 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(manifest["frozenReuseSourceRunId"], "123456")
         self.assertEqual(manifest["snapshotId"], load_and_verify(self.root)["snapshotId"])
 
+    def test_artifact_root_restored_to_nested_destination_round_trips_frozen_snapshot(self):
+        # upload-artifact from source-snapshot stores its contents at artifact root;
+        # download-artifact path is the root into which those contents are extracted.
+        upload_root = self.root / "source-snapshot"
+        upload_root.mkdir()
+        shutil.copy2(self.root / "manifest.json", upload_root / "manifest.json")
+        shutil.copytree(self.root / "sources", upload_root / "sources")
+        restored_root = self.root / "primary-restore" / "source-snapshot"
+        restored_root.parent.mkdir(parents=True)
+        shutil.copytree(upload_root, restored_root)
+
+        self.assertTrue((restored_root / "manifest.json").is_file())
+        self.assertTrue((restored_root / "sources/naptan.xml").is_file())
+        marked_root = self.root / "verified-source-snapshot"
+        marked = mark_frozen_reuse(restored_root, marked_root, "39217550518")
+        verified = load_and_verify(marked_root)
+        self.assertEqual(marked["snapshotId"], verified["snapshotId"])
+        self.assertEqual(verified["frozenReuseSourceRunId"], "39217550518")
+        self.assertFalse(verified["currentSourceFreshnessClaimed"])
+
     def test_tnds_probe_never_retrieves_archives(self):
         result = probe_tnds_metadata("", "")
         self.assertFalse(result["retrievalPerformed"])

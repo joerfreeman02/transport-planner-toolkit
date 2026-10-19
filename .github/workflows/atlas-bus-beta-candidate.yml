@@ -105,6 +105,7 @@ jobs:
               if any(item.get('name') == name and item.get('expired') is False for item in artifacts):
                   print(f'Exact-SHA/ref preflight verified: run {rid}, artifact {name}.'); raise SystemExit(0)
           raise SystemExit('No successful unexpired offline-preflight artifact exists for this exact SHA, branch, and expected workflow.')
+          PY
 
       - name: Validate explicit raw restore parameters
         if: inputs.mode == 'compose' || inputs.mode == 'restore_candidate'
@@ -165,7 +166,7 @@ jobs:
           run-id: ${{ inputs.primary_source_run_id }}
           repository: ${{ github.repository }}
           github-token: ${{ github.token }}
-          path: primary-restore
+          path: primary-restore/source-snapshot
       - name: Verify explicit primary snapshot or acquire fresh eleven-source snapshot
         if: inputs.mode == 'compose'
         env:

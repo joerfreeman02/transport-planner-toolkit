@@ -54,6 +54,21 @@ class ReviewCandidateWorkflowContractTests(unittest.TestCase):
         self.assertIn("needs.main-guard.outputs.trust_mode == 'offline_preflight'", preflight)
         self.assertNotIn("refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector", self.dispatcher.split("  tnds-trust-browser-live:", 1)[1].split("  ", 1)[0])
 
+    def test_s2b_c2_branch_is_offline_preflight_only_and_has_no_candidate_or_publication_route(self):
+        selector = self.dispatcher.split("- name: Resolve S2B-C2 exact zero-download offline preflight selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
+        self.assertIn("id: s2b-c2-selector", selector)
+        self.assertIn("github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology'", selector)
+        self.assertIn("trust_mode=offline_preflight", selector)
+        self.assertIn("CANDIDATE_MODE\" != 'disabled'", selector)
+        self.assertNotIn("trust_mode=review_candidate", selector)
+        self.assertIn("steps.s2b-c2-selector.outputs.trust_mode", self.dispatcher)
+        offline = self.dispatcher.split("  tnds-trust-browser-offline-preflight:", 1)[1].split("  tnds-trust-browser-live:", 1)[0]
+        self.assertIn("refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology", offline)
+        candidate_job = self.dispatcher.split("\n  s2a-c1-review-candidate:\n", 1)[1]
+        self.assertNotIn("refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology", candidate_job)
+        for marker, next_marker in (("freshness", "build-validate"), ("build-validate", "deploy"), ("deploy", "freshness-no-op")):
+            self.assertIn("needs.main-guard.outputs.trust_mode == ''", self.dispatcher.split(f"\n  {marker}:\n", 1)[1].split(f"\n  {next_marker}:\n", 1)[0])
+
     def test_c3_accepts_only_exact_offline_preflight_or_valid_isolated_candidate_modes(self):
         selector = self.dispatcher.split("- name: Resolve S2A-C3 offline preflight or isolated review-candidate selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
         self.assertIn("id: s2a-c3-selector", selector)
@@ -113,6 +128,12 @@ class ReviewCandidateWorkflowContractTests(unittest.TestCase):
         self.assertIn("atlas-tnds-trust-offline-preflight-", self.workflow)
         self.assertIn("atlas-bus-data-refresh.yml", self.workflow)
 
+    def test_exact_sha_preflight_python_heredoc_is_closed_before_the_next_step(self):
+        gate = self.workflow.split("- name: Require successful unexpired exact-SHA offline preflight before source acquisition", 1)[1].split("- name: Validate explicit raw restore parameters", 1)[0]
+        script = gate.split("          python - <<'PY'\n", 1)[1]
+        self.assertTrue(script.rstrip().endswith("          PY"), "exact-SHA gate Python heredoc must close before the next step")
+        self.assertEqual(script.count("          PY"), 1)
+
     def test_raw_artifacts_precede_capacity_and_candidate_preparation(self):
         primary_upload = self.workflow.index("Preserve verified primary snapshot before preparation")
         tnds_upload = self.workflow.index("Preserve fresh raw TNDS snapshot before capacity, extraction, or preparation")
@@ -147,9 +168,14 @@ class ReviewCandidateWorkflowContractTests(unittest.TestCase):
         fresh_branch = primary.split("\n          else", 1)[1].split("\n          fi", 1)[0]
         self.assertIn("inputs.primary_source_run_id != ''", restore_download)
         self.assertIn("run-id: ${{ inputs.primary_source_run_id }}", restore_download)
+        self.assertIn("path: primary-restore/source-snapshot", restore_download)
+        self.assertIn("test -d primary-restore/source-snapshot", explicit_branch)
         self.assertIn("--mark-frozen-reuse primary-restore/source-snapshot --source-run-id \"$PRIMARY_RUN\"", explicit_branch)
+        self.assertEqual(explicit_branch.count("primary-restore/source-snapshot"), 2)
+        self.assertIn("--output source-snapshot", explicit_branch)
         self.assertNotIn("--acquire", explicit_branch)
         self.assertIn("source_snapshot.py --acquire --output source-snapshot", fresh_branch)
+        self.assertIn("--verify source-snapshot", primary)
 
     def test_fresh_primary_artifact_is_preserved_after_verification_before_preparation(self):
         verify = self.workflow.index("Verify explicit primary snapshot or acquire fresh eleven-source snapshot")
@@ -164,9 +190,13 @@ class ReviewCandidateWorkflowContractTests(unittest.TestCase):
 
     def test_tnds_fresh_and_explicit_restore_selectors_remain_unchanged(self):
         tnds = self.workflow.split("- name: Acquire fresh TNDS raw snapshot or verify exact restored snapshot", 1)[1].split("- name:", 1)[0]
+        tnds_download = self.workflow.split("- name: Restore exact raw TNDS artifact", 1)[1].split("- name:", 1)[0]
         self.assertIn("TNDS_RUN: ${{ inputs.tnds_source_run_id }}", tnds)
         self.assertIn('if [[ -n "$TNDS_RUN" ]]; then', tnds)
         self.assertIn("--verify-reused", tnds)
+        self.assertIn("path: tnds-restore", tnds_download)
+        self.assertIn("--snapshot tnds-restore", tnds)
+        self.assertIn("cp -R tnds-restore \"$RUNNER_TEMP/tnds-quarantined-snapshot\"", tnds)
         for name in ("Run metadata-only TNDS authentication and archive gate", "Acquire and verify the fresh eight-region raw TNDS snapshot"):
             block = self.workflow.split(f"- name: {name}", 1)[1].split("- name:", 1)[0]
             self.assertIn("inputs.tnds_source_run_id == ''", block)

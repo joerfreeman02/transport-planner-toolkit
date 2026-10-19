@@ -46,6 +46,13 @@ assert.match(workflow, /name: atlas-v2-national-diagnostic-\$\{\{ github\.run_id
 assert.match(workflow, /if: always\(\) && inputs\.prepared_schema == 'v2'/);
 assert.match(workflow, /Raw authoritative source material must not enter the diagnostic artifact/);
 assert.match(workflow, /Manual non-main execution is diagnostic-only/);
+const s2bC1Selector = workflow.slice(workflow.indexOf('Resolve S2B-C1 exact zero-download offline preflight selector'), workflow.indexOf('Resolve exact-branch TRUST browser selector'));
+assert.match(s2bC1Selector, /github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation'/);
+assert.match(s2bC1Selector, /EXPECTED_SNAPSHOT_ID" != 'TNDS-TRUST-PREFLIGHT-C1B'/);
+assert.match(s2bC1Selector, /CANDIDATE_MODE" != 'disabled'/);
+assert.match(s2bC1Selector, /PRIMARY_RUN\$PRIMARY_ID\$PRIMARY_DIGEST\$TNDS_RUN\$TNDS_ID\$TNDS_DIGEST/);
+assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'offline_preflight'/);
+assert.doesNotMatch(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'review_candidate'/);
 assert.match(workflow, /ATLAS_TNDS_BANKS_JSON/);
 assert.match(workflow, /select-bank\.mjs/);
 assert.match(workflow, /checkout-bank\.mjs/);

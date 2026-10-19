@@ -9,7 +9,9 @@ import { hasScheduledEvidence } from '../../src/atlas/domain/scheduled-evidence.
 
 export const TNDS_REGIONS = Object.freeze(['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y']);
 export const TNDS_SERVICE_SHARD_KEY_LENGTH = 5;
-export const TNDS_XML_MAX_BYTES = 64 * 1024 * 1024;
+// Exact Run #53 production-file parsing was measured at 169,291,408 bytes.
+// Keep a finite guard with roughly 19% headroom above that current maximum.
+export const TNDS_XML_MAX_BYTES = 192 * 1024 * 1024;
 
 async function ensureDiskReserve(directory, upcomingBytes = 0) {
   const required = Number(process.env.ATLAS_TNDS_DISK_RESERVE_BYTES || 0);

@@ -40,6 +40,36 @@ try {
   assert.deepEqual(await readServices(ordinaryOutput), ordinaryExpected, 'streamed materialisation preserves ordinary parser output and ordering');
   assert.equal(ordinaryResult.materialization.recordCount, ordinaryExpected.length);
 
+  assert.equal(TNDS_XML_MAX_BYTES, 192 * 1024 * 1024, 'large XML remains subject to the measured finite document limit');
+  const largeInput = path.join(root, 'large-input');
+  const largeOutput = path.join(root, 'large-output');
+  await fs.mkdir(largeInput, { recursive: true });
+  const largeFile = path.join(largeInput, 'SE-large.xml');
+  const largeHandle = await fs.open(largeFile, 'w');
+  try {
+    await largeHandle.writeFile(serviceXml('large-valid', 'SE000').replace('</TransXChange>', '<!--'));
+    const commentChunk = Buffer.alloc(1024 * 1024, 0x78);
+    for (let index = 0; index < 65; index += 1) await largeHandle.write(commentChunk);
+    await largeHandle.writeFile('--></TransXChange>');
+  } finally {
+    await largeHandle.close();
+  }
+  const largeSize = (await fs.stat(largeFile)).size;
+  assert.ok(largeSize > 64 * 1024 * 1024, 'valid XML regression crosses the historical 64 MiB boundary');
+  assert.ok(largeSize < TNDS_XML_MAX_BYTES, 'scaled large XML remains below the measured finite ceiling');
+  const largeXml = await fs.readFile(largeFile, 'utf8');
+  const largeExpected = parseTndsTransXchangeServices(largeXml, { region: 'SE', sourceArchive: 'SE-large.xml', preparedAt });
+  const largeResult = await prepareTnds({ input: largeInput, output: largeOutput, preparedAt });
+  const largeServices = await readServices(largeOutput);
+  assert.equal(largeResult.services, 1, 'large valid XML retains its Service');
+  assert.deepEqual(largeServices, largeExpected, 'large preparation preserves full parser output without truncation');
+  assert.equal(largeServices[0].operator, 'Scale Fixture');
+  assert.deepEqual(largeServices[0].routePatternStopIds, ['SE0001', 'SE0002']);
+  assert.deepEqual(largeServices[0].stopSchedules.SE0001.monday, [480]);
+  assert.equal(largeServices[0].calendarEvidence[0].resolutionStatus, 'resolved');
+  assert.equal(largeServices[0].patternVariants[0].patternId, 'JP-large-valid');
+  assert.deepEqual(largeServices[0].stops.map(stop => stop.id), ['SE0001', 'SE0002']);
+
   const scaleInput = path.join(root, 'scale-input');
   const scaleOutput = path.join(root, 'scale-output');
   await fs.mkdir(scaleInput, { recursive: true });
@@ -75,4 +105,4 @@ try {
   await fs.rm(root, { recursive: true, force: true });
 }
 
-console.log('PASS TNDS bounded-materialisation equivalence, scale and oversized-input regressions.');
+console.log('PASS TNDS bounded-materialisation equivalence, large-XML semantics, scale and oversized-input regressions.');

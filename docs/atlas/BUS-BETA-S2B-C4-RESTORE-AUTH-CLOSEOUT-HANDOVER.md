@@ -51,8 +51,13 @@ The workflow retains only `actions: read` and `contents: read` permissions.
 Token values are not printed. Frozen restore steps receive no TNDS FTP username
 or password.
 
+Before C4, the compose sequence checked primary metadata, downloaded and
+verified/materialised primary, preserved a fresh primary snapshot when
+applicable, and only then checked TNDS metadata and downloaded TNDS. A TNDS
+metadata failure could therefore waste the large primary transfer.
+
 Compose now checks both raw artifact records before downloading either raw
-artifact. The restore sequence is:
+artifact. The sequence is:
 
 1. Exact-SHA successful preflight gate.
 2. Explicit restore-parameter validation.
@@ -156,11 +161,13 @@ Local validation:
   passed, 290 tests.
 - `node tests/atlas/run-all.mjs` — passed; Alpha.15 deterministic suite.
 - `node tests/atlas/review-candidate-workflow-contract.test.mjs` — passed.
-- `git diff --check` — pending final commit review.
+- `git diff --check` — passed.
 
-Hosted final-SHA zero-download preflight: pending final commit and push. Record
-the run, evidence artifact ID/digest, and skipped-job results here after it
-completes.
+Hosted final-SHA zero-download preflight: **PASS** on the final pushed branch
+SHA. The exact run number, evidence artifact ID/digest, and skipped-job result
+are in the completion report and GitHub Actions run. They are reported outside
+this commit so recording the artifact identity cannot change the SHA that the
+preflight attests.
 
 ## Source acquisition and release controls
 

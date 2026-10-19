@@ -41,7 +41,7 @@ class ReviewCandidateWorkflowContractTests(unittest.TestCase):
         self.assertIn("needs.main-guard.outputs.trust_mode == '' && needs.freshness.outputs.refresh_required", self.dispatcher)
 
     def test_c2_branch_has_only_an_exact_zero_acquisition_final_sha_preflight_selector(self):
-        selector = self.dispatcher.split("- name: Resolve S2A-C2 exact offline preflight selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
+        selector = self.dispatcher.split("- name: Resolve S2A-C2 exact offline preflight selector", 1)[1].split("- name: Resolve S2A-C3 offline preflight or isolated review-candidate selector", 1)[0]
         self.assertIn("id: s2a-c2-selector", selector)
         self.assertIn("github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector'", selector)
         self.assertIn("$EXPECTED_SNAPSHOT_ID\" != 'TNDS-TRUST-PREFLIGHT-C1B'", selector)
@@ -53,6 +53,51 @@ class ReviewCandidateWorkflowContractTests(unittest.TestCase):
         self.assertIn("refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector", preflight)
         self.assertIn("needs.main-guard.outputs.trust_mode == 'offline_preflight'", preflight)
         self.assertNotIn("refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector", self.dispatcher.split("  tnds-trust-browser-live:", 1)[1].split("  ", 1)[0])
+
+    def test_c3_accepts_only_exact_offline_preflight_or_valid_isolated_candidate_modes(self):
+        selector = self.dispatcher.split("- name: Resolve S2A-C3 offline preflight or isolated review-candidate selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
+        self.assertIn("id: s2a-c3-selector", selector)
+        self.assertIn("github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority'", selector)
+        self.assertIn("CANDIDATE_MODE\" == 'compose' || \"$CANDIDATE_MODE\" == 'restore_candidate'", selector)
+        self.assertIn("SCHEMA\" != 'v1'", selector)
+        self.assertIn("MEASURE_ONLY\" != 'false'", selector)
+        self.assertIn("FORCE_REFRESH\" != 'false'", selector)
+        self.assertIn("EXPECTED_SNAPSHOT_ID$SOURCE_RUN_ID$EXPECTED_SOURCE_COUNT$EXPECTED_TOTAL_BYTES", selector)
+        self.assertIn("trust_mode=review_candidate", selector)
+        self.assertIn("review_candidate_mode=$CANDIDATE_MODE", selector)
+        self.assertIn("TNDS-TRUST-PREFLIGHT-C1B", selector)
+        self.assertIn("trust_mode=offline_preflight", selector)
+        self.assertIn("Unknown S2A-C3 review-candidate mode", selector)
+        self.assertIn("steps.s2a-c3-selector.outputs.review_candidate_mode || steps.s2a-c1-selector.outputs.review_candidate_mode", self.dispatcher)
+
+    def test_c3_candidate_remains_read_only_exact_sha_gated_and_outside_legacy_publication_route(self):
+        self.assertIn("refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority", self.dispatcher.split("  s2a-c1-review-candidate:", 1)[1])
+        self.assertIn("needs.main-guard.outputs.trust_mode == 'review_candidate'", self.dispatcher)
+        self.assertIn("needs.main-guard.outputs.trust_mode == ''", self.dispatcher)
+        for marker, next_marker in (("freshness", "build-validate"), ("build-validate", "deploy"), ("deploy", "freshness-no-op")):
+            block = self.dispatcher.split(f"\n  {marker}:\n", 1)[1].split(f"\n  {next_marker}:\n", 1)[0]
+            self.assertIn("needs.main-guard.outputs.trust_mode == ''", block)
+        self.assertIn("Require successful unexpired exact-SHA offline preflight before source acquisition", self.workflow)
+        self.assertIn("if: inputs.mode == 'compose'", self.workflow)
+        self.assertIn("head_sha", self.workflow)
+        self.assertIn("head_branch", self.workflow)
+        self.assertIn("expired') is False", self.workflow)
+        self.assertIn("actions: read", self.workflow)
+        self.assertIn("contents: read", self.workflow)
+        self.assertNotIn("pages: write", self.workflow)
+        self.assertNotIn("deployments: write", self.workflow)
+        self.assertNotIn("environment:", self.workflow)
+
+    def test_c1_candidate_authority_stays_on_its_historical_exact_branch(self):
+        c1_selector = self.dispatcher.split("- name: Resolve S2A-C1 offline preflight selector", 1)[1].split("- name: Resolve S2A-C2 exact offline preflight selector", 1)[0]
+        self.assertIn("if: github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition'", c1_selector)
+        self.assertNotIn("s2a-c3-c2-compose-authority", c1_selector)
+        self.assertIn("github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority'", self.dispatcher)
+
+    def test_c2_primary_acquisition_fix_remains_intact(self):
+        primary = self.workflow.split("- name: Verify explicit primary snapshot or acquire fresh eleven-source snapshot", 1)[1].split("- name:", 1)[0]
+        self.assertIn('if [[ -n "$PRIMARY_RUN_INPUT" ]]; then', primary)
+        self.assertIn("source_snapshot.py --acquire --output source-snapshot", primary)
 
     def test_exact_sha_gate_precedes_both_source_family_paths(self):
         gate = self.workflow.index("Require successful unexpired exact-SHA offline preflight")

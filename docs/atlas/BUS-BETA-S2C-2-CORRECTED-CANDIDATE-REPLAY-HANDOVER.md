@@ -42,7 +42,18 @@ The first sandboxed attempts to run broad Python/browser tests hit Windows tempo
 
 ## Candidate and validation evidence
 
-This section is completed with exact run IDs, artifact IDs/names/digests, structural validation, source-presence results, runtime shard measurements, and acquisition/publication/deployment outcomes after the single authorised S2C-2 compose finishes.
+- Exact-SHA preflight: run #67, ID `39386196456`, succeeded on code SHA `c9f89ce6aed85d8f1cf68db45f2e0378ad893be4`. Evidence artifact ID `12247142703`, name `atlas-tnds-trust-offline-preflight-39386196456`, digest `sha256:693724f12fe0ea48ebe2266dac91ff6888cbee96e4e46a4f324934c54a5b4ff0`.
+- The single authorised compose was run #68, ID `39386511773`, on branch `codex/atlas-bus-beta-s2c-2-candidate-replay-authority`, code SHA `c9f89ce6aed85d8f1cf68db45f2e0378ad893be4`, event `workflow_dispatch`. It failed in `Build complete review-only Bus and TNDS candidate with production builders` before structural validation or candidate checkpoint creation.
+- Both exact Run #53 artifact metadata checks passed. Primary run `39217550518`, artifact `12169814614`, digest `sha256:2d6e925559a90f261d3c4f02490be271356c6fd57c6730a90aa2a1424b194ceb`, was restored and verified. TNDS run `39217550518`, artifact `12171771295`, digest `sha256:cd4e3b83a969eab66529ca59cbacb8a3f02ec9fd8e558b8edd7da2044e9ef7a1`, was restored and verified.
+- No fresh national source acquisition occurred. Fresh primary and TNDS acquisition steps were skipped; frozen artifacts were reused.
+- The blocking TNDS pattern was `tnds:SE:bed_51-C1-_-y08-1.xml:51-C1-_-y08-1:pattern:JP_51-C1-_-y08-1-11-I-7`. It requires `9,765,619` bytes in one runtime shard, exceeding the `8,388,608`-byte (8 MiB) hard ceiling. The builder failed closed and explicitly reported that no service was dropped.
+- No completed TNDS v2 manifest or shard set was produced, so a maximum emitted shard measurement is unavailable. The attempted indivisible pattern requirement was `9,765,619` bytes. Structural validation, post-save candidate integrity, and downstream deterministic validation did not run.
+- Candidate artifact: none. Immutable full candidate checkpoint upload was skipped. Downstream validation artifact: none.
+- Pipers Lane, Waltham Cross, and Chingford hosted deterministic controls were not reached in this failed run. Local Alpha.15 and Bus-data suites passed before dispatch, but they did not exercise this exact restored national candidate end to end.
+- Publication/deployment: NO. The Deploy job was skipped, as were the production build and acquisition jobs.
+- No local manual-review environment was prepared because no immutable candidate artifact exists. Manual acceptance remains outstanding.
+
+The failure exposes an unresolved runtime packaging case: preserving the 8 MiB shard ceiling and every record requires a representation that can handle this 9,765,619-byte pattern without dropping it. This S2C-2 authorization was for one compose, so no second compose or runtime-code change was made under it. A follow-up correction and separately authorised replay are required before manual review.
 
 ## Controls and manual review
 

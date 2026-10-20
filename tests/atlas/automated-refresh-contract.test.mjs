@@ -63,6 +63,7 @@ const offlinePreflight = workflow.slice(workflow.indexOf('  tnds-trust-browser-o
 assert.match(offlinePreflight, /refs\/heads\/codex\/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation/);
 assert.match(offlinePreflight, /refs\/heads\/codex\/atlas-bus-beta-s2b-c2-primary-restore-topology/);
 assert.match(offlinePreflight, /refs\/heads\/codex\/atlas-bus-beta-s2b-c3-run53-replay-authority/);
+assert.match(offlinePreflight, /refs\/heads\/codex\/atlas-bus-beta-s2c-3-oversized-service-closeout/);
 assert.match(offlinePreflight, /needs\.main-guard\.outputs\.trust_mode == 'offline_preflight'/);
 const s2bC3Selector = workflow.slice(workflow.indexOf('Resolve S2B-C3 exact offline preflight or Run #53 compose selector'), workflow.indexOf('Resolve exact-branch TRUST browser selector'));
 assert.match(s2bC3Selector, /github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2b-c3-run53-replay-authority'/);
@@ -72,7 +73,7 @@ assert.match(s2bC3Selector, /FORCE_REFRESH" != 'false'/);
 assert.match(s2bC3Selector, /PRIMARY_ID" != '12169814614'/);
 assert.match(s2bC3Selector, /TNDS_ID" != '12171771295'/);
 assert.match(s2bC3Selector, /review_candidate_mode=compose/);
-assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2b-c3-run53-replay-authority' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2b-c4-restore-auth-closeout' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-2-candidate-replay-authority'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'review_candidate'/);
+assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2b-c3-run53-replay-authority' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2b-c4-restore-auth-closeout' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-2-candidate-replay-authority' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-3-oversized-service-closeout'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'review_candidate'/);
 assert.match(workflow, /ATLAS_TNDS_BANKS_JSON/);
 assert.match(workflow, /select-bank\.mjs/);
 assert.match(workflow, /checkout-bank\.mjs/);

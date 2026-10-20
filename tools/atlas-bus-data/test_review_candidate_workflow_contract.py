@@ -70,7 +70,7 @@ class ReviewCandidateWorkflowContractTests(unittest.TestCase):
             self.assertIn("needs.main-guard.outputs.trust_mode == ''", self.dispatcher.split(f"\n  {marker}:\n", 1)[1].split(f"\n  {next_marker}:\n", 1)[0])
 
     def test_s2c1_branch_accepts_only_exact_zero_download_final_sha_preflight(self):
-        selector = self.dispatcher.split("- name: Resolve S2C-1 exact zero-download offline preflight selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
+        selector = self.dispatcher.split("- name: Resolve S2C-1 exact zero-download offline preflight selector", 1)[1].split("- name: Resolve S2C-2 exact offline preflight or pinned Run #53 compose selector", 1)[0]
         self.assertIn("id: s2c-1-selector", selector)
         self.assertIn("github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-1-national-runtime-scale'", selector)
         self.assertIn("\"$PREPARED_SCHEMA\" != 'v2'", selector)
@@ -87,6 +87,22 @@ class ReviewCandidateWorkflowContractTests(unittest.TestCase):
         self.assertNotIn("refs/heads/codex/atlas-bus-beta-s2c-1-national-runtime-scale", live)
         candidate = self.dispatcher.split("\n  s2a-c1-review-candidate:\n", 1)[1]
         self.assertNotIn("refs/heads/codex/atlas-bus-beta-s2c-1-national-runtime-scale", candidate)
+        for marker, next_marker in (("freshness", "build-validate"), ("build-validate", "deploy"), ("deploy", "freshness-no-op")):
+            block = self.dispatcher.split(f"\n  {marker}:\n", 1)[1].split(f"\n  {next_marker}:\n", 1)[0]
+            self.assertIn("needs.main-guard.outputs.trust_mode == ''", block)
+
+    def test_s2c2_selector_and_candidate_route_are_narrowly_pinned(self):
+        selector = self.dispatcher.split("- name: Resolve S2C-2 exact offline preflight or pinned Run #53 compose selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
+        self.assertIn("id: s2c-2-selector", selector)
+        self.assertIn("github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-2-candidate-replay-authority'", selector)
+        self.assertIn("run: python tools/atlas-bus-data/resolve_s2c2_selector.py", selector)
+        self.assertIn("steps.s2c-2-selector.outputs.trust_mode", self.dispatcher)
+        self.assertIn("steps.s2c-2-selector.outputs.review_candidate_mode", self.dispatcher)
+        self.assertIn("refs/heads/codex/atlas-bus-beta-s2c-2-candidate-replay-authority", self.dispatcher.split("  tnds-trust-browser-offline-preflight:", 1)[1].split("\n  tnds-trust-browser-live:", 1)[0])
+        candidate_job = self.dispatcher.split("\n  s2a-c1-review-candidate:\n", 1)[1]
+        self.assertIn("refs/heads/codex/atlas-bus-beta-s2c-2-candidate-replay-authority", candidate_job)
+        live = self.dispatcher.split("  tnds-trust-browser-live:", 1)[1].split("\n  c3-primary-source:", 1)[0]
+        self.assertNotIn("refs/heads/codex/atlas-bus-beta-s2c-2-candidate-replay-authority", live)
         for marker, next_marker in (("freshness", "build-validate"), ("build-validate", "deploy"), ("deploy", "freshness-no-op")):
             block = self.dispatcher.split(f"\n  {marker}:\n", 1)[1].split(f"\n  {next_marker}:\n", 1)[0]
             self.assertIn("needs.main-guard.outputs.trust_mode == ''", block)

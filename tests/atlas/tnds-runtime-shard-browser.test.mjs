@@ -4,8 +4,9 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
-import { prepareTnds } from '../../tools/atlas-bus-data/prepare_tnds.mjs';
+import { fragmentTndsServiceRecord, prepareTnds } from '../../tools/atlas-bus-data/prepare_tnds.mjs';
 import { launchAtlasBrowser } from './playwright-launch.mjs';
 
 const require = createRequire(import.meta.url);
@@ -18,6 +19,7 @@ const inputRoot = path.join(temporaryRoot, 'source', 'SE');
 const selectedStop = { id: '2100A1', name: 'Pipers Lane', routes: ['230', '231'], timetableAuthority: 'NaPTAN' };
 let server;
 let browser;
+let failedPath = null;
 
 function serviceXml(index) {
   const code = `runtime-${String(index).padStart(3, '0')}`;
@@ -36,7 +38,30 @@ try {
   assert.ok(tndsManifest.runtimeShardCount > 1, 'the fixture must exercise multiple bounded runtime subshards');
   assert.ok(tndsManifest.runtimeShardMaxObservedBytes <= 8 * 1024);
   assert.equal(preparation.services, 50);
-
+  const largeEvidence = Object.fromEntries(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => [day, []]));
+  for (let index = 0; index < 30000; index += 1) largeEvidence.monday.push({ minute: 480 + index % 600, stopPointId: '2100A1', journeyIdentity: `JP-232-VJ-${index}`, sourceRecordId: 'fixture-232', provider: 'TNDS', patternIdentity: 'JP-runtime-oversized', calendarProfileId: 'ordinary', evidenceNote: `Structural Run #68 style journey evidence ${String(index).padStart(5, '0')} ${'x'.repeat(350)}` });
+  const oversized = {
+    id: 'tnds:runtime-oversized-232', routeNumber: '232', operator: 'Runtime Fixture Operator', origin: 'Pipers Lane', destination: 'High Street', direction: 'outbound',
+    principalLocations: ['Pipers Lane'], routePatternStopIds: ['2100A1', '2100A2'], routePatternStops: [{ id: '2100A1', name: 'Pipers Lane' }, { id: '2100A2', name: 'High Street' }],
+    originStopPointId: '2100A1', destinationStopPointId: '2100A2', patternVariants: [{ patternId: 'JP-runtime-oversized', routePatternStopIds: ['2100A1', '2100A2'] }],
+    stopSchedules: { '2100A1': { monday: [480], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] } },
+    departureEvidenceByDay: largeEvidence, calendarEvidence: [{ calendarProfileId: 'ordinary', daysOfWeek: ['monday'] }], source: { provider: 'TNDS', region: 'SE', archive: 'fixture.zip', serviceCode: '232' }
+  };
+  const oversizedParts = fragmentTndsServiceRecord(oversized);
+  const extraDescriptors = [];
+  for (const part of oversizedParts) {
+    const ordinal = part.fragment.ordinal;
+    const relative = `services/2100A-oversized-${String(ordinal).padStart(4, '0')}.json.gz`;
+    const payload = Buffer.from(`${JSON.stringify({ schema: 'atlas-prepared-bus-tnds-v2', region: 'SE', stopPrefix: '2100A', services: [part] })}\n`);
+    const compressed = gzipSync(payload, { mtime: 0 });
+    await fs.writeFile(path.join(tndsRoot, relative), compressed);
+    extraDescriptors.push({ path: relative, stopIds: ['2100A1', '2100A2'], compressedBytes: compressed.byteLength, uncompressedBytes: payload.byteLength, parentServiceId: part.fragment.parentServiceId, fragmentId: part.fragment.fragmentId, fragmentOrdinal: ordinal, fragmentCount: part.fragment.count, fragmentDepartureEvidenceCount: part.fragment.fragmentDepartureEvidenceCount, parentDepartureEvidenceCount: part.fragment.parentDepartureEvidenceCount, parentEvidenceByDayCounts: part.fragment.parentEvidenceByDayCounts });
+  }
+  tndsManifest.serviceShards['2100A'].push(...extraDescriptors);
+  tndsManifest.runtimeShardCount += oversizedParts.length;
+  tndsManifest.runtimeShardMaxObservedBytes = Math.max(tndsManifest.runtimeShardMaxObservedBytes, ...extraDescriptors.map(item => item.uncompressedBytes));
+  tndsManifest.runtimeShardTotalBytes += extraDescriptors.reduce((sum, item) => sum + item.uncompressedBytes, 0);
+  await fs.writeFile(path.join(tndsRoot, 'manifest.json'), JSON.stringify(tndsManifest));
   const harness = `<!doctype html><meta charset="utf-8"><script type="module">
     import { createPreparedBusDataAdapter } from '/src/atlas/adapters/prepared-bus-data-adapter.mjs';
     import { createBusAssessment } from '/src/atlas/application/bus-assessment.mjs';
@@ -58,6 +83,7 @@ try {
       const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
       const base = pathname.startsWith('/src/') ? repositoryRoot : temporaryRoot;
       const relative = pathname.startsWith('/src/') ? pathname.slice(1) : pathname.slice(1);
+      if (failedPath && pathname.endsWith(failedPath)) { response.writeHead(503); response.end(); return; }
       const file = path.resolve(base, relative || 'harness.html');
       if (file !== base && !file.startsWith(`${base}${path.sep}`)) throw new Error('unsafe path');
       const bytes = await fs.readFile(file);
@@ -86,6 +112,17 @@ try {
   assert.ok(result.services.some(service => service.routeNumber === '231' && service.operator === 'Runtime Fixture Operator'), 'TNDS service evidence reaches planner input');
   assert.ok(result.plannerServiceSummaries.some(service => service.routeNumber === '230'));
   assert.ok(result.plannerServiceSummaries.some(service => service.routeNumber === '231'));
+  const reconstructedOversized = result.services.find(service => service.id === 'tnds:runtime-oversized-232');
+  assert.ok(reconstructedOversized, 'fragmented service reaches planner input after real browser manifest/fetch/decode/reassembly');
+  assert.equal(reconstructedOversized.departureEvidenceByDay.monday.length, 30000, 'all fragmented journey evidence reaches planner input');
+  assert.ok(result.plannerServiceSummaries.some(service => service.routeNumber === '232'));
+  failedPath = extraDescriptors[0].path;
+  const partialResult = await page.evaluate(() => window.runAssessment());
+  assert.equal(partialResult.ok, true, 'a missing supplementary fragment does not discard successful BODS evidence');
+  assert.ok(partialResult.services.some(service => service.id === 'bods:230'));
+  assert.equal(partialResult.services.some(service => service.id === 'tnds:runtime-oversized-232'), false, 'incomplete parent service is not exposed downstream');
+  assert.equal(partialResult.provenance.timetables.supplementarySourceCondition, 'UNRESOLVED');
+  assert.equal(partialResult.provenance.timetables.sourceCompleteness, 'PARTIAL');
   assert.equal(result.provenance.timetables.tndsShardRequests, tndsManifest.runtimeShardCount, 'all stop-indexed fixture shards required for the selected stop were fetched and decoded');
   assert.equal(pageErrors.length, 0, `browser errors: ${pageErrors.join('; ')}`);
   assert.deepEqual(failedRequests, []);

@@ -40,6 +40,160 @@ function decodePreparedRecords(records, fields = []) {
 
 const SERVICE_DAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 
+export function reassemblePreparedTndsFragments(rows, expectedFragments = []) {
+  const expectedByParent = new Map();
+  const expectedByPath = new Map();
+  for (const descriptor of expectedFragments) {
+    if (!descriptor || typeof descriptor.parentServiceId !== 'string' || typeof descriptor.fragmentId !== 'string'
+        || !Number.isInteger(descriptor.fragmentOrdinal) || !Number.isInteger(descriptor.fragmentCount)
+        || !Number.isSafeInteger(descriptor.fragmentDepartureEvidenceCount) || descriptor.fragmentDepartureEvidenceCount < 0
+        || !Number.isSafeInteger(descriptor.parentDepartureEvidenceCount) || descriptor.parentDepartureEvidenceCount < 1
+        || !descriptor.parentEvidenceByDayCounts || typeof descriptor.parentEvidenceByDayCounts !== 'object' || Array.isArray(descriptor.parentEvidenceByDayCounts)
+        || descriptor.fragmentOrdinal < 1 || descriptor.fragmentOrdinal > descriptor.fragmentCount || descriptor.fragmentCount < 2) {
+      return { ok: false, services: [], error: 'Prepared TNDS fragment manifest identity is malformed.' };
+    }
+    if (typeof descriptor.path !== 'string' || !descriptor.path) return { ok: false, services: [], error: 'Prepared TNDS fragment manifest path is malformed.' };
+    const ordinalMap = expectedByParent.get(descriptor.parentServiceId) ?? new Map();
+    if (!ordinalMap.has(descriptor.fragmentOrdinal)) ordinalMap.set(descriptor.fragmentOrdinal, []);
+    ordinalMap.get(descriptor.fragmentOrdinal).push(descriptor);
+    expectedByParent.set(descriptor.parentServiceId, ordinalMap);
+    if (expectedByPath.has(descriptor.path)) return { ok: false, services: [], error: `Prepared TNDS fragment path is duplicated in the manifest for ${descriptor.parentServiceId}.` };
+    expectedByPath.set(descriptor.path, descriptor);
+  }
+  const actualByParent = new Map();
+  const ordinary = [];
+  for (const item of rows) {
+    const fragment = item.service?.fragment;
+    if (!fragment) { ordinary.push(item.service); continue; }
+    const expected = expectedByPath.get(item.path);
+    if (!expected || expected.fragmentId !== fragment.fragmentId || expected.fragmentOrdinal !== fragment.ordinal || expected.fragmentCount !== fragment.count
+        || expected.fragmentDepartureEvidenceCount !== fragment.fragmentDepartureEvidenceCount || expected.parentDepartureEvidenceCount !== fragment.parentDepartureEvidenceCount
+        || JSON.stringify(expected.parentEvidenceByDayCounts) !== JSON.stringify(fragment.parentEvidenceByDayCounts)
+        || item.service.id !== fragment.parentServiceId) {
+      return { ok: false, services: [], error: `Prepared TNDS fragment metadata did not match its manifest descriptor for ${fragment.parentServiceId || 'unknown parent'}.` };
+    }
+    const ordinalMap = actualByParent.get(fragment.parentServiceId) ?? new Map();
+    if (!ordinalMap.has(fragment.ordinal)) ordinalMap.set(fragment.ordinal, []);
+    ordinalMap.get(fragment.ordinal).push(item.service);
+    actualByParent.set(fragment.parentServiceId, ordinalMap);
+  }
+  for (const [parentId, descriptorByOrdinal] of expectedByParent) {
+    const descriptors = [...descriptorByOrdinal.values()].flat();
+    const count = descriptors[0]?.fragmentCount;
+    const equivalent = (left, right) => left.fragmentId === right.fragmentId && left.fragmentCount === right.fragmentCount
+      && left.fragmentDepartureEvidenceCount === right.fragmentDepartureEvidenceCount
+      && left.parentDepartureEvidenceCount === right.parentDepartureEvidenceCount
+      && JSON.stringify(left.parentEvidenceByDayCounts) === JSON.stringify(right.parentEvidenceByDayCounts);
+    if (descriptors.some(item => item.fragmentCount !== count)
+        || Array.from({ length: count }, (_, index) => index + 1).some(ordinal => !descriptorByOrdinal.has(ordinal))
+        || [...descriptorByOrdinal.values()].some(copies => copies.some(item => !equivalent(copies[0], item)))) {
+      return { ok: false, services: [], error: `Prepared TNDS fragment set is incomplete in the selected manifest for ${parentId}.` };
+    }
+    const actualByOrdinal = actualByParent.get(parentId) ?? new Map();
+    const fragmentCopies = Array.from({ length: count }, (_, index) => actualByOrdinal.get(index + 1));
+    if (fragmentCopies.some(copies => !copies?.length)) {
+      return { ok: false, services: [], error: `Prepared TNDS fragment set is incomplete after loading for ${parentId}.` };
+    }
+    const sharedMetadata = service => {
+      const common = { ...service };
+      delete common.fragment;
+      delete common.departureEvidenceByDay;
+      delete common.stopSchedules;
+      delete common.tndsQuarantine;
+      return common;
+    };
+    const canonicalQuarantine = quarantine => {
+      if (!quarantine) return null;
+      const common = { ...quarantine };
+      delete common.affectedStopIds;
+      delete common.patterns;
+      const patterns = (quarantine.patterns ?? []).map(pattern => {
+        const shared = { ...pattern };
+        delete shared.affectedStopIds;
+        return { shared, affectedStopIds: [...new Set(pattern.affectedStopIds ?? [])].sort() };
+      });
+      return { common, patterns };
+    };
+    const fragments = [];
+    for (const copies of fragmentCopies) {
+      const reference = copies[0];
+      const referenceShared = JSON.stringify(sharedMetadata(reference));
+      const referenceFragment = JSON.stringify(reference.fragment);
+      const referenceEvidence = JSON.stringify(reference.departureEvidenceByDay);
+      const referenceQuarantine = canonicalQuarantine(reference.tndsQuarantine);
+      if (copies.some(copy => JSON.stringify(sharedMetadata(copy)) !== referenceShared
+          || JSON.stringify(copy.fragment) !== referenceFragment
+          || JSON.stringify(copy.departureEvidenceByDay) !== referenceEvidence)) {
+        return { ok: false, services: [], error: `Prepared TNDS stop-prefix copies disagree on shared fragment evidence or metadata for ${parentId}/${reference.fragment.ordinal}.` };
+      }
+      const stopSchedules = {};
+      const affectedStopIds = new Set();
+      const patternMap = new Map();
+      let quarantineCommon = referenceQuarantine?.common ?? null;
+      for (const copy of copies) {
+        Object.assign(stopSchedules, copy.stopSchedules ?? {});
+        if (!copy.tndsQuarantine) continue;
+        const quarantine = copy.tndsQuarantine;
+        const copyCommon = Object.fromEntries(Object.entries(quarantine).filter(([key]) => !['affectedStopIds', 'patterns'].includes(key)));
+        if (quarantineCommon && JSON.stringify(copyCommon) !== JSON.stringify(quarantineCommon)) {
+          return { ok: false, services: [], error: `Prepared TNDS stop-prefix quarantine metadata disagrees for ${parentId}/${reference.fragment.ordinal}.` };
+        }
+        quarantineCommon ??= copyCommon;
+        for (const stopId of quarantine.affectedStopIds ?? []) affectedStopIds.add(stopId);
+        for (const pattern of quarantine.patterns ?? []) {
+          const shared = { ...pattern };
+          delete shared.affectedStopIds;
+          const key = JSON.stringify(shared);
+          const existing = patternMap.get(key) ?? { ...shared, affectedStopIds: new Set() };
+          for (const stopId of pattern.affectedStopIds ?? []) existing.affectedStopIds.add(stopId);
+          patternMap.set(key, existing);
+        }
+      }
+      const tndsQuarantine = quarantineCommon ? {
+        ...quarantineCommon,
+        affectedStopIds: [...affectedStopIds].sort(),
+        patterns: [...patternMap.values()].map(pattern => ({ ...pattern, affectedStopIds: [...pattern.affectedStopIds].sort() }))
+      } : null;
+      fragments.push({ ...reference, stopSchedules, tndsQuarantine });
+    }
+    const expectedEvidenceCount = descriptors[0].parentDepartureEvidenceCount;
+    const expectedDayCounts = descriptors[0].parentEvidenceByDayCounts;
+    const actualEvidenceCount = fragments.reduce((total, item) => total + SERVICE_DAYS.reduce((dayTotal, day) => dayTotal + (item.departureEvidenceByDay?.[day] ?? []).length, 0), 0);
+    if (descriptors.some(item => item.parentDepartureEvidenceCount !== expectedEvidenceCount)
+        || descriptors.some(item => JSON.stringify(item.parentEvidenceByDayCounts) !== JSON.stringify(expectedDayCounts))
+        || SERVICE_DAYS.reduce((total, day) => total + Number(expectedDayCounts[day] ?? -1), 0) !== expectedEvidenceCount
+        || fragments.some(item => SERVICE_DAYS.reduce((total, day) => total + (item.departureEvidenceByDay?.[day] ?? []).length, 0) !== item.fragment.fragmentDepartureEvidenceCount)
+        || actualEvidenceCount !== expectedEvidenceCount) {
+      return { ok: false, services: [], error: `Prepared TNDS journey evidence count was not conserved across fragments for ${parentId}.` };
+    }
+    const base = { ...fragments[0] };
+    delete base.fragment;
+    delete base.departureEvidenceByDay;
+    if (fragments.some(item => JSON.stringify(sharedMetadata(item)) !== JSON.stringify(sharedMetadata(base)))) return { ok: false, services: [], error: `Prepared TNDS fragments disagree on shared service metadata for ${parentId}.` };
+    const departureEvidenceByDay = {};
+    for (const day of SERVICE_DAYS) {
+      const indexedRows = [];
+      for (const item of fragments) {
+        const order = item.fragment.evidenceOrderByDay?.[day];
+        const rows = item.departureEvidenceByDay?.[day] ?? [];
+        if (!Array.isArray(order) || order.length !== rows.length || order.some(index => !Number.isSafeInteger(index) || index < 0)) {
+          return { ok: false, services: [], error: `Prepared TNDS fragment row order is malformed for ${parentId}/${day}.` };
+        }
+        rows.forEach((entry, index) => indexedRows.push({ index: order[index], entry }));
+      }
+      indexedRows.sort((left, right) => left.index - right.index);
+      const expectedCount = expectedDayCounts[day];
+      if (!Number.isSafeInteger(expectedCount) || expectedCount < 0 || indexedRows.length !== expectedCount
+          || indexedRows.some((row, index) => row.index !== index)) {
+        return { ok: false, services: [], error: `Prepared TNDS fragment row order is incomplete for ${parentId}/${day}.` };
+      }
+      departureEvidenceByDay[day] = indexedRows.map(row => row.entry);
+    }
+    ordinary.push({ ...base, departureEvidenceByDay });
+  }
+  return { ok: true, services: ordinary };
+}
+
 // Source records are normalised to one deterministic shape. A StopPoint key
 // without a real departure remains metadata, not scheduled evidence.
 export function normalisePreparedService(service = {}) {
@@ -379,6 +533,30 @@ export function createPreparedBusDataAdapter({
       } else failSupplementary('invalid_response', 'Prepared supplementary timetable data requires stop-prefix shards.', { endpoint: resolveTndsUrl('manifest.json') });
       if (legacy && !supplementaryFailure) shardPaths = manifest.services.map(file => ({ key: null, descriptor: { path: file, stopIds: [] } }));
       const tndsRows = [];
+      const expectedFragments = [];
+      if (boundedManifest && hasShards && !supplementaryFailure) {
+        const byParent = new Map();
+        for (const selected of new Map(shardPaths.map(row => [row.descriptor.path, row])).values()) {
+          const descriptor = selected.descriptor;
+          if (!descriptor.fragmentId && !descriptor.parentServiceId && !descriptor.fragmentOrdinal && !descriptor.fragmentCount) continue;
+          if (typeof descriptor.parentServiceId !== 'string' || typeof descriptor.fragmentId !== 'string' || !Number.isInteger(descriptor.fragmentOrdinal) || !Number.isInteger(descriptor.fragmentCount)) {
+            failSupplementary('invalid_response', 'Prepared supplementary timetable fragment index was malformed.', { endpoint: resolveTndsUrl(descriptor.path), failedShard: descriptor.path });
+            break;
+          }
+          const value = { ...descriptor };
+          expectedFragments.push(value);
+          if (!byParent.has(value.parentServiceId)) byParent.set(value.parentServiceId, []);
+          byParent.get(value.parentServiceId).push(value);
+        }
+        for (const [parentId, descriptors] of byParent) {
+          const count = descriptors[0]?.fragmentCount;
+          if (descriptors.length !== count || new Set(descriptors.map(item => item.fragmentOrdinal)).size !== count
+              || Array.from({ length: count }, (_, index) => index + 1).some(ordinal => !descriptors.some(item => item.fragmentOrdinal === ordinal))) {
+            failSupplementary('invalid_response', `Prepared supplementary timetable fragments are incomplete for ${parentId}.`, { endpoint: resolveTndsUrl('manifest.json') });
+            break;
+          }
+        }
+      }
       for (const selected of [...new Map(shardPaths.map(row => [row.descriptor.path, row])).values()]) {
         if (supplementaryFailure) break;
         const file = selected.descriptor.path;
@@ -392,9 +570,11 @@ export function createPreparedBusDataAdapter({
           failSupplementary('invalid_response', `Prepared supplementary timetable shard was malformed: ${file}.`, { endpoint: resolveTndsUrl(file), failedShard: file });
           continue;
         }
-        for (const service of legacy ? [response.data] : response.data.services) tndsRows.push(service);
+        for (const service of legacy ? [response.data] : response.data.services) tndsRows.push({ path: file, service });
       }
-      const matchedTndsRows = tndsRows.map(service => normalisePreparedService(service)).map(service => {
+      const fragmentResult = reassemblePreparedTndsFragments(tndsRows, expectedFragments);
+      if (!fragmentResult.ok) failSupplementary('invalid_response', fragmentResult.error, { endpoint: resolveTndsUrl('manifest.json') });
+      const matchedTndsRows = fragmentResult.services.map(service => normalisePreparedService(service)).map(service => {
           const scoped = scopedScheduledService(service, stopIds);
           const affectedAtStop = (service.tndsQuarantine?.affectedStopIds || []).filter(id => stopIds.has(id));
           if (affectedAtStop.length) {

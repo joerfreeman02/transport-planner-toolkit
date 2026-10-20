@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import gzip
 import json
 from pathlib import Path
@@ -271,11 +272,17 @@ def validate(site: Path, bus_only: bool = False) -> dict:
         raise RefreshError("Candidate contains no prepared services")
     tnds_service_count = 0
     tnds_service_ids: set[str] = set()
+    tnds_service_ids_by_region: dict[str, set[str]] = {}
+    tnds_fragment_evidence: dict[str, dict] = {}
+    tnds_unfragmented_evidence: dict[str, int] = {}
+    physical_tnds_evidence_count = 0
     measured_tnds_shards = []
+    measured_fragment_descriptors = 0
     for prefix, relative_paths in service_shards.items():
         if not isinstance(prefix, str) or len(prefix) != tnds_manifest["serviceShardKeyLength"] or not isinstance(relative_paths, list) or not relative_paths:
             raise RefreshError("Candidate TNDS serviceShards are malformed")
         identities = set()
+        fragments_by_parent: dict[str, list[dict]] = {}
         for configured in relative_paths:
             descriptor = configured if bounded_tnds else None
             relative = descriptor.get("path") if descriptor else configured
@@ -290,19 +297,76 @@ def validate(site: Path, bus_only: bool = False) -> dict:
                 if descriptor.get("uncompressedBytes") != uncompressed_bytes or descriptor.get("compressedBytes") != compressed_bytes:
                     raise RefreshError(f"Candidate TNDS shard size index does not match its file: {relative}")
                 measured_tnds_shards.append(uncompressed_bytes)
+                fragment_fields = ("parentServiceId", "fragmentId", "fragmentOrdinal", "fragmentCount", "fragmentDepartureEvidenceCount", "parentDepartureEvidenceCount", "parentEvidenceByDayCounts")
+                fragment_present = [field in descriptor for field in fragment_fields]
+                if any(fragment_present):
+                    if not all(fragment_present) or not isinstance(descriptor["parentServiceId"], str) or not isinstance(descriptor["fragmentId"], str):
+                        raise RefreshError(f"Candidate TNDS fragment descriptor is malformed: {relative}")
+                    ordinal, count = descriptor["fragmentOrdinal"], descriptor["fragmentCount"]
+                    if isinstance(ordinal, bool) or not isinstance(ordinal, int) or isinstance(count, bool) or not isinstance(count, int) or count < 2 or not 1 <= ordinal <= count:
+                        raise RefreshError(f"Candidate TNDS fragment ordinal is malformed: {relative}")
+                    fragments_by_parent.setdefault(descriptor["parentServiceId"], []).append(descriptor)
+                    measured_fragment_descriptors += 1
             else:
                 payload = read_json(tnds / relative)
             expected_schema = "atlas-prepared-bus-tnds-v2" if bounded_tnds else "atlas-prepared-bus-tnds-v1"
             if payload.get("schema") != expected_schema or payload.get("stopPrefix") != prefix or not isinstance(payload.get("services"), list) or not payload["services"]:
                 raise RefreshError(f"Candidate TNDS shard is empty or malformed: {relative}")
             shard_stop_ids = set()
+            fragment_descriptor = descriptor if bounded_tnds and any(field in descriptor for field in ("parentServiceId", "fragmentId", "fragmentOrdinal", "fragmentCount")) else None
+            if fragment_descriptor and len(payload["services"]) != 1:
+                raise RefreshError(f"Candidate TNDS fragment shard must contain exactly one semantic fragment: {relative}")
             for service in payload["services"]:
                 identity = service.get("id") or service.get("source", {}).get("serviceCode")
-                if not identity or identity in identities:
+                row_identity = service.get("fragment", {}).get("fragmentId") if isinstance(service.get("fragment"), dict) else identity
+                if not identity or not row_identity or row_identity in identities:
                     raise RefreshError(f"Candidate TNDS shard contains a duplicate or missing service identity: {relative}")
-                identities.add(identity)
+                identities.add(row_identity)
                 tnds_service_ids.add(str(identity))
+                identity_parts = str(identity).split(":", 2)
+                if len(identity_parts) == 3 and identity_parts[0].lower() == "tnds" and identity_parts[1].upper() in TNDS_REGIONS:
+                    tnds_service_ids_by_region.setdefault(identity_parts[1].upper(), set()).add(str(identity))
                 validate_tnds_service(service, relative)
+                fragment = service.get("fragment")
+                evidence = service.get("departureEvidenceByDay", {})
+                evidence_count = sum(len(rows) for rows in evidence.values() if isinstance(rows, list)) if isinstance(evidence, dict) else 0
+                physical_tnds_evidence_count += evidence_count
+                if fragment_descriptor:
+                    expected_fragment = {"parentServiceId": fragment_descriptor["parentServiceId"], "fragmentId": fragment_descriptor["fragmentId"], "ordinal": fragment_descriptor["fragmentOrdinal"], "count": fragment_descriptor["fragmentCount"], "fragmentDepartureEvidenceCount": fragment_descriptor["fragmentDepartureEvidenceCount"], "parentDepartureEvidenceCount": fragment_descriptor["parentDepartureEvidenceCount"], "parentEvidenceByDayCounts": fragment_descriptor["parentEvidenceByDayCounts"]}
+                    if service.get("id") != fragment_descriptor["parentServiceId"] or not isinstance(fragment, dict) or any(fragment.get(key) != value for key, value in expected_fragment.items()) or evidence_count != fragment_descriptor["fragmentDepartureEvidenceCount"]:
+                        raise RefreshError(f"Candidate TNDS fragment identity does not match its descriptor: {relative}")
+                    parent = fragment_descriptor["parentServiceId"]
+                    day_counts = fragment_descriptor["parentEvidenceByDayCounts"]
+                    if not isinstance(day_counts, dict) or set(day_counts) != {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"} or any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in day_counts.values()):
+                        raise RefreshError(f"Candidate TNDS fragment per-day evidence counts are malformed for {parent}")
+                    if sum(day_counts.values()) != fragment_descriptor["parentDepartureEvidenceCount"]:
+                        raise RefreshError(f"Candidate TNDS fragment evidence totals disagree for {parent}")
+                    order_by_day = fragment.get("evidenceOrderByDay")
+                    if not isinstance(order_by_day, dict) or set(order_by_day) != set(day_counts):
+                        raise RefreshError(f"Candidate TNDS fragment row ordering is malformed for {parent}")
+                    for day, rows in service.get("departureEvidenceByDay", {}).items():
+                        indexes = order_by_day.get(day)
+                        if not isinstance(rows, list) or not isinstance(indexes, list) or len(indexes) != len(rows) or any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in indexes):
+                            raise RefreshError(f"Candidate TNDS fragment row ordering is malformed for {parent}/{day}")
+                    state = tnds_fragment_evidence.setdefault(parent, {"count": fragment_descriptor["fragmentCount"], "parentEvidenceCount": fragment_descriptor["parentDepartureEvidenceCount"], "dayCounts": day_counts, "ordinals": {}, "orderByOrdinal": {}})
+                    if state["count"] != fragment_descriptor["fragmentCount"] or state["parentEvidenceCount"] != fragment_descriptor["parentDepartureEvidenceCount"] or state["dayCounts"] != day_counts:
+                        raise RefreshError(f"Candidate TNDS fragment evidence counts disagree for {parent}")
+                    ordinal = fragment_descriptor["fragmentOrdinal"]
+                    previous = state["ordinals"].get(ordinal)
+                    if previous is not None and previous != evidence_count:
+                        raise RefreshError(f"Candidate TNDS duplicate parent fragment evidence disagrees for {parent}")
+                    state["ordinals"][ordinal] = evidence_count
+                    order_signature = {day: order_by_day[day] for day in day_counts}
+                    previous_order = state["orderByOrdinal"].get(ordinal)
+                    if previous_order is not None and previous_order != order_signature:
+                        raise RefreshError(f"Candidate TNDS duplicate parent fragment ordering disagrees for {parent}")
+                    state["orderByOrdinal"][ordinal] = order_signature
+                elif fragment is not None:
+                    raise RefreshError(f"Candidate TNDS shard contains an undescribed service fragment: {relative}")
+                else:
+                    previous = tnds_unfragmented_evidence.setdefault(str(identity), evidence_count)
+                    if previous != evidence_count:
+                        raise RefreshError(f"Candidate TNDS duplicate logical record evidence disagrees for {identity}")
                 relevant_ids = set(service.get("stopSchedules", {})) | set(service.get("tndsQuarantine", {}).get("affectedStopIds", []) if service.get("tndsQuarantine") else [])
                 if not any(str(stop_id).startswith(prefix) for stop_id in relevant_ids):
                     raise RefreshError(f"Candidate TNDS shard contains a service unrelated to prefix {prefix}: {relative}")
@@ -310,13 +374,47 @@ def validate(site: Path, bus_only: bool = False) -> dict:
                 tnds_service_count += 1
             if bounded_tnds and sorted(shard_stop_ids) != descriptor["stopIds"]:
                 raise RefreshError(f"Candidate TNDS shard stop index does not match its records: {relative}")
+        for parent_id, descriptors in fragments_by_parent.items():
+            count = descriptors[0]["fragmentCount"]
+            ordinals = [descriptor["fragmentOrdinal"] for descriptor in descriptors]
+            if any(descriptor["fragmentCount"] != count for descriptor in descriptors) or sorted(ordinals) != list(range(1, count + 1)):
+                raise RefreshError(f"Candidate TNDS parent {parent_id} has a missing or duplicate fragment in prefix {prefix}")
     if not bus_only and (not tnds_service_count or int(tnds_manifest.get("serviceCount", 0) or 0) < 1):
         raise RefreshError("Candidate contains no prepared TNDS services")
     if bounded_tnds:
+        if tnds_manifest.get("fragmentRecordCount", 0) != measured_fragment_descriptors:
+            raise RefreshError("Candidate TNDS fragment descriptor count does not match its manifest")
+        conserved_evidence = sum(count for count in tnds_unfragmented_evidence.values())
+        for parent, state in tnds_fragment_evidence.items():
+            if sorted(state["ordinals"]) != list(range(1, state["count"] + 1)) or sum(state["ordinals"].values()) != state["parentEvidenceCount"]:
+                raise RefreshError(f"Candidate TNDS journey evidence was lost or duplicated for fragmented parent {parent}")
+            for day, expected_count in state["dayCounts"].items():
+                indexes = [index for ordinal in range(1, state["count"] + 1) for index in state["orderByOrdinal"][ordinal][day]]
+                if sorted(indexes) != list(range(expected_count)):
+                    raise RefreshError(f"Candidate TNDS journey order was lost or duplicated for fragmented parent {parent}/{day}")
+            conserved_evidence += state["parentEvidenceCount"]
+        if tnds_manifest.get("logicalDepartureEvidenceCount") is not None and conserved_evidence != tnds_manifest["logicalDepartureEvidenceCount"]:
+            raise RefreshError("Candidate TNDS logical departure-evidence count does not match the packaged parent records")
+        if tnds_manifest.get("fragmentDepartureEvidenceCount") is not None and physical_tnds_evidence_count != tnds_manifest["fragmentDepartureEvidenceCount"]:
+            raise RefreshError("Candidate TNDS emitted departure-evidence count does not match its physical fragments")
         if len(measured_tnds_shards) != tnds_manifest["runtimeShardCount"] or sum(measured_tnds_shards) != tnds_manifest["runtimeShardTotalBytes"] or max(measured_tnds_shards, default=0) != tnds_manifest.get("runtimeShardMaxObservedBytes"):
             raise RefreshError("Candidate TNDS runtime shard measurements do not match the packaged files")
         if len(tnds_service_ids) != tnds_manifest.get("serviceCount"):
             raise RefreshError("Candidate TNDS service identity count does not match the manifest; a service may have been lost")
+        if tnds_manifest.get("logicalRecordCount", tnds_manifest.get("serviceCount")) != tnds_manifest.get("serviceCount"):
+            raise RefreshError("Candidate TNDS logical record and unique parent identity counts do not reconcile")
+        identity_hashes = tnds_manifest.get("regionServiceIdentitySha256")
+        if identity_hashes is not None:
+            if not isinstance(identity_hashes, dict) or set(identity_hashes) != set(TNDS_REGIONS):
+                raise RefreshError("Candidate TNDS logical identity hashes do not cover exactly eight regions")
+            expected_counts = tnds_manifest.get("regionServiceCounts", {})
+            for region in TNDS_REGIONS:
+                identities = tnds_service_ids_by_region.get(region, set())
+                if len(identities) != expected_counts.get(region):
+                    raise RefreshError(f"Candidate TNDS logical identity count does not match its manifest for {region}")
+                digest = hashlib.sha256(("\n".join(sorted(identities)) + "\n").encode("utf-8")).hexdigest()
+                if digest != identity_hashes.get(region):
+                    raise RefreshError(f"Candidate TNDS logical identity digest does not match its manifest for {region}")
     forbidden = [path for path in data.rglob("*") if path.is_file() and path.suffix.lower() in {".csv", ".zip", ".xml"}]
     if forbidden:
         raise RefreshError(f"Raw source file leaked into public data: {forbidden[0].name}")

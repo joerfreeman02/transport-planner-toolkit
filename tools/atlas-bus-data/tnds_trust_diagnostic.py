@@ -77,6 +77,22 @@ def read_prepared_handoff(prepared_root: str | Path) -> tuple[Path, dict, list[s
             relative = descriptor.get("path") if isinstance(descriptor, dict) else None
             if not relative or not isinstance(descriptor.get("stopIds"), list):
                 raise RuntimeError("Prepared TNDS service shard descriptor is malformed")
+            uncompressed = descriptor.get("uncompressedBytes")
+            if isinstance(uncompressed, bool) or not isinstance(uncompressed, int) or not 1 <= uncompressed <= manifest.get("runtimeShardMaxBytes", 8 * 1024 * 1024):
+                raise RuntimeError("Prepared TNDS service shard exceeds or omits its bounded decompressed byte count")
+            fragment_fields = ("parentServiceId", "fragmentId", "fragmentOrdinal", "fragmentCount", "fragmentDepartureEvidenceCount", "parentDepartureEvidenceCount", "parentEvidenceByDayCounts")
+            present = [field in descriptor for field in fragment_fields]
+            if any(present) and (not all(present) or not isinstance(descriptor["parentServiceId"], str) or not isinstance(descriptor["fragmentId"], str)
+                                 or isinstance(descriptor["fragmentOrdinal"], bool) or not isinstance(descriptor["fragmentOrdinal"], int)
+                                 or isinstance(descriptor["fragmentCount"], bool) or not isinstance(descriptor["fragmentCount"], int)
+                                 or isinstance(descriptor["fragmentDepartureEvidenceCount"], bool) or not isinstance(descriptor["fragmentDepartureEvidenceCount"], int) or descriptor["fragmentDepartureEvidenceCount"] < 0
+                                 or isinstance(descriptor["parentDepartureEvidenceCount"], bool) or not isinstance(descriptor["parentDepartureEvidenceCount"], int) or descriptor["parentDepartureEvidenceCount"] < 1
+                                 or descriptor["fragmentCount"] < 2 or not 1 <= descriptor["fragmentOrdinal"] <= descriptor["fragmentCount"]
+                                 or not isinstance(descriptor["parentEvidenceByDayCounts"], dict)
+                                 or set(descriptor["parentEvidenceByDayCounts"]) != {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
+                                 or any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in descriptor["parentEvidenceByDayCounts"].values())
+                                 or sum(descriptor["parentEvidenceByDayCounts"].values()) != descriptor["parentDepartureEvidenceCount"]):
+                raise RuntimeError("Prepared TNDS service fragment descriptor is malformed")
             target = (root / relative).resolve()
             if root.resolve() not in target.parents or not target.is_file():
                 raise RuntimeError("Prepared TNDS manifest references a missing or unsafe service shard")
@@ -96,8 +112,11 @@ def prepare_tnds_handoff(snapshot_root: str | Path, extracted_root: str | Path, 
     merged = {"schema": "atlas-prepared-bus-tnds-v2", "generatedAt": prepared_at,
               "source": "Traveline National Dataset v2.5", "expectedRegions": list(TNDS_REGIONS),
               "regions": [], "regionServiceCounts": {}, "sourceFileCounts": {}, "parsedFileCounts": {},
+              "regionServiceIdentitySha256": {},
               "ignoredRegistrationFileCounts": {}, "quarantinedPatternCount": 0, "quarantinedServiceCount": 0,
-              "serviceCount": 0, "serviceShardKeyLength": 5, "runtimeShardMaxBytes": 8 * 1024 * 1024,
+              "serviceCount": 0, "logicalRecordCount": 0, "logicalDepartureEvidenceCount": 0,
+              "fragmentDepartureEvidenceCount": 0, "fragmentRecordCount": 0,
+              "serviceShardKeyLength": 5, "runtimeShardMaxBytes": 8 * 1024 * 1024,
               "runtimeShardCount": 0, "runtimeShardMaxObservedBytes": 0, "runtimeShardTotalBytes": 0,
               "serviceShards": {}}
     for region in TNDS_REGIONS:
@@ -128,9 +147,9 @@ def prepare_tnds_handoff(snapshot_root: str | Path, extracted_root: str | Path, 
                 if target.exists(): raise RuntimeError("Prepared TNDS regional shard collision")
                 shutil.move(str(source), str(target))
         for key in ("regions",): merged[key].extend(regional[key])
-        for key in ("regionServiceCounts", "sourceFileCounts", "parsedFileCounts", "ignoredRegistrationFileCounts"):
+        for key in ("regionServiceCounts", "regionServiceIdentitySha256", "sourceFileCounts", "parsedFileCounts", "ignoredRegistrationFileCounts"):
             merged[key].update(regional[key])
-        for key in ("quarantinedPatternCount", "quarantinedServiceCount", "serviceCount"):
+        for key in ("quarantinedPatternCount", "quarantinedServiceCount", "serviceCount", "logicalRecordCount", "logicalDepartureEvidenceCount", "fragmentDepartureEvidenceCount", "fragmentRecordCount"):
             merged[key] += regional[key]
         merged["runtimeShardCount"] += regional["runtimeShardCount"]
         merged["runtimeShardMaxObservedBytes"] = max(merged["runtimeShardMaxObservedBytes"], regional["runtimeShardMaxObservedBytes"])

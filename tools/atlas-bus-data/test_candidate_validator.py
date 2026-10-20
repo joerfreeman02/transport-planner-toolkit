@@ -65,6 +65,51 @@ class CandidateValidatorTests(unittest.TestCase):
                          'runtimeShardTotalBytes': sum(measurements), 'serviceShards': shards})
         manifest_path.write_text(json.dumps(manifest))
 
+    def _fragment_first_tnds_record(self):
+        root = self.root / 'atlas/data/bus-tnds'
+        self._convert_tnds_to_v2()
+        manifest_path = root / 'manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        descriptors = manifest['serviceShards']['STOP-']
+        original = descriptors.pop(0)
+        original_path = root / original['path']
+        payload = json.loads(gzip.decompress(original_path.read_bytes()))
+        service = payload['services'][0]
+        service['departureEvidenceByDay'] = {day: [] for day in ('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday')}
+        service['departureEvidenceByDay']['monday'] = [
+            {'minute': 600, 'stopPointId': 'STOP-1', 'journeyIdentity': 'JOURNEY-1'},
+            {'minute': 615, 'stopPointId': 'STOP-1', 'journeyIdentity': 'JOURNEY-2'}
+        ]
+        parent_id = service['id']
+        for ordinal, row in enumerate(service['departureEvidenceByDay']['monday'], start=1):
+            fragment_id = f'{parent_id}#journey-fragment-{ordinal:04d}'
+            fragment_service = {**service, 'departureEvidenceByDay': {'monday': [row]}, 'fragment': {
+                'parentServiceId': parent_id, 'fragmentId': fragment_id, 'ordinal': ordinal, 'count': 2,
+                'fragmentDepartureEvidenceCount': 1, 'parentDepartureEvidenceCount': 2,
+                'parentEvidenceByDayCounts': {'monday': 2, 'tuesday': 0, 'wednesday': 0, 'thursday': 0, 'friday': 0, 'saturday': 0, 'sunday': 0},
+                'evidenceOrderByDay': {'monday': [ordinal - 1], 'tuesday': [], 'wednesday': [], 'thursday': [], 'friday': [], 'saturday': [], 'sunday': []}
+            }}
+            fragment_payload = {**payload, 'services': [fragment_service]}
+            content = json.dumps(fragment_payload, separators=(',', ':')).encode()
+            compressed = gzip.compress(content, mtime=0)
+            relative = f'services/0-ea-fragment-{ordinal:04d}.json.gz'
+            (root / relative).write_bytes(compressed)
+            descriptors.append({
+                'path': relative, 'stopIds': ['STOP-1'], 'uncompressedBytes': len(content), 'compressedBytes': len(compressed),
+                'parentServiceId': parent_id, 'fragmentId': fragment_id, 'fragmentOrdinal': ordinal, 'fragmentCount': 2,
+                'fragmentDepartureEvidenceCount': 1, 'parentDepartureEvidenceCount': 2,
+                'parentEvidenceByDayCounts': {'monday': 2, 'tuesday': 0, 'wednesday': 0, 'thursday': 0, 'friday': 0, 'saturday': 0, 'sunday': 0}
+            })
+        original_path.unlink()
+        all_descriptors = [descriptor for values in manifest['serviceShards'].values() for descriptor in values]
+        sizes = [descriptor['uncompressedBytes'] for descriptor in all_descriptors]
+        manifest.update({
+            'runtimeShardCount': len(sizes), 'runtimeShardTotalBytes': sum(sizes), 'runtimeShardMaxObservedBytes': max(sizes),
+            'fragmentRecordCount': 2, 'logicalDepartureEvidenceCount': 2
+        })
+        manifest_path.write_text(json.dumps(manifest))
+        return manifest_path
+
     def test_bounded_tnds_v2_candidate_passes_runtime_package_validation(self):
         self._convert_tnds_to_v2()
         result = validate(self.root)
@@ -73,6 +118,20 @@ class CandidateValidatorTests(unittest.TestCase):
     def test_bounded_tnds_v2_rejects_actual_shard_over_limit(self):
         self._convert_tnds_to_v2(max_bytes=64)
         with self.assertRaisesRegex(RefreshError, 'exceeds the bounded 64-byte limit'):
+            validate(self.root)
+
+    def test_bounded_tnds_v2_accepts_lossless_semantic_fragments(self):
+        self._fragment_first_tnds_record()
+        result = validate(self.root)
+        self.assertEqual(result['tndsShardRecords'], len(TNDS_REGIONS) + 1)
+
+    def test_bounded_tnds_v2_rejects_missing_parent_fragment(self):
+        manifest_path = self._fragment_first_tnds_record()
+        manifest = json.loads(manifest_path.read_text())
+        manifest['serviceShards']['STOP-'].pop()
+        manifest['fragmentRecordCount'] = 1
+        manifest_path.write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(RefreshError, 'incomplete or duplicated fragment set'):
             validate(self.root)
 
     def test_bounded_tnds_v2_rejects_mismatched_stop_index(self):

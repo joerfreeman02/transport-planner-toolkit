@@ -71,6 +71,41 @@ try {
   assert.equal(largeServices[0].patternVariants[0].patternId, 'JP-large-valid');
   assert.deepEqual(largeServices[0].stops.map(stop => stop.id), ['SE0001', 'SE0002']);
 
+  const fragmentedInput = path.join(root, 'fragmented-input');
+  const fragmentedOutput = path.join(root, 'fragmented-output');
+  await fs.mkdir(fragmentedInput, { recursive: true });
+  const journeyRows = Array.from({ length: 500 }, (_, index) => `<VehicleJourney><VehicleJourneyCode>V-FRAG-${String(index).padStart(4, '0')}</VehicleJourneyCode><JourneyPatternRef>JP-fragmented</JourneyPatternRef><DepartureTime>08:00:00</DepartureTime><OperatingProfile><MondayToFriday>true</MondayToFriday></OperatingProfile></VehicleJourney>`).join('');
+  const fragmentedXml = serviceXml('fragmented', 'SE000').replace(/<VehicleJourneys>[\s\S]*?<\/VehicleJourneys>/, `<VehicleJourneys>${journeyRows}</VehicleJourneys>`);
+  await fs.writeFile(path.join(fragmentedInput, 'SE-fragmented.xml'), fragmentedXml);
+  const fragmentedExpected = parseTndsTransXchangeServices(fragmentedXml, { region: 'SE', sourceArchive: 'SE-fragmented.xml', preparedAt })[0];
+  const fragmentLimit = 8 * 1024;
+  const fragmentResult = await prepareTnds({ input: fragmentedInput, output: fragmentedOutput, preparedAt, maxRuntimeShardBytes: fragmentLimit });
+  const fragmentManifest = JSON.parse(await fs.readFile(path.join(fragmentedOutput, 'manifest.json'), 'utf8'));
+  const fragmentDescriptors = Object.values(fragmentManifest.serviceShards).flat().filter(item => item.parentServiceId === fragmentedExpected.id);
+  assert.ok(fragmentDescriptors.length > 1, 'journey-expanded source record is split into semantic physical shards');
+  assert.equal(fragmentManifest.logicalRecordCount, 1);
+  assert.ok(fragmentDescriptors.every(item => item.fragmentCount === fragmentDescriptors.length && item.uncompressedBytes <= fragmentLimit && item.compressedBytes > 0));
+  const fragmentRows = [];
+  for (const descriptor of fragmentDescriptors) {
+    const bytes = gunzipSync(await fs.readFile(path.join(fragmentedOutput, descriptor.path)));
+    assert.equal(bytes.byteLength, descriptor.uncompressedBytes, 'descriptor decompressed size matches the physical shard');
+    const payload = JSON.parse(bytes.toString('utf8'));
+    assert.equal(payload.services.length, 1, 'oversized fragments are isolated for exact compressed/decompressed accounting');
+    const row = payload.services[0];
+    assert.equal(row.fragment.parentServiceId, descriptor.parentServiceId);
+    assert.equal(row.fragment.fragmentId, descriptor.fragmentId);
+    assert.equal(row.fragment.ordinal, descriptor.fragmentOrdinal);
+    fragmentRows.push(row);
+  }
+  fragmentRows.sort((left, right) => left.fragment.ordinal - right.fragment.ordinal);
+  const reconstructedEvidence = Object.fromEntries(Object.keys(fragmentedExpected.departureEvidenceByDay).map(day => [day, fragmentRows.flatMap(row => row.departureEvidenceByDay[day] ?? [])]));
+  assert.deepEqual(reconstructedEvidence, fragmentedExpected.departureEvidenceByDay, 'prepared semantic fragments conserve every journey row');
+  assert.equal(fragmentRows[0].routeNumber, fragmentedExpected.routeNumber);
+  assert.equal(fragmentRows[0].operator, fragmentedExpected.operator);
+  assert.deepEqual(fragmentRows[0].calendarEvidence, fragmentedExpected.calendarEvidence);
+  assert.deepEqual(fragmentRows[0].stopSchedules, fragmentedExpected.stopSchedules);
+  assert.equal(fragmentResult.services, 1, 'fragment count never inflates logical service count');
+
   const scaleInput = path.join(root, 'scale-input');
   const scaleOutput = path.join(root, 'scale-output');
   await fs.mkdir(scaleInput, { recursive: true });

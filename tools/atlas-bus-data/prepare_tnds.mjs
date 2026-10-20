@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -13,6 +14,69 @@ export const TNDS_RUNTIME_SHARD_MAX_BYTES = 8 * 1024 * 1024;
 // Exact Run #53 production-file parsing was measured at 169,291,408 bytes.
 // Keep a finite guard with roughly 19% headroom above that current maximum.
 export const TNDS_XML_MAX_BYTES = 192 * 1024 * 1024;
+
+function emptyDepartureEvidence() {
+  return Object.fromEntries(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => [day, []]));
+}
+
+function journeyKey(entry, day, index) {
+  const identity = [entry?.journeyIdentity, entry?.sourceRecordId, entry?.patternIdentity, entry?.calendarProfileId]
+    .map(value => String(value ?? '').trim());
+  return identity.some(Boolean) ? identity.join('\u0000') : `unidentified\u0000${day}\u0000${index}\u0000${JSON.stringify(entry)}`;
+}
+
+export function fragmentTndsServiceRecord(record, maxBytes = TNDS_RUNTIME_SHARD_MAX_BYTES, options = {}) {
+  const serializedBytes = Buffer.byteLength(JSON.stringify(record));
+  if (serializedBytes <= maxBytes && !options.forceFragment) return [record];
+  const days = Object.keys(emptyDepartureEvidence());
+  const journeys = new Map();
+  for (const day of days) {
+    for (const [index, entry] of (record.departureEvidenceByDay?.[day] ?? []).entries()) {
+      const key = journeyKey(entry, day, index);
+      if (!journeys.has(key)) journeys.set(key, { evidence: emptyDepartureEvidence(), order: emptyDepartureEvidence() });
+      journeys.get(key).evidence[day].push(entry);
+      journeys.get(key).order[day].push(index);
+    }
+  }
+  const common = { ...record, departureEvidenceByDay: emptyDepartureEvidence() };
+  const commonBytes = options.commonBytesOverride ?? Buffer.byteLength(JSON.stringify(common));
+  const budget = maxBytes - commonBytes - 512;
+  if (budget < 1) throw new Error(`TNDS service ${record.id} requires ${commonBytes} bytes of indivisible metadata; exceeds the bounded ${maxBytes}-byte ceiling; no service was dropped.`);
+  // Preserve the source's first-seen journey order. The original per-day row
+  // indexes are carried so reconstruction can restore each day exactly even
+  // when calendar-specific journey ordering differs between days.
+  const groups = [...journeys.entries()];
+  const parentDepartureEvidenceCount = days.reduce((total, day) => total + (record.departureEvidenceByDay?.[day] ?? []).length, 0);
+  const parentEvidenceByDayCounts = Object.fromEntries(days.map(day => [day, (record.departureEvidenceByDay?.[day] ?? []).length]));
+  const parts = [];
+  let current = { evidence: emptyDepartureEvidence(), order: emptyDepartureEvidence() };
+  let currentBytes = 2;
+  for (const [, journey] of groups) {
+    const groupBytes = days.reduce((total, day) => total + (journey.evidence[day] ?? []).reduce((sum, entry, index) => sum + Buffer.byteLength(JSON.stringify(entry)) + Buffer.byteLength(String(journey.order[day][index])) + 3, 0), 0);
+    if (groupBytes + commonBytes + 1024 > maxBytes) throw new Error(`TNDS service ${record.id} contains one journey identity requiring ${groupBytes + commonBytes + 1024} bytes; exceeds the bounded ${maxBytes}-byte ceiling; no service was dropped.`);
+    if (currentBytes + groupBytes > budget && days.some(day => current.evidence[day].length)) {
+      parts.push(current);
+      current = { evidence: emptyDepartureEvidence(), order: emptyDepartureEvidence() };
+      currentBytes = 2;
+    }
+    for (const day of days) {
+      current.evidence[day].push(...journey.evidence[day]);
+      current.order[day].push(...journey.order[day]);
+    }
+    currentBytes += groupBytes;
+  }
+  if (days.some(day => current.evidence[day].length)) parts.push(current);
+  if (parts.length < 2) throw new Error(`TNDS service ${record.id} exceeded the bounded runtime shard ceiling but could not be safely partitioned at journey boundaries.`);
+  return parts.map(({ evidence: departureEvidenceByDay, order: evidenceOrderByDay }, index) => {
+    const ordinal = index + 1;
+    const fragmentDepartureEvidenceCount = days.reduce((total, day) => total + departureEvidenceByDay[day].length, 0);
+    const fragment = { parentServiceId: record.id, fragmentId: `${record.id}#journey-fragment-${String(ordinal).padStart(4, '0')}`, ordinal, count: parts.length, fragmentDepartureEvidenceCount, parentDepartureEvidenceCount, parentEvidenceByDayCounts, evidenceOrderByDay };
+    const service = { ...record, departureEvidenceByDay, fragment };
+    const bytes = Buffer.byteLength(JSON.stringify(service));
+    if (!options.deferFinalSizeCheck && bytes > maxBytes) throw new Error(`TNDS service ${record.id} fragment ${ordinal}/${parts.length} measures ${bytes} bytes, exceeding the bounded ${maxBytes}-byte runtime shard ceiling.`);
+    return service;
+  });
+}
 
 async function ensureDiskReserve(directory, upcomingBytes = 0) {
   const required = Number(process.env.ATLAS_TNDS_DISK_RESERVE_BYTES || 0);
@@ -89,6 +153,7 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
   }
   const processedRegions = [];
   const regionServiceIds = new Map();
+  const regionServiceIdentitySha256 = {};
   const sourceFileCounts = {};
   const parsedFileCounts = {};
   const ignoredRegistrationFileCounts = {};
@@ -97,7 +162,7 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
   const serviceIds = new Set();
   const registeredPaths = new Set();
   const work = path.join(output, '.tnds-shards-work');
-  const materialization = { sourceBytes: 0, recordCount: 0, maxRecordBytes: 0, maxBufferedRecordBytes: 0, shardRegionCount: 0 };
+  const materialization = { sourceBytes: 0, recordCount: 0, logicalRecordCount: 0, logicalDepartureEvidenceCount: 0, fragmentDepartureEvidenceCount: 0, fragmentCount: 0, maxRecordBytes: 0, maxBufferedRecordBytes: 0, shardRegionCount: 0 };
   const xmlByteLimit = Number.isInteger(maxXmlBytes) && maxXmlBytes > 0 ? maxXmlBytes : TNDS_XML_MAX_BYTES;
   const runtimeShardByteLimit = Number.isInteger(maxRuntimeShardBytes) && maxRuntimeShardBytes > 0 ? maxRuntimeShardBytes : TNDS_RUNTIME_SHARD_MAX_BYTES;
   let quarantinedPatterns = 0;
@@ -131,9 +196,15 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
           }
           retainedServiceIds.add(service.id);
           serviceIds.add(service.id);
+          materialization.logicalRecordCount += 1;
+          const serviceDepartureEvidenceCount = Object.values(service.departureEvidenceByDay || {}).reduce((total, values) => total + (Array.isArray(values) ? values.length : 0), 0);
+          materialization.logicalDepartureEvidenceCount += serviceDepartureEvidenceCount;
           const ids = [...Object.keys(service.stopSchedules || {}), ...(service.tndsQuarantine?.affectedStopIds || [])];
           const shardKeys = [...new Set(ids.map(id => String(id).slice(0, TNDS_SERVICE_SHARD_KEY_LENGTH)).filter(Boolean))];
           if (!shardKeys.length) throw new Error(`TNDS service ${service.source.serviceCode || service.id} has no shardable StopPoint IDs.`);
+          const scopedByShard = new Map();
+          let largestScopedCommonBytes = 0;
+          let requiresFragmentation = false;
           for (const shardKey of shardKeys) {
             if (!/^[A-Za-z0-9_-]{1,5}$/.test(shardKey)) throw new Error(`TNDS service ${service.source.serviceCode || service.id} has an unsafe StopPoint shard key.`);
             const scheduled = Object.fromEntries(Object.entries(service.stopSchedules || {}).filter(([stopId]) => stopId.startsWith(shardKey)));
@@ -142,23 +213,58 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
               affectedStopIds: service.tndsQuarantine.affectedStopIds.filter(stopId => stopId.startsWith(shardKey)),
               patterns: service.tndsQuarantine.patterns.filter(pattern => pattern.affectedStopIds.some(stopId => stopId.startsWith(shardKey))).map(pattern => ({ ...pattern, affectedStopIds: pattern.affectedStopIds.filter(stopId => stopId.startsWith(shardKey)) }))
             } : null;
-            const record = { ...service, stopSchedules: scheduled, tndsQuarantine: quarantine?.affectedStopIds.length ? quarantine : null };
+            const scopedQuarantine = quarantine?.affectedStopIds.length ? quarantine : null;
+            const scopedRecord = { ...service, stopSchedules: scheduled, tndsQuarantine: scopedQuarantine };
+            scopedByShard.set(shardKey, scopedRecord);
+            const commonRecord = { ...scopedRecord, departureEvidenceByDay: emptyDepartureEvidence() };
+            largestScopedCommonBytes = Math.max(largestScopedCommonBytes, Buffer.byteLength(JSON.stringify(commonRecord)));
+            if (Buffer.byteLength(JSON.stringify(scopedRecord)) > runtimeShardByteLimit) requiresFragmentation = true;
+          }
+          let recordsByShard;
+          if (requiresFragmentation) {
+            // Fragment once against the largest prefix-scoped metadata shape.
+            // This keeps every prefix copy on the same journey boundaries.
+            const stableBase = { ...service, stopSchedules: {}, tndsQuarantine: null };
+            const fragments = fragmentTndsServiceRecord(stableBase, runtimeShardByteLimit, {
+              commonBytesOverride: largestScopedCommonBytes,
+              forceFragment: true,
+              deferFinalSizeCheck: true
+            });
+            if (fragments.length < 2) throw new Error(`TNDS service ${service.id} requires fragmentation but could not be partitioned safely.`);
+            materialization.fragmentCount += fragments.length * scopedByShard.size;
+            recordsByShard = new Map([...scopedByShard].map(([shardKey, scopedRecord]) => [shardKey, fragments.map(fragment => ({
+              ...fragment,
+              stopSchedules: scopedRecord.stopSchedules,
+              tndsQuarantine: scopedRecord.tndsQuarantine
+            }))]));
+          } else {
+            recordsByShard = new Map([...scopedByShard].map(([shardKey, scopedRecord]) => [shardKey, [scopedRecord]]));
+          }
+          for (const [shardKey, records] of recordsByShard) {
+            for (const record of records) {
+              const bytes = Buffer.byteLength(JSON.stringify(record));
+              if (bytes > runtimeShardByteLimit) throw new Error(`TNDS service ${service.id}${record.fragment ? ` fragment ${record.fragment.ordinal}/${record.fragment.count}` : ''} measures ${bytes} bytes after stop-prefix scoping, exceeding the bounded ${runtimeShardByteLimit}-byte runtime shard ceiling.`);
+            }
             if (!shardFiles.has(shardKey)) shardFiles.set(shardKey, { identities: new Set() });
             const shard = shardFiles.get(shardKey);
-            if (shard.identities.has(record.id)) throw new Error(`TNDS prepared service ${record.id} was duplicated in shard ${shardKey}.`);
-            shard.identities.add(record.id);
             const shardRegionKey = `${shardKey}\u0000${region}`;
             if (!shardRegionFiles.has(shardRegionKey)) shardRegionFiles.set(shardRegionKey, { file: path.join(work, `${shardKey}-${region}.jsonl`), entries: [], bytes: 0 });
             const shardRegion = shardRegionFiles.get(shardRegionKey);
-            const serialized = Buffer.from(`${JSON.stringify(record)}\n`);
-            const stopIds = [...new Set([...Object.keys(record.stopSchedules || {}), ...(record.tndsQuarantine?.affectedStopIds || [])])].sort();
-            shardRegion.entries.push({ id: record.id, offset: shardRegion.bytes, byteLength: serialized.byteLength, stopIds });
-            shardRegion.bytes += serialized.byteLength;
-            materialization.sourceBytes += serialized.byteLength;
-            materialization.recordCount += 1;
-            materialization.maxRecordBytes = Math.max(materialization.maxRecordBytes, serialized.byteLength);
-            await ensureDiskReserve(work, serialized.byteLength);
-            await fs.appendFile(shardRegion.file, serialized);
+            for (const record of records) {
+              const identity = record.fragment?.fragmentId || record.id;
+              if (shard.identities.has(identity)) throw new Error(`TNDS prepared fragment ${identity} was duplicated in shard ${shardKey}.`);
+              shard.identities.add(identity);
+              const serialized = Buffer.from(`${JSON.stringify(record)}\n`);
+              const stopIds = [...new Set([...Object.keys(record.stopSchedules || {}), ...(record.tndsQuarantine?.affectedStopIds || [])])].sort();
+              shardRegion.entries.push({ id: identity, parentServiceId: record.fragment?.parentServiceId, fragmentId: record.fragment?.fragmentId, fragmentOrdinal: record.fragment?.ordinal, fragmentCount: record.fragment?.count, fragmentDepartureEvidenceCount: record.fragment?.fragmentDepartureEvidenceCount, parentDepartureEvidenceCount: record.fragment?.parentDepartureEvidenceCount, parentEvidenceByDayCounts: record.fragment?.parentEvidenceByDayCounts, offset: shardRegion.bytes, byteLength: serialized.byteLength, stopIds });
+              shardRegion.bytes += serialized.byteLength;
+              materialization.sourceBytes += serialized.byteLength;
+              materialization.recordCount += 1;
+              materialization.fragmentDepartureEvidenceCount += Object.values(record.departureEvidenceByDay || {}).reduce((total, values) => total + (Array.isArray(values) ? values.length : 0), 0);
+              materialization.maxRecordBytes = Math.max(materialization.maxRecordBytes, serialized.byteLength);
+              await ensureDiskReserve(work, serialized.byteLength);
+              await fs.appendFile(shardRegion.file, serialized);
+            }
           }
         }
       } catch (error) {
@@ -172,6 +278,7 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
     }
     processedRegions.push(region);
     regionServiceIds.set(region, retainedServiceIds);
+    regionServiceIdentitySha256[region] = createHash('sha256').update(`${[...retainedServiceIds].sort().join('\n')}\n`).digest('hex');
     sourceFileCounts[region] = regionFiles.length;
     parsedFileCounts[region] = parsedFiles;
     ignoredRegistrationFileCounts[region] = ignoredRegistrationFiles;
@@ -197,6 +304,11 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
       if (baseBytes + footerBytes + recordBytes > runtimeShardByteLimit) {
         throw new Error(`TNDS service ${entry.id} requires ${baseBytes + footerBytes + recordBytes} bytes in one runtime shard; exceeds the bounded ${runtimeShardByteLimit}-byte ceiling; no service was dropped.`);
       }
+      if (entry.fragmentId) {
+        if (partition.length) { partitions.push(partition); partition = []; partitionBytes = baseBytes + footerBytes; }
+        partitions.push([entry]);
+        continue;
+      }
       if (partition.length && nextBytes > runtimeShardByteLimit) {
         partitions.push(partition);
         partition = [];
@@ -214,7 +326,11 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
       const measured = await materializeShardRegion({ sourceFile: shardRegion.file, outputFile: path.join(output, relative), shardKey, region, entries, stats: materialization, maxRuntimeShardBytes: runtimeShardByteLimit });
       materialization.shardRegionCount += 1;
       if (!serviceShards[shardKey]) serviceShards[shardKey] = [];
-      serviceShards[shardKey].push({ path: relative, stopIds: [...new Set(entries.flatMap(entry => entry.stopIds))].sort(), ...measured });
+      const descriptor = { path: relative, stopIds: [...new Set(entries.flatMap(entry => entry.stopIds))].sort(), ...measured };
+      if (entries.length === 1 && entries[0].fragmentId) {
+        Object.assign(descriptor, { parentServiceId: entries[0].parentServiceId, fragmentId: entries[0].fragmentId, fragmentOrdinal: entries[0].fragmentOrdinal, fragmentCount: entries[0].fragmentCount, fragmentDepartureEvidenceCount: entries[0].fragmentDepartureEvidenceCount, parentDepartureEvidenceCount: entries[0].parentDepartureEvidenceCount, parentEvidenceByDayCounts: entries[0].parentEvidenceByDayCounts });
+      }
+      serviceShards[shardKey].push(descriptor);
       shardMetrics.push(measured);
     }
   }
@@ -226,12 +342,17 @@ export async function prepareTnds({ input, output, preparedAt = new Date().toISO
     expectedRegions: [...TNDS_REGIONS],
     regions: processedRegions,
     regionServiceCounts,
+    regionServiceIdentitySha256,
     sourceFileCounts,
     parsedFileCounts,
     ignoredRegistrationFileCounts,
     quarantinedPatternCount: quarantinedPatterns,
     quarantinedServiceCount: quarantinedServices,
     serviceCount: serviceIds.size,
+    logicalRecordCount: materialization.logicalRecordCount,
+    logicalDepartureEvidenceCount: materialization.logicalDepartureEvidenceCount,
+    fragmentDepartureEvidenceCount: materialization.fragmentDepartureEvidenceCount,
+    fragmentRecordCount: materialization.fragmentCount,
     serviceShardKeyLength: TNDS_SERVICE_SHARD_KEY_LENGTH,
     runtimeShardMaxBytes: runtimeShardByteLimit,
     runtimeShardCount: shardMetrics.length,

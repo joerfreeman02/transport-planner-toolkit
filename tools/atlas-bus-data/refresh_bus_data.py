@@ -565,11 +565,40 @@ def candidate_metrics(site: Path) -> dict:
     tnds_bounded = tnds.get("schema") == "atlas-prepared-bus-tnds-v2"
     tnds_paths = []
     if all(isinstance(values, list) for values in tnds_shards.values()):
-        for values in tnds_shards.values():
+        for prefix, values in tnds_shards.items():
+            fragments: dict[str, list[dict]] = {}
             for item in values:
                 relative = item.get("path") if tnds_bounded and isinstance(item, dict) else item
                 if isinstance(relative, str):
                     tnds_paths.append(relative)
+                if tnds_bounded:
+                    if not isinstance(item, dict) or not isinstance(item.get("stopIds"), list):
+                        raise RefreshError(f"Prepared TNDS candidate shard descriptor for {prefix} is malformed")
+                    size = item.get("uncompressedBytes")
+                    maximum = tnds.get("runtimeShardMaxBytes", 8 * 1024 * 1024)
+                    if isinstance(size, bool) or not isinstance(size, int) or size < 1:
+                        raise RefreshError(f"Prepared TNDS candidate shard {relative} omits its bounded decompressed size")
+                    if size > min(maximum, 8 * 1024 * 1024):
+                        raise RefreshError(f"Prepared TNDS candidate shard exceeds the bounded {min(maximum, 8 * 1024 * 1024)}-byte limit: {relative}")
+                    fragment_fields = ("parentServiceId", "fragmentId", "fragmentOrdinal", "fragmentCount", "fragmentDepartureEvidenceCount", "parentDepartureEvidenceCount", "parentEvidenceByDayCounts")
+                    present = [field in item for field in fragment_fields]
+                    if any(present):
+                        if not all(present) or not isinstance(item["parentServiceId"], str) or not isinstance(item["fragmentId"], str):
+                            raise RefreshError(f"Prepared TNDS candidate fragment descriptor {relative} is malformed")
+                        ordinal, count = item["fragmentOrdinal"], item["fragmentCount"]
+                        if isinstance(ordinal, bool) or not isinstance(ordinal, int) or isinstance(count, bool) or not isinstance(count, int) or count < 2 or not 1 <= ordinal <= count:
+                            raise RefreshError(f"Prepared TNDS candidate fragment ordinal is malformed for {relative}")
+                        day_counts = item["parentEvidenceByDayCounts"]
+                        if (not isinstance(day_counts, dict) or set(day_counts) != {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
+                                or any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in day_counts.values())
+                                or sum(day_counts.values()) != item["parentDepartureEvidenceCount"]):
+                            raise RefreshError(f"Prepared TNDS candidate per-day fragment evidence counts are malformed for {relative}")
+                        fragments.setdefault(item["parentServiceId"], []).append(item)
+            for parent, descriptors in fragments.items():
+                count = descriptors[0]["fragmentCount"]
+                ordinals = [descriptor["fragmentOrdinal"] for descriptor in descriptors]
+                if any(descriptor["fragmentCount"] != count for descriptor in descriptors) or sorted(ordinals) != list(range(1, count + 1)):
+                    raise RefreshError(f"Prepared TNDS candidate has an incomplete or duplicated fragment set for {parent} in prefix {prefix}")
     if not tnds_paths or not isinstance(tnds.get("serviceShardKeyLength"), int) or tnds["serviceShardKeyLength"] < 1:
         raise RefreshError("Prepared TNDS candidate does not contain valid stop-prefix shards")
     for relative in list(bus["stopShards"].values()) + [item for values in bus["serviceShards"].values() for item in values] + tnds_paths:
@@ -588,6 +617,8 @@ def candidate_metrics(site: Path) -> dict:
         "tndsParsedFileCounts": tnds.get("parsedFileCounts", {}),
         "tndsIgnoredRegistrationFileCounts": tnds.get("ignoredRegistrationFileCounts", {}),
         "tndsServiceCount": tnds["serviceCount"],
+        "tndsLogicalRecordCount": tnds.get("logicalRecordCount", tnds["serviceCount"]),
+        "tndsFragmentRecordCount": tnds.get("fragmentRecordCount", 0),
     }
     if bus.get("schema") == "atlas-prepared-bus-data-v2":
         metrics.update({

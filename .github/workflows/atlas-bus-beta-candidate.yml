@@ -333,6 +333,35 @@ jobs:
           overwrite: false
           retention-days: 90
 
+      - name: Set up pnpm for actual-candidate browser audit
+        if: inputs.mode == 'compose'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Install locked JavaScript audit dependencies
+        if: inputs.mode == 'compose'
+        run: pnpm install --frozen-lockfile
+      - name: Install headless Chromium for actual-candidate runtime audit
+        if: inputs.mode == 'compose'
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Exhaustively audit actual prepared TNDS package
+        if: inputs.mode == 'compose'
+        run: |
+          mkdir -p candidate-audit
+          python tools/atlas-bus-data/audit_prepared_tnds.py --prepared-root candidate-site/atlas/data/bus-tnds --output candidate-audit/prepared-tnds-audit.json
+      - name: Exercise actual candidate composition and browser runtime
+        if: inputs.mode == 'compose'
+        run: node tests/atlas/s2c3-real-candidate-runtime-audit.mjs candidate-site candidate-audit/runtime-audit.json
+      - name: Upload actual-candidate readiness audit reports
+        if: always() && inputs.mode == 'compose' && hashFiles('candidate-audit/*.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-bus-beta-s2c3-candidate-audit-${{ github.run_id }}
+          path: candidate-audit
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 90
+
       - name: Verify exact candidate restore artifact metadata
         if: inputs.mode == 'restore_candidate'
         env:

@@ -69,8 +69,8 @@ assert.match(c4Selector, /-n "\$CANDIDATE_RUN\$CANDIDATE_ID\$CANDIDATE_DIGEST"/)
 assert.match(c4Selector, /accepts only disabled offline preflight or exact Run #53 compose; restore_candidate is not enabled/);
 assert.match(dispatcher, /steps\.s2b-c4-selector\.outputs\.trust_mode/);
 assert.match(dispatcher, /steps\.s2b-c4-selector\.outputs\.review_candidate_mode/);
-assert.match(dispatcher, /refs\/heads\/codex\/atlas-bus-beta-s2b-c4-restore-auth-closeout' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-1-national-runtime-scale' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-2-candidate-replay-authority'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'offline_preflight'/);
-assert.match(dispatcher, /refs\/heads\/codex\/atlas-bus-beta-s2b-c4-restore-auth-closeout' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-2-candidate-replay-authority'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'review_candidate'/);
+assert.match(dispatcher, /refs\/heads\/codex\/atlas-bus-beta-s2b-c4-restore-auth-closeout' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-1-national-runtime-scale' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-2-candidate-replay-authority' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-3-oversized-service-closeout'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'offline_preflight'/);
+assert.match(dispatcher, /refs\/heads\/codex\/atlas-bus-beta-s2b-c4-restore-auth-closeout' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-2-candidate-replay-authority' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-3-oversized-service-closeout'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'review_candidate'/);
 
 const s2c1Selector = dispatcher.slice(
   dispatcher.indexOf('      - name: Resolve S2C-1 exact zero-download offline preflight selector'),
@@ -100,6 +100,19 @@ assert.match(dispatcher.slice(dispatcher.indexOf('\n  s2a-c1-review-candidate:\n
 assert.doesNotMatch(dispatcher.slice(dispatcher.indexOf('  tnds-trust-browser-live:'), dispatcher.indexOf('\n  c3-primary-source:')), /atlas-bus-beta-s2c-2-candidate-replay-authority/);
 assert.doesNotMatch(dispatcher.slice(dispatcher.indexOf('\n  deploy:\n'), dispatcher.indexOf('\n  freshness-no-op:\n')), /atlas-bus-beta-s2c-2-candidate-replay-authority/);
 
+const s2c3Selector = dispatcher.slice(
+  dispatcher.indexOf('      - name: Resolve S2C-3 exact offline preflight or pinned Run #53 compose selector'),
+  dispatcher.indexOf('      - name: Resolve exact-branch TRUST browser selector'),
+);
+assert.match(s2c3Selector, /if: github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-3-oversized-service-closeout'/);
+assert.match(s2c3Selector, /run: python tools\/atlas-bus-data\/resolve_s2c3_selector\.py/);
+assert.match(dispatcher, /steps\.s2c-3-selector\.outputs\.trust_mode/);
+assert.match(dispatcher, /steps\.s2c-3-selector\.outputs\.review_candidate_mode/);
+assert.match(dispatcher.slice(dispatcher.indexOf('  tnds-trust-browser-offline-preflight:'), dispatcher.indexOf('  tnds-trust-browser-live:')), /atlas-bus-beta-s2c-3-oversized-service-closeout/);
+assert.match(dispatcher.slice(dispatcher.indexOf('\n  s2a-c1-review-candidate:\n')), /atlas-bus-beta-s2c-3-oversized-service-closeout/);
+assert.doesNotMatch(dispatcher.slice(dispatcher.indexOf('  tnds-trust-browser-live:'), dispatcher.indexOf('\n  c3-primary-source:')), /atlas-bus-beta-s2c-3-oversized-service-closeout/);
+assert.doesNotMatch(dispatcher.slice(dispatcher.indexOf('\n  deploy:\n'), dispatcher.indexOf('\n  freshness-no-op:\n')), /atlas-bus-beta-s2c-3-oversized-service-closeout/);
+
 const primaryVerify = step('Verify explicit primary snapshot or acquire fresh eleven-source snapshot');
 assert.match(primaryVerify, /PRIMARY_RUN: \$\{\{ inputs\.primary_source_run_id \|\| github\.run_id \}\}/);
 assert.match(primaryVerify, /PRIMARY_RUN_INPUT: \$\{\{ inputs\.primary_source_run_id \}\}/);
@@ -108,6 +121,12 @@ assert.match(step('Acquire fresh TNDS raw snapshot or verify exact restored snap
 assert.match(step('Run metadata-only TNDS authentication and archive gate'), /if: inputs\.mode == 'compose' && inputs\.tnds_source_run_id == ''/);
 assert.match(step('Acquire and verify the fresh eight-region raw TNDS snapshot'), /if: inputs\.mode == 'compose' && inputs\.tnds_source_run_id == ''/);
 assert.match(step('Build complete review-only Bus and TNDS candidate with production builders'), /--review-only --acquisition-disabled/);
+assert.match(step('Exhaustively audit actual prepared TNDS package'), /audit_prepared_tnds\.py --prepared-root candidate-site\/atlas\/data\/bus-tnds/);
+assert.match(step('Exercise actual candidate composition and browser runtime'), /s2c3-real-candidate-runtime-audit\.mjs candidate-site candidate-audit\/runtime-audit\.json/);
+assert.match(step('Install headless Chromium for actual-candidate runtime audit'), /playwright install --with-deps chromium/);
+assert.ok(position('Upload immutable full candidate checkpoint') < position('Exhaustively audit actual prepared TNDS package'), 'actual-candidate audits run after the immutable candidate checkpoint is preserved');
+assert.ok(position('Exercise actual candidate composition and browser runtime') < position('Run deterministic Alpha.15 and Bus control tests after checkpoint save'), 'real-candidate runtime audit precedes downstream deterministic acceptance');
+assert.match(step('Upload actual-candidate readiness audit reports'), /retention-days: 90/);
 assert.doesNotMatch(candidate, /actions\/deploy-pages|pages: write|id-token: write/);
 const deploy = dispatcher.slice(dispatcher.indexOf('  deploy:'), dispatcher.indexOf('  freshness-no-op:'));
 assert.match(deploy, /github\.ref == 'refs\/heads\/main'/);

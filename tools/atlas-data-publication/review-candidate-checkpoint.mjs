@@ -59,7 +59,7 @@ export async function createReviewCheckpoint({ candidateRoot, checkpointRoot, pr
   ]);
   if (status.schema !== 'atlas-bus-refresh-status-v1' || status.reviewOnly !== true || status.productionEligible !== false || status.publicationEligible !== false || status.plannerEligible !== false)
     throw new Error('Candidate status does not prove review-only ineligibility.');
-  if (bus.schema !== 'atlas-prepared-bus-data-v2' || tnds.schema !== 'atlas-prepared-bus-tnds-v1') throw new Error('Prepared Bus or TNDS manifest schema is invalid.');
+  if (bus.schema !== 'atlas-prepared-bus-data-v2' || !['atlas-prepared-bus-tnds-v1', 'atlas-prepared-bus-tnds-v2'].includes(tnds.schema)) throw new Error('Prepared Bus or TNDS manifest schema is invalid.');
   if (bus.sources?.bods?.regions?.length !== 9 || !await containsJsonField(path.join(candidateRoot, 'atlas/data/bus'), 'circularPatternStopIds'))
     throw new Error('BODS prepared candidate is missing one or more regional sources or circularPatternStopIds evidence.');
   if (!await containsJsonField(path.join(candidateRoot, 'atlas/data/bus-tnds'), 'routePatternStopIds'))

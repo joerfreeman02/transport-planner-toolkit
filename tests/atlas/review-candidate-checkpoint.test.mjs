@@ -44,6 +44,15 @@ try {
   await fs.appendFile(path.join(candidate, 'atlas/data/bus/services/route.json.gz'), 'tampered');
   await assert.rejects(verifyReviewCheckpoint({ candidateRoot: candidate, checkpointRoot: checkpoint, expectedRunId: '303', expectedCommitSha: 'c'.repeat(40) }), /file set or hashes/);
   await assert.rejects(verifyReviewCheckpoint({ candidateRoot: candidate, checkpointRoot: checkpoint, expectedRunId: '999', expectedCommitSha: 'c'.repeat(40) }), /producer run/);
+
+  await writeGzipJson('atlas/data/bus/services/route.json.gz', { circularPatternStopIds: ['A', 'B'] });
+  await writeJson('atlas/data/bus-tnds/manifest.json', { schema: 'atlas-prepared-bus-tnds-v2', regions: ['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y'] });
+  const v2Checkpoint = path.join(root, 'checkpoint-v2');
+  const createdV2 = await createReviewCheckpoint({ candidateRoot: candidate, checkpointRoot: v2Checkpoint, provenancePath: provenance,
+    commitSha: 'd'.repeat(40), runId: '404', createdAt: '2026-10-20T00:00:00Z' });
+  assert.equal(createdV2.state, 'BUILT_STRUCTURALLY_VERIFIED_REVIEW_ONLY', 'v2 bounded TNDS packages are eligible for an immutable review-only checkpoint');
+  const restoredV2 = await verifyReviewCheckpoint({ candidateRoot: candidate, checkpointRoot: v2Checkpoint, expectedRunId: '404', expectedCommitSha: 'd'.repeat(40) });
+  assert.equal(restoredV2.sourceBinding.tndsProducerRunId, '202');
 } finally {
   await fs.rm(root, { recursive: true, force: true });
 }

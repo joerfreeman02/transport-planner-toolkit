@@ -168,6 +168,28 @@ assert.equal(schoolBranchWithoutCalendarTaxonomy[0].destination, 'Queensgate Bus
 assert.equal(schoolBranchWithoutCalendarTaxonomy[0].frequencyBasisStopId, 'B', 'the school-only branch cannot select the headline timetable stop without calendar taxonomy');
 assert.match(schoolBranchWithoutCalendarTaxonomy[0].typicalFrequencyText, /Mon-Sun/);
 
+const schoolOriginBranchRows = rows([
+  record({
+    id: 'regular-queensgate-to-corby', routeNumber: 'X2', origin: 'Queensgate Bus Station', destination: 'Corby George Street',
+    direction: 'Corby George Street', pattern: ['QUEENSGATE', 'BROADWAY', 'KINGS-SCHOOL', 'CORBY'], stopIds: ['QUEENSGATE'], basis: 'QUEENSGATE',
+    calendarProfileId: null, minutes: [420, 480],
+    departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, day === 'saturday' || day === 'sunday' ? [420] : [420, 480].map(minute => ({
+      minute, stopPointId: 'QUEENSGATE', journeyIdentity: `regular-origin-${day}-${minute}`, provider: 'BODS'
+    }))]))
+  }),
+  record({
+    id: 'school-origin-to-corby', routeNumber: 'X2', origin: 'Kings School', destination: 'Corby George Street',
+    direction: 'Corby George Street', pattern: ['KINGS-SCHOOL', 'CORBY'], stopIds: ['KINGS-SCHOOL', 'QUEENSGATE'], basis: 'KINGS-SCHOOL',
+    calendarProfileId: null, minutes: [],
+    departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, day === 'saturday' || day === 'sunday' ? [] : [{
+      minute: 465, stopPointId: 'KINGS-SCHOOL', journeyIdentity: `school-origin-${day}`, provider: 'BODS'
+    }]]))
+  })
+]);
+assert.equal(schoolOriginBranchRows.length, 1, 'same-destination school-origin journeys remain variants of the public direction');
+assert.equal(schoolOriginBranchRows[0].frequencyBasisStopId, 'QUEENSGATE', 'weekday school-origin evidence cannot replace a regular weekend timetable basis');
+assert.match(schoolOriginBranchRows[0].typicalFrequencyText, /Sat-Sun: 1 journey\/day/);
+
 const route242Groups = buildPlannerServiceGroups([
   record({ id: 'central-out', routeNumber: '242', operator: 'Central Connect', routeId: 'central', origin: 'Bus Station', destination: 'Potters Bar Railway Station' }),
   record({ id: 'uno-out', routeNumber: '242', operator: 'Uno', routeId: 'uno', directionId: '1', origin: 'Bus Station', destination: 'Potters Bar Railway Station' }),

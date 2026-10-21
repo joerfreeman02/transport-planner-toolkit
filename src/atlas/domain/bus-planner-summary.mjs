@@ -775,6 +775,12 @@ function schoolRestrictedLocalVariants(component = []) {
   });
 }
 
+function hasSchoolEndpointWithRegularWeekendService(component = []) {
+  return component.some(schoolEndpoint)
+    && component.some(service => !schoolEndpoint(service)
+      && (serviceRunsOnDay(service, 'saturday') || serviceRunsOnDay(service, 'sunday')));
+}
+
 function principalPatternServices(component = []) {
   if (principalPatternServicesCache.has(component)) return principalPatternServicesCache.get(component);
   const shortWorkingIds = new Set();
@@ -849,8 +855,8 @@ function selectRepresentativeStop(component, stops) {
   const principalServices = principalPatternServices(component);
   const ids = candidateStopIds(principalServices);
   const evidenceIds = ids.filter(id => principalServices.some(service => hasTimetableEvidenceAt(service, id)));
-  const schoolVariants = schoolRestrictedLocalVariants(component);
-  const regularWeekendEvidenceIds = schoolVariants.length
+  const hasSchoolAndRegularWeekendEvidence = hasSchoolEndpointWithRegularWeekendService(component);
+  const regularWeekendEvidenceIds = hasSchoolAndRegularWeekendEvidence
     ? ids.filter(id => component.some(service => !schoolEndpoint(service)
       && (serviceRunsOnDay(service, 'saturday') || serviceRunsOnDay(service, 'sunday'))
       && hasTimetableEvidenceAt(service, id)))
@@ -1317,7 +1323,8 @@ function compareMain(first, second, representativeId, component = [first, second
   const profiles = new Set(component.map(calendarProfileFromService));
   const restrictedVariant = ([...profiles].some(profile => ['school-day', 'term-time'].includes(profile))
     && [...profiles].some(profile => ['ordinary', 'non-school-day', 'holiday', ''].includes(profile)))
-    || schoolRestrictedLocalVariants(component).length > 0;
+    || schoolRestrictedLocalVariants(component).length > 0
+    || hasSchoolEndpointWithRegularWeekendService(component);
   const destinationEvidenceComparison = restrictedVariant
     ? [
       Number(serviceRunsOnDay(second, 'saturday') || serviceRunsOnDay(second, 'sunday'))

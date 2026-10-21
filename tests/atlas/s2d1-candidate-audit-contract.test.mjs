@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 const audit = await readFile(new URL('./s2c3-real-candidate-runtime-audit.mjs', import.meta.url), 'utf8');
 const workflow = await readFile(new URL('../../.github/workflows/atlas-bus-beta-s2d1-closeout.yml', import.meta.url), 'utf8');
+const dispatcher = await readFile(new URL('../../.github/workflows/atlas-bus-data-refresh.yml', import.meta.url), 'utf8');
 
 assert.doesNotMatch(audit, /assert\.(?:ok|equal|deepEqual|throws)/, 'the real-candidate audit must not throw on an early assertion');
 assert.match(audit, /for \(const control of controls\)/, 'every site control must be iterated');
@@ -21,5 +22,9 @@ assert.match(workflow, /39430415441/, 'hosted audit must pin the exact candidate
 assert.match(workflow, /atlas-bus-beta-s2d1-candidate-audit-\$\{\{ github\.run_id \}\}/, 'failed control reports must upload from the audit run');
 assert.doesNotMatch(workflow, /TNDS_USERNAME|TNDS_PASSWORD|refresh_bus_data\.py|tnds_trust_diagnostic\.py/, 'S2D-1 hosted audit must not acquire or prepare national data');
 assert.match(workflow, /permissions:\n  actions: read\n  contents: read/, 'workflow permissions must remain read-only');
+assert.match(dispatcher, /s2d-1-selector/, 'the established default-branch dispatcher must select S2D-1 explicitly');
+assert.match(dispatcher, /s2d1-zero-download-preflight:[\s\S]*?mode: offline_preflight/, 'the exact-SHA preflight must call the hosted offline workflow');
+assert.match(dispatcher, /s2d1-retained-candidate-audit:[\s\S]*?mode: retained_candidate_audit/, 'retained candidate audit must be dispatched through the hosted reusable workflow');
+assert.match(dispatcher, /audit_retained_candidate/, 'audit mode must be selectable from workflow_dispatch');
 
 console.log('PASS S2D-1 retained-candidate audit contract');

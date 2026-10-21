@@ -1,7 +1,7 @@
 name: ATLAS Bus Beta S2D-1 offline closeout
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       mode:
         description: Run the exact-SHA offline preflight or audit the retained immutable Run #75 candidate

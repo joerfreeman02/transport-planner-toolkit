@@ -8,6 +8,8 @@ const normalRuntime = await readFile(new URL('./s2e1-normal-runtime-candidate-di
 
 assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-intelligence-restoration/);
 assert.match(workflow, /workflow_call:[\s\S]*mode:[\s\S]*normal_runtime_diagnosis/);
+assert.match(workflow, /actions\/checkout@v4[\s\S]*ref: \$\{\{ github\.sha \}\}[\s\S]*fetch-depth: 0/);
+assert.match(workflow, /Ensure the default-branch ref is available[\s\S]*git fetch --no-tags origin \+refs\/heads\/main:refs\/remotes\/origin\/main/);
 assert.match(dispatchWorkflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-intelligence-restoration/);
 assert.match(dispatchWorkflow, /s2e1-frozen-candidate-diagnosis:[\s\S]*s2e1_mode == 'normal_runtime_diagnosis'[\s\S]*mode: normal_runtime_diagnosis/);
 assert.match(dispatchWorkflow, /CANDIDATE_RUN" != '39430415441'[\s\S]*CANDIDATE_ID" != '12275615359'[\s\S]*CANDIDATE_DIGEST" != 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471/);

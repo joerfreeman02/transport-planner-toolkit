@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
@@ -35,6 +36,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Chromium for the browser contract suite
         run: pnpm exec playwright install --with-deps chromium
+      - name: Ensure the default-branch ref is available to repository contract tests
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
       - name: Verify deterministic empty TfL diagnostic boundary
         run: node tests/atlas/s2e1-deterministic-empty-tfl.test.mjs
       - name: Run full Bus-data Python suite

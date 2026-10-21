@@ -7,6 +7,7 @@ Status: **NOT READY FOR MANUAL RE-ACCEPTANCE**. This is the forensic baseline an
 - Starting SHA: `f025e53603b6be2ba729d649c45a9b88ee377d5c`.
 - Branch: `codex/atlas-bus-beta-s2e-1-intelligence-restoration`.
 - Baseline implementation SHA: `96e0012da5fcc2b9d76e08297c3e434277628253`.
+- Safe corrective checkpoint: `fe9987816fefc3b345d9f35c7effd48138fe912a` (this handover update is documentation-only and will advance the branch SHA).
 - Candidate: Run `39430415441`, artifact `12275615359`, digest `sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`, producer SHA `151199cc914c235870f444d26b03c2309edbd035`.
 - Hosted diagnostic: Run `39586034190`, report artifact `12340485134`, digest `sha256:bb05f1d986cf57f0feda9640734e965f696dd25273f5b2cd6ee76fc687e9caa2`.
 - The diagnostic verified the immutable candidate/checkpoint, reported all five controls complete, and reported no failed source shards. No acquisition, national preparation, publication, or deployment ran.

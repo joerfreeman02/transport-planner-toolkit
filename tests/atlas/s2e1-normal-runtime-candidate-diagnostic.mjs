@@ -11,14 +11,23 @@ import { createBusStopDiscovery } from '../../src/atlas/application/bus-stop-dis
 import { createBusAssessment } from '../../src/atlas/application/bus-assessment.mjs';
 import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
 
-const [candidateArg, reportArg] = process.argv.slice(2);
-if (!candidateArg || !reportArg) throw new Error('Usage: node tests/atlas/s2e1-normal-runtime-candidate-diagnostic.mjs <immutable-candidate-root> <report.json>');
+const [candidateArg, reportArg, controlId = 'waltham'] = process.argv.slice(2);
+if (!candidateArg || !reportArg) throw new Error('Usage: node tests/atlas/s2e1-normal-runtime-candidate-diagnostic.mjs <immutable-candidate-root> <report.json|-> [waltham|pipers|chingford|pe1|queensgate]');
 const candidateRoot = path.resolve(candidateArg);
 const reportPath = reportArg === '-' ? null : path.resolve(reportArg);
 const busRoot = path.join(candidateRoot, 'atlas', 'data', 'bus');
 const tndsRoot = path.join(candidateRoot, 'atlas', 'data', 'bus-tnds');
 const nationalRequests = [];
 const tflRequests = [];
+const controls = {
+  waltham: { label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700, focusRoutes: ['13', '13A', '13B', '13C'] },
+  pipers: { label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700, focusRoutes: ['46', '230', '231', 'C'] },
+  chingford: { label: 'Normanshire Drive, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250, focusRoutes: ['357', '444', '657', 'W16'] },
+  pe1: { label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '6', '23', '24', '25', '27', '33', '37', '60', '61', '62', '63', '101', '102', '201', '202', '415', '904', '4P', 'A', 'B', 'C'] },
+  queensgate: { label: 'Queensgate Bus Station', latitude: 52.5701, longitude: -0.2498, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '6', '23', '24', '25', '27', '33', '60', '61', '62', '63', '202', '415', '904', '5A', 'A', 'B', 'C'] }
+};
+const control = controls[controlId];
+if (!control) throw new Error(`Unknown diagnostic control: ${controlId}`);
 
 async function candidateFetch(input) {
   const pathname = new URL(input).pathname;
@@ -65,25 +74,25 @@ const assessmentApp = createBusAssessment({
   referenceData
 });
 const site = confirmSite(createSite({
-  suppliedAddress: '47 Berkley Avenue, Waltham Cross',
-  displayAddress: '47 Berkley Avenue, Waltham Cross',
-  latitude: 51.6857829,
-  longitude: -0.0330001,
+  suppliedAddress: control.label,
+  displayAddress: control.label,
+  latitude: control.latitude,
+  longitude: control.longitude,
   assessmentPoint: { method: 'coordinates_entered' }
 }), { confirmedAt: '2026-10-21T00:00:00Z' });
 
-const scope = await assessmentApp.inspectScope(site, { radius: 700 });
+const scope = await assessmentApp.inspectScope(site, { radius: control.radius });
 if (!scope.ok) throw new Error(`Production inspectScope failed: ${scope.message || scope.code}`);
-const assessment = await assessmentApp.assess(site, { radius: 700, mode: 'full', discovery: scope.discovery });
+const assessment = await assessmentApp.assess(site, { radius: control.radius, mode: 'full', discovery: scope.discovery });
 if (!assessment.ok) throw new Error(`Production assess failed: ${assessment.message || assessment.code}`);
 const preparedOnlyApp = createBusAssessment({
   stopDiscovery: { nearbyStops: (...args) => prepared.nearbyStops(...args) },
   timetableData: { servicesForStops: (...args) => prepared.servicesForStops(...args) },
   accessRouting: { matrix: async (_site, stops) => ({ ok: true, routes: stops.map(() => ({ status: 'routed', distanceMetres: 100, durationSeconds: 60 })), warnings: [], provenance: { source: 'deterministic diagnostic stub' } }) }
 });
-const preparedOnly = await preparedOnlyApp.assess(site, { radius: 700, mode: 'full' });
+const preparedOnly = await preparedOnlyApp.assess(site, { radius: control.radius, mode: 'full' });
 if (!preparedOnly.ok) throw new Error(`Prepared-only comparison failed: ${preparedOnly.message || preparedOnly.code}`);
-const wanted = new Set(['13', '13A', '13B', '13C']);
+const wanted = new Set(control.focusRoutes);
 const route = value => String(value ?? '').trim().toUpperCase().replace(/\s+/g, '');
 const stopRows = assessment.stops.map(stop => ({ id: stop.id, name: stop.name, distanceMetres: stop.distanceMetres,
   routes: stop.routes, routeAuthorities: stop.routeAuthorities, sourceAuthorities: stop.sourceAuthorities,
@@ -118,6 +127,7 @@ const report = {
   candidateProducerSha: '151199cc914c235870f444d26b03c2309edbd035',
   candidateArtifactId: '12275615359',
   candidateArtifactDigest: 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471',
+  controlId, control,
   composition: 'Production createBusStopDiscovery + TfL/prepared adapters + createAuthoritativeBusTimetableAdapter + createBusAssessment.inspectScope/assess + production summary/planner grouping',
   deterministicBoundary: 'Exact frozen Run #75 candidate files; TfL network calls deliberately disabled and reported; routing is a deterministic no-op stub.',
   sourceAcquisition: false, candidateModified: false,
@@ -134,7 +144,7 @@ const report = {
     summaryTargetCounts: Object.fromEntries([...wanted].map(r => [r, preparedOnly.serviceSummaries.filter(row => route(row.routeNumber) === r).length])),
     plannerTargetRows: preparedOnly.plannerServiceSummaries.filter(row => wanted.has(route(row.routeNumber)) || (row.routeNumbers ?? []).some(value => wanted.has(route(value)))).map(row => ({ id: row.id, routeNumber: row.routeNumber, routeNumbers: row.routeNumbers }))
   },
-  comparisonLimit: 'TfL HTTP is disabled, so the normal composition is exercised with its prepared-national fallback. This establishes whether national route-family arbitration alone reproduces the 13A selection; it does not reproduce any TfL response/cache state from the historical browser session.',
+  comparisonLimit: 'TfL HTTP is disabled, so the normal composition is exercised with its prepared-national fallback. This isolates the frozen national evidence and production planner path; it does not reproduce any TfL response/cache state from a historical browser session.',
   publicationAttempted: false, deploymentAttempted: false
 };
 if (reportPath) {
@@ -142,9 +152,9 @@ if (reportPath) {
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 }
 process.stdout.write(`${JSON.stringify({ schema: report.schema, reportPath, status: assessment.status, stopCount: stopRows.length,
-  tflRequestsAttempted: tflRequests.length, rawTargetRecords: rawRows.length,
-  summaries: Object.fromEntries([...wanted].map(r => [r, serviceSummaries.filter(row => route(row.routeNumber) === r).length])),
-  planner: Object.fromEntries([...wanted].map(r => [r, plannerRows.filter(row => route(row.routeNumber) === r).length])),
+  controlId, scope: scope.scope, tflRequestsAttempted: tflRequests.length, rawTargetRecords: rawRows.length,
+  summaries: Object.fromEntries([...wanted].map(r => [r, serviceSummaries.filter(row => route(row.routeNumber) === r).length]).filter(([, count]) => count)),
+  planner: Object.fromEntries([...wanted].map(r => [r, plannerRows.filter(row => route(row.routeNumber) === r).length]).filter(([, count]) => count)),
   preparedOnly: report.sameCandidatePreparedOnlyComparison,
   stopRouteAuthority: stopRows.filter(stop => stop.routes?.some(value => wanted.has(route(value)))).map(stop => ({ id: stop.id, routes: stop.routes.filter(value => wanted.has(route(value))), routeAuthorities: Object.fromEntries(Object.entries(stop.routeAuthorities ?? {}).filter(([key]) => wanted.has(route(key)))) })),
   rawSourcesByRoute: Object.fromEntries([...wanted].map(r => [r, Object.fromEntries([...new Set(rawRows.filter(row => route(row.routeNumber) === r).map(row => row.timetableSource))].map(source => [source, rawRows.filter(row => route(row.routeNumber) === r && row.timetableSource === source).length]))])),

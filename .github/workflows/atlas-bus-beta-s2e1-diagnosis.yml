@@ -65,12 +65,14 @@ jobs:
         if: always() && hashFiles('restored/candidate-site/atlas/data/bus/manifest.json') != ''
         run: |
           mkdir -p candidate-diagnostic
-          node tests/atlas/s2e1-normal-runtime-candidate-diagnostic.mjs restored/candidate-site candidate-diagnostic/diagnostic.json
-      - name: Upload normal-runtime real-candidate forensic report
-        if: always() && hashFiles('candidate-diagnostic/diagnostic.json') != ''
+          for control in waltham pipers chingford pe1 queensgate; do
+            node tests/atlas/s2e1-normal-runtime-candidate-diagnostic.mjs restored/candidate-site "candidate-diagnostic/${control}.json" "$control"
+          done
+      - name: Upload normal-runtime candidate control-matrix report
+        if: always() && hashFiles('candidate-diagnostic/*.json') != ''
         uses: actions/upload-artifact@v4
         with:
           name: atlas-bus-beta-s2e1-normal-runtime-diagnostic-${{ github.run_id }}
-          path: candidate-diagnostic/diagnostic.json
+          path: candidate-diagnostic/*.json
           if-no-files-found: error
           retention-days: 90

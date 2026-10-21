@@ -37,7 +37,7 @@ for (const factory of ['createPreparedBusDataAdapter', 'createTflBusStopAdapter'
   assert.ok(normalRuntime.includes(factory), `normal-runtime diagnostic must compose production ${factory}`);
 }
 assert.match(normalRuntime, /assessmentApp\.inspectScope\(site/);
-assert.match(normalRuntime, /assessmentApp\.assess\(site, \{ radius: 700, mode: 'full', discovery: scope\.discovery \}\)/);
+assert.match(normalRuntime, /assessmentApp\.assess\(site, \{ radius: control\.radius, mode: 'full', discovery: scope\.discovery \}\)/);
 assert.match(normalRuntime, /noLiveTflFetch/);
 assert.match(normalRuntime, /candidateProducerRun: '39430415441'/);
 assert.match(normalRuntime, /candidateArtifactId: '12275615359'/);
@@ -45,5 +45,7 @@ assert.match(normalRuntime, /candidateArtifactDigest: 'sha256:5cad24e0a47c4a77a8
 assert.match(normalRuntime, /candidateModified: false/);
 assert.match(normalRuntime, /publicationAttempted: false, deploymentAttempted: false/);
 assert.match(normalRuntime, /sameCandidatePreparedOnlyComparison/);
+for (const site of ['waltham', 'pipers', 'chingford', 'pe1', 'queensgate']) assert.match(normalRuntime, new RegExp(`^\\s*${site}:`, 'm'));
+assert.match(workflow, /for control in waltham pipers chingford pe1 queensgate/);
 
 console.log('PASS S2E-1 frozen-candidate diagnostic workflow contract');

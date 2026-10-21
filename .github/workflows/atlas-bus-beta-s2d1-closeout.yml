@@ -6,10 +6,7 @@ on:
       mode:
         description: Run the exact-SHA offline preflight or audit the retained immutable Run #75 candidate
         required: true
-        type: choice
-        options:
-          - offline_preflight
-          - retained_candidate_audit
+        type: string
 
 permissions:
   actions: read

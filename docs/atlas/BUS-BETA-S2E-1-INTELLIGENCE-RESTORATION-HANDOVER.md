@@ -76,7 +76,7 @@ X4 has exactly two Stagecoach Midlands rows at both PE1 and Queensgate: one inbo
 - Exact workflow run ID: `39602997240` (Run #104).
 - Result: **success** on SHA `4408c790ca3ff88adee15f2da064c2002e0a4a7e`.
 - Artifact: `12348395975`, `atlas-bus-beta-s2e1-normal-runtime-diagnostic-39602997240`, digest `sha256:08e3683cf60d753d78a3d5d364212a204c7471d8dbe12ea7b09a9e73d3302bbe`.
-- Passed: full Bus-data Python suite; `node tests/atlas/run-all.mjs`; immutable Run #75 identity/provenance verification; five-control actual-candidate planner assertions; browser/Word audit; fixture-backed Chingford TfL route 657 golden regression.
+- Passed: full Bus-data Python suite; `node tests/atlas/run-all.mjs`; immutable Run #75 identity/provenance verification; actual-candidate planner diagnostics for Waltham, Pipers, PE1 and Queensgate; five-control browser/Word audit; fixture-backed Chingford TfL route 657 golden regression.
 - The strengthened Pipers 230 assertion passed: final planner row is circular and its principal source record is the Centrebus BODS pattern.
 
 ### Run #105 — exact-final-SHA zero-download preflight

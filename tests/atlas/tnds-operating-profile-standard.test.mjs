@@ -46,5 +46,7 @@ assert.deepEqual(vehicleLevel.stopSchedules['PROFILE-A'].sunday, [480]);
 const special = parseTndsOperatingProfile('<OperatingProfile><RegularDayType><DaysOfWeek><MondayToFriday/></DaysOfWeek></RegularDayType><SpecialDaysOperation><SpecialDay>Tuesday</SpecialDay></SpecialDaysOperation></OperatingProfile>');
 assert.deepEqual(special.daysOfWeek, weekdays, 'regular days remain independently proven when special metadata is present');
 assert.equal(special.resolutionStatus, 'partial');
-assert.match(special.warnings.join(' '), /special-day operating metadata/);
+assert.deepEqual(special.dateExceptions, ['Tuesday'], 'special-day records remain available for engineering inspection');
+assert.deepEqual(special.qualificationMetadata.specialFields, ['SpecialDaysOperation']);
+assert.deepEqual(special.warnings, [], 'nonmaterial special-day metadata does not create a planner-facing per-service warning');
 console.log('PASS TNDS standard EmptyType operating profiles, precedence and calendar safety.');

@@ -9,8 +9,12 @@ assert.doesNotMatch(audit, /assert\.(?:ok|equal|deepEqual|throws)/, 'the real-ca
 assert.match(audit, /for \(const control of controls\)/, 'every site control must be iterated');
 assert.match(audit, /outcome: 'BLOCKED'/, 'control execution failures must be retained as blocked evidence');
 assert.match(audit, /firstDisappearanceStage/, 'Waltham lineage must identify the first disappearance stage');
+assert.match(audit, /none; route identity is present in plannerRows/, 'surviving Waltham identities must be reported as not disappearing');
 assert.match(audit, /preparedBodsRecords/, 'the report must retain prepared primary route evidence');
 assert.match(audit, /preparedTndsRecords/, 'the report must retain prepared supplementary route evidence');
+assert.match(audit, /buildBusWordTables\(assessment\)/, 'real candidate planner output must be checked against Word export tables');
+assert.match(audit, /word-export-route-parity-/, 'Waltham, Pipers, and Chingford export parity must be recorded as audit checks');
+assert.match(audit, /circularServiceDecision/, 'the Pipers planner circular classification must be retained');
 assert.match(audit, /await writeFile\(path\.resolve\(reportArg\)/, 'the full report must be saved before the final non-zero exit');
 assert.ok(audit.indexOf('await writeFile(path.resolve(reportArg)') < audit.indexOf('if (failures.length) process.exitCode = 1'), 'audit reports must be written before blockers fail the workflow');
 

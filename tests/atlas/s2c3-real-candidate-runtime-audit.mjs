@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createPreparedBusDataAdapter } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { createBusAssessment } from '../../src/atlas/application/bus-assessment.mjs';
 import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
+import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
 import { launchAtlasBrowser } from './playwright-launch.mjs';
 
 const [candidateArg, reportArg] = process.argv.slice(2);
@@ -25,6 +26,18 @@ function check(id, passed, reason = '') {
   checks.push(result);
   if (!passed) failures.push(result);
   return passed;
+}
+function visibleWordRouteNumbers(rows, expectedRoutes) {
+  const visible = new Set();
+  const includesRoute = (value, route) => {
+    const escaped = route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^A-Za-z0-9])${escaped}($|[^A-Za-z0-9])`, 'i').test(value);
+  };
+  for (const row of rows ?? []) {
+    const values = Array.isArray(row) ? [String(row[0] ?? '')] : [String(row?.text ?? '')];
+    for (const value of values) for (const route of expectedRoutes) if (includesRoute(value, route)) visible.add(route);
+  }
+  return [...visible].sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
 }
 const localFetch = async input => {
   const pathname = new URL(input).pathname;
@@ -75,6 +88,9 @@ for (const control of controls) {
   const assessment = await assessmentApp.assess(site, { radius: control.radius, mode: 'full' });
   const serviceRows = servicesResult?.data ?? [];
   const plannerRows = assessment.plannerServiceSummaries ?? [];
+  const plannerRoutes = [...new Set(plannerRows.flatMap(row => [row.routeNumber, ...(row.publicRouteNumbers ?? []), ...(row.routeNumbers ?? []), ...(row.memberRouteNumbers ?? []), ...(row.routeFamilyMembers ?? []).map(member => member.routeNumber)].filter(Boolean).map(String)))].sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+  const wordTables = buildBusWordTables(assessment);
+  const wordRouteNumbers = visibleWordRouteNumbers(wordTables[1]?.rows, plannerRoutes);
     results[control.id] = {
     control,
     assessmentStatus: assessment.status,
@@ -82,15 +98,16 @@ for (const control of controls) {
     stops: (assessment.stops ?? []).map(stop => ({ id: stop.id, name: stop.name, routes: stop.routes ?? [], busDomainEligible: stop.busDomainEligible ?? null, timetableCallEligible: stop.timetableCallEligible ?? null, timetableEvidenceStatus: stop.timetableEvidenceStatus ?? null })),
     serviceRows: serviceRows.map(service => ({ id: service.id, routeNumber: service.routeNumber, operator: service.operator, sourceRegion: service.source?.region ?? null, timetableSource: service.timetableSource ?? null, origin: service.origin, destination: service.destination, direction: service.direction, circularPatternStopIds: service.circularPatternStopIds ?? [], calendarEvidence: service.calendarEvidence ?? [], calendarProfileId: service.calendarProfileId ?? null, qualifications: service.qualifications ?? [], schoolDayOnly: Boolean(service.schoolDayOnly || service.qualifications?.some(value => /school/i.test(String(value))) || service.calendarEvidence?.some(value => value?.schoolDayOnly === true || /school/i.test(String(value?.calendarProfileId ?? '')))), matchedStopPointIds: Object.keys(service.stopSchedules ?? {}), stopSchedules: service.stopSchedules ?? {}, routePatternStopIds: service.routePatternStopIds ?? [], routePatternStops: service.routePatternStops ?? [], sourceIdentity: service.source ?? null })),
     serviceSummaries: (assessment.serviceSummaries ?? []).map(service => ({ id: service.id, routeNumber: service.routeNumber, operator: service.operator, origin: service.origin, destination: service.destination, direction: service.direction, routeNumbers: service.routeNumbers ?? [], variantCount: service.variantCount ?? null, variantServiceIds: service.variantServiceIds ?? [], sourceRecordIds: service.sourceRecordIds ?? [], rawServiceSummaries: (service.rawServiceSummaries ?? []).map(raw => ({ id: raw.id, routeNumber: raw.routeNumber, operator: raw.operator, origin: raw.origin, destination: raw.destination, direction: raw.direction, timetableSource: raw.timetableSource ?? null, source: raw.source ?? null, routePatternStopIds: raw.routePatternStopIds ?? [], calendarProfileId: raw.calendarProfileId ?? null })) })),
-    plannerRoutes: [...new Set(plannerRows.flatMap(row => [row.routeNumber, ...(row.publicRouteNumbers ?? []), ...(row.routeNumbers ?? []), ...(row.memberRouteNumbers ?? []), ...(row.routeFamilyMembers ?? []).map(member => member.routeNumber)].filter(Boolean).map(String)))].sort((left, right) => left.localeCompare(right, undefined, { numeric: true })),
-    plannerRows: plannerRows.map(row => ({ routeNumber: row.routeNumber, routeNumbers: row.routeNumbers ?? [], publicRouteNumbers: row.publicRouteNumbers ?? [], memberRouteNumbers: row.memberRouteNumbers ?? [], routeFamilyLabel: row.routeFamilyLabel ?? null, routeFamilyMembers: row.routeFamilyMembers ?? [], operator: row.operator, origin: row.origin, destination: row.destination, direction: row.direction, circular: row.circular ?? null, calendarProfileIds: row.calendarProfileIds ?? [], qualificationNotes: row.qualificationNotes ?? [], publicRouteFamilyDecision: row.publicRouteFamilyDecision ?? null, groupingDecision: row.groupingDecision ?? null, terminusDecision: row.terminusDecision ?? null })),
+    plannerRoutes,
+    exportParity: { plannerRouteNumbers: plannerRoutes, wordRouteNumbers, missingFromWord: plannerRoutes.filter(route => !wordRouteNumbers.includes(route)), extraInWord: wordRouteNumbers.filter(route => !plannerRoutes.includes(route)) },
+    plannerRows: plannerRows.map(row => ({ routeNumber: row.routeNumber, routeNumbers: row.routeNumbers ?? [], publicRouteNumbers: row.publicRouteNumbers ?? [], memberRouteNumbers: row.memberRouteNumbers ?? [], routeFamilyLabel: row.routeFamilyLabel ?? null, routeFamilyMembers: row.routeFamilyMembers ?? [], operator: row.operator, origin: row.origin, destination: row.destination, direction: row.direction, circular: row.circular ?? null, circularServiceDecision: row.circularServiceDecision ?? null, calendarProfileIds: row.calendarProfileIds ?? [], qualificationNotes: row.qualificationNotes ?? [], publicRouteFamilyDecision: row.publicRouteFamilyDecision ?? null, groupingDecision: row.groupingDecision ?? null, terminusDecision: row.terminusDecision ?? null })),
     supplementarySourceCondition: servicesResult?.provenance?.supplementarySourceCondition ?? null,
     sourceCompleteness: servicesResult?.provenance?.sourceCompleteness ?? null,
     unresolvedRequestIdentities: servicesResult?.provenance?.unresolvedRequestIdentities ?? [],
     failedShardDiagnostics: servicesResult?.provenance?.failedShardDiagnostics ?? []
   };
   } catch (error) {
-    results[control.id] = { control, outcome: 'BLOCKED', error: error.message, stops: [], serviceRows: [], serviceSummaries: [], plannerRoutes: [], plannerRows: [], unresolvedRequestIdentities: [], failedShardDiagnostics: [] };
+    results[control.id] = { control, outcome: 'BLOCKED', error: error.message, stops: [], serviceRows: [], serviceSummaries: [], plannerRoutes: [], plannerRows: [], exportParity: { plannerRouteNumbers: [], wordRouteNumbers: [], missingFromWord: [], extraInWord: [] }, unresolvedRequestIdentities: [], failedShardDiagnostics: [] };
     check(`control-${control.id}`, false, error.message);
   } finally { activeControlId = null; }
 }
@@ -205,6 +222,15 @@ check('pe1-call-eligible-stops', pe1CallEligibleStops.length > 0, 'PE1 has no ti
 check('pe1-visible-outcome', pe1HasVisibleLocalOutcome, 'PE1 has neither service evidence nor unresolved evidence.');
 check('queensgate-bce-entrance', queensgateBceEntrances.length > 0, 'Queensgate has no BCE entrance records.');
 check('queensgate-bce-noncall', queensgateBceNonCallInfrastructureOnly, 'Queensgate BCE entrance was treated as timetable-call infrastructure.');
+for (const [id, label] of [
+  ['waltham-cross-47-berkley-avenue', 'Waltham'],
+  ['pipers-lane', 'Pipers'],
+  ['normanshire-drive', 'Chingford']
+]) {
+  const parity = results[id]?.exportParity ?? { missingFromWord: [], extraInWord: [] };
+  check(`word-export-route-parity-${id}`, parity.missingFromWord.length === 0 && parity.extraInWord.length === 0,
+    `${label} planner/Word route mismatch; missing from Word: ${parity.missingFromWord.join(', ') || 'none'}; extra in Word: ${parity.extraInWord.join(', ') || 'none'}.`);
+}
 const report = {
   schema: 'atlas-s2d1-real-candidate-runtime-audit-v1',
   candidateRoot,
@@ -214,6 +240,16 @@ const report = {
   requestedFileCount: requested.length,
   requestedFiles: requested,
   controls: results,
+  controlOutcomes: Object.fromEntries([
+    ['waltham-cross-47-berkley-avenue', ['waltham-required-routes', 'word-export-route-parity-waltham-cross-47-berkley-avenue']],
+    ['pipers-lane', ['pipers-bods-primary-230', 'pipers-tnds-230', 'pipers-tnds-only-231', 'pipers-planner-230-231', 'pipers-circular-evidence', 'word-export-route-parity-pipers-lane']],
+    ['normanshire-drive', ['chingford-routes', 'chingford-657-school-day', 'word-export-route-parity-normanshire-drive']],
+    ['pe1-2tl', ['pe1-call-eligible-stops', 'pe1-visible-outcome']],
+    ['queensgate', ['queensgate-bce-entrance', 'queensgate-bce-noncall']]
+  ].map(([id, checkIds]) => {
+    const failed = checks.filter(item => checkIds.includes(item.id) && item.outcome !== 'PASS');
+    return [id, { outcome: results[id]?.outcome === 'BLOCKED' ? 'BLOCKED' : failed.length ? 'FAIL' : 'PASS', reasons: failed.map(item => item.reason).filter(Boolean) }];
+  })),
   checks,
   failures,
   pipersLane: {
@@ -227,6 +263,7 @@ const report = {
   },
   walthamCross: {
     requiredRoutes: requiredWalthamRoutes, availability: walthamAvailability, evidenceByRoute: walthamEvidenceByRoute, missingRoutes: requiredWalthamRoutes.filter(route => !walthamAvailability[route]),
+    previousAuditFalseNegative: 'The earlier route-set check omitted nested routeFamilyMembers/memberRouteNumbers. The immutable candidate retained 13A/13B through plannerRows.',
     lineage: Object.fromEntries(['13', '13A', '13B', '13C'].map(route => {
       const stops = results['waltham-cross-47-berkley-avenue'].stops.filter(stop => (stop.routes ?? []).map(value => String(value).toUpperCase()).includes(route));
       const matched = results['waltham-cross-47-berkley-avenue'].serviceRows.filter(row => String(row.routeNumber).toUpperCase() === route);
@@ -235,7 +272,7 @@ const report = {
       const planner = results['waltham-cross-47-berkley-avenue'].plannerRows.filter(containsRoute);
       const prepared = walthamPreparedRecords[route] ?? { bods: [], tnds: [] };
       const rawFound = [...prepared.bods, ...prepared.tnds].length > 0;
-      const stage = planner.length ? 'plannerRows' : summarized.length ? 'plannerSummaryConstruction/grouping' : matched.length ? 'serviceSummaryConstruction' : rawFound ? 'adapter source matching, calendar qualification or arbitration' : stops.length ? 'prepared candidate records at eligible Waltham stop IDs' : 'stop discovery / assessment eligibility';
+      const stage = planner.length ? 'none; route identity is present in plannerRows' : summarized.length ? 'plannerRows' : matched.length ? 'plannerSummaryConstruction/grouping' : rawFound ? 'adapter source matching, calendar qualification or arbitration' : stops.length ? 'prepared candidate records at eligible Waltham stop IDs' : 'stop discovery / assessment eligibility';
       return [route, { eligibleStops: stops.map(stop => ({ id: stop.id, name: stop.name, routes: stop.routes, timetableCallEligible: stop.timetableCallEligible, timetableEvidenceStatus: stop.timetableEvidenceStatus })), preparedBodsRecords: prepared.bods, preparedTndsRecords: prepared.tnds, matchedRows: matched, serviceSummaries: summarized, plannerRows: planner, firstDisappearanceStage: stage }];
     }))
   },

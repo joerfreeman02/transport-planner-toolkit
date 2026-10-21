@@ -1,0 +1,149 @@
+name: ATLAS Bus Beta S2D-1 offline closeout
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Run the exact-SHA offline preflight or audit the retained immutable Run #75 candidate
+        required: true
+        type: choice
+        options:
+          - offline_preflight
+          - retained_candidate_audit
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  offline-preflight:
+    if: inputs.mode == 'offline_preflight'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Run full Bus-data Python suite
+        run: python -m unittest discover -s tools/atlas-bus-data -p 'test_*.py' -v
+      - name: Run deterministic Alpha.15 suite
+        run: |
+          set -o pipefail
+          node tests/atlas/run-all.mjs | tee "$RUNNER_TEMP/atlas-alpha15-suite.log"
+          grep -Fx 'ATLAS Alpha.15 deterministic suite passed.' "$RUNNER_TEMP/atlas-alpha15-suite.log"
+      - name: Check exact commit whitespace
+        run: git diff --check "${GITHUB_SHA}^" "$GITHUB_SHA"
+      - name: Record zero-download preflight evidence
+        if: always()
+        env:
+          PREFLIGHT_OUTCOME: ${{ job.status }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/s2d1-evidence"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          record = {
+              'schema': 'atlas-bus-s2d1-zero-download-preflight-v1',
+              'result': os.environ['PREFLIGHT_OUTCOME'],
+              'commit': os.environ['GITHUB_SHA'],
+              'branch': os.environ['GITHUB_REF_NAME'],
+              'sourceAcquisition': False,
+              'nationalPreparation': False,
+              'candidateComposition': False,
+              'publicationAttempted': False,
+              'deploymentAttempted': False,
+          }
+          Path(os.environ['RUNNER_TEMP'], 's2d1-evidence', 'preflight.json').write_text(json.dumps(record, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atlas-bus-s2d1-zero-download-preflight-${{ github.run_id }}
+          path: ${{ runner.temp }}/s2d1-evidence
+          if-no-files-found: error
+          retention-days: 90
+
+  retained-candidate-audit:
+    if: inputs.mode == 'retained_candidate_audit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Verify immutable Run #75 candidate artifact identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: |
+          gh api "repos/$GH_REPOSITORY/actions/artifacts/12275615359" > "$RUNNER_TEMP/run75-artifact.json"
+          python - "$RUNNER_TEMP/run75-artifact.json" <<'PY'
+          import json, sys
+          from pathlib import Path
+          artifact = json.loads(Path(sys.argv[1]).read_text())
+          expected = {
+              'id': 12275615359,
+              'name': 'atlas-bus-beta-review-candidate-39430415441',
+              'digest': 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471',
+              'expired': False,
+              'workflow_run': {'id': 39430415441},
+          }
+          for key, value in expected.items():
+              actual = artifact.get(key)
+              if isinstance(value, dict):
+                  for nested, nested_value in value.items():
+                      if (actual or {}).get(nested) != nested_value:
+                          raise SystemExit(f'Run #75 artifact {key}.{nested} mismatch')
+              elif actual != value:
+                  raise SystemExit(f'Run #75 artifact {key} mismatch')
+          print('Exact unexpired Run #75 candidate artifact ID, digest and producer verified.')
+          PY
+      - name: Restore immutable Run #75 candidate on hosted runner
+        uses: actions/download-artifact@v4
+        with:
+          name: atlas-bus-beta-review-candidate-39430415441
+          run-id: 39430415441
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: restored
+      - name: Verify original candidate checkpoint and source binding
+        run: node tools/atlas-data-publication/review-candidate-checkpoint.mjs verify --candidate-root restored/candidate-site --checkpoint-root restored/review-checkpoint --expected-run-id 39430415441 --expected-commit-sha 151199cc914c235870f444d26b03c2309edbd035
+      - name: Recheck immutable candidate structure
+        run: python tools/atlas-bus-data/validate_candidate.py --site-root restored/candidate-site
+      - name: Install locked browser audit dependencies
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Run complete real-candidate controls and browser audit
+        id: audit
+        run: |
+          mkdir -p candidate-audit
+          node tests/atlas/s2c3-real-candidate-runtime-audit.mjs restored/candidate-site candidate-audit/runtime-audit.json
+      - name: Upload complete audit report, including failed controls
+        if: always() && hashFiles('candidate-audit/*.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-bus-beta-s2d1-candidate-audit-${{ github.run_id }}
+          path: candidate-audit
+          if-no-files-found: error
+          retention-days: 90

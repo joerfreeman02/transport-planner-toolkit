@@ -1,8 +1,8 @@
-import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { createPreparedBusDataAdapter } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { createBusAssessment } from '../../src/atlas/application/bus-assessment.mjs';
@@ -17,6 +17,15 @@ const busRoot = path.join(candidateRoot, 'atlas', 'data', 'bus');
 const tndsRoot = path.join(candidateRoot, 'atlas', 'data', 'bus-tnds');
 const requested = [];
 let blockedRelative = null;
+let activeControlId = null;
+const failures = [];
+const checks = [];
+function check(id, passed, reason = '') {
+  const result = { id, outcome: passed ? 'PASS' : 'FAIL', reason: passed ? null : String(reason || 'Assertion failed.') };
+  checks.push(result);
+  if (!passed) failures.push(result);
+  return passed;
+}
 const localFetch = async input => {
   const pathname = new URL(input).pathname;
   const busMarker = '/atlas/data/bus/';
@@ -29,7 +38,7 @@ const localFetch = async input => {
   if (root === tndsRoot && relative === blockedRelative) return new Response('', { status: 503 });
   const file = path.resolve(root, decodeURIComponent(relative));
   if (file !== path.join(root, 'manifest.json') && !file.startsWith(`${root}${path.sep}`)) return new Response('', { status: 404 });
-  requested.push({ source: root === busRoot ? 'BODS/NaPTAN' : 'TNDS', relative });
+  requested.push({ controlId: activeControlId, source: root === busRoot ? 'BODS/NaPTAN' : 'TNDS', relative });
   try { return new Response(await readFile(file), { status: 200 }); }
   catch { return new Response('', { status: 404 }); }
 };
@@ -50,6 +59,8 @@ const controls = [
 ];
 const results = {};
 for (const control of controls) {
+  try {
+  activeControlId = control.id;
   const site = confirmSite(createSite({
     suppliedAddress: control.label, displayAddress: control.label,
     latitude: control.latitude, longitude: control.longitude,
@@ -64,47 +75,108 @@ for (const control of controls) {
   const assessment = await assessmentApp.assess(site, { radius: control.radius, mode: 'full' });
   const serviceRows = servicesResult?.data ?? [];
   const plannerRows = assessment.plannerServiceSummaries ?? [];
-  results[control.id] = {
+    results[control.id] = {
     control,
     assessmentStatus: assessment.status,
     discoveredStopCount: assessment.discoveredStopCount,
     stops: (assessment.stops ?? []).map(stop => ({ id: stop.id, name: stop.name, routes: stop.routes ?? [], busDomainEligible: stop.busDomainEligible ?? null, timetableCallEligible: stop.timetableCallEligible ?? null, timetableEvidenceStatus: stop.timetableEvidenceStatus ?? null })),
-    serviceRows: serviceRows.map(service => ({ id: service.id, routeNumber: service.routeNumber, operator: service.operator, sourceRegion: service.source?.region ?? null, timetableSource: service.timetableSource ?? null, origin: service.origin, destination: service.destination, direction: service.direction, circularPatternStopIds: service.circularPatternStopIds ?? [], calendarEvidence: service.calendarEvidence ?? [], schoolDayOnly: Boolean(service.schoolDayOnly || service.qualifications?.some(value => /school/i.test(String(value))) || service.calendarEvidence?.some(value => value?.schoolDayOnly === true || /school/i.test(String(value?.calendarProfileId ?? '')))) })),
-    plannerRoutes: [...new Set(plannerRows.map(row => String(row.routeNumber)))].sort((left, right) => left.localeCompare(right, undefined, { numeric: true })),
-    plannerRows: plannerRows.map(row => ({ routeNumber: row.routeNumber, operator: row.operator, origin: row.origin, destination: row.destination, direction: row.direction, circular: row.circular ?? null, calendarProfileIds: row.calendarProfileIds ?? [], qualificationNotes: row.qualificationNotes ?? [] })),
+    serviceRows: serviceRows.map(service => ({ id: service.id, routeNumber: service.routeNumber, operator: service.operator, sourceRegion: service.source?.region ?? null, timetableSource: service.timetableSource ?? null, origin: service.origin, destination: service.destination, direction: service.direction, circularPatternStopIds: service.circularPatternStopIds ?? [], calendarEvidence: service.calendarEvidence ?? [], calendarProfileId: service.calendarProfileId ?? null, qualifications: service.qualifications ?? [], schoolDayOnly: Boolean(service.schoolDayOnly || service.qualifications?.some(value => /school/i.test(String(value))) || service.calendarEvidence?.some(value => value?.schoolDayOnly === true || /school/i.test(String(value?.calendarProfileId ?? '')))), matchedStopPointIds: Object.keys(service.stopSchedules ?? {}), stopSchedules: service.stopSchedules ?? {}, routePatternStopIds: service.routePatternStopIds ?? [], routePatternStops: service.routePatternStops ?? [], sourceIdentity: service.source ?? null })),
+    serviceSummaries: (assessment.serviceSummaries ?? []).map(service => ({ id: service.id, routeNumber: service.routeNumber, operator: service.operator, origin: service.origin, destination: service.destination, direction: service.direction, routeNumbers: service.routeNumbers ?? [], variantCount: service.variantCount ?? null, variantServiceIds: service.variantServiceIds ?? [], sourceRecordIds: service.sourceRecordIds ?? [], rawServiceSummaries: (service.rawServiceSummaries ?? []).map(raw => ({ id: raw.id, routeNumber: raw.routeNumber, operator: raw.operator, origin: raw.origin, destination: raw.destination, direction: raw.direction, timetableSource: raw.timetableSource ?? null, source: raw.source ?? null, routePatternStopIds: raw.routePatternStopIds ?? [], calendarProfileId: raw.calendarProfileId ?? null })) })),
+    plannerRoutes: [...new Set(plannerRows.flatMap(row => [row.routeNumber, ...(row.publicRouteNumbers ?? []), ...(row.routeNumbers ?? []), ...(row.memberRouteNumbers ?? []), ...(row.routeFamilyMembers ?? []).map(member => member.routeNumber)].filter(Boolean).map(String)))].sort((left, right) => left.localeCompare(right, undefined, { numeric: true })),
+    plannerRows: plannerRows.map(row => ({ routeNumber: row.routeNumber, routeNumbers: row.routeNumbers ?? [], publicRouteNumbers: row.publicRouteNumbers ?? [], memberRouteNumbers: row.memberRouteNumbers ?? [], routeFamilyLabel: row.routeFamilyLabel ?? null, routeFamilyMembers: row.routeFamilyMembers ?? [], operator: row.operator, origin: row.origin, destination: row.destination, direction: row.direction, circular: row.circular ?? null, calendarProfileIds: row.calendarProfileIds ?? [], qualificationNotes: row.qualificationNotes ?? [], publicRouteFamilyDecision: row.publicRouteFamilyDecision ?? null, groupingDecision: row.groupingDecision ?? null, terminusDecision: row.terminusDecision ?? null })),
     supplementarySourceCondition: servicesResult?.provenance?.supplementarySourceCondition ?? null,
     sourceCompleteness: servicesResult?.provenance?.sourceCompleteness ?? null,
     unresolvedRequestIdentities: servicesResult?.provenance?.unresolvedRequestIdentities ?? [],
     failedShardDiagnostics: servicesResult?.provenance?.failedShardDiagnostics ?? []
   };
+  } catch (error) {
+    results[control.id] = { control, outcome: 'BLOCKED', error: error.message, stops: [], serviceRows: [], serviceSummaries: [], plannerRoutes: [], plannerRows: [], unresolvedRequestIdentities: [], failedShardDiagnostics: [] };
+    check(`control-${control.id}`, false, error.message);
+  } finally { activeControlId = null; }
+}
+
+async function preparedRouteEvidence(sourceRoot, sourcePath, stopIds, routeNumber) {
+  let bytes = await readFile(path.join(sourceRoot, sourcePath));
+  if (sourcePath.toLowerCase().endsWith('.gz')) bytes = gunzipSync(bytes);
+  const document = JSON.parse(bytes.toString('utf8'));
+  const stack = [document];
+  const found = [];
+  const wanted = new Set(stopIds.map(String));
+  const route = String(routeNumber).toUpperCase().replace(/\s+/g, '');
+  while (stack.length) {
+    const value = stack.pop();
+    if (!value || typeof value !== 'object') continue;
+    if (Array.isArray(value)) { stack.push(...value); continue; }
+    if (String(value.routeNumber ?? '').toUpperCase().replace(/\s+/g, '') === route) {
+      const schedules = value.stopSchedules ?? {};
+      const matchedStopIds = [...wanted].filter(id => Object.hasOwn(schedules, id));
+      if (matchedStopIds.length) found.push({
+        id: value.id ?? null, routeNumber: value.routeNumber, operator: value.operator ?? null,
+        timetableSource: value.timetableSource ?? value.source?.provider ?? null,
+        origin: value.origin ?? null, destination: value.destination ?? null, direction: value.direction ?? null,
+        matchedStopIds, stopSchedules: Object.fromEntries(matchedStopIds.map(id => [id, schedules[id]])),
+        routePatternStopIds: value.routePatternStopIds ?? [], routePatternStops: value.routePatternStops ?? [],
+        calendarProfileId: value.calendarProfileId ?? null, validFrom: value.validFrom ?? null, validTo: value.validTo ?? null,
+        source: value.source ?? null, tndsQuarantine: value.tndsQuarantine ?? null,
+        fragment: value.fragment ?? null
+      });
+    }
+    stack.push(...Object.values(value));
+  }
+  return found;
+}
+
+const walthamStops = results['waltham-cross-47-berkley-avenue'].stops;
+const walthamStopIds = walthamStops.filter(stop => stop.timetableCallEligible !== false).map(stop => String(stop.id));
+const walthamRequestedFiles = [...new Map(requested
+  .filter(item => item.controlId === 'waltham-cross-47-berkley-avenue')
+  .map(item => [`${item.source}|${item.relative}`, item])).values()];
+const walthamPreparedRecords = {};
+for (const route of ['13', '13A', '13B', '13C']) {
+  const bods = [], tnds = [];
+  for (const file of walthamRequestedFiles) {
+    const root = file.source === 'BODS/NaPTAN' ? busRoot : tndsRoot;
+    const rows = await preparedRouteEvidence(root, file.relative, walthamStopIds, route);
+    (file.source === 'BODS/NaPTAN' ? bods : tnds).push(...rows.map(row => ({ ...row, shard: file.relative })));
+  }
+  walthamPreparedRecords[route] = { bods, tnds };
 }
 
 const tndsManifest = JSON.parse(await readFile(path.join(tndsRoot, 'manifest.json'), 'utf8'));
 const regionSweep = [];
 for (const region of ['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y']) {
-  const descriptors = Object.values(tndsManifest.serviceShards ?? {}).flat();
-  const descriptor = descriptors.find(item => String(item.path).toLowerCase().includes(`-${region.toLowerCase()}-`) && item.stopIds?.length);
-  assert.ok(descriptor, `actual candidate has a selectable TNDS runtime shard for ${region}`);
-  const stopId = descriptor.stopIds[0];
-  const result = await adapter.servicesForStops([{ id: stopId, name: `candidate ${region} sweep stop`, routes: [], timetableAuthority: 'NaPTAN', timetableCallEligible: true }]);
-  const matched = (result.data ?? []).filter(service => String(service.source?.region ?? '').toUpperCase() === region);
-  assert.ok(matched.length, `actual candidate ${region} shard resolves to at least one composed service at ${stopId}`);
-  regionSweep.push({ region, stopId, descriptorPath: descriptor.path, parentRows: matched.length, requestedShards: result.provenance?.tndsShardRequests ?? null, supplementarySourceCondition: result.provenance?.supplementarySourceCondition ?? null, sourceCompleteness: result.provenance?.sourceCompleteness ?? null });
+  try {
+    const descriptors = Object.values(tndsManifest.serviceShards ?? {}).flat();
+    const descriptor = descriptors.find(item => String(item.path).toLowerCase().includes(`-${region.toLowerCase()}-`) && item.stopIds?.length);
+    if (!descriptor) throw new Error(`No selectable TNDS runtime shard for ${region}`);
+    const stopId = descriptor.stopIds[0];
+    const result = await adapter.servicesForStops([{ id: stopId, name: `candidate ${region} sweep stop`, routes: [], timetableAuthority: 'NaPTAN', timetableCallEligible: true }]);
+    const matched = (result.data ?? []).filter(service => String(service.source?.region ?? '').toUpperCase() === region);
+    regionSweep.push({ region, outcome: matched.length ? 'PASS' : 'FAIL', reason: matched.length ? null : 'No composed row matched the selected shard stop.', stopId, descriptorPath: descriptor.path, parentRows: matched.length, requestedShards: result.provenance?.tndsShardRequests ?? null, supplementarySourceCondition: result.provenance?.supplementarySourceCondition ?? null, sourceCompleteness: result.provenance?.sourceCompleteness ?? null });
+    check(`national-region-${region}`, matched.length > 0, `No composed row matched ${region} at ${stopId}.`);
+  } catch (error) {
+    regionSweep.push({ region, outcome: 'BLOCKED', reason: error.message });
+    check(`national-region-${region}`, false, error.message);
+  }
 }
 
-const fragmentedDescriptor = Object.values(tndsManifest.serviceShards ?? {}).flat().find(item => item.fragmentId && item.stopIds?.length);
-assert.ok(fragmentedDescriptor, 'actual candidate contains at least one semantically fragmented logical service');
-const failureStop = { id: fragmentedDescriptor.stopIds[0], name: 'candidate fragment failure test', routes: [], timetableAuthority: 'NaPTAN', timetableCallEligible: true };
-const beforeFailure = await adapter.servicesForStops([failureStop]);
-const bodsBeforeFailure = (beforeFailure.data ?? []).filter(service => !/^tnds:/i.test(String(service.id))).map(service => String(service.id)).sort();
-blockedRelative = fragmentedDescriptor.path;
-const afterFailure = await adapter.servicesForStops([failureStop]);
-assert.equal(afterFailure.provenance?.supplementarySourceCondition, 'UNRESOLVED', 'a missing actual candidate fragment cannot produce complete supplementary evidence');
-assert.equal(afterFailure.provenance?.sourceCompleteness, 'PARTIAL');
-assert.equal((afterFailure.data ?? []).some(service => service.id === fragmentedDescriptor.parentServiceId), false, 'an incomplete actual candidate parent is withheld from service composition');
-const bodsAfterFailure = (afterFailure.data ?? []).filter(service => !/^tnds:/i.test(String(service.id))).map(service => String(service.id)).sort();
-assert.deepEqual(bodsAfterFailure, bodsBeforeFailure, 'a missing actual TNDS fragment preserves any independently valid BODS services');
-blockedRelative = null;
+let beforeFailure = { data: [], provenance: {} }, afterFailure = { data: [], provenance: {} }, bodsBeforeFailure = [], bodsAfterFailure = [];
+let fragmentedDescriptor = null;
+try {
+  fragmentedDescriptor = Object.values(tndsManifest.serviceShards ?? {}).flat().find(item => item.fragmentId && item.stopIds?.length);
+  if (!fragmentedDescriptor) throw new Error('No fragmented logical service in the actual candidate.');
+  const failureStop = { id: fragmentedDescriptor.stopIds[0], name: 'candidate fragment failure test', routes: [], timetableAuthority: 'NaPTAN', timetableCallEligible: true };
+  beforeFailure = await adapter.servicesForStops([failureStop]);
+  bodsBeforeFailure = (beforeFailure.data ?? []).filter(service => !/^tnds:/i.test(String(service.id))).map(service => String(service.id)).sort();
+  blockedRelative = fragmentedDescriptor.path;
+  afterFailure = await adapter.servicesForStops([failureStop]);
+  bodsAfterFailure = (afterFailure.data ?? []).filter(service => !/^tnds:/i.test(String(service.id))).map(service => String(service.id)).sort();
+  check('fragment-failure-is-unresolved', afterFailure.provenance?.supplementarySourceCondition === 'UNRESOLVED' && afterFailure.provenance?.sourceCompleteness === 'PARTIAL', 'Missing actual candidate fragment did not produce unresolved/partial provenance.');
+  check('incomplete-parent-withheld', !(afterFailure.data ?? []).some(service => service.id === fragmentedDescriptor.parentServiceId), 'Incomplete logical TNDS parent was not withheld.');
+  check('bodss-preserved-after-tnds-fragment-failure', JSON.stringify(bodsAfterFailure) === JSON.stringify(bodsBeforeFailure), 'Missing TNDS fragment changed independently matched BODS services.');
+} catch (error) {
+  check('fragment-completeness-safety', false, error.message);
+} finally { blockedRelative = null; }
 
 const routeList = results['waltham-cross-47-berkley-avenue'].plannerRoutes;
 const requiredWalthamRoutes = ['13', '13A', '13B', '13C', '14', '15', '15A', '16', '16C', '25C', '66', '217', '242', '251', '279', '310', '317', '327', '491', 'A1', 'N279'];
@@ -121,20 +193,20 @@ const pe1CallEligibleStops = pe1.stops.filter(stop => stop.timetableCallEligible
 const pe1HasVisibleLocalOutcome = pe1.serviceRows.length > 0 || pe1.unresolvedRequestIdentities.length > 0
   || pe1.stops.some(stop => ['partial', 'unresolved', 'review_required'].includes(String(stop.timetableEvidenceStatus ?? '').toLowerCase()));
 const pipers = results['pipers-lane'];
-assert.ok(pipers.serviceRows.some(row => row.routeNumber === '230' && !/^tnds:/i.test(String(row.id))), 'actual candidate must return BODS-primary route 230 at Pipers Lane');
-assert.ok(pipers.serviceRows.some(row => row.routeNumber === '230' && /^tnds:/i.test(String(row.id))), 'actual candidate must return TNDS route 230 at Pipers Lane');
-assert.ok(pipers.serviceRows.some(row => row.routeNumber === '231' && /^tnds:/i.test(String(row.id))), 'actual candidate must return TNDS route 231 at Pipers Lane');
-assert.ok(pipers.plannerRoutes.includes('230') && pipers.plannerRoutes.includes('231'), 'Pipers 230/231 evidence must reach planner summaries');
-assert.ok(pipers.plannerRows.some(row => row.circular) || pipers.serviceRows.some(row => row.circularPatternStopIds.length > 0), 'Pipers circular evidence must reach downstream composition');
-assert.deepEqual(requiredWalthamRoutes.filter(route => !walthamAvailability[route]), [], 'all required Waltham Cross routes must reach planner summaries');
-assert.deepEqual(chingfordExpected.filter(route => !chingfordAvailability[route]), [], 'all Chingford TfL control routes must remain available');
-assert.ok(results['normanshire-drive'].serviceRows.some(row => row.routeNumber === '657' && row.schoolDayOnly), 'Chingford route 657 school-day semantics must survive');
-assert.ok(pe1CallEligibleStops.length, 'PE1 must retain actual timetable-call-eligible stops');
-assert.ok(pe1HasVisibleLocalOutcome, 'PE1 local services or unresolved material evidence must remain visible');
-assert.ok(queensgateBceEntrances.length, 'Queensgate candidate control must include a BCE entrance record');
-assert.ok(queensgateBceNonCallInfrastructureOnly, 'Queensgate BCE entrances must remain non-call infrastructure');
+check('pipers-bods-primary-230', pipers.serviceRows.some(row => row.routeNumber === '230' && !/^tnds:/i.test(String(row.id))), 'BODS-primary 230 missing at Pipers Lane.');
+check('pipers-tnds-230', pipers.serviceRows.some(row => row.routeNumber === '230' && /^tnds:/i.test(String(row.id))), 'TNDS 230 missing at Pipers Lane.');
+check('pipers-tnds-only-231', pipers.serviceRows.some(row => row.routeNumber === '231' && /^tnds:/i.test(String(row.id))), 'TNDS-only 231 missing at Pipers Lane.');
+check('pipers-planner-230-231', pipers.plannerRoutes.includes('230') && pipers.plannerRoutes.includes('231'), 'Pipers 230/231 evidence did not reach planner summaries.');
+check('pipers-circular-evidence', pipers.plannerRows.some(row => row.circular) || pipers.serviceRows.some(row => row.circularPatternStopIds.length > 0), 'Pipers circular evidence missing downstream.');
+check('waltham-required-routes', requiredWalthamRoutes.every(route => walthamAvailability[route]), `Missing planner routes: ${requiredWalthamRoutes.filter(route => !walthamAvailability[route]).join(', ')}`);
+check('chingford-routes', chingfordExpected.every(route => chingfordAvailability[route]), `Missing Chingford routes: ${chingfordExpected.filter(route => !chingfordAvailability[route]).join(', ')}`);
+check('chingford-657-school-day', results['normanshire-drive'].serviceRows.some(row => row.routeNumber === '657' && row.schoolDayOnly), 'Route 657 school-day semantics missing.');
+check('pe1-call-eligible-stops', pe1CallEligibleStops.length > 0, 'PE1 has no timetable-call-eligible stops.');
+check('pe1-visible-outcome', pe1HasVisibleLocalOutcome, 'PE1 has neither service evidence nor unresolved evidence.');
+check('queensgate-bce-entrance', queensgateBceEntrances.length > 0, 'Queensgate has no BCE entrance records.');
+check('queensgate-bce-noncall', queensgateBceNonCallInfrastructureOnly, 'Queensgate BCE entrance was treated as timetable-call infrastructure.');
 const report = {
-  schema: 'atlas-s2c3-real-candidate-runtime-audit-v1',
+  schema: 'atlas-s2d1-real-candidate-runtime-audit-v1',
   candidateRoot,
   sourceAcquisition: false,
   publicationAttempted: false,
@@ -142,6 +214,8 @@ const report = {
   requestedFileCount: requested.length,
   requestedFiles: requested,
   controls: results,
+  checks,
+  failures,
   pipersLane: {
     bodsRoute230: pipers.serviceRows.some(row => row.routeNumber === '230' && !/^tnds:/i.test(String(row.id))),
     tndsRoute230: pipers.serviceRows.some(row => row.routeNumber === '230' && /^tnds:/i.test(String(row.id))),
@@ -151,7 +225,20 @@ const report = {
     circularRows: pipers.plannerRows.filter(row => row.circular),
     serviceRows: pipers.serviceRows.filter(row => ['230', '231'].includes(row.routeNumber))
   },
-  walthamCross: { requiredRoutes: requiredWalthamRoutes, availability: walthamAvailability, evidenceByRoute: walthamEvidenceByRoute, missingRoutes: requiredWalthamRoutes.filter(route => !walthamAvailability[route]) },
+  walthamCross: {
+    requiredRoutes: requiredWalthamRoutes, availability: walthamAvailability, evidenceByRoute: walthamEvidenceByRoute, missingRoutes: requiredWalthamRoutes.filter(route => !walthamAvailability[route]),
+    lineage: Object.fromEntries(['13', '13A', '13B', '13C'].map(route => {
+      const stops = results['waltham-cross-47-berkley-avenue'].stops.filter(stop => (stop.routes ?? []).map(value => String(value).toUpperCase()).includes(route));
+      const matched = results['waltham-cross-47-berkley-avenue'].serviceRows.filter(row => String(row.routeNumber).toUpperCase() === route);
+      const containsRoute = row => [row.routeNumber, ...(row.routeNumbers ?? []), ...(row.publicRouteNumbers ?? []), ...(row.memberRouteNumbers ?? []), ...(row.routeFamilyMembers ?? []).map(member => member.routeNumber)].filter(Boolean).some(value => String(value).toUpperCase() === route);
+      const summarized = results['waltham-cross-47-berkley-avenue'].serviceSummaries.filter(containsRoute);
+      const planner = results['waltham-cross-47-berkley-avenue'].plannerRows.filter(containsRoute);
+      const prepared = walthamPreparedRecords[route] ?? { bods: [], tnds: [] };
+      const rawFound = [...prepared.bods, ...prepared.tnds].length > 0;
+      const stage = planner.length ? 'plannerRows' : summarized.length ? 'plannerSummaryConstruction/grouping' : matched.length ? 'serviceSummaryConstruction' : rawFound ? 'adapter source matching, calendar qualification or arbitration' : stops.length ? 'prepared candidate records at eligible Waltham stop IDs' : 'stop discovery / assessment eligibility';
+      return [route, { eligibleStops: stops.map(stop => ({ id: stop.id, name: stop.name, routes: stop.routes, timetableCallEligible: stop.timetableCallEligible, timetableEvidenceStatus: stop.timetableEvidenceStatus })), preparedBodsRecords: prepared.bods, preparedTndsRecords: prepared.tnds, matchedRows: matched, serviceSummaries: summarized, plannerRows: planner, firstDisappearanceStage: stage }];
+    }))
+  },
   chingford: {
     requiredRoutes: chingfordExpected, availability: chingfordAvailability,
     route657: results['normanshire-drive'].serviceRows.filter(row => row.routeNumber === '657'),
@@ -170,7 +257,7 @@ const report = {
     incompleteParentWithheld: !(afterFailure.data ?? []).some(service => service.id === fragmentedDescriptor.parentServiceId),
     missingFragmentRetainedBodsIds: bodsAfterFailure,
     missingFragmentPreservedBods: JSON.stringify(bodsAfterFailure) === JSON.stringify(bodsBeforeFailure),
-    browserFixtureVerifiedMissingFragmentBodsRetention: true
+    browserFixtureVerifiedMissingFragmentBodsRetention: false
   },
   artifactReadAudit: {
     serviceCount: tndsManifest.serviceCount,
@@ -178,7 +265,8 @@ const report = {
     fragmentRecordCount: tndsManifest.fragmentRecordCount,
     maximumShardBytes: tndsManifest.runtimeShardMaxObservedBytes,
     runtimeShardCount: tndsManifest.runtimeShardCount
-  }
+  },
+  readiness: { outcome: failures.length ? 'NOT_READY_FOR_MANUAL_ACCEPTANCE' : 'READY_FOR_TECHNICAL_DIRECTOR_REVIEW_BEFORE_MANUAL_ACCEPTANCE', failureCount: failures.length }
 };
 
 const require = createRequire(import.meta.url);
@@ -227,12 +315,15 @@ try {
     import { createPreparedBusDataAdapter } from '/src/atlas/adapters/prepared-bus-data-adapter.mjs';
     import { createBusAssessment } from '/src/atlas/application/bus-assessment.mjs';
     import { createSite, confirmSite } from '/src/atlas/domain/site.mjs';
-    window.runPipersCandidateAssessment = async () => {
+    const controls = ${JSON.stringify(controls)};
+    window.runCandidateAssessment = async (controlId) => {
+      const control = controls.find(item => item.id === controlId);
+      if (!control) throw new Error('Unknown browser audit control: ' + controlId);
       const adapter = createPreparedBusDataAdapter({ baseUrl: location.origin + '/atlas/data/bus/', tndsBaseUrl: location.origin + '/atlas/data/bus-tnds/' });
-      const site = confirmSite(createSite({ suppliedAddress: 'Pipers Lane candidate runtime control', displayAddress: 'Pipers Lane candidate runtime control', latitude: 51.852700, longitude: -0.454343, assessmentPoint: { method: 'coordinates_entered' } }), { confirmedAt: '2026-10-20T00:00:00Z' });
+      const site = confirmSite(createSite({ suppliedAddress: control.label, displayAddress: control.label, latitude: control.latitude, longitude: control.longitude, assessmentPoint: { method: 'coordinates_entered' } }), { confirmedAt: '2026-10-20T00:00:00Z' });
       const app = createBusAssessment({ stopDiscovery: { nearbyStops: (...args) => adapter.nearbyStops(...args) }, timetableData: adapter, accessRouting: { matrix: async (_site, stops) => ({ ok: true, routes: stops.map(() => ({ status: 'routed', distanceMetres: 100, durationSeconds: 60 })), warnings: [], provenance: { source: 'actual candidate headless browser audit' } }) } });
-      const result = await app.assess(site, { radius: 700, mode: 'full' });
-      return { status: result.status, routes: result.plannerServiceSummaries.map(row => String(row.routeNumber)), circularRoutes: result.plannerServiceSummaries.filter(row => row.circular).map(row => String(row.routeNumber)), services: result.services.map(row => ({ id: row.id, routeNumber: String(row.routeNumber), source: row.timetableSource ?? null, region: row.source?.region ?? null })), supplementarySourceCondition: result.provenance.timetables.supplementarySourceCondition, sourceCompleteness: result.provenance.timetables.sourceCompleteness };
+      const result = await app.assess(site, { radius: control.radius, mode: 'full' });
+      return { id: control.id, status: result.status, routes: result.plannerServiceSummaries.map(row => String(row.routeNumber)), circularRoutes: result.plannerServiceSummaries.filter(row => row.circular).map(row => String(row.routeNumber)), services: result.services.map(row => ({ id: row.id, routeNumber: String(row.routeNumber), source: row.timetableSource ?? null, region: row.source?.region ?? null })), supplementarySourceCondition: result.provenance.timetables.supplementarySourceCondition, sourceCompleteness: result.provenance.timetables.sourceCompleteness };
     };
   </script>`;
   browser = await launchAtlasBrowser(chromium, { headless: true });
@@ -242,18 +333,29 @@ try {
   page.on('pageerror', error => pageErrors.push(error.message));
   page.on('requestfailed', request => failedRequests.push({ url: request.url(), error: request.failure()?.errorText || 'unknown' }));
   await page.goto(new URL('s2c3-headless-harness.html', browserRoot).href, { waitUntil: 'load', timeout: 30000 });
-  await page.waitForFunction(() => typeof window.runPipersCandidateAssessment === 'function');
-  const pipersBrowser = await page.evaluate(() => window.runPipersCandidateAssessment());
-  assert.ok(pipersBrowser.routes.includes('230') && pipersBrowser.routes.includes('231'), 'headless browser candidate runtime must deliver Pipers 230/231 to planner summaries');
-  assert.equal(pipersBrowser.supplementarySourceCondition, 'CHECKED');
-  assert.equal(pipersBrowser.sourceCompleteness, 'COMPLETE');
-  assert.equal(pageErrors.length, 0, `actual-candidate browser errors: ${pageErrors.join('; ')}`);
-  assert.deepEqual(failedRequests, []);
-  report.headlessBrowserRuntime = { passed: true, assessmentStatus: pipersBrowser.status, plannerRoutes: pipersBrowser.routes, circularRoutes: pipersBrowser.circularRoutes, serviceCount: pipersBrowser.services.length, supplementarySourceCondition: pipersBrowser.supplementarySourceCondition, sourceCompleteness: pipersBrowser.sourceCompleteness, browserRequestCount: browserRequests.length, pageErrors, failedRequests };
+  await page.waitForFunction(() => typeof window.runCandidateAssessment === 'function');
+  const browserControls = {};
+  for (const control of controls) {
+    try { browserControls[control.id] = { outcome: 'PASS', ...(await page.evaluate(id => window.runCandidateAssessment(id), control.id)) }; }
+    catch (error) { browserControls[control.id] = { outcome: 'FAIL', reason: error.message }; }
+  }
+  const pipersBrowser = browserControls['pipers-lane'];
+  check('browser-pipers-230-231', Boolean(pipersBrowser?.routes?.includes('230') && pipersBrowser?.routes?.includes('231')), 'Browser candidate runtime did not return Pipers 230/231.');
+  check('browser-pipers-complete', pipersBrowser?.supplementarySourceCondition === 'CHECKED' && pipersBrowser?.sourceCompleteness === 'COMPLETE', 'Browser Pipers supplementary evidence was not complete.');
+  check('browser-console-errors', pageErrors.length === 0, pageErrors.join('; '));
+  check('browser-failed-requests', failedRequests.length === 0, JSON.stringify(failedRequests));
+  check('browser-all-controls-ran', Object.keys(browserControls).length === controls.length, 'Not all browser control assessments ran.');
+  report.headlessBrowserRuntime = { passed: !Object.values(browserControls).some(item => item.outcome !== 'PASS') && pageErrors.length === 0 && failedRequests.length === 0, controls: browserControls, browserRequestCount: browserRequests.length, browserRequests, pageErrors, failedRequests };
+} catch (error) {
+  check('browser-runtime', false, error.message);
+  report.headlessBrowserRuntime = { passed: false, reason: error.message, browserRequests, pageErrors: [], failedRequests: [] };
 } finally {
   await browser?.close();
   if (browserServer?.listening) await new Promise(resolve => browserServer.close(resolve));
 }
 
+report.readiness = { outcome: failures.length ? 'NOT_READY_FOR_MANUAL_ACCEPTANCE' : 'READY_FOR_TECHNICAL_DIRECTOR_REVIEW_BEFORE_MANUAL_ACCEPTANCE', failureCount: failures.length };
+report.failures = [...failures];
 if (reportArg) await writeFile(path.resolve(reportArg), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+if (failures.length) process.exitCode = 1;

@@ -211,7 +211,17 @@ function operatorDisplayNames(services) {
   const ranked = services.map(service => ({ service, rank: authorityRank(service) }));
   const winningRank = Math.max(0, ...ranked.map(item => item.rank));
   const winningServices = winningRank > 0 ? ranked.filter(item => item.rank === winningRank).map(item => item.service) : services;
-  const candidates = unique(winningServices.map(service => service?.operator)).filter(value => !isUnspecifiedOperator(value));
+  let candidates = unique(winningServices.map(service => service?.operator)).filter(value => !isUnspecifiedOperator(value));
+  if (!candidates.length && winningRank > 0) {
+    // A winning authority may omit the operator while a structurally
+    // corroborated copy carries it. Preserve the winning timetable source,
+    // borrowing only a named operator supported by the same public service.
+    candidates = unique(ranked
+      .filter(item => item.rank < winningRank && !isUnspecifiedOperator(item.service?.operator))
+      .filter(item => winningServices.some(winner => operatorFamilyCompatible(winner, item.service)
+        && hasPublicServiceCopyEvidence(winner, item.service)))
+      .map(item => item.service.operator));
+  }
   const families = new Map();
   for (const candidate of candidates) {
     const key = operatorIdentityKey(candidate) || normal(candidate);

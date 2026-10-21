@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import { createJsonCache, createMemoryStorage } from '../../src/atlas/infrastructure/cache.mjs';
+import { createTflBusStopAdapter } from '../../src/atlas/adapters/tfl-bus-stop-adapter.mjs';
+import { createTflBusTimetableAdapter } from '../../src/atlas/adapters/tfl-bus-timetable-adapter.mjs';
+import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
+import { createDeterministicEmptyTflFetch } from './helpers/s2e1-deterministic-empty-tfl.mjs';
+
+const requests = [];
+const fetchImpl = createDeterministicEmptyTflFetch({ requests });
+const cache = createJsonCache({ storage: createMemoryStorage(), namespace: 's2e1-empty-tfl-test' });
+const site = confirmSite(createSite({ suppliedAddress: 'National control fixture', displayAddress: 'National control fixture', latitude: 52.577554, longitude: -0.242489, assessmentPoint: { method: 'coordinates_entered' } }), { confirmedAt: '2026-10-21T00:00:00Z' });
+const stops = await createTflBusStopAdapter({ fetchImpl, cache }).nearbyStops(site, { radius: 500 });
+assert.equal(stops.ok, true);
+assert.deepEqual(stops.data, []);
+assert.equal(stops.provenance.httpStatus, 200);
+assert.match(stops.warnings.join(' '), /no bus stops/i);
+const timetable = await createTflBusTimetableAdapter({ fetchImpl, cache }).servicesForStop({ lineId: '657', stopPointId: 'NATIONAL-CONTROL-STOP' });
+assert.equal(timetable.ok, true);
+assert.deepEqual(timetable.data, []);
+assert.ok(requests.includes('/StopPoint'));
+assert.ok(requests.some(path => path.includes('/Route')));
+assert.ok(requests.some(path => path.includes('/Timetable/')));
+assert.ok(requests.every(path => path.startsWith('/')));
+console.log('PASS national-only diagnostic receives successful empty TfL StopPoint and timetable contributions with no live HTTP.');

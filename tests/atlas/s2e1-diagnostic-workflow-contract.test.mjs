@@ -38,14 +38,28 @@ for (const factory of ['createPreparedBusDataAdapter', 'createTflBusStopAdapter'
 }
 assert.match(normalRuntime, /assessmentApp\.inspectScope\(site/);
 assert.match(normalRuntime, /assessmentApp\.assess\(site, \{ radius: control\.radius, mode: 'full', discovery: scope\.discovery \}\)/);
-assert.match(normalRuntime, /noLiveTflFetch/);
+assert.match(normalRuntime, /createDeterministicEmptyTflFetch/);
+assert.match(workflow, /Verify deterministic empty TfL diagnostic boundary[\s\S]*node tests\/atlas\/s2e1-deterministic-empty-tfl\.test\.mjs/);
+assert.ok((await readFile(new URL('./run-all.mjs', import.meta.url), 'utf8')).includes("s2e1-deterministic-empty-tfl.test.mjs"));
+assert.match(await readFile(new URL('./s2e1-deterministic-empty-tfl.test.mjs', import.meta.url), 'utf8'), /stops\.ok, true[\s\S]*timetable\.ok, true/);
 assert.match(normalRuntime, /candidateProducerRun: '39430415441'/);
 assert.match(normalRuntime, /candidateArtifactId: '12275615359'/);
 assert.match(normalRuntime, /candidateArtifactDigest: 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471'/);
 assert.match(normalRuntime, /candidateModified: false/);
 assert.match(normalRuntime, /publicationAttempted: false, deploymentAttempted: false/);
 assert.match(normalRuntime, /sameCandidatePreparedOnlyComparison/);
-for (const site of ['waltham', 'pipers', 'chingford', 'pe1', 'queensgate']) assert.match(normalRuntime, new RegExp(`^\\s*${site}:`, 'm'));
-assert.match(workflow, /for control in waltham pipers chingford pe1 queensgate/);
+for (const site of ['waltham', 'pipers', 'pe1', 'queensgate']) assert.ok(new RegExp('^\\s*' + site + ':', 'm').test(normalRuntime));
+assert.doesNotMatch(normalRuntime, /^\s*chingford:/m, 'Chingford must not be represented by an empty-TfL national control');
+assert.match(normalRuntime, /createDeterministicEmptyTflFetch/);
+const deterministicTflHelper = await readFile(new URL('./helpers/s2e1-deterministic-empty-tfl.mjs', import.meta.url), 'utf8');
+assert.ok(deterministicTflHelper.includes('stopPoints: []'));
+assert.match(deterministicTflHelper, /Unexpected TfL endpoint in deterministic diagnostic/);
+assert.doesNotMatch(deterministicTflHelper, /fetch\(.*https?:/);
+assert.doesNotMatch(normalRuntime, /live TfL HTTP is disabled|noLiveTflFetch/);
+assert.match(normalRuntime, /tflLiveRequests: 0/);
+assert.match(workflow, /for control in waltham pipers pe1 queensgate/);
+assert.match(workflow, /fixture-backed Chingford TfL route 657 golden regression[\s\S]*node tests\/atlas\/tfl-bus-timetable\.test\.mjs/);
+const tflGoldenTest = await readFile(new URL('./tfl-bus-timetable.test.mjs', import.meta.url), 'utf8');
+for (const evidence of ['routeMetadata657', 'GROVE-P', 'GROVE-N', "monday, [476]", "monday, [982]"]) assert.ok(tflGoldenTest.includes(evidence), `Chingford route 657 golden evidence missing ${evidence}`);
 
 console.log('PASS S2E-1 frozen-candidate diagnostic workflow contract');

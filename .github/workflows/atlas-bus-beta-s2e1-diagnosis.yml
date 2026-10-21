@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.x'
+      - name: Verify deterministic empty TfL diagnostic boundary
+        run: node tests/atlas/s2e1-deterministic-empty-tfl.test.mjs
       - name: Verify immutable Run #75 artifact identity and provenance
         env:
           GH_TOKEN: ${{ github.token }}
@@ -65,9 +67,12 @@ jobs:
         if: always() && hashFiles('restored/candidate-site/atlas/data/bus/manifest.json') != ''
         run: |
           mkdir -p candidate-diagnostic
-          for control in waltham pipers chingford pe1 queensgate; do
+          for control in waltham pipers pe1 queensgate; do
             node tests/atlas/s2e1-normal-runtime-candidate-diagnostic.mjs restored/candidate-site "candidate-diagnostic/${control}.json" "$control"
           done
+      - name: Run fixture-backed Chingford TfL route 657 golden regression
+        if: always()
+        run: node tests/atlas/tfl-bus-timetable.test.mjs
       - name: Upload normal-runtime candidate control-matrix report
         if: always() && hashFiles('candidate-diagnostic/*.json') != ''
         uses: actions/upload-artifact@v4

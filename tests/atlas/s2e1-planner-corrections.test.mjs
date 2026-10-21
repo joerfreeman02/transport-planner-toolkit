@@ -42,5 +42,12 @@ const planner = buildPlannerBusServiceSummaries([
 ], [stop]);
 assert.equal(planner.length, 1, 'matching BODS/TNDS evidence for one direction forms one planner row');
 assert.equal(planner[0].operator, 'Centrebus', 'operator display comes from winning BODS evidence when feeds corroborate one row');
+const tflOperatorFallback = buildPlannerBusServiceSummaries([
+  { ...plannerBase, id: 'tfl-authority-r1', operator: 'Operator not supplied in the timetable', timetableSource: 'TfL', source: { provider: 'TfL' }, sourceRecordIds: ['tfl-r1'], sourceRouteIds: ['route-r1'] },
+  { ...plannerBase, id: 'bods-copy-r1', operator: 'Arriva London North', timetableSource: 'BODS', provider: 'BODS', source: { provider: 'BODS' }, sourceRecordIds: ['bods-r1'], sourceRouteIds: ['route-r1'] }
+], [stop]);
+assert.equal(tflOperatorFallback.length, 1);
+assert.equal(tflOperatorFallback[0].timetableSource, 'TfL', 'the direct TfL timetable remains the winning source');
+assert.equal(tflOperatorFallback[0].operator, 'Arriva London North', 'a structurally corroborated named BODS operator can fill the missing TfL operator label');
 
 console.log('PASS S2E planner corrections: stop-scoped departures and authority-scoped circular arbitration.');

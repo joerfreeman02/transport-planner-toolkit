@@ -21,11 +21,29 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: '22.x'
+          cache: pnpm
+      - name: Install deterministic test dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium for the browser contract suite
+        run: pnpm exec playwright install --with-deps chromium
       - name: Verify deterministic empty TfL diagnostic boundary
         run: node tests/atlas/s2e1-deterministic-empty-tfl.test.mjs
+      - name: Run full Bus-data Python suite
+        run: python -m unittest discover -s tools/atlas-bus-data -p 'test_*.py' -v
+      - name: Run full deterministic ATLAS suite
+        run: |
+          set -o pipefail
+          node tests/atlas/run-all.mjs | tee "$RUNNER_TEMP/atlas-s2e1-node-suite.log"
+          grep -Fx 'ATLAS Alpha.15 deterministic suite passed.' "$RUNNER_TEMP/atlas-s2e1-node-suite.log"
       - name: Verify immutable Run #75 artifact identity and provenance
         env:
           GH_TOKEN: ${{ github.token }}

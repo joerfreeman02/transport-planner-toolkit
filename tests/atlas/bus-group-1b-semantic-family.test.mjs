@@ -82,6 +82,24 @@ assert.equal(stemPreferredOverLargerVariant.length, 1, 'supported route variants
 assert.equal(stemPreferredOverLargerVariant[0].routeNumber, '60', 'the exact public stem remains the representative even when a suffix has more evidence');
 assert.equal(stemPreferredOverLargerVariant[0].publicRouteFamilyDecision.principalSelectionEvidence[0].exactFamilyStem, 1);
 
+const mixedDirectionLabels = buildPlannerBusServiceSummaries([
+  genericService({ id: '13-main', routeNumber: '13', origin: 'Waltham Cross Bus Station', destination: 'The Talbot', pattern: ['A', 'B', 'C', 'D'], directionFamily: 'outbound', recordActivity: 20 }),
+  genericService({ id: '13a-branch', routeNumber: '13A', origin: 'Waltham Cross Bus Station', destination: "St Margaret's Hospital", pattern: ['A', 'B', 'C', 'E'], directionFamily: 'gtfs:0' }),
+  genericService({ id: '13b-short', routeNumber: '13B', origin: 'Waltham Cross Bus Station', destination: 'Princesfield Road', pattern: ['A', 'B', 'F'], directionFamily: 'gtfs:0' }),
+  genericService({ id: '13c-branch', routeNumber: '13C', origin: 'Waltham Cross Bus Station', destination: 'Two Brewers', pattern: ['A', 'B', 'C', 'G'], directionFamily: 'gtfs:0' })
+], genericStops);
+assert.equal(mixedDirectionLabels.length, 1, 'a provider-local GTFS direction token can join the evidenced route-family direction');
+assert.equal(mixedDirectionLabels[0].routeNumber, '13', 'mixed direction labels preserve the exact numeric principal');
+assert.deepEqual(mixedDirectionLabels[0].routeNumbers, ['13', '13A', '13B', '13C']);
+assert.ok(mixedDirectionLabels[0].routeFamilyMembers.find(member => member.routeNumber === '13C'), '13C remains an explicitly attributed family branch');
+
+const opposedDirectionFamily = buildPlannerBusServiceSummaries([
+  genericService({ id: '14-outbound', routeNumber: '14', origin: 'Alpha', destination: 'Delta', pattern: ['A', 'B', 'C', 'D'], directionFamily: 'outbound' }),
+  genericService({ id: '14a-inbound', routeNumber: '14A', origin: 'Delta', destination: 'Alpha', pattern: ['D', 'C', 'B', 'A'], directionFamily: 'inbound' })
+], genericStops);
+assert.equal(opposedDirectionFamily.length, 2, 'opposed explicit directions remain separate despite a shared route stem');
+assert.ok(opposedDirectionFamily.every(row => (row.routeNumbers?.length ?? 1) === 1), 'opposed route directions never become one family presentation');
+
 const falseStem = buildPlannerBusServiceSummaries([
   genericService({ id: '42', routeNumber: '42', origin: 'North', destination: 'North End', pattern: ['A', 'B', 'N'] }),
   genericService({ id: '42a', routeNumber: '42A', origin: 'South', destination: 'South End', pattern: ['D', 'E', 'S'] })

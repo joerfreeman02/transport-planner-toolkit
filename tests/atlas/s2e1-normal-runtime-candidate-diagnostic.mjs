@@ -111,8 +111,84 @@ const plannerRows = assessment.plannerServiceSummaries.filter(row => wanted.has(
   operatingPeriodLines: row.operatingPeriodLines, sourceRecordIds: row.sourceRecordIds,
   groupingDecision: row.publicServiceGroupingDecision,
   routeFamilyDecision: row.publicRouteFamilyDecision,
-  plannerServiceGroup: row.plannerServiceGroup
+  circular: row.circular,
+  circularClassification: row.circularServiceDecision?.classification ?? null,
+  circularReason: row.circularServiceDecision?.reason ?? null,
+  routeFamilyMembers: row.routeFamilyMembers?.map(member => ({
+    routeNumber: member.routeNumber, origin: member.origin, destination: member.destination,
+    typicalFrequencyLines: member.frequencyLines, operatingPeriodLines: member.operatingPeriodLines
+  })) ?? []
 }));
+
+const plannerRowsFor = target => plannerRows.filter(row => route(row.routeNumber) === target || (row.routeNumbers ?? []).some(value => route(value) === target));
+if (controlId === 'waltham') {
+  const family = plannerRowsFor('13').find(row => route(row.routeNumber) === '13' && ['13', '13A', '13B', '13C'].every(member => (row.routeNumbers ?? []).includes(member)));
+  if (!family || family.routeFamilyDecision?.principalRouteNumber !== '13') {
+    throw new Error('Actual Run #75 Waltham runtime did not present routes 13/13A/13B/13C under principal route 13.');
+  }
+  const route13c = family.routeFamilyMembers?.find(member => member.routeNumber === '13C');
+  if (!route13c || !/Two Brewers/i.test(`${route13c.destination} ${route13c.origin}`)) {
+    throw new Error('Actual Run #75 route 13C branch destination was not retained as a distinct family member.');
+  }
+}
+if (controlId === 'pipers') {
+  const route230 = plannerRowsFor('230');
+  if (!route230.length || !route230.every(row => row.typicalFrequencyLines?.length)) {
+    throw new Error('Actual Run #75 Pipers route 230 planner evidence or frequency is missing.');
+  }
+}
+if (controlId === 'pe1' || controlId === 'queensgate') {
+  const routeX4 = plannerRowsFor('X4');
+  if (routeX4.length !== 2 || !routeX4.every(row => row.typicalFrequencyLines?.length)) {
+    throw new Error(`Actual Run #75 ${controlId} X4 should retain two directional frequency rows; received ${routeX4.length}.`);
+  }
+}
+
+const compactGroupingDecision = decision => decision ? ({
+  decision: decision.decision, reason: decision.reason, routeNumber: decision.routeNumber,
+  sourceRecordIds: decision.sourceRecordIds, branchVariantRecordIds: decision.branchVariantRecordIds,
+  shortWorkingRecordIds: decision.shortWorkingRecordIds, calendarVariantRecordIds: decision.calendarVariantRecordIds,
+  materialDestinationEvidence: decision.materialDestinationEvidence
+}) : null;
+const compactFamilyDecision = decision => decision ? ({
+  state: decision.state, principalRouteNumber: decision.principalRouteNumber,
+  memberRouteNumbers: decision.memberRouteNumbers, reasons: decision.reasons,
+  branchMemberRelationships: decision.branchMemberRelationships
+}) : null;
+const compactPlannerRows = rows => rows.map(row => ({
+  id: row.id, routeNumber: row.routeNumber, routeNumbers: row.routeNumbers, operator: row.operator,
+  direction: row.direction, origin: row.origin, destination: row.destination,
+  directionPatternText: row.directionPatternText, principalLocations: row.principalLocations,
+  typicalFrequencyLines: row.typicalFrequencyLines, operatingPeriodLines: row.operatingPeriodLines,
+  sourceRecordIds: row.sourceRecordIds, groupingDecision: compactGroupingDecision(row.groupingDecision),
+  routeFamilyDecision: compactFamilyDecision(row.routeFamilyDecision), routeFamilyMembers: row.routeFamilyMembers,
+  circular: row.circular, circularClassification: row.circularClassification, circularReason: row.circularReason
+}));
+const compactSummaryRows = rows => rows.map(row => ({
+  id: row.id, routeNumber: row.routeNumber, operator: row.operator, timetableSource: row.timetableSource,
+  origin: row.origin, destination: row.destination, direction: row.direction,
+  frequency: row.typicalFrequencyLines, operatingPeriod: row.operatingPeriodLines, sourceRecordIds: row.sourceRecordIds
+}));
+const compactRawRows = rows => rows.map(row => ({
+  id: row.id, routeNumber: row.routeNumber, operator: row.operator, timetableSource: row.timetableSource,
+  origin: row.origin, destination: row.destination, direction: row.direction,
+  stopScheduleIds: row.stopScheduleIds, scheduledStops: row.scheduledStops
+}));
+const compactStops = stopRows.map(stop => ({
+  id: stop.id, name: stop.name, distanceMetres: stop.distanceMetres,
+  routes: (stop.routes ?? []).filter(value => wanted.has(route(value))),
+  routeAuthorities: Object.fromEntries(Object.entries(stop.routeAuthorities ?? {}).filter(([key]) => wanted.has(route(key))))
+}));
+const rowConsolidationAudit = [...wanted].map(target => {
+  const rawCount = rawRows.filter(row => route(row.routeNumber) === target).length;
+  const summaryCount = serviceSummaries.filter(row => route(row.routeNumber) === target).length;
+  const finalRows = plannerRowsFor(target);
+  return {
+    route: target, rawRecordCount: rawCount, serviceSummaryCount: summaryCount,
+    plannerRowCount: finalRows.length,
+    retainedPlannerRows: finalRows.length > 2 ? compactPlannerRows(finalRows) : []
+  };
+});
 
 const report = {
   schema: 'atlas-bus-s2e1-normal-runtime-diagnostic-v1',
@@ -126,13 +202,14 @@ const report = {
   deterministicBoundary: 'Exact frozen Run #75 candidate files; all TfL adapter requests receive deterministic successful empty fixture responses; routing is a deterministic no-op stub.',
   sourceAcquisition: false, candidateModified: false,
   scope: scope.scope,
-  stages: { stopsDiscovered: stopRows.length, stops: stopRows, tflFixtureRequests: tflRequests, tflLiveRequests: 0,
+  stages: { stopsDiscovered: stopRows.length, stops: compactStops, tflFixtureRequests: tflRequests, tflLiveRequests: 0,
     nationalFilesRead: [...new Map(nationalRequests.map(item => [`${item.source}|${item.relative}`, item])).values()],
-    rawRecordsByTargetRoute: Object.fromEntries([...wanted].map(r => [r, rawRows.filter(row => route(row.routeNumber) === r)])),
-    serviceSummariesByTargetRoute: Object.fromEntries([...wanted].map(r => [r, serviceSummaries.filter(row => route(row.routeNumber) === r)])),
-    plannerRowsByTargetRoute: Object.fromEntries([...wanted].map(r => [r, plannerRows.filter(row => route(row.routeNumber) === r)])),
-    sourceProvenance: assessment.provenance?.timetables ?? {},
-    warnings: assessment.warnings ?? [] },
+    rawRecordsByTargetRoute: Object.fromEntries([...wanted].map(r => [r, compactRawRows(rawRows.filter(row => route(row.routeNumber) === r))])),
+    serviceSummariesByTargetRoute: Object.fromEntries([...wanted].map(r => [r, compactSummaryRows(serviceSummaries.filter(row => route(row.routeNumber) === r))])),
+    plannerRowsByTargetRoute: Object.fromEntries([...wanted].map(r => [r, compactPlannerRows(plannerRowsFor(r))])),
+    rowConsolidationAudit,
+    sourceProvenance: { sourceAuthorities: unique(serviceSummaries.map(row => row.timetableSource).filter(Boolean)), tflLiveRequests: 0 },
+    warnings: (assessment.warnings ?? []).slice(0, 40) },
   sameCandidatePreparedOnlyComparison: {
     rawTargetCounts: Object.fromEntries([...wanted].map(r => [r, preparedOnly.services.filter(row => route(row.routeNumber) === r).length])),
     summaryTargetCounts: Object.fromEntries([...wanted].map(r => [r, preparedOnly.serviceSummaries.filter(row => route(row.routeNumber) === r).length])),
@@ -148,13 +225,10 @@ if (reportPath) {
 process.stdout.write(`${JSON.stringify({ schema: report.schema, reportPath, status: assessment.status, stopCount: stopRows.length,
   controlId, scope: scope.scope, tflFixtureRequests: tflRequests.length, tflLiveRequests: 0, rawTargetRecords: rawRows.length,
   summaries: Object.fromEntries([...wanted].map(r => [r, serviceSummaries.filter(row => route(row.routeNumber) === r).length]).filter(([, count]) => count)),
-  planner: Object.fromEntries([...wanted].map(r => [r, plannerRows.filter(row => route(row.routeNumber) === r).length]).filter(([, count]) => count)),
+  planner: Object.fromEntries([...wanted].map(r => [r, plannerRowsFor(r).length]).filter(([, count]) => count)),
+  rowConsolidationAudit: rowConsolidationAudit.filter(row => row.plannerRowCount > 2),
   preparedOnly: report.sameCandidatePreparedOnlyComparison,
-  stopRouteAuthority: stopRows.filter(stop => stop.routes?.some(value => wanted.has(route(value)))).map(stop => ({ id: stop.id, routes: stop.routes.filter(value => wanted.has(route(value))), routeAuthorities: Object.fromEntries(Object.entries(stop.routeAuthorities ?? {}).filter(([key]) => wanted.has(route(key)))) })),
   rawSourcesByRoute: Object.fromEntries([...wanted].map(r => [r, Object.fromEntries([...new Set(rawRows.filter(row => route(row.routeNumber) === r).map(row => row.timetableSource))].map(source => [source, rawRows.filter(row => route(row.routeNumber) === r && row.timetableSource === source).length]))])),
-  summaryRows: serviceSummaries.map(({ routeNumber, timetableSource, origin, destination, direction }) => ({ routeNumber, timetableSource, origin, destination, direction })),
-  plannerRows: plannerRows.map(row => ({ routeNumber: row.routeNumber, routeNumbers: row.routeNumbers,
-    selectedPrincipal: row.publicRouteFamilyDecision?.principalRouteNumber,
-    familyMembers: row.publicRouteFamilyDecision?.memberRouteNumbers,
-    familyState: row.publicRouteFamilyDecision?.state,
-    principalSelectionEvidence: row.publicRouteFamilyDecision?.principalSelectionEvidence })) })}\n`);
+  targetPlannerRows: [...wanted].flatMap(r => plannerRowsFor(r).map(row => ({ route: row.routeNumber, members: row.routeNumbers,
+    family: row.routeFamilyDecision?.state, principal: row.routeFamilyDecision?.principalRouteNumber,
+    frequency: row.typicalFrequencyLines, circular: row.circularClassification }))) })}\n`);

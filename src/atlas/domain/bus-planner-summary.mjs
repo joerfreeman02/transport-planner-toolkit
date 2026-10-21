@@ -192,6 +192,14 @@ function explicitDirectionMarker(service) {
   return '';
 }
 
+function canonicalFamilyDirectionMarker(service) {
+  const family = text(service?.directionFamily).toLowerCase();
+  if (/^(?:inbound|outbound|northbound|southbound|eastbound|westbound|clockwise|anticlockwise|north|south|east|west)$/.test(family)) return family;
+  const direction = normal(service?.direction || service?.stopDirection);
+  if (/^(?:inbound|outbound|northbound|southbound|eastbound|westbound|clockwise|anticlockwise|north|south|east|west)$/.test(direction)) return direction;
+  return '';
+}
+
 function sourceDirectionMarker(value) {
   return /^(?:inbound|outbound|northbound|southbound|eastbound|westbound|clockwise|anticlockwise|north|south|east|west)$/i.test(text(value));
 }
@@ -1770,8 +1778,8 @@ function familyRowsServices(row) {
 }
 
 function familyDirectionMarker(row) {
-  const markers = unique(familyRowsServices(row).map(explicitDirectionMarker).filter(Boolean));
-  return markers.length === 1 ? markers[0] : text(row?.directionFamily) || text(row?.direction) || 'direction-not-supplied';
+  const markers = unique(familyRowsServices(row).map(canonicalFamilyDirectionMarker).filter(Boolean));
+  return markers.length === 1 ? markers[0] : 'direction-not-supplied';
 }
 
 function familyStem(row) {
@@ -1858,8 +1866,21 @@ function publicRouteFamilyPairEvidence(left, right) {
   const patternOverlap = rowPatternOverlap(left, right);
   const lineageOverlap = rowLineageOverlap(left, right);
   const endpointOverlap = rowEndpointValues(left).filter(value => rowEndpointValues(right).includes(value));
-  const sameDirection = familyDirectionMarker(left) === familyDirectionMarker(right)
-    && familyDirectionMarker(left) !== 'direction-not-supplied';
+  const leftDirection = familyDirectionMarker(left);
+  const rightDirection = familyDirectionMarker(right);
+  const explicitDirectionMatch = leftDirection !== 'direction-not-supplied'
+    && rightDirection !== 'direction-not-supplied'
+    && leftDirection === rightDirection;
+  const alignedEndpointOrientation = familyRowsServices(left).some(first => familyRowsServices(right).some(second => {
+    const firstEndpoints = endpointPair(first);
+    const secondEndpoints = endpointPair(second);
+    const sharesOrigin = Boolean(firstEndpoints.origin && firstEndpoints.origin === secondEndpoints.origin);
+    const sharesDestination = Boolean(firstEndpoints.destination && firstEndpoints.destination === secondEndpoints.destination);
+    return (sharesOrigin || sharesDestination) && !reverseEndpointRelationship(first, second);
+  }));
+  const sameDirection = leftDirection !== 'direction-not-supplied' && rightDirection !== 'direction-not-supplied'
+    ? explicitDirectionMatch
+    : alignedEndpointOrientation;
   const reverseDirection = familyRowsServices(left).some(first => familyRowsServices(right).some(second => reverseEndpointRelationship(first, second)));
   const hardSeparation = familyRowsServices(left).some(first => familyRowsServices(right).some(second => hardCorridorSeparation(first, second)));
   const operatorCompatible = rowOperatorCompatible(left, right);
@@ -1915,12 +1936,30 @@ export function buildPublicRouteFamilyDecisions(rows = []) {
   for (const row of rows ?? []) {
     const stem = familyStem(row);
     if (!stem || /^n/i.test(text(row?.routeNumber))) continue;
-    const key = `${stem}|${familyDirectionMarker(row)}`;
+    const key = stem;
     const members = buckets.get(key) ?? [];
     members.push(row);
     buckets.set(key, members);
   }
-  return [...buckets.entries()].map(([key, members]) => {
+  const decisions = [];
+  for (const [stem, candidates] of buckets) {
+    // Source direction labels such as `gtfs:0` are provider-local identifiers,
+    // not a shared direction vocabulary. Cluster only rows with pairwise
+    // semantic evidence; complete-link membership prevents a short working or
+    // common trunk from bridging opposed directions or unrelated branches.
+    const clusters = [];
+    const orderedCandidates = [...candidates].sort((left, right) =>
+      text(left?.routeNumber).localeCompare(text(right?.routeNumber), undefined, { numeric: true })
+      || text(left?.id).localeCompare(text(right?.id)));
+    for (const candidate of orderedCandidates) {
+      const eligible = clusters.filter(cluster => !cluster.some(row => text(row?.routeNumber) === text(candidate?.routeNumber))
+        && cluster.every(row => publicRouteFamilyPairEvidence(row, candidate).proven));
+      if (eligible.length === 1) eligible[0].push(candidate);
+      else clusters.push([candidate]);
+    }
+    for (const [clusterIndex, members] of clusters.entries()) {
+    const marker = unique(members.map(familyDirectionMarker).filter(value => value !== 'direction-not-supplied'));
+    const key = `${stem}|${marker.length === 1 ? marker[0] : `evidence:${clusterIndex + 1}`}`;
     const memberRouteNumbers = unique(members.map(row => row.routeNumber)).sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
     const pairEvidence = [];
     const memberRelationships = [];
@@ -1959,7 +1998,7 @@ export function buildPublicRouteFamilyDecisions(rows = []) {
         : !principalSelection.clear
           ? ['The family relationship is evidenced, but no principal member was deterministically supported; no presentation consolidation was made.']
         : ['The route-number stem did not meet the minimum semantic-family evidence required for one presentation family.'];
-    return Object.freeze({
+    decisions.push(Object.freeze({
       type: 'PublicRouteFamilyDecision',
       state,
       candidateStem: key.split('|')[0],
@@ -1978,8 +2017,10 @@ export function buildPublicRouteFamilyDecisions(rows = []) {
       calendars: Object.freeze(unique(members.flatMap(row => row.calendarProfileIds ?? []))),
       reasons: Object.freeze(reasons),
       unresolved: state === 'unresolved-review'
-    });
-  });
+    }));
+    }
+  }
+  return decisions;
 }
 
 function familyMemberForPresentation(row) {

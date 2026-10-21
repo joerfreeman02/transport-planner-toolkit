@@ -907,6 +907,10 @@ function semanticDepartureKey(entry) {
   return [entry.routeNumber, entry.direction, entry.origin, entry.destination, entry.stopPointId, entry.day, entry.minute, entry.calendarProfileId].map(normal).join('|');
 }
 
+function semanticRouteKey(entry) {
+  return [entry.routeNumber, entry.direction, entry.origin, entry.destination, entry.stopPointId].map(normal).join('|');
+}
+
 function deduplicateDepartureEntries(entries) {
   const bySemantic = new Map();
   const byStrongIdentity = new Map();
@@ -960,11 +964,13 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
   const authorityByProfile = new Map();
   for (const entry of entries) {
     const profile = calendarProfileIdsForEntry(entry)[0] || 'ordinary';
-    authorityByProfile.set(profile, Math.max(authorityByProfile.get(profile) ?? 0, plannerEvidenceSourceRank({}, entry)));
+    const scope = [profile, semanticRouteKey(entry)].join('|');
+    authorityByProfile.set(scope, Math.max(authorityByProfile.get(scope) ?? 0, plannerEvidenceSourceRank({}, entry)));
   }
   const authoritativeEntries = entries.filter(entry => {
     const profile = calendarProfileIdsForEntry(entry)[0] || 'ordinary';
-    const highestAuthority = authorityByProfile.get(profile) ?? 0;
+    const scope = [profile, semanticRouteKey(entry)].join('|');
+    const highestAuthority = authorityByProfile.get(scope) ?? 0;
     return highestAuthority === 0 || plannerEvidenceSourceRank({}, entry) === highestAuthority;
   });
   const schedules = emptySchedule();
@@ -1047,8 +1053,17 @@ function profileEligibleServices(component, representativeId, profileId) {
 
 function profileFrequencyAuthorityServices(component, representativeId, profileId) {
   const candidates = profileEligibleServices(component, representativeId, profileId);
-  const highestAuthority = Math.max(0, ...candidates.map(service => plannerEvidenceSourceRank(service)));
-  return highestAuthority ? candidates.filter(service => plannerEvidenceSourceRank(service) === highestAuthority) : candidates;
+  const authorityByServicePattern = new Map();
+  const servicePatternKey = service => [profileId, service?.routeNumber, service?.direction, service?.origin, service?.destination]
+    .map(normal).join('|');
+  for (const service of candidates) {
+    const key = servicePatternKey(service);
+    authorityByServicePattern.set(key, Math.max(authorityByServicePattern.get(key) ?? 0, plannerEvidenceSourceRank(service)));
+  }
+  return candidates.filter(service => {
+    const highestAuthority = authorityByServicePattern.get(servicePatternKey(service)) ?? 0;
+    return highestAuthority === 0 || plannerEvidenceSourceRank(service) === highestAuthority;
+  });
 }
 
 function calculateProfileResult(component, representativeId, profileId, partition) {

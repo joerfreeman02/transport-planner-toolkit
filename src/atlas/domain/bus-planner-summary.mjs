@@ -776,6 +776,11 @@ function schoolRestrictedLocalVariants(component = []) {
   });
 }
 
+function servicesShareAssessedStop(first, second) {
+  const firstStops = new Set(candidateStopIds([first]).filter(Boolean).map(text));
+  return candidateStopIds([second]).some(id => firstStops.has(text(id)));
+}
+
 function principalPatternServices(component = []) {
   if (principalPatternServicesCache.has(component)) return principalPatternServicesCache.get(component);
   const shortWorkingIds = new Set();
@@ -804,7 +809,10 @@ function principalPatternServices(component = []) {
   // representative stop for the public timetable.
   for (const service of schoolRestrictedLocalVariants(component)) {
     const id = serviceIdForPlanner(service);
-    if (structurallyShortWorkingIds.has(id)) shortWorkingIds.add(id);
+    if (structurallyShortWorkingIds.has(id) || component.some(candidate => candidate !== service
+      && !schoolEndpoint(candidate)
+      && (serviceRunsOnDay(candidate, 'saturday') || serviceRunsOnDay(candidate, 'sunday'))
+      && servicesShareAssessedStop(service, candidate))) shortWorkingIds.add(id);
   }
   const principal = component.filter(service => !shortWorkingIds.has(serviceIdForPlanner(service)));
   const result = principal.length ? principal : component;

@@ -604,12 +604,25 @@ jobs:
           CANDIDATE_DIGEST: ${{ inputs.candidate_artifact_digest }}
           S2E1_MODE: ${{ inputs.review_candidate_mode }}
         run: |
-          if [[ "$EVENT_NAME" != 'workflow_dispatch' || "$S2E1_MODE" != 'restore_candidate' || "$PREPARED_SCHEMA" != 'v1' || "$MEASURE_ONLY" != 'false' || "$FORCE_REFRESH" != 'false' || "$CANDIDATE_RUN" != '39430415441' || "$CANDIDATE_ID" != '12275615359' || "$CANDIDATE_DIGEST" != 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471' || -n "$RESUME_RUN_ID$EXPECTED_SNAPSHOT_ID$SOURCE_RUN_ID$EXPECTED_SOURCE_COUNT$EXPECTED_TOTAL_BYTES$PRIMARY_RUN$PRIMARY_ID$PRIMARY_DIGEST$TNDS_RUN$TNDS_ID$TNDS_DIGEST" ]]; then
-            echo '::error::S2E-1 accepts only the exact Run #75 frozen-candidate restore selector with all acquisition/source selectors blank/default.'
-            exit 1
+          if [[ "$EVENT_NAME" != 'workflow_dispatch' ]]; then
+            echo '::error::S2E-1 accepts workflow_dispatch only.'; exit 1
           fi
-          echo 'trust_mode=s2e1_diagnostic' >> "$GITHUB_OUTPUT"
-          echo 's2e1_mode=normal_runtime_diagnosis' >> "$GITHUB_OUTPUT"
+          if [[ "$S2E1_MODE" == 'disabled' ]]; then
+            if [[ "$PREPARED_SCHEMA" != 'v2' || "$MEASURE_ONLY" != 'true' || "$FORCE_REFRESH" != 'true' || -n "$RESUME_RUN_ID" || "$EXPECTED_SNAPSHOT_ID" != 'TNDS-TRUST-PREFLIGHT-C1B' || -n "$SOURCE_RUN_ID$EXPECTED_SOURCE_COUNT$EXPECTED_TOTAL_BYTES$PRIMARY_RUN$PRIMARY_ID$PRIMARY_DIGEST$TNDS_RUN$TNDS_ID$TNDS_DIGEST$CANDIDATE_RUN$CANDIDATE_ID$CANDIDATE_DIGEST" ]]; then
+              echo '::error::S2E-1 offline preflight accepts only the exact zero-download C1B selector.'; exit 1
+            fi
+            echo 'trust_mode=offline_preflight' >> "$GITHUB_OUTPUT"
+            echo 's2e1_mode=offline_preflight' >> "$GITHUB_OUTPUT"
+          elif [[ "$S2E1_MODE" == 'restore_candidate' ]]; then
+            if [[ "$PREPARED_SCHEMA" != 'v1' || "$MEASURE_ONLY" != 'false' || "$FORCE_REFRESH" != 'false' || "$CANDIDATE_RUN" != '39430415441' || "$CANDIDATE_ID" != '12275615359' || "$CANDIDATE_DIGEST" != 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471' || -n "$RESUME_RUN_ID$EXPECTED_SNAPSHOT_ID$SOURCE_RUN_ID$EXPECTED_SOURCE_COUNT$EXPECTED_TOTAL_BYTES$PRIMARY_RUN$PRIMARY_ID$PRIMARY_DIGEST$TNDS_RUN$TNDS_ID$TNDS_DIGEST" ]]; then
+              echo '::error::S2E-1 candidate diagnosis requires the exact Run #75 frozen-candidate restore selector with all acquisition/source selectors blank/default.'
+              exit 1
+            fi
+            echo 'trust_mode=s2e1_diagnostic' >> "$GITHUB_OUTPUT"
+            echo 's2e1_mode=normal_runtime_diagnosis' >> "$GITHUB_OUTPUT"
+          else
+            echo '::error::S2E-1 accepts only offline_preflight or the exact Run #75 candidate diagnosis.'; exit 1
+          fi
       - name: Resolve S2C-3 exact offline preflight or pinned Run #53 compose selector
         id: s2c-3-selector
         if: github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-3-oversized-service-closeout'
@@ -1031,7 +1044,7 @@ jobs:
   tnds-trust-browser-offline-preflight:
     name: Run default-branch-compatible TNDS TRUST offline preflight
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-refresh-checkpoint-readiness' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c4-restore-auth-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-1-national-runtime-scale' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-2-candidate-replay-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-3-oversized-service-closeout') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'offline_preflight'
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-refresh-checkpoint-readiness' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c4-restore-auth-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-1-national-runtime-scale' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-2-candidate-replay-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-3-oversized-service-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'offline_preflight'
     uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml
     with:
       mode: offline_preflight

@@ -13,7 +13,9 @@ assert.match(workflow, /Ensure the default-branch ref is available[\s\S]*git fet
 assert.match(dispatchWorkflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-intelligence-restoration/);
 assert.match(dispatchWorkflow, /s2e1-frozen-candidate-diagnosis:[\s\S]*s2e1_mode == 'normal_runtime_diagnosis'[\s\S]*mode: normal_runtime_diagnosis/);
 assert.match(dispatchWorkflow, /CANDIDATE_RUN" != '39430415441'[\s\S]*CANDIDATE_ID" != '12275615359'[\s\S]*CANDIDATE_DIGEST" != 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471/);
-assert.match(dispatchWorkflow, /S2E-1 accepts only the exact Run #75 frozen-candidate restore selector with all acquisition\/source selectors blank\/default/);
+assert.match(dispatchWorkflow, /S2E-1 candidate diagnosis requires the exact Run #75 frozen-candidate restore selector with all acquisition\/source selectors blank\/default/);
+assert.match(dispatchWorkflow, /S2E-1 offline preflight accepts only the exact zero-download C1B selector/);
+assert.match(dispatchWorkflow, /tnds-trust-browser-offline-preflight:[\s\S]*atlas-bus-beta-s2e-1-intelligence-restoration[\s\S]*outputs\.trust_mode == 'offline_preflight'/);
 assert.match(workflow, /actions:\s*read[\s\S]*contents:\s*read/);
 assert.match(workflow, /12275615359/);
 assert.match(workflow, /39430415441/);
@@ -60,6 +62,7 @@ assert.doesNotMatch(deterministicTflHelper, /fetch\(.*https?:/);
 assert.doesNotMatch(normalRuntime, /live TfL HTTP is disabled|noLiveTflFetch/);
 assert.match(normalRuntime, /tflLiveRequests: 0/);
 assert.match(workflow, /for control in waltham pipers pe1 queensgate/);
+assert.match(workflow, /five-control actual-candidate browser and Word audit[\s\S]*s2c3-real-candidate-runtime-audit\.mjs restored\/candidate-site candidate-diagnostic\/real-candidate-browser-word-audit\.json/);
 assert.match(normalRuntime, /Actual Run #75 Waltham runtime did not present routes 13\/13A\/13B\/13C under principal route 13/);
 assert.match(normalRuntime, /Actual Run #75 Pipers route 230 planner evidence or frequency is missing/);
 assert.match(normalRuntime, /Actual Run #75 \$\{controlId\} X4 should retain two directional frequency rows/);

@@ -91,6 +91,9 @@ jobs:
           for control in waltham pipers pe1 queensgate; do
             node tests/atlas/s2e1-normal-runtime-candidate-diagnostic.mjs restored/candidate-site "candidate-diagnostic/${control}.json" "$control"
           done
+      - name: Run five-control actual-candidate browser and Word audit
+        if: always() && hashFiles('restored/candidate-site/atlas/data/bus/manifest.json') != ''
+        run: node tests/atlas/s2c3-real-candidate-runtime-audit.mjs restored/candidate-site candidate-diagnostic/real-candidate-browser-word-audit.json
       - name: Run fixture-backed Chingford TfL route 657 golden regression
         if: always()
         run: node tests/atlas/tfl-bus-timetable.test.mjs

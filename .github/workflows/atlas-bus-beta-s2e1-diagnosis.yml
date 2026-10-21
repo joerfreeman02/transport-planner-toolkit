@@ -1,0 +1,71 @@
+name: ATLAS Bus Beta S2E-1 frozen-candidate diagnosis
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  frozen-candidate-diagnosis:
+    if: github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Verify immutable Run #75 artifact identity and provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: |
+          gh api "repos/$GH_REPOSITORY/actions/artifacts/12275615359" > "$RUNNER_TEMP/run75-artifact.json"
+          python - "$RUNNER_TEMP/run75-artifact.json" <<'PY'
+          import json, sys
+          from pathlib import Path
+          artifact = json.loads(Path(sys.argv[1]).read_text())
+          expected = {
+              'id': 12275615359,
+              'name': 'atlas-bus-beta-review-candidate-39430415441',
+              'digest': 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471',
+              'expired': False,
+              'workflow_run': {'id': 39430415441, 'head_sha': '151199cc914c235870f444d26b03c2309edbd035'},
+          }
+          for key, value in expected.items():
+              actual = artifact.get(key)
+              if isinstance(value, dict):
+                  for nested, nested_value in value.items():
+                      if (actual or {}).get(nested) != nested_value:
+                          raise SystemExit(f'Run #75 artifact {key}.{nested} mismatch')
+              elif actual != value:
+                  raise SystemExit(f'Run #75 artifact {key} mismatch')
+          print('Exact immutable Run #75 candidate artifact, digest and producer verified.')
+          PY
+      - name: Restore only the immutable Run #75 candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: atlas-bus-beta-review-candidate-39430415441
+          run-id: 39430415441
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: restored
+      - name: Verify retained checkpoint provenance
+        run: node tools/atlas-data-publication/review-candidate-checkpoint.mjs verify --candidate-root restored/candidate-site --checkpoint-root restored/review-checkpoint --expected-run-id 39430415441 --expected-commit-sha 151199cc914c235870f444d26b03c2309edbd035
+      - name: Run actual-candidate planner diagnostic
+        if: always() && hashFiles('restored/candidate-site/atlas/data/bus/manifest.json') != ''
+        run: |
+          mkdir -p candidate-diagnostic
+          node tests/atlas/s2e1-real-candidate-diagnostic.mjs restored/candidate-site candidate-diagnostic/diagnostic.json
+      - name: Upload real-candidate forensic report
+        if: always() && hashFiles('candidate-diagnostic/diagnostic.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-bus-beta-s2e1-baseline-diagnostic-${{ github.run_id }}
+          path: candidate-diagnostic/diagnostic.json
+          if-no-files-found: error
+          retention-days: 90

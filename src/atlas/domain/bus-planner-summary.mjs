@@ -736,15 +736,46 @@ function strictPatternSubsequence(shorter, longer) {
 
 const principalPatternServicesCache = new WeakMap();
 
+function schoolEndpoint(service) {
+  return /\bschool\b/i.test([
+    service?.origin, service?.destination, service?.stopDirection, service?.direction,
+    service?.serviceNote, service?.routeGroupNote
+  ].map(text).join(' '));
+}
+
+function scheduledDayCount(service, day) {
+  return Math.max(
+    (service?.departuresByDay?.[day] ?? []).length,
+    (service?.departureEvidenceByDay?.[day] ?? []).length
+  );
+}
+
+function schoolRestrictedLocalVariants(component = []) {
+  const peersRunAtWeekends = component.some(service => !schoolEndpoint(service)
+    && (scheduledDayCount(service, 'saturday') > 0 || scheduledDayCount(service, 'sunday') > 0));
+  if (!peersRunAtWeekends) return [];
+  return component.filter(service => {
+    if (!schoolEndpoint(service)) return false;
+    const explicitlyRestricted = ['school-day', 'term-time'].includes(calendarProfileFromService(service))
+      || /school[- ]days? only|school-day service|term[- ]time only/i.test(text(service?.serviceNote));
+    if (explicitlyRestricted) return true;
+    const weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+      .reduce((total, day) => total + scheduledDayCount(service, day), 0);
+    return weekdays > 0 && scheduledDayCount(service, 'saturday') === 0 && scheduledDayCount(service, 'sunday') === 0;
+  });
+}
+
 function principalPatternServices(component = []) {
   if (principalPatternServicesCache.has(component)) return principalPatternServicesCache.get(component);
   const shortWorkingIds = new Set();
+  const structurallyShortWorkingIds = new Set();
   // Reuse the same professional short-working decision used for the row’s
   // retained variant evidence.  It also recognises endpoint-contained
   // patterns when provider-local stop IDs cannot be compared directly.
   for (const principal of component) {
     const decision = makePublicServiceGroupingDecision({ services: component, principal });
     for (const id of decision.shortWorkingRecordIds ?? []) {
+      structurallyShortWorkingIds.add(id);
       const service = component.find(candidate => serviceIdForPlanner(candidate) === id);
       if (service && ['school-day', 'term-time'].includes(calendarProfileFromService(service))) shortWorkingIds.add(id);
     }
@@ -754,6 +785,15 @@ function principalPatternServices(component = []) {
       && component.some(candidate => candidate !== service
       && !reverseEndpointRelationship(service, candidate)
       && strictPatternSubsequence(service, candidate))) shortWorkingIds.add(serviceIdForPlanner(service));
+  }
+  // Some frozen BODS/GTFS and TNDS extracts carry the actual operating-day
+  // population but omit calendar taxonomy.  When a school-named local branch
+  // runs only on weekdays and the same public direction has weekend service,
+  // keep that branch as variant evidence without letting it choose the
+  // representative stop for the public timetable.
+  for (const service of schoolRestrictedLocalVariants(component)) {
+    const id = serviceIdForPlanner(service);
+    if (structurallyShortWorkingIds.has(id)) shortWorkingIds.add(id);
   }
   const principal = component.filter(service => !shortWorkingIds.has(serviceIdForPlanner(service)));
   const result = principal.length ? principal : component;
@@ -1257,8 +1297,9 @@ function compareMain(first, second, representativeId, component = [first, second
   const firstSupport = principalSupport(first, component, representativeId);
   const secondSupport = principalSupport(second, component, representativeId);
   const profiles = new Set(component.map(calendarProfileFromService));
-  const restrictedVariant = [...profiles].some(profile => ['school-day', 'term-time'].includes(profile))
-    && [...profiles].some(profile => ['ordinary', 'non-school-day', 'holiday', ''].includes(profile));
+  const restrictedVariant = ([...profiles].some(profile => ['school-day', 'term-time'].includes(profile))
+    && [...profiles].some(profile => ['ordinary', 'non-school-day', 'holiday', ''].includes(profile)))
+    || schoolRestrictedLocalVariants(component).length > 0;
   const destinationEvidenceComparison = restrictedVariant
     ? [
       secondSupport.destinationJourneys - firstSupport.destinationJourneys,

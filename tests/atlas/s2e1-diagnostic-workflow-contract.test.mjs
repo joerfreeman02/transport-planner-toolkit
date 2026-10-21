@@ -67,6 +67,8 @@ assert.match(normalRuntime, /Actual Run #75 Waltham runtime did not present rout
 assert.match(normalRuntime, /Actual Run #75 Pipers route 230 planner evidence or frequency is missing/);
 assert.match(normalRuntime, /Actual Run #75 \$\{controlId\} X4 should retain two directional frequency rows/);
 assert.match(normalRuntime, /rowConsolidationAudit/);
+assert.match(normalRuntime, /circularEvidenceAudit/);
+assert.match(normalRuntime, /sourceCircular: row\.source\?\.circular/);
 assert.match(workflow, /Run full Bus-data Python suite[\s\S]*python -m unittest discover -s tools\/atlas-bus-data -p 'test_\*\.py' -v/);
 assert.match(workflow, /Run full deterministic ATLAS suite[\s\S]*node tests\/atlas\/run-all\.mjs/);
 assert.match(workflow, /Install Chromium for the browser contract suite[\s\S]*playwright install --with-deps chromium/);

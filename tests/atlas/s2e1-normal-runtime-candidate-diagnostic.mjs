@@ -122,6 +122,26 @@ const plannerRows = assessment.plannerServiceSummaries.filter(row => wanted.has(
 }));
 
 const plannerRowsFor = target => plannerRows.filter(row => route(row.routeNumber) === target || (row.routeNumbers ?? []).some(value => route(value) === target));
+const circularEvidenceAudit = controlId === 'pipers' ? {
+  route: '230',
+  sourceRecords: assessment.services.filter(row => route(row.routeNumber) === '230').map(row => ({
+    id: row.id, operator: row.operator, provider: row.provider, timetableSource: row.timetableSource,
+    sourceProvider: row.source?.provider ?? null, primaryAuthority: row.source?.primaryAuthority ?? row.primaryAuthority ?? null,
+    sourceCircular: row.source?.circular ?? null, circular: row.circular ?? null,
+    circularPatternStopIds: row.circularPatternStopIds ?? [], routePatternStopIds: row.routePatternStopIds ?? [],
+    direction: row.direction, origin: row.origin, destination: row.destination
+  })),
+  plannerRows: plannerRowsFor('230').map(row => ({
+    circular: row.circular, classification: row.circularServiceDecision?.classification ?? null,
+    reason: row.circularServiceDecision?.reason ?? null,
+    principalSourceRecordId: row.circularServiceDecision?.principalSourceRecordId ?? null,
+    variants: (row.circularServiceDecision?.variantClassifications ?? []).map(item => ({
+      sourceRecordIds: item.sourceRecordIds, classification: item.classification,
+      variantClassification: item.variantClassification, loopClosureEvidence: item.loopClosureEvidence,
+      completeOrderedPattern: item.completeOrderedPattern, orderedStopPoints: item.orderedStopPoints
+    }))
+  }))
+} : null;
 if (controlId === 'waltham') {
   const family = plannerRowsFor('13').find(row => route(row.routeNumber) === '13' && ['13', '13A', '13B', '13C'].every(member => (row.routeNumbers ?? []).includes(member)));
   if (!family || family.routeFamilyDecision?.principalRouteNumber !== '13') {
@@ -217,6 +237,7 @@ const report = {
     plannerTargetRows: preparedOnly.plannerServiceSummaries.filter(row => wanted.has(route(row.routeNumber)) || (row.routeNumbers ?? []).some(value => wanted.has(route(value)))).map(row => ({ id: row.id, routeNumber: row.routeNumber, routeNumbers: row.routeNumbers }))
   },
   comparisonLimit: 'The national-candidate matrix uses successful empty TfL fixture responses, so it exercises the prepared-national fallback without claiming historical TfL evidence. Chingford TfL behavior is covered separately by the fixture-backed route 657 regression test.',
+  circularEvidenceAudit,
   publicationAttempted: false, deploymentAttempted: false
 };
 if (reportPath) {

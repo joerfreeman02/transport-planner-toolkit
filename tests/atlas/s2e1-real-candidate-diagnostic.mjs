@@ -370,7 +370,7 @@ for (const control of controls) {
       sourceCompleteness: servicesResult?.provenance?.sourceCompleteness ?? null,
       failedShards: servicesResult?.provenance?.failedShardDiagnostics ?? [],
       requestedShards: [...new Map(requests.filter(item => item.control === control.id).map(item => [`${item.source}|${item.relative}`, item])).values()],
-      rawServiceRecords: (servicesResult?.data ?? []).filter(row => control.focusRoutes.map(routeKey).includes(routeKey(row.routeNumber))).map(compactEvidenceRecord),
+      rawServiceRecords: (servicesResult?.data ?? []).filter(row => control.focusRoutes.map(routeKey).includes(routeKey(row.routeNumber))).map(row => compactEvidenceRecord(row)),
       serviceSummaries: [],
       plannerRows: [],
       rowCounts: { rawEvidenceRecordsByRoute: {}, serviceSummariesByRoute: {}, plannerRowsByRoute: {}, routesOverTwoPlannerRows: [] },

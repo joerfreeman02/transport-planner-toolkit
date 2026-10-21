@@ -24,6 +24,7 @@ const errors = [];
 const failedRequests = [];
 const failedResponses = [];
 const externalRequests = [];
+const statusManifestFallbacks = [];
 let server;
 let browser;
 
@@ -63,6 +64,16 @@ try {
   server = createServer(async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url, 'http://127.0.0.1').pathname);
+      if (pathname === '/atlas/data/status/manifest.json') {
+        // The immutable review candidate and code checkout do not carry the
+        // separately published freshness-status manifest. Return an empty
+        // local response so the normal app handles status as unavailable
+        // without turning this unrelated missing file into a 404/browser error.
+        statusManifestFallbacks.push(pathname);
+        response.writeHead(204);
+        response.end();
+        return;
+      }
       const marker = pathname.startsWith('/atlas/data/bus-tnds/') ? '/atlas/data/bus-tnds/' : pathname.startsWith('/atlas/data/bus/') ? '/atlas/data/bus/' : null;
       const root = marker ? path.join(candidateRoot, pathname.startsWith('/atlas/data/bus-tnds/') ? 'atlas/data/bus-tnds' : 'atlas/data/bus') : repositoryRoot;
       const relative = marker ? pathname.slice(marker.length) : pathname.replace(/^\/+/, '');
@@ -107,6 +118,7 @@ try {
     const outcome = { label: control.label };
     try {
       await page.goto(new URL('atlas/', baseUrl).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.locator('.coordinate-details > summary').click();
       await page.locator('#latitude').fill(String(control.latitude));
       await page.locator('#longitude').fill(String(control.longitude));
       await page.locator('#coordinatesForm button[type="submit"]').click();
@@ -217,6 +229,8 @@ report.browserErrors = errors;
 report.failedRequests = failedRequests;
 report.failedResponses = failedResponses;
 report.externalRequests = externalRequests;
+report.statusManifestFallbacks = statusManifestFallbacks;
+report.statusManifestNote = 'The Run #75 candidate and production checkout do not include the separately published status manifest; the localhost audit supplies 204 No Content, and the normal app reports status unavailable. This response is independent of Bus assessment data.';
 report.readiness = report.failures.length ? 'NOT_READY_FOR_MANUAL_RE-ACCEPTANCE' : 'READY_FOR_TECHNICAL_DIRECTOR_REVIEW_BEFORE_MANUAL_RE-ACCEPTANCE';
 if (reportArg) {
   const destination = path.resolve(reportArg);

@@ -126,7 +126,7 @@ try {
       assert.equal(await page.locator('#findStops').isEnabled(), true, 'Normal workflow did not enable Bus assessment after confirming the site.');
       await page.locator('#findStops').click();
       await page.locator('#taskStatusMessage').waitFor({ state: 'visible', timeout: 180000 });
-      await page.waitForFunction(() => ['Complete', 'Partial', 'Needs review'].includes(document.querySelector('#taskStatusMessage')?.textContent?.trim()), undefined, { timeout: 180000 });
+      await page.waitForFunction(() => ['complete', 'partial', 'unavailable'].includes(document.querySelector('#taskStatus')?.dataset.phase), undefined, { timeout: 180000 });
       const serviceTable = page.locator('.bus-service-summary');
       const wrap = serviceTable.locator('xpath=ancestor::div[contains(@class,"table-wrap")]');
       const scroll = await wrap.evaluate(element => ({ client: element.clientWidth, scroll: element.scrollWidth }));

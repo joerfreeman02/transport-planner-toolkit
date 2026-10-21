@@ -750,9 +750,20 @@ function scheduledDayCount(service, day) {
   );
 }
 
+function serviceRunsOnDay(service, day) {
+  if (scheduledDayCount(service, day) > 0) return true;
+  const dayLabel = {
+    monday: '(?:Mon|Monday)', tuesday: '(?:Tue|Tuesday)', wednesday: '(?:Wed|Wednesday)',
+    thursday: '(?:Thu|Thursday)', friday: '(?:Fri|Friday)', saturday: '(?:Sat|Saturday)', sunday: '(?:Sun|Sunday)'
+  }[day];
+  const labels = [service?.typicalFrequencyLines, service?.frequency, service?.operatingPeriodLines, service?.operatingPeriod]
+    .flatMap(value => Array.isArray(value) ? value : value ? [value] : []).map(text);
+  return labels.some(line => new RegExp(`^\\s*${dayLabel}(?:\\s*[-–]\\s*(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))?\\s*:\\s*(?!no scheduled service|no timetable|not scheduled)`, 'i').test(line));
+}
+
 function schoolRestrictedLocalVariants(component = []) {
   const peersRunAtWeekends = component.some(service => !schoolEndpoint(service)
-    && (scheduledDayCount(service, 'saturday') > 0 || scheduledDayCount(service, 'sunday') > 0));
+    && (serviceRunsOnDay(service, 'saturday') || serviceRunsOnDay(service, 'sunday')));
   if (!peersRunAtWeekends) return [];
   return component.filter(service => {
     if (!schoolEndpoint(service)) return false;
@@ -760,8 +771,8 @@ function schoolRestrictedLocalVariants(component = []) {
       || /school[- ]days? only|school-day service|term[- ]time only/i.test(text(service?.serviceNote));
     if (explicitlyRestricted) return true;
     const weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-      .reduce((total, day) => total + scheduledDayCount(service, day), 0);
-    return weekdays > 0 && scheduledDayCount(service, 'saturday') === 0 && scheduledDayCount(service, 'sunday') === 0;
+      .some(day => serviceRunsOnDay(service, day));
+    return weekdays && !serviceRunsOnDay(service, 'saturday') && !serviceRunsOnDay(service, 'sunday');
   });
 }
 

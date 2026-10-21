@@ -1,7 +1,12 @@
 name: ATLAS Bus Beta S2E-1 frozen-candidate diagnosis
 
 on:
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      mode:
+        description: Run the exact frozen Run #75 planner-intelligence baseline diagnosis.
+        required: true
+        type: string
 
 permissions:
   actions: read
@@ -9,7 +14,7 @@ permissions:
 
 jobs:
   frozen-candidate-diagnosis:
-    if: github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration'
+    if: github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration' && inputs.mode == 'baseline_diagnosis'
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:

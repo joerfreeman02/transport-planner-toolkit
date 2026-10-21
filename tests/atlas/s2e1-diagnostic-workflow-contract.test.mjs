@@ -2,9 +2,15 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const workflow = await readFile(new URL('../../.github/workflows/atlas-bus-beta-s2e1-diagnosis.yml', import.meta.url), 'utf8');
+const dispatchWorkflow = await readFile(new URL('../../.github/workflows/atlas-bus-data-refresh.yml', import.meta.url), 'utf8');
 const diagnostic = await readFile(new URL('./s2e1-real-candidate-diagnostic.mjs', import.meta.url), 'utf8');
 
 assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-intelligence-restoration/);
+assert.match(workflow, /workflow_call:[\s\S]*mode:[\s\S]*baseline_diagnosis/);
+assert.match(dispatchWorkflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-intelligence-restoration/);
+assert.match(dispatchWorkflow, /s2e1-frozen-candidate-diagnosis:[\s\S]*mode: baseline_diagnosis/);
+assert.match(dispatchWorkflow, /CANDIDATE_RUN" != '39430415441'[\s\S]*CANDIDATE_ID" != '12275615359'[\s\S]*CANDIDATE_DIGEST" != 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471/);
+assert.match(dispatchWorkflow, /S2E-1 accepts only the exact Run #75 frozen-candidate restore selector with all acquisition\/source selectors blank\/default/);
 assert.match(workflow, /actions:\s*read[\s\S]*contents:\s*read/);
 assert.match(workflow, /12275615359/);
 assert.match(workflow, /39430415441/);

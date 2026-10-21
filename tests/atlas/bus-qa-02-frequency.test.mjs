@@ -146,7 +146,7 @@ assert.doesNotMatch(mixedQualification.serviceNote, /School-day journeys only|No
 const html = fs.readFileSync(new URL('../../atlas/index.html', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../../atlas/assets/css/atlas-shell.css', import.meta.url), 'utf8');
 assert.deepEqual((html.match(/<th>/g) ?? []).slice(-8).length, 8);
-for (const [className, width] of [['col-include', '4%'], ['col-route', '6%'], ['col-operator', '13%'], ['col-direction', '21%'], ['col-served-at', '16%'], ['col-principal', '16%'], ['col-frequency', '12%'], ['col-operating-period', '12%']]) assert.ok(css.includes('.' + className + ' { width: ' + width + '; }'), className);
+for (const [className, width] of [['col-include', '4%'], ['col-route', '6%'], ['col-operator', '11%'], ['col-direction', '18%'], ['col-served-at', '11%'], ['col-principal', '17%'], ['col-frequency', '12%'], ['col-operating-period', '13%'], ['col-source', '8%']]) assert.ok(css.includes('.' + className + ' { width: ' + width + '; }'), className);
 assert.match(css, /input\[type="checkbox"\].*width: 17px/);
 
 const word = buildBusWordTables({ ok: true, stops: [], serviceSummaries: [varied] });

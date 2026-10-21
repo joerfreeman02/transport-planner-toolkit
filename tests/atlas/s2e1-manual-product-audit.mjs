@@ -218,6 +218,7 @@ try {
       const checksText = await page.locator('#plannerChecks').innerText();
       assert.doesNotMatch(checksText, /SpecialDaysOperation|TNDS .*special dates require review/i, 'Sources and checks exposes raw per-service special-day warnings.');
       const rendered = await serviceTable.locator('tbody tr:not(.service-note)').evaluateAll(rows => rows.map(row => Object.fromEntries([...row.querySelectorAll('td[data-label]')].map(cell => [cell.dataset.label, cell.innerText.replace(/\s+/g, ' ').trim()]))));
+      const renderedServiceNotes = await serviceTable.locator('tbody tr.service-note').allInnerTexts();
       const byRoute = new Map();
       for (const row of rendered) {
         const route = row.Route || '';
@@ -241,6 +242,7 @@ try {
       const exportedWordText = wordText(documentXml);
       outcome.status = await page.locator('#taskStatusMessage').innerText();
       outcome.renderedRows = rendered;
+      outcome.renderedServiceNotes = renderedServiceNotes;
       outcome.routesWithMoreThanTwoRows = [...byRoute].filter(([, rows]) => rows.length > 2).map(([route, rows]) => ({ route, rows }));
       outcome.sourceColumn = { visibleOnTopMiddleBottom: true, samples: sourceSamples, overflow: scroll };
       outcome.technicalDetailsHidden = true;
@@ -273,7 +275,10 @@ try {
         const keys102 = rows102.map(row => [row['Direction / main service pattern'], row['Principal locations'], row['Typical frequency']].join('|').toLowerCase().replace(/\s+/g, ' ').trim());
         assert.ok(rows102.length <= 2 && new Set(keys102).size === keys102.length, `PE1 route 102 has duplicate planner rows (${rows102.length} total, ${new Set(keys102).size} distinct).`);
         const rowsX4 = rendered.filter(row => row.Route === 'X4');
-        assert.ok(rowsX4.length >= 2 && rowsX4.some(row => !/school|term/i.test(row['Operating period at stop'])) && rowsX4.some(row => /school|term/i.test(`${row['Typical frequency']} ${row['Operating period at stop']}`)), 'PE1 X4 does not visibly preserve both regular principal and school/term patterns.');
+        const x4Notes = renderedServiceNotes.join(' ');
+        assert.ok(rowsX4.length >= 2 && rowsX4.some(row => /Sat:|Sun:/i.test(`${row['Typical frequency']} ${row['Operating period at stop']}`))
+          && /X4.*Kings School/i.test(x4Notes) && /School-day journeys only/i.test(x4Notes), 'PE1 X4 does not visibly preserve its regular principal rows and qualified school short working in the normal browser UI.');
+        assert.match(exportedWordText, /X4.*Kings School[\s\S]{0,500}School-day journeys only/i, 'PE1 Word export does not preserve the X4 school short-working qualification.');
         assert.ok(rows102.every(row => row['Direction / main service pattern'] && row['Principal locations']), 'Remaining PE1 route 102 rows lack visible distinction labels.');
       }
       report.controls[control.id] = outcome;

@@ -810,6 +810,16 @@ function principalPatternServices(component = []) {
   for (const service of schoolRestrictedLocalVariants(component)) {
     shortWorkingIds.add(serviceIdForPlanner(service));
   }
+  // A school-named local endpoint alongside the same connected public
+  // direction’s regular weekend timetable is retained as a visible variant,
+  // even when source calendar metadata is labelled ordinary or omitted.
+  // The regular weekend evidence identifies the principal pattern; the
+  // school endpoint remains available for the row’s short-working note.
+  if (hasSchoolEndpointWithRegularWeekendService(component)) {
+    for (const service of component.filter(schoolEndpoint)) {
+      shortWorkingIds.add(serviceIdForPlanner(service));
+    }
+  }
   const principal = component.filter(service => !shortWorkingIds.has(serviceIdForPlanner(service)));
   const result = principal.length ? principal : component;
   principalPatternServicesCache.set(component, result);
@@ -1595,6 +1605,9 @@ function variantCalendarQualification(service) {
   if (profile === 'school-day' || /\bschool[- ]?days?\b|\bschooldays?\b/i.test(raw)) return 'School-day journeys only';
   if (profile === 'term-time' || /term[- ]time|term[- ]only/i.test(raw)) return 'term time only';
   if (profile === 'holiday' || /holiday/i.test(raw)) return 'holidays only';
+  if (schoolEndpoint(service)
+    && ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].some(day => serviceRunsOnDay(service, day))
+    && !serviceRunsOnDay(service, 'saturday') && !serviceRunsOnDay(service, 'sunday')) return 'weekdays only';
   return '';
 }
 
@@ -1731,12 +1744,24 @@ function buildPlannerServiceGroup(component, stops, main, representative, public
   const endpointIdentity = endpointEvidence.map(value => normal(value)).join('~');
   const originDecision = preferredServiceEndpointDecision(component, 'origin', main);
   const destinationDecision = preferredServiceEndpointDecision(component, 'destination', main);
-  const groupingDecision = makePublicServiceGroupingDecision({
+  const baseGroupingDecision = makePublicServiceGroupingDecision({
     services: component,
     principal: main,
     publicRouteFamilyKey,
     ambiguousServices: component.ambiguousServices ?? []
   });
+  const visibleSchoolVariantIds = hasSchoolEndpointWithRegularWeekendService(component)
+    ? component.filter(schoolEndpoint).map(serviceIdForPlanner)
+    : [];
+  const groupingDecision = visibleSchoolVariantIds.length
+    ? Object.freeze({
+      ...baseGroupingDecision,
+      shortWorkingRecordIds: Object.freeze(unique([
+        ...(baseGroupingDecision.shortWorkingRecordIds ?? []),
+        ...visibleSchoolVariantIds
+      ]))
+    })
+    : baseGroupingDecision;
   const circularServiceDecision = resolveCircularServiceDecision(circularServices, { principal: circularPrincipal(circularServices, main, representative.id), component });
   const terminusDecision = makeTerminusDecision({
     services: component,

@@ -189,6 +189,7 @@ const schoolOriginBranchRows = rows([
 assert.equal(schoolOriginBranchRows.length, 1, 'same-destination school-origin journeys remain variants of the public direction');
 assert.equal(schoolOriginBranchRows[0].frequencyBasisStopId, 'QUEENSGATE', 'weekday school-origin evidence cannot replace a regular weekend timetable basis');
 assert.match(schoolOriginBranchRows[0].typicalFrequencyText, /Sat-Sun: 1 journey\/day/);
+assert.match(`${schoolOriginBranchRows[0].serviceNote} ${schoolOriginBranchRows[0].routeGroupNote || ''}`, /short workings.*Kings School.*weekdays only/i, 'school-endpoint evidence remains visible as a qualified short working');
 
 const route242Groups = buildPlannerServiceGroups([
   record({ id: 'central-out', routeNumber: '242', operator: 'Central Connect', routeId: 'central', origin: 'Bus Station', destination: 'Potters Bar Railway Station' }),

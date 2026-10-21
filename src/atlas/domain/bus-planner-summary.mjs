@@ -734,15 +734,27 @@ function strictPatternSubsequence(shorter, longer) {
   return true;
 }
 
+const principalPatternServicesCache = new WeakMap();
+
 function principalPatternServices(component = []) {
+  if (principalPatternServicesCache.has(component)) return principalPatternServicesCache.get(component);
   const shortWorkingIds = new Set();
+  // Reuse the same professional short-working decision used for the row’s
+  // retained variant evidence.  It also recognises endpoint-contained
+  // patterns when provider-local stop IDs cannot be compared directly.
+  for (const principal of component) {
+    const decision = makePublicServiceGroupingDecision({ services: component, principal });
+    for (const id of decision.shortWorkingRecordIds ?? []) shortWorkingIds.add(id);
+  }
   for (const service of component) {
     if (component.some(candidate => candidate !== service
       && !reverseEndpointRelationship(service, candidate)
-      && strictPatternSubsequence(service, candidate))) shortWorkingIds.add(service);
+      && strictPatternSubsequence(service, candidate))) shortWorkingIds.add(serviceIdForPlanner(service));
   }
-  const principal = component.filter(service => !shortWorkingIds.has(service));
-  return principal.length ? principal : component;
+  const principal = component.filter(service => !shortWorkingIds.has(serviceIdForPlanner(service)));
+  const result = principal.length ? principal : component;
+  principalPatternServicesCache.set(component, result);
+  return result;
 }
 
 function hasTimetableEvidenceAt(service, id) {

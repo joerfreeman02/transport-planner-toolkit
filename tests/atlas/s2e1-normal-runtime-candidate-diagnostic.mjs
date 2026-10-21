@@ -131,7 +131,13 @@ const circularEvidenceAudit = controlId === 'pipers' ? {
     circularPatternStopIds: row.circularPatternStopIds ?? [], routePatternStopIds: row.routePatternStopIds ?? [],
     direction: row.direction, origin: row.origin, destination: row.destination
   })),
-  plannerRows: plannerRowsFor('230').map(row => ({
+  serviceSummaries: assessment.serviceSummaries.filter(row => route(row.routeNumber) === '230').map(row => ({
+    id: row.id, timetableSource: row.timetableSource, source: row.source,
+    circular: row.circular ?? null, circularPatternStopIds: row.circularPatternStopIds ?? [],
+    routePatternStopIds: row.routePatternStopIds ?? [], routePatternStops: row.routePatternStops ?? [],
+    orderedPatternStops: row.orderedPatternStops ?? [], direction: row.direction
+  })),
+  plannerRows: assessment.plannerServiceSummaries.filter(row => route(row.routeNumber) === '230').map(row => ({
     circular: row.circular, classification: row.circularServiceDecision?.classification ?? null,
     reason: row.circularServiceDecision?.reason ?? null,
     principalSourceRecordId: row.circularServiceDecision?.principalSourceRecordId ?? null,

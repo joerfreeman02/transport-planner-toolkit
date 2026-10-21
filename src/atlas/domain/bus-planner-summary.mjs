@@ -1884,7 +1884,10 @@ function publicRouteFamilyPairEvidence(left, right) {
   const reverseDirection = familyRowsServices(left).some(first => familyRowsServices(right).some(second => reverseEndpointRelationship(first, second)));
   const hardSeparation = familyRowsServices(left).some(first => familyRowsServices(right).some(second => hardCorridorSeparation(first, second)));
   const operatorCompatible = rowOperatorCompatible(left, right);
-  const commonTrunk = sharedStops.length >= 2 || patternOverlap.length >= 2 || sharedCorridor.length >= 2;
+  // Endpoint stand/stop identifiers can be shared by separate branches at an
+  // interchange; they are not, by themselves, evidence of a common corridor.
+  // Require at least two ordered pattern stops or two named corridor places.
+  const commonTrunk = patternOverlap.length >= 2 || sharedCorridor.length >= 2;
   const endpointRelationshipEvidence = endpointOverlap.length > 0 || lineageOverlap.length > 0;
   const proven = !hardSeparation
     && !reverseDirection

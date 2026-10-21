@@ -108,6 +108,7 @@ function compactEvidenceRecord(record = {}, assessedStopIds = []) {
 }
 
 function compactCircularDecision(value = {}) {
+  value ??= {};
   return {
     type: value.type ?? null,
     publicRouteIdentity: value.publicRouteIdentity ?? null,
@@ -137,6 +138,7 @@ function compactCircularDecision(value = {}) {
 }
 
 function compactGroupingDecision(value = {}) {
+  value ??= {};
   return {
     type: value.type ?? null,
     decision: value.decision ?? null,
@@ -165,6 +167,7 @@ function compactGroupingDecision(value = {}) {
 }
 
 function compactTerminusDecision(value = {}) {
+  value ??= {};
   return {
     type: value.type ?? null,
     status: value.status ?? null,
@@ -178,6 +181,7 @@ function compactTerminusDecision(value = {}) {
 }
 
 function compactFamilyDecision(value = {}) {
+  value ??= {};
   return {
     type: value.type ?? null,
     state: value.state ?? null,
@@ -193,6 +197,7 @@ function compactFamilyDecision(value = {}) {
 }
 
 function compactRouteFamilyMembers(value = []) {
+  value ??= [];
   return value.map(member => ({
     routeNumber: member.routeNumber ?? null,
     operator: member.operator ?? null,

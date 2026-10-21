@@ -24,6 +24,8 @@ import { plannerStopWarning, recommendedBusStop } from '../../../src/atlas/domai
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
+const diagnosticMode = new URLSearchParams(window.location.search).get('diagnostics') === '1';
+if (diagnosticMode && $('developerDiagnostics')) $('developerDiagnostics').hidden = false;
 const declaredTestBuild = String(document.body.dataset.atlasTestBuild || document.documentElement.dataset.atlasTestBuild || '').trim();
 document.querySelectorAll('body [data-atlas-test-build]').forEach(element => {
   element.textContent = declaredTestBuild ? `Development/Test build · ${declaredTestBuild}` : 'Development/Test build · not declared';
@@ -490,7 +492,7 @@ function renderConfirmedSite(site) {
     const dd = document.createElement('dd'); dd.textContent = value;
     details.append(dt, dd);
   });
-  if (site.geocoding.source) {
+  if (diagnosticMode && site.geocoding.source) {
     const technical = document.createElement('details');
     technical.className = 'technical-details';
     const summary = document.createElement('summary');
@@ -746,6 +748,7 @@ function renderAssessment(result) {
     reviewItems.forEach(item => { const line = document.createElement('li'); line.textContent = reviewItemText(item); list.append(line); });
     plannerChecks.append(heading, list);
   }
+  if (diagnosticMode) {
   const diagnostics = $('diagnostics');
   diagnostics.replaceChildren();
   const diagnosticLines = [
@@ -786,6 +789,7 @@ function renderAssessment(result) {
     stopAreaList.append(line);
   }
   diagnostics.append(stopAreaList);
+  }
 }
 
 async function searchAddress(event) {

@@ -86,9 +86,7 @@ function parseOperatingProfile(block, { sourceLabel = null, precedence = null } 
   const resolved = days.size > 0 && !complex;
   const warning = complex
     ? `TNDS ${sourceLabel || 'service'} has an unsupported complex operating profile (${specialFields.join(', ')}); operating days remain unresolved and no timetable days were fabricated.`
-    : specialFields.length
-      ? `TNDS ${sourceLabel || 'service'} includes special-day operating metadata (${specialFields.join(', ')}); regular-day evidence was retained, but special dates require review.`
-      : null;
+    : null;
   return createServiceCalendarEvidence({
     daysOfWeek: DAYS.filter(day => days.has(day)),
     calendarResolved: resolved,
@@ -100,6 +98,10 @@ function parseOperatingProfile(block, { sourceLabel = null, precedence = null } 
     dateExceptions,
     qualificationMetadata: { precedence, specialFields, nonOperationDays: [...nonOperationDays] },
     provenance: { provider: 'TNDS', authority: 'Traveline National Dataset', sourceField: sourceLabel || null },
+    // Preserve special-day/date-exception fields in qualificationMetadata and
+    // dateExceptions for engineering inspection. Do not emit a service-level
+    // warning; keep the calendar internally partial until a date-aware
+    // assessment proves that an exception changes the selected result.
     resolutionStatus: resolved ? (specialFields.length ? 'partial' : 'resolved') : 'unresolved',
     warnings: warning ? [warning] : []
   });

@@ -581,7 +581,7 @@ jobs:
           fi
       - name: Resolve S2E-1 frozen-candidate diagnosis selector
         id: s2e-1-selector
-        if: github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration'
+        if: github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c1-manual-corrections'
         env:
           EVENT_NAME: ${{ github.event_name }}
           PREPARED_SCHEMA: ${{ inputs.prepared_schema }}
@@ -651,7 +651,7 @@ jobs:
 
       - name: Resolve exact-branch TRUST browser selector
         id: trust-selector
-        if: github.ref != 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2b-c4-restore-auth-closeout' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2c-1-national-runtime-scale' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2c-2-candidate-replay-authority' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2c-3-oversized-service-closeout' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2d-1-waltham-planner-closeout' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration'
+        if: github.ref != 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2b-c4-restore-auth-closeout' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2c-1-national-runtime-scale' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2c-2-candidate-replay-authority' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2c-3-oversized-service-closeout' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2d-1-waltham-planner-closeout' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration' && github.ref != 'refs/heads/codex/atlas-bus-beta-s2e-1-c1-manual-corrections'
         env:
           TRUST_BRANCH_C3: refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation
           TRUST_BRANCH_C3_C1: refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout
@@ -1044,7 +1044,7 @@ jobs:
   tnds-trust-browser-offline-preflight:
     name: Run default-branch-compatible TNDS TRUST offline preflight
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-refresh-checkpoint-readiness' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c4-restore-auth-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-1-national-runtime-scale' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-2-candidate-replay-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-3-oversized-service-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'offline_preflight'
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-recoverable-reconciliation' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-region-scale-recovery-closeout' || github.ref == 'refs/heads/codex/atlas-bus-data-trust-1a-c1b-c3-c1-c1-c1-branch-dispatch-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-refresh-checkpoint-readiness' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c1-review-candidate-composition' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c2-primary-acquisition-selector' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2a-c3-c2-compose-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c1-large-tnds-xml-preparation' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c2-primary-restore-topology' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c3-run53-replay-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2b-c4-restore-auth-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-1-national-runtime-scale' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-2-candidate-replay-authority' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-3-oversized-service-closeout' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c1-manual-corrections') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 'offline_preflight'
     uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml
     with:
       mode: offline_preflight
@@ -1149,7 +1149,7 @@ jobs:
   s2e1-frozen-candidate-diagnosis:
     name: S2E-1 frozen Run #75 normal-runtime diagnosis
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration' && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 's2e1_diagnostic' && needs.main-guard.outputs.s2e1_mode == 'normal_runtime_diagnosis'
+    if: github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c1-manual-corrections') && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 's2e1_diagnostic' && needs.main-guard.outputs.s2e1_mode == 'normal_runtime_diagnosis'
     uses: ./.github/workflows/atlas-bus-beta-s2e1-diagnosis.yml
     with:
       mode: normal_runtime_diagnosis

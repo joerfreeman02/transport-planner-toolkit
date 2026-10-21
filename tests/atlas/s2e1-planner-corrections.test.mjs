@@ -36,6 +36,24 @@ const plannerBase = {
   routePatternStopIds: ['ORIGIN', 'PIPERS-A', 'DESTINATION'], frequencyBasisStopId: 'PIPERS-A', stopIds: ['PIPERS-A'],
   departuresByDay: weekdays, frequencyEvidence: [], sourceRecordIds: ['main']
 };
+const departureEvidence = (minutes, provider, profile = null) => Object.fromEntries(Object.keys(weekdays).map(day => [day,
+  ['saturday', 'sunday'].includes(day) ? [] : minutes.map((minute, index) => ({ minute, stopPointId: 'PIPERS-A', journeyIdentity: `${provider}-${day}-${index}-${minute}`, provider, ...(profile ? { calendarProfileId: profile } : {}) }))
+]));
+const hourlyMinutes = Array.from({ length: 12 }, (_value, index) => 360 + index * 60);
+const authorityPriority = buildPlannerBusServiceSummaries([
+  { ...plannerBase, id: 'bods-hourly', routeNumber: '230', provider: 'BODS', timetableSource: 'BODS', source: { provider: 'BODS' }, departureEvidenceByDay: departureEvidence(hourlyMinutes, 'BODS') },
+  { ...plannerBase, id: 'tnds-duplicate-population', routeNumber: '230', provider: 'TNDS', timetableSource: 'TNDS', source: { provider: 'TNDS' }, departureEvidenceByDay: departureEvidence(hourlyMinutes.flatMap(minute => [minute, minute + 5, minute + 11]), 'TNDS') }
+], [stop]);
+assert.equal(authorityPriority.length, 1, 'matching BODS/TNDS public timetable evidence remains one planner row');
+assert.deepEqual(authorityPriority[0].canonicalDeparturePopulation.monday.map(entry => entry.minute), hourlyMinutes, 'BODS primary departures define the ordinary frequency population when equivalent TNDS supplementation repeats the same public service');
+assert.match(authorityPriority[0].typicalFrequencyText, /Every ~60 mins/i, 'supplementary national journey identities cannot inflate the BODS-led hourly headway');
+const calendarSupplement = buildPlannerBusServiceSummaries([
+  { ...plannerBase, id: 'bods-ordinary', routeNumber: 'X4', provider: 'BODS', timetableSource: 'BODS', source: { provider: 'BODS' }, departureEvidenceByDay: departureEvidence(hourlyMinutes, 'BODS') },
+  { ...plannerBase, id: 'tnds-school-pattern', routeNumber: 'X4', provider: 'TNDS', timetableSource: 'TNDS', calendarProfileId: 'school-day', calendarEvidence: [{ calendarProfileId: 'school-day', schoolDayOnly: true, calendarResolved: true, daysOfWeek: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] }], source: { provider: 'TNDS', calendarProfileId: 'school-day' }, departureEvidenceByDay: departureEvidence([390, 450], 'TNDS', 'school-day') }
+], [stop]);
+assert.equal(calendarSupplement.length, 1, 'regular and school-specific timetable patterns remain grouped to the same public service');
+assert.ok(calendarSupplement[0].typicalFrequencyLines.some(line => /60\s*mins/i.test(line)), `the regular BODS principal timetable remains visible beside a school-specific supplement: ${calendarSupplement[0].typicalFrequencyLines.join(' / ')}`);
+assert.ok(calendarSupplement[0].typicalFrequencyLines.some(line => /school/i.test(line)), 'the distinct school-specific TNDS calendar remains qualified');
 const planner = buildPlannerBusServiceSummaries([
   { ...plannerBase, id: 'bods-main', operator: 'Centrebus', timetableSource: 'BODS', source: { provider: 'BODS' } },
   { ...plannerBase, id: 'tnds-corroboration', operator: 'Centrebus South', timetableSource: 'TNDS', source: { provider: 'TNDS' } }

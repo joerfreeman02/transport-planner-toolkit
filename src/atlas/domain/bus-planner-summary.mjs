@@ -776,6 +776,17 @@ function departureIdentity(item) {
   return text(item?.journeyIdentity || item?.journeyId || item?.sourceJourneyId || item?.vehicleJourneyCode || item?.tripId || item?.vehicleJourneyId || item?.journeyCode);
 }
 
+function plannerEvidenceSourceRank(service = {}, item = null) {
+  const providers = [item?.authorityProvider, item?.provider, item?.primaryAuthority,
+    service?.source?.primaryAuthority, service?.primaryAuthority, service?.source?.provider,
+    service?.provider, service?.timetableSource]
+    .map(value => text(value).toLowerCase());
+  if (providers.some(provider => /\btfl\b|transport for london/.test(provider))) return 3;
+  if (providers.some(provider => /\bbods\b|bus open data/.test(provider))) return 2;
+  if (providers.some(provider => /\btnds\b|traveline national dataset/.test(provider))) return 1;
+  return 0;
+}
+
 function primaryProvider(service, item = null) {
   return text(item?.primaryAuthority
     || item?.provider
@@ -811,6 +822,7 @@ function serviceDepartureEntries(service, representativeId) {
         stopPointId: text(item?.stopPointId) || representativeId,
         journeyIdentity: departureIdentity(item) || null,
         provider: primaryProvider(service, item),
+        authorityProvider: text(item?.authorityProvider || item?.provider || service?.source?.provider || service?.provider || service?.timetableSource || item?.primaryAuthority || primaryProvider(service, item)) || null,
         sourceRecordId: text(item?.sourceRecordId || service?.id) || null,
         routeNumber: text(item?.routeNumber || service?.routeNumber),
         direction: text(item?.direction || service?.direction || service?.destination || service?.origin),
@@ -945,10 +957,20 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
       ? DAY_ORDER.flatMap(day => normaliseCircularTerminalEntries(serviceEntries.filter(entry => entry.day === day)))
       : serviceEntries;
   }));
+  const authorityByProfile = new Map();
+  for (const entry of entries) {
+    const profile = calendarProfileIdsForEntry(entry)[0] || 'ordinary';
+    authorityByProfile.set(profile, Math.max(authorityByProfile.get(profile) ?? 0, plannerEvidenceSourceRank({}, entry)));
+  }
+  const authoritativeEntries = entries.filter(entry => {
+    const profile = calendarProfileIdsForEntry(entry)[0] || 'ordinary';
+    const highestAuthority = authorityByProfile.get(profile) ?? 0;
+    return highestAuthority === 0 || plannerEvidenceSourceRank({}, entry) === highestAuthority;
+  });
   const schedules = emptySchedule();
-  for (const entry of entries) schedules[entry.day].push(entry.minute);
+  for (const entry of authoritativeEntries) schedules[entry.day].push(entry.minute);
   for (const day of DAY_ORDER) schedules[day].sort((first, second) => first - second);
-  return { entries, schedules, eligible };
+  return { entries: authoritativeEntries, schedules, eligible };
 }
 
 function schedulesFromEntries(entries) {
@@ -1014,11 +1036,13 @@ function supplementaryAuditForServices(component, representativeId) {
 }
 
 function profileEligibleServices(component, representativeId, profileId) {
-  return component.filter(service => serviceAtRepresentative(service, representativeId)
+  const candidates = component.filter(service => serviceAtRepresentative(service, representativeId)
     && serviceDepartureEntries(service, representativeId).some(entry => {
       const profiles = calendarProfileIdsForEntry(entry);
       return profiles.includes(profileId) || ((profileId === 'ordinary' || profileId === null) && profiles.length === 0);
     }));
+  const highestAuthority = Math.max(0, ...candidates.map(service => plannerEvidenceSourceRank(service)));
+  return highestAuthority ? candidates.filter(service => plannerEvidenceSourceRank(service) === highestAuthority) : candidates;
 }
 
 function calculateProfileResult(component, representativeId, profileId, partition) {
@@ -1657,7 +1681,8 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const canonical = canonicalDeparturePopulation(component, representative.id, main, plannerServiceGroup);
   const profileIds = orderedCalendarProfiles([
     ...component.map(calendarProfileFromService),
-    ...canonical.entries.flatMap(calendarProfileIdsForEntry)
+    ...canonical.entries.flatMap(calendarProfileIdsForEntry),
+    ...(canonical.entries.some(entry => calendarProfileIdsForEntry(entry).length === 0) ? ['ordinary'] : [])
   ]);
   const hasOrdinaryProfile = profileIds.includes('ordinary');
   const ordinaryEntries = canonical.entries.filter(entry => calendarProfileIdsForEntry(entry).includes('ordinary'));

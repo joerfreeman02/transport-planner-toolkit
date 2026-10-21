@@ -73,6 +73,11 @@ const unsupported = parseTndsTransXchange(unsupportedXml, { region: 'SE', source
 assert.equal(unsupported.calendarEvidence[0].resolutionStatus, 'unresolved');
 assert.match(unsupported.sourceWarnings.join(' '), /unsupported complex operating profile/);
 assert.deepEqual(unsupported.stopSchedules['021013518'].monday, [], 'unsupported complex profiles never become fabricated weekday evidence');
+const specialDayXml = xml.replace(/<OperatingProfile><MondayToFriday>true<\/MondayToFriday><\/OperatingProfile>/g, '<OperatingProfile><MondayToFriday>true</MondayToFriday><SpecialDaysOperation><DateException>2026-12-25</DateException></SpecialDaysOperation></OperatingProfile>');
+const specialDay = parseTndsTransXchange(specialDayXml, { region: 'SE', sourceArchive: 'special-day.xml' });
+assert.equal(specialDay.calendarEvidence[0].resolutionStatus, 'partial', 'regular service calendar retains internal date uncertainty until a date-aware assessment resolves it');
+assert.deepEqual(specialDay.calendarEvidence[0].dateExceptions, ['2026-12-25'], 'raw special-day exceptions remain available for date-aware evaluation');
+assert.deepEqual(specialDay.sourceWarnings, [], 'non-material special-day metadata does not create per-service planner warnings');
 const bods = [{ routeNumber: '999', operator: 'Other', direction: 'outbound', origin: 'X', destination: 'Y', stopSchedules: { '021013518': {} } }];
 assert.equal(mergeBusTimetableSources({ bods, tnds: [parsed] }).length, 2);
 assert.equal(mergeBusTimetableSources({ bods: [{ routeNumber: '231', operator: 'Example', direction: 'outbound', origin: 'A', destination: 'B', stopSchedules: parsed.stopSchedules }], tnds: [parsed] }).length, 2, 'matching route, operator and endpoints cannot arbitrate without ordered physical pattern evidence');

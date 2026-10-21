@@ -1019,7 +1019,9 @@ function profileOperatingPeriodEvidence(component, representativeId, profileId) 
   const targetProfile = text(profileId).toLowerCase();
   const byDay = Object.fromEntries(DAY_ORDER.map(day => [day, (selected.byDay?.[day] ?? []).filter(item => {
     const itemProfile = text(item?.calendarProfileId).toLowerCase();
-    return itemProfile === targetProfile || (!targetProfile && (!itemProfile || itemProfile === 'ordinary'));
+    return itemProfile === targetProfile
+      || (targetProfile === 'ordinary' && !itemProfile)
+      || (!targetProfile && (!itemProfile || itemProfile === 'ordinary'));
   })]));
   return { byDay, warnings: selected.warnings, state: selected.state };
 }
@@ -1036,20 +1038,25 @@ function supplementaryAuditForServices(component, representativeId) {
 }
 
 function profileEligibleServices(component, representativeId, profileId) {
-  const candidates = component.filter(service => serviceAtRepresentative(service, representativeId)
+  return component.filter(service => serviceAtRepresentative(service, representativeId)
     && serviceDepartureEntries(service, representativeId).some(entry => {
       const profiles = calendarProfileIdsForEntry(entry);
       return profiles.includes(profileId) || ((profileId === 'ordinary' || profileId === null) && profiles.length === 0);
     }));
+}
+
+function profileFrequencyAuthorityServices(component, representativeId, profileId) {
+  const candidates = profileEligibleServices(component, representativeId, profileId);
   const highestAuthority = Math.max(0, ...candidates.map(service => plannerEvidenceSourceRank(service)));
   return highestAuthority ? candidates.filter(service => plannerEvidenceSourceRank(service) === highestAuthority) : candidates;
 }
 
 function calculateProfileResult(component, representativeId, profileId, partition) {
   const eligible = profileEligibleServices(component, representativeId, profileId);
-  const evidence = profileFrequencyEvidence(eligible.length ? eligible : component, representativeId, profileId);
+  const frequencyEligible = profileFrequencyAuthorityServices(component, representativeId, profileId);
+  const evidence = profileFrequencyEvidence(frequencyEligible.length ? frequencyEligible : component, representativeId, profileId);
   const operatingEvidence = profileOperatingPeriodEvidence(eligible.length ? eligible : component, representativeId, profileId);
-  const calculationEvidence = eligible.length <= 1 || eligible.every(service => (service.frequencyEvidence ?? [])
+  const calculationEvidence = frequencyEligible.length <= 1 || frequencyEligible.every(service => (service.frequencyEvidence ?? [])
     .some(item => (!item.stopPointId || text(item.stopPointId) === representativeId) && calendarProfileFromEntry(service, item) === profileId)) ? evidence : [];
   const frequencyByDay = Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, calculateTypicalServiceFrequency(partition.schedules[day], { day, frequencyEvidence: calculationEvidence })])));
   const operatingPopulation = selectAuthoritativeDepartureEvidence(Object.fromEntries(DAY_ORDER.map(day => [

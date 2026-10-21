@@ -824,7 +824,9 @@ function hasTimetableEvidenceAt(service, id) {
   const stop = text(id);
   if (!stop) return false;
   const hasScheduledEntries = DAY_ORDER.some(day => (service?.departuresByDay?.[day] ?? []).length || (service?.departureEvidenceByDay?.[day] ?? []).length);
-  if (text(service?.frequencyBasisStopId) === stop && hasScheduledEntries) return true;
+  const hasFrequencyEvidence = (service?.frequencyEvidence ?? []).length > 0
+    || (service?.typicalFrequencyLines ?? service?.frequency ?? []).length > 0;
+  if (text(service?.frequencyBasisStopId) === stop && (hasScheduledEntries || hasFrequencyEvidence)) return true;
   if (DAY_ORDER.some(day => (service?.departureEvidenceByDay?.[day] ?? []).some(item => text(item?.stopPointId) === stop))) return true;
   const candidates = unique([...(service?.stopIds ?? []), ...(service?.assessedStops ?? [])]);
   const hasUnboundEntries = DAY_ORDER.some(day => [
@@ -1328,6 +1330,8 @@ function compareMain(first, second, representativeId, component = [first, second
     || schoolRestrictedLocalVariants(component).length > 0;
   const destinationEvidenceComparison = restrictedVariant
     ? [
+      Number(serviceRunsOnDay(second, 'saturday') || serviceRunsOnDay(second, 'sunday'))
+        - Number(serviceRunsOnDay(first, 'saturday') || serviceRunsOnDay(first, 'sunday')),
       secondSupport.destinationJourneys - firstSupport.destinationJourneys,
       secondSupport.destinationRecords - firstSupport.destinationRecords,
       secondSupport.journeys - firstSupport.journeys,

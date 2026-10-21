@@ -19,14 +19,42 @@ const controls = [
   { id: 'chingford', label: 'Normanshire Drive, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250 },
   { id: 'pe1', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500 }
 ];
+const chingfordRouteMetadata657 = { id: '657', routeSections: [
+  { id: '657-out', direction: 'outbound', originationName: "Salisbury Hall Sainsbury's", destinationName: "Bancroft's School" },
+  { id: '657-in', direction: 'inbound', originationName: "Bancroft's School", destinationName: "Salisbury Hall Sainsbury's" }
+] };
+const chingfordStops657 = [
+  { id: 'GROVE-P', name: 'Grove Road', indicator: 'P' },
+  { id: 'MAPLETON-HA', name: 'Mapleton Road', indicator: 'HA' },
+  { id: 'GROVE-N', name: 'Grove Road', indicator: 'N' },
+  { id: '657-END', name: "Bancroft's School" },
+  { id: '657-ORIGIN', name: "Salisbury Hall Sainsbury's" }
+];
+function chingfordTimetable657({ stopId, direction, patternId, destination, time, adjacentTime, adjacentId }) {
+  return {
+    lineId: '657', lineName: '657', direction, stations: chingfordStops657,
+    timetable: { departureStopId: stopId, routes: [{ stationIntervals: [{ id: patternId, intervals: [
+      { stopId, timeToArrival: 0 }, { stopId: adjacentId, timeToArrival: 2 }, { stopId: destination === "Bancroft's School" ? '657-END' : '657-ORIGIN', timeToArrival: 40 }
+    ] }], schedules: [{ name: 'Schooldays', knownJourneys: [{ intervalId: patternId, vehicleJourneyId: `657-${direction}-morning`, stopTimes: [
+      { stopId, departureTime: { hour: Math.floor(time / 60), minute: time % 60 } },
+      { stopId: adjacentId, departureTime: { hour: Math.floor(adjacentTime / 60), minute: adjacentTime % 60 } }
+    ] }] }] }] }
+  };
+}
+const chingfordTimetables657 = {
+  'GROVE-P': chingfordTimetable657({ stopId: 'GROVE-P', direction: 'outbound', patternId: '657-out', destination: "Bancroft's School", time: 476, adjacentTime: 478, adjacentId: 'MAPLETON-HA' }),
+  'GROVE-N': chingfordTimetable657({ stopId: 'GROVE-N', direction: 'inbound', patternId: '657-in', destination: "Salisbury Hall Sainsbury's", time: 982, adjacentTime: 984, adjacentId: '657-ORIGIN' })
+};
 const report = { schema: 'atlas-bus-s2e1-normal-product-browser-word-audit-v1', candidateRoot, candidateRun: '39430415441', candidateArtifactId: '12275615359', candidateDigest: 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471', candidateProducerSha: '151199cc914c235870f444d26b03c2309edbd035', acquisitionAttempted: false, publicationAttempted: false, deploymentAttempted: false, controls: {}, failures: [] };
 const errors = [];
+report.chingfordFixtureNote = 'Chingford route 657 browser regression uses the existing fixture-backed timetable golden. Fixture StopPoint coordinates are anchored at the confirmed control point solely for deterministic radius matching and are not represented as live TfL location evidence.';
 const failedRequests = [];
 const failedResponses = [];
 const externalRequests = [];
 const statusManifestFallbacks = [];
 let server;
 let browser;
+let activeControl = null;
 
 function zipEntry(bytes, entryName) {
   const signature = 0x02014b50;
@@ -113,8 +141,24 @@ try {
     }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'Ok', routes: [{ distance: 100, duration: 60, geometry: { type: 'LineString', coordinates: [[-0.03, 51.68], [-0.031, 51.681]] } }] }) });
   });
-  await page.route('https://api.tfl.gov.uk/**', route => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }));
+  await page.route('https://api.tfl.gov.uk/**', route => {
+    if (activeControl?.id !== 'chingford') return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
+    const url = new URL(route.request().url());
+    let body = [];
+    if (url.pathname === '/StopPoint') body = { stopPoints: ['GROVE-P', 'GROVE-N'].map((id, index) => ({ id, naptanId: id, commonName: 'Grove Road', indicator: index ? 'N' : 'P', towards: index ? "Salisbury Hall Sainsbury's" : "Bancroft's School", lat: 51.616596, lon: -0.0117893, stopType: 'NaptanPublicBusCoachTram', lines: [{ id: '657', name: '657' }] })) };
+    else if (url.pathname === '/Line/657/Route') body = [chingfordRouteMetadata657];
+    else if (url.pathname === '/Line/657/Timetable/GROVE-P') body = chingfordTimetables657['GROVE-P'];
+    else if (url.pathname === '/Line/657/Timetable/GROVE-N') body = chingfordTimetables657['GROVE-N'];
+    else if (url.pathname.startsWith('/Line/657/Route/Sequence/')) {
+      const direction = url.pathname.endsWith('/inbound') ? 'inbound' : 'outbound';
+      body = { lineId: '657', direction, stopPointSequences: [{ branchId: direction === 'inbound' ? 2 : 1, serviceType: 'Regular', stopPoint: direction === 'inbound'
+        ? [{ naptanId: '657-END' }, { naptanId: 'GROVE-N' }, { naptanId: '657-ORIGIN' }]
+        : [{ naptanId: '657-ORIGIN' }, { naptanId: 'GROVE-P' }, { naptanId: '657-END' }] }] };
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+  });
   for (const control of controls) {
+    activeControl = control;
     const outcome = { label: control.label };
     try {
       await page.goto(new URL('atlas/', baseUrl).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -126,7 +170,25 @@ try {
       assert.equal(await page.locator('#findStops').isEnabled(), true, 'Normal workflow did not enable Bus assessment after confirming the site.');
       await page.locator('#findStops').click();
       await page.locator('#taskStatusMessage').waitFor({ state: 'visible', timeout: 180000 });
-      await page.waitForFunction(() => ['complete', 'partial', 'unavailable'].includes(document.querySelector('#taskStatus')?.dataset.phase), undefined, { timeout: 180000 });
+      const continueStaged = page.locator('#assessmentScope button').filter({ hasText: 'Continue full staged assessment' });
+      await page.waitForFunction(() => {
+        const phase = document.querySelector('#taskStatus')?.dataset.phase;
+        const terminal = ['complete', 'partial', 'unavailable'].includes(phase);
+        const staged = [...document.querySelectorAll('#assessmentScope button')].some(button => button.textContent.includes('Continue full staged assessment'));
+        return terminal || staged;
+      }, undefined, { timeout: 180000 });
+      if (await continueStaged.count()) await continueStaged.click();
+      try {
+        await page.waitForFunction(() => ['complete', 'partial', 'unavailable'].includes(document.querySelector('#taskStatus')?.dataset.phase), undefined, { timeout: 180000 });
+      } catch (error) {
+        const lastStatus = await page.evaluate(() => ({
+          phase: document.querySelector('#taskStatus')?.dataset.phase || null,
+          message: document.querySelector('#taskStatusMessage')?.textContent?.trim() || null,
+          busy: document.querySelector('#taskStatus')?.getAttribute('aria-busy') || null,
+          stagedScopeVisible: document.querySelector('#assessmentScope')?.hidden === false
+        }));
+        throw new Error(`${error.message}; last normal-workflow state: ${JSON.stringify(lastStatus)}`);
+      }
       const serviceTable = page.locator('.bus-service-summary');
       const wrap = serviceTable.locator('xpath=ancestor::div[contains(@class,"table-wrap")]');
       const scroll = await wrap.evaluate(element => ({ client: element.clientWidth, scroll: element.scrollWidth }));
@@ -197,7 +259,12 @@ try {
         assert.doesNotMatch(`${checksText} ${exportedWordText}`, /Planner review required for:\s*(?:217|279|317|327|491|N279)|timetable data unavailable\/incomplete for 1 assessed stop/i, 'Waltham output contains a known false review/incomplete warning.');
         assert.match(rendered.find(row => row.Route === '13')?.['Direction / main service pattern'] || '', /13|Two Brewers|Waltham/i, 'Waltham route 13 principal presentation is missing.');
       }
-      if (control.id === 'chingford') assert.ok(rendered.some(row => row.Route === '657'), 'Chingford golden control lost route 657.');
+      if (control.id === 'chingford') {
+        const route657 = rendered.find(row => row.Route === '657');
+        assert.ok(route657, 'Chingford golden control lost route 657.');
+        assert.match(route657['Typical frequency'], /Mon-Fri: 1 journey\/day/i, 'Chingford route 657 fixture golden frequency changed.');
+        assert.match(route657['Operating period at stop'], /07:56|16:22/, 'Chingford route 657 fixture golden timetable time changed.');
+      }
       if (control.id === 'pe1') {
         const rows102 = rendered.filter(row => row.Route === '102');
         const keys102 = rows102.map(row => [row['Direction / main service pattern'], row['Principal locations'], row['Typical frequency']].join('|').toLowerCase().replace(/\s+/g, ' ').trim());

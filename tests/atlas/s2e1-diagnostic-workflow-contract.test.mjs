@@ -5,6 +5,7 @@ const workflow = await readFile(new URL('../../.github/workflows/atlas-bus-beta-
 const dispatchWorkflow = await readFile(new URL('../../.github/workflows/atlas-bus-data-refresh.yml', import.meta.url), 'utf8');
 const diagnostic = await readFile(new URL('./s2e1-real-candidate-diagnostic.mjs', import.meta.url), 'utf8');
 const normalRuntime = await readFile(new URL('./s2e1-normal-runtime-candidate-diagnostic.mjs', import.meta.url), 'utf8');
+const manualBrowserAudit = await readFile(new URL('./s2e1-manual-product-audit.mjs', import.meta.url), 'utf8');
 
 assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-intelligence-restoration/);
 assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-c1-manual-corrections/);
@@ -56,6 +57,9 @@ assert.match(normalRuntime, /publicationAttempted: false, deploymentAttempted: f
 assert.match(normalRuntime, /sameCandidatePreparedOnlyComparison/);
 for (const site of ['waltham', 'pipers', 'pe1', 'queensgate']) assert.ok(new RegExp('^\\s*' + site + ':', 'm').test(normalRuntime));
 assert.doesNotMatch(normalRuntime, /^\s*chingford:/m, 'Chingford must not be represented by an empty-TfL national control');
+assert.match(manualBrowserAudit, /Continue full staged assessment/, 'normal browser audit must continue staged Waltham/PE1 assessments');
+assert.match(manualBrowserAudit, /GROVE-P[\s\S]*GROVE-N[\s\S]*657-out[\s\S]*657-in/, 'rendered Chingford control must use the fixture-backed route 657 golden evidence');
+assert.match(manualBrowserAudit, /Normal rendered Bus assessment has no service rows/);
 assert.match(normalRuntime, /createDeterministicEmptyTflFetch/);
 const deterministicTflHelper = await readFile(new URL('./helpers/s2e1-deterministic-empty-tfl.mjs', import.meta.url), 'utf8');
 assert.ok(deterministicTflHelper.includes('stopPoints: []'));

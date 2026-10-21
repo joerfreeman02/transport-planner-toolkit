@@ -394,6 +394,14 @@ const report = {
   candidateProducerSha: '151199cc914c235870f444d26b03c2309edbd035',
   candidateArtifactId: '12275615359',
   candidateArtifactDigest: 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471',
+  pipelineCoverage: {
+    stopDiscovery: 'prepared-bus-data-adapter-only',
+    timetableData: 'prepared-bus-data-adapter-only',
+    productionBrowserStopDiscovery: 'create-bus-stop-discovery-with-tfl-and-prepared-naptan',
+    productionBrowserTimetableData: 'authoritative-adapter-with-tfl-and-prepared-national-sources',
+    browserParity: 'not-established',
+    firstUncomparedStage: 'stop-discovery-and-timetable-adapter-population'
+  },
   sourceAcquisition: false,
   nationalPreparation: false,
   publicationAttempted: false,

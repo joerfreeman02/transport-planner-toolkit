@@ -76,3 +76,17 @@ Not yet completed:
 No fresh acquisition, candidate rebuild, publication, deployment, PR, merge, or release was performed. No candidate files were modified. No derived-data builder change has been shown necessary. The browser Source order and domain corrections have fixture/unit evidence only and are not a substitute for the real-candidate hosted gates. Source hierarchy remains TfL > BODS > TNDS; no universal BODS/TNDS identity bridge was added.
 
 Remaining acceptance blockers include planner grouping and source arbitration at PE1/Queensgate, the actual browser-vs-harness Waltham discrepancy, warning/technical-detail presentation, and all hosted final-SHA validations. Therefore the S2E-1 status remains **NOT READY FOR MANUAL RE-ACCEPTANCE**.
+
+## Continuation from 232c5d3
+
+The Product Owner supplied the original S2E-1 continuation brief. Work remains on the same branch; no new sprint or branch was started. The initial continuation checkout matched origin at `232c5d3eb8531a7995bd6cb99c3c8584f4230015`. The preserved `.tmp/` directory remains untracked and untouched.
+
+The Waltham comparison has one proven earlier pipeline difference: the hosted diagnostic directly injects the prepared bus adapter for both stop discovery and timetable lookup, while the normal browser uses `createBusStopDiscovery` (TfL plus prepared NaPTAN) and `createAuthoritativeBusTimetableAdapter` (TfL plus prepared national evidence). This difference occurs before service assessment and grouping, so the diagnostic's route 13 result cannot establish parity with the browser's reported 13A principal. The diagnostic report now records this limitation and marks browser parity as not established. No claim is made that the missing TfL population alone explains the 13/13A representative discrepancy; a same-candidate normal-runtime comparison is still required.
+
+The browser's Detailed Evidence panel now presents concise operator, source, calendar, pattern-coverage counts and resolved endpoint names. Raw service identifiers, StopPoint ID lists, fragment identities, NPTG/StopArea traces and source-reconciliation dumps remain in the in-memory assessment result for diagnostics but are no longer rendered in that panel.
+
+Continuation checks passed: S2E-1 diagnostic workflow contract; Bus UI contract; S2E planner-correction tests; Alpha.14 row consolidation; Alpha.15 planner service grouping; DEST endpoint and endpoint-alias tests; CIRC tests; calendar/frequency tests; source presentation; Word export; app and diagnostic syntax checks; `git diff --check`; and the lightweight Python `test_build_static_index.py` suite (19 tests).
+
+The complete `node tests/atlas/run-all.mjs` did not complete: the first browser shard test failed while atomically renaming a generated synthetic shard in the sandbox temporary directory (`EPERM`). The full Python Bus-data suite was stopped when it entered the national-scale handoff test, in keeping with the local-machine restriction; it also reported fixture/path errors before the stop. Neither result is a passing full-suite result. Hosted final-SHA testing remains necessary.
+
+The PE1/Queensgate consolidation, DEST result validation, warning materiality, real-candidate frequency/calendar values, full browser parity and final-SHA hosted gates remain outstanding. No national candidate data was downloaded, extracted, prepared or rebuilt locally.

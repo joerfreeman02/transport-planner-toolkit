@@ -18,7 +18,7 @@ import { createBusAssessment, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/
 import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
 import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-task-status.mjs';
 import { buildBusTimetablePresentationNote, buildPlannerBusServiceSummaries, plannerRouteDisplayNumber, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
-import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination, operatorProvenanceLabel } from '../../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, isOtherNearbyStopRecord, partialTimetableQualification, plannerFacingServiceNote, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { plannerStopWarning, recommendedBusStop } from '../../../src/atlas/domain/bus-planner-trust.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
@@ -690,41 +690,23 @@ function renderAssessment(result) {
         const heading = document.createElement('strong');
         heading.textContent = `${service.routeNumber || 'Route not supplied'} · ${service.origin || 'Origin not supplied'} – ${service.destination || 'Destination not supplied'}`;
         const detail = document.createElement('p');
-        const stopIds = Object.keys(service.stopSchedules ?? {}).join(', ') || 'no selected StopPoint';
-        const pattern = service.source?.patternVariantId || service.source?.patternId || service.source?.intervalId || service.id || 'pattern identity not supplied';
         const planner = (result.serviceSummaries ?? []).find(summary => (summary.sourceRecordIds ?? []).includes(service.id))
           || (result.plannerServiceSummaries ?? []).find(summary => (summary.sourceRecordIds ?? []).includes(service.id));
-        const endpointLines = ['origin', 'destination'].flatMap(side => {
+        const endpointLines = ['origin', 'destination'].map(side => {
           const decision = planner?.[`${side}EndpointDecision`];
-          if (!decision) return [];
-          const evidence = decision.evidence || {};
-          const requested = (decision.requestedEndpointStopPointIds ?? []).join(', ') || 'none';
-          const hydrated = (decision.hydratedEndpointStopPointIds ?? []).join(', ') || 'none';
-          const unresolved = (decision.unresolvedEndpointStopPointIds ?? []).join(', ') || 'none';
-          const physicalStops = (evidence.endpointEvidenceSet ?? [])
-            .filter(item => item.hydrated && item.physicalStop)
-            .map(item => `${item.endpointStopPointId}: ${item.physicalStop.name || 'name not supplied'}`).join('; ') || 'none resolved';
-          const localities = (evidence.localities ?? [])
-            .map(locality => `${locality.name || 'name not supplied'}${locality.code ? ` [${locality.code}]` : ''}`).join('; ') || 'none resolved';
-          const stopAreas = (evidence.stopAreas ?? [])
-            .map(area => `${area.name || 'name not supplied'}${area.id ? ` [${area.id}]` : ''}`).join('; ') || 'none resolved';
-          const preparedEvidence = Object.values(evidence.endpointEvidenceById ?? {})
-            .map(item => item?.preparedEvidence)
-            .find(Boolean);
-          const preparedSummary = preparedEvidence
-            ? `Source evidence — ${decision.evidenceSource || 'not supplied'} · GTFS stop_id: ${preparedEvidence.rawGtfsStopId || 'not supplied'} · stop_code: ${preparedEvidence.rawGtfsStopCode || 'not supplied'} · stop_name: ${preparedEvidence.rawGtfsStopName || 'not supplied'} · exact match: ${preparedEvidence.exactMatchMethod || 'not supplied'} · NaPTAN: ${preparedEvidence.resolvedStopPointId || 'not supplied'} / ${preparedEvidence.naptanCode || 'code not supplied'} · indicator: ${preparedEvidence.indicator || 'not supplied'} · stop type: ${preparedEvidence.stopType || 'not supplied'} · NPTG parent: ${preparedEvidence.parentLocalityName || preparedEvidence.parentLocalityId || 'none supplied'} · headsign: ${preparedEvidence.provenance?.tripHeadsign || 'not supplied'} · route long name: ${preparedEvidence.provenance?.routeLongName || 'not supplied'} · route description: ${preparedEvidence.provenance?.routeDescription || 'not supplied'} · source: ${preparedEvidence.provenance?.source || 'not supplied'}`
-            : `Source evidence — ${decision.evidenceSource || 'not supplied'} · no persisted prepared endpoint record`;
-          return [
-            `${side[0].toUpperCase() + side.slice(1)} — raw: ${decision.rawEndpointText || 'not supplied'} · primary endpoint ID: ${decision.primaryEndpointStopPointId || 'none'} · requested IDs: ${requested} · hydrated IDs: ${hydrated} · unresolved IDs: ${unresolved} · physical stops: ${physicalStops} · NPTG localities: ${localities} · StopAreas: ${stopAreas} · planner endpoint/place: ${decision.chosenDisplayName || 'Destination requires review'} · decision type: ${decision.decisionType || 'not supplied'} · partial coverage: ${decision.partialExactCoverage ? 'yes' : 'no'} · conflict: ${decision.conflict ? 'yes' : 'no'} · reason: ${decision.reason}`,
-            preparedSummary,
-          ];
+          const label = side[0].toUpperCase() + side.slice(1);
+          if (!decision) return `${label}: ${service[side] || 'not supplied'} · source resolution not available`;
+          const state = decision.conflict ? 'conflicting evidence' : decision.unresolved ? 'needs review' : 'resolved';
+          return `${label}: ${decision.chosenDisplayName || service[side] || 'not supplied'} · ${state}`;
         });
-        const sourceRouteIds = service.sourceRouteIds ?? service.source?.sourceRouteIds ?? [];
-        const orderedPattern = service.routePatternStopIds ?? service.orderedPatternEndpoints ?? [];
-        const sourceIdentity = `Route/source identity: ${sourceRouteIds.join(', ') || service.source?.lineId || service.routeNumber || 'not supplied'} · direction: ${service.direction || 'not supplied'} · operator: ${service.operator || 'not supplied'} · operator provenance: ${operatorProvenanceLabel(service)} · calendar: ${service.calendarProfileId || 'not supplied'} · origin StopPoint IDs: ${(service.originStopPointIds ?? [service.originStopPointId]).filter(Boolean).join(', ') || 'not supplied'} · destination StopPoint IDs: ${(service.destinationStopPointIds ?? [service.destinationStopPointId]).filter(Boolean).join(', ') || 'not supplied'} · ordered pattern StopPoint IDs: ${orderedPattern.join(' → ') || 'not supplied'}`;
-        const sourceNotes = [...(service.qualifications ?? []), ...(service.sourceWarnings ?? [])].filter(Boolean).map(note => `Technical source note — ${note}`);
-        const reconciliationLines = (service.sourceAuthorityDiagnostics ?? []).map(diagnostic => `Technical source reconciliation — ${diagnostic.provider}: fields ${diagnostic.fields.join(', ')} differ; classification ${diagnostic.classification}; authoritative result ${diagnostic.authoritativeProvider}.`);
-        detail.textContent = [`Pattern: ${pattern} · Stops: ${stopIds} · Source: ${service.timetableSource || service.source?.provider || 'timetable source'}`, sourceIdentity, ...endpointLines, ...sourceNotes, ...reconciliationLines].join('\n');
+        const calendar = service.calendarProfileLabel || service.calendarProfileId || 'not supplied';
+        const servedStopCount = Object.keys(service.stopSchedules ?? {}).length;
+        const patternStopCount = (service.routePatternStopIds ?? []).length;
+        detail.textContent = [
+          `Operator: ${service.operator || 'not supplied'} · Source: ${service.timetableSource || service.source?.provider || 'not supplied'} · Calendar: ${calendar}`,
+          `Pattern coverage: ${patternStopCount || 'not supplied'} route stops · ${servedStopCount} assessed stops`,
+          ...endpointLines
+        ].join('\n');
         article.append(heading, detail);
         detailRows.append(article);
       }

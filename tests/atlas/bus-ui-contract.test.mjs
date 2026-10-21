@@ -31,6 +31,8 @@ assert.match(app, /createTflRequestScheduler/);
 assert.match(app, /requestScheduler: tflRequestScheduler/);
 assert.match(app, /detailedEvidenceVisible/);
 assert.match(app, /Show detailed evidence/);
+assert.match(app, /Pattern coverage:/);
+assert.doesNotMatch(app, /NPTG localities:|StopAreas:|Technical source note —|Technical source reconciliation —/);
 assert.match(app, /The assessment radius changed\. Build the Bus assessment again to update the evidence\./);
 assert.match(app, /pendingScopeDiscovery/);
 assert.match(app, /discoveryOverride/);

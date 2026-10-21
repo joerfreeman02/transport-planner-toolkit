@@ -22,6 +22,10 @@ assert.doesNotMatch(workflow, /TNDS_USERNAME|TNDS_PASSWORD|refresh_bus_data\.py|
 for (const site of ['waltham', 'pipers', 'chingford', 'pe1', 'queensgate']) assert.match(diagnostic, new RegExp(`id: '${site}'`));
 for (const field of ['rawServiceRecords', 'serviceSummaries', 'plannerRows', 'rowCounts', 'circularServiceDecision', 'wordRouteParity', 'uniqueDeparturesByDay', 'operatingPeriods', 'sourceAuthority']) assert.ok(diagnostic.includes(field), `diagnostic must retain ${field}`);
 assert.match(diagnostic, /candidateProducerRun: '39430415441'/);
+assert.match(diagnostic, /stopDiscovery: 'prepared-bus-data-adapter-only'/);
+assert.match(diagnostic, /productionBrowserStopDiscovery: 'create-bus-stop-discovery-with-tfl-and-prepared-naptan'/);
+assert.match(diagnostic, /productionBrowserTimetableData: 'authoritative-adapter-with-tfl-and-prepared-national-sources'/);
+assert.match(diagnostic, /browserParity: 'not-established'/);
 assert.match(diagnostic, /sourceAcquisition: false/);
 assert.match(diagnostic, /nationalPreparation: false/);
 assert.match(diagnostic, /publicationAttempted: false/);

@@ -160,6 +160,8 @@ test('source-unavailable route-bearing stops remain recommended while Other near
   assert.equal(recommendedBusStop({ id: 'other', transportMode: 'bus_coach', routes: [], timetableMatch: false, timetableEvidenceStatus: 'SOURCE_UNAVAILABLE' }), false);
   assert.equal(plannerStopWarning('The prepared dataset reported no bus stops within the selected distance.', { stops: [{ id: 'waltham-1' }] }), '');
   assert.equal(plannerStopWarning('The prepared dataset reported no bus stops within the selected distance.', { stops: [] }), 'No bus stops were found within the selected distance.');
+  assert.equal(plannerStopWarning('TNDS JP_52-230 includes special-day operating metadata (SpecialDaysOperation); regular-day evidence was retained, but special dates require review.'), '');
+  assert.equal(plannerStopWarning('Some timetables contain date-specific changes. Check the assessment date before formal use.'), 'Some timetables contain date-specific changes. Check the assessment date before formal use.');
 });
 
 test('station access infrastructure is not reported as a missing timetable call point', async () => {

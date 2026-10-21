@@ -6,6 +6,7 @@ import { isOtherNearbyStopRecord } from './bus-source-presentation.mjs';
  */
 export function plannerStopWarning(warning, result = null) {
   const text = String(warning ?? '');
+  if (/SpecialDaysOperation|special-day operating metadata/i.test(text)) return '';
   if (/sidecar|prepared v1 data does not contain|logical stoparea|nptg locality/i.test(text)) return '';
   if (/incomplete/i.test(text)) return 'Some incomplete stop records were left out.';
   if (/duplicate/i.test(text)) return 'Repeated stop records were counted once.';

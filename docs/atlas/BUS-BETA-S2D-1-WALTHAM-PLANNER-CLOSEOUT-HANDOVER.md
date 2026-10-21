@@ -51,7 +51,7 @@ All planner rows retain route-family members `13`, `13A`, `13B`, and `13C`; the 
 - **Browser smoke:** the HTTP-served headless assessment harness loaded the production Bus assessment/adapter modules and real candidate files. All five controls ran; 85 requests completed with zero failed requests and zero page errors. Pipers browser result retained 230/231 and complete supplementary provenance. This exercised the assessment runtime; it did not automate address-provider/geocoder or map-tile interaction in the full visual shell.
 - **Word export parity:** PASS for Waltham, Pipers, and Chingford. The audit compared each actual candidate assessment's planner route identity set with the existing `buildBusWordTables` export model. No route identity was missing or extra.
 
-The audit recorded all five site controls as PASS, all eight regional checks as PASS, zero failed checks, and `READY_FOR_TECHNICAL_DIRECTOR_REVIEW_BEFORE_MANUAL_ACCEPTANCE`.
+The audit recorded all five site controls as PASS, all eight regional checks as PASS, all 31 audit checks as PASS, zero failed checks, and `READY_FOR_TECHNICAL_DIRECTOR_REVIEW_BEFORE_MANUAL_ACCEPTANCE`.
 
 ## Tests and hosted evidence
 
@@ -96,3 +96,4 @@ Focused local checks passed: `node tests/atlas/review-candidate-workflow-contrac
 No Waltham candidate-to-planner defect was found. The Pipers mixed closed/open route-family circular decision remains conservative and its full evidence/reason is available in the audit artifact. The browser result covers the assessment runtime and candidate data, not visual map/geocoder interaction.
 
 **Status:** `READY FOR TECHNICAL DIRECTOR REVIEW BEFORE MANUAL ACCEPTANCE`
+

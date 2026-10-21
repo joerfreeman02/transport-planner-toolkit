@@ -563,18 +563,18 @@ jobs:
           if [[ "$EVENT_NAME" != 'workflow_dispatch' ]]; then
             echo '::error::S2D-1 accepts workflow_dispatch only.'; exit 1
           fi
-          if [[ "$CANDIDATE_MODE" == 'disabled' ]]; then
-            if [[ "$PREPARED_SCHEMA" != 'v2' || "$MEASURE_ONLY" != 'true' || "$FORCE_REFRESH" != 'true' || -n "$RESUME_RUN_ID" || "$EXPECTED_SNAPSHOT_ID" != 'TNDS-TRUST-PREFLIGHT-C1B' || -n "$SOURCE_RUN_ID$EXPECTED_SOURCE_COUNT$EXPECTED_TOTAL_BYTES$PRIMARY_RUN$PRIMARY_ID$PRIMARY_DIGEST$TNDS_RUN$TNDS_ID$TNDS_DIGEST$CANDIDATE_RUN$CANDIDATE_ID$CANDIDATE_DIGEST" ]]; then
-              echo '::error::S2D-1 offline preflight accepts only the exact zero-download selector.'; exit 1
-            fi
-            echo 'trust_mode=offline_preflight' >> "$GITHUB_OUTPUT"
-            echo 'review_candidate_mode=' >> "$GITHUB_OUTPUT"
-          elif [[ "$CANDIDATE_MODE" == 'disabled' && "$CANDIDATE_RUN" == '39430415441' && "$CANDIDATE_ID" == '12275615359' && "$CANDIDATE_DIGEST" == 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471' ]]; then
+          if [[ "$CANDIDATE_MODE" == 'disabled' && "$CANDIDATE_RUN" == '39430415441' && "$CANDIDATE_ID" == '12275615359' && "$CANDIDATE_DIGEST" == 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471' ]]; then
             if [[ "$PREPARED_SCHEMA" != 'v1' || "$MEASURE_ONLY" != 'false' || "$FORCE_REFRESH" != 'false' || -n "$RESUME_RUN_ID$EXPECTED_SNAPSHOT_ID$SOURCE_RUN_ID$EXPECTED_SOURCE_COUNT$EXPECTED_TOTAL_BYTES$PRIMARY_RUN$PRIMARY_ID$PRIMARY_DIGEST$TNDS_RUN$TNDS_ID$TNDS_DIGEST" ]]; then
               echo '::error::S2D-1 retained audit requires the exact Run #75 candidate selector and blank acquisition/source selectors.'; exit 1
             fi
             echo 'trust_mode=review_candidate' >> "$GITHUB_OUTPUT"
             echo 'review_candidate_mode=audit_retained_candidate' >> "$GITHUB_OUTPUT"
+          elif [[ "$CANDIDATE_MODE" == 'disabled' ]]; then
+            if [[ "$PREPARED_SCHEMA" != 'v2' || "$MEASURE_ONLY" != 'true' || "$FORCE_REFRESH" != 'true' || -n "$RESUME_RUN_ID" || "$EXPECTED_SNAPSHOT_ID" != 'TNDS-TRUST-PREFLIGHT-C1B' || -n "$SOURCE_RUN_ID$EXPECTED_SOURCE_COUNT$EXPECTED_TOTAL_BYTES$PRIMARY_RUN$PRIMARY_ID$PRIMARY_DIGEST$TNDS_RUN$TNDS_ID$TNDS_DIGEST$CANDIDATE_RUN$CANDIDATE_ID$CANDIDATE_DIGEST" ]]; then
+              echo '::error::S2D-1 offline preflight accepts only the exact zero-download selector.'; exit 1
+            fi
+            echo 'trust_mode=offline_preflight' >> "$GITHUB_OUTPUT"
+            echo 'review_candidate_mode=' >> "$GITHUB_OUTPUT"
           else
             echo '::error::S2D-1 accepts only offline_preflight or audit_retained_candidate.'; exit 1
           fi

@@ -609,7 +609,7 @@ jobs:
             exit 1
           fi
           echo 'trust_mode=s2e1_diagnostic' >> "$GITHUB_OUTPUT"
-          echo 's2e1_mode=baseline_diagnosis' >> "$GITHUB_OUTPUT"
+          echo 's2e1_mode=normal_runtime_diagnosis' >> "$GITHUB_OUTPUT"
       - name: Resolve S2C-3 exact offline preflight or pinned Run #53 compose selector
         id: s2c-3-selector
         if: github.ref == 'refs/heads/codex/atlas-bus-beta-s2c-3-oversized-service-closeout'
@@ -1134,12 +1134,12 @@ jobs:
       contents: read
 
   s2e1-frozen-candidate-diagnosis:
-    name: S2E-1 frozen Run #75 planner-intelligence diagnosis
+    name: S2E-1 frozen Run #75 normal-runtime diagnosis
     needs: main-guard
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration' && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 's2e1_diagnostic' && needs.main-guard.outputs.s2e1_mode == 'baseline_diagnosis'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration' && needs.main-guard.result == 'success' && needs.main-guard.outputs.trust_mode == 's2e1_diagnostic' && needs.main-guard.outputs.s2e1_mode == 'normal_runtime_diagnosis'
     uses: ./.github/workflows/atlas-bus-beta-s2e1-diagnosis.yml
     with:
-      mode: baseline_diagnosis
+      mode: normal_runtime_diagnosis
     permissions:
       actions: read
       contents: read

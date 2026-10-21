@@ -1770,9 +1770,11 @@ function familyStem(row) {
 
 function familyPrincipalScore(row) {
   const profileIds = row?.calendarProfileIds ?? [];
+  const stem = familyStem(row);
   const departurePopulation = Object.values(row?.canonicalDeparturePopulationAll ?? {}).flat().length;
   return Object.freeze({
     routeNumber: text(row?.routeNumber),
+    exactFamilyStem: Number(Boolean(stem) && text(row?.routeNumber).toUpperCase() === text(stem).toUpperCase()),
     endpointSupport: assessedEndpointSupport(row),
     patternExtent: Number(row?.routePatternExtent) || 0,
     ordinaryCalendar: Number(profileIds.includes('ordinary')),
@@ -1784,7 +1786,8 @@ function familyPrincipalScore(row) {
 
 function compareFamilyPrincipalEvidence(left, right) {
   const leftScore = familyPrincipalScore(left), rightScore = familyPrincipalScore(right);
-  return rightScore.endpointSupport - leftScore.endpointSupport
+  return rightScore.exactFamilyStem - leftScore.exactFamilyStem
+    || rightScore.endpointSupport - leftScore.endpointSupport
     || rightScore.patternExtent - leftScore.patternExtent
     || rightScore.ordinaryCalendar - leftScore.ordinaryCalendar
     || rightScore.timetablePopulation - leftScore.timetablePopulation
@@ -1800,7 +1803,7 @@ function selectFamilyPrincipal(members) {
   const firstScore = first ? familyPrincipalScore(first) : null;
   const secondScore = second ? familyPrincipalScore(second) : null;
   const evidenceDifference = firstScore && secondScore
-    ? ['endpointSupport', 'patternExtent', 'ordinaryCalendar', 'timetablePopulation', 'activity', 'principalLocationCount']
+    ? ['exactFamilyStem', 'endpointSupport', 'patternExtent', 'ordinaryCalendar', 'timetablePopulation', 'activity', 'principalLocationCount']
       .some(field => firstScore[field] !== secondScore[field])
     : Boolean(first);
   return Object.freeze({

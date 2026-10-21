@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       mode:
-        description: Run the exact frozen Run #75 planner-intelligence baseline diagnosis.
+        description: Run a diagnostic against the exact frozen Run #75 candidate using production adapter composition.
         required: true
         type: string
 
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   frozen-candidate-diagnosis:
-    if: github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration' && inputs.mode == 'baseline_diagnosis'
+    if: github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration' && inputs.mode == 'normal_runtime_diagnosis'
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:
@@ -65,12 +65,12 @@ jobs:
         if: always() && hashFiles('restored/candidate-site/atlas/data/bus/manifest.json') != ''
         run: |
           mkdir -p candidate-diagnostic
-          node tests/atlas/s2e1-real-candidate-diagnostic.mjs restored/candidate-site candidate-diagnostic/diagnostic.json
-      - name: Upload real-candidate forensic report
+          node tests/atlas/s2e1-normal-runtime-candidate-diagnostic.mjs restored/candidate-site candidate-diagnostic/diagnostic.json
+      - name: Upload normal-runtime real-candidate forensic report
         if: always() && hashFiles('candidate-diagnostic/diagnostic.json') != ''
         uses: actions/upload-artifact@v4
         with:
-          name: atlas-bus-beta-s2e1-baseline-diagnostic-${{ github.run_id }}
+          name: atlas-bus-beta-s2e1-normal-runtime-diagnostic-${{ github.run_id }}
           path: candidate-diagnostic/diagnostic.json
           if-no-files-found: error
           retention-days: 90

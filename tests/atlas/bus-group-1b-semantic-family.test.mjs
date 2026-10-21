@@ -74,6 +74,14 @@ assert.equal(trueFamily[0].routeNumber, '50');
 assert.equal(trueFamily[0].routeFamilyLabel, '50 / 50A / 50B');
 assert.equal(trueFamily[0].routeFamilyMembers.length, 3);
 
+const stemPreferredOverLargerVariant = buildPlannerBusServiceSummaries([
+  genericService({ id: '60-main', routeNumber: '60', origin: 'Alpha', destination: 'Gamma', pattern: ['A', 'B', 'C'], recordActivity: 1 }),
+  genericService({ id: '60a-branch', routeNumber: '60A', origin: 'Alpha', destination: 'Delta', pattern: ['A', 'B', 'C', 'D', 'E'], recordActivity: 99 })
+], genericStops);
+assert.equal(stemPreferredOverLargerVariant.length, 1, 'supported route variants remain a single public family');
+assert.equal(stemPreferredOverLargerVariant[0].routeNumber, '60', 'the exact public stem remains the representative even when a suffix has more evidence');
+assert.equal(stemPreferredOverLargerVariant[0].publicRouteFamilyDecision.principalSelectionEvidence[0].exactFamilyStem, 1);
+
 const falseStem = buildPlannerBusServiceSummaries([
   genericService({ id: '42', routeNumber: '42', origin: 'North', destination: 'North End', pattern: ['A', 'B', 'N'] }),
   genericService({ id: '42a', routeNumber: '42A', origin: 'South', destination: 'South End', pattern: ['D', 'E', 'S'] })

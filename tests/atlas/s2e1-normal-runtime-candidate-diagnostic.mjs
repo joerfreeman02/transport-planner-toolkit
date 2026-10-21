@@ -9,6 +9,7 @@ import { createAuthoritativeBusTimetableAdapter } from '../../src/atlas/adapters
 import { createAtlasReferenceData } from '../../src/atlas/reference-data/atlas-reference-data.mjs';
 import { createBusStopDiscovery } from '../../src/atlas/application/bus-stop-discovery.mjs';
 import { createBusAssessment } from '../../src/atlas/application/bus-assessment.mjs';
+import { buildPlannerBusServiceSummaries } from '../../src/atlas/domain/bus-planner-summary.mjs';
 import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
 import { createDeterministicEmptyTflFetch } from './helpers/s2e1-deterministic-empty-tfl.mjs';
 
@@ -119,6 +120,29 @@ const plannerRows = assessment.plannerServiceSummaries.filter(row => wanted.has(
     routeNumber: member.routeNumber, origin: member.origin, destination: member.destination,
     typicalFrequencyLines: member.frequencyLines, operatingPeriodLines: member.operatingPeriodLines
   })) ?? []
+}));
+const detailedX4Rows = ['pe1', 'queensgate'].includes(controlId)
+  ? buildPlannerBusServiceSummaries(assessment.serviceSummaries.filter(row => route(row.routeNumber) === 'X4'), assessment.stops)
+  : [];
+const x4GroupingProbe = detailedX4Rows.map(row => ({
+  direction: row.directionPatternText, destination: row.destination, origin: row.origin,
+  servedAtStopId: row.servedAtStopId, timetableBasisStopLabel: row.timetableBasisStopLabel,
+  frequencyBasisStopId: row.frequencyBasisStopId, frequency: row.typicalFrequencyLines,
+  operatingPeriod: row.operatingPeriodLines, calendarProfileIds: row.calendarProfileIds,
+  principalSourceRecordId: row.publicServiceGroupingDecision?.principalPattern?.sourceRecordId ?? null,
+  shortWorkingRecordIds: row.publicServiceGroupingDecision?.shortWorkingRecordIds ?? [],
+  rawServices: (row.rawServiceSummaries ?? []).map(service => ({
+    id: service.id, origin: service.origin, destination: service.destination, direction: service.direction,
+    calendarProfileId: service.calendarProfileId ?? null, serviceNote: service.serviceNote ?? null,
+    frequencyBasisStopId: service.frequencyBasisStopId ?? null, stopIds: service.stopIds ?? [],
+    routePatternStopIds: service.routePatternStopIds ?? [],
+    typicalFrequencyLines: service.typicalFrequencyLines ?? service.frequency ?? [],
+    operatingPeriodLines: service.operatingPeriodLines ?? service.operatingPeriod ?? [],
+    departureCountsByDay: Object.fromEntries(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => [day,
+      Math.max((service.departuresByDay?.[day] ?? []).length, (service.departureEvidenceByDay?.[day] ?? []).length)])),
+    frequencyEvidenceCount: (service.frequencyEvidence ?? []).length,
+    sourceRecordIds: service.sourceRecordIds ?? []
+  }))
 }));
 
 const plannerRowsFor = target => plannerRows.filter(row => route(row.routeNumber) === target || (row.routeNumbers ?? []).some(value => route(value) === target));
@@ -256,6 +280,7 @@ const report = {
     rawRecordsByTargetRoute: Object.fromEntries([...wanted].map(r => [r, compactRawRows(rawRows.filter(row => route(row.routeNumber) === r))])),
     serviceSummariesByTargetRoute: Object.fromEntries([...wanted].map(r => [r, compactSummaryRows(serviceSummaries.filter(row => route(row.routeNumber) === r))])),
     plannerRowsByTargetRoute: Object.fromEntries([...wanted].map(r => [r, compactPlannerRows(plannerRowsFor(r))])),
+    x4GroupingProbe,
     rowConsolidationAudit,
     sourceProvenance: { sourceAuthorities: unique(serviceSummaries.map(row => row.timetableSource).filter(Boolean)), tflLiveRequests: 0 },
     warnings: (assessment.warnings ?? []).slice(0, 40) },

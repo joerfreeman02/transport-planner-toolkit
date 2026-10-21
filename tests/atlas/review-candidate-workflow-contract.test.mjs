@@ -74,7 +74,7 @@ assert.match(dispatcher, /refs\/heads\/codex\/atlas-bus-beta-s2b-c4-restore-auth
 
 const s2c1Selector = dispatcher.slice(
   dispatcher.indexOf('      - name: Resolve S2C-1 exact zero-download offline preflight selector'),
-  dispatcher.indexOf('      - name: Resolve exact-branch TRUST browser selector'),
+  dispatcher.indexOf('      - name: Check out exact S2C-2 commit for selector validation'),
 );
 assert.match(s2c1Selector, /if: github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-1-national-runtime-scale'/);
 assert.match(s2c1Selector, /PREPARED_SCHEMA" != 'v2'.*MEASURE_ONLY" != 'true'.*FORCE_REFRESH" != 'true'.*EXPECTED_SNAPSHOT_ID" != 'TNDS-TRUST-PREFLIGHT-C1B'/);
@@ -89,7 +89,7 @@ assert.doesNotMatch(dispatcher.slice(dispatcher.indexOf('\n  s2a-c1-review-candi
 
 const s2c2Selector = dispatcher.slice(
   dispatcher.indexOf('      - name: Resolve S2C-2 exact offline preflight or pinned Run #53 compose selector'),
-  dispatcher.indexOf('      - name: Resolve exact-branch TRUST browser selector'),
+  dispatcher.indexOf('      - name: Check out exact S2C-3 commit for selector validation'),
 );
 assert.match(s2c2Selector, /if: github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-2-candidate-replay-authority'/);
 assert.match(s2c2Selector, /run: python tools\/atlas-bus-data\/resolve_s2c2_selector\.py/);

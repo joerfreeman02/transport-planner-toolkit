@@ -14,8 +14,8 @@ assert.match(audit, /preparedTndsRecords/, 'the report must retain prepared supp
 assert.match(audit, /await writeFile\(path\.resolve\(reportArg\)/, 'the full report must be saved before the final non-zero exit');
 assert.ok(audit.indexOf('await writeFile(path.resolve(reportArg)') < audit.indexOf('if (failures.length) process.exitCode = 1'), 'audit reports must be written before blockers fail the workflow');
 
-assert.match(workflow, /- offline_preflight/, 'workflow must expose a zero-download preflight mode');
-assert.match(workflow, /- retained_candidate_audit/, 'workflow must expose retained-candidate audit mode');
+assert.match(workflow, /inputs\.mode == 'offline_preflight'/, 'workflow must expose a zero-download preflight mode');
+assert.match(workflow, /inputs\.mode == 'retained_candidate_audit'/, 'workflow must expose retained-candidate audit mode');
 assert.match(workflow, /12275615359/, 'hosted audit must restore the exact immutable Run #75 artifact');
 assert.match(workflow, /5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471/, 'hosted audit must pin the candidate artifact digest');
 assert.match(workflow, /39430415441/, 'hosted audit must pin the exact candidate producer run');

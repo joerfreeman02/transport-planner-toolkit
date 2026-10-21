@@ -721,6 +721,30 @@ function candidateStopIds(component) {
   return unique(component.flatMap(service => [service.frequencyBasisStopId, ...(service.stopIds ?? []), ...(service.assessedStops ?? [])]));
 }
 
+function strictPatternSubsequence(shorter, longer) {
+  const left = explicitPattern(shorter);
+  const right = explicitPattern(longer);
+  if (left.length < 2 || left.length >= right.length) return false;
+  let cursor = 0;
+  for (const stopId of left) {
+    const match = right.indexOf(stopId, cursor);
+    if (match < 0) return false;
+    cursor = match + 1;
+  }
+  return true;
+}
+
+function principalPatternServices(component = []) {
+  const shortWorkingIds = new Set();
+  for (const service of component) {
+    if (component.some(candidate => candidate !== service
+      && !reverseEndpointRelationship(service, candidate)
+      && strictPatternSubsequence(service, candidate))) shortWorkingIds.add(service);
+  }
+  const principal = component.filter(service => !shortWorkingIds.has(service));
+  return principal.length ? principal : component;
+}
+
 function hasTimetableEvidenceAt(service, id) {
   const stop = text(id);
   if (!stop) return false;
@@ -750,8 +774,14 @@ function compareStopRank(first, second) {
 
 function selectRepresentativeStop(component, stops) {
   const byId = new Map((stops ?? []).map(stop => [stopId(stop), stop]).filter(([id]) => id));
-  const ids = candidateStopIds(component);
-  const evidenceIds = ids.filter(id => component.some(service => hasTimetableEvidenceAt(service, id)));
+  // A local short working can serve a nearer stop while the ordinary
+  // principal pattern also serves another assessed stop.  In that case the
+  // short working must not select the headline timetable basis for the
+  // entire public direction.  Keep the short-working evidence in the group;
+  // select among stops served by its non-subsequence principal patterns.
+  const principalServices = principalPatternServices(component);
+  const ids = candidateStopIds(principalServices);
+  const evidenceIds = ids.filter(id => principalServices.some(service => hasTimetableEvidenceAt(service, id)));
   const candidates = (evidenceIds.length ? evidenceIds : ids).map(id => byId.get(id)).filter(Boolean);
   const stop = [...candidates].sort(compareStopRank)[0] ?? null;
   const fallbackId = (evidenceIds[0] || ids[0]) || null;
@@ -1208,6 +1238,10 @@ function circularPrincipal(component, main, representativeId) {
 }
 
 function compareMain(first, second, representativeId, component = [first, second]) {
+  const principalServices = principalPatternServices(component);
+  const firstIsShortWorking = !principalServices.includes(first);
+  const secondIsShortWorking = !principalServices.includes(second);
+  if (firstIsShortWorking !== secondIsShortWorking) return Number(firstIsShortWorking) - Number(secondIsShortWorking);
   const firstSupport = principalSupport(first, component, representativeId);
   const secondSupport = principalSupport(second, component, representativeId);
   const profiles = new Set(component.map(calendarProfileFromService));
@@ -2206,6 +2240,73 @@ function collapsePublicRouteFamilies(rows) {
   return output;
 }
 
+function plannerSourceKind(row) {
+  const provider = normal(row?.timetableSource || row?.source?.provider || row?.provider);
+  return /\bbods\b/.test(provider) ? 'BODS' : /\btnds\b/.test(provider) ? 'TNDS' : '';
+}
+
+function plannerCopyKey(row) {
+  const direction = normal(text(row?.directionPatternText).replace(/\s*\([^()]*\)/g, ' '));
+  const locations = unique(row?.principalLocations ?? []).map(normal).sort();
+  const profiles = unique(row?.calendarProfileIds ?? []).map(normal).sort();
+  const stopId = text(row?.servedAtStopId || row?.frequencyBasisStopId);
+  if (!direction || !locations.length || !stopId || row?.unresolvedPublicIdentity) return null;
+  return JSON.stringify([
+    normal(row?.routeNumber),
+    normal(row?.operator),
+    stopId,
+    direction,
+    locations,
+    profiles
+  ]);
+}
+
+function collapseCrossProviderPlannerCopies(rows = []) {
+  const buckets = new Map();
+  for (const row of rows) {
+    const key = plannerCopyKey(row);
+    const source = plannerSourceKind(row);
+    if (!key || !source) continue;
+    const members = buckets.get(key) ?? [];
+    members.push(row);
+    buckets.set(key, members);
+  }
+  const consumed = new Set();
+  const replacements = new Map();
+  for (const members of buckets.values()) {
+    const bods = members.filter(row => plannerSourceKind(row) === 'BODS');
+    const tnds = members.filter(row => plannerSourceKind(row) === 'TNDS');
+    // This is a planner presentation reconciliation only: it requires an
+    // exact route/operator/assessed-stop/direction/principal-place/calendar
+    // match across the two national feeds.  Keep the BODS timetable as the
+    // visible authority and retain all TNDS rows as structured evidence.
+    if (bods.length !== 1 || !tnds.length || bods.length + tnds.length !== members.length) continue;
+    const principal = bods[0];
+    const copies = tnds.map(row => Object.freeze({
+      source: 'TNDS',
+      sourceRowId: row.id,
+      sourceRecordIds: Object.freeze([...(row.sourceRecordIds ?? [])]),
+      endpointDecision: row.destinationDecision ?? null,
+      groupingDecision: row.publicServiceGroupingDecision ?? null,
+      frequencyLines: Object.freeze([...(row.typicalFrequencyLines ?? [])]),
+      operatingPeriodLines: Object.freeze([...(row.operatingPeriodLines ?? [])])
+    }));
+    replacements.set(principal.id, Object.freeze({
+      ...principal,
+      sourceRecordIds: Object.freeze(unique([...principal.sourceRecordIds, ...tnds.flatMap(row => row.sourceRecordIds ?? [])])),
+      crossProviderPlannerCopies: Object.freeze(copies),
+      rawServiceSummaries: Object.freeze([...new Map([
+        ...(principal.rawServiceSummaries ?? []),
+        ...tnds.flatMap(row => row.rawServiceSummaries ?? [])
+      ].map(service => [text(service?.id) || JSON.stringify(service), service])).values()])
+    }));
+    for (const row of members) consumed.add(row.id);
+  }
+  return rows.flatMap(row => consumed.has(row.id)
+    ? (replacements.has(row.id) ? [replacements.get(row.id)] : [])
+    : [row]);
+}
+
 function endpointLocationKeys(decision = {}) {
   return unique([
     decision.stopArea?.id,
@@ -2769,7 +2870,7 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
       if (!representedByResolvedRow) provisionalRows.push(Object.freeze({ ...row, destination: 'Destination requires review', directionPatternText: 'Destination requires review', unresolvedPublicIdentity: true, serviceNote: unique([row.serviceNote, 'Destination requires review before formal use.']).join(' ') }));
     }
   }
-  let familyRows = collapsePublicRouteFamilies(provisionalRows);
+  let familyRows = collapseCrossProviderPlannerCopies(collapsePublicRouteFamilies(provisionalRows));
   const plannerRouteNumbers = row => new Set(row?.publicRouteNumbers ?? row?.routeNumbers ?? [row?.routeNumber]);
   const sharesPlannerRouteNumber = (first, second) => [...plannerRouteNumbers(first)].some(route => plannerRouteNumbers(second).has(route));
   const hasDepartingTerminus = row => familyRows.some(candidate => candidate !== row

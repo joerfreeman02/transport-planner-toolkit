@@ -125,6 +125,26 @@ assert.equal(calendarRows.length, 1);
 assert.deepEqual(calendarRows[0].calendarProfileIds, ['ordinary', 'school-day']);
 assert.match(calendarRows[0].typicalFrequencyText, /Standard days|School days/);
 
+const schoolShortWorkingRows = rows([
+  record({
+    id: 'principal-full-pattern', routeNumber: 'LOCAL-SCHOOL', destination: 'Regional Terminus',
+    pattern: ['ORIGIN', 'A', 'LOCAL', 'B', 'MID', 'REGIONAL'], stopIds: ['B'], basis: 'B',
+    calendarProfileId: 'ordinary', minutes: [420, 480, 540, 600, 660, 720, 780],
+    departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, [420, 480, 540, 600, 660, 720, 780].map(minute => ({ minute, stopPointId: 'B', journeyIdentity: `principal-${day}-${minute}`, provider: 'BODS', calendarProfileId: 'ordinary' }))]))
+  }),
+  record({
+    id: 'principal-school-short-working', routeNumber: 'LOCAL-SCHOOL', destination: 'Local School',
+    pattern: ['ORIGIN', 'A', 'LOCAL'], stopIds: ['A'], basis: 'A',
+    calendarProfileId: 'school-day', minutes: [],
+    departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, day === 'saturday' || day === 'sunday' ? [] : [{ minute: 465, stopPointId: 'A', journeyIdentity: `school-${day}`, provider: 'BODS', calendarProfileId: 'school-day' }]]))
+  })
+]);
+assert.equal(schoolShortWorkingRows.length, 1, 'a restricted local short working remains attached to its public route direction');
+assert.equal(schoolShortWorkingRows[0].destination, 'Regional Terminus', 'the longer ordinary principal pattern remains the headline route');
+assert.equal(schoolShortWorkingRows[0].frequencyBasisStopId, 'B', 'a nearer stop served only by a school short working cannot set principal frequency');
+assert.match(schoolShortWorkingRows[0].typicalFrequencyText, /Mon-Sun: Every ~60 mins/);
+assert.match(`${schoolShortWorkingRows[0].serviceNote} ${schoolShortWorkingRows[0].routeGroupNote || ''}`, /short workings|variant/i);
+
 const route242Groups = buildPlannerServiceGroups([
   record({ id: 'central-out', routeNumber: '242', operator: 'Central Connect', routeId: 'central', origin: 'Bus Station', destination: 'Potters Bar Railway Station' }),
   record({ id: 'uno-out', routeNumber: '242', operator: 'Uno', routeId: 'uno', directionId: '1', origin: 'Bus Station', destination: 'Potters Bar Railway Station' }),

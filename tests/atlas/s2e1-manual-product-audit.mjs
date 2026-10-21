@@ -257,12 +257,15 @@ try {
       }
       if (control.id === 'waltham-cross') {
         assert.doesNotMatch(`${checksText} ${exportedWordText}`, /Planner review required for:\s*(?:217|279|317|327|491|N279)|timetable data unavailable\/incomplete for 1 assessed stop/i, 'Waltham output contains a known false review/incomplete warning.');
-        assert.match(rendered.find(row => row.Route === '13')?.['Direction / main service pattern'] || '', /13|Two Brewers|Waltham/i, 'Waltham route 13 principal presentation is missing.');
+        const route13 = rendered.find(row => row.Route === '13');
+        assert.ok(route13, 'Waltham route 13 principal row is missing.');
+        assert.match(route13['Direction / main service pattern'] || '', /Towards\s+The Talbot/i, 'Waltham route 13 principal direction is missing.');
+        assert.match(route13['Principal locations'] || '', /Waltham Cross Railway Station/i, 'Waltham route 13 principal locations are missing.');
       }
       if (control.id === 'chingford') {
         const route657 = rendered.find(row => row.Route === '657');
         assert.ok(route657, 'Chingford golden control lost route 657.');
-        assert.match(route657['Typical frequency'], /Mon-Fri: 1 journey\/day/i, 'Chingford route 657 fixture golden frequency changed.');
+        assert.match(route657['Typical frequency'], /Mon-Fri(?: \(School days\))?: 1 journey\/day/i, 'Chingford route 657 fixture golden frequency changed.');
         assert.match(route657['Operating period at stop'], /07:56|16:22/, 'Chingford route 657 fixture golden timetable time changed.');
       }
       if (control.id === 'pe1') {

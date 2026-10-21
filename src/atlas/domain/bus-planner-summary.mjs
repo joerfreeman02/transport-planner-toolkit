@@ -744,10 +744,14 @@ function principalPatternServices(component = []) {
   // patterns when provider-local stop IDs cannot be compared directly.
   for (const principal of component) {
     const decision = makePublicServiceGroupingDecision({ services: component, principal });
-    for (const id of decision.shortWorkingRecordIds ?? []) shortWorkingIds.add(id);
+    for (const id of decision.shortWorkingRecordIds ?? []) {
+      const service = component.find(candidate => serviceIdForPlanner(candidate) === id);
+      if (service && ['school-day', 'term-time'].includes(calendarProfileFromService(service))) shortWorkingIds.add(id);
+    }
   }
   for (const service of component) {
-    if (component.some(candidate => candidate !== service
+    if (['school-day', 'term-time'].includes(calendarProfileFromService(service))
+      && component.some(candidate => candidate !== service
       && !reverseEndpointRelationship(service, candidate)
       && strictPatternSubsequence(service, candidate))) shortWorkingIds.add(serviceIdForPlanner(service));
   }
@@ -1250,10 +1254,6 @@ function circularPrincipal(component, main, representativeId) {
 }
 
 function compareMain(first, second, representativeId, component = [first, second]) {
-  const principalServices = principalPatternServices(component);
-  const firstIsShortWorking = !principalServices.includes(first);
-  const secondIsShortWorking = !principalServices.includes(second);
-  if (firstIsShortWorking !== secondIsShortWorking) return Number(firstIsShortWorking) - Number(secondIsShortWorking);
   const firstSupport = principalSupport(first, component, representativeId);
   const secondSupport = principalSupport(second, component, representativeId);
   const profiles = new Set(component.map(calendarProfileFromService));

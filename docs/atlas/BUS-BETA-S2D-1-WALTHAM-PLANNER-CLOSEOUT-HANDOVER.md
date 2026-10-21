@@ -96,4 +96,3 @@ Focused local checks passed: `node tests/atlas/review-candidate-workflow-contrac
 No Waltham candidate-to-planner defect was found. The Pipers mixed closed/open route-family circular decision remains conservative and its full evidence/reason is available in the audit artifact. The browser result covers the assessment runtime and candidate data, not visual map/geocoder interaction.
 
 **Status:** `READY FOR TECHNICAL DIRECTOR REVIEW BEFORE MANUAL ACCEPTANCE`
-

@@ -149,7 +149,7 @@ const schoolBranchWithoutCalendarTaxonomy = rows([
   record({
     id: 'regular-queensgate', routeNumber: 'X', destination: 'Queensgate Bus Station',
     pattern: ['CORBY', 'VILLAGE', 'PETERBOROUGH', 'BROADWAY', 'KINGS-SCHOOL', 'QUEENSGATE'], stopIds: ['B'], basis: 'B',
-    calendarProfileId: null, minutes: [420, 480],
+    calendarProfileId: null, minutes: [420, 480], routeGroupNote: 'Some journeys operate on school days only.',
     departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, [420, 480].map(minute => ({
       minute, stopPointId: 'B', journeyIdentity: `regular-${day}-${minute}`, provider: 'BODS'
     }))]))
@@ -157,7 +157,7 @@ const schoolBranchWithoutCalendarTaxonomy = rows([
   record({
     id: 'local-kings-school', routeNumber: 'X', destination: 'Kings School',
     pattern: ['CORBY', 'VILLAGE', 'PETERBOROUGH', 'BROADWAY', 'KINGS-SCHOOL'],
-    stopIds: ['A'], basis: 'A', calendarProfileId: null, minutes: [],
+    stopIds: ['A'], basis: 'A', calendarProfileId: null, minutes: [], serviceNote: 'School-day journeys only.',
     departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, day === 'saturday' || day === 'sunday' ? [] : [{
       minute: 465, stopPointId: 'A', journeyIdentity: `school-${day}`, provider: 'BODS'
     }]]))

@@ -738,8 +738,7 @@ const principalPatternServicesCache = new WeakMap();
 
 function schoolEndpoint(service) {
   return /\bschool\b/i.test([
-    service?.origin, service?.destination, service?.stopDirection, service?.direction,
-    service?.serviceNote, service?.routeGroupNote
+    service?.origin, service?.destination, service?.stopDirection, service?.direction
   ].map(text).join(' '));
 }
 

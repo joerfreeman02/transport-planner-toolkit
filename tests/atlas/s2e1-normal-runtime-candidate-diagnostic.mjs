@@ -193,8 +193,23 @@ const compactPlannerRows = rows => rows.map(row => ({
   id: row.id, routeNumber: row.routeNumber, routeNumbers: row.routeNumbers, operator: row.operator,
   direction: row.direction, origin: row.origin, destination: row.destination,
   directionPatternText: row.directionPatternText, principalLocations: row.principalLocations,
+  servedAtStopId: row.servedAtStopId, timetableBasisStopLabel: row.timetableBasisStopLabel,
+  frequencyBasisStopId: row.frequencyBasisStopId, calendarProfileIds: row.calendarProfileIds,
   typicalFrequencyLines: row.typicalFrequencyLines, operatingPeriodLines: row.operatingPeriodLines,
   sourceRecordIds: row.sourceRecordIds, groupingDecision: compactGroupingDecision(row.groupingDecision),
+  selectedPrincipalPatternSourceRecordId: row.groupingDecision?.principalPattern?.sourceRecordId ?? null,
+  groupedServiceEvidence: (row.rawServiceSummaries ?? []).map(service => ({
+    id: service.id, origin: service.origin, destination: service.destination, direction: service.direction,
+    calendarProfileId: service.calendarProfileId ?? null, serviceNote: service.serviceNote ?? null,
+    frequencyBasisStopId: service.frequencyBasisStopId ?? null, stopIds: service.stopIds ?? [],
+    routePatternStopIds: service.routePatternStopIds ?? [],
+    typicalFrequencyLines: service.typicalFrequencyLines ?? service.frequency ?? [],
+    operatingPeriodLines: service.operatingPeriodLines ?? service.operatingPeriod ?? [],
+    departureCountsByDay: Object.fromEntries(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => [day,
+      Math.max((service.departuresByDay?.[day] ?? []).length, (service.departureEvidenceByDay?.[day] ?? []).length)])),
+    frequencyEvidenceCount: (service.frequencyEvidence ?? []).length,
+    sourceRecordIds: service.sourceRecordIds ?? []
+  })),
   routeFamilyDecision: compactFamilyDecision(row.routeFamilyDecision), routeFamilyMembers: row.routeFamilyMembers,
   circular: row.circular, circularClassification: row.circularClassification, circularReason: row.circularReason
 }));

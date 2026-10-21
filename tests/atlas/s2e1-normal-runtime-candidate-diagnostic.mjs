@@ -88,6 +88,7 @@ const preparedOnly = await preparedOnlyApp.assess(site, { radius: control.radius
 if (!preparedOnly.ok) throw new Error(`Prepared-only comparison failed: ${preparedOnly.message || preparedOnly.code}`);
 const wanted = new Set(control.focusRoutes);
 const route = value => String(value ?? '').trim().toUpperCase().replace(/\s+/g, '');
+const unique = values => [...new Set(values ?? [])];
 const stopRows = assessment.stops.map(stop => ({ id: stop.id, name: stop.name, distanceMetres: stop.distanceMetres,
   routes: stop.routes, routeAuthorities: stop.routeAuthorities, sourceAuthorities: stop.sourceAuthorities,
   timetableAuthorities: stop.timetableAuthorities, timetableEvidenceStatus: stop.timetableEvidenceStatus }));

@@ -56,7 +56,22 @@ function departureCounts(value = {}) {
   }]));
 }
 
-function compactEvidenceRecord(record = {}) {
+function compactCalendarEvidence(value) {
+  const entries = Array.isArray(value) ? value : value == null ? [] : [value];
+  return entries.map(item => item && typeof item === 'object' ? {
+    id: item.id ?? item.calendarId ?? item.profileId ?? null,
+    profileId: item.calendarProfileId ?? item.profileId ?? null,
+    operatingDays: item.operatingDays ?? item.days ?? null,
+    validFrom: item.validFrom ?? item.from ?? null,
+    validTo: item.validTo ?? item.to ?? null,
+    specialDaysOperation: item.specialDaysOperation ?? item.operation ?? null
+  } : item).slice(0, 30);
+}
+
+function compactEvidenceRecord(record = {}, assessedStopIds = []) {
+  const relevantStopIds = new Set(assessedStopIds);
+  const schedules = Object.fromEntries(Object.entries(record.stopSchedules ?? {}).filter(([stopId]) => relevantStopIds.has(stopId)));
+  const rawSpecialDays = record.specialDaysOperation ?? record.source?.specialDaysOperation ?? null;
   return {
     id: record.id ?? null,
     routeNumber: record.routeNumber ?? null,
@@ -66,23 +81,130 @@ function compactEvidenceRecord(record = {}) {
     origin: record.origin ?? null,
     destination: record.destination ?? null,
     direction: record.direction ?? null,
-    routePatternStopIds: record.routePatternStopIds ?? [],
-    routePatternNames: (record.routePatternStops ?? []).map(stop => text(stop.name ?? stop.commonName ?? stop)),
-    patternIds: record.source?.patternIds ?? record.source?.patternVariantId ?? record.source?.patternId ?? [],
+    routePatternStopIds: (record.routePatternStopIds ?? []).slice(0, 100),
+    routePatternNames: (record.routePatternStops ?? []).slice(0, 100).map(stop => text(stop.name ?? stop.commonName ?? stop)),
+    patternIds: (Array.isArray(record.source?.patternIds ?? record.source?.patternVariantId ?? record.source?.patternId) ? record.source?.patternIds ?? record.source?.patternVariantId ?? record.source?.patternId : [record.source?.patternIds ?? record.source?.patternVariantId ?? record.source?.patternId]).filter(Boolean).slice(0, 50),
     calendarProfileId: record.calendarProfileId ?? record.source?.calendarProfileId ?? null,
-    calendarEvidence: record.calendarEvidence ?? [],
-    specialDaysOperation: record.specialDaysOperation ?? record.source?.specialDaysOperation ?? null,
+    calendarEvidence: compactCalendarEvidence(record.calendarEvidence),
+    specialDaysOperation: Array.isArray(rawSpecialDays) ? rawSpecialDays.slice(0, 20) : rawSpecialDays && typeof rawSpecialDays === 'object' ? Object.fromEntries(Object.entries(rawSpecialDays).slice(0, 20)) : rawSpecialDays,
     validFrom: record.validFrom ?? record.validity?.from ?? null,
     validTo: record.validTo ?? record.validity?.to ?? null,
     fragment: record.fragment ?? record.source?.fragment ?? null,
-    stopIds: Object.keys(record.stopSchedules ?? {}),
-    departuresByStopAndDay: Object.fromEntries(Object.entries(record.stopSchedules ?? {}).map(([stopId, schedule]) => [stopId, departureCounts(schedule)])),
+    stopIds: Object.keys(record.stopSchedules ?? {}).filter(stopId => relevantStopIds.has(stopId)),
+    departuresByStopAndDay: Object.fromEntries(Object.entries(schedules).map(([stopId, schedule]) => [stopId, departureCounts(schedule)])),
     departureEvidenceByDay: departureCounts(record.departureEvidenceByDay),
     frequencyByDay: record.frequencyByDay ?? null,
     typicalFrequency: record.typicalFrequency ?? null,
     operatingPeriods: record.operatingPeriods ?? null,
-    frequencyEvidence: record.frequencyEvidence ?? []
+    frequencyEvidence: Array.isArray(record.frequencyEvidence) ? record.frequencyEvidence.slice(0, 40).map(item => item && typeof item === 'object' ? {
+      source: item.source ?? item.provider ?? null,
+      stopId: item.stopId ?? item.stopPointId ?? null,
+      day: item.day ?? item.dayType ?? null,
+      count: item.departureCount ?? item.uniqueJourneyCount ?? item.count ?? null,
+      basis: item.basis ?? null,
+      calendarProfileId: item.calendarProfileId ?? null
+    } : item) : []
   };
+}
+
+function compactCircularDecision(value = {}) {
+  return {
+    type: value.type ?? null,
+    publicRouteIdentity: value.publicRouteIdentity ?? null,
+    classification: value.classification ?? null,
+    reason: value.reason ?? null,
+    principalSourceRecordId: value.principalSourceRecordId ?? null,
+    sourceRecordCount: value.sourceRecordIds?.length ?? 0,
+    patternCount: value.variantClassifications?.length ?? 0,
+    principalLoopClosure: value.loopClosureEvidence ? {
+      proven: value.loopClosureEvidence.proven ?? null,
+      basis: value.loopClosureEvidence.basis ?? null,
+      samePhysicalStopPoint: value.loopClosureEvidence.samePhysicalStopPoint ?? null,
+      sameAuthoritativeStopArea: value.loopClosureEvidence.sameAuthoritativeStopArea ?? null,
+      sameLogicalPlace: value.loopClosureEvidence.sameLogicalPlace ?? null
+    } : null,
+    closedPatternCount: (value.variantClassifications ?? []).filter(item => item.loopClosureEvidence?.proven || item.classification === 'circular').length,
+    openPatternCount: (value.variantClassifications ?? []).filter(item => item.completeOrderedPattern && item.classification !== 'circular').length,
+    variantClassifications: (value.variantClassifications ?? []).map(item => ({
+      sourceRecordId: item.sourceRecordId ?? item.recordId ?? null,
+      classification: item.classification ?? null,
+      reason: item.reason ?? null,
+      completeOrderedPattern: item.completeOrderedPattern ?? null,
+      loopClosureProven: item.loopClosureEvidence?.proven ?? null,
+      loopClosureBasis: item.loopClosureEvidence?.basis ?? null
+    })).slice(0, 40)
+  };
+}
+
+function compactGroupingDecision(value = {}) {
+  return {
+    type: value.type ?? null,
+    decision: value.decision ?? null,
+    reason: value.reason ?? null,
+    publicRouteFamilyKey: value.publicRouteFamilyKey ?? null,
+    routeNumber: value.routeNumber ?? null,
+    authority: value.authority ?? null,
+    providers: value.providers ?? [],
+    operators: value.operators ?? [],
+    sourceRecordCount: value.sourceRecordIds?.length ?? 0,
+    groupedRecordCount: value.groupedSourceRecordIds?.length ?? 0,
+    deduplicatedRecordCount: value.deduplicatedSourceRecordIds?.length ?? 0,
+    shortWorkingRecordCount: value.shortWorkingRecordIds?.length ?? 0,
+    branchVariantRecordCount: value.branchVariantRecordIds?.length ?? 0,
+    calendarVariantRecordCount: value.calendarVariantRecordIds?.length ?? 0,
+    alternateDestinations: (value.alternateDestinations ?? []).slice(0, 20),
+    materialDestinationEvidence: (value.materialDestinationEvidence ?? []).slice(0, 20),
+    calendarProfiles: value.calendarProfiles ?? [],
+    principalPattern: value.principalPattern ? {
+      sourceRecordId: value.principalPattern.sourceRecordId ?? null,
+      stopCount: value.principalPattern.orderedRoutePatternStopIds?.length ?? 0,
+      origin: value.principalPattern.endpoint?.origin ?? null,
+      destination: value.principalPattern.endpoint?.destination ?? null
+    } : null
+  };
+}
+
+function compactTerminusDecision(value = {}) {
+  return {
+    type: value.type ?? null,
+    status: value.status ?? null,
+    presentation: value.presentation ?? null,
+    proven: value.proven ?? null,
+    assessedPlace: value.assessedPlace ?? null,
+    reason: value.reason ?? null,
+    note: value.note ?? null,
+    suppressedArrivalCount: value.suppressedArrivalSourceRecordIds?.length ?? 0
+  };
+}
+
+function compactFamilyDecision(value = {}) {
+  return {
+    type: value.type ?? null,
+    state: value.state ?? null,
+    candidateStem: value.candidateStem ?? null,
+    familyKey: value.familyKey ?? null,
+    memberRouteNumbers: value.memberRouteNumbers ?? [],
+    principalRouteNumber: value.principalRouteNumber ?? null,
+    principalMemberRowId: value.principalMemberRowId ?? null,
+    principalSelectionEvidence: value.principalSelectionEvidence ? Object.fromEntries(Object.entries(value.principalSelectionEvidence).filter(([, entry]) => entry == null || ['string', 'number', 'boolean'].includes(typeof entry))) : null,
+    reasonCount: value.reasons?.length ?? 0,
+    unresolved: value.unresolved ?? null
+  };
+}
+
+function compactRouteFamilyMembers(value = []) {
+  return value.map(member => ({
+    routeNumber: member.routeNumber ?? null,
+    operator: member.operator ?? null,
+    origin: member.origin ?? null,
+    destination: member.destination ?? null,
+    principalLocations: member.principalLocations ?? [],
+    sourceAuthority: member.sourceAuthority ?? member.timetableSource ?? null,
+    sourceRecordCount: member.sourceRecordIds?.length ?? 0,
+    calendarProfileIds: member.calendarProfileIds ?? [],
+    shortWorkingClassification: member.shortWorkingClassification ?? null,
+    additionalServiceClassification: member.additionalServiceClassification ?? null
+  })).slice(0, 40);
 }
 
 function compactPlannerRow(row = {}) {
@@ -120,15 +242,15 @@ function compactPlannerRow(row = {}) {
     operatingPeriodLines: row.operatingPeriodLines ?? [],
     uniqueDeparturesByDay: departureCounts(row.canonicalDeparturePopulationAll),
     circular: row.circular ?? null,
-    circularServiceDecision: row.circularServiceDecision ?? null,
+    circularServiceDecision: compactCircularDecision(row.circularServiceDecision),
     qualificationNotes: row.qualificationNotes ?? [],
     serviceNote: row.serviceNote ?? null,
     shortWorkingClassification: row.shortWorkingClassification ?? row.groupingDecision?.shortWorkingClassification ?? null,
     additionalServiceClassification: row.additionalServiceClassification ?? row.groupingDecision?.additionalServiceClassification ?? null,
-    groupingDecision: row.publicServiceGroupingDecision ?? group.publicServiceGroupingDecision ?? null,
-    terminusDecision: row.terminusDecision ?? group.terminusDecision ?? null,
-    publicRouteFamilyDecision: decision,
-    routeFamilyMembers: row.routeFamilyMembers ?? [],
+    groupingDecision: compactGroupingDecision(row.publicServiceGroupingDecision ?? group.publicServiceGroupingDecision),
+    terminusDecision: compactTerminusDecision(row.terminusDecision ?? group.terminusDecision),
+    publicRouteFamilyDecision: compactFamilyDecision(decision),
+    routeFamilyMembers: compactRouteFamilyMembers(row.routeFamilyMembers),
     sourceRecordIds: row.sourceRecordIds ?? [],
     sourceWarnings: row.sourceWarnings ?? []
   };
@@ -175,6 +297,7 @@ for (const control of controls) {
     accessRouting: { matrix: async (_site, stops) => ({ ok: true, routes: stops.map(() => ({ status: 'routed', distanceMetres: 100, durationSeconds: 60 })), warnings: [], provenance: { source: 'hosted frozen-candidate diagnostic' } }) }
   });
   const assessment = await app.assess(site, { radius: control.radius, mode: 'full' });
+  const assessedStopIds = (assessment.stops ?? []).map(stop => stop.id).filter(Boolean);
   const rawRows = (servicesResult?.data ?? []).filter(row => control.focusRoutes.map(routeKey).includes(routeKey(row.routeNumber)));
   const serviceSummaries = (assessment.serviceSummaries ?? []).filter(row => control.focusRoutes.map(routeKey).includes(routeKey(row.routeNumber)) || (row.routeNumbers ?? []).some(route => control.focusRoutes.map(routeKey).includes(routeKey(route))));
   const plannerRows = (assessment.plannerServiceSummaries ?? []).map(compactPlannerRow);
@@ -188,6 +311,10 @@ for (const control of controls) {
   const rawCounts = Object.fromEntries([...new Set(rawRows.map(row => text(row.routeNumber)))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map(route => [route, rawRows.filter(row => routeKey(row.routeNumber) === routeKey(route)).length]));
   const summaryCounts = Object.fromEntries([...new Set(serviceSummaries.map(row => text(row.routeNumber)))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map(route => [route, serviceSummaries.filter(row => routeKey(row.routeNumber) === routeKey(route)).length]));
   const overTwo = Object.entries(plannerRowCounts).filter(([, count]) => count > 2).map(([route, count]) => ({ route, count, rows: plannerRows.filter(row => row.routeNumber === route) }));
+  const overTwoRows = overTwo.flatMap(item => item.rows);
+  const capturedRows = [...new Map([...focusPlannerRows, ...overTwoRows.map(compactPlannerRow)].map(row => [row.id, row])).values()];
+  const reviewItems = assessment.reviewItems ?? assessment.sourceChecks ?? [];
+  const reviewItemsByCode = Object.fromEntries([...new Set(reviewItems.map(item => text(item.code ?? item.id ?? 'unknown')))].map(code => [code, reviewItems.filter(item => text(item.code ?? item.id ?? 'unknown') === code).length]));
   results[control.id] = {
     control,
     status: assessment.status,
@@ -197,7 +324,7 @@ for (const control of controls) {
     sourceCompleteness: servicesResult?.provenance?.sourceCompleteness ?? null,
     failedShards: servicesResult?.provenance?.failedShardDiagnostics ?? [],
     requestedShards: [...new Map(requests.filter(item => item.control === control.id).map(item => [`${item.source}|${item.relative}`, item])).values()],
-    rawServiceRecords: rawRows.map(compactEvidenceRecord),
+    rawServiceRecords: rawRows.map(row => compactEvidenceRecord(row, assessedStopIds)),
     serviceSummaries: serviceSummaries.map(summary => ({
       id: summary.id,
       routeNumber: summary.routeNumber,
@@ -225,12 +352,13 @@ for (const control of controls) {
       circularServiceDecision: summary.circularServiceDecision ?? null,
       serviceNote: summary.serviceNote ?? null,
       sourceWarnings: summary.sourceWarnings ?? [],
-      rawEvidence: (summary.rawServiceSummaries ?? []).map(compactEvidenceRecord)
+      rawEvidence: (summary.rawServiceSummaries ?? []).map(row => compactEvidenceRecord(row, assessedStopIds))
     })),
-    plannerRows: focusPlannerRows,
+    plannerRows: capturedRows,
     rowCounts: { rawEvidenceRecordsByRoute: rawCounts, serviceSummariesByRoute: summaryCounts, plannerRowsByRoute: plannerRowCounts, routesOverTwoPlannerRows: overTwo.map(({ route, count }) => ({ route, count })) },
-    qaReviewItems: (assessment.reviewItems ?? assessment.sourceChecks ?? []).map(item => ({ code: item.code ?? item.id ?? null, route: item.route ?? null, stop: item.stop ?? item.stopId ?? null, source: item.source ?? null, severity: item.severity ?? null, message: item.message ?? item.label ?? null })),
-    qaSummary: { reviewItemCount: (assessment.reviewItems ?? assessment.sourceChecks ?? []).length, status: assessment.status },
+    routesOverTwoPlannerRows: overTwo.map(({ route, count, rows }) => ({ route, count, rows: rows.map(compactPlannerRow) })),
+    qaReviewItems: reviewItems.slice(0, 100).map(item => ({ code: item.code ?? item.id ?? null, route: item.route ?? null, stop: item.stop ?? item.stopId ?? null, source: item.source ?? null, severity: item.severity ?? null, message: item.message ?? item.label ?? null })),
+    qaSummary: { reviewItemCount: reviewItems.length, reviewItemsByCode, status: assessment.status },
     wordRouteParity: { plannerRoutes: plannerRouteNumbers, wordRoutes: wordRouteNumbers, missingFromWord: plannerRouteNumbers.filter(route => !wordRouteNumbers.includes(route)) }
   };
   } catch (error) {

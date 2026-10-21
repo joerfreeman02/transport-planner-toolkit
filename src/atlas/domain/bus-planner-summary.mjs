@@ -776,22 +776,15 @@ function schoolRestrictedLocalVariants(component = []) {
   });
 }
 
-function servicesShareAssessedStop(first, second) {
-  const firstStops = new Set(candidateStopIds([first]).filter(Boolean).map(text));
-  return candidateStopIds([second]).some(id => firstStops.has(text(id)));
-}
-
 function principalPatternServices(component = []) {
   if (principalPatternServicesCache.has(component)) return principalPatternServicesCache.get(component);
   const shortWorkingIds = new Set();
-  const structurallyShortWorkingIds = new Set();
   // Reuse the same professional short-working decision used for the row’s
   // retained variant evidence.  It also recognises endpoint-contained
   // patterns when provider-local stop IDs cannot be compared directly.
   for (const principal of component) {
     const decision = makePublicServiceGroupingDecision({ services: component, principal });
     for (const id of decision.shortWorkingRecordIds ?? []) {
-      structurallyShortWorkingIds.add(id);
       const service = component.find(candidate => serviceIdForPlanner(candidate) === id);
       if (service && ['school-day', 'term-time'].includes(calendarProfileFromService(service))) shortWorkingIds.add(id);
     }
@@ -806,13 +799,11 @@ function principalPatternServices(component = []) {
   // population but omit calendar taxonomy.  When a school-named local branch
   // runs only on weekdays and the same public direction has weekend service,
   // keep that branch as variant evidence without letting it choose the
-  // representative stop for the public timetable.
+  // representative stop for the public timetable.  The composition is
+  // already constrained to one connected public-service component; its
+  // alternate endpoint remains in retained service/variant evidence.
   for (const service of schoolRestrictedLocalVariants(component)) {
-    const id = serviceIdForPlanner(service);
-    if (structurallyShortWorkingIds.has(id) || component.some(candidate => candidate !== service
-      && !schoolEndpoint(candidate)
-      && (serviceRunsOnDay(candidate, 'saturday') || serviceRunsOnDay(candidate, 'sunday'))
-      && servicesShareAssessedStop(service, candidate))) shortWorkingIds.add(id);
+    shortWorkingIds.add(serviceIdForPlanner(service));
   }
   const principal = component.filter(service => !shortWorkingIds.has(serviceIdForPlanner(service)));
   const result = principal.length ? principal : component;

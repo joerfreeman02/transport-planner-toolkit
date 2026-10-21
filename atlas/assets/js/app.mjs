@@ -626,13 +626,9 @@ function renderAssessment(result) {
     include.addEventListener('change', () => { if (include.checked) selectedServiceIds.add(serviceKey(service)); else selectedServiceIds.delete(serviceKey(service)); renderAssessment(result); });
     appendCell(row, 'Include', include);
     appendCell(row, 'Route', plannerRouteDisplayNumber(service));
-    const sourceBadge = document.createElement('span');
-    sourceBadge.className = 'timetable-source-badge';
-    sourceBadge.textContent = service.timetableSource || '';
-    appendCell(row, 'Source', sourceBadge);
     appendCell(row, 'Operator', service.operator);
     appendCell(row, 'Direction / main service pattern', service.directionPatternText || formatServiceOriginDestination(service));
-    appendCell(row, 'Stops', service.servedAtText || service.frequencyBasisStopName || 'Representative stop not supplied');
+    appendCell(row, 'Served at', service.servedAtText || service.frequencyBasisStopName || 'Representative stop not supplied');
     appendCell(row, 'Principal locations', service.principalLocationsText || service.presentation?.principalLocationsText || 'See route origin / destination');
     const frequencies = document.createElement('ul'); frequencies.className = 'period-lines';
     (service.typicalFrequencyLines || String(service.typicalFrequencyText || 'Frequency unavailable').split('\n')).forEach(line => { const item = document.createElement('li'); item.textContent = line; frequencies.append(item); });
@@ -640,6 +636,10 @@ function renderAssessment(result) {
     const periods = document.createElement('ul'); periods.className = 'period-lines';
     service.operatingPeriodLines.forEach(line => { const item = document.createElement('li'); item.textContent = line; periods.append(item); });
     appendCell(row, 'Operating period at stop', periods);
+    const sourceBadge = document.createElement('span');
+    sourceBadge.className = 'timetable-source-badge';
+    sourceBadge.textContent = service.timetableSource || '';
+    appendCell(row, 'Source', sourceBadge);
     serviceRows.append(row);
     const duplicateTerminusNote = service.plannerNotes?.terminus && /\broute terminus\b/i.test(String(service.serviceNote || ''));
     const structuredQualificationNote = /^(?:school[- ]day(?:s)?(?:[- ]only)?(?: service)?|runs? on school days only|operates? during term time only|term[- ]time service|runs? on non-school days only|non-school days only|operates? on holidays only|operating days could not be fully confirmed)(?:;.*)?\.?$/i.test(String(service.serviceNote || '').trim());

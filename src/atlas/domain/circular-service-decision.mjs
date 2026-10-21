@@ -370,22 +370,43 @@ export function resolveCircularServiceDecision(services = [], { principal = null
   const scopedPrincipal = scopedRecords.includes(selectedPrincipal) ? selectedPrincipal : principalFor(scopedRecords, principal);
   const scopedPrincipalDecision = scopedPrincipal ? inspectCircularPattern(scopedPrincipal) : inspectCircularPattern({});
   const scopedDecisions = scopedRecords.map(inspectCircularPattern);
+  const providerOf = service => {
+    const value = text(service?.source?.primaryAuthority || service?.primaryAuthority || service?.source?.provider || service?.provider || service?.timetableSource);
+    if (/\btfl\b|transport for london/i.test(value)) return 'tfl';
+    if (/\bbods\b|bus open data/i.test(value)) return 'bods';
+    if (/\btnds\b|traveline national dataset/i.test(value)) return 'tnds';
+    return normal(value);
+  };
+  const principalProvider = providerOf(scopedPrincipal);
+  // Cross-feed supplementary patterns remain in the audit variants, but
+  // cannot veto a closed/open decision made from the principal authority's
+  // own patterns. This keeps contradictory evidence fail-visible without
+  // letting an unrelated feed redefine the public route shape.
+  const classificationServices = principalProvider
+    ? records.filter(service => providerOf(service) === principalProvider)
+    : records;
+  const classificationAuthorityDecisions = principalProvider
+    ? decisions.filter((_, index) => providerOf(records[index]) === principalProvider)
+    : decisions;
+  const classificationScopedDecisions = principalProvider
+    ? scopedDecisions.filter((_, index) => providerOf(scopedRecords[index]) === principalProvider)
+    : scopedDecisions;
   const variants = decisions.map((decision, index) => Object.freeze({
     ...decision,
     variantClassification: variantKind(records[index], selectedPrincipal, principalDecision)
   }));
-  const twoWayMarkers = unique(records.map(directionMarker));
-  const scopedMarkers = unique(scopedRecords.map(directionMarker));
-  const openPatternAcrossDirections = decisions.some(decision => decision.classification === 'linear' && decision.completeOrderedPattern);
-  const scopedOpenPatterns = scopedDecisions.filter(decision => decision.classification === 'linear' && decision.completeOrderedPattern);
-  const circularPatterns = decisions.filter(decision => decision.classification === 'circular');
-  const openPatterns = decisions.filter(decision => decision.classification === 'linear' && decision.completeOrderedPattern);
+  const twoWayMarkers = unique(classificationServices.map(directionMarker));
+  const scopedMarkers = unique(classificationServices.map(directionMarker));
+  const openPatternAcrossDirections = classificationAuthorityDecisions.some(decision => decision.classification === 'linear' && decision.completeOrderedPattern);
+  const scopedOpenPatterns = classificationScopedDecisions.filter(decision => decision.classification === 'linear' && decision.completeOrderedPattern);
+  const circularPatterns = classificationAuthorityDecisions.filter(decision => decision.classification === 'circular');
+  const openPatterns = classificationAuthorityDecisions.filter(decision => decision.classification === 'linear' && decision.completeOrderedPattern);
   const patternKeys = decision => new Set(orderedKeys(decision.orderedStopPoints));
   const circularAndOpenPatternsOverlap = circularPatterns.some(circular => {
     const circularKeys = patternKeys(circular);
     return openPatterns.some(open => [...patternKeys(open)].some(key => circularKeys.has(key)));
   });
-  const scopedCircularPatterns = scopedDecisions.filter(decision => decision.classification === 'circular');
+  const scopedCircularPatterns = classificationScopedDecisions.filter(decision => decision.classification === 'circular');
   const scopedHasMixedClosedAndOpen = scopedCircularPatterns.length > 0 && scopedOpenPatterns.length > 0;
   const scopedPatternOverlap = scopedCircularPatterns.some(circular => {
     const circularKeys = patternKeys(circular);
@@ -398,7 +419,7 @@ export function resolveCircularServiceDecision(services = [], { principal = null
   const familyContradictsCircular = scopedCircularPatterns.length > 0
     && ((scopedHasMixedClosedAndOpen && scopedPatternOverlap && scopedOpenPatternExtendsClosed)
       || (twoWayMarkers.length > 1 && openPatternAcrossDirections && circularAndOpenPatternsOverlap));
-  const classificationDecisions = scopedDecisions.length ? scopedDecisions : decisions;
+  const classificationDecisions = classificationScopedDecisions.length ? classificationScopedDecisions : decisions;
   const classificationPrincipal = scopedDecisions.length ? scopedPrincipalDecision : principalDecision;
   const classification = familyContradictsCircular
     ? 'linear'

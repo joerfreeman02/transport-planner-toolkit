@@ -51,8 +51,8 @@ function compactSource(source = {}) {
 function departureCounts(value = {}) {
   return Object.fromEntries(Object.entries(asDays(value)).map(([day, entries]) => [day, {
     entries: entries.length,
-    uniqueTimes: new Set(entries.map(item => typeof item === 'string' ? item : item?.time ?? item?.departureTime ?? item?.scheduledTime).filter(Boolean)).size,
-    sample: unique(entries.slice(0, 8).map(item => typeof item === 'string' ? item : item?.time ?? item?.departureTime ?? item?.scheduledTime))
+    uniqueTimes: new Set(entries.map(item => typeof item === 'string' || typeof item === 'number' ? item : item?.minute ?? item?.departureMinute ?? item?.time ?? item?.departureTime ?? item?.scheduledTime).filter(value => value !== null && value !== undefined && value !== '')).size,
+    sample: unique(entries.slice(0, 8).map(item => typeof item === 'string' || typeof item === 'number' ? item : item?.minute ?? item?.departureMinute ?? item?.time ?? item?.departureTime ?? item?.scheduledTime))
   }]));
 }
 

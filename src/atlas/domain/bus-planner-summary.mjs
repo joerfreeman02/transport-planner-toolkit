@@ -201,7 +201,17 @@ function operatorIdentityKey(value) {
 }
 
 function operatorDisplayNames(services) {
-  const candidates = unique(services.map(service => service?.operator)).filter(value => !isUnspecifiedOperator(value));
+  const authorityRank = service => {
+    const provider = text(service?.source?.primaryAuthority || service?.primaryAuthority || service?.source?.provider || service?.provider || service?.timetableSource);
+    if (/\btfl\b|transport for london/i.test(provider)) return 3;
+    if (/\bbods\b|bus open data/i.test(provider)) return 2;
+    if (/\btnds\b|traveline national dataset/i.test(provider)) return 1;
+    return sourceAuthorityRank(service);
+  };
+  const ranked = services.map(service => ({ service, rank: authorityRank(service) }));
+  const winningRank = Math.max(0, ...ranked.map(item => item.rank));
+  const winningServices = winningRank > 0 ? ranked.filter(item => item.rank === winningRank).map(item => item.service) : services;
+  const candidates = unique(winningServices.map(service => service?.operator)).filter(value => !isUnspecifiedOperator(value));
   const families = new Map();
   for (const candidate of candidates) {
     const key = operatorIdentityKey(candidate) || normal(candidate);

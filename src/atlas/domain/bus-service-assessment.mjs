@@ -385,9 +385,14 @@ function departureEvidenceForRecords(records, stopId) {
     const pattern = patternIdentity(record);
     for (const day of DAY_ORDER) {
       const explicitEntries = Array.isArray(record.departureEvidenceByDay?.[day]) ? record.departureEvidenceByDay[day] : null;
-      const scopedEntries = explicitEntries && explicitEntries.some(item => text(item?.stopPointId))
+      const hasStopScopedEvidence = Boolean(explicitEntries?.some(item => text(item?.stopPointId)));
+      const scopedEntries = hasStopScopedEvidence
         ? explicitEntries.filter(item => text(item?.stopPointId) === stopId)
-        : explicitEntries;
+        // Some prepared sources attach whole-pattern journey evidence to each
+        // record without identifying the stop call. When a stop-specific
+        // schedule exists, use that local schedule instead of counting every
+        // call in the pattern at the representative stop.
+        : schedule[day] ? ordered(schedule[day]).map(minute => ({ minute })) : explicitEntries;
       const sourceEntries = scopedEntries?.length
         ? scopedEntries
         : ordered(schedule[day] ?? []).map(minute => ({ minute }));

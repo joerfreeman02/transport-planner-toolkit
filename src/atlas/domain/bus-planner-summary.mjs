@@ -857,9 +857,16 @@ function selectRepresentativeStop(component, stops) {
   const principalServices = principalPatternServices(component);
   const ids = candidateStopIds(principalServices);
   const evidenceIds = ids.filter(id => principalServices.some(service => hasTimetableEvidenceAt(service, id)));
-  const candidates = (evidenceIds.length ? evidenceIds : ids).map(id => byId.get(id)).filter(Boolean);
+  const schoolVariants = schoolRestrictedLocalVariants(component);
+  const regularWeekendEvidenceIds = schoolVariants.length
+    ? ids.filter(id => component.some(service => !schoolEndpoint(service)
+      && (serviceRunsOnDay(service, 'saturday') || serviceRunsOnDay(service, 'sunday'))
+      && hasTimetableEvidenceAt(service, id)))
+    : [];
+  const candidateIds = regularWeekendEvidenceIds.length ? regularWeekendEvidenceIds : evidenceIds.length ? evidenceIds : ids;
+  const candidates = candidateIds.map(id => byId.get(id)).filter(Boolean);
   const stop = [...candidates].sort(compareStopRank)[0] ?? null;
-  const fallbackId = (evidenceIds[0] || ids[0]) || null;
+  const fallbackId = (candidateIds[0] || ids[0]) || null;
   return { stop, id: stopId(stop) || fallbackId, name: text(stop?.name) || text(component.find(service => service.frequencyBasisStopId === fallbackId)?.frequencyBasisStopName) || null };
 }
 

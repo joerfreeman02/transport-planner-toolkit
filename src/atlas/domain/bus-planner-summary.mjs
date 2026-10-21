@@ -1704,7 +1704,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const profileIds = orderedCalendarProfiles([
     ...component.map(calendarProfileFromService),
     ...canonical.entries.flatMap(calendarProfileIdsForEntry),
-    ...(canonical.entries.some(entry => calendarProfileIdsForEntry(entry).length === 0) ? ['ordinary'] : [])
+    ...(canonical.entries.some(entry => calendarProfileIdsForEntry(entry).length === 0 && plannerEvidenceSourceRank({}, entry) === 2) ? ['ordinary'] : [])
   ]);
   const hasOrdinaryProfile = profileIds.includes('ordinary');
   const ordinaryEntries = canonical.entries.filter(entry => calendarProfileIdsForEntry(entry).includes('ordinary'));

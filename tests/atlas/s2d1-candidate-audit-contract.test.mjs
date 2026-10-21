@@ -27,6 +27,7 @@ assert.match(workflow, /atlas-bus-beta-s2d1-candidate-audit-\$\{\{ github\.run_i
 assert.doesNotMatch(workflow, /TNDS_USERNAME|TNDS_PASSWORD|refresh_bus_data\.py|tnds_trust_diagnostic\.py/, 'S2D-1 hosted audit must not acquire or prepare national data');
 assert.match(workflow, /permissions:\n  actions: read\n  contents: read/, 'workflow permissions must remain read-only');
 assert.match(dispatcher, /s2d-1-selector/, 'the established default-branch dispatcher must select S2D-1 explicitly');
+assert.match(dispatcher, /CANDIDATE_MODE" == 'disabled' && "\$PREPARED_SCHEMA" == 'v1'/, 'retained-candidate mode must be selected by v1 schema before validating the exact pinned identity');
 assert.match(dispatcher, /s2d1-zero-download-preflight:[\s\S]*?mode: offline_preflight/, 'the exact-SHA preflight must call the hosted offline workflow');
 assert.match(dispatcher, /s2d1-retained-candidate-audit:[\s\S]*?mode: retained_candidate_audit/, 'retained candidate audit must be dispatched through the hosted reusable workflow');
 assert.match(dispatcher, /audit_retained_candidate/, 'audit mode must be selectable from workflow_dispatch');

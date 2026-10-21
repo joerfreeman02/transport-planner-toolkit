@@ -42,6 +42,23 @@ const planner = buildPlannerBusServiceSummaries([
 ], [stop]);
 assert.equal(planner.length, 1, 'matching BODS/TNDS evidence for one direction forms one planner row');
 assert.equal(planner[0].operator, 'Centrebus', 'operator display comes from winning BODS evidence when feeds corroborate one row');
+const mixedAuthorityCircularPlanner = buildPlannerBusServiceSummaries([
+  {
+    ...plannerBase, id: 'bods-230-loop', routeNumber: '230', operator: 'Centrebus', direction: 'outbound',
+    timetableSource: 'BODS', provider: 'BODS', source: { provider: 'BODS', provenance: 'BODS GTFS frozen-source preparation' },
+    circular: true, circularPatternStopIds: ['PIPERS-A', 'MID-1', 'MID-2', 'PIPERS-A'],
+    routePatternStopIds: [], sourceRecordIds: ['bods-230-loop']
+  },
+  {
+    ...plannerBase, id: 'tnds-230-open', routeNumber: '230', operator: 'Centrebus South', direction: 'outbound',
+    timetableSource: 'TNDS', provider: 'TNDS', source: { provider: 'TNDS' }, circular: false,
+    circularPatternStopIds: [], routePatternStopIds: ['PIPERS-A', 'MID-1', 'MID-2', 'REMOTE-END'],
+    sourceRecordIds: ['tnds-230-open']
+  }
+], [stop]);
+assert.equal(mixedAuthorityCircularPlanner.length, 1, 'BODS and TNDS patterns for one public route form one planner row');
+assert.equal(mixedAuthorityCircularPlanner[0].circular, true, 'open TNDS supplementation cannot replace a closed BODS primary circular decision');
+assert.equal(mixedAuthorityCircularPlanner[0].circularServiceDecision.principalSourceRecordId, 'bods-230-loop', 'circular principal follows source authority priority rather than longest supplementary pattern');
 const tflOperatorFallback = buildPlannerBusServiceSummaries([
   { ...plannerBase, id: 'tfl-authority-r1', operator: 'Operator not supplied in the timetable', timetableSource: 'TfL', source: { provider: 'TfL' }, sourceRecordIds: ['tfl-r1'], sourceRouteIds: ['route-r1'] },
   { ...plannerBase, id: 'bods-copy-r1', operator: 'Arriva London North', timetableSource: 'BODS', provider: 'BODS', source: { provider: 'BODS' }, sourceRecordIds: ['bods-r1'], sourceRouteIds: ['route-r1'] }

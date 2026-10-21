@@ -163,6 +163,13 @@ if (controlId === 'pipers') {
   if (!route230.length || !route230.every(row => row.typicalFrequencyLines?.length)) {
     throw new Error('Actual Run #75 Pipers route 230 planner evidence or frequency is missing.');
   }
+  if (!route230.some(row => row.circularClassification === 'circular' && row.circular === true)) {
+    throw new Error('Actual Run #75 Pipers route 230 did not preserve the closed BODS principal as a circular planner service.');
+  }
+  const circularAudit = circularEvidenceAudit.plannerRows.find(row => row.classification === 'circular');
+  if (!circularAudit?.principalSourceRecordId?.includes('centrebus|gtfs')) {
+    throw new Error('Actual Run #75 Pipers route 230 circular principal is not the BODS Centrebus pattern.');
+  }
 }
 if (controlId === 'pe1' || controlId === 'queensgate') {
   const routeX4 = plannerRowsFor('X4');

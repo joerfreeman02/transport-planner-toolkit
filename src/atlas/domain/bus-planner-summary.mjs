@@ -1138,6 +1138,29 @@ function principalSupport(service, component, representativeId) {
   };
 }
 
+function circularAuthorityRank(service) {
+  const rank = value => {
+    const provider = text(value).toLowerCase();
+    if (/\btfl\b|transport for london/.test(provider)) return 3;
+    if (/\bbods\b|bus open data/.test(provider)) return 2;
+    if (/\btnds\b|traveline national dataset/.test(provider)) return 1;
+    return 0;
+  };
+  const declaredPrimary = rank(service?.source?.primaryAuthority || service?.primaryAuthority);
+  if (declaredPrimary) return declaredPrimary;
+  const source = rank(service?.source?.provider || service?.provider || service?.timetableSource);
+  if (source) return source;
+  const provenance = rank(service?.source?.provenance || service?.sourceProvenance);
+  return provenance || sourceAuthorityRank(service);
+}
+
+function circularPrincipal(component, main, representativeId) {
+  const winningRank = Math.max(0, ...component.map(circularAuthorityRank));
+  if (!winningRank) return main;
+  const authoritative = component.filter(service => circularAuthorityRank(service) === winningRank);
+  return [...authoritative].sort((first, second) => compareMain(first, second, representativeId, authoritative))[0] || main;
+}
+
 function compareMain(first, second, representativeId, component = [first, second]) {
   const firstSupport = principalSupport(first, component, representativeId);
   const secondSupport = principalSupport(second, component, representativeId);
@@ -1554,7 +1577,7 @@ function buildPlannerServiceGroup(component, stops, main, representative, public
     publicRouteFamilyKey,
     ambiguousServices: component.ambiguousServices ?? []
   });
-  const circularServiceDecision = resolveCircularServiceDecision(circularServices, { principal: main, component });
+  const circularServiceDecision = resolveCircularServiceDecision(circularServices, { principal: circularPrincipal(circularServices, main, representative.id), component });
   const terminusDecision = makeTerminusDecision({
     services: component,
     principal: main,

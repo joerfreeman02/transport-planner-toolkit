@@ -26,8 +26,9 @@ assert.match(app, /These records remain on the map and in the detailed source ev
 assert.match(app, /result\.stops\.filter\(stop => !isOtherNearbyStopRecord\(stop\)\)/);
 assert.match(app, /other-nearby-stop-table/);
 assert.match(app, /Walking distance \/ time/);
-assert.match(app, /Technical source note/);
-assert.match(app, /operator: \$\{service\.operator \|\| 'not supplied'\}/);
+assert.match(app, /const sourceMessage = \(outcome, noun = 'data'\)/, 'source status uses concise public wording rather than internal technical-note headings');
+assert.match(app, /sources\?\.tnds\?\.outcome/);
+assert.match(app, /Operator: \$\{service\.operator \|\| 'not supplied'\}/);
 
 const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const weekday = Object.fromEntries(days.map(day => [day, day === 'sunday' ? [] : [420, 480, 540]]));

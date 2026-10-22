@@ -1074,7 +1074,15 @@ function deduplicateDepartureEntries(entries) {
 
 function canonicalDeparturePopulation(component, representativeId, main, plannerServiceGroup = null) {
   const eligible = component.filter(service => serviceAtRepresentative(service, representativeId));
-  const records = eligible.length ? eligible : (main ? [main] : []);
+  const shortWorkingIds = new Set(plannerServiceGroup?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []);
+  const principalEligible = eligible.filter(service => ![serviceIdForPlanner(service), ...(service?.sourceRecordIds ?? [])]
+    .filter(Boolean).some(id => shortWorkingIds.has(id)));
+  // A short working is retained in the raw service group and planner
+  // annotations, but it must not inflate the principal public timetable's
+  // frequency merely because it serves the same assessed stop. If the group
+  // contains no separately identified principal, retain the original
+  // population rather than silently dropping the only available service.
+  const records = principalEligible.length ? principalEligible : eligible.length ? eligible : (main ? [main] : []);
   const terminalEvidence = plannerServiceGroup?.terminusDecision?.proven
     && plannerServiceGroup.terminusDecision.terminalStopPointIds?.includes(representativeId)
     && records.some(service => sourceAssertsCircular(service));
@@ -1452,6 +1460,8 @@ function materialServiceNote(note) {
 function materialServiceNotesForService(service) {
   const raw = text(service?.serviceNote);
   const route = text(service?.routeNumber);
+  const routeMentioned = route && new RegExp(`\\b${route.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(raw);
+  if (routeMentioned && /non[- ]school/i.test(raw)) return [`Route ${route} operates on non-school days only.`];
   if (route && /(?:school[- ]?days?|schooldays?)/i.test(raw) && new RegExp(`\\b${route.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'i').test(raw)) {
     return ['School-day journeys only.'];
   }
@@ -1476,14 +1486,16 @@ function materialServiceNotesForComponent(component, fallbackSchedules = {}, gro
     ...(groupingDecision?.branchVariantRecordIds ?? []),
     ...(groupingDecision?.calendarVariantRecordIds ?? [])
   ]);
+  const recordIdsFor = service => unique([serviceIdForPlanner(service), ...(service?.sourceRecordIds ?? [])]).filter(Boolean);
+  const isVariant = service => recordIdsFor(service).some(id => variantIds.has(id));
   const hasUnrestrictedPrincipal = component.some(service => {
-    if (variantIds.has(serviceIdForPlanner(service))) return false;
+    if (isVariant(service)) return false;
     return !['school-day', 'non-school-day', 'holiday'].includes(calendarProfileFromService(service));
   });
   return unique(component.flatMap(service => materialServiceNotesForService(service)
     .filter(note => !(hasUnrestrictedPrincipal
-      && variantIds.has(serviceIdForPlanner(service))
-      && /^(?:School-day journeys only\.|Non-school days only\.|Term-time service\.|Route .* operates in term time only\.|Holidays only\.)$/i.test(note)))
+      && isVariant(service)
+      && /^(?:School-day journeys only\.|Non-school days only\.|Term-time service\.|Route .* operates in term time only\.|Holidays only\.|Operating days could not be fully confirmed; check the timetable before use\.)$/i.test(note)))
     .filter(note => noteAppliesToCanonicalPopulation(note,
       hasCalendarMetadata(service) ? (service?.departuresByDay ?? service?.stopSchedules ?? {}) : fallbackSchedules, service))));
 }
@@ -1880,8 +1892,12 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     || resolveCircularServiceDecision(component, { principal: main, component });
   const rowCircular = circularClassificationIsProven(circularServiceDecision);
   const canonical = canonicalDeparturePopulation(component, representative.id, main, plannerServiceGroup);
+  const shortWorkingIds = new Set(plannerServiceGroup.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []);
+  const principalComponent = component.filter(service => ![serviceIdForPlanner(service), ...(service?.sourceRecordIds ?? [])]
+    .filter(Boolean).some(id => shortWorkingIds.has(id)));
+  const profileComponent = principalComponent.length ? principalComponent : component;
   const profileIds = orderedCalendarProfiles([
-    ...component.map(calendarProfileFromService),
+    ...profileComponent.map(calendarProfileFromService),
     ...canonical.entries.flatMap(calendarProfileIdsForEntry),
     ...(canonical.entries.some(entry => calendarProfileIdsForEntry(entry).length === 0 && plannerEvidenceSourceRank({}, entry) === 2)
       && canonical.entries.some(entry => calendarProfileIdsForEntry(entry).some(profile => profile !== 'ordinary') && plannerEvidenceSourceRank({}, entry) === 1)
@@ -1891,7 +1907,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const ordinaryEntries = canonical.entries.filter(entry => calendarProfileIdsForEntry(entry).includes('ordinary'));
   const profileResults = new Map(profileIds.map(profileId => [
     profileId,
-    calculateProfileResult(component, representative.id, profileId, calendarPartition(canonical.entries, profileId, ordinaryEntries, hasOrdinaryProfile))
+    calculateProfileResult(profileComponent, representative.id, profileId, calendarPartition(canonical.entries, profileId, ordinaryEntries, hasOrdinaryProfile))
   ]));
   const effectiveProfileIds = profileIds.filter(profileId => profileResults.get(profileId).entries.length);
   const separateTimetableProfiles = separateTimetableProfileIds(effectiveProfileIds);
@@ -1899,7 +1915,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const displayProfileId = schoolHolidayVariant
     ? separateTimetableProfiles.termTime[0]
     : effectiveProfileIds.includes('ordinary') ? 'ordinary' : effectiveProfileIds[0] ?? profileIds[0] ?? null;
-  const selectedProfileResult = profileResults.get(displayProfileId) ?? calculateProfileResult(component, representative.id, displayProfileId, calendarPartition(canonical.entries, displayProfileId, ordinaryEntries, hasOrdinaryProfile));
+  const selectedProfileResult = profileResults.get(displayProfileId) ?? calculateProfileResult(profileComponent, representative.id, displayProfileId, calendarPartition(canonical.entries, displayProfileId, ordinaryEntries, hasOrdinaryProfile));
   const displayResult = schoolHolidayVariant
     ? composeRepresentativeSchoolTermWeek(
       separateTimetableProfiles.termTime.map(profileId => profileResults.get(profileId)).filter(Boolean),
@@ -1909,7 +1925,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const mixedProfileOutput = effectiveProfileIds.length > 1 && !schoolHolidayVariant;
   const outputProfileIds = mixedProfileOutput ? effectiveProfileIds : [displayProfileId];
   const unresolvedNeedsQualification = profileIds.includes(UNKNOWN_CALENDAR_PROFILE)
-    && (profileIds.length > 1 || component.some(hasCalendarMetadata));
+    && (profileIds.length > 1 || profileComponent.some(hasCalendarMetadata));
   const displayFrequencyLines = [...displayResult.frequencyLines];
   const displayOperatingLines = [...displayResult.operatingLines];
   let frequencyLines = displayFrequencyLines;
@@ -2682,7 +2698,7 @@ export function plannerAnnotationTaxonomy(row) {
   const mixedSchoolCalendar = hasSchoolAndNonSchoolProfiles(services);
   const shortWorkingRecordIds = new Set(row?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []);
   const variantQualificationNotes = new Set(services.filter(service => serviceRecordIds(service).some(id => shortWorkingRecordIds.has(id)))
-    .flatMap(service => materialServiceNotesForService(service)));
+    .flatMap(service => materialServiceNotesForService(service).map(note => materialServiceNote(note) || note)));
   const principalEndpointService = services.find(service => normal(plannerDestination(service)) === mainDestination) || services[0] || null;
   const duplicateIds = new Set(row?.publicServiceGroupingDecision?.deduplicatedSourceRecordIds ?? []);
   const principalSourceIds = new Set(services[0]?.sourceRecordIds ?? []);

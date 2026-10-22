@@ -49,14 +49,25 @@ function nationalEvidenceUnavailableForStop(stop, provenance = {}) {
   return requiresNationalEvidence(stop);
 }
 
-function incompleteTimetableIdentitiesForStop(stop, provenance = {}) {
+function incompleteTimetableIdentitiesForStop(stop, provenance = {}, services = []) {
   const identitySuffix = `|${stopKey(stop)}`;
+  const tflIdentities = new Set((provenance.tflTimetableRequestIdentities ?? []).map(String));
+  const resolvedTfLRoutes = new Set((services ?? []).filter(service => /\btfl\b/i.test(String(service.timetableSource || service.source?.provider || ''))
+    && Object.values(service.stopSchedules ?? {}).some(hasScheduledEvidence))
+    .map(service => String(service.routeNumber ?? '').trim()).filter(Boolean));
   return [...new Set([
     ...(provenance.unresolvedRequestIdentities ?? []),
     ...(provenance.nationalUnresolvedRequestIdentities ?? []),
     ...(provenance.unprocessedRequestIdentities ?? []),
     ...(provenance.quarantinedRequestIdentities ?? [])
-  ].map(String).filter(identity => identity.endsWith(identitySuffix)))];
+  ].map(String).filter(identity => identity.endsWith(identitySuffix)))].filter(identity => {
+    const route = identity.split('|')[0];
+    // Preserve the failed request in provenance. It is redundant for the
+    // normal stop summary only when this exact TfL request's public route has
+    // already resolved from scheduled TfL evidence elsewhere in the selected
+    // assessment. National, unprocessed and quarantined requests stay visible.
+    return !(tflIdentities.has(identity) && resolvedTfLRoutes.has(route));
+  });
 }
 
 function failedTimetableEvidenceForStop(stop, provenance = {}) {
@@ -114,7 +125,7 @@ function checkedSourceLabels(stop, provenance = {}, services = []) {
 function buildStopTimetableEvidence(stop, services, servicesResult) {
   const provenance = servicesResult?.provenance ?? {};
   if (stop?.timetableCallEligible === false) return Object.freeze({ status: 'NOT_A_TIMETABLE_CALL_POINT', label: 'Station access/infrastructure point · scheduled calls are not expected here', sources: [] });
-  const incompleteIdentities = incompleteTimetableIdentitiesForStop(stop, provenance);
+  const incompleteIdentities = incompleteTimetableIdentitiesForStop(stop, provenance, services);
   const incompleteCount = incompleteIdentities.length;
   const incompleteLabel = `timetable evidence unresolved or incomplete for ${incompleteCount} route${incompleteCount === 1 ? '' : 's'}`;
   const matched = (services ?? []).filter(service => hasScheduledEvidence(service.stopSchedules?.[stopKey(stop)] || {}));
@@ -171,8 +182,13 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     if (!items.has(key)) items.set(key, item);
   };
   const provenance = servicesResult?.provenance ?? {};
+  const tflRequestIdentities = new Set((provenance.tflTimetableRequestIdentities ?? []).map(String));
+  const resolvedTfLRoutes = new Set((serviceSummaries ?? []).filter(service => /\btfl\b/i.test(String(service.timetableSource || service.frequencyEvidenceSource || service.provider || service.sourceProviders?.join(' ') || service.sourceAuthorities?.join(' ') || service.source?.provider || ''))
+    && String(service.routeNumber ?? '').trim())
+    .map(service => String(service.routeNumber).trim()));
   for (const identity of [...(provenance.unresolvedRequestIdentities ?? []), ...(provenance.nationalUnresolvedRequestIdentities ?? [])]) {
     const parts = requestParts(identity);
+    if (tflRequestIdentities.has(String(identity)) && resolvedTfLRoutes.has(String(parts.route ?? ''))) continue;
     add({ code: 'unresolved-timetable-request', route: parts.route, stop: parts.stop, source: 'timetable source', message: 'This route/stop timetable request remained unresolved; inspect the returned source evidence before formal use.' });
   }
   for (const failure of provenance.failedShardDiagnostics ?? []) {

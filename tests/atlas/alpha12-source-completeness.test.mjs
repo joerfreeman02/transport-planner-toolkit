@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createAuthoritativeBusTimetableAdapter } from '../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
 import { createBusAssessment } from '../../src/atlas/application/bus-assessment.mjs';
 import { createBusStopDiscovery } from '../../src/atlas/application/bus-stop-discovery.mjs';
+import { stopRoutesPresentation } from '../../src/atlas/domain/bus-source-presentation.mjs';
 
 const schedule = departures => ({ monday: departures, tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] });
 const sourceSuccess = (source, data = [], provenance = {}) => ({ ok: true, data, evidence: [], warnings: [], provenance: { source, ...provenance } });
@@ -255,5 +256,25 @@ const ambiguousNoFallbackResult = await ambiguousNoFallback.servicesForStops([{ 
 assert.equal(ambiguousNoFallbackResult.ok, false);
 assert.equal(ambiguousNoFallbackResult.provenance.timetableConclusion, 'UNRESOLVED');
 assert.match(ambiguousNoFallbackResult.message, /No London zero-service conclusion/);
+
+const redundantTflFailureAssessment = createBusAssessment({
+  stopDiscovery: { nearbyStops: async () => sourceSuccess('TfL', [
+    { id: 'RESOLVED-STOP', name: 'Resolved route stop', latitude: 51.7, longitude: -0.1, routes: ['279'], timetableAuthority: 'TfL', routeAuthorities: { '279': ['TfL'] } },
+    { id: 'REDUNDANT-STOP', name: 'Redundant failed-call stop', latitude: 51.701, longitude: -0.1, routes: ['279'], timetableAuthority: 'TfL', routeAuthorities: { '279': ['TfL'] } }
+  ], { stopCoverageComplete: true }) },
+  timetableData: { servicesForStops: async () => sourceSuccess('TfL', [{
+    id: 'tfl-279-resolved', routeNumber: '279', operator: 'Arriva London North', origin: 'Origin', destination: 'Terminus',
+    direction: 'Terminus', timetableSource: 'TfL', provider: 'TfL', source: { provider: 'TfL' }, stopSchedules: { 'RESOLVED-STOP': schedule([420]) }
+  }], {
+    processedRequests: 2, unresolvedRequests: 1, failedRequests: 1, sourceCompleteness: 'PARTIAL',
+    timetableConclusion: 'MATCHED', checkedStopIds: ['RESOLVED-STOP', 'REDUNDANT-STOP'],
+    tflTimetableRequestIdentities: ['279|REDUNDANT-STOP'], unresolvedRequestIdentities: ['279|REDUNDANT-STOP']
+  }) },
+  accessRouting: { matrix: routed }
+});
+const redundantTflResult = await redundantTflFailureAssessment.assess({ latitude: 51.7, longitude: -0.1 });
+assert.ok(redundantTflResult.provenance.timetables.unresolvedRequestIdentities.includes('279|REDUNDANT-STOP'), 'the failed request stays in technical provenance');
+assert.doesNotMatch(stopRoutesPresentation(redundantTflResult.stops.find(stop => stop.id === 'REDUNDANT-STOP')), /unavailable\/incomplete/i, 'a redundant TfL call does not contaminate the normal Routes serving stop text after the same route resolved from TfL');
+assert.equal(redundantTflResult.reviewItems.some(item => item.code === 'unresolved-timetable-request' && item.route === '279'), false, 'redundant TfL request failure is not promoted to planner review');
 
 console.log('PASS Alpha.12 source completeness, selected-stop duplicate coverage, evidence, nearest, and ambiguous-TfL regressions.');

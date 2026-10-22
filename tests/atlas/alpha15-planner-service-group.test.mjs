@@ -168,6 +168,39 @@ assert.equal(schoolShortWorkingRows[0].frequencyBasisStopId, 'B', 'a nearer stop
 assert.match(schoolShortWorkingRows[0].typicalFrequencyText, /Mon-Sun: Every ~60 mins/);
 assert.match(`${schoolShortWorkingRows[0].serviceNote} ${schoolShortWorkingRows[0].routeGroupNote || ''}`, /short workings|variant/i);
 
+const sameStopShortWorkingRows = rows([
+  record({
+    id: 'same-stop-principal', routeNumber: 'SAME-STOP-SCHOOL', destination: 'Regional Terminus',
+    pattern: ['ORIGIN', 'SHARED', 'REGIONAL'], stopIds: ['B'], basis: 'B', minutes: [360, 420, 480, 540, 600, 660, 720, 780],
+    departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, [360, 420, 480, 540, 600, 660, 720, 780].map(minute => ({
+      minute, stopPointId: 'B', journeyIdentity: `principal-${day}-${minute}`, provider: 'BODS', calendarProfileId: 'ordinary'
+    }))]))
+  }),
+  record({
+    id: 'same-stop-school-short', routeNumber: 'SAME-STOP-SCHOOL', destination: 'Local School',
+    pattern: ['ORIGIN', 'SHARED', 'SCHOOL'], stopIds: ['B'], basis: 'B', calendarProfileId: 'school-day', minutes: [],
+    departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, day === 'saturday' || day === 'sunday' ? [] : [360, 365, 370, 375, 380].map(minute => ({
+      minute, stopPointId: 'B', journeyIdentity: `short-${day}-${minute}`, provider: 'BODS', calendarProfileId: 'school-day'
+    }))]))
+  })
+]);
+assert.equal(sameStopShortWorkingRows.length, 1, 'same-stop short workings stay attached to the principal public direction');
+assert.ok(sameStopShortWorkingRows[0].publicServiceGroupingDecision.shortWorkingRecordIds.includes('same-stop-school-short'), 'grouping identifies the school journey as a short working');
+assert.deepEqual(sameStopShortWorkingRows[0].canonicalDeparturePopulation.monday.map(entry => entry.minute), [360, 420, 480, 540, 600, 660, 720, 780], 'same-stop short-working departures do not enter the principal frequency population');
+assert.match(sameStopShortWorkingRows[0].typicalFrequencyText, /Mon-Sun: Every ~60 mins/, 'principal frequency reflects only the regular timetable even when a short working uses the exact same stop');
+assert.match(sameStopShortWorkingRows[0].plannerNotes?.shortWorkings ?? '', /Local School/i, 'excluded frequency evidence remains visible as a planner short-working annotation');
+
+const scopedNonSchoolRows = rows([
+  record({ id: '101-regular', routeNumber: '101', destination: 'Main Terminus', pattern: ['ORIGIN', 'MID', 'MAIN'], minutes: [420, 480] }),
+  record({ id: '101-non-school-variant', routeNumber: '101', destination: 'Local Terminus', pattern: ['ORIGIN', 'MID'], minutes: [420], calendarProfileId: null,
+    serviceNote: 'Route 101 – Non-school days only; operating days could not be fully confirmed.' })
+]);
+assert.equal(scopedNonSchoolRows.length, 1, 'route 101 public service and its restricted variant remain one direction');
+assert.doesNotMatch(scopedNonSchoolRows[0].plannerNotes?.serviceQualification ?? '', /(?:School-day journeys only|Non-school days only|Operating days could not be fully confirmed)/i,
+  'a non-school-only short-working qualification must not become a route-wide 101 qualification');
+assert.match(scopedNonSchoolRows[0].plannerNotes?.shortWorkings ?? '', /Local Terminus/i, 'the restricted route 101 variant remains visible in its scoped short-working annotation');
+assert.match(scopedNonSchoolRows[0].plannerNotes?.shortWorkings ?? '', /non-school days only/i, 'the restricted route 101 calendar remains attached to the variant');
+
 const schoolBranchWithoutCalendarTaxonomy = rows([
   record({
     id: 'regular-queensgate', routeNumber: 'X', destination: 'Queensgate Bus Station',

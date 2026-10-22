@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   frozen-candidate-diagnosis:
-    if: (github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c1-manual-corrections' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c3-final-intelligence-correction') && inputs.mode == 'normal_runtime_diagnosis'
+    if: (github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-intelligence-restoration' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c1-manual-corrections' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c3-final-intelligence-correction' || github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c4-final-product-trace') && inputs.mode == 'normal_runtime_diagnosis'
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:
@@ -89,7 +89,7 @@ jobs:
         run: |
           mkdir -p candidate-diagnostic
           failed=0
-          for control in waltham pipers pe1 queensgate; do
+          for control in waltham pipers pe1 enfield queensgate; do
             if ! node tests/atlas/s2e1-normal-runtime-candidate-diagnostic.mjs restored/candidate-site "candidate-diagnostic/${control}.json" "$control"; then
               failed=1
             fi

@@ -19,7 +19,8 @@ const controls = [
   { id: 'pipers-lane', label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700 },
   { id: 'waltham-cross', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700 },
   { id: 'chingford', label: 'Normanshire Drive, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250 },
-  { id: 'pe1', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500 }
+  { id: 'pe1', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500 },
+  { id: 'enfield', label: 'Enfield Town', latitude: 51.6522, longitude: -0.0809, radius: 500 }
 ];
 const chingfordRouteMetadata657 = { id: '657', routeSections: [
   { id: '657-out', direction: 'outbound', originationName: "Salisbury Hall Sainsbury's", destinationName: "Bancroft's School" },
@@ -90,6 +91,12 @@ function wordText(xml) {
 
 function wordParagraphs(xml) {
   return [...xml.matchAll(/<w:p(?:\s[^>]*)?>([\s\S]*?)<\/w:p>/g)].map(([, paragraph]) => wordText(paragraph));
+}
+
+function wordTables(xml) {
+  return [...xml.matchAll(/<w:tbl(?:\s[^>]*)?>([\s\S]*?)<\/w:tbl>/g)].map(([, table]) =>
+    [...table.matchAll(/<w:tr(?:\s[^>]*)?>([\s\S]*?)<\/w:tr>/g)].map(([, row]) =>
+      [...row.matchAll(/<w:tc(?:\s[^>]*)?>([\s\S]*?)<\/w:tc>/g)].map(([, cell]) => wordText(cell))));
 }
 
 function fail(id, reason) { report.failures.push({ id, reason }); }
@@ -272,7 +279,20 @@ try {
       await download.saveAs(wordPath);
       const documentXml = zipEntry(await readFile(wordPath), 'word/document.xml');
       const exportedWordText = wordText(documentXml);
-        const exportedWordParagraphs = wordParagraphs(documentXml);
+      const exportedWordParagraphs = wordParagraphs(documentXml);
+      const exportedWordTables = wordTables(documentXml);
+      const wordServiceTable = exportedWordTables.find(table => table[0]?.includes('Direction / main service pattern') && table[0]?.includes('Typical frequency'));
+      assert.ok(wordServiceTable, 'Generated Word export has no planner-facing Bus Service Summary table.');
+      const wordHeaders = wordServiceTable[0];
+      const wordRows = wordServiceTable.slice(1).map(cells => Object.fromEntries(wordHeaders.map((header, index) => [header, cells[index] ?? ''])));
+      const parityFields = ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop'];
+      const normalized = value => String(value ?? '').replace(/\s+/g, ' ').trim();
+      for (const browserRow of rendered) {
+        const wordRow = wordRows.find(candidate => normalized(candidate.Route) === normalized(browserRow.Route)
+          && normalized(candidate['Direction / main service pattern']) === normalized(browserRow['Direction / main service pattern']));
+        assert.ok(wordRow, `Generated Word row is missing browser route/direction ${browserRow.Route} ${browserRow['Direction / main service pattern']}.`);
+        for (const field of parityFields) assert.equal(normalized(wordRow[field]), normalized(browserRow[field]), `Browser/Word ${field} differs for route ${browserRow.Route}.`);
+      }
       outcome.status = await page.locator('#taskStatusMessage').innerText();
       outcome.renderedRows = rendered;
       outcome.renderedServiceNotes = renderedServiceNotes;
@@ -287,15 +307,17 @@ try {
         const rows230 = rendered.filter(row => /^230$/i.test(row.Route || ''));
         assert.equal(rows230.length, 1, `Pipers normal UI must present one 230 principal row; got ${rows230.length}.`);
         assert.match(rows230[0].Source, /BODS/i, 'Pipers route 230 must identify BODS as its primary displayed timetable source.');
+        assert.match(rows230[0]['Served at'] || '', /\*/i, 'Pipers route 230 row must identify the selected assessed stop that controls its frequency.');
         assert.ok(renderedServiceNotes.some(note => /230.*Circular service/i.test(note)), 'Pipers route 230 circular evidence is missing from the normal service presentation.');
         assert.ok(rendered.some(row => row.Route === '231'), 'Pipers TNDS-only route 231 must remain available in the normal planner.');
-        assert.match(rows230[0]['Typical frequency'], /60\s*mins/i, 'Pipers rendered route 230 must match the hourly frozen BODS local-stop truth.');
         assert.doesNotMatch(rows230[0]['Typical frequency'], /5\s*mins/i, 'Pipers rendered route 230 must not show five-minute inflation.');
         assert.match(rows230[0]['Typical frequency'], /Sun: No scheduled service/i, 'Pipers rendered BODS-primary route 230 must retain the frozen Sunday no-service calendar.');
         assert.match(exportedWordText, /230[\s\S]{0,500}Sun: No scheduled service/i, 'Generated Word export does not preserve the route 230 Sunday no-service calendar.');
         assert.match(exportedWordText, /230.*60\s*mins/i, 'Generated Word export does not preserve the hourly route 230 frequency.');
         const rows46 = rendered.filter(row => /^46$/i.test(row.Route || ''));
         assert.doesNotMatch(rows46.map(row => row['Typical frequency']).join(' '), /(?:every|~)\s*5\s*mins/i, 'Pipers route 46 must not inherit the implausible five-minute cross-stop frequency.');
+        assert.ok(rows46.length > 0 && rows46.every(row => /\*/.test(row['Served at'] || '')), 'Pipers route 46 frequency rows must expose their selected assessed stop.');
+        assert.doesNotMatch(exportedWordText, /(?:every|~)\s*5\s*mins/i, 'Pipers Word export must not retain five-minute route frequency inflation.');
       }
       if (control.id === 'waltham-cross') {
         assert.doesNotMatch(`${checksText} ${exportedWordText}`, /Planner review required for:\s*(?:217|279|317|327|491|N279)|timetable data unavailable\/incomplete for 1 assessed stop/i, 'Waltham output contains a known false review/incomplete warning.');
@@ -332,25 +354,41 @@ try {
           && /\bX4\b/i.test(paragraph) && /Kings School/i.test(paragraph)).join(' ');
         assert.match(x4WordShortWorking, /X4\b[^.]*Kings School[^.]*(?:School-day journeys only|weekdays only)/i, 'PE1 Word export does not preserve the qualification within the X4 school short-working paragraph.');
         assert.ok(rows102.every(row => row['Direction / main service pattern'] && row['Principal locations']), 'Remaining PE1 route 102 rows lack visible distinction labels.');
-        // Preserve the exact output already accepted in C2 Run #151. These
-        // services legitimately include five-minute frequency text at this
-        // control, so a blanket ban would reject the frozen accepted baseline.
-        const acceptedFrequencyBaseline = [
-          ['1', 'Towards Werrington Centre', 'Mon-Fri: Typically every ~5 mins Sat: Approx. every 10 mins (irregular) Sun: Typically every ~20 mins'],
-          ['1', 'Towards Queensgate Bus Stn', 'Mon-Sat: Approx. every 10 mins (irregular) Sun: Typically every ~20 mins'],
-          ['5', 'Towards Dogsthorpe Lavender Crescent', 'Mon-Fri: Typically every ~30 mins Sat: Typically every ~10–20 mins Sun: Typically every ~10–50 mins'],
-          ['5', 'Towards Yaxley (Windsor Road)', 'Mon-Sat: Typically every ~5–25 mins Sun: Approx. every 5 mins (irregular)'],
-          ['33', 'Towards Whittlesey (Roman Close)', 'Mon-Sat: Typically every ~10–50 mins Sun: No scheduled service'],
-          ['33', 'Towards City Hospital Bretton Gate', 'Mon-Sat: Approx. every 5 mins (irregular) Sun: No scheduled service']
+        const inflatedFrequencyControls = [
+          ['1', /Werrington Centre/i, 'Mon-Fri'],
+          ['5', /Yaxley/i, 'Sun'],
+          ['33', /City Hospital/i, 'Mon-Sat']
         ];
-        for (const [route, direction, frequency] of acceptedFrequencyBaseline) {
-          const row = rendered.find(candidate => candidate.Route === route && candidate['Direction / main service pattern'] === direction);
-          assert.ok(row, `PE1 accepted-baseline route ${route} ${direction} is missing.`);
-          assert.equal(row['Typical frequency'], frequency, `PE1 route ${route} ${direction} changed from the accepted C2 Run #151 frequency baseline.`);
+        for (const [route, direction, days] of inflatedFrequencyControls) {
+          const row = rendered.find(candidate => candidate.Route === route && direction.test(candidate['Direction / main service pattern'] || ''));
+          assert.ok(row, `PE1 route ${route} selected direction ${direction} is missing.`);
+          assert.match(row['Served at'] || '', /\*/, `PE1 route ${route} ${direction} does not identify its selected assessed stop.`);
+          const frequency = row['Typical frequency'].split(/(?=\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:-|:))/).find(line => line.trim().startsWith(days));
+          assert.ok(frequency, `PE1 route ${route} has no ${days} frequency for selected direction ${direction}.`);
+          assert.doesNotMatch(frequency, /(?:every|~)\s*5\s*mins/i, `PE1 route ${route} ${direction} remains approximately every five minutes in ${days}.`);
         }
+        assert.doesNotMatch(exportedWordText, /1[\s\S]{0,300}Towards Werrington Centre[\s\S]{0,250}(?:every|~)\s*5\s*mins/i, 'PE1 Word route 1 Werrington frequency remains inflated.');
+        assert.doesNotMatch(exportedWordText, /5[\s\S]{0,300}Towards Yaxley[\s\S]{0,250}Sun:[^\n]{0,50}(?:every|~)\s*5\s*mins/i, 'PE1 Word route 5 Yaxley Sunday frequency remains inflated.');
+        assert.doesNotMatch(exportedWordText, /33[\s\S]{0,300}Towards City Hospital[\s\S]{0,250}(?:every|~)\s*5\s*mins/i, 'PE1 Word route 33 City Hospital frequency remains inflated.');
         for (const route of ['27', '101', '201']) {
           const routeNotes = renderedServiceNotes.filter(note => new RegExp(`(?:^|\\b)${route}(?:\\b|\\s*[–-])`).test(note)).join(' ');
           assert.doesNotMatch(routeNotes, new RegExp(`${route}\\s*[–-]\\s*(?:School-day journeys only|Non-school days only)\\.`, 'i'), `PE1 route ${route} must not receive a route-level calendar qualification from a variant.`);
+        }
+      }
+      if (control.id === 'enfield') {
+        for (const route of ['121', '191', 'W8']) {
+          const routeRows = rendered.filter(row => row.Route === route);
+          if (routeRows.length) {
+            const routeNotes = renderedServiceNotes.filter(note => new RegExp(`(?:^|\\b)${route}(?:\\b|\\s*[–-])`, 'i').test(note)).join(' ');
+            assert.doesNotMatch(`${routeRows.map(row => `${row['Typical frequency']} ${row['Operating period at stop']}`).join(' ')} ${routeNotes}`,
+              new RegExp(`${route}\\s*[–-]\\s*School-day journeys only|School-day journeys only\\.?`, 'i'), `Enfield normal term-time route ${route} was classified as school-only.`);
+          }
+        }
+        const route629 = rendered.filter(row => row.Route === '629');
+        if (route629.length) {
+          const route629Notes = renderedServiceNotes.filter(note => /(?:^|\b)629(?:\b|\s*[–-])/i.test(note)).join(' ');
+          assert.match(`${route629.map(row => `${row['Typical frequency']} ${row['Operating period at stop']}`).join(' ')} ${route629Notes}`, /School days|School-day journeys only/i,
+            'Enfield 629 must remain qualified as a school-day service where present.');
         }
       }
       report.controls[control.id] = outcome;

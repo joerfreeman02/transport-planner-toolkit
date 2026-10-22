@@ -25,6 +25,7 @@ const controls = {
   waltham: { label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700, focusRoutes: ['13', '13A', '13B', '13C', '14', '15', '15A', '16', '16C', '25C', '66', '217', '242', '251', '279', '310', '317', '327', '491', 'A1', 'N279'] },
   pipers: { label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700, focusRoutes: ['46', '230', '231', 'C'] },
   pe1: { label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '6', '23', '24', '25', '27', '33', '37', '60', '61', '62', '63', '101', '102', '201', '202', '415', '904', '4P', 'A', 'B', 'C'] },
+  enfield: { label: 'Enfield Town', latitude: 51.6522, longitude: -0.0809, radius: 500, focusRoutes: ['121', '191', '313', '329', '629', 'W8'] },
   queensgate: { label: 'Queensgate Bus Station', latitude: 52.5701, longitude: -0.2498, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '6', '23', '24', '25', '27', '33', '60', '61', '62', '63', '202', '415', '904', '5A', 'A', 'B', 'C'] }
 };
 const control = controls[controlId];
@@ -147,6 +148,38 @@ const plannerRows = assessment.plannerServiceSummaries.filter(row => wanted.has(
   id: row.id, routeNumber: row.routeNumber, routeNumbers: row.routeNumbers, operator: row.operator,
   direction: row.direction, principalLocations: row.principalLocations, typicalFrequencyLines: row.typicalFrequencyLines,
   operatingPeriodLines: row.operatingPeriodLines, sourceRecordIds: row.sourceRecordIds,
+  servedAtStopId: row.servedAtStopId, frequencyBasisStopId: row.frequencyBasisStopId, timetableBasisStopLabel: row.timetableBasisStopLabel,
+  selectedDeparturePopulationByDay: Object.fromEntries(Object.entries(row.canonicalDeparturePopulation ?? {}).map(([day, entries]) => [day, entries.map(entry => ({
+    minute: entry.minute, stopPointId: entry.stopPointId, routeNumber: entry.routeNumber, journeyIdentity: entry.journeyIdentity,
+    sourceRecordId: entry.sourceRecordId, provider: entry.provider, calendarProfileIds: entry.calendarProfileIds
+  }))])),
+  canonicalDeparturePopulationByDay: Object.fromEntries(Object.entries(row.canonicalDeparturePopulationAll ?? {}).map(([day, entries]) => [day, entries.map(entry => ({
+    minute: entry.minute, stopPointId: entry.stopPointId, routeNumber: entry.routeNumber, journeyIdentity: entry.journeyIdentity,
+    sourceRecordId: entry.sourceRecordId, provider: entry.provider, calendarProfileIds: entry.calendarProfileIds
+  }))])),
+  frequencyByDay: row.frequencyByDay,
+  rawServiceEvidence: (row.rawServiceSummaries ?? []).map(service => ({
+    id: service.id, sourceRecordIds: service.sourceRecordIds, routeNumber: service.routeNumber, operator: service.operator,
+    provider: service.provider, timetableSource: service.timetableSource, origin: service.origin, destination: service.destination,
+    direction: service.direction, stopIds: service.stopIds, frequencyBasisStopId: service.frequencyBasisStopId,
+    calendarProfileId: service.calendarProfileId, departuresByDay: service.departuresByDay,
+    departureEvidenceByDay: service.departureEvidenceByDay
+  })),
+  selectedDeparturePopulationByDay: Object.fromEntries(Object.entries(row.canonicalDeparturePopulation ?? {}).map(([day, entries]) => [day, entries.map(entry => ({
+    minute: entry.minute, stopPointId: entry.stopPointId, routeNumber: entry.routeNumber, journeyIdentity: entry.journeyIdentity,
+    sourceRecordId: entry.sourceRecordId, provider: entry.provider, calendarProfileIds: entry.calendarProfileIds
+  }))])),
+  canonicalDeparturePopulationByDay: Object.fromEntries(Object.entries(row.canonicalDeparturePopulationAll ?? {}).map(([day, entries]) => [day, entries.map(entry => ({
+    minute: entry.minute, stopPointId: entry.stopPointId, routeNumber: entry.routeNumber, journeyIdentity: entry.journeyIdentity,
+    sourceRecordId: entry.sourceRecordId, provider: entry.provider, calendarProfileIds: entry.calendarProfileIds
+  }))])),
+  rawServiceEvidence: (row.rawServiceSummaries ?? []).map(service => ({
+    id: service.id, sourceRecordIds: service.sourceRecordIds, routeNumber: service.routeNumber, operator: service.operator,
+    provider: service.provider, timetableSource: service.timetableSource, origin: service.origin, destination: service.destination,
+    direction: service.direction, stopIds: service.stopIds, frequencyBasisStopId: service.frequencyBasisStopId,
+    calendarProfileId: service.calendarProfileId, departuresByDay: service.departuresByDay,
+    departureEvidenceByDay: service.departureEvidenceByDay
+  })),
   serviceNote: row.serviceNote, routeVariantNote: row.routeVariantNote, routeGroupNote: row.routeGroupNote, plannerNotes: row.plannerNotes,
   groupingDecision: row.publicServiceGroupingDecision,
   routeFamilyDecision: row.publicRouteFamilyDecision,
@@ -183,6 +216,20 @@ const x4GroupingProbe = detailedX4Rows.map(row => ({
 }));
 
 const plannerRowsFor = target => plannerRows.filter(row => route(row.routeNumber) === target || (row.routeNumbers ?? []).some(value => route(value) === target));
+function assertSelectedStopPopulation(row, controlName) {
+  const stopId = row.frequencyBasisStopId;
+  if (!stopId || row.servedAtStopId !== stopId) throw new Error(`${controlName} route ${row.routeNumber} frequency basis does not match its selected assessed stop.`);
+  for (const [day, entries] of Object.entries(row.selectedDeparturePopulationByDay ?? {})) {
+    if (entries.some(entry => entry.stopPointId && entry.stopPointId !== stopId)) {
+      throw new Error(`${controlName} route ${row.routeNumber} ${day} frequency population contains a different StopPoint from ${stopId}.`);
+    }
+    const count = row.frequencyByDay?.[day]?.departureCount;
+    if (count !== entries.length) throw new Error(`${controlName} route ${row.routeNumber} ${day} frequency uses ${count} departures but its selected-stop population contains ${entries.length}.`);
+    const identities = entries.map(entry => [entry.stopPointId || stopId, entry.journeyIdentity || entry.sourceRecordId || '', entry.minute].join('|'));
+    if (new Set(identities).size !== identities.length) throw new Error(`${controlName} route ${row.routeNumber} ${day} population contains a duplicated physical departure identity.`);
+  }
+}
+for (const row of plannerRows) assertSelectedStopPopulation(row, control.label);
 const circularEvidenceAudit = controlId === 'pipers' ? {
   route: '230',
   sourceRecords: assessment.services.filter(row => route(row.routeNumber) === '230').map(row => ({
@@ -284,6 +331,9 @@ const compactPlannerRows = rows => rows.map(row => ({
   serviceNote: row.serviceNote, routeVariantNote: row.routeVariantNote, routeGroupNote: row.routeGroupNote, plannerNotes: row.plannerNotes,
   servedAtStopId: row.servedAtStopId, timetableBasisStopLabel: row.timetableBasisStopLabel,
   frequencyBasisStopId: row.frequencyBasisStopId, calendarProfileIds: row.calendarProfileIds,
+  selectedDeparturePopulationByDay: row.selectedDeparturePopulationByDay,
+  canonicalDeparturePopulationByDay: row.canonicalDeparturePopulationByDay,
+  frequencyByDay: row.frequencyByDay, rawServiceEvidence: row.rawServiceEvidence,
   typicalFrequencyLines: row.typicalFrequencyLines, operatingPeriodLines: row.operatingPeriodLines,
   sourceRecordIds: row.sourceRecordIds, groupingDecision: compactGroupingDecision(row.groupingDecision),
   selectedPrincipalPatternSourceRecordId: row.groupingDecision?.principalPattern?.sourceRecordId ?? null,

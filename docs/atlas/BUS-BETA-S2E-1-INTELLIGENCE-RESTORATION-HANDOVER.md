@@ -1,6 +1,6 @@
 # BUS-BETA-S2E-1 — Intelligence Restoration Handover
 
-Status: **READY FOR TECHNICAL DIRECTOR REVIEW**. C2 corrected the remaining frozen-candidate calendar defect and passed the exact-SHA hosted regression and normal-product browser/Word audits. Product Owner manual acceptance has not occurred.
+Status: **C2 READY FOR TECHNICAL DIRECTOR REVIEW; C3 HOSTED VALIDATION PENDING**. The C2 result below is historical. C3 adds further frequency-scope, calendar-qualification, and warning-materiality corrections; it has not yet passed exact-final-SHA hosted candidate validation. Product Owner manual acceptance has not occurred.
 
 ## Accepted production revision and candidate provenance
 
@@ -130,3 +130,32 @@ X4 has exactly two Stagecoach Midlands rows at both PE1 and Queensgate: one inbo
 - No new code defect was identified by the completed hosted candidate and regression gates. Remaining source caveats are special-day/date-specific timetable metadata and the unresolved corridors expressly listed above; these are surfaced rather than silently merged. The remaining gate is Technical Director review before any manual re-acceptance authorization. The unchanged Run #75 candidate remains immutable.
 
 **C2 gate: READY FOR TECHNICAL DIRECTOR REVIEW.**
+
+## S2E-1-C3 — final intelligence correction checkpoint
+
+### Branch and implementation
+
+- Branch: `codex/atlas-bus-beta-s2e-1-c3-final-intelligence-correction`.
+- Verified starting SHA: `487f5b05a07e5dcfcf62b55132101e13ccd2f68a`.
+- Pushed implementation SHA: `8bc4f7a3e1e3eff18f0d388d32ca6415f4dd74b8`, directly based on the verified starting SHA. Origin points to this SHA.
+- The C3 delta changes the planner's use of explicit per-stop departure evidence: an explicit empty/filtered stop population no longer falls back to denser route aggregate departures. Route-level calendar notes contributed only by recognized short-working/branch/calendar variant records are not promoted over an unrestricted principal service; the variant note remains visible.
+- When a failed TfL request is redundant because the same route/service is resolved at another selected stop and a same-stop national fallback exists, the lookup remains in provenance and its fallback evidence remains available, but that redundant failure alone does not add an incomplete/fallback review warning. Material unresolved requests still warn.
+- The S2E-1 frozen Run #75 diagnostic selector now admits this exact branch and remains restricted to the exact immutable candidate; the diagnostic workflow has no acquisition, publication, or deployment path.
+
+### C3 regression coverage and local test evidence
+
+- Added direct frequency assertions for explicit representative-stop records, including a day with no representative-stop service despite denser records at another selected stop.
+- Added audit assertions that redundant cross-stop lookup failures remain traceable without creating a false material warning, while genuinely unresolved evidence still warns.
+- Strengthened actual-candidate diagnostic and normal-product browser/Word gates for Waltham 217, Pipers 46, PE1 routes 1/5/33, X4's retained Kings School variant note, and route-level qualification scope for 27/101/201. Waltham's normal-product browser/Word gate uses the deterministic route 217 TfL operating-period fixture; it does not issue live TfL HTTP.
+- Local lightweight tests passed: `alpha12-evidence-integrity-audit`, `alpha15-planner-service-group`, `alpha13-calendar-safety`, `alpha13-summary-closeout`, `bus-robustness-1a2-enfield-variant`, `bus-robustness-1a4f-tfl-ibus-operator`, `tfl-operating-period-1b`, `review-candidate-workflow-contract`, and `s2e1-diagnostic-workflow-contract`; updated diagnostic scripts passed `node --check`; `git diff --check` passed. One initial Alpha.12 run hit a Windows sandbox temporary-directory rename restriction; it passed when its temporary files were directed into the isolated checkout.
+- The focused tests confirm Enfield calendar precedence, route 629/657 school-only semantics, iBus operator precedence over BODS corroboration, and operator/source separation. The production app already wires the date-valid checked iBus static operator adapter. This C3 change does not modify that authority path.
+
+### Candidate/hosted status and gate
+
+- Immutable candidate remains Run `39430415441`, artifact `12275615359`, digest `sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`, producer SHA `151199cc914c235870f444d26b03c2309edbd035`. It was not downloaded, rebuilt, or modified in C3.
+- No local national-data extraction, preparation, exhaustive scan, candidate build, or live source acquisition occurred. No publication, deployment, main merge, release, or version/build change occurred.
+- The full Bus-data Python suite, full `node tests/atlas/run-all.mjs`, immutable Run #75 verification, actual-candidate planner diagnostics, browser/Word candidate audits, and exact-final-SHA hosted validation have **not** run for C3. No C3 hosted run or artifact is claimed.
+- Push succeeded, but this session cannot dispatch `workflow_dispatch`: the available GitHub connector exposes read-only workflow-run APIs and the in-app GitHub page is signed out. No authentication flow was automated and no credential was requested. The C3 exact-SHA hosted gate remains pending.
+- Worktree is clean after the pushed code checkpoint. The historical dirty OneDrive `main` checkout was not modified. This document update is a separate documentation-only change and will advance branch HEAD; its resulting SHA must be used for any exact-final-SHA hosted validation.
+
+**C3 gate: NOT READY FOR TECHNICAL DIRECTOR REVIEW until exact-final-SHA hosted validation is green.**

@@ -288,7 +288,7 @@ const sourceScopedCalendarVariantRows = rows([
   { ...record({ id: sharedSynthesizedId, routeNumber: '101', destination: 'Peterborough Bus Station', calendarProfileId: 'ordinary', minutes: [420] }),
     sourceRecordIds: ['tnds:101:pattern:ordinary'] },
   { ...record({ id: sharedSynthesizedId, routeNumber: '101', destination: 'Z Local Terminus', calendarProfileId: null, minutes: [450],
-    serviceNote: 'Operating days could not be fully confirmed; check the timetable before use.' }),
+    serviceNote: 'Route 101 – Non-school days only; operating days could not be fully confirmed.' }),
     sourceRecordIds: ['tnds:101:pattern:unresolved'], calendarEvidence: [{ calendarProfileId: 'unresolved' }] }
 ]);
 assert.equal(sourceScopedCalendarVariantRows.length, 1, 'same synthesized direction IDs remain one public route row');

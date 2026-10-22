@@ -1914,12 +1914,25 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     ...(plannerServiceGroup.publicServiceGroupingDecision?.branchVariantRecordIds ?? []),
     ...(plannerServiceGroup.publicServiceGroupingDecision?.calendarVariantRecordIds ?? [])
   ]);
+  const scopedCalendarVariantServices = component.filter(service => {
+    if (!plannerRecordIds(service).some(id => variantRecordIds.has(id))) return false;
+    const profile = calendarProfileFromService(service);
+    const restrictedProfile = ['school-day', 'term-time', 'non-school-day', 'holiday'].includes(profile);
+    const scopedCalendarNote = materialServiceNotesForService(service)
+      .some(note => /school-day journeys only|non-school days only|term-time service|operates in term time only|holidays only|timetable varies between school and non-school days/i.test(note));
+    return restrictedProfile || scopedCalendarNote;
+  });
+  const scopedCalendarVariantIds = new Set(scopedCalendarVariantServices.flatMap(plannerRecordIds));
   const principalProfileComponent = profileComponent.filter(service => !plannerRecordIds(service).some(id => variantRecordIds.has(id)));
   const isVariantDeparture = entry => {
     const sourceRecordId = text(entry?.sourceRecordId);
     const patternIdentity = text(entry?.patternIdentity);
-    return [...variantRecordIds].some(id => id === sourceRecordId || id === patternIdentity
-      || (patternIdentity && id.includes(`:pattern:${patternIdentity}`)));
+    if ([...scopedCalendarVariantIds].some(id => id === sourceRecordId || id === patternIdentity
+      || (patternIdentity && id.includes(`:pattern:${patternIdentity}`)))) return true;
+    return calendarProfileIdsForEntry(entry).includes(UNKNOWN_CALENDAR_PROFILE)
+      && scopedCalendarVariantServices.some(service => text(entry?.routeNumber) === text(service.routeNumber)
+        && normal(entry?.origin) === normal(plannerOrigin(service))
+        && normal(entry?.destination) === normal(plannerDestination(service)));
   };
   const profileIds = orderedCalendarProfiles([
     ...profileComponent.map(calendarProfileFromService),

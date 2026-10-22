@@ -84,7 +84,8 @@ assert.doesNotMatch(plannerSourceWarning(resolvedOrdinary).join(' '), /complete 
 const rows = buildPlannerBusServiceSummaries(resolved.services, [{ id: 'ASSESS', name: 'Assessment stop', walking: { status: 'routed', distanceMetres: 100 } }]);
 assert.equal(rows.length, 1);
 assert.equal(rows[0].destination, 'Authoritative Main Station');
-assert.ok(rows[0].calendarProfileIds.includes('school-day'));
+assert.ok(rows[0].publicServiceGroupingDecision.shortWorkingRecordIds.includes('school'), 'the restricted destination remains identified as structured short-working evidence');
+assert.ok(rows[0].alternateDestinationNames.includes("Dame Alice Owen's School"), 'the restricted destination remains visible in route annotations');
 const wordText = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: rows, serviceSummaries: [] })
   .flatMap(table => table.rows ?? [])
   .map(row => Array.isArray(row) ? row.join(' ') : String(row?.text ?? ''))

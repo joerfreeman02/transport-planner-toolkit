@@ -144,12 +144,14 @@ assert.match(row16.typicalFrequencyText, /every ~30 mins/i, 'B1: route 16 no lon
 assert.match(row16.operatingPeriodLines.join('\n'), /08:15–21:40/);
 assert.equal(row16.canonicalDeparturePopulationAll.monday.length, 27, 'B1: route 16 Monday population excludes terminal arrivals');
 
-// B2: 16C is broadly hourly and its outgoing short workings remain useful.
+// B2: 16C remains broadly hourly; identified short workings stay auditable
+// but do not extend the principal operating period or inflate its frequency.
 const row16c = frozenRoute('16C');
 assert.equal(row16c.terminusDecision.proven, true, 'B2: route 16C terminal is proven from closed exact endpoint evidence');
 assert.match(row16c.typicalFrequencyText, /every ~60 mins/i, 'B2: route 16C is presented as broadly hourly');
-assert.match(row16c.operatingPeriodLines.join('\n'), /08:00–19:45/);
-assert.equal(row16c.canonicalDeparturePopulationAll.sunday.length, 14, 'B2: route 16C Sunday population excludes terminal arrivals but retains short workings');
+assert.match(row16c.operatingPeriodLines.join('\n'), /08:00–18:43/);
+assert.equal(row16c.canonicalDeparturePopulationAll.sunday.length, 12, 'B2: route 16C Sunday principal population excludes terminal arrivals and identified short workings');
+assert.equal(row16c.rawServiceSummaries.length, 5, 'B2: raw route 16C service evidence, including short workings, remains available for review');
 
 // B3: explicit occurrence roles are authoritative when available; the same
 // physical journey's terminating arrival is never counted as a departure.

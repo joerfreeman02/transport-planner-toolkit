@@ -83,7 +83,8 @@ assert.match(normalRuntime, /Actual Run #75 Waltham runtime did not present rout
 assert.match(normalRuntime, /Actual Run #75 Pipers route 230 planner evidence or frequency is missing/);
 assert.match(normalRuntime, /route46\.some\(row => .*5\\s\*mins/);
 assert.doesNotMatch(normalRuntime, /route46\.length\s*===?\s*0|!route46\.length/);
-assert.match(normalRuntime, /Actual Run #75 Waltham route 217 retains the reported late-night-only operating span/);
+assert.doesNotMatch(normalRuntime, /Actual Run #75 Waltham route 217 retains the reported late-night-only operating span/);
+assert.match(workflow, /failed=0[\s\S]*for control in waltham pipers pe1 queensgate[\s\S]*if ! node tests\/atlas\/s2e1-normal-runtime-candidate-diagnostic\.mjs[\s\S]*exit "\$failed"/);
 assert.match(normalRuntime, /Actual Run #75 \$\{controlId\} X4 should retain two directional frequency rows/);
 assert.match(normalRuntime, /Actual Run #75 \$\{controlId\} X4 has a route-level school-only qualification/);
 assert.match(normalRuntime, /rowConsolidationAudit/);
@@ -102,6 +103,7 @@ assert.match(productAudit, /publicationAttempted: false/);
 assert.match(productAudit, /deploymentAttempted: false/);
 assert.match(productAudit, /tfl-waltham-stop-a-operating-period-1a\.json/);
 assert.match(productAudit, /Waltham route 217 must retain the fixture-backed full TfL span at the selected stop/);
+assert.match(manualBrowserAudit, /Waltham route 217 must retain the fixture-backed full TfL span at the selected stop/);
 assert.match(productAudit, /rows46\.map\(row => row\['Typical frequency'\]\)/);
 assert.doesNotMatch(productAudit, /assert\.ok\(rows46\.length/);
 assert.match(productAudit, /PE1 route \$\{route\} must not acquire an implausible five-minute cross-stop frequency/);

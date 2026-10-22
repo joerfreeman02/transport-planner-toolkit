@@ -238,15 +238,6 @@ if (controlId === 'pipers') {
     throw new Error('Actual Run #75 Pipers route 46 retains the implausible five-minute cross-stop frequency.');
   }
 }
-if (controlId === 'waltham') {
-  const route217 = plannerRowsFor('217');
-  if (!route217.length || route217.every(row => !(row.operatingPeriodLines ?? []).length)) {
-    throw new Error('Actual Run #75 Waltham route 217 operating-period regression evidence is missing.');
-  }
-  if (route217.some(row => (row.operatingPeriodLines ?? []).join(' ').match(/00:05\s*[–-]\s*00:25/i))) {
-    throw new Error('Actual Run #75 Waltham route 217 retains the reported late-night-only operating span.');
-  }
-}
 if (controlId === 'pe1' || controlId === 'queensgate') {
   const routeX4 = plannerRowsFor('X4');
   if (routeX4.length !== 2 || !routeX4.every(row => row.typicalFrequencyLines?.length)) {

@@ -2676,6 +2676,7 @@ export function plannerAnnotationTaxonomy(row) {
   ]);
   const serviceRecordIds = service => unique([serviceIdForPlanner(service), ...(service?.sourceRecordIds ?? [])]).filter(Boolean);
   const isVariantService = service => serviceRecordIds(service).some(id => variantRecordIds.has(id));
+  const isShortWorkingService = service => serviceRecordIds(service).some(id => shortWorkingRecordIds.has(id));
   const hasUnrestrictedPrincipal = services.some(service => !isVariantService(service)
     && !['school-day', 'non-school-day', 'holiday'].includes(calendarProfileFromService(service)));
   const mixedSchoolCalendar = hasSchoolAndNonSchoolProfiles(services);
@@ -2726,20 +2727,25 @@ export function plannerAnnotationTaxonomy(row) {
     const variantKeys = unique([...(variant.endpointPlaceKeys ?? []), ...(variant.endpointStopPointIds ?? []), ...plannerServiceDestinationKeys(service)]);
     const sameMainPlace = destination && (sameCanonicalPlannerEndpoint(service, principalEndpointService)
       || sameStructuredPlannerPlace(mainDestinationKeys, variantKeys));
+    const shortWorkingVariant = variant.kind === 'short-working' || isShortWorkingService(service);
     const variantOnlyQualification = hasUnrestrictedPrincipal && isVariantService(service)
-      && (variant.kind === 'short-working' || serviceRecordIds(service).some(id => (row?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []).includes(id)));
-    const scopedQualification = !mixedSchoolCalendar && variantOnlyQualification
-      ? variantCalendarQualification(service) : '';
-    if ((variant.kind === 'short-working' && origin && normal(origin) !== mainOrigin)
+      && shortWorkingVariant;
+    // A qualification attached to the explicitly identified short-working
+    // entry describes that entry only. Keep it even when the route's wider
+    // calendar population is mixed; suppressing it here loses useful scope.
+    const scopedQualification = shortWorkingVariant
+      ? variantCalendarQualification(service)
+      : (!mixedSchoolCalendar && variantOnlyQualification ? variantCalendarQualification(service) : '');
+    if ((shortWorkingVariant && origin && normal(origin) !== mainOrigin)
       || (origin && normal(destination) === mainDestination && normal(origin) !== mainOrigin)) {
       const location = origin || destination;
-       addShortWorkingEntry(route, location, service, variant.kind, scopedQualification);
-    } else if (variant.kind === 'short-working' && destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
-       addShortWorkingEntry(route, destination, service, variant.kind, scopedQualification);
+       addShortWorkingEntry(route, location, service, shortWorkingVariant ? 'short-working' : variant.kind, scopedQualification);
+    } else if (shortWorkingVariant && destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
+       addShortWorkingEntry(route, destination, service, 'short-working', scopedQualification);
     } else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
        addAdditionalEntry(route, [destination], variant.kind, service);
     }
-    const qualification = mixedSchoolCalendar || variantOnlyQualification ? '' : variantCalendarQualification(service);
+    const qualification = mixedSchoolCalendar || shortWorkingVariant || variantOnlyQualification ? '' : variantCalendarQualification(service);
     if (qualification) addUnique(qualifications, `${route} – ${qualification}`);
   }
 
@@ -2760,8 +2766,9 @@ export function plannerAnnotationTaxonomy(row) {
       const knownShortWorking = serviceRecordIds(service).some(id => shortWorkingSourceIds.has(id));
       const variantOnlyQualification = hasUnrestrictedPrincipal && isVariantService(service)
         && serviceRecordIds(service).some(id => shortWorkingSourceIds.has(id));
-      const scopedQualification = !mixedSchoolCalendar && variantOnlyQualification
-        ? variantCalendarQualification(service) : '';
+      const scopedQualification = knownShortWorking
+        ? variantCalendarQualification(service)
+        : (!mixedSchoolCalendar && variantOnlyQualification ? variantCalendarQualification(service) : '');
       if (knownShortWorking && originDiffers && destination && (normal(destination) === mainDestination || sameMainPlace)) {
          addShortWorkingEntry(route, origin, service, null, scopedQualification);
       }
@@ -2774,7 +2781,7 @@ export function plannerAnnotationTaxonomy(row) {
       else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
          addAdditionalEntry(route, [destination], null, service);
       }
-      const qualification = mixedSchoolCalendar || variantOnlyQualification ? '' : variantCalendarQualification(service);
+      const qualification = mixedSchoolCalendar || knownShortWorking || variantOnlyQualification ? '' : variantCalendarQualification(service);
       if (qualification) addUnique(qualifications, `${service.routeNumber || row.routeNumber} – ${qualification}`);
     }
     // Preserve material alternate destinations even when the source-record

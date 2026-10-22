@@ -222,6 +222,33 @@ assert.equal(canonicalShortWorkingIdWithSeparateSourceIds.shortWorkingEntries[0]
 assert.equal(canonicalShortWorkingIdWithSeparateSourceIds.serviceQualification, null,
   'a qualified short working does not make the unrestricted X4 principal route school-only');
 
+const shortWorkingQualificationWithoutUnrestrictedPrincipal = plannerAnnotationTaxonomy({
+  routeNumber: 'X4', origin: 'Corby George Street', destination: 'Queensgate Bus Stn',
+  rawServiceSummaries: [
+    {
+      id: 'x4-principal-school-profile', routeNumber: 'X4', origin: 'Corby George Street', destination: 'Queensgate Bus Stn',
+      routePatternStopIds: ['CORBY', 'PETERBOROUGH', 'QUEENSGATE'], sourceRecordIds: ['tnds:principal'],
+      calendarProfileId: 'school-day', serviceNote: ''
+    },
+    {
+      id: 'x4-school-short-working-without-calendar-profile', routeNumber: 'X4', origin: 'Corby George Street', destination: 'Kings School',
+      routePatternStopIds: ['CORBY', 'PETERBOROUGH', 'KINGS'], sourceRecordIds: ['bods:school-short'],
+      calendarProfileId: null, serviceNote: 'Limited service. School-day journeys only.'
+    }
+  ],
+  publicServiceGroupingDecision: {
+    shortWorkingRecordIds: ['x4-school-short-working-without-calendar-profile'],
+    branchVariantRecordIds: ['x4-school-short-working-without-calendar-profile'],
+    calendarVariantRecordIds: [],
+    variantDestinationEvidence: [{
+      kind: 'branch-variant', routeNumber: 'X4', destination: 'Kings School',
+      sourceRecordIds: ['x4-school-short-working-without-calendar-profile']
+    }]
+  }
+});
+assert.equal(shortWorkingQualificationWithoutUnrestrictedPrincipal.shortWorkingEntries[0]?.qualification, 'School-day journeys only',
+  'an explicitly grouped short working keeps its own qualification even without an unrestricted principal/calendar profile');
+
 const schoolOriginBranchRows = rows([
   record({
     id: 'regular-queensgate-to-corby', routeNumber: 'X2', origin: 'Queensgate Bus Station', destination: 'Corby George Street',

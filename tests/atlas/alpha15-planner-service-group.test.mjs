@@ -25,6 +25,7 @@ function record({
   minutes = [420, 480],
   calendarProfileId = 'ordinary',
   circular = false,
+  timetableSource = 'BODS',
   serviceNote = '',
   principalLocations = ['Waltham Cross Bus Station'],
   patternNames = pattern,
@@ -44,14 +45,17 @@ function record({
     frequencyBasisStopId: basis,
     frequencyBasisStopName: stops.find(stop => stop.id === basis)?.name,
     departuresByDay: week(minutes),
-    departureEvidenceByDay: departureEvidenceByDay ?? Object.fromEntries(DAYS.map(day => [day, minutes.map(minute => ({ minute, stopPointId: basis, journeyIdentity: `${id}:${day}:${minute}`, provider: 'BODS' }))])),
+    departureEvidenceByDay: departureEvidenceByDay ?? Object.fromEntries(DAYS.map(day => [day, minutes.map(minute => ({ minute, stopPointId: basis, journeyIdentity: `${id}:${day}:${minute}`, provider: timetableSource }))])),
     calendarProfileId,
     serviceNote,
     circular,
     principalLocations,
     sourceRecordIds: [id],
     routePatternStops: pattern.map((name, index) => ({ id: name, name: patternNames[index] ?? name })),
-    timetableSource: 'BODS'
+    timetableSource,
+    provider: timetableSource,
+    primaryAuthority: timetableSource,
+    source: { provider: timetableSource, primaryAuthority: timetableSource }
   };
 }
 
@@ -188,6 +192,29 @@ assert.equal(sameStopShortWorkingRows.length, 1, 'same-stop short workings stay 
 assert.ok(sameStopShortWorkingRows[0].publicServiceGroupingDecision.shortWorkingRecordIds.includes('same-stop-school-short'), 'grouping identifies the school journey as a short working');
 assert.deepEqual(sameStopShortWorkingRows[0].canonicalDeparturePopulation.monday.map(entry => entry.minute), [360, 420, 480, 540, 600, 660, 720, 780], 'same-stop short-working departures do not enter the principal frequency population');
 assert.match(sameStopShortWorkingRows[0].typicalFrequencyText, /Mon-Sun: Every ~60 mins/, 'principal frequency reflects only the regular timetable even when a short working uses the exact same stop');
+
+const primaryCalendarRows = rows([
+  record({
+    id: '230-tnds-principal', routeNumber: '230', operator: 'Centrebus South', timetableSource: 'TNDS',
+    origin: 'Lyons Community Centre', destination: 'Caddington Woods', direction: 'outbound',
+    pattern: ['LYONS', 'PIPERS', 'CADDINGTON'], stopIds: ['B'], basis: 'B', minutes: [],
+    departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, (day === 'sunday' ? [360, 420, 480, 540] : [360, 420, 480, 540, 600]).map(minute => ({
+      minute, stopPointId: 'B', journeyIdentity: `230-tnds-${day}-${minute}`, provider: 'TNDS', calendarProfileId: 'ordinary'
+    }))]))
+  }),
+  record({
+    id: '230-bods-short', routeNumber: '230', operator: 'Centrebus', timetableSource: 'BODS',
+    origin: 'Lyons Community Centre', destination: 'Pipers Lane', direction: 'outbound',
+    pattern: ['LYONS', 'PIPERS'], stopIds: ['B'], basis: 'B', minutes: [],
+    departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, (day === 'sunday' ? [] : [360, 420]).map(minute => ({
+      minute, stopPointId: 'B', journeyIdentity: `230-bods-${day}-${minute}`, provider: 'BODS', calendarProfileId: 'ordinary'
+    }))]))
+  })
+]);
+assert.equal(primaryCalendarRows.length, 1, 'BODS and TNDS route 230 evidence composes into one public direction');
+assert.ok(primaryCalendarRows[0].publicServiceGroupingDecision.shortWorkingRecordIds.includes('230-bods-short'), 'the BODS variant remains excluded from principal frequency counts as a short working');
+assert.deepEqual(primaryCalendarRows[0].canonicalDeparturePopulation.sunday, [], 'higher-authority BODS explicit Sunday zero remains authoritative even when its record is excluded from principal frequency');
+assert.match(primaryCalendarRows[0].typicalFrequencyText, /Mon-Sat: Every ~60 mins[\s\S]*Sun: No scheduled service/, 'TNDS cannot restore Sunday service against the selected-stop BODS zero-service calendar');
 assert.match(sameStopShortWorkingRows[0].plannerNotes?.shortWorkings ?? '', /Local School/i, 'excluded frequency evidence remains visible as a planner short-working annotation');
 
 const scopedNonSchoolRows = rows([

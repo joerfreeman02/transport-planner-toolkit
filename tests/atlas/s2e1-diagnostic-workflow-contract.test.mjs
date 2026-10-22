@@ -84,7 +84,7 @@ assert.doesNotMatch(deterministicTflHelper, /fetch\(.*https?:/);
 assert.doesNotMatch(normalRuntime, /live TfL HTTP is disabled|noLiveTflFetch/);
 assert.match(normalRuntime, /tflLiveRequests: 0/);
 assert.match(workflow, /for control in waltham pipers pe1 enfield queensgate/);
-assert.match(workflow, /five-control actual-candidate browser and Word audit[\s\S]*s2c3-real-candidate-runtime-audit\.mjs restored\/candidate-site candidate-diagnostic\/real-candidate-browser-word-audit\.json/);
+assert.match(workflow, /six-control actual-candidate browser and Word audit[\s\S]*s2c3-real-candidate-runtime-audit\.mjs restored\/candidate-site candidate-diagnostic\/real-candidate-browser-word-audit\.json/);
 assert.match(workflow, /rendered normal-product browser and generated Word acceptance audit[\s\S]*s2e1-manual-product-audit\.mjs restored\/candidate-site candidate-diagnostic\/manual-product-acceptance\.json/);
 assert.match(normalRuntime, /Actual Run #75 Waltham runtime did not present routes 13\/13A\/13B\/13C under principal route 13/);
 assert.match(normalRuntime, /Actual Run #75 Pipers route 230 planner evidence or frequency is missing/);

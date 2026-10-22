@@ -95,7 +95,7 @@ jobs:
             fi
           done
           exit "$failed"
-      - name: Run five-control actual-candidate browser and Word audit
+      - name: Run six-control actual-candidate browser and Word audit
         if: always() && hashFiles('restored/candidate-site/atlas/data/bus/manifest.json') != ''
         run: node tests/atlas/s2c3-real-candidate-runtime-audit.mjs restored/candidate-site candidate-diagnostic/real-candidate-browser-word-audit.json
       - name: Run rendered normal-product browser and generated Word acceptance audit

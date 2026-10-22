@@ -1100,7 +1100,10 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
   // a day the primary timetable explicitly says has none.
   const noServiceAuthorityByRouteProfileDay = new Map();
   const authorityScope = (routeNumber, profile, day, stopPointId) => [normal(routeNumber), profile, day, stopPointId].join('|');
-  for (const service of records) {
+  // Calendar authority is broader than the departure population: an exact
+  // selected-stop zero-service day on a higher-authority short working still
+  // constrains supplementary records for the same route/profile/stop.
+  for (const service of eligible) {
     const serviceRank = plannerEvidenceSourceRank(service);
     if (!serviceRank) continue;
     const serviceEvidence = service?.departureEvidenceByDay ?? {};

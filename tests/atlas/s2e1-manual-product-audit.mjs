@@ -88,6 +88,10 @@ function wordText(xml) {
     .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")).join(' ');
 }
 
+function wordParagraphs(xml) {
+  return [...xml.matchAll(/<w:p(?:\s[^>]*)?>([\s\S]*?)<\/w:p>/g)].map(([, paragraph]) => wordText(paragraph));
+}
+
 function fail(id, reason) { report.failures.push({ id, reason }); }
 
 try {
@@ -268,6 +272,7 @@ try {
       await download.saveAs(wordPath);
       const documentXml = zipEntry(await readFile(wordPath), 'word/document.xml');
       const exportedWordText = wordText(documentXml);
+        const exportedWordParagraphs = wordParagraphs(documentXml);
       outcome.status = await page.locator('#taskStatusMessage').innerText();
       outcome.renderedRows = rendered;
       outcome.renderedServiceNotes = renderedServiceNotes;
@@ -321,7 +326,9 @@ try {
           && /X4.*Kings School.*(?:School-day journeys only|weekdays only)/i.test(x4Notes), 'PE1 X4 does not visibly preserve its regular principal rows and a route-scoped qualified school short working in the normal browser UI.');
         assert.doesNotMatch(x4Notes, /X4\s*[–-]\s*School-day journeys only\./i, 'PE1 X4 must not be labelled school-only as a whole route.');
         assert.doesNotMatch(exportedWordText, /X4\s*[–-]\s*School-day journeys only\./i, 'PE1 Word must not classify the whole X4 as school-only.');
-        assert.match(exportedWordText, /Short workings:\s*Some route X4\b[^.]*Kings School[^.]*(?:School-day journeys only|weekdays only)/i, 'PE1 Word export does not preserve the qualification within the X4 school short-working annotation.');
+        const x4WordShortWorking = exportedWordParagraphs.filter(paragraph => /Short workings:/i.test(paragraph)
+          && /\bX4\b/i.test(paragraph) && /Kings School/i.test(paragraph)).join(' ');
+        assert.match(x4WordShortWorking, /X4\b[^.]*Kings School[^.]*(?:School-day journeys only|weekdays only)/i, 'PE1 Word export does not preserve the qualification within the X4 school short-working paragraph.');
         assert.ok(rows102.every(row => row['Direction / main service pattern'] && row['Principal locations']), 'Remaining PE1 route 102 rows lack visible distinction labels.');
         // Preserve the exact output already accepted in C2 Run #151. These
         // services legitimately include five-minute frequency text at this

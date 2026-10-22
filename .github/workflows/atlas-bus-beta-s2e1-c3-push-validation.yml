@@ -1,0 +1,24 @@
+name: ATLAS Bus Beta S2E-1 C3 frozen-candidate validation
+
+on:
+  push:
+    branches:
+      - codex/atlas-bus-beta-s2e-1-c3-final-intelligence-correction
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: atlas-bus-beta-s2e1-c3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frozen-candidate-diagnosis:
+    if: github.event_name == 'push' && github.repository == 'joerfreeman02/transport-planner-toolkit' && github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c3-final-intelligence-correction'
+    uses: ./.github/workflows/atlas-bus-beta-s2e1-diagnosis.yml
+    with:
+      mode: normal_runtime_diagnosis
+    permissions:
+      actions: read
+      contents: read

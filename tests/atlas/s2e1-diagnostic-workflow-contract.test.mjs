@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 const workflow = await readFile(new URL('../../.github/workflows/atlas-bus-beta-s2e1-diagnosis.yml', import.meta.url), 'utf8');
 const dispatchWorkflow = await readFile(new URL('../../.github/workflows/atlas-bus-data-refresh.yml', import.meta.url), 'utf8');
+const c3PushWorkflow = await readFile(new URL('../../.github/workflows/atlas-bus-beta-s2e1-c3-push-validation.yml', import.meta.url), 'utf8');
 const diagnostic = await readFile(new URL('./s2e1-real-candidate-diagnostic.mjs', import.meta.url), 'utf8');
 const normalRuntime = await readFile(new URL('./s2e1-normal-runtime-candidate-diagnostic.mjs', import.meta.url), 'utf8');
 const manualBrowserAudit = await readFile(new URL('./s2e1-manual-product-audit.mjs', import.meta.url), 'utf8');
@@ -19,6 +20,12 @@ assert.match(dispatchWorkflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-c3-fina
 assert.match(dispatchWorkflow, /s2e1-frozen-candidate-diagnosis:[\s\S]*s2e1_mode == 'normal_runtime_diagnosis'[\s\S]*mode: normal_runtime_diagnosis/);
 assert.match(dispatchWorkflow, /CANDIDATE_RUN" != '39430415441'[\s\S]*CANDIDATE_ID" != '12275615359'[\s\S]*CANDIDATE_DIGEST" != 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471/);
 assert.match(dispatchWorkflow, /S2E-1 candidate diagnosis requires the exact Run #75 frozen-candidate restore selector with all acquisition\/source selectors blank\/default/);
+assert.match(c3PushWorkflow, /^name: ATLAS Bus Beta S2E-1 C3 frozen-candidate validation/m);
+assert.match(c3PushWorkflow, /push:\n\s+branches:\n\s+- codex\/atlas-bus-beta-s2e-1-c3-final-intelligence-correction/);
+assert.match(c3PushWorkflow, /permissions:\n\s+actions: read\n\s+contents: read/);
+assert.match(c3PushWorkflow, /github\.event_name == 'push' && github\.repository == 'joerfreeman02\/transport-planner-toolkit' && github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2e-1-c3-final-intelligence-correction'/);
+assert.match(c3PushWorkflow, /uses: \.\/\.github\/workflows\/atlas-bus-beta-s2e1-diagnosis\.yml[\s\S]*mode: normal_runtime_diagnosis/);
+assert.doesNotMatch(c3PushWorkflow, /workflow_dispatch|atlas-bus-beta-candidate|force_refresh:\s*true|pages|deploy|publish/i, 'C3 push validation calls only the frozen-candidate diagnostic with no refresh or publication path');
 assert.match(dispatchWorkflow, /S2E-1 offline preflight accepts only the exact zero-download C1B selector/);
 assert.match(dispatchWorkflow, /tnds-trust-browser-offline-preflight:[\s\S]*atlas-bus-beta-s2e-1-intelligence-restoration[\s\S]*outputs\.trust_mode == 'offline_preflight'/);
 assert.match(workflow, /actions:\s*read[\s\S]*contents:\s*read/);

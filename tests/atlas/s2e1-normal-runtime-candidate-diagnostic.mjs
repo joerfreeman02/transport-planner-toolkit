@@ -76,17 +76,53 @@ const site = confirmSite(createSite({
   assessmentPoint: { method: 'coordinates_entered' }
 }), { confirmedAt: '2026-10-21T00:00:00Z' });
 
-const scope = await assessmentApp.inspectScope(site, { radius: control.radius });
-if (!scope.ok) throw new Error(`Production inspectScope failed: ${scope.message || scope.code}`);
-const assessment = await assessmentApp.assess(site, { radius: control.radius, mode: 'full', discovery: scope.discovery });
-if (!assessment.ok) throw new Error(`Production assess failed: ${assessment.message || assessment.code}`);
+let scope;
+let assessment;
+let preparedOnly;
+let compositionStage = 'production inspectScope';
+try {
+  scope = await assessmentApp.inspectScope(site, { radius: control.radius });
+  if (!scope.ok) throw new Error(`Production inspectScope failed: ${scope.message || scope.code}`);
+  compositionStage = 'production assess';
+  assessment = await assessmentApp.assess(site, { radius: control.radius, mode: 'full', discovery: scope.discovery });
+  if (!assessment.ok) throw new Error(`Production assess failed: ${assessment.message || assessment.code}`);
+} catch (error) {
+  if (reportPath) {
+    await mkdir(path.dirname(reportPath), { recursive: true });
+    await writeFile(reportPath, `${JSON.stringify({
+      schema: 'atlas-bus-s2e1-normal-runtime-diagnostic-failure-v1',
+      candidateProducerRun: '39430415441', candidateProducerSha: '151199cc914c235870f444d26b03c2309edbd035',
+      candidateArtifactId: '12275615359', candidateArtifactDigest: 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471',
+      controlId, control, compositionStage, error: error.message,
+      tflFixtureRequests: tflRequests, tflLiveRequests: 0, nationalFilesRead: nationalRequests,
+      acquisitionAttempted: false, candidateModified: false, publicationAttempted: false, deploymentAttempted: false
+    }, null, 2)}\n`, 'utf8');
+  }
+  throw error;
+}
 const preparedOnlyApp = createBusAssessment({
   stopDiscovery: { nearbyStops: (...args) => prepared.nearbyStops(...args) },
   timetableData: { servicesForStops: (...args) => prepared.servicesForStops(...args) },
   accessRouting: { matrix: async (_site, stops) => ({ ok: true, routes: stops.map(() => ({ status: 'routed', distanceMetres: 100, durationSeconds: 60 })), warnings: [], provenance: { source: 'deterministic diagnostic stub' } }) }
 });
-const preparedOnly = await preparedOnlyApp.assess(site, { radius: control.radius, mode: 'full' });
-if (!preparedOnly.ok) throw new Error(`Prepared-only comparison failed: ${preparedOnly.message || preparedOnly.code}`);
+compositionStage = 'prepared-only comparison';
+try {
+  preparedOnly = await preparedOnlyApp.assess(site, { radius: control.radius, mode: 'full' });
+  if (!preparedOnly.ok) throw new Error(`Prepared-only comparison failed: ${preparedOnly.message || preparedOnly.code}`);
+} catch (error) {
+  if (reportPath) {
+    await mkdir(path.dirname(reportPath), { recursive: true });
+    await writeFile(reportPath, `${JSON.stringify({
+      schema: 'atlas-bus-s2e1-normal-runtime-diagnostic-failure-v1',
+      candidateProducerRun: '39430415441', candidateProducerSha: '151199cc914c235870f444d26b03c2309edbd035',
+      candidateArtifactId: '12275615359', candidateArtifactDigest: 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471',
+      controlId, control, compositionStage, error: error.message,
+      tflFixtureRequests: tflRequests, tflLiveRequests: 0, nationalFilesRead: nationalRequests,
+      acquisitionAttempted: false, candidateModified: false, publicationAttempted: false, deploymentAttempted: false
+    }, null, 2)}\n`, 'utf8');
+  }
+  throw error;
+}
 const wanted = new Set(control.focusRoutes);
 const route = value => String(value ?? '').trim().toUpperCase().replace(/\s+/g, '');
 const unique = values => [...new Set(values ?? [])];

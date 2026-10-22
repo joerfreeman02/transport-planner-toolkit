@@ -91,6 +91,8 @@ assert.match(normalRuntime, /circularEvidenceAudit/);
 assert.match(normalRuntime, /sourceCircular: row\.source\?\.circular/);
 assert.match(normalRuntime, /diagnosticGateError: diagnosticGateError\?\.message/);
 assert.match(normalRuntime, /serviceNote: row\.serviceNote, routeVariantNote: row\.routeVariantNote, routeGroupNote: row\.routeGroupNote, plannerNotes: row\.plannerNotes/);
+assert.match(normalRuntime, /atlas-bus-s2e1-normal-runtime-diagnostic-failure-v1/);
+assert.match(normalRuntime, /compositionStage, error: error\.message/);
 const productAudit = await readFile(new URL('./s2e1-manual-product-audit.mjs', import.meta.url), 'utf8');
 for (const control of ['pipers-lane', 'waltham-cross', 'chingford', 'pe1']) assert.ok(productAudit.includes(`id: '${control}'`) || productAudit.includes(`id: '${control.replace('-lane', '-lane')}'`), `normal-product browser audit must cover ${control}`);
 for (const field of ['#coordinatesForm', '#confirmAssessmentPoint', '#findStops', '.bus-service-summary', '#developerDiagnostics', '#exportBusWord', 'word/document.xml', 'horizontal overflow']) assert.ok(productAudit.includes(field), `normal-product browser audit must inspect ${field}`);

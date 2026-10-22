@@ -1081,38 +1081,40 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
       ? DAY_ORDER.flatMap(day => normaliseCircularTerminalEntries(serviceEntries.filter(entry => entry.day === day)))
       : serviceEntries;
   }));
-  // Source authority applies to the complete local service-day schedule for a
-  // public route, including an explicitly empty day. Comparing endpoint
-  // strings here let a lower-authority TNDS pattern add Sunday journeys to a
-  // BODS-primary route when the two feeds described different endpoints.
-  const authorityByRouteProfileDay = new Map();
+  // Preserve the existing per-pattern source arbitration for departures. A
+  // primary source's explicit zero-service day is also authoritative across
+  // endpoint variants; otherwise a supplementary feed can invent service on
+  // a day the primary timetable explicitly says has none.
+  const noServiceAuthorityByRouteProfileDay = new Map();
   const authorityScope = (routeNumber, profile, day, stopPointId) => [normal(routeNumber), profile, day, stopPointId].join('|');
   for (const service of records) {
     const serviceRank = plannerEvidenceSourceRank(service);
     if (!serviceRank) continue;
-    const routeNumber = text(service?.routeNumber);
     const serviceEvidence = service?.departureEvidenceByDay ?? {};
     const serviceSchedules = service?.departuresByDay ?? {};
+    const scopedServiceEntries = serviceDepartureEntries(service, representativeId);
     for (const day of DAY_ORDER) {
-      // Summary records expose all seven day keys when the source supplied a
-      // complete local timetable, so an empty array is meaningful no-service
-      // evidence. Records without an explicit day key make no such claim.
-      if (!Array.isArray(serviceEvidence[day]) && !Array.isArray(serviceSchedules[day])) continue;
+      const hasExplicitDay = Array.isArray(serviceEvidence[day]) || Array.isArray(serviceSchedules[day]);
+      if (!hasExplicitDay || scopedServiceEntries.some(entry => entry.day === day)) continue;
       const profile = calendarProfileFromService(service) || 'ordinary';
-      const scope = authorityScope(routeNumber, profile, day, representativeId);
-      authorityByRouteProfileDay.set(scope, Math.max(authorityByRouteProfileDay.get(scope) ?? 0, serviceRank));
+      const scope = authorityScope(service?.routeNumber, profile, day, representativeId);
+      noServiceAuthorityByRouteProfileDay.set(scope, Math.max(noServiceAuthorityByRouteProfileDay.get(scope) ?? 0, serviceRank));
     }
   }
+  const authorityByProfile = new Map();
   for (const entry of entries) {
     const profile = calendarProfileIdsForEntry(entry)[0] || 'ordinary';
-    const scope = authorityScope(entry.routeNumber, profile, entry.day, entry.stopPointId);
-    authorityByRouteProfileDay.set(scope, Math.max(authorityByRouteProfileDay.get(scope) ?? 0, plannerEvidenceSourceRank({}, entry)));
+    const scope = [profile, semanticRouteKey(entry)].join('|');
+    authorityByProfile.set(scope, Math.max(authorityByProfile.get(scope) ?? 0, plannerEvidenceSourceRank({}, entry)));
   }
   const authoritativeEntries = entries.filter(entry => {
     const profile = calendarProfileIdsForEntry(entry)[0] || 'ordinary';
-    const scope = authorityScope(entry.routeNumber, profile, entry.day, entry.stopPointId);
-    const highestAuthority = authorityByRouteProfileDay.get(scope) ?? 0;
-    return highestAuthority === 0 || plannerEvidenceSourceRank({}, entry) === highestAuthority;
+    const routeDayScope = authorityScope(entry.routeNumber, profile, entry.day, entry.stopPointId);
+    const entryAuthority = plannerEvidenceSourceRank({}, entry);
+    if ((noServiceAuthorityByRouteProfileDay.get(routeDayScope) ?? 0) > entryAuthority) return false;
+    const scope = [profile, semanticRouteKey(entry)].join('|');
+    const highestAuthority = authorityByProfile.get(scope) ?? 0;
+    return highestAuthority === 0 || entryAuthority === highestAuthority;
   });
   const schedules = emptySchedule();
   for (const entry of authoritativeEntries) schedules[entry.day].push(entry.minute);

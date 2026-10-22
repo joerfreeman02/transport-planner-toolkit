@@ -82,7 +82,8 @@ const school = service({
 const rows = buildPlannerBusServiceSummaries([ordinary, school], stops);
 assert.equal(rows.length, 1, '313 principal and school variant remain one public row');
 assert.equal(rows[0].destination, 'Main Station', 'an exact endpoint from a different variant cannot replace the selected principal');
-assert.ok(rows[0].calendarProfileIds.includes('school-day'), 'the restricted variant remains visible as structured evidence');
+assert.ok(rows[0].publicServiceGroupingDecision.shortWorkingRecordIds.includes('313-school'), 'the restricted school journey remains identified as structured short-working evidence');
+assert.ok(rows[0].alternateDestinationNames.includes('School'), 'the restricted variant destination remains visible in route annotations');
 
 const wordText = buildBusWordTables({ ok: true, stops, plannerServiceSummaries: rows, serviceSummaries: [] })
   .flatMap(table => table.rows ?? [])

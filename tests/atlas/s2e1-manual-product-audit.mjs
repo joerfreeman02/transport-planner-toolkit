@@ -386,6 +386,10 @@ try {
           assert.doesNotMatch(exportedWordText, routeGlobalQualification,
             `PE1 Word route ${route} must not receive a whole-route calendar qualification from a variant.`);
         }
+        assert.doesNotMatch(renderedServiceNotes.join(' '), /Service qualification:\s*Operating days could not be fully confirmed/i,
+          'PE1 Browser must not show an unscoped operating-days qualification left by route 101 calendar evidence.');
+        assert.doesNotMatch(exportedWordText, /Service qualification:\s*Operating days could not be fully confirmed/i,
+          'PE1 Word must not show an unscoped operating-days qualification left by route 101 calendar evidence.');
       }
       if (control.id === 'enfield') {
         for (const route of ['121', '191', 'W8']) {

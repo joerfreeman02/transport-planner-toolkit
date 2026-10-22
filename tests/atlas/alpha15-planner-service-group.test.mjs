@@ -255,7 +255,7 @@ assert.match(scopedNonSchoolRows[0].plannerNotes?.shortWorkings ?? '', /Local Te
 assert.match(scopedNonSchoolRows[0].plannerNotes?.shortWorkings ?? '', /non-school days only/i, 'the restricted route 101 calendar remains attached to the variant');
 const calendarVariantNonSchoolQualification = plannerAnnotationTaxonomy({
   routeNumber: '101', origin: 'Origin', destination: 'Main Terminus',
-  serviceNote: '',
+  serviceNote: 'Operating days could not be fully confirmed; check the timetable before use.',
   rawServiceSummaries: [
     {
       id: '101-principal-calendar', routeNumber: '101', origin: 'Origin', destination: 'Main Terminus',

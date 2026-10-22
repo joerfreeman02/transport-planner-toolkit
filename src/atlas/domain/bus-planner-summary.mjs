@@ -2706,7 +2706,7 @@ export function plannerAnnotationTaxonomy(row) {
     && !['school-day', 'non-school-day', 'holiday'].includes(calendarProfileFromService(service)));
   const mixedSchoolCalendar = hasSchoolAndNonSchoolProfiles(services);
   const shortWorkingRecordIds = new Set(row?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []);
-  const variantQualificationNotes = new Set(services.filter(service => serviceRecordIds(service).some(id => shortWorkingRecordIds.has(id)))
+  const variantQualificationNotes = new Set(services.filter(service => isVariantService(service))
     .flatMap(service => materialServiceNotesForService(service).map(note => materialServiceNote(note) || note)));
   const principalEndpointService = services.find(service => normal(plannerDestination(service)) === mainDestination) || services[0] || null;
   const duplicateIds = new Set(row?.publicServiceGroupingDecision?.deduplicatedSourceRecordIds ?? []);

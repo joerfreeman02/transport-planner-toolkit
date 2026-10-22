@@ -923,10 +923,15 @@ function serviceDepartureEntries(service, representativeId) {
   const hasEvidence = evidence && DAY_ORDER.some(day => Array.isArray(evidence[day]));
   return DAY_ORDER.flatMap(day => {
     const explicitEntries = hasEvidence && Array.isArray(evidence[day]) ? evidence[day] : null;
-    const scopedEntries = explicitEntries && explicitEntries.some(item => text(item?.stopPointId))
+    const hasStopScopedEntries = explicitEntries?.some(item => text(item?.stopPointId));
+    const scopedEntries = hasStopScopedEntries
       ? explicitEntries.filter(item => text(item?.stopPointId) === representativeId)
       : explicitEntries;
-    const entries = scopedEntries?.length ? scopedEntries : (service?.departuresByDay?.[day] ?? []);
+    // Explicit per-stop evidence is authoritative even when it is empty at
+    // the selected stop.  Falling back to the aggregate route schedule in
+    // that case reintroduces departures belonging to other stops and can
+    // inflate the planner's assessed-stop frequency.
+    const entries = explicitEntries !== null ? scopedEntries : (service?.departuresByDay?.[day] ?? []);
     return entries.map(item => {
       const minute = Number(item?.minute ?? item?.departureMinute ?? item?.time ?? item);
       if (!Number.isFinite(minute)) return null;
@@ -1465,8 +1470,20 @@ function noteAppliesToCanonicalPopulation(note, schedules, service = {}) {
   return true;
 }
 
-function materialServiceNotesForComponent(component, fallbackSchedules = {}) {
+function materialServiceNotesForComponent(component, fallbackSchedules = {}, groupingDecision = null) {
+  const variantIds = new Set([
+    ...(groupingDecision?.shortWorkingRecordIds ?? []),
+    ...(groupingDecision?.branchVariantRecordIds ?? []),
+    ...(groupingDecision?.calendarVariantRecordIds ?? [])
+  ]);
+  const hasUnrestrictedPrincipal = component.some(service => {
+    if (variantIds.has(serviceIdForPlanner(service))) return false;
+    return !['school-day', 'non-school-day', 'holiday'].includes(calendarProfileFromService(service));
+  });
   return unique(component.flatMap(service => materialServiceNotesForService(service)
+    .filter(note => !(hasUnrestrictedPrincipal
+      && variantIds.has(serviceIdForPlanner(service))
+      && /^(?:School-day journeys only\.|Non-school days only\.|Term-time service\.|Route .* operates in term time only\.|Holidays only\.)$/i.test(note)))
     .filter(note => noteAppliesToCanonicalPopulation(note,
       hasCalendarMetadata(service) ? (service?.departuresByDay ?? service?.stopSchedules ?? {}) : fallbackSchedules, service))));
 }
@@ -1909,7 +1926,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const profileNotes = [];
   if (mixedProfileOutput) profileNotes.push('Calendar profiles vary; each frequency line is labelled.');
   if (unresolvedNeedsQualification) profileNotes.push('Operating days could not be fully confirmed; check the timetable before use.');
-  const notes = materialServiceNotesForComponent(component, displayResult.schedules)
+  const notes = materialServiceNotesForComponent(component, displayResult.schedules, plannerServiceGroup.publicServiceGroupingDecision)
     .filter(note => !schoolHolidayVariant || !hasCalendarTaxonomyNote(note));
   notes.push(...profileNotes);
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));

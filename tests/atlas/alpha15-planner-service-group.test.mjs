@@ -117,6 +117,27 @@ const physicalEvidence = Object.fromEntries(DAYS.map(day => [day, [
 const physicalRows = rows([record({ id: 'physical', routeNumber: 'PHYS', departureEvidenceByDay: physicalEvidence, minutes: [] })]);
 assert.equal(physicalRows[0].canonicalDeparturePopulationAll.monday.length, 2, 'same physical journey copies collapse but distinct physical journeys at the same minute remain');
 
+const stopScopedPopulation = rows([record({
+  id: 'stop-scoped-explicit-empty', routeNumber: 'STOP-SCOPED', stopIds: ['A', 'B'], basis: 'A',
+  minutes: [360, 365, 370, 375, 380],
+  departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, day === 'monday'
+    ? [
+      { minute: 360, stopPointId: 'A', journeyIdentity: 'a-1', provider: 'BODS' },
+      { minute: 420, stopPointId: 'A', journeyIdentity: 'a-2', provider: 'BODS' },
+      { minute: 365, stopPointId: 'B', journeyIdentity: 'b-1', provider: 'BODS' },
+      { minute: 370, stopPointId: 'B', journeyIdentity: 'b-2', provider: 'BODS' },
+      { minute: 375, stopPointId: 'B', journeyIdentity: 'b-3', provider: 'BODS' },
+      { minute: 380, stopPointId: 'B', journeyIdentity: 'b-4', provider: 'BODS' }
+    ]
+    : day === 'tuesday'
+      ? [{ minute: 480, stopPointId: 'B', journeyIdentity: 'tuesday-b', provider: 'BODS' }]
+      : []]))
+})])[0];
+assert.equal(stopScopedPopulation.frequencyBasisStopId, 'A');
+assert.deepEqual(stopScopedPopulation.canonicalDeparturePopulation.monday.map(entry => entry.minute), [360, 420], 'explicit representative-stop records are isolated from denser nearby-stop records');
+assert.deepEqual(stopScopedPopulation.canonicalDeparturePopulation.tuesday, [], 'an explicit empty stop-scoped day cannot fall back to aggregate route departures');
+assert.match(stopScopedPopulation.typicalFrequencyText, /Tue-Sun: No scheduled service/, 'a day with no representative-stop journeys remains visibly unscheduled');
+
 const calendarRows = rows([
   record({ id: 'ordinary', routeNumber: 'CAL', calendarProfileId: 'ordinary', minutes: [420] }),
   record({ id: 'school', routeNumber: 'CAL', calendarProfileId: 'school-day', minutes: [600] })
@@ -167,6 +188,8 @@ assert.equal(schoolBranchWithoutCalendarTaxonomy.length, 1, 'a local school bran
 assert.equal(schoolBranchWithoutCalendarTaxonomy[0].destination, 'Queensgate Bus Station', 'the seven-day regular pattern remains principal when a school-only local branch lacks calendar labels');
 assert.equal(schoolBranchWithoutCalendarTaxonomy[0].frequencyBasisStopId, 'B', 'the school-only branch cannot select the headline timetable stop without calendar taxonomy');
 assert.match(schoolBranchWithoutCalendarTaxonomy[0].typicalFrequencyText, /Mon-Sun/);
+assert.doesNotMatch(schoolBranchWithoutCalendarTaxonomy[0].serviceNote, /^School-day journeys only\.$/i, 'a school short-working must not classify the whole regular public service as school-only');
+assert.match(schoolBranchWithoutCalendarTaxonomy[0].routeVariantNote, /Kings School.*(?:School-day journeys only|weekdays only)/i, 'the school-only qualification remains attached to its visible short-working variant');
 
 const schoolOriginBranchRows = rows([
   record({

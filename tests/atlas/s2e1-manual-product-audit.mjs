@@ -13,6 +13,8 @@ const candidateRoot = path.resolve(candidateArg);
 const repositoryRoot = path.resolve(new URL('../../', import.meta.url).pathname);
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
+const tflWalthamOperatingFixture = JSON.parse(await readFile(path.join(repositoryRoot, 'tests/atlas/fixtures/tfl-waltham-stop-a-operating-period-1a.json'), 'utf8'));
+const tflWalthamByLine = new Map(tflWalthamOperatingFixture.requests.map(request => [String(request.lineId), request.response]));
 const controls = [
   { id: 'pipers-lane', label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700 },
   { id: 'waltham-cross', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700 },
@@ -142,6 +144,32 @@ try {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'Ok', routes: [{ distance: 100, duration: 60, geometry: { type: 'LineString', coordinates: [[-0.03, 51.68], [-0.031, 51.681]] } }] }) });
   });
   await page.route('https://api.tfl.gov.uk/**', route => {
+    if (activeControl?.id === 'waltham-cross') {
+      const url = new URL(route.request().url());
+      let body = [];
+      if (url.pathname === '/StopPoint') {
+        body = { stopPoints: [{
+          id: tflWalthamOperatingFixture.requestedStopPointId,
+          naptanId: tflWalthamOperatingFixture.requestedStopPointId,
+          commonName: 'Waltham Cross Bus Station', indicator: 'Stop A',
+          lat: 51.6851, lon: -0.0341, stopType: 'NaptanPublicBusCoachTram',
+          lines: ['217', '317', '327'].map(id => ({ id, name: id }))
+        }] };
+      } else {
+        const timetableMatch = url.pathname.match(/^\/Line\/([^/]+)\/Timetable\/([^/]+)$/);
+        if (timetableMatch && decodeURIComponent(timetableMatch[2]) === tflWalthamOperatingFixture.requestedStopPointId) {
+          const response = tflWalthamByLine.get(decodeURIComponent(timetableMatch[1]));
+          if (response) {
+            body = structuredClone(response);
+            const stations = body.timetable.routes.flatMap(item => item.stationIntervals.flatMap(pattern => pattern.intervals.map(interval => ({ id: interval.stopId, name: interval.stopId }))));
+            body.stations = stations;
+            body.stops = stations;
+            body.timetable.departureStopId = tflWalthamOperatingFixture.requestedStopPointId;
+          }
+        }
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+    }
     if (activeControl?.id !== 'chingford') return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
     const url = new URL(route.request().url());
     let body = [];
@@ -261,9 +289,18 @@ try {
         assert.match(rows230[0]['Typical frequency'], /Sun: No scheduled service/i, 'Pipers rendered BODS-primary route 230 must retain the frozen Sunday no-service calendar.');
         assert.match(exportedWordText, /230[\s\S]{0,500}Sun: No scheduled service/i, 'Generated Word export does not preserve the route 230 Sunday no-service calendar.');
         assert.match(exportedWordText, /230.*60\s*mins/i, 'Generated Word export does not preserve the hourly route 230 frequency.');
+        const rows46 = rendered.filter(row => /^46$/i.test(row.Route || ''));
+        assert.ok(rows46.length, 'Pipers route 46 regression control is missing.');
+        assert.doesNotMatch(rows46.map(row => row['Typical frequency']).join(' '), /(?:every|~)\s*5\s*mins/i, 'Pipers route 46 must not inherit the implausible five-minute cross-stop frequency.');
       }
       if (control.id === 'waltham-cross') {
         assert.doesNotMatch(`${checksText} ${exportedWordText}`, /Planner review required for:\s*(?:217|279|317|327|491|N279)|timetable data unavailable\/incomplete for 1 assessed stop/i, 'Waltham output contains a known false review/incomplete warning.');
+        const rows217 = rendered.filter(row => /^217$/i.test(row.Route || ''));
+        assert.ok(rows217.length, 'Waltham route 217 operating-period regression control is missing.');
+        assert.doesNotMatch(rows217.map(row => row['Operating period at stop']).join(' '), /00:05\s*[–-]\s*00:25/i, 'Waltham route 217 must not collapse to the reported late-night-only period.');
+        assert.ok(rows217.some(row => /TfL/i.test(row.Source) && /04:00.*00:59/i.test(row['Operating period at stop'])), 'Waltham route 217 must retain the fixture-backed full TfL span at the selected stop in the normal Browser table.');
+        assert.match(exportedWordText, /217[\s\S]{0,500}04:00.*00:59/i, 'Waltham Word export does not preserve the fixture-backed route 217 operating span.');
+        assert.doesNotMatch(exportedWordText, /Source\s*:\s*TfL/i, 'Word output remains source-neutral while Browser identifies TfL authority.');
         const route13 = rendered.find(row => row.Route === '13');
         assert.ok(route13, 'Waltham route 13 principal row is missing.');
         assert.match(route13['Direction / main service pattern'] || '', /Towards\s+The Talbot/i, 'Waltham route 13 principal direction is missing.');
@@ -282,9 +319,20 @@ try {
         const rowsX4 = rendered.filter(row => row.Route === 'X4');
         const x4Notes = renderedServiceNotes.join(' ');
         assert.ok(rowsX4.length >= 2 && rowsX4.some(row => /Sat:|Sun:/i.test(`${row['Typical frequency']} ${row['Operating period at stop']}`))
-          && /X4.*Kings School/i.test(x4Notes) && /School-day journeys only/i.test(x4Notes), 'PE1 X4 does not visibly preserve its regular principal rows and qualified school short working in the normal browser UI.');
-        assert.match(exportedWordText, /X4.*Kings School[\s\S]{0,500}School-day journeys only/i, 'PE1 Word export does not preserve the X4 school short-working qualification.');
+          && /X4.*Kings School/i.test(x4Notes) && /Kings School.*(?:School-day journeys only|weekdays only)/i.test(x4Notes), 'PE1 X4 does not visibly preserve its regular principal rows and qualified school short working in the normal browser UI.');
+        assert.doesNotMatch(x4Notes, /X4\s*[–-]\s*School-day journeys only\./i, 'PE1 X4 must not be labelled school-only as a whole route.');
+        assert.doesNotMatch(exportedWordText, /X4\s*[–-]\s*School-day journeys only\./i, 'PE1 Word must not classify the whole X4 as school-only.');
+        assert.match(exportedWordText, /X4.*Kings School[\s\S]{0,500}(?:School-day journeys only|weekdays only)/i, 'PE1 Word export does not preserve the qualified X4 school short working.');
         assert.ok(rows102.every(row => row['Direction / main service pattern'] && row['Principal locations']), 'Remaining PE1 route 102 rows lack visible distinction labels.');
+        for (const route of ['1', '5', '33']) {
+          const rows = rendered.filter(row => row.Route === route);
+          assert.ok(rows.length, `PE1 frequency regression route ${route} is missing.`);
+          assert.doesNotMatch(rows.map(row => row['Typical frequency']).join(' '), /(?:every|~)\s*5\s*mins/i, `PE1 route ${route} must not acquire an implausible five-minute cross-stop frequency.`);
+        }
+        for (const route of ['27', '101', '201']) {
+          const routeNotes = renderedServiceNotes.filter(note => new RegExp(`(?:^|\\b)${route}(?:\\b|\\s*[–-])`).test(note)).join(' ');
+          assert.doesNotMatch(routeNotes, new RegExp(`${route}\\s*[–-]\\s*(?:School-day journeys only|Non-school days only)\\.`, 'i'), `PE1 route ${route} must not receive a route-level calendar qualification from a variant.`);
+        }
       }
       report.controls[control.id] = outcome;
     } catch (error) {

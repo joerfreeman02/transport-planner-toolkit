@@ -472,7 +472,16 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       source: { ...(service.source ?? {}), provider: 'TfL', primaryAuthority: 'TfL' }
     })));
     const directTfLOperators = new Map(services.map(service => [text(service.id), text(service.operator)]).filter(([id]) => id));
-    const unresolvedEntries = unresolvedObserved.filter(({ request }) => !matchNationalRequest(request?.lineId, request?.stopPointId, nationalServices));
+    const redundantResolvedRequests = unresolvedObserved.filter(({ request }) => {
+      const nationalMatch = matchNationalRequest(request?.lineId, request?.stopPointId, nationalServices);
+      if (!nationalMatch) return false;
+      return services.some(service => normal(service.routeNumber) === normal(request?.lineId)
+        && !scheduledStopIds(service).includes(text(request?.stopPointId))
+        && sameServiceIdentity(service, nationalMatch));
+    });
+    const redundantResolvedRequestKeys = new Set(redundantResolvedRequests.map(({ request }) => requestIdentity(request)).filter(Boolean));
+    const materialUnresolvedObserved = unresolvedObserved.filter(({ request }) => !redundantResolvedRequestKeys.has(requestIdentity(request)));
+    const unresolvedEntries = materialUnresolvedObserved.filter(({ request }) => !matchNationalRequest(request?.lineId, request?.stopPointId, nationalServices));
     const tflUnresolvedRequestIdentities = unresolvedEntries.map(({ request }) => requestIdentity(request)).filter(Boolean);
     const noCurrentRequestIdentities = resultEntries
       .filter(({ result }) => result?.ok && (result.timetableConclusion || result.provenance?.timetableConclusion) === 'NO_CURRENT_MATCH')
@@ -488,6 +497,9 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       const unresolved = Boolean(result?.ok) && result?.provenance?.timetableConclusion === 'UNRESOLVED';
       return fallback ? [fallbackService(fallback, request, unresolved ? 'unresolved' : 'failure')] : [];
     });
+    const materialFallbackServices = fallbackServices.filter(fallback => !redundantResolvedRequestKeys.has(
+      `${text(fallback.source?.requestedLineId)}|${text(fallback.source?.requestedStopPointId)}`
+    ));
     const nationalUnresolvedRequestIdentities = rawNationalUnresolvedRequestIdentities.filter(identity => !fallbackServices.some(fallback => `${fallback.source?.requestedLineId}|${fallback.source?.requestedStopPointId}` === identity));
     const unresolvedRequestIdentities = [...new Set([...tflUnresolvedRequestIdentities, ...nationalUnresolvedRequestIdentities])];
     let conflicts = 0;
@@ -507,10 +519,10 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       }
     }
     if (conflicts) warnings.push(conflictWarning);
-    if (unresolvedObserved.length && (fallbackServices.length || unresolvedEntries.length)) warnings.push(partialWarning);
+    if (materialUnresolvedObserved.length && (materialFallbackServices.length || unresolvedEntries.length)) warnings.push(partialWarning);
     if (unresolvedEntries.length || nationalUnresolvedRequestIdentities.length) warnings.push(incompleteWarning);
     if (!nationalSourceAvailable) warnings.push(nationalUnavailableWarning);
-    if (fallbackServices.length) warnings.push(fallbackWarning);
+    if (materialFallbackServices.length) warnings.push(fallbackWarning);
     if (unprocessed.length) warnings.push(`Unprocessed timetable scope: ${unprocessed.map(request => `${request.lineId}/${request.stopPointId}`).join(', ')}.`);
     let routeSequenceResult = null;
     if (typeof tflAdapter.routeSequencesForLineDirections === 'function' && services.length) {
@@ -554,6 +566,8 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
       routeSequenceAmbiguousMatches: composed.filter(service => service.tflRouteSequenceEvidence?.status === 'ambiguous-or-incomplete-link').length,
       totalTfLRequests: results.length + routeMetadataRequests + (routeSequenceResult?.provenance?.requestCount ?? 0), successfulRequests: successful.length, failedRequests: failed.length,
       unresolvedRequests: unresolvedRequestIdentities.length, unresolvedRequestIdentities,
+      observedUnresolvedRequestIdentities: unresolvedObserved.map(({ request }) => requestIdentity(request)).filter(Boolean),
+      redundantResolvedRequestIdentities: [...redundantResolvedRequestKeys],
       noCurrentRequestIdentities: [...new Set(noCurrentRequestIdentities)],
       nationalUnresolvedRequestIdentities,
       nationalSourceAvailable,

@@ -101,6 +101,15 @@ const crossStopAssessment = await assessWith([stop('A', 'Q'), stop('B', 'Q')], c
 assert.equal(crossStopAssessment.stops.find(item => item.id === 'A').timetableEvidenceStatus, 'FALLBACK');
 assert.equal(crossStopAssessment.stops.find(item => item.id === 'B').timetableEvidenceStatus, 'MATCHED');
 assert.deepEqual(crossStopAssessment.serviceSummaries[0].departuresByDay.monday, [450], 'frequency uses the representative fallback stop and does not sum another physical stop');
+const crossStopResult = await crossStopAuthority.servicesForStops([stop('A', 'Q'), stop('B', 'Q')], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.ok(crossStopResult.provenance.observedUnresolvedRequestIdentities.includes('Q|A'), 'the failed redundant stop lookup remains auditable');
+assert.deepEqual(crossStopResult.provenance.redundantResolvedRequestIdentities, ['Q|A'], 'the same service resolved by TfL at another selected stop is identified as redundant evidence');
+assert.equal(crossStopResult.warnings.some(warning => /could not be checked|fallback|unavailable\/incomplete/i.test(warning)), false, 'a failed redundant stop lookup does not add a planner-review warning to a resolved service');
+assert.ok(crossStopResult.data.some(service => service.provider === 'TfL') && crossStopResult.data.some(service => /BODS fallback/.test(service.timetableSource)), 'the failure and stop-scoped fallback evidence are both retained');
+
+const genuinelyUnresolved = await createAuthority({ results: { 'Q|A': sourceFailure() }, nationalServices: [] }).servicesForStops([stop('A', 'Q')], { site: { latitude: 51.7, longitude: -0.1 } });
+assert.ok(genuinelyUnresolved.warnings.some(warning => /could not be checked|incomplete/i.test(warning)), 'a failure with no authoritative resolution remains a material review warning');
+assert.deepEqual(genuinelyUnresolved.provenance.redundantResolvedRequestIdentities, []);
 
 const mixedNationalAuthority = createAuthority({
   london: false,

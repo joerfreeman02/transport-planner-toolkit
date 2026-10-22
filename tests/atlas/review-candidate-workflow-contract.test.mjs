@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const dispatcher = fs.readFileSync(path.join(root, '.github/workflows/atlas-bus-data-refresh.yml'), 'utf8').replace(/\r\n/g, '\n');
 const candidate = fs.readFileSync(path.join(root, '.github/workflows/atlas-bus-beta-candidate.yml'), 'utf8').replace(/\r\n/g, '\n');
+const s2e1Diagnosis = fs.readFileSync(path.join(root, '.github/workflows/atlas-bus-beta-s2e1-diagnosis.yml'), 'utf8').replace(/\r\n/g, '\n');
 
 const steps = candidate.split(/(?=^      - name: )/m).filter((block) => block.startsWith('      - name: '));
 const step = (name) => {
@@ -71,6 +72,16 @@ assert.match(dispatcher, /steps\.s2b-c4-selector\.outputs\.trust_mode/);
 assert.match(dispatcher, /steps\.s2b-c4-selector\.outputs\.review_candidate_mode/);
 assert.match(dispatcher, /refs\/heads\/codex\/atlas-bus-beta-s2b-c4-restore-auth-closeout' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-1-national-runtime-scale' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-2-candidate-replay-authority' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-3-oversized-service-closeout' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2e-1-intelligence-restoration' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2e-1-c1-manual-corrections'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'offline_preflight'/);
 assert.match(dispatcher, /refs\/heads\/codex\/atlas-bus-beta-s2b-c4-restore-auth-closeout' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-2-candidate-replay-authority' \|\| github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2c-3-oversized-service-closeout'\) && needs\.main-guard\.result == 'success' && needs\.main-guard\.outputs\.trust_mode == 'review_candidate'/);
+
+const s2e1Branch = "refs/heads/codex/atlas-bus-beta-s2e-1-c3-final-intelligence-correction";
+assert.match(dispatcher, new RegExp(`s2e-1-selector\\n        if: [^\\n]*${s2e1Branch.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}`));
+assert.match(dispatcher, new RegExp(`s2e1-frozen-candidate-diagnosis:[\\s\\S]*?${s2e1Branch.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}[\\s\\S]*?mode: normal_runtime_diagnosis`));
+assert.match(s2e1Diagnosis, new RegExp(`${s2e1Branch.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}[\\s\\S]*?inputs.mode == 'normal_runtime_diagnosis'`));
+assert.match(s2e1Diagnosis, /Exact immutable Run #75 candidate artifact, digest and producer verified/);
+assert.match(s2e1Diagnosis, /Run full Bus-data Python suite/);
+assert.match(s2e1Diagnosis, /Run actual-candidate planner diagnostic/);
+assert.match(s2e1Diagnosis, /Run rendered normal-product browser and generated Word acceptance audit/);
+assert.doesNotMatch(s2e1Diagnosis, /workflow_dispatch|force_refresh:\s*true|acquire fresh national/i, 'C3 hosted acceptance remains diagnostic-only and cannot start a refresh workflow');
 
 const s2c1Selector = dispatcher.slice(
   dispatcher.indexOf('      - name: Resolve S2C-1 exact zero-download offline preflight selector'),

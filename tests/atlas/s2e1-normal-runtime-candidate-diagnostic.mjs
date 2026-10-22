@@ -22,7 +22,7 @@ const tndsRoot = path.join(candidateRoot, 'atlas', 'data', 'bus-tnds');
 const nationalRequests = [];
 const tflRequests = [];
 const controls = {
-  waltham: { label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700, focusRoutes: ['13', '13A', '13B', '13C'] },
+  waltham: { label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700, focusRoutes: ['13', '13A', '13B', '13C', '14', '15', '15A', '16', '16C', '25C', '66', '217', '242', '251', '279', '310', '317', '327', '491', 'A1', 'N279'] },
   pipers: { label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700, focusRoutes: ['46', '230', '231', 'C'] },
   pe1: { label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '6', '23', '24', '25', '27', '33', '37', '60', '61', '62', '63', '101', '102', '201', '202', '415', '904', '4P', 'A', 'B', 'C'] },
   queensgate: { label: 'Queensgate Bus Station', latitude: 52.5701, longitude: -0.2498, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '6', '23', '24', '25', '27', '33', '60', '61', '62', '63', '202', '415', '904', '5A', 'A', 'B', 'C'] }
@@ -194,11 +194,42 @@ if (controlId === 'pipers') {
   if (!circularAudit?.principalSourceRecordId?.includes('centrebus|gtfs')) {
     throw new Error('Actual Run #75 Pipers route 230 circular principal is not the BODS Centrebus pattern.');
   }
+  const route46 = plannerRowsFor('46');
+  if (!route46.length || route46.some(row => (row.typicalFrequencyLines ?? []).join(' ').match(/(?:every|~)\s*5\s*mins/i))) {
+    throw new Error('Actual Run #75 Pipers route 46 is missing or retains the implausible five-minute cross-stop frequency.');
+  }
+}
+if (controlId === 'waltham') {
+  const route217 = plannerRowsFor('217');
+  if (!route217.length || route217.every(row => !(row.operatingPeriodLines ?? []).length)) {
+    throw new Error('Actual Run #75 Waltham route 217 operating-period regression evidence is missing.');
+  }
+  if (route217.some(row => (row.operatingPeriodLines ?? []).join(' ').match(/00:05\s*[–-]\s*00:25/i))) {
+    throw new Error('Actual Run #75 Waltham route 217 retains the reported late-night-only operating span.');
+  }
 }
 if (controlId === 'pe1' || controlId === 'queensgate') {
   const routeX4 = plannerRowsFor('X4');
   if (routeX4.length !== 2 || !routeX4.every(row => row.typicalFrequencyLines?.length)) {
     throw new Error(`Actual Run #75 ${controlId} X4 should retain two directional frequency rows; received ${routeX4.length}.`);
+  }
+  if (routeX4.some(row => /^School-day journeys only\.$/i.test(String(row.serviceNote ?? '').trim()))) {
+    throw new Error(`Actual Run #75 ${controlId} X4 has a route-level school-only qualification.`);
+  }
+  if (!routeX4.some(row => /Kings School/i.test(String(row.routeVariantNote ?? '')))) {
+    throw new Error(`Actual Run #75 ${controlId} X4 lost the qualified Kings School short-working note.`);
+  }
+  for (const route of ['1', '5', '33']) {
+    const rows = plannerRowsFor(route);
+    if (!rows.length || rows.some(row => (row.typicalFrequencyLines ?? []).join(' ').match(/(?:every|~)\s*5\s*mins/i))) {
+      throw new Error(`Actual Run #75 ${controlId} route ${route} is missing or has the implausible five-minute cross-stop frequency.`);
+    }
+  }
+  for (const route of ['27', '101', '201']) {
+    const rows = plannerRowsFor(route);
+    if (!rows.length || rows.some(row => new RegExp(`^${route}\\s*[–-]\\s*(?:School-day journeys only|Non-school days only)\\.$`, 'i').test(String(row.serviceNote ?? '').trim()))) {
+      throw new Error(`Actual Run #75 ${controlId} route ${route} has a route-level calendar qualification or is missing.`);
+    }
   }
 }
 
@@ -217,6 +248,7 @@ const compactPlannerRows = rows => rows.map(row => ({
   id: row.id, routeNumber: row.routeNumber, routeNumbers: row.routeNumbers, operator: row.operator,
   direction: row.direction, origin: row.origin, destination: row.destination,
   directionPatternText: row.directionPatternText, principalLocations: row.principalLocations,
+  serviceNote: row.serviceNote, routeVariantNote: row.routeVariantNote,
   servedAtStopId: row.servedAtStopId, timetableBasisStopLabel: row.timetableBasisStopLabel,
   frequencyBasisStopId: row.frequencyBasisStopId, calendarProfileIds: row.calendarProfileIds,
   typicalFrequencyLines: row.typicalFrequencyLines, operatingPeriodLines: row.operatingPeriodLines,

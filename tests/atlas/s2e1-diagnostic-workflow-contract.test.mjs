@@ -9,11 +9,13 @@ const manualBrowserAudit = await readFile(new URL('./s2e1-manual-product-audit.m
 
 assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-intelligence-restoration/);
 assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-c1-manual-corrections/);
+assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-c3-final-intelligence-correction/);
 assert.match(workflow, /workflow_call:[\s\S]*mode:[\s\S]*normal_runtime_diagnosis/);
 assert.match(workflow, /actions\/checkout@v4[\s\S]*ref: \$\{\{ github\.sha \}\}[\s\S]*fetch-depth: 0/);
 assert.match(workflow, /Ensure the default-branch ref is available[\s\S]*git fetch --no-tags origin \+refs\/heads\/main:refs\/remotes\/origin\/main/);
 assert.match(dispatchWorkflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-intelligence-restoration/);
 assert.match(dispatchWorkflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-c1-manual-corrections/);
+assert.match(dispatchWorkflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-c3-final-intelligence-correction/);
 assert.match(dispatchWorkflow, /s2e1-frozen-candidate-diagnosis:[\s\S]*s2e1_mode == 'normal_runtime_diagnosis'[\s\S]*mode: normal_runtime_diagnosis/);
 assert.match(dispatchWorkflow, /CANDIDATE_RUN" != '39430415441'[\s\S]*CANDIDATE_ID" != '12275615359'[\s\S]*CANDIDATE_DIGEST" != 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471/);
 assert.match(dispatchWorkflow, /S2E-1 candidate diagnosis requires the exact Run #75 frozen-candidate restore selector with all acquisition\/source selectors blank\/default/);
@@ -72,7 +74,10 @@ assert.match(workflow, /five-control actual-candidate browser and Word audit[\s\
 assert.match(workflow, /rendered normal-product browser and generated Word acceptance audit[\s\S]*s2e1-manual-product-audit\.mjs restored\/candidate-site candidate-diagnostic\/manual-product-acceptance\.json/);
 assert.match(normalRuntime, /Actual Run #75 Waltham runtime did not present routes 13\/13A\/13B\/13C under principal route 13/);
 assert.match(normalRuntime, /Actual Run #75 Pipers route 230 planner evidence or frequency is missing/);
+assert.match(normalRuntime, /Actual Run #75 Pipers route 46 is missing or retains the implausible five-minute cross-stop frequency/);
+assert.match(normalRuntime, /Actual Run #75 Waltham route 217 retains the reported late-night-only operating span/);
 assert.match(normalRuntime, /Actual Run #75 \$\{controlId\} X4 should retain two directional frequency rows/);
+assert.match(normalRuntime, /Actual Run #75 \$\{controlId\} X4 has a route-level school-only qualification/);
 assert.match(normalRuntime, /rowConsolidationAudit/);
 assert.match(normalRuntime, /circularEvidenceAudit/);
 assert.match(normalRuntime, /sourceCircular: row\.source\?\.circular/);
@@ -83,6 +88,10 @@ assert.match(productAudit, /candidateRun: '39430415441'/);
 assert.match(productAudit, /acquisitionAttempted: false/);
 assert.match(productAudit, /publicationAttempted: false/);
 assert.match(productAudit, /deploymentAttempted: false/);
+assert.match(productAudit, /tfl-waltham-stop-a-operating-period-1a\.json/);
+assert.match(productAudit, /Waltham route 217 must retain the fixture-backed full TfL span at the selected stop/);
+assert.match(productAudit, /Pipers route 46 regression control is missing/);
+assert.match(productAudit, /PE1 route \$\{route\} must not acquire an implausible five-minute cross-stop frequency/);
 assert.match(manualBrowserAudit, /Sun: No scheduled service/i, 'Pipers normal-product audit must lock the frozen BODS Sunday no-service calendar in browser/Word output.');
 assert.doesNotMatch(manualBrowserAudit, /rows102\.length <= 2/, 'Route 102 must not have an arbitrary display-row cap.');
 const compositionAudit = await readFile(new URL('./s2c3-real-candidate-runtime-audit.mjs', import.meta.url), 'utf8');

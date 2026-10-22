@@ -383,4 +383,9 @@ if (reportArg) {
   await (await import('node:fs/promises')).writeFile(destination, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 }
 process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-if (report.failures.length) process.exitCode = 1;
+if (report.failures.length) {
+  const annotation = report.failures.map(failure => `${failure.id}: ${failure.reason}`).join(' | ')
+    .replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  process.stdout.write(`::error title=Normal-product acceptance failure::${annotation}\n`);
+  process.exitCode = 1;
+}

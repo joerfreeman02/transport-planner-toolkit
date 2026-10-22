@@ -2753,8 +2753,7 @@ export function plannerAnnotationTaxonomy(row) {
     const sameMainPlace = destination && (sameCanonicalPlannerEndpoint(service, principalEndpointService)
       || sameStructuredPlannerPlace(mainDestinationKeys, variantKeys));
     const shortWorkingVariant = variant.kind === 'short-working' || isShortWorkingService(service);
-    const variantOnlyQualification = hasUnrestrictedPrincipal && isVariantService(service)
-      && shortWorkingVariant;
+    const variantOnlyQualification = hasUnrestrictedPrincipal && isVariantService(service);
     // A qualification attached to the explicitly identified short-working
     // entry describes that entry only. Keep it even when the route's wider
     // calendar population is mixed; suppressing it here loses useful scope.
@@ -2789,8 +2788,7 @@ export function plannerAnnotationTaxonomy(row) {
       const sameMainPlace = destination && (sameCanonicalPlannerEndpoint(service, principalEndpointService)
         || sameStructuredPlannerPlace(mainDestinationKeys, serviceKeys));
       const knownShortWorking = serviceRecordIds(service).some(id => shortWorkingSourceIds.has(id));
-      const variantOnlyQualification = hasUnrestrictedPrincipal && isVariantService(service)
-        && serviceRecordIds(service).some(id => shortWorkingSourceIds.has(id));
+      const variantOnlyQualification = hasUnrestrictedPrincipal && isVariantService(service);
       const scopedQualification = knownShortWorking
         ? variantCalendarQualification(service)
         : (!mixedSchoolCalendar && variantOnlyQualification ? variantCalendarQualification(service) : '');

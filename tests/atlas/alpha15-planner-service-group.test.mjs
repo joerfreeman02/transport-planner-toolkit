@@ -253,6 +253,35 @@ assert.doesNotMatch(scopedNonSchoolRows[0].plannerNotes?.serviceQualification ??
   'a non-school-only short-working qualification must not become a route-wide 101 qualification');
 assert.match(scopedNonSchoolRows[0].plannerNotes?.shortWorkings ?? '', /Local Terminus/i, 'the restricted route 101 variant remains visible in its scoped short-working annotation');
 assert.match(scopedNonSchoolRows[0].plannerNotes?.shortWorkings ?? '', /non-school days only/i, 'the restricted route 101 calendar remains attached to the variant');
+const calendarVariantNonSchoolQualification = plannerAnnotationTaxonomy({
+  routeNumber: '101', origin: 'Origin', destination: 'Main Terminus',
+  serviceNote: '',
+  rawServiceSummaries: [
+    {
+      id: '101-principal-calendar', routeNumber: '101', origin: 'Origin', destination: 'Main Terminus',
+      routePatternStopIds: ['ORIGIN', 'MAIN'], sourceRecordIds: ['bods:101-principal'],
+      calendarProfileId: 'ordinary', serviceNote: ''
+    },
+    {
+      id: '101-calendar-variant', routeNumber: '101', origin: 'Origin', destination: 'Local Terminus',
+      routePatternStopIds: ['ORIGIN', 'LOCAL'], sourceRecordIds: ['bods:101-variant'],
+      calendarProfileId: 'non-school-day', serviceNote: 'Non-school days only; operating days could not be fully confirmed.'
+    }
+  ],
+  publicServiceGroupingDecision: {
+    shortWorkingRecordIds: [],
+    branchVariantRecordIds: [],
+    calendarVariantRecordIds: ['101-calendar-variant'],
+    variantDestinationEvidence: [{
+      kind: 'calendar-variant', routeNumber: '101', destination: 'Local Terminus',
+      sourceRecordIds: ['101-calendar-variant']
+    }]
+  }
+});
+assert.doesNotMatch(calendarVariantNonSchoolQualification.serviceQualification ?? '', /non-school days only|operating days could not be fully confirmed/i,
+  'a calendar-variant qualification must not leak onto the unrestricted route 101 row');
+assert.match(calendarVariantNonSchoolQualification.additionalServices ?? '', /Local Terminus/i,
+  'calendar-variant service remains visibly scoped as an additional service');
 
 const schoolBranchWithoutCalendarTaxonomy = rows([
   record({

@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: atlas-bus-beta-s2e1-c4-${{ github.ref }}
+  group: atlas-bus-beta-s2e1-c4-final-v2-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

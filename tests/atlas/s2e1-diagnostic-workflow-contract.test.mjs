@@ -30,6 +30,7 @@ assert.match(c3PushWorkflow, /github\.event_name == 'push' && github\.repository
 assert.match(c3PushWorkflow, /uses: \.\/\.github\/workflows\/atlas-bus-beta-s2e1-diagnosis\.yml[\s\S]*mode: normal_runtime_diagnosis/);
 assert.doesNotMatch(c3PushWorkflow, /workflow_dispatch|atlas-bus-beta-candidate|force_refresh:\s*true|pages|deploy|publish/i, 'C3 push validation calls only the frozen-candidate diagnostic with no refresh or publication path');
 assert.match(c4PushWorkflow, /^name: ATLAS Bus Beta S2E-1 C4 final product trace/m);
+assert.match(c4PushWorkflow, /group: atlas-bus-beta-s2e1-c4-final-v2-\$\{\{ github\.ref \}\}/, 'C4 validations use the rotated concurrency group to avoid the orphaned prior queue.');
 assert.match(c4PushWorkflow, /push:\r?\n\s+branches:\r?\n\s+-\s+codex\/atlas-bus-beta-s2e-1-c4-final-product-trace/);
 assert.match(c4PushWorkflow, /uses: \.\/\.github\/workflows\/atlas-bus-beta-s2e1-diagnosis\.yml[\s\S]*mode: normal_runtime_diagnosis/);
 assert.doesNotMatch(c4PushWorkflow, /workflow_dispatch|atlas-bus-beta-candidate|force_refresh:\s*true|pages|deploy|publish/i, 'C4 push validation calls only the frozen-candidate diagnostic with no acquisition or publication path');

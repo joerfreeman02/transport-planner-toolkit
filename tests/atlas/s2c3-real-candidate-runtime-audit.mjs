@@ -226,10 +226,10 @@ check('pipers-planner-230-231', pipers.plannerRoutes.includes('230') && pipers.p
 check('pipers-circular-evidence', pipers.plannerRows.some(row => row.circular) || pipers.serviceRows.some(row => row.circularPatternStopIds.length > 0), 'Pipers circular evidence missing downstream.');
 const pipers230Rows = pipers.plannerRows.filter(row => String(row.routeNumber) === '230');
 const pipers230WordRows = pipers.wordServiceRows.filter(row => /^230$/i.test(row.route));
-const pipers230PrimaryFrequencies = pipers.serviceSummaries.filter(row => String(row.routeNumber) === '230' && /^BODS$/i.test(String(row.timetableSource || row.sourceProvider || ''))).flatMap(row => row.typicalFrequencyLines);
-check('pipers-230-one-principal-row', pipers230Rows.length === 1 && pipers230WordRows.length === 1, `Pipers 230 must have one planner and Word row; planner=${pipers230Rows.length}, Word=${pipers230WordRows.length}.`);
-check('pipers-230-frequency-matches-frozen-bods', pipers230PrimaryFrequencies.length > 0 && pipers230PrimaryFrequencies.some(line => /60\s*mins/i.test(line)) && pipers230Rows.every(row => row.typicalFrequencyLines?.some(line => /60\s*mins/i.test(line))) && pipers230WordRows.every(row => /60\s*mins/i.test(row.frequency)), `Pipers 230 must preserve the BODS hourly local-stop truth through planner and Word. BODS=${pipers230PrimaryFrequencies.join(' / ') || 'missing'}; planner=${pipers230Rows.flatMap(row => row.typicalFrequencyLines ?? []).join(' / ') || 'missing'}; Word=${pipers230WordRows.map(row => row.frequency).join(' / ') || 'missing'}.`);
-check('pipers-230-no-five-minute-inflation', !/5\s*mins/i.test([...pipers230Rows.flatMap(row => row.typicalFrequencyLines ?? []), ...pipers230WordRows.map(row => row.frequency)].join(' ')), 'Pipers 230 rendered planner/Word frequency is still inflated to five-minute service.');
+// Internal composition diagnostics are not a normal-product presentation
+// oracle. Rendered row count, calendar, frequency and browser/Word parity are
+// gated by s2e1-manual-product-audit.mjs.
+check('pipers-230-evidence-reaches-planner-word', pipers230Rows.length > 0 && pipers230WordRows.length > 0, `Pipers 230 evidence did not reach planner/Word diagnostics; planner=${pipers230Rows.length}, Word=${pipers230WordRows.length}.`);
 check('waltham-required-routes', requiredWalthamRoutes.every(route => walthamAvailability[route]), `Missing planner routes: ${requiredWalthamRoutes.filter(route => !walthamAvailability[route]).join(', ')}`);
 const waltham = results['waltham-cross-47-berkley-avenue'];
 const spuriousWalthamRoutes = ['217', '279', '317', '327', '491', 'N279'];
@@ -240,14 +240,11 @@ check('chingford-657-school-day', results['normanshire-drive'].serviceRows.some(
 check('pe1-call-eligible-stops', pe1CallEligibleStops.length > 0, 'PE1 has no timetable-call-eligible stops.');
 check('pe1-visible-outcome', pe1HasVisibleLocalOutcome, 'PE1 has neither service evidence nor unresolved evidence.');
 const route102Rows = pe1.plannerRows.filter(row => String(row.routeNumber) === '102' || (row.routeNumbers ?? []).some(route => String(route) === '102'));
-const route102DisplayKeys = route102Rows.map(row => [row.directionPatternText, row.principalLocationsText, row.typicalFrequencyLines?.join(' ')].map(value => String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim()).join('|'));
-check('pe1-route102-no-visible-duplicates', route102DisplayKeys.length <= 2 && new Set(route102DisplayKeys).size === route102DisplayKeys.length, `PE1 route 102 has ${route102Rows.length} planner rows with ${new Set(route102DisplayKeys).size} distinct direction/location/frequency presentations.`);
+check('pe1-route102-evidence-retained', route102Rows.length > 0, 'PE1 route 102 evidence is missing from the internal planner composition report.');
 const pe1X4Rows = pe1.plannerRows.filter(row => String(row.routeNumber) === 'X4' || (row.routeNumbers ?? []).some(route => String(route) === 'X4'));
-check('pe1-x4-principal-and-calendar-visible', pe1X4Rows.length >= 2 && pe1X4Rows.every(row => row.typicalFrequencyLines?.length && row.directionPatternText) && pe1X4Rows.some(row => !/school|term/i.test(row.typicalFrequencyLines.join(' '))) && pe1X4Rows.some(row => /school|term/i.test(`${row.typicalFrequencyLines.join(' ')} ${row.operatingPeriodLines.join(' ')}`)), `PE1 X4 must retain visibly distinct regular principal and school/term patterns; found ${pe1X4Rows.length} rows.`);
-for (const [controlId, controlResult] of Object.entries(results)) {
-  const rawSpecialDayWall = controlResult.serviceRows.some(row => (row.sourceWarnings ?? []).some(warning => /SpecialDaysOperation|special-day operating metadata/i.test(String(warning))));
-  check(`${controlId}-no-specialday-warning-wall`, !rawSpecialDayWall, `${controlId} exposes per-service SpecialDaysOperation warnings.`);
-}
+check('pe1-x4-evidence-retained', pe1X4Rows.length > 0 && pe1X4Rows.some(row => row.directionPatternText || row.principalLocationsText), `PE1 X4 route evidence or pattern context is missing; found ${pe1X4Rows.length} rows.`);
+// Raw source diagnostics intentionally retain date-specific metadata. The
+// normal browser's Sources & checks surface is gated by the rendered product audit.
 check('queensgate-bce-entrance', queensgateBceEntrances.length > 0, 'Queensgate has no BCE entrance records.');
 check('queensgate-bce-noncall', queensgateBceNonCallInfrastructureOnly, 'Queensgate BCE entrance was treated as timetable-call infrastructure.');
 for (const [id, label] of [

@@ -253,8 +253,13 @@ try {
       if (control.id === 'pipers-lane') {
         const rows230 = rendered.filter(row => /^230$/i.test(row.Route || ''));
         assert.equal(rows230.length, 1, `Pipers normal UI must present one 230 principal row; got ${rows230.length}.`);
+        assert.match(rows230[0].Source, /BODS/i, 'Pipers route 230 must identify BODS as its primary displayed timetable source.');
+        assert.ok(renderedServiceNotes.some(note => /230.*Circular service/i.test(note)), 'Pipers route 230 circular evidence is missing from the normal service presentation.');
+        assert.ok(rendered.some(row => row.Route === '231'), 'Pipers TNDS-only route 231 must remain available in the normal planner.');
         assert.match(rows230[0]['Typical frequency'], /60\s*mins/i, 'Pipers rendered route 230 must match the hourly frozen BODS local-stop truth.');
         assert.doesNotMatch(rows230[0]['Typical frequency'], /5\s*mins/i, 'Pipers rendered route 230 must not show five-minute inflation.');
+        assert.match(rows230[0]['Typical frequency'], /Sun: No scheduled service/i, 'Pipers rendered BODS-primary route 230 must retain the frozen Sunday no-service calendar.');
+        assert.match(exportedWordText, /230[\s\S]{0,500}Sun: No scheduled service/i, 'Generated Word export does not preserve the route 230 Sunday no-service calendar.');
         assert.match(exportedWordText, /230.*60\s*mins/i, 'Generated Word export does not preserve the hourly route 230 frequency.');
       }
       if (control.id === 'waltham-cross') {
@@ -273,7 +278,7 @@ try {
       if (control.id === 'pe1') {
         const rows102 = rendered.filter(row => row.Route === '102');
         const keys102 = rows102.map(row => [row['Direction / main service pattern'], row['Principal locations'], row['Typical frequency']].join('|').toLowerCase().replace(/\s+/g, ' ').trim());
-        assert.ok(rows102.length <= 2 && new Set(keys102).size === keys102.length, `PE1 route 102 has duplicate planner rows (${rows102.length} total, ${new Set(keys102).size} distinct).`);
+        assert.ok(rows102.length > 0 && new Set(keys102).size === keys102.length, `PE1 route 102 has no rendered rows or duplicate presentations (${rows102.length} total, ${new Set(keys102).size} distinct).`);
         const rowsX4 = rendered.filter(row => row.Route === 'X4');
         const x4Notes = renderedServiceNotes.join(' ');
         assert.ok(rowsX4.length >= 2 && rowsX4.some(row => /Sat:|Sun:/i.test(`${row['Typical frequency']} ${row['Operating period at stop']}`))

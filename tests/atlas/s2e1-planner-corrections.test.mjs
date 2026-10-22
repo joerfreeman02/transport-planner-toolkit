@@ -47,6 +47,35 @@ const authorityPriority = buildPlannerBusServiceSummaries([
 assert.equal(authorityPriority.length, 1, 'matching BODS/TNDS public timetable evidence remains one planner row');
 assert.deepEqual(authorityPriority[0].canonicalDeparturePopulation.monday.map(entry => entry.minute), hourlyMinutes, 'BODS primary departures define the ordinary frequency population when equivalent TNDS supplementation repeats the same public service');
 assert.match(authorityPriority[0].typicalFrequencyText, /Every ~60 mins/i, 'supplementary national journey identities cannot inflate the BODS-led hourly headway');
+const pipersBodsWeekly = Object.fromEntries(Object.keys(weekdays).map(day => [day,
+  day === 'sunday' ? [] : Array.from({ length: day === 'saturday' ? 9 : 15 }, (_value, index) => ({ minute: 360 + index * 60, stopPointId: 'PIPERS-A', journeyIdentity: `BODS-${day}-${index}`, provider: 'BODS' }))
+]));
+const pipersTndsWeekly = Object.fromEntries(Object.keys(weekdays).map(day => [day,
+  Array.from({ length: 15 }, (_value, index) => ({ minute: 360 + index * 60, stopPointId: 'PIPERS-A', journeyIdentity: `TNDS-${day}-${index}`, provider: 'TNDS' }))
+]));
+const pipers230WeeklyAuthority = buildPlannerBusServiceSummaries([
+  {
+    ...plannerBase, id: 'pipers-bods-230-circular', routeNumber: '230', operator: 'Centrebus', direction: 'Caddington Woods, Lyons Community Centre',
+    origin: 'Lyons Community Centre', destination: 'Lyons Community Centre', provider: 'BODS', timetableSource: 'BODS', source: { provider: 'BODS' },
+    circular: true, circularPatternStopIds: ['PIPERS-A', 'MID-1', 'MID-2', 'PIPERS-A'], departureEvidenceByDay: pipersBodsWeekly
+  },
+  {
+    ...plannerBase, id: 'pipers-tnds-230-open', routeNumber: '230', operator: 'Centrebus South', direction: 'outbound',
+    origin: 'Lyons Community Centre', destination: 'Caddington Woods', provider: 'TNDS', timetableSource: 'TNDS', source: { provider: 'TNDS' },
+    circular: false, circularPatternStopIds: [], departureEvidenceByDay: pipersTndsWeekly
+  },
+  {
+    ...plannerBase, id: 'pipers-tnds-231-only', routeNumber: '231', operator: 'South Beds Dial-a-Ride', direction: 'outbound',
+    origin: 'Brickhill Park', destination: 'Dunstable Asda', provider: 'TNDS', timetableSource: 'TNDS', source: { provider: 'TNDS' },
+    circular: false, circularPatternStopIds: [], departureEvidenceByDay: pipersTndsWeekly
+  }
+], [stop]);
+const pipers230Primary = pipers230WeeklyAuthority.find(row => row.routeNumber === '230');
+assert.ok(pipers230Primary, 'Pipers BODS/TNDS route 230 must produce a principal planner row.');
+assert.deepEqual(pipers230Primary.canonicalDeparturePopulation.sunday, [], 'BODS explicit Sunday no-service must not be overwritten by TNDS departures for the same public route at the same stop.');
+assert.match(pipers230Primary.typicalFrequencyText, /Sun: No scheduled service/i, 'BODS-primary route 230 presentation must retain its day-specific Sunday no-service calendar.');
+assert.equal(pipers230Primary.circular, true, 'TNDS open-pattern evidence must not replace the BODS circular principal.');
+assert.ok(pipers230WeeklyAuthority.some(row => row.routeNumber === '231'), 'a TNDS-only neighboring route must remain available.');
 const calendarSupplement = buildPlannerBusServiceSummaries([
   { ...plannerBase, id: 'bods-ordinary', routeNumber: 'X4', provider: 'BODS', timetableSource: 'BODS', source: { provider: 'BODS' }, departureEvidenceByDay: departureEvidence(hourlyMinutes, 'BODS') },
   { ...plannerBase, id: 'tnds-school-pattern', routeNumber: 'X4', provider: 'TNDS', timetableSource: 'TNDS', calendarProfileId: 'school-day', calendarEvidence: [{ calendarProfileId: 'school-day', schoolDayOnly: true, calendarResolved: true, daysOfWeek: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] }], source: { provider: 'TNDS', calendarProfileId: 'school-day' }, departureEvidenceByDay: departureEvidence([390, 450], 'TNDS', 'school-day') }

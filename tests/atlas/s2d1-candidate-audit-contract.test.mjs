@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const audit = await readFile(new URL('./s2c3-real-candidate-runtime-audit.mjs', import.meta.url), 'utf8');
-const workflow = await readFile(new URL('../../.github/workflows/atlas-bus-beta-s2d1-closeout.yml', import.meta.url), 'utf8');
+const workflow = (await readFile(new URL('../../.github/workflows/atlas-bus-beta-s2d1-closeout.yml', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
 const dispatcher = await readFile(new URL('../../.github/workflows/atlas-bus-data-refresh.yml', import.meta.url), 'utf8');
 
 assert.doesNotMatch(audit, /assert\.(?:ok|equal|deepEqual|throws)/, 'the real-candidate audit must not throw on an early assertion');

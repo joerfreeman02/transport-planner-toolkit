@@ -1081,16 +1081,37 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
       ? DAY_ORDER.flatMap(day => normaliseCircularTerminalEntries(serviceEntries.filter(entry => entry.day === day)))
       : serviceEntries;
   }));
-  const authorityByProfile = new Map();
+  // Source authority applies to the complete local service-day schedule for a
+  // public route, including an explicitly empty day. Comparing endpoint
+  // strings here let a lower-authority TNDS pattern add Sunday journeys to a
+  // BODS-primary route when the two feeds described different endpoints.
+  const authorityByRouteProfileDay = new Map();
+  const authorityScope = (routeNumber, profile, day, stopPointId) => [normal(routeNumber), profile, day, stopPointId].join('|');
+  for (const service of records) {
+    const serviceRank = plannerEvidenceSourceRank(service);
+    if (!serviceRank) continue;
+    const routeNumber = text(service?.routeNumber);
+    const serviceEvidence = service?.departureEvidenceByDay ?? {};
+    const serviceSchedules = service?.departuresByDay ?? {};
+    for (const day of DAY_ORDER) {
+      // Summary records expose all seven day keys when the source supplied a
+      // complete local timetable, so an empty array is meaningful no-service
+      // evidence. Records without an explicit day key make no such claim.
+      if (!Array.isArray(serviceEvidence[day]) && !Array.isArray(serviceSchedules[day])) continue;
+      const profile = calendarProfileFromService(service) || 'ordinary';
+      const scope = authorityScope(routeNumber, profile, day, representativeId);
+      authorityByRouteProfileDay.set(scope, Math.max(authorityByRouteProfileDay.get(scope) ?? 0, serviceRank));
+    }
+  }
   for (const entry of entries) {
     const profile = calendarProfileIdsForEntry(entry)[0] || 'ordinary';
-    const scope = [profile, semanticRouteKey(entry)].join('|');
-    authorityByProfile.set(scope, Math.max(authorityByProfile.get(scope) ?? 0, plannerEvidenceSourceRank({}, entry)));
+    const scope = authorityScope(entry.routeNumber, profile, entry.day, entry.stopPointId);
+    authorityByRouteProfileDay.set(scope, Math.max(authorityByRouteProfileDay.get(scope) ?? 0, plannerEvidenceSourceRank({}, entry)));
   }
   const authoritativeEntries = entries.filter(entry => {
     const profile = calendarProfileIdsForEntry(entry)[0] || 'ordinary';
-    const scope = [profile, semanticRouteKey(entry)].join('|');
-    const highestAuthority = authorityByProfile.get(scope) ?? 0;
+    const scope = authorityScope(entry.routeNumber, profile, entry.day, entry.stopPointId);
+    const highestAuthority = authorityByRouteProfileDay.get(scope) ?? 0;
     return highestAuthority === 0 || plannerEvidenceSourceRank({}, entry) === highestAuthority;
   });
   const schedules = emptySchedule();

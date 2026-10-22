@@ -283,6 +283,29 @@ assert.doesNotMatch(calendarVariantNonSchoolQualification.serviceQualification ?
 assert.match(calendarVariantNonSchoolQualification.additionalServices ?? '', /Local Terminus/i,
   'calendar-variant service remains visibly scoped as an additional service');
 
+const sharedSynthesizedId = '101|delaine buses|headsign:outbound|bus station|peterborough bus station';
+const sourceScopedCalendarVariantRows = rows([
+  { ...record({ id: sharedSynthesizedId, routeNumber: '101', destination: 'Peterborough Bus Station', calendarProfileId: 'ordinary', minutes: [420] }),
+    sourceRecordIds: ['tnds:101:pattern:ordinary'] },
+  { ...record({ id: sharedSynthesizedId, routeNumber: '101', destination: 'Z Local Terminus', calendarProfileId: null, minutes: [450],
+    serviceNote: 'Operating days could not be fully confirmed; check the timetable before use.' }),
+    sourceRecordIds: ['tnds:101:pattern:unresolved'], calendarEvidence: [{ calendarProfileId: 'unresolved' }] }
+]);
+assert.equal(sourceScopedCalendarVariantRows.length, 1, 'same synthesized direction IDs remain one public route row');
+assert.deepEqual(sourceScopedCalendarVariantRows[0].publicServiceGroupingDecision.calendarVariantRecordIds, ['tnds:101:pattern:unresolved'],
+  'calendar variant evidence retains underlying pattern identity when synthesized route/direction IDs collide');
+assert.doesNotMatch(sourceScopedCalendarVariantRows[0].plannerNotes?.serviceQualification ?? '', /Operating days could not be fully confirmed/i,
+  'an unresolved calendar pattern explicitly classified as a variant cannot qualify the confirmed ordinary principal timetable');
+assert.match(sourceScopedCalendarVariantRows[0].plannerNotes?.additionalServices ?? '', /Z Local Terminus/i,
+  'the source-scoped unresolved variant remains visible as an alternate service');
+
+const unresolvedPrincipalCalendarRows = rows([
+  { ...record({ id: 'unresolved-principal-calendar', routeNumber: 'UNCAL', calendarProfileId: null, minutes: [420] }),
+    calendarEvidence: [{ calendarProfileId: 'unresolved' }] }
+]);
+assert.match(unresolvedPrincipalCalendarRows[0].plannerNotes?.serviceQualification ?? '', /Operating days could not be fully confirmed/i,
+  'a genuinely unresolved principal calendar still requires review');
+
 const schoolBranchWithoutCalendarTaxonomy = rows([
   record({
     id: 'regular-queensgate', routeNumber: 'X', destination: 'Queensgate Bus Station',

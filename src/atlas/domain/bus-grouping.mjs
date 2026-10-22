@@ -284,6 +284,10 @@ function strictSubsequenceServices(shorterService, longerService) {
 
 function serviceId(service) { return text(service.id || service.sourceRecordId); }
 function sourceRecordIds(services) { return unique(services.flatMap(service => service.sourceRecordIds ?? [serviceId(service)])); }
+function groupingRecordIds(service) {
+  const sourceIds = unique(service?.sourceRecordIds ?? []);
+  return sourceIds.length ? sourceIds : [serviceId(service)].filter(Boolean);
+}
 function lineageIds(service) { return unique([service.serviceLineageId, ...(service.sourceRouteIds ?? []), service.routeId, service.source?.routeId]); }
 function calendarIds(service) { return unique([service.calendarProfileId, ...(service.calendarEvidence ?? []).map(item => item?.calendarProfileId)]); }
 
@@ -495,9 +499,13 @@ export function makePublicServiceGroupingDecision({
       orderedRoutePatternStopIds: Object.freeze(mainPattern),
       orderedPatternPlaces: Object.freeze(patternNames(principal))
     }),
-    shortWorkingRecordIds: Object.freeze(shortWorkingRecords.map(serviceId).filter(Boolean)),
-    branchVariantRecordIds: Object.freeze(branchRecords.map(serviceId).filter(Boolean)),
-    calendarVariantRecordIds: Object.freeze(calendarVariantRecords.map(serviceId).filter(Boolean)),
+    // Variant identifiers must retain source-record granularity. Synthesized
+    // route/direction IDs can be shared by distinct calendar patterns (for
+    // example ordinary and holiday TNDS journeys) and would otherwise mark
+    // both populations as variants.
+    shortWorkingRecordIds: Object.freeze(unique(shortWorkingRecords.flatMap(groupingRecordIds))),
+    branchVariantRecordIds: Object.freeze(unique(branchRecords.flatMap(groupingRecordIds))),
+    calendarVariantRecordIds: Object.freeze(unique(calendarVariantRecords.flatMap(groupingRecordIds))),
     variantDestinationEvidence: Object.freeze(variantDestinationEvidence),
     alternateDestinations: Object.freeze(alternateDestinations),
     materialDestinationEvidence: Object.freeze(destinationValues(records)),

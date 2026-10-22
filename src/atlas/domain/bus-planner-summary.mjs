@@ -790,7 +790,7 @@ function principalPatternServices(component = []) {
   for (const principal of component) {
     const decision = makePublicServiceGroupingDecision({ services: component, principal });
     for (const id of decision.shortWorkingRecordIds ?? []) {
-      const service = component.find(candidate => serviceIdForPlanner(candidate) === id);
+      const service = component.find(candidate => plannerRecordIds(candidate).includes(id));
       if (service && ['school-day', 'term-time'].includes(calendarProfileFromService(service))) shortWorkingIds.add(id);
     }
   }
@@ -798,7 +798,7 @@ function principalPatternServices(component = []) {
     if (['school-day', 'term-time'].includes(calendarProfileFromService(service))
       && component.some(candidate => candidate !== service
       && !reverseEndpointRelationship(service, candidate)
-      && strictPatternSubsequence(service, candidate))) shortWorkingIds.add(serviceIdForPlanner(service));
+      && strictPatternSubsequence(service, candidate))) plannerRecordIds(service).forEach(id => shortWorkingIds.add(id));
   }
   // Some frozen BODS/GTFS and TNDS extracts carry the actual operating-day
   // population but omit calendar taxonomy.  When a school-named local branch
@@ -808,7 +808,7 @@ function principalPatternServices(component = []) {
   // already constrained to one connected public-service component; its
   // alternate endpoint remains in retained service/variant evidence.
   for (const service of schoolRestrictedLocalVariants(component)) {
-    shortWorkingIds.add(serviceIdForPlanner(service));
+    plannerRecordIds(service).forEach(id => shortWorkingIds.add(id));
   }
   // A school-named local endpoint alongside the same connected public
   // direction’s regular weekend timetable is retained as a visible variant,
@@ -817,10 +817,10 @@ function principalPatternServices(component = []) {
   // school endpoint remains available for the row’s short-working note.
   if (hasSchoolEndpointWithRegularWeekendService(component)) {
     for (const service of component.filter(schoolEndpoint)) {
-      shortWorkingIds.add(serviceIdForPlanner(service));
+      plannerRecordIds(service).forEach(id => shortWorkingIds.add(id));
     }
   }
-  const principal = component.filter(service => !shortWorkingIds.has(serviceIdForPlanner(service)));
+  const principal = component.filter(service => !plannerRecordIds(service).some(id => shortWorkingIds.has(id)));
   const result = principal.length ? principal : component;
   principalPatternServicesCache.set(component, result);
   return result;
@@ -1689,11 +1689,11 @@ function variantNote(component, main, groupingDecision) {
   const calendarIds = new Set(groupingDecision?.calendarVariantRecordIds ?? []);
   const candidates = component
     .filter(service => service !== main)
-    .filter(service => !duplicateIds.has(serviceIdForPlanner(service)))
+    .filter(service => !plannerRecordIds(service).some(id => duplicateIds.has(id)))
     .map(service => {
-      const id = serviceIdForPlanner(service);
+      const ids = plannerRecordIds(service);
       const destination = plannerDestination(service);
-      const kind = shortIds.has(id) ? 'short working' : branchIds.has(id) ? 'route variant' : calendarIds.has(id) ? 'calendar variant' : 'variant';
+      const kind = ids.some(id => shortIds.has(id)) ? 'short working' : ids.some(id => branchIds.has(id)) ? 'route variant' : ids.some(id => calendarIds.has(id)) ? 'calendar variant' : 'variant';
       const qualification = hasSchoolAndNonSchoolProfiles(component) ? '' : variantCalendarQualification(service);
       const origin = plannerOrigin(service);
       const originDiffers = origin && normal(origin) !== normal(plannerOrigin(main));
@@ -1718,8 +1718,8 @@ function variantNote(component, main, groupingDecision) {
     return `${route} – ${prefix} ${preposition} ${item.destination}${item.qualification ? ` (${item.qualification})` : ''}.`;
   });
   const unresolvedStructuralVariant = component.some(service => {
-    const id = serviceIdForPlanner(service);
-    return (shortIds.has(id) || branchIds.has(id)) && !plannerDestination(service);
+    const ids = plannerRecordIds(service);
+    return ids.some(id => shortIds.has(id) || branchIds.has(id)) && !plannerDestination(service);
   });
   if (unresolvedStructuralVariant) return null;
   return notes.length ? notes.join(' ') : 'Additional short workings and timetable variants operate.';
@@ -1732,6 +1732,11 @@ function hasSchoolAndNonSchoolProfiles(services = []) {
 
 function serviceIdForPlanner(service) {
   return text(service?.id || service?.sourceRecordId);
+}
+
+function plannerRecordIds(service) {
+  const sourceIds = unique(service?.sourceRecordIds ?? []);
+  return sourceIds.length ? sourceIds : [serviceIdForPlanner(service)].filter(Boolean);
 }
 
 export function resolvedPlannerDestination(service) {
@@ -1902,9 +1907,20 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const rowCircular = circularClassificationIsProven(circularServiceDecision);
   const canonical = canonicalDeparturePopulation(component, representative.id, main, plannerServiceGroup);
   const shortWorkingIds = new Set(plannerServiceGroup.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []);
-  const principalComponent = component.filter(service => ![serviceIdForPlanner(service), ...(service?.sourceRecordIds ?? [])]
-    .filter(Boolean).some(id => shortWorkingIds.has(id)));
+  const principalComponent = component.filter(service => !plannerRecordIds(service).some(id => shortWorkingIds.has(id)));
   const profileComponent = principalComponent.length ? principalComponent : component;
+  const variantRecordIds = new Set([
+    ...(plannerServiceGroup.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []),
+    ...(plannerServiceGroup.publicServiceGroupingDecision?.branchVariantRecordIds ?? []),
+    ...(plannerServiceGroup.publicServiceGroupingDecision?.calendarVariantRecordIds ?? [])
+  ]);
+  const principalProfileComponent = profileComponent.filter(service => !plannerRecordIds(service).some(id => variantRecordIds.has(id)));
+  const isVariantDeparture = entry => {
+    const sourceRecordId = text(entry?.sourceRecordId);
+    const patternIdentity = text(entry?.patternIdentity);
+    return [...variantRecordIds].some(id => id === sourceRecordId || id === patternIdentity
+      || (patternIdentity && id.includes(`:pattern:${patternIdentity}`)));
+  };
   const profileIds = orderedCalendarProfiles([
     ...profileComponent.map(calendarProfileFromService),
     ...canonical.entries.flatMap(calendarProfileIdsForEntry),
@@ -1933,8 +1949,12 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     : selectedProfileResult;
   const mixedProfileOutput = effectiveProfileIds.length > 1 && !schoolHolidayVariant;
   const outputProfileIds = mixedProfileOutput ? effectiveProfileIds : [displayProfileId];
-  const unresolvedNeedsQualification = profileIds.includes(UNKNOWN_CALENDAR_PROFILE)
-    && (profileIds.length > 1 || profileComponent.some(hasCalendarMetadata));
+  const principalProfileIds = orderedCalendarProfiles([
+    ...principalProfileComponent.map(calendarProfileFromService),
+    ...canonical.entries.filter(entry => !isVariantDeparture(entry)).flatMap(calendarProfileIdsForEntry)
+  ]);
+  const unresolvedNeedsQualification = principalProfileIds.includes(UNKNOWN_CALENDAR_PROFILE)
+    && (principalProfileIds.length > 1 || principalProfileComponent.some(hasCalendarMetadata));
   const displayFrequencyLines = [...displayResult.frequencyLines];
   const displayOperatingLines = [...displayResult.operatingLines];
   let frequencyLines = displayFrequencyLines;

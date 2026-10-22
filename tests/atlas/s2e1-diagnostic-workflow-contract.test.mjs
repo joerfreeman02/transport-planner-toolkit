@@ -110,6 +110,9 @@ assert.match(productAudit, /accepted C2 Run #151 frequency baseline/);
 assert.match(manualBrowserAudit, /Sun: No scheduled service/i, 'Pipers normal-product audit must lock the frozen BODS Sunday no-service calendar in browser/Word output.');
 assert.doesNotMatch(manualBrowserAudit, /rows102\.length <= 2/, 'Route 102 must not have an arbitrary display-row cap.');
 const compositionAudit = await readFile(new URL('./s2c3-real-candidate-runtime-audit.mjs', import.meta.url), 'utf8');
+const candidateDiagnostic = await readFile(new URL('./s2e1-normal-runtime-candidate-diagnostic.mjs', import.meta.url), 'utf8');
+assert.match(candidateDiagnostic, /\['27', '101', '201'\]\.filter\(route => control\.focusRoutes\.includes\(route\)\)/,
+  'calendar qualification controls must be limited to routes declared in each control focus list.');
 assert.doesNotMatch(compositionAudit, /pipers-230-one-principal-row|pipers-230-frequency-matches-frozen-bods|no-specialday-warning-wall/, 'Internal evidence diagnostics must not gate on final normal-product presentation.');
 assert.match(workflow, /Run full Bus-data Python suite[\s\S]*python -m unittest discover -s tools\/atlas-bus-data -p 'test_\*\.py' -v/);
 assert.match(workflow, /Run full deterministic ATLAS suite[\s\S]*node tests\/atlas\/run-all\.mjs/);

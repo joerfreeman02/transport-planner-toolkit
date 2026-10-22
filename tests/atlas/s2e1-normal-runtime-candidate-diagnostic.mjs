@@ -255,7 +255,7 @@ if (controlId === 'pe1' || controlId === 'queensgate') {
       throw new Error(`Actual Run #75 ${controlId} route ${route} is missing.`);
     }
   }
-  for (const route of ['27', '101', '201']) {
+  for (const route of ['27', '101', '201'].filter(route => control.focusRoutes.includes(route))) {
     const rows = plannerRowsFor(route);
     if (!rows.length || rows.some(row => new RegExp(`^${route}\\s*[–-]\\s*(?:School-day journeys only|Non-school days only)\\.$`, 'i').test(String(row.serviceNote ?? '').trim()))) {
       throw new Error(`Actual Run #75 ${controlId} route ${route} has a route-level calendar qualification or is missing.`);

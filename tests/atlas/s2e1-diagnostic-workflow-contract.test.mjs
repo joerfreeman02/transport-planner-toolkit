@@ -30,6 +30,8 @@ assert.match(c3PushWorkflow, /github\.event_name == 'push' && github\.repository
 assert.match(c3PushWorkflow, /uses: \.\/\.github\/workflows\/atlas-bus-beta-s2e1-diagnosis\.yml[\s\S]*mode: normal_runtime_diagnosis/);
 assert.doesNotMatch(c3PushWorkflow, /workflow_dispatch|atlas-bus-beta-candidate|force_refresh:\s*true|pages|deploy|publish/i, 'C3 push validation calls only the frozen-candidate diagnostic with no refresh or publication path');
 assert.match(c4PushWorkflow, /^name: ATLAS Bus Beta S2E-1 C4 final product trace/m);
+assert.match(workflow, /Install Chromium for the C4 browser contract suite[\s\S]*if: github\.ref == 'refs\/heads\/codex\/atlas-bus-beta-s2e-1-c4-final-product-trace'[\s\S]*run: pnpm exec playwright install chromium/);
+assert.match(workflow, /Install Chromium and OS dependencies for other browser contract suites[\s\S]*if: github\.ref != 'refs\/heads\/codex\/atlas-bus-beta-s2e-1-c4-final-product-trace'[\s\S]*run: pnpm exec playwright install --with-deps chromium/);
 assert.match(c4PushWorkflow, /group: atlas-bus-beta-s2e1-c4-final-v2-\$\{\{ github\.ref \}\}/, 'C4 validations use the rotated concurrency group to avoid the orphaned prior queue.');
 assert.match(c4PushWorkflow, /push:\r?\n\s+branches:\r?\n\s+-\s+codex\/atlas-bus-beta-s2e-1-c4-final-product-trace/);
 assert.match(c4PushWorkflow, /uses: \.\/\.github\/workflows\/atlas-bus-beta-s2e1-diagnosis\.yml[\s\S]*mode: normal_runtime_diagnosis/);
@@ -130,7 +132,7 @@ assert.match(candidateDiagnostic, /\['27', '101', '201'\]\.filter\(route => cont
 assert.doesNotMatch(compositionAudit, /pipers-230-one-principal-row|pipers-230-frequency-matches-frozen-bods|no-specialday-warning-wall/, 'Internal evidence diagnostics must not gate on final normal-product presentation.');
 assert.match(workflow, /Run full Bus-data Python suite[\s\S]*python -m unittest discover -s tools\/atlas-bus-data -p 'test_\*\.py' -v/);
 assert.match(workflow, /Run full deterministic ATLAS suite[\s\S]*node tests\/atlas\/run-all\.mjs/);
-assert.match(workflow, /Install Chromium for the browser contract suite[\s\S]*playwright install --with-deps chromium/);
+assert.match(workflow, /Install Chromium and OS dependencies for other browser contract suites[\s\S]*playwright install --with-deps chromium/);
 assert.match(workflow, /fixture-backed Chingford TfL route 657 golden regression[\s\S]*node tests\/atlas\/tfl-bus-timetable\.test\.mjs/);
 const tflGoldenTest = await readFile(new URL('./tfl-bus-timetable.test.mjs', import.meta.url), 'utf8');
 for (const evidence of ['routeMetadata657', 'GROVE-P', 'GROVE-N', "monday, [476]", "monday, [982]"]) assert.ok(tflGoldenTest.includes(evidence), `Chingford route 657 golden evidence missing ${evidence}`);

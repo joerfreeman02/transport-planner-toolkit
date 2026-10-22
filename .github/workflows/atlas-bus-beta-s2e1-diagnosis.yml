@@ -34,7 +34,11 @@ jobs:
           cache: pnpm
       - name: Install deterministic test dependencies
         run: pnpm install --frozen-lockfile
-      - name: Install Chromium for the browser contract suite
+      - name: Install Chromium for the C4 browser contract suite
+        if: github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c4-final-product-trace'
+        run: pnpm exec playwright install chromium
+      - name: Install Chromium and OS dependencies for other browser contract suites
+        if: github.ref != 'refs/heads/codex/atlas-bus-beta-s2e-1-c4-final-product-trace'
         run: pnpm exec playwright install --with-deps chromium
       - name: Ensure the default-branch ref is available to repository contract tests
         run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main

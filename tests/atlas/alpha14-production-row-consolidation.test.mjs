@@ -374,9 +374,11 @@ alpha14AmbiguousBridgeRecords[1].principalLocations = ['Bridge Start', 'Bridge M
 const alpha14AmbiguousBridgeRows = reviewRows(alpha14AmbiguousBridgeRecords);
 assert.equal(alpha14AmbiguousBridgeRows.length, 2, 'ambiguous bridge cannot collapse explicit opposite directions');
 assert.equal(alpha14AmbiguousBridgeRows.filter(row => row.rawServiceSummaries.some(service => service.sourceRecordIds?.includes('bridge-b'))).length, 1, 'ambiguous bridge record is assigned to exactly one component');
-for (const minute of [420, 430, 520]) {
-  assert.equal(alpha14AmbiguousBridgeRows.flatMap(row => row.departuresByDay.monday).filter(value => value === minute).length, 1, `ambiguous bridge minute ${minute} remains unique`);
+for (const minute of [420, 520]) {
+  assert.equal(alpha14AmbiguousBridgeRows.flatMap(row => row.departuresByDay.monday).filter(value => value === minute).length, 1, `principal direction minute ${minute} remains unique`);
 }
+assert.equal(alpha14AmbiguousBridgeRows.flatMap(row => row.departuresByDay.monday).filter(value => value === 430).length, 0,
+  'an ambiguous same-stop short-working departure remains auditable but does not inflate either principal direction');
 
 const reverseWorkingCases = [
   {

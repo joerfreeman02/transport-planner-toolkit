@@ -69,7 +69,8 @@ const controls = [
   { id: 'waltham-cross-47-berkley-avenue', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700 },
   { id: 'normanshire-drive', label: 'Normanshire Drive, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250 },
   { id: 'pe1-2tl', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500 },
-  { id: 'queensgate', label: 'Queensgate Bus Station', latitude: 52.5701, longitude: -0.2498, radius: 500 }
+  { id: 'queensgate', label: 'Queensgate Bus Station', latitude: 52.5701, longitude: -0.2498, radius: 500 },
+  { id: 'enfield-town', label: 'Enfield Town', latitude: 51.6522, longitude: -0.0809, radius: 500 }
 ];
 const results = {};
 for (const control of controls) {

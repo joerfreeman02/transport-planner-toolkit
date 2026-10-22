@@ -8,6 +8,7 @@ const c4PushWorkflow = await readFile(new URL('../../.github/workflows/atlas-bus
 const diagnostic = await readFile(new URL('./s2e1-real-candidate-diagnostic.mjs', import.meta.url), 'utf8');
 const normalRuntime = await readFile(new URL('./s2e1-normal-runtime-candidate-diagnostic.mjs', import.meta.url), 'utf8');
 const manualBrowserAudit = await readFile(new URL('./s2e1-manual-product-audit.mjs', import.meta.url), 'utf8');
+const candidateBrowserAudit = await readFile(new URL('./s2c3-real-candidate-runtime-audit.mjs', import.meta.url), 'utf8');
 
 assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-intelligence-restoration/);
 assert.match(workflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-c1-manual-corrections/);
@@ -101,7 +102,9 @@ assert.match(normalRuntime, /serviceNote: row\.serviceNote, routeVariantNote: ro
 assert.match(normalRuntime, /atlas-bus-s2e1-normal-runtime-diagnostic-failure-v1/);
 assert.match(normalRuntime, /compositionStage, error: error\.message/);
 const productAudit = await readFile(new URL('./s2e1-manual-product-audit.mjs', import.meta.url), 'utf8');
-for (const control of ['pipers-lane', 'waltham-cross', 'chingford', 'pe1', 'enfield']) assert.ok(productAudit.includes(`id: '${control}'`), `normal-product browser audit must cover ${control}`);
+for (const control of ['pipers-lane', 'waltham-cross', 'chingford', 'pe1']) assert.ok(productAudit.includes(`id: '${control}'`), `normal-product browser audit must cover ${control}`);
+assert.match(productAudit, /enfieldCoverage = 'Enfield term-time and operator controls are exercised by the exact-candidate prepared-adapter browser\/Word audit and candidate diagnostic/);
+assert.match(candidateBrowserAudit, /id: 'enfield-town'/, 'the exact-candidate browser/Word audit must retain the Enfield control');
 for (const field of ['#coordinatesForm', '#confirmAssessmentPoint', '#findStops', '.bus-service-summary', '#developerDiagnostics', '#exportBusWord', 'word/document.xml', 'horizontal overflow']) assert.ok(productAudit.includes(field), `normal-product browser audit must inspect ${field}`);
 assert.match(productAudit, /candidateRun: '39430415441'/);
 assert.match(productAudit, /acquisitionAttempted: false/);

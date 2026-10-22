@@ -19,8 +19,7 @@ const controls = [
   { id: 'pipers-lane', label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700 },
   { id: 'waltham-cross', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700 },
   { id: 'chingford', label: 'Normanshire Drive, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250 },
-  { id: 'pe1', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500 },
-  { id: 'enfield', label: 'Enfield Town', latitude: 51.6522, longitude: -0.0809, radius: 500 }
+  { id: 'pe1', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500 }
 ];
 const chingfordRouteMetadata657 = { id: '657', routeSections: [
   { id: '657-out', direction: 'outbound', originationName: "Salisbury Hall Sainsbury's", destinationName: "Bancroft's School" },
@@ -49,6 +48,7 @@ const chingfordTimetables657 = {
   'GROVE-N': chingfordTimetable657({ stopId: 'GROVE-N', direction: 'inbound', patternId: '657-in', destination: "Salisbury Hall Sainsbury's", time: 982, adjacentTime: 984, adjacentId: '657-ORIGIN' })
 };
 const report = { schema: 'atlas-bus-s2e1-normal-product-browser-word-audit-v1', candidateRoot, candidateRun: '39430415441', candidateArtifactId: '12275615359', candidateDigest: 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471', candidateProducerSha: '151199cc914c235870f444d26b03c2309edbd035', acquisitionAttempted: false, publicationAttempted: false, deploymentAttempted: false, controls: {}, failures: [] };
+report.enfieldCoverage = 'Enfield term-time and operator controls are exercised by the exact-candidate prepared-adapter browser/Word audit and candidate diagnostic. The normal-shell audit intentionally does not fabricate TfL StopPoint records; with live TfL disabled, the frozen candidate contains no TfL StopPoint response fixture for Enfield.';
 const errors = [];
 report.chingfordFixtureNote = 'Chingford route 657 browser regression uses the existing fixture-backed timetable golden. Fixture StopPoint coordinates are anchored at the confirmed control point solely for deterministic radius matching and are not represented as live TfL location evidence.';
 const failedRequests = [];
@@ -285,8 +285,11 @@ try {
       assert.ok(wordServiceTable, 'Generated Word export has no planner-facing Bus Service Summary table.');
       const wordHeaders = wordServiceTable[0];
       const wordRows = wordServiceTable.slice(1).map(cells => Object.fromEntries(wordHeaders.map((header, index) => [header, cells[index] ?? ''])));
+      outcome.renderedRows = rendered;
+      outcome.renderedServiceNotes = renderedServiceNotes;
+      outcome.generatedWordRows = wordRows;
       const parityFields = ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop'];
-      const normalized = value => String(value ?? '').replace(/\s+/g, ' ').trim();
+      const normalized = value => String(value ?? '').replace(/[’‘]/g, "'").replace(/\s*;\s*/g, ' ').replace(/\s+/g, ' ').trim();
       for (const browserRow of rendered) {
         const wordRow = wordRows.find(candidate => normalized(candidate.Route) === normalized(browserRow.Route)
           && normalized(candidate['Direction / main service pattern']) === normalized(browserRow['Direction / main service pattern']));

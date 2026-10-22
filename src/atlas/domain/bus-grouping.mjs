@@ -284,9 +284,12 @@ function strictSubsequenceServices(shorterService, longerService) {
 
 function serviceId(service) { return text(service.id || service.sourceRecordId); }
 function sourceRecordIds(services) { return unique(services.flatMap(service => service.sourceRecordIds ?? [serviceId(service)])); }
-function groupingRecordIds(service) {
-  const sourceIds = unique(service?.sourceRecordIds ?? []);
-  return sourceIds.length ? sourceIds : [serviceId(service)].filter(Boolean);
+function groupingRecordIds(service, records = []) {
+  const sourceIds = unique(service?.sourceRecordIds ?? [])
+    .filter(id => !records.some(other => other !== service && unique(other?.sourceRecordIds ?? []).includes(id)));
+  if (sourceIds.length) return sourceIds;
+  const id = serviceId(service);
+  return id && !records.some(other => other !== service && serviceId(other) === id) ? [id] : [];
 }
 function lineageIds(service) { return unique([service.serviceLineageId, ...(service.sourceRouteIds ?? []), service.routeId, service.source?.routeId]); }
 function calendarIds(service) { return unique([service.calendarProfileId, ...(service.calendarEvidence ?? []).map(item => item?.calendarProfileId)]); }
@@ -503,9 +506,9 @@ export function makePublicServiceGroupingDecision({
     // route/direction IDs can be shared by distinct calendar patterns (for
     // example ordinary and holiday TNDS journeys) and would otherwise mark
     // both populations as variants.
-    shortWorkingRecordIds: Object.freeze(unique(shortWorkingRecords.flatMap(groupingRecordIds))),
-    branchVariantRecordIds: Object.freeze(unique(branchRecords.flatMap(groupingRecordIds))),
-    calendarVariantRecordIds: Object.freeze(unique(calendarVariantRecords.flatMap(groupingRecordIds))),
+    shortWorkingRecordIds: Object.freeze(unique(shortWorkingRecords.flatMap(service => groupingRecordIds(service, records)))),
+    branchVariantRecordIds: Object.freeze(unique(branchRecords.flatMap(service => groupingRecordIds(service, records)))),
+    calendarVariantRecordIds: Object.freeze(unique(calendarVariantRecords.flatMap(service => groupingRecordIds(service, records)))),
     variantDestinationEvidence: Object.freeze(variantDestinationEvidence),
     alternateDestinations: Object.freeze(alternateDestinations),
     materialDestinationEvidence: Object.freeze(destinationValues(records)),

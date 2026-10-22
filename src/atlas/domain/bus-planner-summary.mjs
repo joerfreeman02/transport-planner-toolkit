@@ -2962,7 +2962,22 @@ function attachRouteNotes(rows) {
       const location = text(entry?.location);
       const locations = unique(entry?.locations ?? []);
       const signature = `${route}|${location}|${locations.join('|')}`;
-      if (route && (location || locations.length) && !target.some(existing => existing.__signature === signature)) target.push({ ...entry, __signature: signature });
+      if (!route || (!location && !locations.length)) return;
+      const existingIndex = target.findIndex(existing => existing.__signature === signature);
+      if (existingIndex < 0) {
+        target.push({ ...entry, __signature: signature });
+        return;
+      }
+      // Same route and endpoint can be contributed by more than one planner
+      // row. Preserve the strongest scoped annotation instead of letting an
+      // earlier unqualified copy mask a later qualified short-working.
+      const existing = target[existingIndex];
+      target[existingIndex] = {
+        ...existing,
+        ...(!existing.qualification && entry.qualification ? { qualification: entry.qualification } : {}),
+        ...(existing.variantKind !== 'short-working' && entry.variantKind === 'short-working' ? { variantKind: 'short-working' } : {}),
+        ...(!existing.patternComplete && entry.patternComplete ? { patternComplete: true, pattern: entry.pattern } : {})
+      };
     };
     group.forEach(({ row }) => {
       (row.plannerNotes?.additionalServiceEntries ?? []).forEach(entry => mergeEntry(mergedAdditionalServiceEntries, entry));

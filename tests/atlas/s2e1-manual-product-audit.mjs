@@ -322,8 +322,10 @@ try {
         assert.ok(rows102.length > 0 && new Set(keys102).size === keys102.length, `PE1 route 102 has no rendered rows or duplicate presentations (${rows102.length} total, ${new Set(keys102).size} distinct).`);
         const rowsX4 = rendered.filter(row => row.Route === 'X4');
         const x4Notes = renderedServiceNotes.filter(note => /\bX4\b/i.test(note) && /Kings School/i.test(note)).join(' ');
-        assert.ok(rowsX4.length >= 2 && rowsX4.some(row => /Sat:|Sun:/i.test(`${row['Typical frequency']} ${row['Operating period at stop']}`))
-          && /X4.*Kings School.*(?:School-day journeys only|weekdays only)/i.test(x4Notes), 'PE1 X4 does not visibly preserve its regular principal rows and a route-scoped qualified school short working in the normal browser UI.');
+        const x4BrowserAccepted = rowsX4.length >= 2
+          && rowsX4.some(row => /Sat:|Sun:/i.test(`${row['Typical frequency']} ${row['Operating period at stop']}`))
+          && /X4.*Kings School.*(?:School-day journeys only|weekdays only)/i.test(x4Notes);
+        assert.ok(x4BrowserAccepted, `PE1 X4 does not visibly preserve its regular principal rows and a route-scoped qualified school short working in the normal browser UI. Rendered X4 rows=${rowsX4.length}; X4 note text=${JSON.stringify(x4Notes)}.`);
         assert.doesNotMatch(x4Notes, /X4\s*[–-]\s*School-day journeys only\./i, 'PE1 X4 must not be labelled school-only as a whole route.');
         assert.doesNotMatch(exportedWordText, /X4\s*[–-]\s*School-day journeys only\./i, 'PE1 Word must not classify the whole X4 as school-only.');
         const x4WordShortWorking = exportedWordParagraphs.filter(paragraph => /Short workings:/i.test(paragraph)

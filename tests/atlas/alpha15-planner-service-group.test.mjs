@@ -25,6 +25,7 @@ function record({
   minutes = [420, 480],
   calendarProfileId = 'ordinary',
   circular = false,
+  serviceNote = '',
   principalLocations = ['Waltham Cross Bus Station'],
   patternNames = pattern,
   departureEvidenceByDay
@@ -45,6 +46,7 @@ function record({
     departuresByDay: week(minutes),
     departureEvidenceByDay: departureEvidenceByDay ?? Object.fromEntries(DAYS.map(day => [day, minutes.map(minute => ({ minute, stopPointId: basis, journeyIdentity: `${id}:${day}:${minute}`, provider: 'BODS' }))])),
     calendarProfileId,
+    serviceNote,
     circular,
     principalLocations,
     sourceRecordIds: [id],
@@ -516,6 +518,35 @@ const shortWorkingRows = buildPlannerBusServiceSummaries([
 ], stops);
 assert.equal(shortWorkingRows.length, 1, 'an ordered-subsequence short working remains within the principal direction row');
 assert.match(`${shortWorkingRows[0].serviceNote} ${shortWorkingRows[0].routeGroupNote || ''}`, /short workings/i);
+
+const crossDirectionSchoolShortWorkingRows = buildPlannerBusServiceSummaries([
+  record({
+    id: 'x4-eastbound-principal', routeNumber: 'X4', routeId: 'x4-line', directionId: '0',
+    origin: 'Corby George Street', destination: 'Queensgate Bus Stn', direction: 'Peterborough',
+    pattern: ['CORBY', 'PETERBOROUGH', 'QUEENSGATE'], patternNames: ['Corby George Street', 'Peterborough', 'Queensgate Bus Stn']
+  }),
+  record({
+    id: 'x4-eastbound-kings-copy', routeNumber: 'X4', routeId: 'x4-line', directionId: '0',
+    origin: 'Corby George Street', destination: 'Kings School', direction: 'Peterborough',
+    pattern: ['CORBY', 'PETERBOROUGH', 'KINGS'], patternNames: ['Corby George Street', 'Peterborough', 'Kings School'],
+    serviceNote: 'School-day journeys only.'
+  }),
+  record({
+    id: 'x4-westbound-principal', routeNumber: 'X4', routeId: 'x4-line', directionId: '1',
+    origin: 'Queensgate Bus Stn', destination: 'Corby George Street', direction: 'Corby',
+    pattern: ['QUEENSGATE', 'PETERBOROUGH', 'CORBY'], patternNames: ['Queensgate Bus Stn', 'Peterborough', 'Corby George Street']
+  }),
+  record({
+    id: 'x4-westbound-kings-copy', routeNumber: 'X4', routeId: 'x4-line', directionId: '1',
+    origin: 'Queensgate Bus Stn', destination: 'Kings School', direction: 'Corby',
+    pattern: ['QUEENSGATE', 'PETERBOROUGH', 'KINGS'], patternNames: ['Queensgate Bus Stn', 'Peterborough', 'Kings School'],
+    serviceNote: 'Limited service. School-day journeys only.'
+  })
+], stops);
+assert.equal(crossDirectionSchoolShortWorkingRows.length, 2, 'X4 opposite directions remain separate planner rows');
+assert.ok(crossDirectionSchoolShortWorkingRows.some(row => row.plannerNotes?.shortWorkingEntries?.some(entry =>
+  /Kings School/i.test(entry.location) && entry.qualification === 'School-day journeys only')),
+'route-level short-working merging preserves a later school-day qualifier for the Kings School endpoint');
 
 const markerlessOpposites = rows([
   record({ id: 'forward', routeNumber: 'MD', routeId: 'markerless', directionId: undefined, direction: '', origin: 'A Terminal', destination: 'B Terminal', pattern: ['A', 'MID', 'B'] }),

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildPlannerBusServiceSummaries, buildPlannerServiceGroups } from '../../src/atlas/domain/bus-planner-summary.mjs';
+import { buildPlannerBusServiceSummaries, buildPlannerServiceGroups, plannerAnnotationTaxonomy } from '../../src/atlas/domain/bus-planner-summary.mjs';
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const stops = [
@@ -192,6 +192,35 @@ assert.doesNotMatch(schoolBranchWithoutCalendarTaxonomy[0].serviceNote, /^School
 assert.match(schoolBranchWithoutCalendarTaxonomy[0].routeVariantNote, /Kings School.*(?:School-day journeys only|weekdays only)/i, 'the school-only qualification remains attached to its visible short-working variant');
 assert.doesNotMatch(schoolBranchWithoutCalendarTaxonomy[0].plannerNotes?.serviceQualification ?? '', /School-day journeys only/i, 'planner annotations must not promote a variant-only school qualification to the regular route');
 assert.match(schoolBranchWithoutCalendarTaxonomy[0].plannerNotes?.shortWorkings ?? '', /Kings School.*(?:School-day journeys only|weekdays only)/i, 'structured planner annotations retain the school qualification beside the short-working endpoint');
+
+const canonicalShortWorkingIdWithSeparateSourceIds = plannerAnnotationTaxonomy({
+  routeNumber: 'X4',
+  origin: 'Corby George Street',
+  destination: 'Queensgate Bus Stn',
+  rawServiceSummaries: [
+    {
+      id: 'x4-principal-service', routeNumber: 'X4', origin: 'Corby George Street', destination: 'Queensgate Bus Stn',
+      routePatternStopIds: ['CORBY', 'PETERBOROUGH', 'QUEENSGATE'], sourceRecordIds: ['tnds:principal'],
+      calendarProfileId: 'ordinary', serviceNote: ''
+    },
+    {
+      id: 'x4-school-short-working', routeNumber: 'X4', origin: 'Corby George Street', destination: 'Kings School',
+      routePatternStopIds: ['CORBY', 'PETERBOROUGH', 'KINGS'], sourceRecordIds: ['bods:school-short'],
+      calendarProfileId: null, serviceNote: 'Limited service. School-day journeys only.'
+    }
+  ],
+  publicServiceGroupingDecision: {
+    shortWorkingRecordIds: ['x4-school-short-working'],
+    branchVariantRecordIds: [],
+    calendarVariantRecordIds: [],
+    variantDestinationEvidence: []
+  }
+});
+assert.match(canonicalShortWorkingIdWithSeparateSourceIds.shortWorkings ?? '', /Kings School.*School-day journeys only/i,
+  'the canonical short-working service ID retains its qualification when source-record IDs differ');
+assert.equal(canonicalShortWorkingIdWithSeparateSourceIds.shortWorkingEntries[0]?.qualification, 'School-day journeys only');
+assert.equal(canonicalShortWorkingIdWithSeparateSourceIds.serviceQualification, null,
+  'a qualified short working does not make the unrestricted X4 principal route school-only');
 
 const schoolOriginBranchRows = rows([
   record({

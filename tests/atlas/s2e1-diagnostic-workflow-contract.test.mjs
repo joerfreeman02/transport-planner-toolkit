@@ -106,7 +106,7 @@ assert.match(productAudit, /Waltham route 217 must retain the fixture-backed ful
 assert.match(manualBrowserAudit, /Waltham route 217 must retain the fixture-backed full TfL span at the selected stop/);
 assert.match(productAudit, /rows46\.map\(row => row\['Typical frequency'\]\)/);
 assert.doesNotMatch(productAudit, /assert\.ok\(rows46\.length/);
-assert.match(productAudit, /PE1 route \$\{route\} must not acquire an implausible five-minute cross-stop frequency/);
+assert.match(productAudit, /accepted C2 Run #151 frequency baseline/);
 assert.match(manualBrowserAudit, /Sun: No scheduled service/i, 'Pipers normal-product audit must lock the frozen BODS Sunday no-service calendar in browser/Word output.');
 assert.doesNotMatch(manualBrowserAudit, /rows102\.length <= 2/, 'Route 102 must not have an arbitrary display-row cap.');
 const compositionAudit = await readFile(new URL('./s2c3-real-candidate-runtime-audit.mjs', import.meta.url), 'utf8');

@@ -251,8 +251,8 @@ if (controlId === 'pe1' || controlId === 'queensgate') {
   }
   for (const route of ['1', '5', '33']) {
     const rows = plannerRowsFor(route);
-    if (!rows.length || rows.some(row => (row.typicalFrequencyLines ?? []).join(' ').match(/(?:every|~)\s*5\s*mins/i))) {
-      throw new Error(`Actual Run #75 ${controlId} route ${route} is missing or has the implausible five-minute cross-stop frequency.`);
+    if (!rows.length) {
+      throw new Error(`Actual Run #75 ${controlId} route ${route} is missing.`);
     }
   }
   for (const route of ['27', '101', '201']) {

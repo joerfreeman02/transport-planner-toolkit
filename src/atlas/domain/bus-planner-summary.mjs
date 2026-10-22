@@ -2757,7 +2757,7 @@ export function plannerAnnotationTaxonomy(row) {
       const serviceKeys = plannerServiceDestinationKeys(service);
       const sameMainPlace = destination && (sameCanonicalPlannerEndpoint(service, principalEndpointService)
         || sameStructuredPlannerPlace(mainDestinationKeys, serviceKeys));
-      const knownShortWorking = (service.sourceRecordIds ?? []).some(sourceId => shortWorkingSourceIds.has(sourceId));
+      const knownShortWorking = serviceRecordIds(service).some(id => shortWorkingSourceIds.has(id));
       const variantOnlyQualification = hasUnrestrictedPrincipal && isVariantService(service)
         && serviceRecordIds(service).some(id => shortWorkingSourceIds.has(id));
       const scopedQualification = !mixedSchoolCalendar && variantOnlyQualification

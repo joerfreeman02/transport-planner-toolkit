@@ -190,6 +190,8 @@ assert.equal(schoolBranchWithoutCalendarTaxonomy[0].frequencyBasisStopId, 'B', '
 assert.match(schoolBranchWithoutCalendarTaxonomy[0].typicalFrequencyText, /Mon-Sun/);
 assert.doesNotMatch(schoolBranchWithoutCalendarTaxonomy[0].serviceNote, /^School-day journeys only\.$/i, 'a school short-working must not classify the whole regular public service as school-only');
 assert.match(schoolBranchWithoutCalendarTaxonomy[0].routeVariantNote, /Kings School.*(?:School-day journeys only|weekdays only)/i, 'the school-only qualification remains attached to its visible short-working variant');
+assert.doesNotMatch(schoolBranchWithoutCalendarTaxonomy[0].plannerNotes?.serviceQualification ?? '', /School-day journeys only/i, 'planner annotations must not promote a variant-only school qualification to the regular route');
+assert.match(schoolBranchWithoutCalendarTaxonomy[0].plannerNotes?.shortWorkings ?? '', /Kings School.*(?:School-day journeys only|weekdays only)/i, 'structured planner annotations retain the school qualification beside the short-working endpoint');
 
 const schoolOriginBranchRows = rows([
   record({

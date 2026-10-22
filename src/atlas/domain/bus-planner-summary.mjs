@@ -2575,7 +2575,9 @@ function plannerShortWorkingSentence(entries = []) {
     const location = text(entry?.location);
     if (!route || !location) continue;
     const current = grouped.get(route) ?? [];
-    if (!current.some(existing => normal(existing) === normal(location))) current.push(location);
+    const qualification = text(entry?.qualification);
+    const label = `${location}${qualification ? ` (${qualification})` : ''}`;
+    if (!current.some(existing => normal(existing) === normal(label))) current.push(label);
     grouped.set(route, current);
   }
   return [...grouped.entries()].map(([route, locations]) => {
@@ -2643,7 +2645,7 @@ export function plannerAnnotationTaxonomy(row) {
     }
     addUnique(additionalServices, `${text(route)} – ${cleanLocations.join(', ')}`);
   };
-  const addShortWorkingEntry = (route, location, service = null, variantKind = null) => {
+  const addShortWorkingEntry = (route, location, service = null, variantKind = null, qualification = '') => {
     const cleanLocation = text(location);
     if (!text(route) || !cleanLocation) return;
     const evidenceKey = annotationEvidenceKey(service, route, cleanLocation);
@@ -2652,6 +2654,7 @@ export function plannerAnnotationTaxonomy(row) {
       routeNumber: text(route),
       location: cleanLocation,
       variantKind: text(variantKind) || null,
+      qualification: text(qualification) || null,
       evidenceKey,
       patternComplete: annotationPatternComplete(service),
       pattern: Object.freeze(annotationPattern(service))
@@ -2659,6 +2662,18 @@ export function plannerAnnotationTaxonomy(row) {
     addUnique(shortWorkings, `${text(route)} – ${cleanLocation}`);
   };
   const services = row?.rawServiceSummaries?.length ? [...row.rawServiceSummaries] : [];
+  const variantRecordIds = new Set([
+    ...(row?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []),
+    ...(row?.publicServiceGroupingDecision?.branchVariantRecordIds ?? []),
+    ...(row?.publicServiceGroupingDecision?.calendarVariantRecordIds ?? [])
+  ]);
+  const serviceRecordIds = service => unique([serviceIdForPlanner(service), ...(service?.sourceRecordIds ?? [])]).filter(Boolean);
+  const isVariantService = service => serviceRecordIds(service).some(id => variantRecordIds.has(id));
+  const hasUnrestrictedPrincipal = services.some(service => !isVariantService(service)
+    && !['school-day', 'non-school-day', 'holiday'].includes(calendarProfileFromService(service)));
+  const mixedSchoolCalendar = hasSchoolAndNonSchoolProfiles(services);
+  const variantQualificationNotes = new Set(services.filter(isVariantService)
+    .flatMap(service => materialServiceNotesForService(service)));
   const principalEndpointService = services.find(service => normal(plannerDestination(service)) === mainDestination) || services[0] || null;
   const duplicateIds = new Set(row?.publicServiceGroupingDecision?.deduplicatedSourceRecordIds ?? []);
   const principalSourceIds = new Set(services[0]?.sourceRecordIds ?? []);
@@ -2688,7 +2703,6 @@ export function plannerAnnotationTaxonomy(row) {
 
   const decisionVariants = samePhysicalJourney ? [] : (row?.publicServiceGroupingDecision?.variantDestinationEvidence ?? []);
   const mainDestinationKeys = plannerServiceDestinationKeys(row?.destinationDecision ?? row?.destinationEndpointDecision);
-  const mixedSchoolCalendar = hasSchoolAndNonSchoolProfiles(services);
   for (const variant of decisionVariants) {
     const idSet = new Set(variant.sourceRecordIds ?? []);
     if ([...idSet].some(id => principalSourceIds.has(id))) continue;
@@ -2704,16 +2718,20 @@ export function plannerAnnotationTaxonomy(row) {
     const variantKeys = unique([...(variant.endpointPlaceKeys ?? []), ...(variant.endpointStopPointIds ?? []), ...plannerServiceDestinationKeys(service)]);
     const sameMainPlace = destination && (sameCanonicalPlannerEndpoint(service, principalEndpointService)
       || sameStructuredPlannerPlace(mainDestinationKeys, variantKeys));
+    const variantOnlyQualification = hasUnrestrictedPrincipal && isVariantService(service)
+      && (variant.kind === 'short-working' || serviceRecordIds(service).some(id => (row?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []).includes(id)));
+    const scopedQualification = !mixedSchoolCalendar && variantOnlyQualification
+      ? variantCalendarQualification(service) : '';
     if ((variant.kind === 'short-working' && origin && normal(origin) !== mainOrigin)
       || (origin && normal(destination) === mainDestination && normal(origin) !== mainOrigin)) {
       const location = origin || destination;
-       addShortWorkingEntry(route, location, service, variant.kind);
+       addShortWorkingEntry(route, location, service, variant.kind, scopedQualification);
     } else if (variant.kind === 'short-working' && destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
-       addShortWorkingEntry(route, destination, service, variant.kind);
+       addShortWorkingEntry(route, destination, service, variant.kind, scopedQualification);
     } else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
        addAdditionalEntry(route, [destination], variant.kind, service);
     }
-    const qualification = mixedSchoolCalendar ? '' : variantCalendarQualification(service);
+    const qualification = mixedSchoolCalendar || variantOnlyQualification ? '' : variantCalendarQualification(service);
     if (qualification) addUnique(qualifications, `${route} – ${qualification}`);
   }
 
@@ -2732,11 +2750,15 @@ export function plannerAnnotationTaxonomy(row) {
       const sameMainPlace = destination && (sameCanonicalPlannerEndpoint(service, principalEndpointService)
         || sameStructuredPlannerPlace(mainDestinationKeys, serviceKeys));
       const knownShortWorking = (service.sourceRecordIds ?? []).some(sourceId => shortWorkingSourceIds.has(sourceId));
+      const variantOnlyQualification = hasUnrestrictedPrincipal && isVariantService(service)
+        && serviceRecordIds(service).some(id => shortWorkingSourceIds.has(id));
+      const scopedQualification = !mixedSchoolCalendar && variantOnlyQualification
+        ? variantCalendarQualification(service) : '';
       if (knownShortWorking && originDiffers && destination && (normal(destination) === mainDestination || sameMainPlace)) {
-         addShortWorkingEntry(route, origin, service);
+         addShortWorkingEntry(route, origin, service, null, scopedQualification);
       }
       else if (knownShortWorking && destination && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
-         addShortWorkingEntry(route, destination, service, 'short-working');
+         addShortWorkingEntry(route, destination, service, 'short-working', scopedQualification);
       }
       else if (originDiffers && destination && (normal(destination) === mainDestination || sameMainPlace)) {
          addShortWorkingEntry(route, origin, service);
@@ -2744,7 +2766,7 @@ export function plannerAnnotationTaxonomy(row) {
       else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
          addAdditionalEntry(route, [destination], null, service);
       }
-      const qualification = mixedSchoolCalendar ? '' : variantCalendarQualification(service);
+      const qualification = mixedSchoolCalendar || variantOnlyQualification ? '' : variantCalendarQualification(service);
       if (qualification) addUnique(qualifications, `${service.routeNumber || row.routeNumber} – ${qualification}`);
     }
     // Preserve material alternate destinations even when the source-record
@@ -2776,7 +2798,8 @@ export function plannerAnnotationTaxonomy(row) {
   }
 
   const rowQualification = materialServiceNote(row?.serviceNote);
-  if (rowQualification && /school|term(?:[- ]time|[- ]only)|non-school|circular|holiday|calendar|operating days could not be fully confirmed/i.test(rowQualification)
+  if (rowQualification && !(hasUnrestrictedPrincipal && variantQualificationNotes.has(rowQualification))
+    && /school|term(?:[- ]time|[- ]only)|non-school|circular|holiday|calendar|operating days could not be fully confirmed/i.test(rowQualification)
     && rowQualification.toLowerCase() !== SCHOOL_HOLIDAY_VARIATION_NOTE.toLowerCase()
     && !/circular service/i.test(rowQualification)
     && !qualifications.some(existing => normal(existing).includes(normal(rowQualification)))) addUnique(qualifications, rowQualification);

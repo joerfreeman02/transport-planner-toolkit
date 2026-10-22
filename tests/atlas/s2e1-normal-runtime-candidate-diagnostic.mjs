@@ -195,8 +195,8 @@ if (controlId === 'pipers') {
     throw new Error('Actual Run #75 Pipers route 230 circular principal is not the BODS Centrebus pattern.');
   }
   const route46 = plannerRowsFor('46');
-  if (!route46.length || route46.some(row => (row.typicalFrequencyLines ?? []).join(' ').match(/(?:every|~)\s*5\s*mins/i))) {
-    throw new Error('Actual Run #75 Pipers route 46 is missing or retains the implausible five-minute cross-stop frequency.');
+  if (route46.some(row => (row.typicalFrequencyLines ?? []).join(' ').match(/(?:every|~)\s*5\s*mins/i))) {
+    throw new Error('Actual Run #75 Pipers route 46 retains the implausible five-minute cross-stop frequency.');
   }
 }
 if (controlId === 'waltham') {

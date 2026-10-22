@@ -29,11 +29,12 @@ assert.equal(planner.length, 3, 'main direction, genuine branch and opposite dir
 const main = planner.find(row => row.destination === 'Chingford');
 assert.ok(main);
 assert.equal(main.servedAtText, 'Waltham Cross Bus Station — G · 82 m*\nWaltham Cross Bus Station — H · 120 m');
-assert.deepEqual(main.departuresByDay.monday, [360, 360, 420, 480, 540, 600, 660], 'same representative-stop schedules are consolidated without cross-stop addition while a destination-distinguished short working remains represented');
+assert.deepEqual(main.departuresByDay.monday, [360, 420, 480, 540, 600, 660], 'same-stop short-working departures do not inflate the unrestricted principal frequency, while the short working remains represented');
 assert.deepEqual(main.typicalFrequencyLines, ['Mon-Fri: Every ~60 mins', 'Sat: 2 journeys/day', 'Sun: 1 journey/day']);
 assert.match(main.operatingPeriodLines.join(' '), /Sun: Departs approx\. 10:00/);
 assert.doesNotMatch(main.serviceNote, /School-day journeys only\./, 'a school-day qualification is not shown alongside retained weekend departures');
 assert.doesNotMatch(main.serviceNote, /Includes scheduled short workings/);
+assert.match(main.plannerNotes?.shortWorkings ?? '', /Enfield/i, 'the excluded same-stop short-working remains a planner-visible variant');
 assert.equal(main.directionPatternText, 'Towards Chingford');
 assert.equal(planner.filter(row => row.routeNumber === '657').length, 3);
 
@@ -115,7 +116,7 @@ assert.equal(route279[0].directionPatternText, 'Towards Theobalds Grove');
 const sameTime = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: 'Q', departures: [420], ids: 'same-physical' }),
   plannerRecord({ routeNumber: 'Q', pattern: ['A', 'B'], departures: [420], ids: 'same-physical' }),
-  plannerRecord({ routeNumber: 'Q', pattern: ['A', 'B'], departures: [420], ids: 'different-physical' })
+  plannerRecord({ routeNumber: 'Q', departures: [420], ids: 'different-physical' })
 ], coherentStops)[0];
 assert.equal(sameTime.departuresByDay.monday.length, 2, 'distinguishable same-time physical journeys remain distinct while duplicate identities collapse');
 
@@ -155,7 +156,7 @@ const route13 = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: '13', destination: 'North Weald', pattern: ['A', 'B', 'C'], departures: [360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1140, 1200, 1260, 1320, 1380], ids: '13-main' }),
   plannerRecord({ routeNumber: '13', destination: 'North Weald', pattern: ['A', 'B'], departures: [390, 450, 510], ids: '13-short', serviceNote: 'Limited service: no more than three scheduled journeys on any represented day.' })
 ], coherentStops)[0];
-assert.equal(route13.departuresByDay.monday.length, 21);
+assert.equal(route13.departuresByDay.monday.length, 18, 'principal-route frequency excludes three same-stop short-working trips');
 assert.doesNotMatch(route13.serviceNote, /Limited service|no more than three/i, 'limited-service notes are recalculated after consolidation');
 assert.equal(route13.routeGroupNote, 'Additional short workings and timetable variants operate.'); // legacy audit field; not planner-facing
 assert.equal(route13.directionPatternText, 'Towards North Weald');
@@ -164,7 +165,7 @@ const mixedPatternEvidence = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: 'E', departures: [420, 480, 540, 600, 660, 720], ids: 'e-main', frequencyEvidence: [{ periodType: 'FrequencyMinutes', day: 'monday', lowestFrequency: 10, highestFrequency: 10 }] }),
   plannerRecord({ routeNumber: 'E', pattern: ['A', 'B'], departures: [450, 510], ids: 'e-short' })
 ], coherentStops)[0];
-assert.notEqual(mixedPatternEvidence.frequencyByDay.monday.basis, 'frequency-band', 'one constituent pattern cannot impose a frequency band on a consolidated row without equivalent evidence for the whole population');
+assert.equal(mixedPatternEvidence.frequencyByDay.monday.basis, 'frequency-band', 'the principal pattern frequency band remains valid after the identified short working is excluded from the population');
 
 const directionRows = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: 'R', destination: 'North Terminal', direction: 'outbound', pattern: ['A', 'B'], departures: [420], ids: 'north' }),

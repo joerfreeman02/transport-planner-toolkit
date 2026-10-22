@@ -2649,7 +2649,14 @@ export function plannerAnnotationTaxonomy(row) {
     const cleanLocation = text(location);
     if (!text(route) || !cleanLocation) return;
     const evidenceKey = annotationEvidenceKey(service, route, cleanLocation);
-    if (shortWorkingEntries.some(entry => entry.evidenceKey === evidenceKey)) return;
+    const existingIndex = shortWorkingEntries.findIndex(entry => entry.evidenceKey === evidenceKey);
+    if (existingIndex >= 0) {
+      const existing = shortWorkingEntries[existingIndex];
+      if (!existing.qualification && text(qualification)) {
+        shortWorkingEntries[existingIndex] = Object.freeze({ ...existing, qualification: text(qualification) });
+      }
+      return;
+    }
     shortWorkingEntries.push(Object.freeze({
       routeNumber: text(route),
       location: cleanLocation,
@@ -2672,7 +2679,8 @@ export function plannerAnnotationTaxonomy(row) {
   const hasUnrestrictedPrincipal = services.some(service => !isVariantService(service)
     && !['school-day', 'non-school-day', 'holiday'].includes(calendarProfileFromService(service)));
   const mixedSchoolCalendar = hasSchoolAndNonSchoolProfiles(services);
-  const variantQualificationNotes = new Set(services.filter(isVariantService)
+  const shortWorkingRecordIds = new Set(row?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []);
+  const variantQualificationNotes = new Set(services.filter(service => serviceRecordIds(service).some(id => shortWorkingRecordIds.has(id)))
     .flatMap(service => materialServiceNotesForService(service)));
   const principalEndpointService = services.find(service => normal(plannerDestination(service)) === mainDestination) || services[0] || null;
   const duplicateIds = new Set(row?.publicServiceGroupingDecision?.deduplicatedSourceRecordIds ?? []);

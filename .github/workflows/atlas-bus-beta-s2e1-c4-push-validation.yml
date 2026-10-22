@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/atlas-bus-beta-s2e-1-c4-final-product-trace
+  workflow_dispatch:
 
 permissions:
   actions: read
@@ -15,7 +16,7 @@ concurrency:
 
 jobs:
   frozen-candidate-diagnosis:
-    if: github.event_name == 'push' && github.repository == 'joerfreeman02/transport-planner-toolkit' && github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c4-final-product-trace'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.repository == 'joerfreeman02/transport-planner-toolkit' && github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c4-final-product-trace'
     uses: ./.github/workflows/atlas-bus-beta-s2e1-diagnosis.yml
     with:
       mode: normal_runtime_diagnosis

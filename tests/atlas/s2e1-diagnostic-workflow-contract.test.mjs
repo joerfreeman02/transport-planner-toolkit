@@ -35,7 +35,9 @@ assert.match(workflow, /Install Chromium and OS dependencies for other browser c
 assert.match(c4PushWorkflow, /group: atlas-bus-beta-s2e1-c4-final-v2-\$\{\{ github\.ref \}\}/, 'C4 validations use the rotated concurrency group to avoid the orphaned prior queue.');
 assert.match(c4PushWorkflow, /push:\r?\n\s+branches:\r?\n\s+-\s+codex\/atlas-bus-beta-s2e-1-c4-final-product-trace/);
 assert.match(c4PushWorkflow, /uses: \.\/\.github\/workflows\/atlas-bus-beta-s2e1-diagnosis\.yml[\s\S]*mode: normal_runtime_diagnosis/);
-assert.doesNotMatch(c4PushWorkflow, /workflow_dispatch|atlas-bus-beta-candidate|force_refresh:\s*true|pages|deploy|publish/i, 'C4 push validation calls only the frozen-candidate diagnostic with no acquisition or publication path');
+assert.match(c4PushWorkflow, /workflow_dispatch:/, 'C4 frozen-candidate diagnostic supports a guarded self-dispatch if GitHub drops a push event.');
+assert.match(c4PushWorkflow, /github\.event_name == 'push' \|\| github\.event_name == 'workflow_dispatch'[\s\S]*github\.repository == 'joerfreeman02\/transport-planner-toolkit'[\s\S]*refs\/heads\/codex\/atlas-bus-beta-s2e-1-c4-final-product-trace/);
+assert.doesNotMatch(c4PushWorkflow, /atlas-bus-beta-candidate|force_refresh:\s*true|pages|deploy|publish/i, 'C4 validation calls only the frozen-candidate diagnostic with no acquisition or publication path');
 assert.match(dispatchWorkflow, /S2E-1 offline preflight accepts only the exact zero-download C1B selector/);
 assert.match(dispatchWorkflow, /tnds-trust-browser-offline-preflight:[\s\S]*atlas-bus-beta-s2e-1-intelligence-restoration[\s\S]*outputs\.trust_mode == 'offline_preflight'/);
 assert.match(workflow, /actions:\s*read[\s\S]*contents:\s*read/);

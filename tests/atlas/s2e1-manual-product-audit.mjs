@@ -371,7 +371,8 @@ try {
           const row = rendered.find(candidate => candidate.Route === route && direction.test(candidate['Direction / main service pattern'] || ''));
           assert.ok(row, `PE1 route ${route} selected direction ${direction} is missing.`);
           assert.match(row['Served at'] || '', /\*/, `PE1 route ${route} ${direction} does not identify its selected assessed stop.`);
-          const frequency = row['Typical frequency'].match(new RegExp('(?:^|\\s)' + days + ':\\s*([\\s\\S]*?)(?=\\s(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:-|:)|$)', 'i'))?.[1];
+          const dayPattern = days === 'Mon-Fri' ? 'Mon-(?:Fri|Sat|Sun)' : days;
+          const frequency = row['Typical frequency'].match(new RegExp('(?:^|\\s)' + dayPattern + ':\\s*([\\s\\S]*?)(?=\\s(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:-|:)|$)', 'i'))?.[1];
           assert.ok(frequency, `PE1 route ${route} has no ${days} frequency for selected direction ${direction}.`);
           assert.doesNotMatch(frequency, /(?:every|~)\s*5\s*mins/i, `PE1 route ${route} ${direction} remains approximately every five minutes in ${days}.`);
         }

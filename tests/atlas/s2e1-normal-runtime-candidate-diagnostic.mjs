@@ -111,6 +111,7 @@ const plannerRows = assessment.plannerServiceSummaries.filter(row => wanted.has(
   id: row.id, routeNumber: row.routeNumber, routeNumbers: row.routeNumbers, operator: row.operator,
   direction: row.direction, principalLocations: row.principalLocations, typicalFrequencyLines: row.typicalFrequencyLines,
   operatingPeriodLines: row.operatingPeriodLines, sourceRecordIds: row.sourceRecordIds,
+  serviceNote: row.serviceNote, routeVariantNote: row.routeVariantNote, routeGroupNote: row.routeGroupNote, plannerNotes: row.plannerNotes,
   groupingDecision: row.publicServiceGroupingDecision,
   routeFamilyDecision: row.publicRouteFamilyDecision,
   circular: row.circular,
@@ -172,6 +173,8 @@ const circularEvidenceAudit = controlId === 'pipers' ? {
     }))
   }))
 } : null;
+let diagnosticGateError = null;
+try {
 if (controlId === 'waltham') {
   const family = plannerRowsFor('13').find(row => route(row.routeNumber) === '13' && ['13', '13A', '13B', '13C'].every(member => (row.routeNumbers ?? []).includes(member)));
   if (!family || family.routeFamilyDecision?.principalRouteNumber !== '13') {
@@ -232,6 +235,9 @@ if (controlId === 'pe1' || controlId === 'queensgate') {
     }
   }
 }
+} catch (error) {
+  diagnosticGateError = error;
+}
 
 const compactGroupingDecision = decision => decision ? ({
   decision: decision.decision, reason: decision.reason, routeNumber: decision.routeNumber,
@@ -248,7 +254,7 @@ const compactPlannerRows = rows => rows.map(row => ({
   id: row.id, routeNumber: row.routeNumber, routeNumbers: row.routeNumbers, operator: row.operator,
   direction: row.direction, origin: row.origin, destination: row.destination,
   directionPatternText: row.directionPatternText, principalLocations: row.principalLocations,
-  serviceNote: row.serviceNote, routeVariantNote: row.routeVariantNote,
+  serviceNote: row.serviceNote, routeVariantNote: row.routeVariantNote, routeGroupNote: row.routeGroupNote, plannerNotes: row.plannerNotes,
   servedAtStopId: row.servedAtStopId, timetableBasisStopLabel: row.timetableBasisStopLabel,
   frequencyBasisStopId: row.frequencyBasisStopId, calendarProfileIds: row.calendarProfileIds,
   typicalFrequencyLines: row.typicalFrequencyLines, operatingPeriodLines: row.operatingPeriodLines,
@@ -303,6 +309,7 @@ const report = {
   candidateArtifactId: '12275615359',
   candidateArtifactDigest: 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471',
   controlId, control,
+  diagnosticGateError: diagnosticGateError?.message ?? null,
   composition: 'Production createBusStopDiscovery + TfL/prepared adapters + createAuthoritativeBusTimetableAdapter + createBusAssessment.inspectScope/assess + production summary/planner grouping',
   deterministicBoundary: 'Exact frozen Run #75 candidate files; all TfL adapter requests receive deterministic successful empty fixture responses; routing is a deterministic no-op stub.',
   sourceAcquisition: false, candidateModified: false,
@@ -339,3 +346,4 @@ process.stdout.write(`${JSON.stringify({ schema: report.schema, reportPath, stat
   targetPlannerRows: [...wanted].flatMap(r => plannerRowsFor(r).map(row => ({ route: row.routeNumber, members: row.routeNumbers,
     family: row.routeFamilyDecision?.state, principal: row.routeFamilyDecision?.principalRouteNumber,
     frequency: row.typicalFrequencyLines, circular: row.circularClassification }))) })}\n`);
+if (diagnosticGateError) throw diagnosticGateError;

@@ -215,6 +215,32 @@ assert.equal(primaryCalendarRows.length, 1, 'BODS and TNDS route 230 evidence co
 assert.ok(primaryCalendarRows[0].publicServiceGroupingDecision.shortWorkingRecordIds.includes('230-bods-short'), 'the BODS variant remains excluded from principal frequency counts as a short working');
 assert.deepEqual(primaryCalendarRows[0].canonicalDeparturePopulation.sunday, [], 'higher-authority BODS explicit Sunday zero remains authoritative even when its record is excluded from principal frequency');
 assert.match(primaryCalendarRows[0].typicalFrequencyText, /Mon-Sat: Every ~60 mins[\s\S]*Sun: No scheduled service/, 'TNDS cannot restore Sunday service against the selected-stop BODS zero-service calendar');
+
+const crossSourceAliasRows = rows([
+  record({
+    id: 'route-alias-bods', routeNumber: 'ROUTE-ALIAS', operator: 'Stagecoach East',
+    origin: 'Queensgate Bus Stn', destination: 'Werrington Centre', direction: 'Werrington Centre',
+    timetableSource: 'BODS', pattern: ['QUEENSGATE', 'WERRINGTON'], stopIds: ['B'], basis: 'B', minutes: [],
+    departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, [360, 420, 480].map(minute => ({
+      minute, stopPointId: 'B', journeyIdentity: 'bods-' + day + '-' + minute, provider: 'BODS', calendarProfileId: 'ordinary'
+    }))]))
+  }),
+  record({
+    id: 'route-alias-tnds', routeNumber: 'ROUTE-ALIAS', operator: 'Stagecoach East',
+    origin: 'Queensgate Bus Stn', destination: 'Werrington Centre', direction: 'outbound',
+    timetableSource: 'TNDS', pattern: ['QUEENSGATE', 'WERRINGTON'], stopIds: ['B'], basis: 'B', minutes: [],
+    departureEvidenceByDay: Object.fromEntries(DAYS.map(day => [day, [355, 385, 415, 445, 475].map(minute => ({
+      minute, stopPointId: 'B', journeyIdentity: 'tnds-' + day + '-' + minute, provider: 'TNDS', calendarProfileId: 'ordinary'
+    }))]))
+  })
+]);
+assert.equal(crossSourceAliasRows.length, 1, 'headsign versus generic direction labels remain one service direction');
+assert.deepEqual(crossSourceAliasRows[0].canonicalDeparturePopulation.monday.map(entry => entry.provider), ['BODS', 'BODS', 'BODS'],
+  'higher-authority BODS departures replace same-endpoint TNDS rows despite feed-specific direction labels');
+assert.deepEqual(crossSourceAliasRows[0].canonicalDeparturePopulation.monday.map(entry => entry.minute), [360, 420, 480],
+  'lower-authority TNDS departures do not interleave with BODS and inflate the selected-stop frequency');
+assert.match(crossSourceAliasRows[0].typicalFrequencyText, /Mon-Sun: 3 journeys\/day/);
+
 assert.match(sameStopShortWorkingRows[0].plannerNotes?.shortWorkings ?? '', /Local School/i, 'excluded frequency evidence remains visible as a planner short-working annotation');
 
 const scopedNonSchoolRows = rows([

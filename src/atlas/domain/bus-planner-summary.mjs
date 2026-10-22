@@ -950,6 +950,7 @@ function serviceDepartureEntries(service, representativeId) {
         authorityProvider: text(item?.authorityProvider || item?.provider || service?.source?.provider || service?.provider || service?.timetableSource || item?.primaryAuthority || primaryProvider(service, item)) || null,
         sourceRecordId: text(item?.sourceRecordId || service?.id) || null,
         routeNumber: text(item?.routeNumber || service?.routeNumber),
+        operator: text(item?.operator || service?.operator),
         direction: text(item?.direction || service?.direction || service?.destination || service?.origin),
         origin: text(item?.origin || service?.origin),
         destination: text(item?.destination || service?.destination),
@@ -1033,7 +1034,12 @@ function semanticDepartureKey(entry) {
 }
 
 function semanticRouteKey(entry) {
-  return [entry.routeNumber, entry.direction, entry.origin, entry.destination, entry.stopPointId].map(normal).join('|');
+  // Feed adapters can label the same directional timetable with a headsign
+  // in one source and a generic "outbound"/"inbound" value in another.
+  // When both endpoints are known, use those as the service identity and
+  // retain direction only as a fallback for endpoint-free evidence.
+  const hasEndpoints = Boolean(text(entry.origin) && text(entry.destination));
+  return [entry.routeNumber, entry.operator, hasEndpoints ? '' : entry.direction, entry.origin, entry.destination, entry.stopPointId].map(normal).join('|');
 }
 
 function deduplicateDepartureEntries(entries) {

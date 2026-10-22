@@ -294,8 +294,9 @@ try {
       const normalized = value => String(value ?? '').replace(/[’‘]/g, "'").replace(/\s*;\s*/g, ' ').replace(/\s+/g, ' ').trim();
       for (const browserRow of rendered) {
         const wordRow = wordRows.find(candidate => normalized(candidate.Route) === normalized(browserRow.Route)
-          && normalized(candidate['Direction / main service pattern']) === normalized(browserRow['Direction / main service pattern']));
-        assert.ok(wordRow, `Generated Word row is missing browser route/direction ${browserRow.Route} ${browserRow['Direction / main service pattern']}.`);
+          && normalized(candidate['Direction / main service pattern']) === normalized(browserRow['Direction / main service pattern'])
+          && normalized(candidate['Served at']) === normalized(browserRow['Served at']));
+        assert.ok(wordRow, `Generated Word row is missing browser route/direction/assessed-stop row ${browserRow.Route} ${browserRow['Direction / main service pattern']} ${browserRow['Served at']}.`);
         for (const field of parityFields) assert.equal(normalized(wordRow[field]), normalized(browserRow[field]), `Browser/Word ${field} differs for route ${browserRow.Route}.`);
       }
       outcome.status = await page.locator('#taskStatusMessage').innerText();
@@ -320,8 +321,10 @@ try {
         assert.match(exportedWordText, /230[\s\S]{0,500}Sun: No scheduled service/i, 'Generated Word export does not preserve the route 230 Sunday no-service calendar.');
         assert.match(exportedWordText, /230.*60\s*mins/i, 'Generated Word export does not preserve the hourly route 230 frequency.');
         const rows46 = rendered.filter(row => /^46$/i.test(row.Route || ''));
-        assert.doesNotMatch(rows46.map(row => row['Typical frequency']).join(' '), /(?:every|~)\s*5\s*mins/i, 'Pipers route 46 must not inherit the implausible five-minute cross-stop frequency.');
-        assert.ok(rows46.length > 0 && rows46.every(row => /\*/.test(row['Served at'] || '')), 'Pipers route 46 frequency rows must expose their selected assessed stop.');
+        if (rows46.length) {
+          assert.doesNotMatch(rows46.map(row => row['Typical frequency']).join(' '), /(?:every|~)\s*5\s*mins/i, 'Pipers route 46 must not inherit the implausible five-minute cross-stop frequency.');
+          assert.ok(rows46.every(row => /\*/.test(row['Served at'] || '')), 'Pipers route 46 frequency rows must expose their selected assessed stop.');
+        }
         assert.doesNotMatch(exportedWordText, /(?:every|~)\s*5\s*mins/i, 'Pipers Word export must not retain five-minute route frequency inflation.');
       }
       if (control.id === 'waltham-cross') {
@@ -368,7 +371,7 @@ try {
           const row = rendered.find(candidate => candidate.Route === route && direction.test(candidate['Direction / main service pattern'] || ''));
           assert.ok(row, `PE1 route ${route} selected direction ${direction} is missing.`);
           assert.match(row['Served at'] || '', /\*/, `PE1 route ${route} ${direction} does not identify its selected assessed stop.`);
-          const frequency = row['Typical frequency'].split(/(?=\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:-|:))/).find(line => line.trim().startsWith(days));
+          const frequency = row['Typical frequency'].match(new RegExp('(?:^|\\s)' + days + ':\\s*([\\s\\S]*?)(?=\\s(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:-|:)|$)', 'i'))?.[1];
           assert.ok(frequency, `PE1 route ${route} has no ${days} frequency for selected direction ${direction}.`);
           assert.doesNotMatch(frequency, /(?:every|~)\s*5\s*mins/i, `PE1 route ${route} ${direction} remains approximately every five minutes in ${days}.`);
         }

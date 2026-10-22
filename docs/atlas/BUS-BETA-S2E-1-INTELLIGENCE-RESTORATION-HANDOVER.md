@@ -1,6 +1,6 @@
 # BUS-BETA-S2E-1 — Intelligence Restoration Handover
 
-Status: **READY FOR MANUAL RE-ACCEPTANCE**. The Technical Director accepted the production correction and exact-final-SHA offline preflight as technically consistent. Manual acceptance of the frozen candidate remains the next review gate; this document does not claim that manual acceptance has already occurred.
+Status: **READY FOR TECHNICAL DIRECTOR REVIEW**. C2 corrected the remaining frozen-candidate calendar defect and passed the exact-SHA hosted regression and normal-product browser/Word audits. Product Owner manual acceptance has not occurred.
 
 ## Accepted production revision and candidate provenance
 
@@ -18,7 +18,7 @@ Status: **READY FOR MANUAL RE-ACCEPTANCE**. The Technical Director accepted the 
 4. **National circular arbitration:** an open TNDS supplementary route 230 pattern could replace/veto a closed BODS principal. Circular arbitration now selects by source authority (TfL, BODS, TNDS) before comparing evidence within the winning authority. Lower-ranked patterns remain auditable and cannot redefine the principal authority’s pattern.
 5. **Review-row safety:** source, route, endpoint and ordered-pattern evidence is consolidated only when it supports one public service. Materially ambiguous corridors remain visible with an unresolved-review decision; there is no arbitrary two-row cap.
 
-No further GROUP, DEST, CIRC, source-arbitration or frequency correction is indicated by the final hosted tests.
+The C2 explicit no-service correction preserves source arbitration on operated days. No further GROUP, DEST, CIRC or frequency redesign is indicated by the final hosted tests.
 
 ## Final control results
 
@@ -32,7 +32,7 @@ The representative family timetable is approximately every 30 minutes Monday–F
 
 ### Pipers Lane — routes 230/231
 
-- **230:** three source records (one BODS, two TNDS) form one planner row. The Centrebus BODS pattern is the circular principal, with a proven same-physical-StopPoint closure and 34 ordered stops. TNDS remains a supplementary open-pattern variant in the audit and no longer vetoes BODS circular presentation. The planner reports approximately hourly service daily, approximately 06:10–20:10.
+- **230:** three source records (one BODS, two TNDS) form one normal planner row. The Centrebus BODS circular is the principal pattern, with the proven same-physical-StopPoint closure and 34 ordered stops. Frozen BODS schedules support 15 departures Monday–Friday, 9 Saturday and zero Sunday at both assessed local stops. The normal browser and Word preserve the approximately hourly weekday/Saturday presentation and explicit Sunday no-service; TNDS does not fill that primary zero-service day. The circular interpretation and BODS Source label remain visible.
 - **231:** two directional planner rows remain for the TNDS-only service: outbound about every 85–130 minutes (approximately 08:04–11:34) and inbound about every 68 minutes (approximately 11:18–18:02). They remain separate because they are opposite directions with distinct stop patterns and operating periods.
 - The actual-candidate assertion verifies route 230 is circular and that the BODS Centrebus pattern is the selected principal.
 
@@ -64,7 +64,7 @@ X4 has exactly two Stagecoach Midlands rows at both PE1 and Queensgate: one inbo
 
 - **GROUP:** exact numeric route-stem selection produces the Waltham route 13 family principal; 13A/13B/13C remain distinct members. Equivalent source records group only with supporting route-family, endpoint/place, ordered-pattern, physical-stop, lineage or timetable evidence. The row counts above two remain because of evidenced branches, directions or unresolved material corridors.
 - **DEST:** endpoint resolution preserves branch destinations and source-supported endpoint choices. Route 13C retains Two Brewers. Route 102’s unresolved materially different corridor evidence remains explicit instead of being assigned a false common destination.
-- **Warning scope:** the four national controls report no failed-source, unavailable-timetable or “needs review” warning. Warnings are limited to evidence actually observed: deterministic empty TfL response/scope and timestamp metadata, TNDS special-day operating metadata, and date-specific timetable changes. These remain visible as source/date caveats and do not erase valid national evidence.
+- **Warning scope:** the four national controls report no failed-source, unavailable-timetable or “needs review” warning. Raw TNDS SpecialDays metadata remains in technical diagnostics and is absent from normal Sources & checks; a concise date-specific caveat is shown only where relevant. Deterministic empty-TfL scope/timestamp and source-date context do not erase valid national evidence.
 - **Sources & checks / technical details:** the actual candidate’s BODS/NaPTAN and TNDS manifests and required shards loaded successfully for each control; no live TfL calls occurred. Source IDs, provider authority, pattern evidence, calendar evidence and unresolved grouping reasons remain available for technical inspection. Pipers 230 technical details identify BODS as the circular principal and TNDS as supplementary.
 - **Browser Source column:** the real-candidate browser audit passed with Source in the final column after Operating period at stop (following the Include selector), as specified by the browser contract.
 - **Word/browser parity:** the five-control real-candidate browser and Word audit passed. The Word output remained aligned with the browser planner rows and did not introduce source-specific duplication or omit the retained route/branch rows.
@@ -87,6 +87,37 @@ X4 has exactly two Stagecoach Midlands rows at both PE1 and Queensgate: one inbo
 - Evidence records `snapshotAcquired=false`, `tndsSecretsInjected=false`, `tndsFtpCalled=false`, `retrievalPerformed=false`, `boddsAcquired=false`, `publicationAttempted=false`, and `deploymentAttempted=false`; `plannerEligible=false`.
 - Passed: full Bus-data, TNDS and workflow-contract suite; deterministic Alpha.15 suite; exact C1B offline selector/evidence checks.
 
+## S2E-1-C2 — final bug-elimination closeout
+
+### Starting point, correction and regression lock
+
+- Verified starting branch HEAD: `d86d4b4ed29073205fc4140f6c86de43b51402ad` on `codex/atlas-bus-beta-s2e-1-c1-manual-corrections`.
+- C2 code/test SHA validated by hosted Run #151: `276e7c5850bd86f5a162e8ea388333c2f656e050`.
+- **Pipers 230 root cause:** planner departure authority was compared by route, calendar profile and a semantic key containing endpoints. The BODS weekly timetable had no Sunday departure entries, so it did not participate in Sunday’s entry-based authority comparison; a different-endpoint TNDS route-230 pattern then supplied Sunday journeys. The normal row consequently claimed Mon–Sun service despite frozen BODS showing no Sunday service.
+- **Production correction:** keep existing per-pattern arbitration for operating days, and treat an explicitly empty local day from a higher-authority source as no-service evidence across endpoint variants. This is provider-ranked and data-driven; it does not hardcode route, operator, frequency or calendar. TNDS-only route 231 remains available. On days with primary departures, distinct source semantics remain eligible; the existing provider-local journey identity collision regression continues to pass.
+- **Legacy audit reconciliation:** the five-control internal diagnostic had treated pre-composition planner counts as final visible row counts, capped PE1 route 102 at two, required X4 calendar text in the wrong fields, and interpreted retained raw SpecialDays metadata as user-facing warning spam. Those predicates were moved to appropriate evidence checks. The actual normal-product browser/Word audit now gates rendered Pipers row/source/circular/calendar behavior, PE1 route 102 distinct labeled presentations without a maximum, X4 regular service plus qualified school short working, concise Sources & checks, and browser/Word parity. Raw source metadata remains available to technical diagnostics.
+- Regression protection added for BODS-primary weekly service with an explicit Sunday zero, same-route TNDS Sunday departures with different endpoints, BODS circular authority and retained TNDS-only 231. Existing distinct-provider semantic and Chingford/TfL regressions also pass.
+
+### Exact hosted evidence — Run #151
+
+- Workflow run: **#151**, ID `39747744400`, result **success**, event `workflow_dispatch`, branch `codex/atlas-bus-beta-s2e-1-c1-manual-corrections`, SHA `276e7c5850bd86f5a162e8ea388333c2f656e050`.
+- Diagnostic artifact: ID `12411893340`, name `atlas-bus-beta-s2e1-normal-runtime-diagnostic-39747744400`, digest `sha256:2500e8021b58b061e26ed5b8ff8560dd8f37f1c93a8be09f9572f806eb1eb2bb`.
+- The complete Bus-data Python suite and `node tests/atlas/run-all.mjs` passed. The deterministic empty-TfL boundary, immutable Run #75 identity/provenance verification, actual-candidate planner diagnostics, five-control candidate browser/Word diagnostic, normal-product browser/generated-DOCX audit, and fixture-backed Chingford route-657 golden regression all passed.
+- Pipers route 230 now passes browser and Word checks for one principal row, Centrebus BODS source, circular note, approximately hourly service, and BODS Sunday no-service. Route 231 remains present.
+- Waltham route/family and false-warning controls passed. PE1/Queensgate acceptance passed without an arbitrary route-102 row cap; X4 remains a regular public service with its Kings School short-working qualification. Chingford TfL routes and route 657 school-day semantics passed.
+- Source column visibility, responsive table overflow checks, technical-details suppression, concise Sources & checks, and browser/Word route parity passed.
+- Candidate provenance remains Run `39430415441`, artifact `12275615359`, digest `sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`, producer SHA `151199cc914c235870f444d26b03c2309edbd035`.
+- Fresh acquisition: **NO**. Run #75 rebuild/modification: **NO**. Publication/deployment: **NO**. Main merge/release: **NO**. Version/build unchanged: `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`.
+- The first hosted attempt at C2 exposed an over-broad initial authority comparison through the pre-existing test requiring distinct cross-provider route semantics to survive. That attempt was not accepted. The correction was narrowed to explicit primary no-service days; the full final Run #151 suite passed.
+
+### Tooling adoption review
+
+- Dependabot: configured.
+- Codecov: deferred until a meaningful coverage baseline exists.
+- OpenSSF Scorecard: deferred to a later release/security milestone.
+- Sentry: deferred pending telemetry/privacy architecture.
+- Renovate: not required alongside Dependabot.
+- **No new GitHub tooling installation milestone.**
 ## Safety, branch state and remaining gate
 
 - Fresh source acquisition: **NO**.
@@ -95,7 +126,7 @@ X4 has exactly two Stagecoach Midlands rows at both PE1 and Queensgate: one inbo
 - Publication/deployment: **NO**.
 - PR/merge/release: **NO**.
 - Local national extraction/preparation: **NO**; the existing `.tmp/` outputs were preserved.
-- At the reviewed production SHA, the isolated worktree was clean and origin matched exactly. The documentation closeout advances branch HEAD; the closeout commit is verified clean and in origin parity after push. Its diff contains this document only; no production, test or workflow file changed.
-- No new code defect was identified by the completed hosted candidate and regression gates. Remaining source caveats are special-day/date-specific timetable metadata and the unresolved corridors expressly listed above; these are surfaced rather than silently merged. The remaining acceptance gate is Product Owner manual re-acceptance of the unchanged Run #75 candidate.
+- The C2 code/test worktree is in the isolated non-OneDrive checkout. The only pre-existing untracked item, `tools/atlas-bus-data/tmpotdqoq2p/`, was preserved and not staged or modified. This handover update is documentation-only and is included in the final exact-SHA hosted validation; the historical dirty OneDrive `main` checkout was not accessed or changed.
+- No new code defect was identified by the completed hosted candidate and regression gates. Remaining source caveats are special-day/date-specific timetable metadata and the unresolved corridors expressly listed above; these are surfaced rather than silently merged. The remaining gate is Technical Director review before any manual re-acceptance authorization. The unchanged Run #75 candidate remains immutable.
 
-**Recommended gate: READY FOR MANUAL RE-ACCEPTANCE.**
+**C2 gate: READY FOR TECHNICAL DIRECTOR REVIEW.**

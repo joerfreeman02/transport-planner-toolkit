@@ -380,8 +380,11 @@ try {
         assert.doesNotMatch(exportedWordText, /5[\s\S]{0,300}Towards Yaxley[\s\S]{0,250}Sun:[^\n]{0,50}(?:every|~)\s*5\s*mins/i, 'PE1 Word route 5 Yaxley Sunday frequency remains inflated.');
         assert.doesNotMatch(exportedWordText, /33[\s\S]{0,300}Towards City Hospital[\s\S]{0,250}(?:every|~)\s*5\s*mins/i, 'PE1 Word route 33 City Hospital frequency remains inflated.');
         for (const route of ['27', '101', '201']) {
-          const routeNotes = renderedServiceNotes.filter(note => new RegExp(`(?:^|\\b)${route}(?:\\b|\\s*[–-])`).test(note)).join(' ');
-          assert.doesNotMatch(routeNotes, new RegExp(`${route}\\s*[–-]\\s*(?:School-day journeys only|Non-school days only)\\.`, 'i'), `PE1 route ${route} must not receive a route-level calendar qualification from a variant.`);
+          const routeGlobalQualification = new RegExp(`Service qualification:\\s*[^.]*\\b${route}\\s*[–-]\\s*(?:School-day journeys only|Non-school days only)`, 'i');
+          assert.doesNotMatch(renderedServiceNotes.join(' '), routeGlobalQualification,
+            `PE1 Browser route ${route} must not receive a whole-route calendar qualification from a variant.`);
+          assert.doesNotMatch(exportedWordText, routeGlobalQualification,
+            `PE1 Word route ${route} must not receive a whole-route calendar qualification from a variant.`);
         }
       }
       if (control.id === 'enfield') {

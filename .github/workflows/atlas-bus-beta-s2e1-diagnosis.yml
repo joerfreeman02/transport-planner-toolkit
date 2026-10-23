@@ -93,13 +93,13 @@ jobs:
         run: |
           mkdir -p candidate-diagnostic
           failed=0
-          for control in waltham pipers pe1 enfield queensgate; do
+          for control in waltham pipers pipers46 pe1 enfield queensgate; do
             if ! node tests/atlas/s2e1-normal-runtime-candidate-diagnostic.mjs restored/candidate-site "candidate-diagnostic/${control}.json" "$control"; then
               failed=1
             fi
           done
           exit "$failed"
-      - name: Run six-control actual-candidate browser and Word audit
+      - name: Run actual-candidate browser and Word audit
         if: always() && hashFiles('restored/candidate-site/atlas/data/bus/manifest.json') != ''
         run: node tests/atlas/s2c3-real-candidate-runtime-audit.mjs restored/candidate-site candidate-diagnostic/real-candidate-browser-word-audit.json
       - name: Run rendered normal-product browser and generated Word acceptance audit

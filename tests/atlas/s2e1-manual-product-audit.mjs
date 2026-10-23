@@ -87,6 +87,7 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') {
 }
 const controls = [
   { id: 'pipers-lane', label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700 },
+  { id: 'pipers-route46', label: 'Pipers Lane route 46 frequency control', latitude: 51.852700, longitude: -0.454343, radius: 1200 },
   { id: 'waltham-cross', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700 },
   { id: 'chingford', label: 'Normanshire Drive, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250 },
   { id: 'pe1', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500 }
@@ -371,6 +372,11 @@ try {
       await page.locator('details > summary').filter({ hasText: 'Sources and checks' }).click();
       const checksText = await page.locator('#plannerChecks').innerText();
       outcome.sourcesAndChecks = checksText;
+      const resultFreshnessText = await page.locator('#resultFreshness').innerText();
+      if (/0 evidence items? need review/i.test(resultFreshnessText)) {
+        assert.doesNotMatch(checksText, /review (?:the affected )?service evidence before formal use|review the incomplete evidence before formal use/i,
+          'A zero-review/complete status must not coexist with a material review-before-use instruction in Points to note.');
+      }
 
 
       assert.doesNotMatch(checksText, /SpecialDaysOperation|TNDS .*special dates require review/i, 'Sources and checks exposes raw per-service special-day warnings.');
@@ -419,11 +425,16 @@ try {
         const browser313 = rendered.filter(row => normalized(row.Route) === '313');
         if (control.id === 'enfield-313-e2e') {
         assert.ok(browser313.length, 'Enfield production Browser did not render the fixture-backed TfL 313 service.');
+        const route313BrowserText = `${browser313.map(row => `${row['Typical frequency']} ${row['Operating period at stop']}`).join(' ')} ${renderedServiceNotes.join(' ')}`;
+        assert.doesNotMatch(route313BrowserText, /Non-school days only\. School-day journeys only\./i, 'Enfield Browser must not generate contradictory route-313 calendar wording.');
+        assert.doesNotMatch(route313BrowserText, /313\s*[–-]\s*(?:School-day journeys only|Non-school days only)\./i, 'Enfield Browser must not classify the whole route-313 principal as school-only or non-school-only.');
         const expectedOperator313 = normalized(enfieldFixtures.get('enfield-313-e2e').activeJourney.operatorName);
         assert.ok(browser313.every(row => normalized(row.Operator) === expectedOperator313), `Enfield route 313 Browser operator differs from the active iBus operator ${expectedOperator313}.`);
         const word313 = wordRows.filter(row => normalized(row.Route) === '313');
         assert.equal(word313.length, browser313.length, 'Enfield route 313 Browser/Word row counts differ.');
         assert.ok(word313.every(row => normalized(row.Operator) === expectedOperator313), `Enfield route 313 Word operator differs from the active iBus operator ${expectedOperator313}.`);
+        assert.doesNotMatch(exportedWordText, /Non-school days only\. School-day journeys only\./i, 'Enfield Word must not generate contradictory route-313 calendar wording.');
+        assert.doesNotMatch(exportedWordText, /313\s*[–-]\s*(?:School-day journeys only|Non-school days only)\./i, 'Enfield Word must not classify the whole route-313 principal as school-only or non-school-only.');
         const browser329 = rendered.filter(row => normalized(row.Route) === '329');
         const word329 = wordRows.filter(row => normalized(row.Route) === '329');
         outcome.enfieldOperatorTrace = {
@@ -435,13 +446,13 @@ try {
         } else {
           const browser329 = rendered.filter(row => normalized(row.Route) === '329');
           const word329 = wordRows.filter(row => normalized(row.Route) === '329');
-          const word329Review = wordRows.filter(row => /Planner review required:.*routes 329/i.test(row.Route || ''));
           const stopId329 = enfieldFixtures.get('enfield-329-e2e').stopId;
-          assert.equal(browser329.length, 0, 'Ambiguous route-329 candidate evidence must not be presented as a resolved service row.');
-          assert.equal(word329.length, 0, 'Ambiguous route-329 candidate evidence must not be presented as a resolved Word service row.');
-          assert.match(checksText, new RegExp(`Route 329 \\u00b7 Stop ${stopId329} \\u00b7 timetable source:.*remained unresolved`, 'i'), 'Browser Sources & checks must identify the exact unresolved route-329 stop request.');
-          assert.ok(word329Review.length, 'Generated Word must contain an explicit route-329 review row rather than silently omit the candidate evidence.');
-          assert.ok(word329Review.every(row => !normalized(row.Operator)), 'Enfield route-329 Word review rows must leave Operator blank while candidate evidence is ambiguous.');
+          assert.ok(browser329.length > 0, 'Valid Enfield route-329 candidate service rows must be preserved despite unresolved operator identity.');
+          assert.equal(word329.length, browser329.length, 'Enfield route-329 Browser and Word service row counts must match.');
+          assert.ok(browser329.every(row => !normalized(row.Operator)), 'Enfield route-329 Browser rows must leave Operator blank while evidence conflicts.');
+          assert.ok(word329.every(row => !normalized(row.Operator)), 'Enfield route-329 Word rows must leave Operator blank while evidence conflicts.');
+          assert.match(checksText, /Route 329[^\n]*operator evidence: Operator evidence is unresolved or conflicting; ATLAS has therefore not stated an operator\./i, 'Browser Sources & checks must expose route 329 operator conflict as a review item.');
+          assert.match(exportedWordText, /Additional operator evidence also requires planner review for routes 329/i, 'Generated Word must count unresolved route-329 operator evidence as a planner review item.');
           const candidateRecordsAtStop = enfieldFixtures.get('enfield-329-e2e').candidateServices.filter(service => service.stopsWithSchedules.includes(stopId329));
           const candidateOperatorsAtStop = [...new Set(candidateRecordsAtStop.map(service => normalized(service.operator)).filter(Boolean))].sort();
           assert.ok(candidateRecordsAtStop.length >= 2, 'Candidate evidence must show the competing BODS route-329 records at the assessed stop.');
@@ -455,12 +466,12 @@ try {
             stopFixtureProvenance: enfieldFixtures.get('enfield-329-e2e').stopFixtureProvenance,
             browserServiceRowCount: browser329.length, wordServiceRowCount: word329.length,
             browserServiceRows: browser329.map(row => ({ route: row.Route, operator: row.Operator })),
-            browserSourcesAndChecksUnresolvedEvidence: checksText.split('\n').find(line => line.includes(stopId329) && /Route 329/.test(line)) ?? null,
-            wordReviewRows: word329Review.map(row => ({ route: row.Route, operator: row.Operator })),
+            browserSourcesAndChecksUnresolvedEvidence: checksText.split('\n').find(line => /Route 329/.test(line) && /operator evidence/i.test(line)) ?? null,
+            wordReviewQualification: exportedWordText.match(/Additional operator evidence[^.]+\./i)?.[0] ?? null,
             candidateRecordsAtStop, candidateOperatorsAtStop,
             iBusServiceLineMappings: serviceLineMappings, iBusProductivePatterns: productivePatterns,
             unresolvedEvidence: `Route 329 · Stop ${stopId329} · timetable source: unresolved`,
-            conclusion: 'No unique approved operator can be selected: Run #75 has distinct BODS records at the stop with conflicting operator values, while the applicable iBus index has no route-329 mapping. Browser Sources & checks preserve the exact unresolved item; generated Word preserves the explicit review row with blank Operator.'
+            conclusion: 'Valid Run #75 route-329 service rows remain visible, but no unique approved operator can be selected: distinct BODS records at the stop conflict and the applicable iBus index has no route-329 mapping. Browser Sources & checks and the Word review qualification both make the unresolved operator status explicit; Operator remains blank.'
           };
         }
       }
@@ -486,12 +497,20 @@ try {
         assert.match(rows230[0]['Typical frequency'], /Sun: No scheduled service/i, 'Pipers rendered BODS-primary route 230 must retain the frozen Sunday no-service calendar.');
         assert.match(exportedWordText, /230[\s\S]{0,500}Sun: No scheduled service/i, 'Generated Word export does not preserve the route 230 Sunday no-service calendar.');
         assert.match(exportedWordText, /230.*60\s*mins/i, 'Generated Word export does not preserve the hourly route 230 frequency.');
-        const rows46 = rendered.filter(row => /^46$/i.test(row.Route || ''));
-        if (rows46.length) {
-          assert.doesNotMatch(rows46.map(row => row['Typical frequency']).join(' '), /(?:every|~)\s*5\s*mins/i, 'Pipers route 46 must not inherit the implausible five-minute cross-stop frequency.');
-          assert.ok(rows46.every(row => /\*/.test(row['Served at'] || '')), 'Pipers route 46 frequency rows must expose their selected assessed stop.');
-        }
         assert.doesNotMatch(exportedWordText, /(?:every|~)\s*5\s*mins/i, 'Pipers Word export must not retain five-minute route frequency inflation.');
+      }
+      if (control.id === 'pipers-route46') {
+        const rows46 = rendered.filter(row => /^46$/i.test(row.Route || ''));
+        const frequency46 = rows46.map(row => row['Typical frequency'] || '').join(' ');
+        assert.ok(rows46.length >= 1, 'Pipers extended-radius control must render route 46 from the frozen candidate.');
+        assert.ok(rows46.every(row => /\*/.test(row['Served at'] || '')), 'Pipers route 46 frequency must be tied to the selected assessed stop.');
+        assert.doesNotMatch(frequency46, /(?:every|~)\s*(?:5|15)\s*[–-]\s*60\s*mins|(?:every|~)\s*5\s*mins/i, 'Pipers route 46 must not combine duplicate/cross-stop headways into a falsely frequent 5–60 or 15–60 minute range.');
+        assert.match(frequency46, /(?:every\s*~?\s*(?:55|56|57|58|59|60)|~\s*(?:55|56|57|58|59|60))\s*mins/i, 'Pipers route 46 selected-stop population should present the candidate-supported broadly hourly service.');
+        const word46 = wordRows.filter(row => normalized(row.Route) === '46');
+        assert.ok(word46.length, 'Pipers route 46 must remain in generated Word output.');
+        assert.ok(word46.every(row => /\*/.test(row['Served at'] || '')), 'Pipers Word route 46 frequency must identify its selected assessed stop.');
+        assert.doesNotMatch(word46.map(row => row['Typical frequency']).join(' '), /(?:every|~)\s*(?:5|15)\s*[–-]\s*60\s*mins|(?:every|~)\s*5\s*mins/i, 'Pipers Word route 46 must not retain duplicate/cross-stop frequency inflation.');
+        assert.match(word46.map(row => row['Typical frequency']).join(' '), /(?:every\s*~?\s*(?:55|56|57|58|59|60)|~\s*(?:55|56|57|58|59|60))\s*mins/i, 'Pipers Word route 46 should preserve the broadly hourly selected-stop frequency.');
       }
       if (control.id === 'waltham-cross') {
         assert.doesNotMatch(`${checksText} ${exportedWordText}`, /Planner review required for:\s*(?:217|279|317|327|491|N279)|timetable data unavailable\/incomplete for 1 assessed stop/i, 'Waltham output contains a known false review/incomplete warning.');
@@ -513,6 +532,16 @@ try {
         assert.match(route657['Operating period at stop'], /07:56|16:22/, 'Chingford route 657 fixture golden timetable time changed.');
       }
       if (control.id === 'pe1') {
+        const rows202 = rendered.filter(row => row.Route === '202');
+        const word202 = wordRows.filter(row => row.Route === '202');
+        const route202Labels = rows202.map(row => `${row['Direction / main service pattern']} ${row['Principal locations']}`);
+        assert.equal(rows202.length, 3, `PE1 route 202 must preserve its three evidence-backed patterns; received ${rows202.length}.`);
+        assert.equal(word202.length, 3, `PE1 Word route 202 must preserve its three Browser patterns; received ${word202.length}.`);
+        assert.ok(route202Labels.some(value => /Peterborough Bus Station/i.test(value)), 'PE1 route 202 Peterborough Bus Station principal pattern is missing.');
+        assert.ok(route202Labels.some(value => /Austerby|Helpston/i.test(value)), 'PE1 route 202 Austerby/Helpston pattern is missing.');
+        assert.ok(route202Labels.some(value => /Bourne|Bainton/i.test(value)), 'PE1 route 202 separate Bourne/Bainton pattern is missing.');
+        assert.doesNotMatch(renderedServiceNotes.join(' '), /Additional services: Some route 202 journeys also serve Bourne Bus Station\./i, 'PE1 Browser must not repeat the Bourne destination as an additional-services note.');
+        assert.doesNotMatch(exportedWordText, /Additional services: Some route 202 journeys also serve Bourne Bus Station\./i, 'PE1 Word must not repeat the Bourne destination as an additional-services note.');
         const rows102 = rendered.filter(row => row.Route === '102');
         const keys102 = rows102.map(row => [row['Direction / main service pattern'], row['Principal locations'], row['Typical frequency']].join('|').toLowerCase().replace(/\s+/g, ' ').trim());
         assert.ok(rows102.length > 0 && new Set(keys102).size === keys102.length, `PE1 route 102 has no rendered rows or duplicate presentations (${rows102.length} total, ${new Set(keys102).size} distinct).`);

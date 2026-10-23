@@ -173,7 +173,7 @@ export function createReviewItem({ code, severity = 'warning', actionability = '
   return Object.freeze({ id: id || String(code) + ':unassigned', code, category: taxonomy.category, severity, actionability, route: route ? String(route) : null, stop: stop ? String(stop) : null, source, message: cleanMessage });
 }
 
-function buildReviewItems({ selectedStops = [], services = [], serviceSummaries = [], servicesResult = null, prepared = null, stopCoverageComplete = true, routingComplete = true } = {}) {
+function buildReviewItems({ selectedStops = [], services = [], serviceSummaries = [], plannerServiceSummaries = [], servicesResult = null, warnings = [], prepared = null, stopCoverageComplete = true, routingComplete = true } = {}) {
   const items = new Map();
   const add = ({ code, severity = 'warning', actionability = 'review', route = null, stop = null, source = 'timetable source', message, factKey = null }) => {
     const item = createReviewItem({ code, severity, actionability, route, stop, source, message, id: code + ':' + items.size });
@@ -190,6 +190,16 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     const parts = requestParts(identity);
     if (tflRequestIdentities.has(String(identity)) && resolvedTfLRoutes.has(String(parts.route ?? ''))) continue;
     add({ code: 'unresolved-timetable-request', route: parts.route, stop: parts.stop, source: 'timetable source', message: 'This route/stop timetable request remained unresolved; inspect the returned source evidence before formal use.' });
+  }
+  for (const row of plannerServiceSummaries ?? []) if (row.operatorEvidenceConflict) {
+    add({
+      code: 'unresolved-operator-evidence',
+      route: row.routeNumber,
+      stop: row.frequencyBasisStopId,
+      source: 'operator evidence',
+      factKey: (row.operatorRawNames ?? []).map(String).sort().join('|'),
+      message: 'Operator evidence is unresolved or conflicting; ATLAS has therefore not stated an operator.'
+    });
   }
   for (const failure of provenance.failedShardDiagnostics ?? []) {
     const affected = (failure.stopIds ?? []).map(String);
@@ -229,6 +239,11 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
   if (!stopCoverageComplete) add({ code: 'stop-source-coverage', stop: selectedStops[0]?.id, source: 'NaPTAN', message: 'Stop-source coverage was incomplete; the returned stop set does not establish an authoritative zero-stop conclusion.' });
   if (!routingComplete) for (const stop of selectedStops.filter(item => item.walking?.status !== 'routed' || item.cycling?.status !== 'routed')) add({ code: 'access-routing', stop: stop.id, source: 'OSRM', message: 'Walking or cycling access could not be routed for this stop; review access distances before formal use.' });
   if (servicesResult && !servicesResult.ok && !Number(provenance.unprocessedRequests || 0) && !Number(provenance.failedRequests || 0)) add({ code: 'timetable-source-unavailable', stop: selectedStops[0]?.id, source: provenance.source || 'timetable source', message: 'The timetable source did not return a usable result for this assessment; review the source response before formal use.' });
+  for (const warning of warnings ?? []) {
+    const message = String(warning ?? '').trim();
+    if (!message || !/(?:review .*before formal use|review the affected service evidence|evidence remains unresolved|operator evidence.*(?:unresolved|conflicting))/i.test(message)) continue;
+    add({ code: 'material-assessment-warning', source: 'assessment evidence', message });
+  }
   if (!serviceSummaries.length && servicesResult?.ok) add({ code: 'no-planner-summary', stop: selectedStops[0]?.id, source: 'timetable source', message: 'No planner-facing timetable row was established from the selected-stop evidence.' });
   return [...items.values()];
 }
@@ -431,7 +446,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     ].map(String)).size;
     const timetablesComplete = Boolean(servicesResult?.ok) && servicesResult?.provenance?.sourceCompleteness !== 'PARTIAL' && !Number(servicesResult?.provenance?.failedShardCount || 0) && nationalEvidenceComplete && Number(servicesResult?.provenance?.unprocessedRequests || 0) === 0 && Math.max(Number(servicesResult?.provenance?.unresolvedRequests || 0), unresolvedIdentityCount) === 0;
     const status = stopCoverageComplete && timetablesComplete && serviceSummaries.length && routingComplete ? 'complete' : 'partial';
-    const reviewItems = buildReviewItems({ selectedStops, services, serviceSummaries: resolvedServiceSummaries, servicesResult, prepared, stopCoverageComplete, routingComplete });
+    const reviewItems = buildReviewItems({ selectedStops, services, serviceSummaries: resolvedServiceSummaries, plannerServiceSummaries, servicesResult, warnings, prepared, stopCoverageComplete, routingComplete });
     const selectedIds = new Set(selectedStops.map(stopKey));
     const routes = new Set(enrichedDiscoveredStops.flatMap(stop => stop.routes ?? []));
     onProgress({ phase: status === 'complete' ? 'complete' : 'partial', detail: status === 'complete' ? 'Complete' : partialDetail(reviewItems) });

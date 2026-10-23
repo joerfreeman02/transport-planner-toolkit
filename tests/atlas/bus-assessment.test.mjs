@@ -87,6 +87,33 @@ test('BODS survives unresolved supplementary TNDS without a complete assessment'
   assert.ok(result.reviewItems.length > 0, 'supplementary uncertainty remains visible for review');
 });
 
+test('conflicting route operator evidence preserves service rows and creates a visible review item', async () => {
+  const route329Services = [
+    { ...service, id: 'bods-329-north', routeNumber: '329', operator: 'Arriva London North', timetableSource: 'BODS', source: { provider: 'BODS' } },
+    { ...service, id: 'bods-329-arriva', routeNumber: '329', operator: 'Arriva London', timetableSource: 'BODS', source: { provider: 'BODS' } }
+  ];
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [{ ...stop, routes: ['329'] }], evidence: [], warnings: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: route329Services, warnings: [], provenance: { source: 'BODS' } }) },
+    accessRouting: { matrix: async (_site, stops) => ({ ok: true, routes: stops.map(() => ({ status: 'routed', distanceMetres: 100, durationSeconds: 60 })), warnings: [], provenance: { source: 'OSRM' } }) }
+  });
+  const result = await assessment.assess({});
+  const route329Rows = result.plannerServiceSummaries.filter(row => row.routeNumber === '329');
+  assert.ok(route329Rows.length > 0, 'valid route-329 rows survive operator ambiguity');
+  assert.ok(route329Rows.every(row => row.operator === '' && row.operatorEvidenceConflict), 'no operator is stated when evidence conflicts');
+  assert.ok(result.reviewItems.some(item => item.code === 'unresolved-operator-evidence' && item.route === '329'), 'unresolved route-329 operator is counted as a planner review item');
+});
+
+test('material review-before-use warning cannot coexist with a zero review count', async () => {
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], evidence: [], warnings: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [service], warnings: ['Review the affected service evidence before formal use.'], provenance: { source: 'BODS' } }) },
+    accessRouting: { matrix: async (_site, stops) => ({ ok: true, routes: stops.map(() => ({ status: 'routed', distanceMetres: 100, durationSeconds: 60 })), warnings: [], provenance: { source: 'OSRM' } }) }
+  });
+  const result = await assessment.assess({});
+  assert.ok(result.reviewItems.some(item => item.code === 'material-assessment-warning'), 'material review warning contributes to the displayed evidence review count');
+});
+
 test('all assessment review paths carry deterministic taxonomy categories', async () => {
   const normalAssessment = createBusAssessment({
     stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], evidence: [], warnings: [], provenance: {} }) },

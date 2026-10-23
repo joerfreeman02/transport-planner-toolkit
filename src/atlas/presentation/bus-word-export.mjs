@@ -48,6 +48,7 @@ function reviewQualification(reviewItems) {
   } else if (timetable) sentences.push('timetable/source evidence requires review before formal use.');
   const categoryLabels = {
     'service-source': 'service-source evidence',
+    operator: 'operator evidence',
     'planner-route-identity': 'planner route/destination identity evidence',
     'stop-source-coverage': 'stop-source coverage evidence',
     'access-routing': 'access-routing evidence',

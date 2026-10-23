@@ -14,7 +14,7 @@ import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
 import { createDeterministicEmptyTflFetch } from './helpers/s2e1-deterministic-empty-tfl.mjs';
 
 const [candidateArg, reportArg, controlId = 'waltham'] = process.argv.slice(2);
-if (!candidateArg || !reportArg) throw new Error('Usage: node tests/atlas/s2e1-normal-runtime-candidate-diagnostic.mjs <immutable-candidate-root> <report.json|-> [waltham|pipers|pe1|queensgate]');
+if (!candidateArg || !reportArg) throw new Error('Usage: node tests/atlas/s2e1-normal-runtime-candidate-diagnostic.mjs <immutable-candidate-root> <report.json|-> [waltham|pipers|pipers46|pe1|enfield|queensgate]');
 const candidateRoot = path.resolve(candidateArg);
 const reportPath = reportArg === '-' ? null : path.resolve(reportArg);
 const busRoot = path.join(candidateRoot, 'atlas', 'data', 'bus');
@@ -24,6 +24,7 @@ const tflRequests = [];
 const controls = {
   waltham: { label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700, focusRoutes: ['13', '13A', '13B', '13C', '14', '15', '15A', '16', '16C', '25C', '66', '217', '242', '251', '279', '310', '317', '327', '491', 'A1', 'N279'] },
   pipers: { label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700, focusRoutes: ['46', '230', '231', 'C'] },
+  pipers46: { label: 'Pipers Lane route 46 selected-stop frequency control', latitude: 51.852700, longitude: -0.454343, radius: 1200, focusRoutes: ['46'] },
   pe1: { label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '6', '23', '24', '25', '27', '33', '37', '60', '61', '62', '63', '101', '102', '201', '202', '415', '904', '4P', 'A', 'B', 'C'] },
   enfield: { label: 'Enfield Town', latitude: 51.6522, longitude: -0.0809, radius: 500, focusRoutes: ['121', '191', '313', '329', '629', 'W8'] },
   queensgate: { label: 'Queensgate Bus Station', latitude: 52.5701, longitude: -0.2498, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '6', '23', '24', '25', '27', '33', '60', '61', '62', '63', '202', '415', '904', '5A', 'A', 'B', 'C'] }
@@ -283,6 +284,22 @@ if (controlId === 'pipers') {
   const route46 = plannerRowsFor('46');
   if (route46.some(row => (row.typicalFrequencyLines ?? []).join(' ').match(/(?:every|~)\s*5\s*mins/i))) {
     throw new Error('Actual Run #75 Pipers route 46 retains the implausible five-minute cross-stop frequency.');
+  }
+}
+if (controlId === 'pipers46') {
+  const route46 = plannerRowsFor('46');
+  if (!route46.length) throw new Error('Actual Run #75 extended-radius Pipers control did not produce a route-46 planner row.');
+  for (const row of route46) {
+    const entries = Object.values(row.canonicalDeparturePopulationByDay ?? {}).flat();
+    if (!entries.length) throw new Error('Pipers route 46 has no unique selected-stop departure population.');
+    const sorted = entries.map(entry => Number(entry.minute)).sort((left, right) => left - right);
+    const gaps = sorted.slice(1).map((minute, index) => minute - sorted[index]).filter(gap => gap > 0);
+    if (!gaps.length || gaps.some(gap => gap < 45)) {
+      throw new Error(`Actual Run #75 Pipers route 46 contains an artificial short selected-stop headway: ${gaps.join(', ')}`);
+    }
+    if (!(row.typicalFrequencyLines ?? []).join(' ').match(/(?:every\s*~?\s*(?:55|56|57|58|59|60)|~\s*(?:55|56|57|58|59|60))\s*mins/i)) {
+      throw new Error(`Actual Run #75 Pipers route 46 is not broadly hourly at its selected stop: ${(row.typicalFrequencyLines ?? []).join(' | ')}`);
+    }
   }
 }
 if (controlId === 'pe1' || controlId === 'queensgate') {

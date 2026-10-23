@@ -32,6 +32,21 @@ assert.deepEqual(word[0].rows.map(row => row[0]), ['1', '2', '3'], 'Word stop re
 assert.match(word[1].rows[0].text, /^\* marks the assessed stop/);
 assert.ok(word[1].rows.findIndex(row => Array.isArray(row)) > 0, 'frequency-basis explanation precedes the first service row');
 
+const qualificationWord = buildBusWordTables({
+  ok: true,
+  stops: [],
+  plannerServiceSummaries: [{
+    routeNumber: '29', operator: 'Example Operator', directionPatternText: 'Towards Example', servedAtText: 'Civic Centre [2]*',
+    principalLocationsText: 'Example Town', typicalFrequencyText: 'Mon–Fri: Every 20 minutes', typicalFrequencyLines: ['Mon–Fri: Every 20 minutes'],
+    operatingPeriodLines: ['Mon–Fri: Approx. 06:00–22:00'], stopIds: ['490010001A'], publicRouteFamilyKey: '29',
+    plannerNotes: { serviceQualification: 'School-day journeys only' }
+  }],
+  serviceSummaries: [],
+  reviewItems: [{ code: 'unresolved-timetable-request', route: '29', message: 'Review timetable evidence.' }]
+})[1].rows;
+assert.equal(qualificationWord.find(row => row.semantic === 'qualification')?.kind, 'section', 'service qualifications use the restrained highlighted Word row style');
+assert.equal(qualificationWord.find(row => row.semantic === 'review')?.kind, 'section', 'material review notes use the restrained highlighted Word row style');
+
 const html = fs.readFileSync(new URL('../../atlas/index.html', import.meta.url), 'utf8');
 const app = fs.readFileSync(new URL('../../atlas/assets/js/app.mjs', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../../atlas/assets/css/atlas-shell.css', import.meta.url), 'utf8');

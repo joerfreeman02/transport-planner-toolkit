@@ -115,7 +115,9 @@ assert.match(workflow, /rendered normal-product browser and generated Word accep
 assert.match(normalRuntime, /Actual Run #75 Waltham runtime did not present routes 13\/13A\/13B\/13C under principal route 13/);
 assert.match(normalRuntime, /Actual Run #75 Pipers route 230 planner evidence or frequency is missing/);
 assert.match(normalRuntime, /Actual Run #75 extended-radius Pipers control did not produce a route-46 planner row/);
-assert.match(normalRuntime, /Pipers route 46 contains an artificial short selected-stop headway/);
+assert.match(normalRuntime, /const populations = row\.selectedDeparturePopulationByDay/);
+assert.match(normalRuntime, /Pipers route 46 \$\{day\} frequency population includes a different StopPoint/);
+assert.match(normalRuntime, /gaps\.some\(gap => gap < 45\)/);
 assert.match(normalRuntime, /Pipers route 46 is not broadly hourly at its selected stop/);
 assert.doesNotMatch(normalRuntime, /Actual Run #75 Waltham route 217 retains the reported late-night-only operating span/);
 assert.match(workflow, /failed=0[\s\S]*for control in waltham pipers pipers46 pe1 enfield queensgate[\s\S]*if ! node tests\/atlas\/s2e1-normal-runtime-candidate-diagnostic\.mjs[\s\S]*exit "\$failed"/);
@@ -142,6 +144,7 @@ assert.match(productAudit, /Waltham route 217 must retain the fixture-backed ful
 assert.match(manualBrowserAudit, /Waltham route 217 must retain the fixture-backed full TfL span at the selected stop/);
 assert.match(productAudit, /rows46\.length >= 1/);
 assert.match(productAudit, /rows46\.every\(row => \/\\\*\/\.test\(row\['Served at'\]/);
+assert.match(productAudit, /page\.locator\('#radius'\)\.fill\(String\(control\.radius\)\)/);
 assert.match(productAudit, /Pipers route 46 selected-stop population should present the candidate-supported broadly hourly service/);
 assert.match(productAudit, /Pipers Word route 46 should preserve the broadly hourly selected-stop frequency/);
 assert.doesNotMatch(productAudit, /accepted C2 Run #151 frequency baseline/);

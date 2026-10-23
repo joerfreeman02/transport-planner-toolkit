@@ -119,7 +119,7 @@ const route46Bods = {
 const route46Tnds = {
   ...plannerBase, id: 'tnds-route46-supplement', routeNumber: '46', operator: 'Centrebus South',
   direction: 'outbound', directionFamily: 'outbound', origin: 'Park Square', destination: 'Hemel Hempstead',
-  provider: 'TNDS', timetableSource: 'TNDS', source: { provider: 'TNDS' }, routePatternStopIds: ['PARK', 'MID-A', 'PIPERS-A', 'MID-B', 'HEMEL'],
+  provider: 'TNDS', timetableSource: 'TNDS', calendarProfileId: 'ordinary', source: { provider: 'TNDS', calendarProfileId: 'ordinary' }, routePatternStopIds: ['PARK', 'MID-A', 'PIPERS-A', 'MID-B', 'HEMEL'],
   departureEvidenceByDay: departureEvidence([360, 363, 420, 435, 480, 540, 600, 660, 720, 780, 840, 900], 'TNDS')
 };
 const route46Composition = buildPlannerBusServiceSummaries([route46Bods, route46Tnds], [stop]);
@@ -127,6 +127,25 @@ const route46Principal = route46Composition.find(row => row.routeNumber === '46'
 assert.ok(route46Principal, 'the route-46 public service remains available');
 assert.deepEqual(route46Principal.canonicalDeparturePopulation.monday.map(entry => entry.minute), hourlyMinutes, 'an exact same-direction, operator-compatible, shared-stop BODS principal supplies the route-46 frequency population instead of TNDS duplicate/variant headways');
 assert.match(route46Principal.typicalFrequencyText, /Every ~60 mins/i);
+const sparsePrimaryInbound = {
+  ...plannerBase, id: 'bods-route46-inbound-sparse-endpoints', routeNumber: '46', operator: 'Centrebus',
+  direction: 'Park Square (Stop P1)', directionFamily: 'gtfs:1', origin: 'Bridge Street', destination: 'Park Square',
+  provider: 'BODS', timetableSource: 'BODS', source: { provider: 'BODS', orderedPatternEndpoints: ['BRIDGE', 'PARK'] },
+  routePatternStopIds: undefined, orderedPatternEndpoints: ['BRIDGE', 'PARK'],
+  departureEvidenceByDay: departureEvidence(hourlyMinutes, 'BODS')
+};
+const detailedSupplementaryInbound = {
+  ...plannerBase, id: 'tnds-route46-inbound-detailed', routeNumber: '46', operator: 'Centrebus South',
+  direction: 'inbound', directionFamily: 'inbound', origin: 'Bridge Street', destination: 'Luton, Park Square',
+  provider: 'TNDS', timetableSource: 'TNDS', calendarProfileId: 'ordinary', source: { provider: 'TNDS', calendarProfileId: 'ordinary' },
+  routePatternStopIds: ['BRIDGE', 'MID-1', 'PIPERS-A', 'MID-2', 'PARK'],
+  departureEvidenceByDay: departureEvidence([360, 363, 420, 435, 480, 540, 600, 660, 720, 780, 840, 900], 'TNDS')
+};
+const sparseEndpointArbitration = buildPlannerBusServiceSummaries([sparsePrimaryInbound, detailedSupplementaryInbound], [stop]);
+const sparseInbound = sparseEndpointArbitration.find(row => row.routeNumber === '46');
+assert.ok(sparseInbound, 'the inbound route-46 service remains available when the primary carries endpoint-only pattern metadata');
+assert.deepEqual(sparseInbound.canonicalDeparturePopulation.monday.map(entry => entry.minute), hourlyMinutes, 'endpoint-only BODS metadata cannot be misclassified as a short working; its ordinary primary departures arbitrate against detailed TNDS supplementation');
+assert.doesNotMatch(sparseInbound.typicalFrequencyText, /5\s*[–-]\s*60|15\s*[–-]\s*60/i, 'sparse endpoint metadata cannot create artificial route-46 short headways');
 const ambiguousOperatorServiceRows = buildPlannerBusServiceSummaries([
   { ...plannerBase, id: 'bods-329-arriva-north', routeNumber: '329', operator: 'Arriva London North', provider: 'BODS', timetableSource: 'BODS', source: { provider: 'BODS' }, sourceRecordIds: ['bods-329-north'], departureEvidenceByDay: departureEvidence([360, 420], 'BODS') },
   { ...plannerBase, id: 'bods-329-arriva', routeNumber: '329', operator: 'Arriva London', provider: 'BODS', timetableSource: 'BODS', source: { provider: 'BODS' }, sourceRecordIds: ['bods-329-arriva'], departureEvidenceByDay: departureEvidence([390, 450], 'BODS') }

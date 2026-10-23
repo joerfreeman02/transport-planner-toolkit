@@ -264,7 +264,19 @@ function orderedLocalCorridorEvidence(first, second) {
 }
 
 function strictSubsequenceServices(shorterService, longerService) {
-  const shorter = pattern(shorterService), longer = pattern(longerService);
+  // Ordered endpoint pairs are sufficient to describe corridor direction,
+  // but they are not a complete stop sequence. Treating such a pair as a
+  // short pattern falsely classifies a sparse higher-authority timetable as
+  // a short working when a supplementary feed carries the full route stops.
+  const completePattern = service => {
+    const explicitIds = unique(service?.routePatternStopIds ?? []);
+    if (explicitIds.length) return explicitIds;
+    const stops = unique((service?.routePatternStops ?? []).map(stop => typeof stop === 'string' ? stop : stop?.id || stop?.commonName || stop?.name));
+    if (stops.length > 2) return stops;
+    const names = unique(service?.routePatternStopNames ?? []);
+    return names.length > 2 ? names : [];
+  };
+  const shorter = completePattern(shorterService), longer = completePattern(longerService);
   if (!shorter.length || shorter.length >= longer.length) return false;
   let cursor = 0;
   for (let index = 0; index < shorter.length; index += 1) {

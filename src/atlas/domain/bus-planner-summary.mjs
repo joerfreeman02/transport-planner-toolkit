@@ -92,6 +92,14 @@ function calendarProfileFromService(service) {
   return profiles.length === 1 ? profiles[0] : profiles.length > 1 ? UNKNOWN_CALENDAR_PROFILE : null;
 }
 
+function calendarProfileAuthorityKey(service) {
+  // An unqualified all-days source participates in the ordinary profile.
+  // Keep it aligned with profileEligibleServices and the no-service authority
+  // scope so a higher-authority unlabelled timetable can arbitrate an
+  // explicitly ordinary supplementary copy.
+  return calendarProfileFromService(service) || 'ordinary';
+}
+
 function calendarProfileFromEntry(service, item) {
   const explicit = text(item?.calendarProfileId).toLowerCase();
   if (explicit) return explicit;
@@ -1111,7 +1119,7 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
   const populationRecords = principalEligible.length ? principalEligible : eligible.length ? eligible : (main ? [main] : []);
   const authoritativeRecords = populationRecords.filter(service => !populationRecords.some(candidate => candidate !== service
     && text(candidate?.routeNumber) === text(service?.routeNumber)
-    && calendarProfileFromService(candidate) === calendarProfileFromService(service)
+    && calendarProfileAuthorityKey(candidate) === calendarProfileAuthorityKey(service)
     && plannerEvidenceSourceRank(candidate) > plannerEvidenceSourceRank(service)
     && operatorFamilyCompatible(candidate, service)
     && !reverseEndpointRelationship(candidate, service)
@@ -1173,6 +1181,9 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
 }
 
 function endpointDirectionCompatible(first, second) {
+  const firstEndpoint = endpointIdentity(first, 'destination');
+  const secondEndpoint = endpointIdentity(second, 'destination');
+  if (firstEndpoint && secondEndpoint && firstEndpoint === secondEndpoint) return true;
   const firstDestination = normal(plannerDestination(first));
   const secondDestination = normal(plannerDestination(second));
   if (firstDestination && secondDestination
@@ -1202,7 +1213,7 @@ function higherAuthorityEquivalentPatterns(component, relatedServices, represent
     && hasTimetableEvidenceAt(candidate, representativeId)
     && component.some(service => plannerEvidenceSourceRank(candidate) > plannerEvidenceSourceRank(service)
       && operatorFamilyCompatible(candidate, service)
-      && calendarProfileFromService(candidate) === calendarProfileFromService(service)
+      && calendarProfileAuthorityKey(candidate) === calendarProfileAuthorityKey(service)
       && !reverseEndpointRelationship(candidate, service)
         && endpointDirectionCompatible(candidate, service)));
   if (!peers.length) return [];

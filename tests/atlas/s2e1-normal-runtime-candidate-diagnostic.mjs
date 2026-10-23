@@ -290,12 +290,20 @@ if (controlId === 'pipers46') {
   const route46 = plannerRowsFor('46');
   if (!route46.length) throw new Error('Actual Run #75 extended-radius Pipers control did not produce a route-46 planner row.');
   for (const row of route46) {
-    const entries = Object.values(row.canonicalDeparturePopulationByDay ?? {}).flat();
-    if (!entries.length) throw new Error('Pipers route 46 has no unique selected-stop departure population.');
-    const sorted = entries.map(entry => Number(entry.minute)).sort((left, right) => left - right);
-    const gaps = sorted.slice(1).map((minute, index) => minute - sorted[index]).filter(gap => gap > 0);
-    if (!gaps.length || gaps.some(gap => gap < 45)) {
-      throw new Error(`Actual Run #75 Pipers route 46 contains an artificial short selected-stop headway: ${gaps.join(', ')}`);
+    const populations = row.selectedDeparturePopulationByDay ?? {};
+    if (!row.frequencyBasisStopId || row.servedAtStopId !== row.frequencyBasisStopId
+      || !Object.values(populations).some(entries => entries.length)) {
+      throw new Error('Pipers route 46 frequency does not use its starred assessed-stop departure population.');
+    }
+    for (const [day, entries] of Object.entries(populations)) {
+      if (entries.some(entry => entry.stopPointId && entry.stopPointId !== row.frequencyBasisStopId)) {
+        throw new Error(`Pipers route 46 ${day} frequency population includes a different StopPoint from its starred stop ${row.frequencyBasisStopId}.`);
+      }
+      const sorted = [...new Set(entries.map(entry => Number(entry.minute)))].sort((left, right) => left - right);
+      const gaps = sorted.slice(1).map((minute, index) => minute - sorted[index]).filter(gap => gap > 0);
+      if (gaps.some(gap => gap < 45)) {
+        throw new Error(`Actual Run #75 Pipers route 46 has an artificial short selected-stop headway on ${day}: ${gaps.join(', ')}`);
+      }
     }
     if (!(row.typicalFrequencyLines ?? []).join(' ').match(/(?:every\s*~?\s*(?:55|56|57|58|59|60)|~\s*(?:55|56|57|58|59|60))\s*mins/i)) {
       throw new Error(`Actual Run #75 Pipers route 46 is not broadly hourly at its selected stop: ${(row.typicalFrequencyLines ?? []).join(' | ')}`);

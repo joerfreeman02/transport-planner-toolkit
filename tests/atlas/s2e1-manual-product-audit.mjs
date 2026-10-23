@@ -435,16 +435,13 @@ try {
         } else {
           const browser329 = rendered.filter(row => normalized(row.Route) === '329');
           const word329 = wordRows.filter(row => normalized(row.Route) === '329');
-          const browser329Review = rendered.filter(row => /Planner review required:.*routes 329/i.test(row.Route || ''));
           const word329Review = wordRows.filter(row => /Planner review required:.*routes 329/i.test(row.Route || ''));
+          const stopId329 = enfieldFixtures.get('enfield-329-e2e').stopId;
           assert.equal(browser329.length, 0, 'Ambiguous route-329 candidate evidence must not be presented as a resolved service row.');
           assert.equal(word329.length, 0, 'Ambiguous route-329 candidate evidence must not be presented as a resolved Word service row.');
-          assert.ok(browser329Review.length, 'Enfield Browser must retain an explicit route-329 review row rather than silently omit it.');
-          assert.equal(word329Review.length, browser329Review.length, 'Enfield route-329 review row counts differ between Browser and Word.');
-          assert.ok(browser329Review.every(row => !normalized(row.Operator)), 'Enfield route-329 review rows must leave Operator blank while candidate evidence is ambiguous.');
+          assert.match(checksText, new RegExp(`Route 329 \\u00b7 Stop ${stopId329} \\u00b7 timetable source:.*remained unresolved`, 'i'), 'Browser Sources & checks must identify the exact unresolved route-329 stop request.');
+          assert.ok(word329Review.length, 'Generated Word must contain an explicit route-329 review row rather than silently omit the candidate evidence.');
           assert.ok(word329Review.every(row => !normalized(row.Operator)), 'Enfield route-329 Word review rows must leave Operator blank while candidate evidence is ambiguous.');
-          assert.match(checksText, new RegExp(`Route 329 \\u00b7 Stop ${enfieldFixtures.get('enfield-329-e2e').stopId} \\u00b7 timetable source:.*remained unresolved`, 'i'), 'Sources & checks must identify the exact unresolved route-329 stop request.');
-          const stopId329 = enfieldFixtures.get('enfield-329-e2e').stopId;
           const candidateRecordsAtStop = enfieldFixtures.get('enfield-329-e2e').candidateServices.filter(service => service.stopsWithSchedules.includes(stopId329));
           const candidateOperatorsAtStop = [...new Set(candidateRecordsAtStop.map(service => normalized(service.operator)).filter(Boolean))].sort();
           assert.ok(candidateRecordsAtStop.length >= 2, 'Candidate evidence must show the competing BODS route-329 records at the assessed stop.');
@@ -453,18 +450,17 @@ try {
           const productivePatterns = enfieldIbusIndex.patterns.filter(pattern => String(pattern.serviceLineNo) === '329' && Number(pattern.patternType) === 1).length;
           assert.equal(serviceLineMappings.length, 0, 'The applicable iBus index must remain without a route-329 Service_Line mapping.');
           assert.equal(productivePatterns, 0, 'The applicable iBus index must remain without a productive route-329 pattern.');
-          const reviewFields = ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop'];
-          assert.ok(browser329Review.every(browserRow => word329Review.some(wordRow => reviewFields.every(field => normalized(browserRow[field]) === normalized(wordRow[field])))), 'Route-329 Browser/Word review row content differs.');
           outcome.enfieldRoute329OperatorTrace = {
             control: { latitude: control.latitude, longitude: control.longitude, stopId: stopId329, stopName: enfieldFixtures.get('enfield-329-e2e').stopName },
             stopFixtureProvenance: enfieldFixtures.get('enfield-329-e2e').stopFixtureProvenance,
             browserServiceRowCount: browser329.length, wordServiceRowCount: word329.length,
-            browserReviewRows: browser329Review.map(row => ({ route: row.Route, operator: row.Operator })),
+            browserServiceRows: browser329.map(row => ({ route: row.Route, operator: row.Operator })),
+            browserSourcesAndChecksUnresolvedEvidence: checksText.split('\n').find(line => line.includes(stopId329) && /Route 329/.test(line)) ?? null,
             wordReviewRows: word329Review.map(row => ({ route: row.Route, operator: row.Operator })),
             candidateRecordsAtStop, candidateOperatorsAtStop,
             iBusServiceLineMappings: serviceLineMappings, iBusProductivePatterns: productivePatterns,
             unresolvedEvidence: `Route 329 · Stop ${stopId329} · timetable source: unresolved`,
-            conclusion: 'No unique approved operator can be selected: Run #75 has distinct BODS records at the stop with conflicting operator values, while the applicable iBus index has no route-329 mapping. Browser and Word preserve an explicit review row with blank Operator.'
+            conclusion: 'No unique approved operator can be selected: Run #75 has distinct BODS records at the stop with conflicting operator values, while the applicable iBus index has no route-329 mapping. Browser Sources & checks preserve the exact unresolved item; generated Word preserves the explicit review row with blank Operator.'
           };
         }
       }

@@ -92,3 +92,6 @@ await import('./atlas-candidate-checkpoint.test.mjs');
 await import('./review-candidate-checkpoint.test.mjs');
 await import('./atlas-recovery-0f-publication.integration.test.mjs');
 console.log('ATLAS Alpha.15 deterministic suite passed.');
+
+await import('./atlas-final-recovery-ui-contract.test.mjs');
+await import('./frozen-product-parity-contract.test.mjs');

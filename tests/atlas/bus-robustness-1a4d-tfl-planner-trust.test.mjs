@@ -23,7 +23,7 @@ assert.ok(wordStopRows.some(row => row[1] === 'Cecil Road' && row[5].includes('T
 const app = fs.readFileSync(new URL('../../atlas/assets/js/app.mjs', import.meta.url), 'utf8');
 assert.match(app, /Other nearby stop records — no route information currently available \(\$\{otherNearbyRecords\.length\}\)/);
 assert.match(app, /These records remain on the map and in the detailed source evidence/);
-assert.match(app, /result\.stops\.filter\(stop => !isOtherNearbyStopRecord\(stop\)\)/);
+assert.match(app, /presentationStops\.filter\(stop => !isOtherNearbyStopRecord\(stop\)\)/);
 assert.match(app, /other-nearby-stop-table/);
 assert.match(app, /Walking distance \/ time/);
 assert.match(app, /const sourceMessage = \(outcome, noun = 'data'\)/, 'source status uses concise public wording rather than internal technical-note headings');

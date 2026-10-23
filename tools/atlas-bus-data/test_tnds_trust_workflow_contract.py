@@ -64,13 +64,18 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn("inputs.v2_source_snapshot_run_id == ''", self.dispatcher)
         self.assertIn("normal expected snapshot ID is valid only with an explicit frozen source producer run ID", self.dispatcher)
 
-    def test_default_branch_contains_dispatcher_but_not_feature_callee(self):
+    def test_default_branch_callees_are_dispatcher_gated_off_main(self):
         dispatcher = subprocess.run(["git", "show", "origin/main:.github/workflows/atlas-bus-data-refresh.yml"],
                                     cwd=ROOT, check=True, capture_output=True, text=True).stdout
         callee = subprocess.run(["git", "show", "origin/main:.github/workflows/atlas-bus-tnds-trust-diagnostic.yml"],
                                 cwd=ROOT, capture_output=True, text=True)
         self.assertIn("name: ATLAS Bus data refresh", dispatcher)
-        self.assertNotEqual(callee.returncode, 0)
+        self.assertEqual(callee.returncode, 0)
+        self.assertIn("workflow_call:", callee.stdout)
+        for job in ("tnds-trust-offline-preflight", "tnds-trust-live-diagnostic"):
+            block = workflow_job_block(dispatcher, job)
+            self.assertIn("github.ref != 'refs/heads/main'", block,
+                          f"default-branch {job} must remain inaccessible from main")
 
     def test_trust_browser_selector_uses_product_owned_controls(self):
         names = parse_dispatch_input_names(self.dispatcher)

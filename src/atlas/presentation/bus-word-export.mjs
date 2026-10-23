@@ -66,6 +66,10 @@ function reviewQualification(reviewItems) {
   return `Planner review required: ${sentences.join(' ')} Detailed evidence is retained in ATLAS and should be reviewed before formal use.`;
 }
 
+function presentationNote(textValue, semantic) {
+  return { kind: semantic === 'qualification' || semantic === 'review' ? 'section' : 'summary', semantic, text: textValue };
+}
+
 export function buildBusWordTables(result) {
   if (!result?.ok) throw new Error('A completed Bus assessment is required for Word export.');
   const stopRows = (result.stops ?? []).filter(stop => !isOtherNearbyStopRecord(stop)).map(stop => [
@@ -107,21 +111,31 @@ export function buildBusWordTables(result) {
     const duplicateTerminusNote = service.plannerNotes?.terminus && /\broute terminus\b/i.test(text(service.serviceNote));
     const structuredQualificationNote = /^(?:school[- ]day(?:s)?(?:[- ]only)?(?: journeys? only| service)?|runs? on school days only|operates? during term time only|term[- ]time service|runs? on non-school days only|non-school days only|operates? on holidays only|operating days could not be fully confirmed)(?:;.*)?\.?$/i.test(text(service.serviceNote));
     const visibleServiceNote = plannerFacingServiceNote(service.serviceNote);
-    if (visibleServiceNote && !duplicateTerminusNote && !structuredQualificationNote) serviceRows.push({ kind: 'summary', text: `Service note: ${visibleServiceNote}` });
+    if (visibleServiceNote && !duplicateTerminusNote && !structuredQualificationNote) {
+      const semantic = /school|term-time|holiday|short working/i.test(visibleServiceNote) ? 'qualification' : undefined;
+      serviceRows.push(presentationNote(`Service note: ${visibleServiceNote}`, semantic));
+    }
     const plannerAnnotations = hasPlannerSummary ? plannerAnnotationRows(service) : [];
     const next = services[index + 1];
     if (hasPlannerSummary && (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey)) {
       if (plannerAnnotations.length) {
-        plannerAnnotations.forEach(textValue => serviceRows.push({ kind: 'summary', text: textValue }));
+        plannerAnnotations.forEach(textValue => {
+          const semantic = /school|term-time|holiday|short working/i.test(textValue) ? 'qualification' : undefined;
+          serviceRows.push(presentationNote(textValue, semantic));
+        });
       }
-      else if (plannerFacingServiceNote(service.routeGroupNote)) serviceRows.push({ kind: 'summary', text: `Service note: ${plannerFacingServiceNote(service.routeGroupNote)}` });
+      else if (plannerFacingServiceNote(service.routeGroupNote)) {
+        const note = plannerFacingServiceNote(service.routeGroupNote);
+        const semantic = /school|term-time|holiday|short working/i.test(note) ? 'qualification' : undefined;
+        serviceRows.push(presentationNote(`Service note: ${note}`, semantic));
+      }
     }
   });
   const qualification = reviewQualification(result.reviewItems);
-  if (qualification) serviceRows.push({ kind: 'summary', text: qualification });
+  if (qualification) serviceRows.push(presentationNote(qualification, 'review'));
   const partialQualification = partialTimetableQualification(result.stops);
-  if (partialQualification) serviceRows.push({ kind: 'summary', semantic: 'partial-timetable-qualification', text: partialQualification });
-  if (hasPlannerSummary) serviceRows.push({ kind: 'summary', text: PLANNER_METHODOLOGY_NOTE });
+  if (partialQualification) serviceRows.push(presentationNote(partialQualification, 'qualification'));
+  if (hasPlannerSummary) serviceRows.push(presentationNote(PLANNER_METHODOLOGY_NOTE, 'methodology'));
 
   return [
     {

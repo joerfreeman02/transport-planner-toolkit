@@ -9,6 +9,7 @@ import { inflateRawSync } from 'node:zlib';
 import { launchAtlasBrowser } from './playwright-launch.mjs';
 import { createPreparedBusDataAdapter } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
+import { assertFrozenProductParity } from './frozen-product-parity.mjs';
 
 const [candidateArg, reportArg] = process.argv.slice(2);
 if (!candidateArg) throw new Error('Usage: node tests/atlas/s2e1-manual-product-audit.mjs <Run-75-candidate-root> [report.json]');
@@ -158,6 +159,8 @@ const failedRequests = [];
 const failedResponses = [];
 const externalRequests = [];
 const statusManifestFallbacks = [];
+const screenshotDirectory = process.env.ATLAS_AUDIT_SCREENSHOT_DIR ? path.resolve(process.env.ATLAS_AUDIT_SCREENSHOT_DIR) : null;
+if (screenshotDirectory) await mkdir(screenshotDirectory, { recursive: true });
 const tflReplayRequests = [];
 let server;
 let browser;
@@ -327,20 +330,23 @@ try {
     const outcome = { label: control.label, assessmentCoordinates: { latitude: control.latitude, longitude: control.longitude } };
     try {
       await page.goto(new URL('atlas/', baseUrl).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.locator('.coordinate-details > summary').click();
-      await page.locator('#latitude').fill(String(control.latitude));
-      await page.locator('#longitude').fill(String(control.longitude));
-      await page.locator('#coordinatesForm button[type="submit"]').click();
-      await page.locator('#radius').fill(String(control.radius));
+      await page.waitForFunction(() => Boolean(window.__ATLAS_SITE_SELECTOR__?.getMap()));
+      if (screenshotDirectory && control.id === controls[0].id) await page.screenshot({ path: path.join(screenshotDirectory, 'modules-and-bus-workspace.png'), fullPage: true });
+      await page.evaluate(({ latitude, longitude }) => {
+        const map = window.__ATLAS_SITE_SELECTOR__.getMap();
+        map.setView([latitude, longitude], 16, { animate: false });
+        map.fire('click', { latlng: window.L.latLng(latitude, longitude) });
+      }, { latitude: control.latitude, longitude: control.longitude });
+      await page.locator('#confirmMapLocation').click();
       await page.locator('#confirmAssessmentPoint').click();
-      assert.equal(await page.locator('#findStops').isEnabled(), true, 'Normal workflow did not enable Bus assessment after confirming the site.');
+      await page.locator('#radius').fill(String(control.radius));      assert.equal(await page.locator('#findStops').isEnabled(), true, 'Normal workflow did not enable Bus assessment after confirming the site.');
       await page.locator('#findStops').click();
       await page.locator('#taskStatusMessage').waitFor({ state: 'visible', timeout: 180000 });
-      const continueStaged = page.locator('#assessmentScope button').filter({ hasText: 'Continue full staged assessment' });
+      const continueStaged = page.locator('#assessmentScope button').filter({ hasText: 'Continue full assessment' });
       await page.waitForFunction(() => {
         const phase = document.querySelector('#taskStatus')?.dataset.phase;
         const terminal = ['complete', 'partial', 'unavailable'].includes(phase);
-        const staged = [...document.querySelectorAll('#assessmentScope button')].some(button => button.textContent.includes('Continue full staged assessment'));
+        const staged = document.querySelector('#assessmentScope')?.hidden === false;
         return terminal || staged;
       }, undefined, { timeout: 180000 });
       if (await continueStaged.count()) await continueStaged.click();
@@ -361,6 +367,7 @@ try {
         assert.ok(outcome.operatorStageTrace, 'Production assessment result was not exposed to the test-only C4 trace observer.');
       }
       const serviceTable = page.locator('.bus-service-summary');
+      if (screenshotDirectory && control.id === controls[0].id) await page.screenshot({ path: path.join(screenshotDirectory, `${control.id}-results.png`), fullPage: true });
       const wrap = serviceTable.locator('xpath=ancestor::div[contains(@class,"table-wrap")]');
       const scroll = await wrap.evaluate(element => ({ client: element.clientWidth, scroll: element.scrollWidth }));
       assert.ok(scroll.scroll <= scroll.client + 1, `Bus Service Summary has horizontal overflow (${scroll.scroll}px > ${scroll.client}px).`);
@@ -385,10 +392,17 @@ try {
       }
       const technical = page.locator('#developerDiagnostics');
       assert.equal(await technical.getAttribute('hidden') !== null, true, 'Developer diagnostics must be absent from ordinary planner mode.');
-      await page.locator('details > summary').filter({ hasText: 'Sources and checks' }).click();
+      await page.locator('#sourceChecksDetails > summary').click();
       const checksText = await page.locator('#plannerChecks').innerText();
       outcome.sourcesAndChecks = checksText;
+      outcome.reviewEvidence = await page.locator('.evidence-review-group > ul > li').evaluateAll(items => items.map(item => {
+        const copy = item.cloneNode(true);
+        copy.querySelectorAll('details').forEach(details => details.remove());
+        return copy.innerText.replace(/\s+/g, ' ').trim();
+      }));
       const resultFreshnessText = await page.locator('#resultFreshness').innerText();
+      const reviewCountMatch = resultFreshnessText.match(/(\d+)\s+evidence items?\s+need(?:s)? review/i);
+      outcome.reviewCount = reviewCountMatch ? Number(reviewCountMatch[1]) : 0;
       if (/0 evidence items? need review/i.test(resultFreshnessText)) {
         assert.doesNotMatch(checksText, /review (?:the affected )?service evidence before formal use|review the incomplete evidence before formal use/i,
           'A zero-review/complete status must not coexist with a material review-before-use instruction in Points to note.');
@@ -428,6 +442,10 @@ try {
       outcome.renderedRows = rendered;
       outcome.renderedServiceNotes = renderedServiceNotes;
       outcome.generatedWordRows = wordRows;
+      const wordStopTable = exportedWordTables.find(table => table[0]?.includes('Map reference') && table[0]?.includes('Routes serving stop'));
+      assert.ok(wordStopTable, 'Generated Word export has no assessed Bus Stop Summary table.');
+      const stopHeaders = wordStopTable[0];
+      outcome.generatedWordStops = wordStopTable.slice(1).map(cells => Object.fromEntries(stopHeaders.map((header, index) => [header, cells[index] ?? ''])));
       const parityFields = ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop'];
       const normalized = value => String(value ?? '').replace(/[’‘]/g, "'").replace(/\s*;\s*/g, ' ').replace(/\s+/g, ' ').trim();
       for (const browserRow of rendered) {
@@ -469,7 +487,9 @@ try {
           const stopId329 = enfieldFixtures.get('enfield-329-e2e').stopId;
           assert.equal(browser329.length, 0, 'The accepted Enfield route-329 control must not fabricate a resolved planner service row from conflicting candidate evidence.');
           assert.equal(word329.length, 0, 'The accepted Enfield route-329 control must not fabricate a resolved Word summary row from conflicting candidate evidence.');
-          assert.match(checksText, /Route 329 · Stop 490006588R · timetable source: This route\/stop timetable request remained unresolved/i, 'Browser Sources & checks must expose the accepted route-329 unresolved timetable evidence.');
+          assert.match(checksText, /Timetable evidence · 1 item · Route 329/i, 'Browser Sources & checks must expose the route-329 timetable review category.');
+          const route329UnresolvedEvidence = outcome.reviewEvidence.find(item => /Route 329 · Stop 490006588R · timetable source: This route\/stop timetable request remained unresolved/i.test(item));
+          assert.ok(route329UnresolvedEvidence, 'Browser Sources & checks detail must retain the accepted route-329 unresolved timetable evidence.');
           assert.match(exportedWordText, /Planner review required: timetable\/source evidence requires review for routes 329 at one or more assessed stops/i, 'Generated Word must preserve the accepted route-329 unresolved-evidence review row.');
           const candidateRecordsAtStop = enfieldFixtures.get('enfield-329-e2e').candidateServices.filter(service => service.stopsWithSchedules.includes(stopId329));
           const candidateOperatorsAtStop = [...new Set(candidateRecordsAtStop.map(service => normalized(service.operator)).filter(Boolean))].sort();
@@ -484,7 +504,7 @@ try {
             stopFixtureProvenance: enfieldFixtures.get('enfield-329-e2e').stopFixtureProvenance,
             browserServiceRowCount: browser329.length, wordServiceRowCount: word329.length,
             browserServiceRows: browser329.map(row => ({ route: row.Route, operator: row.Operator })),
-            browserSourcesAndChecksUnresolvedEvidence: checksText.split('\n').find(line => /Route 329/.test(line) && /operator evidence/i.test(line)) ?? null,
+            browserSourcesAndChecksUnresolvedEvidence: route329UnresolvedEvidence,
             wordReviewQualification: exportedWordText.match(/Additional operator evidence[^.]+\./i)?.[0] ?? null,
             candidateRecordsAtStop, candidateOperatorsAtStop,
             iBusServiceLineMappings: serviceLineMappings, iBusProductivePatterns: productivePatterns,
@@ -647,6 +667,13 @@ report.externalRequests = externalRequests;
 report.statusManifestFallbacks = statusManifestFallbacks;
 report.statusManifestNote = 'The Run #75 candidate and production checkout do not include the separately published status manifest; the localhost audit supplies 204 No Content, and the normal app reports status unavailable. This response is independent of Bus assessment data.';
 report.readiness = report.failures.length ? 'NOT_READY_FOR_MANUAL_RE-ACCEPTANCE' : 'READY_FOR_TECHNICAL_DIRECTOR_REVIEW_BEFORE_MANUAL_RE-ACCEPTANCE';
+try {
+  const oracle = JSON.parse(await readFile(path.join(repositoryRoot, 'tests/atlas/fixtures/accepted-bus-product-semantic-oracle.json'), 'utf8'));
+  report.frozenProductParity = assertFrozenProductParity(oracle, report);
+} catch (error) {
+  report.failures.push({ id: 'frozen-product-parity', reason: error.message });
+  report.readiness = 'NOT_READY_FOR_MANUAL_RE-ACCEPTANCE';
+}
 if (reportArg) {
   const destination = path.resolve(reportArg);
   await mkdir(path.dirname(destination), { recursive: true });

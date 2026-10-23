@@ -43,7 +43,8 @@ assert.doesNotMatch(c4PushWorkflow, /5cad24e0a47c4a77a8ec8616d746bf9f538404420fc
 assert.match(manualBrowserAudit, /prepared\.servicesForStops\(stopResult\.data \?\? \[\]\)/, 'Route 329 control inspects actual frozen-candidate timetable services.');
 assert.match(manualBrowserAudit, /candidate329UsableAtStops/, 'Route 329 control records candidate schedule evidence at selected stops.');
 assert.match(manualBrowserAudit, /route329ServiceStopIds/, 'Route 329 control prefers a stop with scheduled candidate evidence.');
-assert.match(manualBrowserAudit, /stopPoints: \[\]/, 'Route 329 control does not inject a synthetic TfL StopPoint.');assert.match(manualBrowserAudit, /Enfield production Browser did not render the frozen-candidate BODS 329 service/);
+assert.match(manualBrowserAudit, /stopFixtureProvenance: 'Run #75 candidate NaPTAN stop identity, coordinates and route associations/, 'Route 329 discovery fixture is transparently derived from the immutable candidate stop record.');
+assert.match(manualBrowserAudit, /candidate329Services/, 'Route 329 Browser/Word row must be supplied by the actual candidate timetable adapter.');assert.match(manualBrowserAudit, /Enfield production Browser did not render the frozen-candidate BODS 329 service/);
 assert.match(manualBrowserAudit, /activeJourney\.operatorName/);
 assert.doesNotMatch(c4PushWorkflow, /atlas-bus-beta-candidate|force_refresh:\s*true|pages|deploy|publish/i, 'C4 validation calls only the frozen-candidate diagnostic with no acquisition or publication path');
 assert.match(dispatchWorkflow, /S2E-1 offline preflight accepts only the exact zero-download C1B selector/);

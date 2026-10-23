@@ -73,7 +73,12 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') {
   });
   enfieldFixtures.set('enfield-329-e2e', {
     stopId: String(route329Stop.id), stopName: String(route329Stop.name), routeNumber: '329',
-    stopPoints: [],
+    // Inside Greater London the normal app selects TfL stop discovery. Project
+    // only this exact Run #75 NaPTAN stop identity, coordinates and route
+    // associations into that local API boundary fixture. The real candidate
+    // supplies all timetable/operator evidence; none is fabricated here.
+    stopPoints: [{ id: String(route329Stop.id), naptanId: String(route329Stop.id), commonName: String(route329Stop.name), lat: Number(route329Stop.latitude), lon: Number(route329Stop.longitude), stopType: 'NaptanPublicBusCoachTram', lines: (route329Stop.routes ?? []).map(id => ({ id: String(id), name: String(id) })) }],
+    stopFixtureProvenance: 'Run #75 candidate NaPTAN stop identity, coordinates and route associations; no live TfL response and no synthetic timetable/operator evidence.',
     route: [],
     timetable: { lineId: '329', lineName: '329', direction: '', timetable: { departureStopId: String(route329Stop.id), routes: [] } },
     sequence: { lineId: '329', direction: 'outbound', stopPointSequences: [] },
@@ -127,7 +132,7 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') report.enfieldIbusFixtur
     operatorName: enfieldFixtures.get('enfield-313-e2e').activeJourney.operatorName,
     orderedStopPointIds: enfieldFixtures.get('enfield-313-e2e').ids
   },
-  route329CandidateStop: { stopId: enfieldFixtures.get('enfield-329-e2e').stopId, name: enfieldFixtures.get('enfield-329-e2e').stopName, latitude: Number(enfieldControls[1].latitude), longitude: Number(enfieldControls[1].longitude), candidateRoutes: enfieldFixtures.get('enfield-329-e2e').candidateStopRoutes, candidateServices: enfieldFixtures.get('enfield-329-e2e').candidateServices, usableCandidateEvidenceAtStops: enfieldFixtures.get('enfield-329-e2e').usableCandidateEvidenceAtStops },
+  route329CandidateStop: { stopId: enfieldFixtures.get('enfield-329-e2e').stopId, name: enfieldFixtures.get('enfield-329-e2e').stopName, latitude: Number(enfieldControls[1].latitude), longitude: Number(enfieldControls[1].longitude), stopFixtureProvenance: enfieldFixtures.get('enfield-329-e2e').stopFixtureProvenance, candidateRoutes: enfieldFixtures.get('enfield-329-e2e').candidateStopRoutes, candidateServices: enfieldFixtures.get('enfield-329-e2e').candidateServices, usableCandidateEvidenceAtStops: enfieldFixtures.get('enfield-329-e2e').usableCandidateEvidenceAtStops },
   route329ServiceLineMappings: enfieldIbusIndex.serviceLines.filter(line => String(line.serviceLineNo) === '329'),
   route329ProductivePatterns: enfieldIbusIndex.patterns.filter(pattern => String(pattern.serviceLineNo) === '329' && Number(pattern.patternType) === 1).length
 };

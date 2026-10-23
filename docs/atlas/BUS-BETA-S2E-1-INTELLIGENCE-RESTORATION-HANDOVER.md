@@ -1,6 +1,6 @@
 # BUS-BETA-S2E-1 — Intelligence Restoration Handover
 
-Status: **C2 HISTORICAL; C3 READY FOR TECHNICAL DIRECTOR REVIEW**. The C2 result below is historical. C3 adds frequency-scope, calendar-qualification, warning-materiality, and rendered short-working corrections. Exact-SHA hosted validation is green; Product Owner manual acceptance has not occurred.
+Status: **C2 HISTORICAL; C3 MANUAL ACCEPTANCE REJECTED; C4 EVIDENCE CLOSEOUT BLOCKED**. Historical C1–C3 records remain intact. C4 Run #23 passed its hosted automated gates on the tested product SHA, but three requested evidence conclusions remain unproven.
 
 ## Accepted production revision and candidate provenance
 
@@ -187,37 +187,64 @@ X4 has exactly two Stagecoach Midlands rows at both PE1 and Queensgate: one inbo
 
 **C3 gate: READY FOR TECHNICAL DIRECTOR REVIEW.** Run #12 is green on exact implementation SHA `5663ae56e3e18dc76ea4fdb7570089dcf7acec00`; this handover documentation update also uses the exact-branch push trigger and therefore receives its own exact-SHA hosted validation.
 
-## S2E-1-C4 — final product trace and acceptance lock
+## S2E-1-C4 — final product trace and evidence closeout
 
-Status: **BLOCKED — TECHNICAL DIRECTOR DECISION REQUIRED.** This section records C4 separately; historical C1–C3 records above remain unchanged. C3 manual acceptance was rejected because the rendered Browser/Word outputs still showed inflated selected-stop frequencies, redundant Waltham review contamination, a route-wide PE1 101 calendar qualification, and blank Enfield TfL operator fields for 313/329.
+Status: **BLOCKED — TECHNICAL DIRECTOR DECISION REQUIRED.** C3 manual acceptance was rejected after planner-facing frequency, warning, and qualification defects were observed. C4 corrected the proven defects, but the evidence below does not prove every remaining control.
 
-### Baseline, candidate, and changes
+### Tested product, candidate, and hosted result
 
-- C4 branch: `codex/atlas-bus-beta-s2e-1-c4-final-product-trace`; accepted C3 starting SHA: `f31123a10ed4c188077a53ab1de1885f8eac4ca4`.
-- Current code/workflow SHA: `f4b0d984b72b791c6a1c484f40f1d4fb32a86839`.
-- Immutable candidate remains Run `39430415441`, artifact `12275615359`, digest `sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`, producer SHA `151199cc914c235870f444d26b03c2309edbd035`. No candidate rebuild, national acquisition, or candidate mutation occurred.
-- Changed files: `src/atlas/domain/bus-planner-summary.mjs`; `tests/atlas/alpha15-planner-service-group.test.mjs`; `tests/atlas/s2e1-manual-product-audit.mjs`; `.github/workflows/atlas-bus-beta-s2e1-c4-push-validation.yml`; `tests/atlas/s2e1-diagnostic-workflow-contract.test.mjs`.
-- The production correction scopes calendar-variant qualifications using all explicit variant identities, not only short-working IDs. The C4 Browser/Word gate now tests the visible `Service qualification:` label for routes 27/101/201 and accepts semicolon-separated text in its route-specific matching.
-- The C4 concurrency group was rotated after the prior workflow parent remained stuck `in_progress` after its Chromium setup job was canceled. The rotated key retains same-branch `cancel-in-progress` behavior and is covered by the workflow contract test; this affects validation orchestration only.
+- Branch: codex/atlas-bus-beta-s2e-1-c4-final-product-trace.
+- C4 tested product SHA: 2cc207baea330664c743db027d9e11b3ed7959ee. The documentation reconciliation commit is separate and is not the SHA tested by Run #23.
+- Hosted Run #23: ID 39804940981, conclusion success, exact head SHA 2cc207baea330664c743db027d9e11b3ed7959ee.
+- Run #23 report artifact: ID 12436993174, name atlas-bus-beta-s2e1-normal-runtime-diagnostic-39804940981, digest sha256:f2bebf1acd24f48c5c6e83ab87c9d8d0bbfefe6ac946fb4153eb7301d0eec7fb.
+- Immutable candidate: Run 39430415441, artifact 12275615359, digest sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471, producer SHA 151199cc914c235870f444d26b03c2309edbd035. It was restored and verified; it was not rebuilt or modified.
+- Hosted gates passed: complete Bus-data Python suite; complete deterministic ATLAS suite; immutable candidate identity/provenance; actual-candidate planner diagnostic; six-control candidate Browser/Word audit; rendered normal-product Browser/generated-Word audit; and Chingford route 657 golden regression.
+- The normal-product Browser/Word audit covered Pipers, Waltham, Chingford, and PE1. The separate candidate Browser/Word audit covered six controls using the prepared national-data adapter; it did not compose Enfield TfL/iBus services through the production authoritative adapter.
+- No production code changed after Run #23. No fresh source acquisition, candidate rebuild/modification, publication, deployment, main merge, release, or version/build bump occurred. Version/build remain 2.0.0-alpha.15 / ATLAS-2.0.0-alpha.15-20260914.
 
-### Latest available rendered-candidate evidence
+### Pipers Lane — route 46 control/radius difference; route 230 retained
 
-The last complete hosted candidate audit is Run #10, ID `39793756245`, SHA `b3d5729b07191362bccf538e0d94e3237e2cf88f`, report artifact `12432053268`, digest `sha256:c32aa72919cbf180a38dffa8e6004621e00bc47cce79fa485d3e4ebbd01c7df4`. Its full Bus Python suite, full deterministic ATLAS suite, Run #75 restore/provenance, planner diagnostic, candidate Browser/Word audit, normal-product Browser/Word audit, and Chingford 657 regression passed. Its report had no listed failures, but the route-101 rendered qualification predicate was too weak and a subsequent inspection found the false whole-route qualification. Run #10 is therefore historical evidence, not final-SHA acceptance.
+- The hosted Pipers control used 51.852700, -0.454343, with a 700 m radius. The three preserved C4 reports (Runs #15, #16, and #23) use the same point and discover the same 11 stops.
+- Those stops include Hillcrest Park and Manor Road for routes 230/231. None lists route 46; the reports contain no route-46 planner row or selected-stop timetable population.
+- The Product Owner’s prior real Word assessment identifies route 46 at Woodside Animal Farm, approximately 1,216 m away, and Caddington Hall, approximately 1,228 m away. Both are outside the hosted 700 m radius. The control therefore cannot be expected to show those route-46 rows.
+- Conclusion: **CONTROL/RADIUS DIFFERENCE — NO C4 PRODUCT DEFECT PROVEN.** Route 46 is not frequency-validated by the hosted Pipers control; no route-46 logic was added or forced into scope.
+- Route 230 remains one Centrebus BODS principal circular row via Caddington Woods/Chaul End Road. The actual Browser and Word output shows Mon–Sat approximately every 60 minutes, 06:10–20:10, and Sunday no scheduled service. Frozen selected-stop evidence was 15 weekday, 9 Saturday, and 0 Sunday BODS departures. TNDS remains supplementary. Route 231 remains two separate TNDS directional rows.
 
-- **Pipers 230:** Run #10 showed one BODS/Centrebus circular principal row, approximately hourly Mon–Sat, Sunday no scheduled service, with TNDS supplementary evidence. The selected-stop departure evidence was 15 BODS departures on weekdays, 9 Saturday, 0 Sunday at each assessed local stop. **Pipers 231:** two separate TNDS directional rows remained. Route 46 had no candidate service row at the Pipers assessed stops; no route was fabricated.
-- **PE1 frequency:** Run #10 rendered route 1 towards Werrington Centre at approximately 10 minutes, route 5 towards Yaxley at approximately 60 minutes Sunday, and route 33 towards City Hospital at approximately 60 minutes Mon–Sat. These values passed that run’s Browser/Word audit and were not changed by the later route-qualification correction.
-- **Waltham:** the six redundant TfL review warnings and unavailable/incomplete stop-summary contamination were absent in Run #10. Three remaining review items concerned unresolved origin endpoints for routes 217/317/327 at stop `210021703420`; these remain material review items. Route 217 retained fixture-backed TfL authority, Arriva London North, and approximately `04:00–00:59 (next day)` in Browser and Word.
-- **Route 101:** the defect was a calendar-variant record being excluded from the variant-only qualification suppression, allowing `non-school days only; operating days could not be fully confirmed` to appear as a route-wide qualification despite unrestricted principal rows. The product correction and focused regression pass locally, but Browser/Word verification on the final SHA is pending; do not treat route 101 as accepted yet.
-- **X4 / 27 / 657 / Enfield term-time / 629:** Run #10 passed the existing rendered controls for X4 regular service plus its scoped Kings School short working, route 27’s scoped school branch, Chingford 657’s school-day-only control, and the available Enfield term-time/629 checks. PE1 route 102 retained distinct rendered rows with direction/location labels; the Browser/Word audit passed. These controls have not been rerun on the final SHA.
-- **TfL operator trace:** the committed iBus index Base_Version `20261009` is date-valid `2026-10-08` through (exclusive) `2026-11-05`. For route 313 it contains six productive patterns and 111 active journeys on `2026-10-22`, all resolving to Arriva London North (`MN`). Production enrichment runs only on composed `provider=tfl` services and requires a structured route-pattern/assessed-stop/endpoint match. The existing test uses a matching indexed pattern through the adapter and Word projection, but the actual Enfield Browser row and generated Word row were not exercised by Run #10 because the frozen candidate audit intentionally used no fabricated TfL StopPoint records. Route 313 therefore remains unresolved for acceptance; the existence of index evidence alone does not prove the live planner row matched it. Route 329 has no Service_Line mapping or productive pattern in this Base_Version, so no operator is defensible from this index; leave it blank unless further authoritative evidence is supplied.
-- **Warnings and parity:** Run #10’s Sources & Checks and technical details retained the three specific Waltham endpoint decisions and other control-specific material items; no global warning suppression was introduced. Browser Source-column placement and Browser/Word parity passed on that prior SHA. Neither result is an exact-final-SHA gate.
+### PE1 route 202 — inbound identity comparison remains unresolved
 
-### Final-SHA validation state and remaining gate
+Run #23 presents three route-202 rows at Queensgate: outbound toward Peterborough; inbound toward Austerby; inbound toward Bourne Bus Station.
 
-- Local lightweight checks: `node tests/atlas/alpha15-planner-service-group.test.mjs` passed; `node tests/atlas/s2e1-diagnostic-workflow-contract.test.mjs` passed; `node --check tests/atlas/s2e1-manual-product-audit.mjs` passed; `git diff --check` passed.
-- The push-triggered Run #11 (`39795762373`, SHA `bbfb08939414cd81642eb084a9dced4c8cc02c41`) stalled during Chromium installation and was canceled before suites or candidate restore. Run #12 (`39797711953`, SHA `6894e798208a5678ca803830135b84dd9bb8e4bf`) did not start. Run #13 (`39798355854`, SHA `f4b0d984b72b791c6a1c484f40f1d4fb32a86839`) is queued under the rotated group; no runner was assigned at handover time. No exact-final-SHA hosted artifact exists.
-- Full Bus Python suite, full `node tests/atlas/run-all.mjs`, frozen Run #75 restore/provenance, actual-candidate controls, and final Browser/Word acceptance remain pending on a completed hosted run.
-- Version/build remain `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`. No `main` merge, PR, publication, deployment, or release occurred. Local C4 worktree is clean and matches `origin/codex/atlas-bus-beta-s2e-1-c4-final-product-trace` at the current code/workflow SHA before this documentation commit. The dirty OneDrive `main` checkout was not touched.
-- GitHub tooling review: Dependabot remains configured; Codecov remains deferred pending a coverage baseline; OpenSSF Scorecard remains for a later release/security milestone; Sentry remains deferred pending telemetry/privacy architecture; Renovate is not added alongside Dependabot.
+- Both inbound rows use assessed stop 0590PQG09, ordinary weekday calendars, no weekend service, and show two journeys/day with a 07:10–07:45 period.
+- The Austerby row groups BODS records east_midlands:4866:1:d15e1d4bfd6c (destination Austerby) and east_midlands:4866:1:7dc60243305e (destination Bus Station) with TNDS pattern JP_PF0007016:2-45 (destination Bourne).
+- The Bourne Bus Station row uses TNDS patterns JP_PF0007016:2-46 and JP_PF0007016:2-48. Its Monday selected-stop population reports VJ38 at 07:10 and VJ39 at 07:45. The Austerby row reports VJ37 at 07:10 and a BODS departure at 07:45 without a journey identity.
+- These are different source records and reported TNDS journey IDs, but the same times and stop. The compact Run #23 planner report does not contain the ordered pattern stop sequences, terminal stop identities, or sufficient vehicle-journey lineage to decide whether these are genuinely distinct public patterns or overlapping representations.
+- Conclusion: **UNRESOLVED.** The rows were not collapsed solely due to matching frequency, and differing source IDs were not treated as proof of distinct services. No route-202 production change is justified until the frozen candidate pattern/vehicle lineage is compared.
 
-**C4 gate: BLOCKED — TECHNICAL DIRECTOR DECISION REQUIRED.** Do not begin Product Owner manual acceptance. Reopen the gate only after the hosted validation completes successfully on the documentation-final SHA and the route-101 rendered assertions pass; separately resolve or formally decide the route-313 operator evidence gap.
+### Enfield — routes 313 and 329 operator evidence
+
+- The committed TfL iBus index is Base_Version 20261009, valid 8 October through (exclusive) 5 November 2026.
+- **313:** the index contains six productive patterns and 111 active journeys for 22 October 2026, with operator code MN / Arriva London North. The normal app loads the index manifest and the production authoritative adapter applies iBus enrichment to composed TfL services when the route pattern, assessed stop, and exact endpoints match. The existing focused adapter test verifies a matching indexed 313 service and operator retention through the service and Word projection. Run #23 did not exercise an actual Enfield 313 TfL service through the production Browser and generated Word rows. Thus the complete requested rendering trace is **UNCONFIRMED**; no loss of operator in the actual product path has been demonstrated.
+- **329:** the applicable indexed version contains no Service_Line mapping and no productive iBus pattern for route 329. The available Run #23 Enfield normal-runtime report does not establish an alternate same-public-service operator record. The correct evidence-based result is to leave operator blank unless such defensible corroboration exists. Run #23 did not exercise an actual Enfield 329 row through the production Browser and Word, so that rendered blank is **UNCONFIRMED**.
+- No operator was fabricated, and no production change was made.
+
+### Other C4 planner-facing controls
+
+- **Waltham:** route 217 retains Arriva London North and the fixture-backed full operating span 04:00–00:59 next day in Browser and Word. The six redundant TfL review warnings and unavailable/incomplete stop-summary contamination are removed. Three specific endpoint-identity review items remain for routes 217, 317, and 327 at stop 210021703420; these are retained as unresolved evidence rather than globally suppressed. The 13 family remains principal 13 with distinct 13A/13B/13C branches and destinations; 13C remains visible within the family.
+- **PE1 frequencies:** route 1 toward Werrington shows approximately every 10 minutes irregular Mon–Sat and about every 20 minutes Sunday. Route 5 toward Yaxley shows about every 30 minutes weekdays, 30–45 minutes Saturday, and 60 minutes Sunday. Route 33 shows about every 10–50 minutes toward Roman Close and about every 60 minutes toward City Hospital, Mon–Sat.
+- **PE1 qualification/calendar:** route 101 has ordinary public-service rows without the unjustified whole-route non-school-day qualification. X4 remains two regular directional rows, with Kings School represented as a scoped short working. Route 27 retains ordinary service and its scoped school-day branch. Chingford 657 remains school-day-only in the fixture-backed golden regression.
+- **PE1 route 102:** four rows remain because the candidate contains supported Towngate/Health Centre service evidence and materially conflicting Queensgate/Peterborough endpoints. The unresolved corridor is retained for review; there is no arbitrary two-row cap.
+- **Sources & Checks and parity:** the normal-product report records three route-specific Waltham endpoint items and incomplete-stop/date-specific context; browser Source-column, technical-details visibility, normal Sources & Checks, and Browser/Word material parity assertions passed. There were no Browser console errors, failed requests, failed responses, or external requests in the Run #23 normal-product audit. Four empty-status-manifest responses were intentional local fallbacks, not HTTP failures.
+
+### Remaining gate and tooling review
+
+- Pipers 46 is resolved as a control/radius distinction, not a proven product defect.
+- PE1 202 physical-pattern equivalence remains unresolved.
+- Enfield 313 operator rendering and Enfield 329 intentional blank have not been demonstrated through the production Browser/Word path.
+- Therefore C4 is not ready for manual Product Owner acceptance. Technical Director review remains first.
+- Dependabot: configured.
+- Codecov: deferred pending a meaningful coverage baseline.
+- OpenSSF Scorecard: deferred to a later release/security milestone.
+- Sentry: deferred pending telemetry/privacy architecture.
+- Renovate: not required alongside Dependabot.
+
+**C4 gate: BLOCKED — TECHNICAL DIRECTOR DECISION REQUIRED.**

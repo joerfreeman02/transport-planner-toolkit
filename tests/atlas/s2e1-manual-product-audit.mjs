@@ -127,7 +127,7 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') report.enfieldIbusFixtur
     operatorName: enfieldFixtures.get('enfield-313-e2e').activeJourney.operatorName,
     orderedStopPointIds: enfieldFixtures.get('enfield-313-e2e').ids
   },
-  route329CandidateStop: { stopId: enfieldFixtures.get('enfield-329-e2e').stopId, name: enfieldFixtures.get('enfield-329-e2e').stopName, candidateRoutes: enfieldFixtures.get('enfield-329-e2e').candidateStopRoutes, candidateServices: enfieldFixtures.get('enfield-329-e2e').candidateServices, usableCandidateEvidenceAtStops: enfieldFixtures.get('enfield-329-e2e').usableCandidateEvidenceAtStops },
+  route329CandidateStop: { stopId: enfieldFixtures.get('enfield-329-e2e').stopId, name: enfieldFixtures.get('enfield-329-e2e').stopName, latitude: Number(enfieldControls[1].latitude), longitude: Number(enfieldControls[1].longitude), candidateRoutes: enfieldFixtures.get('enfield-329-e2e').candidateStopRoutes, candidateServices: enfieldFixtures.get('enfield-329-e2e').candidateServices, usableCandidateEvidenceAtStops: enfieldFixtures.get('enfield-329-e2e').usableCandidateEvidenceAtStops },
   route329ServiceLineMappings: enfieldIbusIndex.serviceLines.filter(line => String(line.serviceLineNo) === '329'),
   route329ProductivePatterns: enfieldIbusIndex.patterns.filter(pattern => String(pattern.serviceLineNo) === '329' && Number(pattern.patternType) === 1).length
 };
@@ -213,7 +213,8 @@ try {
         let appSource = bytes.toString('utf8');
         const assignment = '  currentBusResult = result;';
         if (appSource.split(assignment).length !== 2) throw new Error('Expected one production assessment result assignment for the C4 trace hook.');
-        const observer = `${assignment}\n  window.__ATLAS_C4_OPERATOR_TRACE__ = routeNumber => {\n    const routeRecords = records => (records ?? []).filter(record => String(record.routeNumber) === String(routeNumber)).map(record => ({ id: record.id ?? null, operator: record.operator ?? null, provider: record.provider ?? null, timetableSource: record.timetableSource ?? null, source: record.source ? { provider: record.source.provider ?? null, primaryAuthority: record.source.primaryAuthority ?? null, operatorProvenance: record.source.operatorProvenance ?? null, tflIbusOperatorEvidence: record.source.tflIbusOperatorEvidence ?? null } : null }));\n    return { routeNumber, stops: (result.stops ?? []).filter(stop => (stop.routes ?? []).some(route => String(route) === String(routeNumber))).map(stop => ({ id: stop.id ?? stop.sourceId ?? null, name: stop.name ?? null, routes: stop.routes ?? [], timetableAuthority: stop.timetableAuthority ?? null, timetableAuthorities: stop.timetableAuthorities ?? [], routeAuthorities: stop.routeAuthorities ?? null, timetableCallEligible: stop.timetableCallEligible ?? null })), composedServices: routeRecords(result.services), normalizedServiceSummaries: routeRecords(result.serviceSummaries), plannerRows: routeRecords(result.plannerServiceSummaries), timetableProvenance: result.provenance?.timetables ?? null };\n  };`;
+        const observer = `${assignment}\n  window.__ATLAS_C4_OPERATOR_TRACE__ = routeNumber => {\n    const routeRecords = records => (records ?? []).filter(record => String(record.routeNumber) === String(routeNumber)).map(record => ({ id: record.id ?? null, operator: record.operator ?? null, provider: record.provider ?? null, timetableSource: record.timetableSource ?? null, source: record.source ? { provider: record.source.provider ?? null, primaryAuthority: record.source.primaryAuthority ?? null, operatorProvenance: record.source.operatorProvenance ?? null, tflIbusOperatorEvidence: record.source.tflIbusOperatorEvidence ?? null } : null }));\n    const summarizeStop = stop => ({ id: stop.id ?? stop.sourceId ?? null, name: stop.name ?? null, latitude: stop.latitude ?? null, longitude: stop.longitude ?? null, distanceMetres: stop.distanceMetres ?? null, routes: stop.routes ?? [], timetableAuthority: stop.timetableAuthority ?? null, timetableAuthorities: stop.timetableAuthorities ?? [], routeAuthorities: stop.routeAuthorities ?? null, timetableCallEligible: stop.timetableCallEligible ?? null });
+    return { routeNumber, allDiscoveredStops: (result.stops ?? []).map(summarizeStop), stops: (result.stops ?? []).filter(stop => (stop.routes ?? []).some(route => String(route) === String(routeNumber))).map(summarizeStop), stopProvenance: result.provenance?.stops ?? null, composedServices: routeRecords(result.services), normalizedServiceSummaries: routeRecords(result.serviceSummaries), plannerRows: routeRecords(result.plannerServiceSummaries), timetableProvenance: result.provenance?.timetables ?? null };\n  };`;
         bytes = Buffer.from(appSource.replace(assignment, observer), 'utf8');
       }
       const extension = path.extname(file).toLowerCase();
@@ -302,7 +303,7 @@ try {
   });
   for (const control of controls) {
     activeControl = control;
-    const outcome = { label: control.label };
+    const outcome = { label: control.label, assessmentCoordinates: { latitude: control.latitude, longitude: control.longitude } };
     try {
       await page.goto(new URL('atlas/', baseUrl).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.locator('.coordinate-details > summary').click();

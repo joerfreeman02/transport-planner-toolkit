@@ -353,6 +353,10 @@ try {
       await page.locator('details > summary').filter({ hasText: 'Sources and checks' }).click();
       const checksText = await page.locator('#plannerChecks').innerText();
       outcome.sourcesAndChecks = checksText;
+      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id === 'enfield-313-e2e') {
+        outcome.operatorStageTrace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.() ?? null);
+        assert.ok(outcome.operatorStageTrace, 'Production assessment result was not exposed to the test-only C4 trace observer.');
+      }
 
       assert.doesNotMatch(checksText, /SpecialDaysOperation|TNDS .*special dates require review/i, 'Sources and checks exposes raw per-service special-day warnings.');
       const rendered = await serviceTable.locator('tbody tr:not(.service-note)').evaluateAll(rows => rows.map(row => Object.fromEntries([...row.querySelectorAll('td[data-label]')].map(cell => [cell.dataset.label, cell.innerText.replace(/\s+/g, ' ').trim()]))));
@@ -435,10 +439,7 @@ try {
       outcome.sourceColumn = { visibleOnTopMiddleBottom: true, samples: sourceSamples, overflow: scroll };
       outcome.technicalDetailsHidden = true;
       outcome.sourcesAndChecks = checksText;
-      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id === 'enfield-313-e2e') {
-        outcome.operatorStageTrace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.() ?? null);
-        assert.ok(outcome.operatorStageTrace, 'Production assessment result was not exposed to the test-only C4 trace observer.');
-      }
+
       outcome.wordFilename = download.suggestedFilename();
       outcome.wordArtifact = wordPath;
       outcome.wordText = exportedWordText;

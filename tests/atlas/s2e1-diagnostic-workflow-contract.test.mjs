@@ -45,10 +45,10 @@ assert.match(manualBrowserAudit, /candidate329UsableAtStops/, 'Route 329 control
 assert.match(manualBrowserAudit, /route329ServiceStopIds/, 'Route 329 control prefers a stop with scheduled candidate evidence.');
 assert.match(manualBrowserAudit, /stopFixtureProvenance: 'Run #75 candidate NaPTAN stop identity, coordinates and route associations/, 'Route 329 discovery fixture is transparently derived from the immutable candidate stop record.');
 assert.match(manualBrowserAudit, /candidate329Services/, 'Route 329 control records exact candidate timetable evidence.');
-assert.match(manualBrowserAudit, /Valid Enfield route-329 candidate service rows must be preserved/);
-assert.match(manualBrowserAudit, /Enfield route-329 Browser rows must leave Operator blank/);
-assert.match(manualBrowserAudit, /Browser Sources & checks must expose route 329 operator conflict as a review item/);
-assert.match(manualBrowserAudit, /Generated Word must count unresolved route-329 operator evidence as a planner review item/);
+assert.match(manualBrowserAudit, /accepted Enfield route-329 control must not fabricate a resolved planner service row/);
+assert.match(manualBrowserAudit, /accepted Enfield route-329 control must not fabricate a resolved Word summary row/);
+assert.match(manualBrowserAudit, /Browser Sources & checks must expose the accepted route-329 unresolved timetable evidence/);
+assert.match(manualBrowserAudit, /Generated Word must preserve the accepted route-329 unresolved-evidence review row/);
 assert.match(manualBrowserAudit, /PE1 route 202 must preserve its three evidence-backed patterns/);
 assert.match(manualBrowserAudit, /PE1 Browser must not repeat the Bourne destination as an additional-services note/);
 assert.match(manualBrowserAudit, /PE1 Word must not repeat the Bourne destination as an additional-services note/);
@@ -57,7 +57,10 @@ assert.match(manualBrowserAudit, /Enfield Browser must not generate contradictor
 assert.match(manualBrowserAudit, /Enfield Word must not generate contradictory route-313 calendar wording/);
 assert.match(manualBrowserAudit, /candidateOperatorsAtStop.length > 1/, 'Route 329 evidence contract must retain conflicting operator identities without selecting one.');
 assert.match(manualBrowserAudit, /browserSourcesAndChecksUnresolvedEvidence/);
-assert.match(manualBrowserAudit, /activeJourney\.operatorName/);
+assert.match(manualBrowserAudit, /enfieldTflCapture\.responses/, 'Enfield 313 browser audit must replay captured TfL response bodies rather than synthesize a journey from iBus.');
+assert.match(manualBrowserAudit, /capturedEnfieldRegular\.operator/, 'Enfield 313 operator must be derived from the captured production identity bridge.');
+assert.match(manualBrowserAudit, /route313Timetable[\s\S]*route313Sequence/, 'Enfield 313 audit must use the captured timetable and route sequence through the production adapter.');
+assert.doesNotMatch(manualBrowserAudit, /activeJourney\.operatorName/, 'The old one-journey iBus-only Enfield fixture must not return.');
 assert.doesNotMatch(c4PushWorkflow, /atlas-bus-beta-candidate|force_refresh:\s*true|pages|deploy|publish/i, 'C4 validation calls only the frozen-candidate diagnostic with no acquisition or publication path');
 assert.match(dispatchWorkflow, /S2E-1 offline preflight accepts only the exact zero-download C1B selector/);
 assert.match(dispatchWorkflow, /tnds-trust-browser-offline-preflight:[\s\S]*atlas-bus-beta-s2e-1-intelligence-restoration[\s\S]*outputs\.trust_mode == 'offline_preflight'/);

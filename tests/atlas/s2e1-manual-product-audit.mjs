@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
 import { launchAtlasBrowser } from './playwright-launch.mjs';
 import { createPreparedBusDataAdapter } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
@@ -12,15 +13,24 @@ import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
 const [candidateArg, reportArg] = process.argv.slice(2);
 if (!candidateArg) throw new Error('Usage: node tests/atlas/s2e1-manual-product-audit.mjs <Run-75-candidate-root> [report.json]');
 const candidateRoot = path.resolve(candidateArg);
-const repositoryRoot = path.resolve(new URL('../../', import.meta.url).pathname);
+const repositoryRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const tflWalthamOperatingFixture = JSON.parse(await readFile(path.join(repositoryRoot, 'tests/atlas/fixtures/tfl-waltham-stop-a-operating-period-1a.json'), 'utf8'));
 const tflWalthamByLine = new Map(tflWalthamOperatingFixture.requests.map(request => [String(request.lineId), request.response]));
 const enfieldIbusIndex = JSON.parse(await readFile(path.join(repositoryRoot, 'atlas/data/tfl-ibus/20261009/operator-index.json'), 'utf8'));
+const enfieldTflCapture = JSON.parse(await readFile(path.join(repositoryRoot, 'tests/atlas/fixtures/enfield-route313-tfl-capture-2026-10-23.json'), 'utf8'));
+const enfieldTflResponses = new Map(enfieldTflCapture.responses.map(response => [response.path, response]));
+const capturedEnfieldStop = enfieldTflCapture.stopPoint;
+const capturedEnfieldRegular = enfieldTflCapture.observedServices.find(service => service.intervalId === '0' && service.direction === 'inbound' && service.calendarProfileId === 'non-school-day');
+const capturedEnfieldSchoolWorking = enfieldTflCapture.observedServices.find(service => service.intervalId === '1' && service.direction === 'inbound' && service.calendarProfileId === 'school-day');
+if (!capturedEnfieldRegular || !capturedEnfieldSchoolWorking || capturedEnfieldRegular.routeMetadata !== 'matched' || capturedEnfieldSchoolWorking.routeMetadata !== 'incomplete') throw new Error('Captured Enfield 313 regular and school-working evidence is incomplete.');
+assert.deepEqual([capturedEnfieldRegular.departureCountsByDay.monday, capturedEnfieldRegular.departureCountsByDay.friday], [56, 56], 'Actual captured route-313 regular interval must retain its weekday population.');
+assert.equal(capturedEnfieldSchoolWorking.departureCountsByDay.monday, 1, 'Actual captured school-working interval must remain a separate one-journey/day record.');
+assert.equal(capturedEnfieldRegular.operatorEvidence?.operator?.name, 'Arriva London North', 'Actual captured iBus evidence must resolve the regular route-313 operator.');
 const enfieldControls = [
-  { id: 'enfield-313-e2e', label: 'Enfield route 313 frozen candidate/iBus operator control', latitude: 51.6522, longitude: -0.0809, radius: 250, focusRoutes: ['313'] },
-  { id: 'enfield-329-e2e', label: 'Enfield route 329 frozen candidate operator control', latitude: 51.6522, longitude: -0.0809, radius: 250, focusRoutes: ['329'] }
+  { id: 'enfield-313-e2e', label: 'Enfield route 313 captured TfL service control', latitude: capturedEnfieldStop.lat, longitude: capturedEnfieldStop.lon, radius: 250, focusRoutes: ['313'] },
+  { id: 'enfield-329-e2e', label: 'Enfield route 329 frozen candidate operator control', latitude: 51.65167, longitude: -0.07946, radius: 250, focusRoutes: ['329'] }
 ];
 const enfieldFixtures = new Map();
 if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') {
@@ -40,10 +50,20 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') {
   const probeSite = confirmSite(createSite({ suppliedAddress: 'Enfield Town', displayAddress: 'Enfield Town', latitude: enfieldControls[0].latitude, longitude: enfieldControls[0].longitude, assessmentPoint: { method: 'coordinates_entered' } }), { confirmedAt: '2026-10-22T00:00:00Z' });
   const stopResult = await prepared.nearbyStops(probeSite, { radius: 2000 });
   if (!stopResult.ok) throw new Error(`Frozen candidate Enfield stop lookup failed: ${stopResult.message}`);
-  const route313Patterns = enfieldIbusIndex.patterns.filter(pattern => String(pattern.serviceLineNo) === '313' && pattern.journeys.some(journey => journey.calendarEvidence?.some(calendar => calendar.calendarDay === '2026-10-23' && calendar.blockRunsOnDay === true)));
-  const match = (stopResult.data ?? []).flatMap(stop => route313Patterns.filter(pattern => pattern.orderedStopPointIds.includes(String(stop.id))).map(pattern => ({ stop, pattern })))
-    .sort((left, right) => Number(left.stop.distanceMetres ?? 0) - Number(right.stop.distanceMetres ?? 0) || left.pattern.patternIdx.localeCompare(right.pattern.patternIdx))[0];
-  if (!match) throw new Error('Frozen Run #75 candidate has no Enfield stop that matches an active 2026-10-23 route-313 iBus ordered pattern.');
+  const route313Response = pathname => enfieldTflResponses.get(pathname)?.body ?? null;
+  const route313Route = route313Response('/Line/313/Route');
+  const route313Timetable = route313Response('/Line/313/Timetable/' + capturedEnfieldStop.id);
+  const route313Sequence = route313Response('/Line/313/Route/Sequence/inbound');
+  if (!route313Route || !route313Timetable || !route313Sequence) throw new Error('Captured Enfield TfL route-313 API responses are incomplete.');
+  const route313Operator = capturedEnfieldRegular.operator;
+  if (route313Operator !== 'Arriva London North') throw new Error('Captured productive iBus identity bridge did not resolve Arriva London North.');
+  enfieldFixtures.set('enfield-313-e2e', {
+    routeNumber: '313', stopId: String(capturedEnfieldStop.id), stopName: String(capturedEnfieldStop.name), operator: route313Operator,
+    operatorEvidence: capturedEnfieldRegular.operatorEvidence, stopPoints: [{ id: String(capturedEnfieldStop.id), naptanId: String(capturedEnfieldStop.id), commonName: String(capturedEnfieldStop.name), name: String(capturedEnfieldStop.name), lat: Number(capturedEnfieldStop.lat), lon: Number(capturedEnfieldStop.lon), stopType: capturedEnfieldStop.stopType, indicator: capturedEnfieldStop.stopLetter, towards: capturedEnfieldStop.towards, lines: (capturedEnfieldStop.lines ?? []).map(line => ({ id: String(line.id), name: String(line.name ?? line.id) })) }],
+    route: route313Route, timetable: route313Timetable, sequences: { inbound: route313Sequence },
+    fixtureProvenance: 'Exact captured TfL Route, TimetableResponse and RouteSequence responses from the bounded Enfield assessment on 2026-10-23; stop identity is copied from the captured MatchedStop. The normal interval and incomplete school-working interval remain unedited.'
+  });
+  Object.assign(enfieldControls[0], { latitude: Number(capturedEnfieldStop.lat), longitude: Number(capturedEnfieldStop.lon) });
   const candidate329Result = await prepared.servicesForStops(stopResult.data ?? []);
   if (!candidate329Result.ok) throw new Error(`Frozen candidate Enfield timetable lookup failed: ${candidate329Result.message}`);
   const candidate329Services = (candidate329Result.data ?? []).filter(service => String(service.routeNumber) === '329');
@@ -52,26 +72,9 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') {
     .map(([stopId]) => ({ serviceId: service.id ?? null, stopId, operator: service.operator ?? null, provider: service.provider ?? service.timetableSource ?? service.source?.provider ?? null })));
   const route329ServiceStopIds = new Set(candidate329UsableAtStops.map(evidence => String(evidence.stopId)));
   const route329StopCandidates = (stopResult.data ?? []).filter(stop => (stop.routes ?? []).some(value => String(value) === '329'));
-  const route329Stop = [...route329StopCandidates].sort((left, right) => Number(route329ServiceStopIds.has(String(right.id)))-Number(route329ServiceStopIds.has(String(left.id))) || Number(left.distanceMetres ?? 0)-Number(right.distanceMetres ?? 0) || String(left.id).localeCompare(String(right.id)))[0];
+  const route329Stop = route329StopCandidates.find(stop => String(stop.id) === '490006588R' && route329ServiceStopIds.has(String(stop.id)));
   if (!route329Stop) throw new Error('Frozen Run #75 candidate has no Enfield BODS route-329 stop within 2,000 metres of the control point.');
-  Object.assign(enfieldControls[0], { latitude: Number(match.stop.latitude), longitude: Number(match.stop.longitude) });
-  Object.assign(enfieldControls[1], { latitude: Number(route329Stop.latitude), longitude: Number(route329Stop.longitude) });
-  const activeJourney = match.pattern.journeys.find(journey => journey.calendarEvidence?.some(calendar => calendar.calendarDay === '2026-10-23' && calendar.blockRunsOnDay === true));
-  const ids = [...match.pattern.orderedStopPointIds];
-  enfieldFixtures.set('enfield-313-e2e', {
-    stopId: String(match.stop.id), stopName: String(match.stop.name), patternId: String(match.pattern.patternIdx),
-    patternDirection: String(match.pattern.direction), ids,
-    activeJourney: { journeyIdx: String(activeJourney.journeyIdx), blockIdx: String(activeJourney.blockIdx), operatorCode: activeJourney.operatorCode, operatorName: activeJourney.operatorName },
-    stopPoints: [{ id: String(match.stop.id), naptanId: String(match.stop.id), commonName: String(match.stop.name), lat: enfieldControls[0].latitude, lon: enfieldControls[0].longitude, stopType: 'NaptanPublicBusCoachTram', lines: [{ id: '313', name: '313' }] }],
-    route: { id: '313', routeSections: [{ id: `313-${match.pattern.patternIdx}`, direction: 'outbound', originationName: ids[0], destinationName: ids.at(-1), originator: ids[0], destination: ids.at(-1), serviceType: 'Regular', validFrom: enfieldIbusIndex.validFrom, validTo: enfieldIbusIndex.validTo }] },
-    sequence: { lineId: '313', direction: 'outbound', stopPointSequences: [{ branchId: 1, serviceType: 'Regular', stopPoint: ids.map(naptanId => ({ naptanId })) }] },
-    timetable: {
-      lineId: '313', lineName: '313', direction: 'outbound', directionId: '1', stations: ids.map(id => ({ id, name: id })),
-      timetable: { departureStopId: String(match.stop.id), routes: [{ stationIntervals: [{ id: String(match.pattern.patternIdx), intervals: ids.map((stopId, index) => ({ stopId, timeToArrival: index })) }],
-        schedules: [{ name: 'Monday to Sunday', knownJourneys: [{ intervalId: String(match.pattern.patternIdx), vehicleJourneyId: `ibus-${activeJourney.journeyIdx}`, stopTimes: [{ stopId: String(match.stop.id), departureTime: { hour: 7, minute: 10 } }] }] }] }] }
-    }
-  });
-  enfieldFixtures.set('enfield-329-e2e', {
+    enfieldFixtures.set('enfield-329-e2e', {
     stopId: String(route329Stop.id), stopName: String(route329Stop.name), routeNumber: '329',
     // Inside Greater London the normal app selects TfL stop discovery. Project
     // only this exact Run #75 NaPTAN stop identity, coordinates and route
@@ -121,24 +124,22 @@ const chingfordTimetables657 = {
 };
 const report = { schema: 'atlas-bus-s2e1-normal-product-browser-word-audit-v1', candidateRoot, candidateRun: '39430415441', candidateArtifactId: '12275615359', candidateDigest: 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471', candidateProducerSha: '151199cc914c235870f444d26b03c2309edbd035', acquisitionAttempted: false, publicationAttempted: false, deploymentAttempted: false, controls: {}, failures: [] };
 if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') report.enfieldIbusFixture = {
-  source: 'Exact checked-in TfL iBus Base_Version 20261009 index plus selected Run #75 NaPTAN StopPoint; deterministic TfL API response fixture; no live TfL requests.',
+  source: 'Exact captured Enfield TfL Route, TimetableResponse and RouteSequence bodies plus checked-in 20261009 iBus evidence; route 329 stop identity and timetable/operator evidence remain candidate-backed; no live TfL requests.',
   baseVersion: enfieldIbusIndex.baseVersion,
   validFrom: enfieldIbusIndex.validFrom,
   validTo: enfieldIbusIndex.validTo,
   route313: {
-    stopId: enfieldFixtures.get('enfield-313-e2e').stopId,
-    patternId: enfieldFixtures.get('enfield-313-e2e').patternId,
-    journeyIdx: enfieldFixtures.get('enfield-313-e2e').activeJourney.journeyIdx,
-    operatorCode: enfieldFixtures.get('enfield-313-e2e').activeJourney.operatorCode,
-    operatorName: enfieldFixtures.get('enfield-313-e2e').activeJourney.operatorName,
-    orderedStopPointIds: enfieldFixtures.get('enfield-313-e2e').ids
+    captureSchema: enfieldTflCapture.schema, capturedAt: enfieldTflCapture.capturedAt, assessmentDate: enfieldTflCapture.assessmentDate,
+    stopId: enfieldFixtures.get('enfield-313-e2e').stopId, operatorName: enfieldFixtures.get('enfield-313-e2e').operator,
+    operatorEvidence: enfieldFixtures.get('enfield-313-e2e').operatorEvidence, fixtureProvenance: enfieldFixtures.get('enfield-313-e2e').fixtureProvenance,
+    regularService: capturedEnfieldRegular, schoolWorking: capturedEnfieldSchoolWorking
   },
   route329CandidateStop: { stopId: enfieldFixtures.get('enfield-329-e2e').stopId, name: enfieldFixtures.get('enfield-329-e2e').stopName, latitude: Number(enfieldControls[1].latitude), longitude: Number(enfieldControls[1].longitude), stopFixtureProvenance: enfieldFixtures.get('enfield-329-e2e').stopFixtureProvenance, candidateRoutes: enfieldFixtures.get('enfield-329-e2e').candidateStopRoutes, candidateServices: enfieldFixtures.get('enfield-329-e2e').candidateServices, usableCandidateEvidenceAtStops: enfieldFixtures.get('enfield-329-e2e').usableCandidateEvidenceAtStops },
   route329ServiceLineMappings: enfieldIbusIndex.serviceLines.filter(line => String(line.serviceLineNo) === '329'),
   route329ProductivePatterns: enfieldIbusIndex.patterns.filter(pattern => String(pattern.serviceLineNo) === '329' && Number(pattern.patternType) === 1).length
 };
 report.enfieldCoverage = process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1'
-  ? 'Dedicated evidence-only mode selects exact Run #75 candidate stops for routes 313 and 329, uses the checked-in 20261009 iBus index for a controlled TfL 313 response, and projects only the exact route-329 Run #75 NaPTAN stop identity/coordinates/routes into the local StopPoint boundary fixture. All route-329 timetable and operator evidence comes from the frozen candidate; the fixture supplies none. No live TfL request is made.'
+  ? 'Dedicated evidence-only mode replays the exact captured TfL 313 Route, TimetableResponse and RouteSequence bodies with the captured MatchedStop and uses Run #75 for national supplementation; route 329 stop identity and timetable/operator evidence remain frozen-candidate-backed. No live TfL request is made.'
   : 'The normal-shell audit intentionally does not fabricate TfL StopPoint records; with live TfL disabled, the frozen candidate contains no TfL StopPoint response fixture for Enfield.';
 const errors = [];
 report.chingfordFixtureNote = 'Chingford route 657 browser regression uses the existing fixture-backed timetable golden. Fixture StopPoint coordinates are anchored at the confirmed control point solely for deterministic radius matching and are not represented as live TfL location evidence.';
@@ -146,6 +147,7 @@ const failedRequests = [];
 const failedResponses = [];
 const externalRequests = [];
 const statusManifestFallbacks = [];
+const tflReplayRequests = [];
 let server;
 let browser;
 let activeControl = null;
@@ -256,6 +258,8 @@ try {
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'Ok', routes: [{ distance: 100, duration: 60, geometry: { type: 'LineString', coordinates: [[-0.03, 51.68], [-0.031, 51.681]] } }] }) });
   });
   await page.route('https://api.tfl.gov.uk/**', route => {
+    const replayUrl = new URL(route.request().url());
+    if (activeControl?.id?.startsWith('enfield-')) tflReplayRequests.push({ control: activeControl.id, path: replayUrl.pathname, query: replayUrl.search.slice(1) });
     if (activeControl?.id === 'waltham-cross') {
       const url = new URL(route.request().url());
       let body = [];
@@ -287,9 +291,9 @@ try {
       const url = new URL(route.request().url());
       let body = [];
       if (url.pathname === '/StopPoint') body = { stopPoints: fixture.stopPoints };
-      else if (url.pathname === `/Line/${fixture.routeNumber ?? '313'}/Route`) body = fixture.route;
+      else if (url.pathname.endsWith('/Route') && decodeURIComponent(url.pathname.split('/')[2] ?? '').split(',').includes(String(fixture.routeNumber ?? '313'))) body = [fixture.route];
       else if (url.pathname === `/Line/${fixture.routeNumber ?? '313'}/Timetable/${fixture.stopId}`) body = fixture.timetable;
-      else if (url.pathname === `/Line/${fixture.routeNumber ?? '313'}/Route/Sequence/outbound`) body = fixture.sequence;
+      else if (url.pathname.startsWith(`/Line/${fixture.routeNumber ?? '313'}/Route/Sequence/`)) body = fixture.sequences?.[url.pathname.split('/').at(-1)] ?? [];
       return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
     }
     if (activeControl?.id !== 'chingford') return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
@@ -423,19 +427,23 @@ try {
         for (const field of parityFields) assert.equal(normalized(wordRow[field]), normalized(browserRow[field]), `Browser/Word ${field} differs for route ${browserRow.Route}.`);
       }
       if (control.id.startsWith('enfield-')) {
-        const browser313 = rendered.filter(row => normalized(row.Route) === '313');
+        const browser313 = rendered.filter(row => normalized(row.Route).replace(/[†‡]/g, '') === '313');
         if (control.id === 'enfield-313-e2e') {
-        assert.ok(browser313.length, 'Enfield production Browser did not render the fixture-backed TfL 313 service.');
+        assert.ok(browser313.length, 'Enfield production Browser did not render the captured-response TfL 313 service.');
+        assert.ok(browser313.some(row => /Typically every ~20 mins/.test(row['Typical frequency']) && /Every ~30 mins/.test(row['Typical frequency'])), 'Enfield production Browser did not retain the actual normal 313 timetable population.');
+        assert.ok(browser313.every(row => !/1 journey\/day/i.test(row['Typical frequency'])), 'The incomplete one-trip school interval must not replace the normal 313 principal row.');
+        assert.match(renderedServiceNotes.join(' '), /Short workings: Some route 313 journeys operate to Crown Road \(EN1\) \(School-day journeys only\)\./i, 'The Run #75 school-day short working must remain visible as a subordinate route qualification.');
         const route313BrowserText = `${browser313.map(row => `${row['Typical frequency']} ${row['Operating period at stop']}`).join(' ')} ${renderedServiceNotes.join(' ')}`;
         assert.doesNotMatch(route313BrowserText, /Non-school days only\. School-day journeys only\./i, 'Enfield Browser must not generate contradictory route-313 calendar wording.');
         assert.doesNotMatch(route313BrowserText, /313\s*[–-]\s*(?:School-day journeys only|Non-school days only)\./i, 'Enfield Browser must not classify the whole route-313 principal as school-only or non-school-only.');
-        const expectedOperator313 = normalized(enfieldFixtures.get('enfield-313-e2e').activeJourney.operatorName);
+        const expectedOperator313 = normalized(enfieldFixtures.get('enfield-313-e2e').operator);
         assert.ok(browser313.every(row => normalized(row.Operator) === expectedOperator313), `Enfield route 313 Browser operator differs from the active iBus operator ${expectedOperator313}.`);
-        const word313 = wordRows.filter(row => normalized(row.Route) === '313');
+        const word313 = wordRows.filter(row => normalized(row.Route).replace(/[†‡]/g, '') === '313');
         assert.equal(word313.length, browser313.length, 'Enfield route 313 Browser/Word row counts differ.');
         assert.ok(word313.every(row => normalized(row.Operator) === expectedOperator313), `Enfield route 313 Word operator differs from the active iBus operator ${expectedOperator313}.`);
         assert.doesNotMatch(exportedWordText, /Non-school days only\. School-day journeys only\./i, 'Enfield Word must not generate contradictory route-313 calendar wording.');
         assert.doesNotMatch(exportedWordText, /313\s*[–-]\s*(?:School-day journeys only|Non-school days only)\./i, 'Enfield Word must not classify the whole route-313 principal as school-only or non-school-only.');
+        assert.match(exportedWordText, /Short workings: Some route 313 journeys operate to Crown Road \(EN1\) \(School-day journeys only\)\./i, 'Generated Word must preserve the same subordinate route-313 short-working qualification as Browser.');
         const browser329 = rendered.filter(row => normalized(row.Route) === '329');
         const word329 = wordRows.filter(row => normalized(row.Route) === '329');
         outcome.enfieldOperatorTrace = {
@@ -448,12 +456,10 @@ try {
           const browser329 = rendered.filter(row => normalized(row.Route) === '329');
           const word329 = wordRows.filter(row => normalized(row.Route) === '329');
           const stopId329 = enfieldFixtures.get('enfield-329-e2e').stopId;
-          assert.ok(browser329.length > 0, 'Valid Enfield route-329 candidate service rows must be preserved despite unresolved operator identity.');
-          assert.equal(word329.length, browser329.length, 'Enfield route-329 Browser and Word service row counts must match.');
-          assert.ok(browser329.every(row => !normalized(row.Operator)), 'Enfield route-329 Browser rows must leave Operator blank while evidence conflicts.');
-          assert.ok(word329.every(row => !normalized(row.Operator)), 'Enfield route-329 Word rows must leave Operator blank while evidence conflicts.');
-          assert.match(checksText, /Route 329[^\n]*operator evidence: Operator evidence is unresolved or conflicting; ATLAS has therefore not stated an operator\./i, 'Browser Sources & checks must expose route 329 operator conflict as a review item.');
-          assert.match(exportedWordText, /Additional operator evidence also requires planner review for routes 329/i, 'Generated Word must count unresolved route-329 operator evidence as a planner review item.');
+          assert.equal(browser329.length, 0, 'The accepted Enfield route-329 control must not fabricate a resolved planner service row from conflicting candidate evidence.');
+          assert.equal(word329.length, 0, 'The accepted Enfield route-329 control must not fabricate a resolved Word summary row from conflicting candidate evidence.');
+          assert.match(checksText, /Route 329 · Stop 490006588R · timetable source: This route\/stop timetable request remained unresolved/i, 'Browser Sources & checks must expose the accepted route-329 unresolved timetable evidence.');
+          assert.match(exportedWordText, /Planner review required: timetable\/source evidence requires review for routes 329 at one or more assessed stops/i, 'Generated Word must preserve the accepted route-329 unresolved-evidence review row.');
           const candidateRecordsAtStop = enfieldFixtures.get('enfield-329-e2e').candidateServices.filter(service => service.stopsWithSchedules.includes(stopId329));
           const candidateOperatorsAtStop = [...new Set(candidateRecordsAtStop.map(service => normalized(service.operator)).filter(Boolean))].sort();
           assert.ok(candidateRecordsAtStop.length >= 2, 'Candidate evidence must show the competing BODS route-329 records at the assessed stop.');
@@ -472,7 +478,7 @@ try {
             candidateRecordsAtStop, candidateOperatorsAtStop,
             iBusServiceLineMappings: serviceLineMappings, iBusProductivePatterns: productivePatterns,
             unresolvedEvidence: `Route 329 · Stop ${stopId329} · timetable source: unresolved`,
-            conclusion: 'Valid Run #75 route-329 service rows remain visible, but no unique approved operator can be selected: distinct BODS records at the stop conflict and the applicable iBus index has no route-329 mapping. Browser Sources & checks and the Word review qualification both make the unresolved operator status explicit; Operator remains blank.'
+            conclusion: 'At the accepted Run #75 route-329 control, conflicting BODS records do not become a fabricated resolved summary row. Browser Sources & checks and the Word review qualification expose the unresolved operator evidence; no operator is stated.'
           };
         }
       }
@@ -623,6 +629,7 @@ try {
 }
 
 report.browserErrors = errors;
+report.tflReplayRequests = tflReplayRequests;
 report.failedRequests = failedRequests;
 report.failedResponses = failedResponses;
 report.externalRequests = externalRequests;

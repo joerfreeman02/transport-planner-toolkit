@@ -306,6 +306,34 @@ Run #40 report artifact `12489174997`, name `atlas-bus-beta-s2e1-normal-runtime-
 - Dependabot: configured. Codecov: deferred pending coverage baseline. OpenSSF Scorecard: later security/release milestone. Sentry: deferred pending telemetry/privacy architecture. Renovate: not required alongside Dependabot.
 
 **C4 gate: READY FOR TECHNICAL DIRECTOR REVIEW. Product Owner manual acceptance remains unauthorized until that review is complete.**
+
+## S2E-1-C4 — final Enfield route-313 production-path diagnosis — 2026-10-23
+
+This append-only closeout supersedes the earlier C4 route-313 uncertainty above. It records the bounded capture and deterministic replay; it does not reopen any other accepted site or change production Bus behavior.
+
+### Finding: the one-journey result came from the harness
+
+The previously reported one-school-journey Chingford-bound row was not produced by the normal Enfield TfL composition path. The old acceptance harness selected productive iBus pattern `6018` / journey `438477` and built a synthetic TfL `TimetableResponse` containing that single journey. That pattern is useful operator-identity evidence, but it is not the complete public timetable. Treating it as the whole TfL service manufactured the one-journey/day result. The old check also searched for route text `313` without accounting for the legitimate `†` marker and expected the wrong short-working wording; both were harness assertions, not application behavior.
+
+The harness now replays the exact bounded TfL Route, TimetableResponse and inbound RouteSequence bodies captured on 2026-10-23 for matched stop `490006587E` through the normal Browser assessment and Word export. The fixture is `tests/atlas/fixtures/enfield-route313-tfl-capture-2026-10-23.json`; it contains no authentication material. Its regular interval has matched route metadata, a complete 21-stop pattern to Chingford Station and 56 departures on each weekday, 53 Saturday and 38 Sunday. The separate interval 1 record has one Monday–Friday departure, school-day applicability, incomplete route metadata and an eight-stop pattern that does not reach Chingford. It cannot replace the normal principal service.
+
+The replayed production Browser and Word row is `313†`, towards Chingford Station, operator **Arriva London North**, `Mon-Sat: Typically every ~20 mins; Sun: Every ~30 mins`; both outputs agree on the row and operating period. The dagger is the existing separate-timetable marker. The immutable Run #75 evidence retains the scoped Crown Road (EN1) school-day short-working qualification; it does not qualify the principal as school-only. The contradictory phrase `Non-school days only. School-day journeys only.` remains absent. Existing `BUS-ROBUSTNESS-1A4` covers the opposite 313 principal endpoint regression.
+
+### Operator identity bridge and route-329 preservation
+
+The actual normal 313 service can be matched to the applicable TfL iBus evidence without treating the individual iBus journey as the timetable. The productive service-line mapping is 313 → contract line 313; the productive ordered pattern contains the exact assessed NaPTAN stop `490006587E` and continues along the public route toward Chingford. Its applicable Journey → Block → Operator chain resolves code `MN`, **Arriva London North**, with an active calendar on assessment date 2026-10-23 and one candidate operator. The deterministic Browser and generated Word preserve that supported operator.
+
+The unchanged route-329 control remains Enfield Town / Genotin Road, stop `490006588R` at `51.65167,-0.07946`. Run #75 contains two competing BODS records at that stop (Arriva London North and Arriva London); the applicable iBus index has no 329 Service_Line mapping or productive pattern. Browser therefore does not invent a resolved 329 summary row; Sources & Checks exposes the unresolved route/stop item and Word carries the planner review qualification. This is the accepted fail-safe result. No route-329 product behavior was changed.
+
+### Correction and validation
+
+Only the deterministic acceptance harness and its workflow contract were corrected; production application code, candidate data and version/build were not changed. The C4 Browser/Word audit passes the exact 313 capture replay plus the accepted 329 unresolved-evidence control, with no Browser console errors, failed requests, failed responses or external requests. It records Run #75 (`39430415441`, artifact `12275615359`, canonical digest `sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`, producer SHA `151199cc914c235870f444d26b03c2309edbd035`) and reports acquisition/publication/deployment as false. The audit is route-evidence scoped: other Enfield routes were not supplied captured TfL bodies and remain review items in that diagnostic; this is not represented as a full live Enfield assessment.
+
+Local deterministic verification passed: full Bus-data Python suite (**309 tests**), full deterministic ATLAS suite, focused S2E planner/assessment/TfL iBus/workflow-contract guards, captured-response Browser/Word audit for 313 and route-329 preservation, and `git diff --check`. The isolated C4 branch’s exact hosted validation is recorded in the follow-up handover entry after the push-triggered workflow completes.
+
+The tested production/runtime code remains `c23c7aa16e549ab3f9f48154f3816865af372928`; current branch HEAD `47c2f82dd0965a3edfe4fcb80607f591c5eb9c3f` contains no production change relative to that runtime. Run #75 remains immutable. No fresh national acquisition, candidate rebuild/modification, publication, deployment, main merge, release, or version/build change occurred. Version/build remain `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`.
+
+**C4 route-313 diagnosis: no production defect proven; corrected evidence harness is ready for hosted validation and Technical Director review.**
 ## S2E-1-C4 — Pipers route 46 selected-stop frequency correction — 2026-10-23
 
 This append-only addendum records the final narrow Pipers route 46 correction and its full hosted regression. It does not rewrite earlier audit entries. Tested runtime SHA: `c23c7aa16e549ab3f9f48154f3816865af372928`.

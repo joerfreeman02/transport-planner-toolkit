@@ -477,7 +477,7 @@ button.secondary, .secondary { border-color: #c3d1df; background: #fff !importan
 .task-stages li[data-state="complete"] { border-color: #43845f; color: #24583b; }
 .data-status { margin-top: 12px; padding: 10px; border-color: #d7e1ea; background: #f7f9fb; }
 .data-status-heading h3 { font-size: .88rem; }
-.evidence-panel { grid-column: 1 / -1; grid-row: 3; padding: 20px 22px 26px; border-top: 1px solid #d7e1ea; border-radius: 0 0 11px 11px; background: #fbfcfe; }
+.evidence-panel { margin-top: 18px; padding: 20px 22px 26px; border: 1px solid #d7e1ea; border-radius: 11px; background: #fbfcfe; }
 .evidence-heading h3 { font-size: 1.28rem; }
 .evidence-heading #evidenceSummary { padding: 7px 10px; border: 1px solid #dce4ec; border-radius: 7px; background: #f6f8fa; }
 .result-review-notice { margin-top: 9px; padding: 9px 12px; border-left: 4px solid #b2463d; border-radius: 5px; background: #fff2f0; color: #64231e; font-size: .82rem; font-weight: 750; }
@@ -517,7 +517,6 @@ footer > a:last-child { color: #dce6ef; text-decoration: none; }
   .workspace { grid-template-columns: minmax(0,1fr); }
   .steps { grid-column: 1; grid-row: 2; padding-right: 16px; }
   .persistent-map-panel { grid-column: 1; grid-row: 3; position: relative; top: auto; margin: 0 16px 18px; }
-  .evidence-panel { grid-row: 4; }
   .site-map { height: min(62vh,620px); min-height: 410px; }
 }
 @media (max-width: 700px) {

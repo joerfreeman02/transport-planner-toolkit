@@ -41,15 +41,15 @@ await page.route('https://api.tfl.gov.uk/**', route => route.fulfill({ status: 2
 try {
   await page.goto(review.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   assert.equal(page.url(), review.url);
-  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.15/);
-  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--atlas-blue').trim()), '#002060');
-  for (const section of ['Report Builder', 'Modules', 'Projects', 'About']) {
+  assert.match(await page.locator('footer').innerText(), /2\.0\.0-alpha\.15/);
+  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--atlas-blue').trim()), '#002761');
+  for (const section of ['Modules', 'About']) {
     await page.getByRole('button', { name: section }).click();
     const heading = section === 'About' ? 'ATLAS — Automated Transport & Location Assessment System' : section;
     assert.equal(await page.getByRole('heading', { name: heading, exact: true }).isVisible(), true);
   }
   await page.getByRole('button', { name: 'Modules' }).click();
-  assert.equal(await page.getByRole('heading', { name: 'Establish the assessment point', exact: true }).isVisible(), true);
+  assert.equal(await page.getByRole('heading', { name: 'Guided Bus Assessment', exact: true }).isVisible(), true);
   assert.equal(await page.locator('#siteMap.leaflet-container').isVisible(), true);
   await page.getByLabel('Site address or name').fill('33 Westow Street, Crystal Palace');
   await page.getByRole('button', { name: 'Find site' }).click();
@@ -181,7 +181,7 @@ try {
     directAtlasRoute: new URL(review.url).pathname,
     cssAndLeafletLoaded: true,
     javascriptModulesLoaded: true,
-    navigation: ['Report Builder', 'Modules', 'Projects', 'About'],
+    navigation: ['Modules', 'About'],
     siteSelectorAccessible: true,
     fixtureEvidenceRows: 2,
     pageErrors,

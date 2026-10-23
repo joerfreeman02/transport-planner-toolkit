@@ -48,7 +48,7 @@ try {
   assert.match(await page.locator('#geocodeStatus').innerText(), /building or location details/i);
   await page.getByRole('button', { name: 'Use this result' }).click();
   await page.locator('.assessment-point-marker').waitFor({ timeout: 5000 });
-  assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).isDisabled(), true);
+  assert.equal(await page.locator('#findStops').isDisabled(), true);
   const selected = await page.evaluate(() => window.__ATLAS_SITE_SELECTOR__.getSnapshot().site);
   assert.equal(selected.suppliedAddress, productOwnerQuery);
   assert.deepEqual([selected.geocoding.latitude, selected.geocoding.longitude], [51.7901, 0.0123]);
@@ -68,6 +68,7 @@ try {
   assert.deepEqual([moved.geocoding.latitude, moved.geocoding.longitude], [51.7901, 0.0123]);
   assert.equal(moved.assessmentPoint.adjustedFromCandidate, true);
 
+  await page.getByRole('button', { name: /Location looks right/ }).click();
   await page.getByRole('button', { name: 'Confirm assessment point' }).click();
   await page.getByText('Confirmed assessment point', { exact: true }).waitFor({ timeout: 5000 });
   const confirmed = await page.evaluate(() => window.__ATLAS_SITE_SELECTOR__.getSnapshot().confirmedSite);
@@ -81,9 +82,10 @@ try {
   const mapBox = await page.locator('#siteMap').boundingBox();
   await page.mouse.click(mapBox.x + mapBox.width * 0.72, mapBox.y + mapBox.height * 0.35);
   await page.waitForFunction(() => document.getElementById('selectedMethod').textContent === 'Adjusted on map' && document.getElementById('evidencePanel').hidden);
-  assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).isDisabled(), true);
+  assert.equal(await page.locator('#findStops').isDisabled(), true);
   assert.match(await page.locator('#stopStatus').innerText(), /earlier bus results were cleared/i);
 
+  await page.getByRole('button', { name: 'Change site' }).click();
   await page.getByLabel('Site address or name').fill('Unknown former depot site');
   await page.getByRole('button', { name: 'Find site' }).click();
   await page.waitForFunction(() => /We could not find a suitable match|Site search is temporarily unavailable/.test(document.getElementById('geocodeStatus')?.textContent || ''), null, { timeout: 30000 });
@@ -108,12 +110,13 @@ try {
   await page.waitForFunction(() => document.getElementById('selectedMethod').textContent === 'Entered coordinates');
   const entered = await page.evaluate(() => window.__ATLAS_SITE_SELECTOR__.getSnapshot().site);
   assert.deepEqual([entered.latitude, entered.longitude], [51.791, 0.014]);
+  await page.getByRole('button', { name: /Location looks right/ }).click();
   await page.getByRole('button', { name: 'Confirm assessment point' }).click();
   assert.match(await page.locator('#confirmationStatus').innerText(), /Entered coordinates/);
   assert.equal(await page.locator('#confirmedSite p').count(), 0);
 
   assert.equal(pageErrors.length, 0);
-  assert.equal(failedRequests.length, 0);
+  assert.equal(failedRequests.length, 0, JSON.stringify(failedRequests));
   console.log(JSON.stringify({
     productOwnerQuery,
     controlledQueries: geocodeQueries.slice(0, 2),

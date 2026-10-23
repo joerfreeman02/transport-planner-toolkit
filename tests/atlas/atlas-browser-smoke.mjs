@@ -31,8 +31,8 @@ await page.route('https://api.tfl.gov.uk/**', route => {
 try {
   await page.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
   assert.match(await page.locator('footer').innerText(), /2\.0\.0-alpha\.15/);
-  await page.getByRole('button', { name: 'Report Builder' }).click();
-  assert.equal(await page.getByRole('heading', { name: 'Report Builder', exact: true }).isVisible(), true);
+  assert.deepEqual(await page.locator('nav [data-view]').evaluateAll(nodes => nodes.map(node => node.dataset.view)), ['modules', 'about']);
+  assert.equal(await page.getByRole('button', { name: 'Projects' }).count(), 0, 'non-functional project navigation is not presented');
   await page.getByRole('button', { name: 'About' }).click();
   assert.equal(await page.getByRole('heading', { name: 'ATLAS — Automated Transport & Location Assessment System' }).isVisible(), true);
   assert.equal(await page.getByRole('heading', { name: 'Joe Freeman', exact: true }).isVisible(), true);
@@ -44,7 +44,7 @@ try {
   await page.getByRole('button', { name: 'Use this result' }).waitFor({ timeout: 5000 });
   assert.equal(await page.getByText('Possible match — not yet confirmed', { exact: true }).count(), 0);
   assert.equal(geocodeRequests, 1);
-  assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).isDisabled(), true);
+  assert.equal(await page.locator('#findStops').isDisabled(), true);
   await chooseFirstCandidateAndConfirm(page);
   assert.match(await page.locator('#confirmedSite').innerText(), /Confirmed from address/);
   assert.equal(await page.evaluate(() => window.__ATLAS_BUS_UI__.hasRadiusCircle()), true);
@@ -63,6 +63,7 @@ try {
   const requestsAfterFirstAssessment = tflRequests;
   assert.match(await page.locator('#resultSource').innerText(), /Transport for London.*OpenStreetMap routing/);
   assert.match(await page.locator('#resultFreshness').innerText(), /Assessment complete/);
+  await page.getByRole('button', { name: 'Change assessment' }).click();
   await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   assert.equal(tflRequests, requestsAfterFirstAssessment, 'A valid cache hit should not make another TfL request.');
   assert.equal(errors.length, 0);

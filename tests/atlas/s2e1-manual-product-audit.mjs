@@ -332,6 +332,7 @@ try {
       await page.locator('#longitude').fill(String(control.longitude));
       await page.locator('#coordinatesForm button[type="submit"]').click();
       await page.locator('#radius').fill(String(control.radius));
+      await page.locator('#confirmMapLocation').click();
       await page.locator('#confirmAssessmentPoint').click();
       assert.equal(await page.locator('#findStops').isEnabled(), true, 'Normal workflow did not enable Bus assessment after confirming the site.');
       await page.locator('#findStops').click();

@@ -59,7 +59,7 @@ const accessRouting = createOsrmAccessRoutingAdapter();
 const busStops = createBusStopDiscovery({ tflAdapter: tfl, naptanAdapter: preparedBusData, referenceData, crossBoundaryTfL: true });
 const busAssessment = createBusAssessment({ stopDiscovery: busStops, timetableData: authoritativeTimetable, accessRouting, referenceData });
 const selector = createSiteSelector();
-const views = ['report-builder', 'modules', 'projects', 'about'];
+const views = ['modules', 'about'];
 const METHOD_LABELS = Object.freeze({
   [SITE_LOCATION_METHODS.GEOCODED_CANDIDATE]: 'From address result',
   [SITE_LOCATION_METHODS.PLANNER_ADJUSTED]: 'Adjusted on map',
@@ -81,6 +81,7 @@ let selectedServiceIds = new Set();
 let selectionInitialised = false;
 let detailedEvidenceVisible = false;
 let radiusTouched = false;
+let locationChecked = false;
 
 function stopKey(stop) { return String(stop?.id || stop?.sourceId || ''); }
 function serviceKey(service) { return String(service?.id || `${service?.routeNumber}|${service?.operator}|${service?.origin}|${service?.destination}`); }
@@ -119,6 +120,8 @@ async function refreshDataStatus() {
       message.className = 'status-message success';
     }
   } catch { message.textContent = 'Bus data: Status unavailable'; message.className = 'status-message warning'; }
+  $('moduleDataStatus').textContent = message.textContent;
+  $('moduleDataStatus').dataset.state = message.classList.contains('success') ? 'current' : 'review';
 }
 
 async function updateBusData() {
@@ -142,6 +145,40 @@ function showView(name) {
   });
   if (location.hash !== `#${selected}`) history.replaceState(null, '', `#${selected}`);
   if (selected === 'modules' && map) setTimeout(() => map.invalidateSize({ pan: false, animate: false }), 0);
+}
+
+function updateGuidedWorkflow() {
+  const selectedSite = Boolean(selector.getSnapshot().site);
+  const hasResults = Boolean(currentBusResult?.ok);
+  const states = {
+    'site-step-card': selectedSite ? 'complete' : 'active',
+    'location-step-card': confirmedSite ? 'complete' : selectedSite ? 'active' : 'upcoming',
+    'assessment-settings-step-card': confirmedSite ? (hasResults ? 'complete' : 'active') : 'upcoming',
+    'assessment-step-card': hasResults ? 'complete' : confirmedSite ? 'active' : 'upcoming',
+    'results-step-card': hasResults ? 'active' : 'upcoming',
+    'export-step-card': hasResults ? 'active' : 'upcoming'
+  };
+  for (const [id, state] of Object.entries(states)) {
+    const card = $(id);
+    if (!card) continue;
+    card.dataset.workflowState = state;
+  }
+  $('results-step-card').hidden = !hasResults;
+  $('assessment-settings-step-card').hidden = !confirmedSite;
+  $('export-step-card').hidden = !hasResults;
+  $('confirmMapLocation').disabled = !selectedSite || Boolean(confirmedSite) || locationChecked;
+  $('confirmAssessmentPoint').disabled = !selectedSite || !locationChecked || Boolean(confirmedSite);
+  $('siteSetupContent').hidden = selectedSite;
+  $('siteStageSummary').hidden = !selectedSite;
+  if (selectedSite) $('siteStageSummaryText').textContent = `${selector.getSnapshot().site?.displayAddress || selector.getSnapshot().site?.suppliedAddress || 'Site selected'} · continue to map check`;
+  $('locationSetupContent').hidden = Boolean(confirmedSite) || locationChecked;
+  $('locationStageSummary').hidden = !locationChecked;
+  $('confirmSetupContent').hidden = !locationChecked || Boolean(confirmedSite);
+  $('confirm-point-step-card').dataset.workflowState = confirmedSite ? 'complete' : locationChecked ? 'active' : 'upcoming';
+  $('confirmPointStageSummary').hidden = !confirmedSite;
+  $('reviewMapStep').hidden = Boolean(confirmedSite);
+  if (locationChecked) $('locationStageSummaryText').textContent = `${selector.getSnapshot().site?.displayAddress || 'Site location'} checked on the map`;
+  if (confirmedSite) $('confirmPointStageSummaryText').textContent = `${confirmedSite.displayAddress || confirmedSite.suppliedAddress || 'Assessment point'} confirmed`;
 }
 
 function setCallout(element, message, state = 'neutral') {
@@ -168,11 +205,20 @@ function plannerFailure(kind, result) {
 
 function assessmentWording(result, services, selectedIds = null) {
   const presented = (services ?? []).filter(service => !selectedIds || (selectedIds.has(serviceKey(service)) && service.stopIds?.some(id => result.stops.some(stop => selectedIds.has(stopKey(stop)) && String(id) === stopKey(stop)))));
-  const routeLabels = [...new Set(presented.map(plannerRouteDisplayNumber).filter(Boolean))]
-    .sort((left, right) => left.localeCompare(right, 'en-GB', { numeric: true }));
-  const routeDescription = routeLabels.length === 1 ? `route ${routeLabels[0]}` : `${routeLabels.length} routes (${routeLabels.join(', ')})`;
+  const routeCount = new Set(presented.map(plannerRouteDisplayNumber).filter(Boolean)).size;
+  const stopCount = new Set(presented.flatMap(service => service.stopIds ?? []).map(String)).size;
+  const allLocations = [...new Set(presented.flatMap(service => String(service.principalLocationsText ?? '').split(/[,;·]/).map(value => value.trim()).filter(Boolean)))];
+  const locationText = allLocations.length ? ` Principal locations evidenced in the summaries include ${allLocations.slice(0, 4).join(', ')}${allLocations.length > 4 ? ' and other destinations' : ''}.` : '';
+  const intervals = presented.map(service => {
+    const text = String(service.typicalFrequencyText ?? '');
+    const match = text.match(/(?:every|~)\s*~?(\d+)\s*(?:–|-|to)\s*\d+\s*mins?|(?:every|~)\s*~?(\d+)\s*mins?/i);
+    return Number(match?.[1] ?? match?.[2]);
+  }).filter(Number.isFinite);
+  const frequent = intervals.filter(minutes => minutes <= 15).length;
+  const lessFrequent = intervals.filter(minutes => minutes >= 30).length;
+  const frequencyText = [frequent && `${frequent} pattern${frequent === 1 ? '' : 's'} with intervals of 15 minutes or less`, lessFrequent && `${lessFrequent} with intervals of 30 minutes or more`].filter(Boolean).join('; ');
   const base = presented.length
-    ? `The assessment identified service information for ${routeDescription} at the assessed stops. Route directions, principal locations, typical frequencies and operating periods are set out in Table 3.3, based on the timetable evidence available at the selected assessed stops.`
+    ? `The assessment identified ${presented.length} evidenced service pattern${presented.length === 1 ? '' : 's'} across ${routeCount} route${routeCount === 1 ? '' : 's'} at ${stopCount} selected stop${stopCount === 1 ? '' : 's'}.${frequencyText ? ` Available frequency summaries include ${frequencyText}.` : ''}${locationText} Table 3.3 sets out the directions, operating periods and selected-stop frequency basis.`
     : 'No matched timetable service summary is available for the selected assessed stops. Review Sources & checks before using this assessment.';
   const qualification = partialTimetableQualification(result.stops);
   return qualification ? `${base} ${qualification}` : base;
@@ -219,28 +265,29 @@ function assessmentMethod(site) {
 }
 
 function moveResultsMap(showResults) {
-  const frame = $('siteMapFrame');
-  const target = showResults ? $('resultsMapHost') : $('siteMapHome');
-  if (!frame || !target || frame.parentElement === target) return;
-  target.append(frame);
-  setTimeout(() => map?.invalidateSize({ pan: false, animate: false }), 0);
+  // The one Leaflet map remains in the workspace for setup and results.
+  if (map) setTimeout(() => map.invalidateSize({ pan: false, animate: false }), 0);
 }
 
 function collapseSiteSetup(collapsed) {
-  ['siteSetupContent', 'locationSetupContent', 'confirmSetupContent'].forEach(id => { if ($(id)) $(id).hidden = collapsed; });
-  $('siteStageSummary').hidden = !collapsed;
-  if (collapsed) $('siteStageSummaryText').textContent = `${confirmedSite?.displayAddress || confirmedSite?.suppliedAddress || 'Assessment point'} · Assessment point confirmed`;
+  const site = selector.getSnapshot().site;
+  $('siteSetupContent').hidden = collapsed;
+  $('siteStageSummary').hidden = !collapsed || !site;
+  if (collapsed) $('siteStageSummaryText').textContent = `${site?.displayAddress || site?.suppliedAddress || 'Assessment point'} · Site selected`;
+  updateGuidedWorkflow();
 }
 
 function collapseAssessmentSetup(collapsed) {
   $('assessmentSetupContent').hidden = collapsed;
   $('assessmentStageSummary').hidden = !collapsed;
   if (collapsed) $('assessmentStageSummaryText').textContent = `${lastAssessmentMode === 'nearest' ? 'Nearest stop assessment' : 'Full assessment'} · ${selectedRadius()} m radius`;
+  updateGuidedWorkflow();
 }
 
 function clearBusEvidence(message = 'Confirm the assessment point before checking nearby bus stops.') {
   const hadEvidence = !$('evidencePanel').hidden;
   confirmedSite = null;
+  locationChecked = false;
   radiusTouched = false;
   detailedEvidenceVisible = false;
   currentBusResult = null;
@@ -256,6 +303,9 @@ function clearBusEvidence(message = 'Confirm the assessment point before checkin
   $('refreshStops').disabled = true;
   $('exportBusWord').disabled = true;
   $('evidencePanel').hidden = true;
+  $('results-step-card').hidden = true;
+  $('export-step-card').hidden = true;
+  $('resultReviewNotice').hidden = true;
   $('evidenceRows').replaceChildren();
   $('serviceRows').replaceChildren();
   $('assessmentWording').textContent = '';
@@ -266,6 +316,7 @@ function clearBusEvidence(message = 'Confirm the assessment point before checkin
   moveResultsMap(false);
   taskStatus.reset();
   setCallout($('stopStatus'), hadEvidence ? 'The assessment point changed, so the earlier bus results were cleared. Confirm the new point before checking again.' : message, hadEvidence ? 'warning' : 'neutral');
+  updateGuidedWorkflow();
 }
 
 function clearStaleBusAssessment() {
@@ -281,6 +332,8 @@ function clearStaleBusAssessment() {
   routeLayers = [];
   $('exportBusWord').disabled = true;
   $('evidencePanel').hidden = true;
+  $('results-step-card').hidden = true;
+  $('export-step-card').hidden = true;
   $('assessmentScope').replaceChildren();
   $('assessmentScope').hidden = true;
   $('evidenceRows').replaceChildren();
@@ -294,6 +347,7 @@ function clearStaleBusAssessment() {
   moveResultsMap(false);
   taskStatus.reset();
   setCallout($('stopStatus'), 'The assessment radius changed. Build the Bus assessment again to update the evidence.', 'warning');
+  updateGuidedWorkflow();
 }
 
 function selectedRadius() {
@@ -397,6 +451,7 @@ function renderBusStopMarkers(stops) {
 function clearSelection() {
   selector.reset();
   confirmedSite = null;
+  locationChecked = false;
   radiusTouched = false;
   detailedEvidenceVisible = false;
   if (assessmentMarker) {
@@ -431,6 +486,7 @@ function ensureMarker(latitude, longitude, centreMap = false) {
 }
 
 function renderDraftSite(site, { centreMap = false, message } = {}) {
+  locationChecked = false;
   ensureMarker(site.latitude, site.longitude, centreMap);
   $('latitude').value = site.latitude.toFixed(6);
   $('longitude').value = site.longitude.toFixed(6);
@@ -446,6 +502,15 @@ function renderDraftSite(site, { centreMap = false, message } = {}) {
   setCallout($('confirmationStatus'), 'The assessment point has not been confirmed yet.', 'warning');
   clearBusEvidence();
   syncRadiusCircle();
+  updateGuidedWorkflow();
+}
+
+function confirmMapLocation() {
+  if (!selector.getSnapshot().site) return;
+  locationChecked = true;
+  setCallout($('mapStatus'), 'Location checked. Confirm the exact assessment point to continue.', 'success');
+  updateGuidedWorkflow();
+  $('confirm-point-step-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function chooseMapPoint(latitude, longitude, message = 'Assessment point chosen on the map. Check it carefully, then confirm it.') {
@@ -566,6 +631,8 @@ function renderAssessment(result) {
   const detailRows = $('serviceDetailRows');
   const detailToggle = $('toggleDetailedEvidence');
   panel.hidden = false;
+  $('results-step-card').hidden = false;
+  $('export-step-card').hidden = false;
   moveResultsMap(true);
   collapseAssessmentSetup(true);
   rows.replaceChildren();
@@ -739,6 +806,7 @@ function renderAssessment(result) {
   }
   renderBusStopMarkers(presentationStops);
   $('assessmentWording').textContent = assessmentWording(result, presentedServices.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => selectedStopIds.has(String(id)))));
+  updateGuidedWorkflow();
   const stopProvenance = result.provenance.stops ?? {};
   const timetableProvenance = result.provenance.timetables ?? {};
   const checked = formatTime(stopProvenance.retrievedAt || timetableProvenance.retrievedAt);
@@ -756,6 +824,8 @@ function renderAssessment(result) {
   const reviewBadge = $('sourceChecksBadge');
   reviewBadge.hidden = reviewItems.length === 0;
   reviewBadge.textContent = reviewItems.length ? evidenceReviewText(reviewItems.length) : '';
+  $('resultReviewNotice').hidden = reviewItems.length === 0;
+  $('resultReviewNotice').textContent = reviewItems.length ? evidenceReviewText(reviewItems.length) + ' — open Sources & checks for details.' : 'No evidence items need review.';
   $('sourceChecksHint').textContent = reviewItems.length ? 'Review flagged evidence before formal use.' : 'Source, freshness and assessment notes';
   const plannerChecks = $('plannerChecks');
   plannerChecks.replaceChildren();
@@ -830,7 +900,7 @@ async function searchAddress(event) {
   $('candidateList').replaceChildren();
   setCallout($('geocodeStatus'), 'Searching for the site…', 'neutral');
   const submit = event.submitter;
-  if (submit) submit.disabled = true;
+  if (submit) { submit.disabled = true; submit.classList.add('is-loading'); submit.setAttribute('aria-busy', 'true'); }
   try {
     const result = await geocoder.searchAddress(query);
     if (!result.ok) {
@@ -840,7 +910,7 @@ async function searchAddress(event) {
     }
     renderCandidates(result);
   } finally {
-    if (submit) submit.disabled = false;
+    if (submit) { submit.disabled = false; submit.classList.remove('is-loading'); submit.removeAttribute('aria-busy'); }
   }
 }
 
@@ -860,6 +930,7 @@ function enterCoordinates(event) {
 
 function confirmAssessmentPoint() {
   try {
+    if (!locationChecked) throw new Error('map-review-required');
     confirmedSite = selector.confirm();
     if (!radiusTouched) $('radius').value = isGreaterLondonPoint(confirmedSite) ? '400' : '700';
     renderConfirmedSite(confirmedSite);
@@ -871,6 +942,7 @@ function confirmAssessmentPoint() {
     collapseSiteSetup(true);
     setCallout($('confirmationStatus'), `${assessmentMethod(confirmedSite)}. The assessment point is confirmed.`, 'success');
     setCallout($('stopStatus'), `Ready to check nearby bus stops. The ${selectedRadius()} m assessment radius is shown on the map.`, 'neutral');
+    updateGuidedWorkflow();
   } catch {
     setCallout($('confirmationStatus'), 'Select a valid assessment point before confirming.', 'error');
   }
@@ -890,6 +962,8 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
   $('exportBusWord').disabled = true;
   $('assessmentScope').hidden = true;
   taskStatus.update({ phase: 'finding-stops' });
+  $('findStops').classList.add('is-loading');
+  $('findNearestStops').classList.add('is-loading');
   try {
     let discovery = discoveryOverride;
     if (lastAssessmentMode === 'full' && !skipScope) {
@@ -942,6 +1016,8 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
     taskStatus.update({ phase: 'unavailable', detail: 'The assessment could not be completed.' });
     setCallout($('stopStatus'), 'The assessment could not be completed. No successful-looking result has been shown.', 'error');
   } finally {
+    $('findStops').classList.remove('is-loading');
+    $('findNearestStops').classList.remove('is-loading');
     $('findStops').disabled = !confirmedSite;
     $('findNearestStops').disabled = !confirmedSite;
     $('refreshStops').disabled = !confirmedSite;
@@ -990,6 +1066,9 @@ $('chooseOnMap').addEventListener('click', () => {
   $('siteMap').focus({ preventScroll: true });
 });
 $('coordinatesForm').addEventListener('submit', enterCoordinates);
+$('confirmMapLocation').addEventListener('click', confirmMapLocation);
+$('reviewMapStep').addEventListener('click', () => { $('locationSetupContent').hidden = false; $('locationStageSummary').hidden = true; locationChecked = false; updateGuidedWorkflow(); $('siteMap').focus({ preventScroll: true }); });
+$('reviewResultsButton').addEventListener('click', () => $('evidencePanel').scrollIntoView({ behavior: 'smooth', block: 'start' }));
 $('confirmAssessmentPoint').addEventListener('click', confirmAssessmentPoint);
 $('changeSite').addEventListener('click', clearSelection);
 $('changeAssessment').addEventListener('click', () => { clearStaleBusAssessment(); $('assessmentSetupContent').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
@@ -1013,6 +1092,7 @@ window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
 initMap();
 showView(location.hash.slice(1));
 refreshDataStatus();
+updateGuidedWorkflow();
 
 window.__ATLAS_SITE_SELECTOR__ = Object.freeze({ getSnapshot: selector.getSnapshot, getMap: () => map });
 window.__ATLAS_BUS_UI__ = Object.freeze({ hasRadiusCircle: () => Boolean(radiusCircle), getTaskStatus: () => taskStatus.getState() });

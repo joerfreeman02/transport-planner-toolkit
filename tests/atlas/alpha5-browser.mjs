@@ -49,6 +49,7 @@ try {
   const download = await downloadPromise;
   assert.match(download.suggestedFilename(), /\.docx$/i);
 
+  await page.getByRole('button', { name: 'Change assessment' }).click();
   await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await page.locator('#evidenceRows tr').nth(1).waitFor({ timeout: 20000 });
   assert.equal(await page.locator('#evidenceRows tr').count(), 2);

@@ -64,13 +64,16 @@ class TndsWorkflowContractTests(unittest.TestCase):
         self.assertIn("inputs.v2_source_snapshot_run_id == ''", self.dispatcher)
         self.assertIn("normal expected snapshot ID is valid only with an explicit frozen source producer run ID", self.dispatcher)
 
-    def test_default_branch_contains_dispatcher_but_not_feature_callee(self):
+    def test_default_branch_contains_tnds_trust_dispatcher_and_reusable_callee(self):
         dispatcher = subprocess.run(["git", "show", "origin/main:.github/workflows/atlas-bus-data-refresh.yml"],
                                     cwd=ROOT, check=True, capture_output=True, text=True).stdout
         callee = subprocess.run(["git", "show", "origin/main:.github/workflows/atlas-bus-tnds-trust-diagnostic.yml"],
                                 cwd=ROOT, capture_output=True, text=True)
         self.assertIn("name: ATLAS Bus data refresh", dispatcher)
-        self.assertNotEqual(callee.returncode, 0)
+        self.assertIn("uses: ./.github/workflows/atlas-bus-tnds-trust-diagnostic.yml", dispatcher)
+        self.assertEqual(callee.returncode, 0)
+        self.assertIn("name: ATLAS Bus TNDS TRUST diagnostic", callee.stdout)
+        self.assertIn("workflow_call:", callee.stdout)
 
     def test_trust_browser_selector_uses_product_owned_controls(self):
         names = parse_dispatch_input_names(self.dispatcher)

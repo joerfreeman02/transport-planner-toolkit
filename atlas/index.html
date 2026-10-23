@@ -8,37 +8,26 @@
   <title>ATLAS — Transport and Location Assessment</title>
   <link rel="stylesheet" href="../assets/css/eas-theme.css">
   <link rel="stylesheet" href="../assets/vendor/leaflet/leaflet.css">
+  <link rel="icon" href="assets/branding/favicon.ico">
   <link rel="stylesheet" href="assets/css/atlas-shell.css?build=ATLAS-2.0.0-alpha.15-20260914">
+  <link rel="stylesheet" href="assets/css/bus-beta-workspace.css?build=ATLAS-2.0.0-alpha.15-20260914">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
   <header class="app-header">
     <div class="header-inner">
-      <a class="brand" href="#modules" aria-label="ATLAS home">
-        <img src="../assets/images/eas-white.png" alt="EAS Transport Planning">
-        <span><b>ATLAS</b><small>Trusted transport information for development sites.</small></span>
+      <a class="brand" href="#modules" aria-label="EAS ATLAS home">
+        <img src="assets/branding/eas-atlas-header-lockup-transparent.svg" alt="EAS | ATLAS — Transport Planning Toolkit">
       </a>
       <nav aria-label="ATLAS sections">
-        <button type="button" data-view="report-builder">Report Builder</button>
         <button type="button" data-view="modules" class="active">Modules</button>
-        <button type="button" data-view="projects">Projects</button>
         <button type="button" data-view="about">About</button>
       </nav>
-      <div class="build" aria-label="ATLAS release and test build"><b>Release · 2.0.0-alpha.15</b><span>ATLAS-2.0.0-alpha.15-20260914</span><span data-atlas-test-build="BUS-TFL-COMPLETE · 737f26a">BUS-TFL-COMPLETE · 737f26a</span></div>
+      <div class="build" aria-label="ATLAS release build"><b>Release · 2.0.0-alpha.15</b><span>ATLAS-2.0.0-alpha.15-20260914</span></div>
     </div>
   </header>
 
   <main id="main">
-    <section class="view" data-view-panel="report-builder" hidden>
-      <div class="page-heading"><p class="eyebrow">Future assessment output</p><h1>Report Builder</h1><p>This planned section will help prepare consistent transport assessment outputs from checked project information.</p></div>
-      <article class="placeholder"><span class="status planned">Planned</span><h2>Report Builder is not available yet</h2><p>It will be added in a future development stage. Bus tables and wording can be reviewed in the Bus assessment workspace.</p></article>
-    </section>
-
-    <section class="view" data-view-panel="projects" hidden>
-      <div class="page-heading"><p class="eyebrow">Future project workspace</p><h1>Projects</h1><p>This planned section will save a development site's details for use across ATLAS assessments.</p></div>
-      <article class="placeholder"><span class="status planned">Planned</span><h2>Project saving is not available yet</h2><p>For Alpha.4, a confirmed site is kept only while this page is open.</p></article>
-    </section>
-
     <section class="view" data-view-panel="about" hidden>
       <div class="page-heading"><p class="eyebrow">About ATLAS</p><h1>ATLAS — Automated Transport &amp; Location Assessment System</h1><p>ATLAS is EAS's internal transport-planning platform for faster, more consistent site assessment and research.</p></div>
       <div class="about-grid">
@@ -64,7 +53,7 @@
             <strong>Created by Joe Freeman · EAS FORGE</strong>
           </div>
         </article>
-          <article class="about-card"><p class="eyebrow">Current status</p><h2>Alpha.15 production-fidelity bus service abstraction sprint</h2><dl><dt>Version</dt><dd>2.0.0-alpha.15</dd><dt>Release build</dt><dd>ATLAS-2.0.0-alpha.15-20260914</dd><dt>Development/test build</dt><dd data-atlas-test-build="BUS-TFL-COMPLETE · 737f26a">BUS-TFL-COMPLETE · 737f26a</dd><dt>Status</dt><dd>WIP / Technical Director review required</dd></dl></article>
+          <article class="about-card"><p class="eyebrow">Current status</p><h2>Bus Beta UI release candidate</h2><dl><dt>Version</dt><dd>2.0.0-alpha.15</dd><dt>Release build</dt><dd>ATLAS-2.0.0-alpha.15-20260914</dd><dt>Development/test build</dt><dd data-atlas-test-build="BUS-TFL-COMPLETE · 737f26a">BUS-TFL-COMPLETE · 737f26a</dd><dt>Status</dt><dd>Technical Director review required before Product Owner acceptance</dd></dl></article>
         <article class="about-card"><p class="eyebrow">Data acknowledgements</p><h2>Trusted sources used today</h2><p>Address search, maps and access routing use OpenStreetMap data. London stop discovery is provided by Transport for London. National stops use Department for Transport NaPTAN; timetables use the Department for Transport Bus Open Data Service and supplementary Traveline National Dataset (TNDS) information.</p><p class="acknowledgement">© OpenStreetMap contributors · Routed by OSRM · Data provided by Transport for London · NaPTAN and BODS © Department for Transport · Traveline National Dataset (TNDS) contains public sector information licensed under the Open Government Licence v3.0 · Contains National Statistics and Ordnance Survey data © Crown copyright and database right 2015</p></article>
       </div>
     </section>
@@ -76,24 +65,37 @@
       </div>
 
       <section class="module-grid" aria-label="ATLAS module status">
-        <article><span class="status legacy">Existing Toolkit</span><h2>Accessibility</h2><p>Available in the existing Toolkit. Moving it into ATLAS is planned, not started.</p></article>
-        <article class="featured"><span class="status development">In development</span><h2>Bus</h2><p>Check authoritative nearby bus stops and available routes from the confirmed assessment point.</p><a href="#site-workspace">Establish the site</a></article>
-        <article><span class="status planned">Planned</span><h2>Rail</h2><p>The existing Railway Assessment remains available. Moving it into ATLAS has not started.</p></article>
-        <article><span class="status legacy">Existing Toolkit</span><h2>Road Safety</h2><p>The existing STATS19 tool remains available. Future ATLAS integration is planned.</p></article>
-        <article><span class="status wip">Under review</span><h2>Drawings</h2><p>The existing Drawing Generator is still being reviewed and is not approved for normal use.</p></article>
+        <article><span class="module-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="15" cy="5" r="2.5"/><path d="M14 10h5l3 7h-4l-2-4-3 6-4 8m5-10 5 5 3 6m-8-18-5 4-4 1m11-2 5 2 3 0"/></svg></span><span class="status legacy">Existing Toolkit</span><h2>Accessibility</h2><p>Access to key services and inclusive movement.</p></article>
+        <article class="featured"><span class="module-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M7 23V9a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v14M7 17h18M11 10h10v5H11zM10 26l-2 2m14-2 2 2M11 21h1m8 0h1"/></svg></span><span class="status development">Bus assessment</span><h2>Bus</h2><p>Stops, routes and timetable evidence around your site.</p><a href="#bus">Open Bus assessment</a></article>
+        <article><span class="module-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 24V8a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v16M8 16h16M11 9h10v5H11zM11 24l-3 4m13-4 3 4m-12-4 4-5 4 5"/></svg></span><span class="status planned">Planned</span><h2>Rail</h2><p>Rail access and services.</p></article>
+        <article><span class="module-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M4 20l2-7a3 3 0 0 1 3-2h14a3 3 0 0 1 3 2l2 7v5H4zm3-5h18M9 11l2-4h10l2 4M8 25v3m16-3v3M8 21h2m12 0h2"/></svg></span><span class="status legacy">Existing Toolkit</span><h2>Road Safety</h2><p>Collision data and safety context.</p></article>
+        <article><span class="module-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 4h11l6 6v18H8zM19 4v7h6M12 16h9m-9 4h9m-9 4h5M5 26l3 1 3-3-3-3-3 3z"/></svg></span><span class="status wip">Under review</span><h2>Drawings</h2><p>Create and review drawing outputs.</p></article>
       </section>
+    </section>
 
+    <section class="view" data-view-panel="bus" hidden>
       <section class="workspace" id="site-workspace" aria-labelledby="site-selector-title">
         <div class="workspace-header">
-          <div><p class="eyebrow">Shared ATLAS site</p><h2 id="site-selector-title">Establish the assessment point</h2><p>Identify the development, check its access on the map, then confirm the exact point ATLAS should use.</p></div>
-          <span class="status development">Alpha.15 production-fidelity bus service abstraction sprint</span>
+          <div><p class="eyebrow">ATLAS Bus Assessment</p><h1 id="site-selector-title">Assess nearby bus access</h1><p>Use trusted stop, route and timetable evidence to prepare a reviewable site assessment.</p></div>
+          <button id="newAssessment" class="secondary" type="button">New assessment</button>
         </div>
 
+        <div class="workflow-layout">
+        <nav id="workflowRail" class="workflow-rail" aria-label="Bus assessment steps">
+          <button type="button" data-workflow-step="1" class="active"><span>1</span><b>Find location</b><small>Search for a site</small></button>
+          <button type="button" data-workflow-step="2"><span>2</span><b>Confirm point</b><small>Set the assessment point</small></button>
+          <button type="button" data-workflow-step="3"><span>3</span><b>Assessment settings</b><small>Choose radius and options</small></button>
+          <button type="button" data-workflow-step="4"><span>4</span><b>Run assessment</b><small>Analyse stops and services</small></button>
+          <button type="button" data-workflow-step="5" disabled><span>5</span><b>Results</b><small>Review evidence and services</small></button>
+          <button type="button" data-workflow-step="6" disabled><span>6</span><b>Export</b><small>Prepare report and map</small></button>
+        </nav>
+
+        <div class="workflow-main">
         <div class="steps">
           <section id="site-step-card" class="step-card" aria-labelledby="find-site-step">
             <div class="step-number">1</div>
             <div id="siteSetupContent" class="step-content">
-              <h3 id="find-site-step">Find the site</h3>
+              <h3 id="find-site-step">Find the location</h3>
               <p class="supporting">Search using an address, postcode, building name or site description. ATLAS will not choose a result for you.</p>
               <form id="addressForm" class="address-form">
                 <label for="address">Site address or name</label>
@@ -109,8 +111,8 @@
           <section id="location-step-card" class="step-card" aria-labelledby="check-location-step">
             <div class="step-number">2</div>
             <div id="locationSetupContent" class="step-content">
-              <h3 id="check-location-step">Check the location</h3>
-              <p class="supporting">Check the marker is at the point you want ATLAS to assess. Drag it or click the map to move it if required.</p>
+              <h3 id="check-location-step">Review the selected site</h3>
+              <p class="supporting">Confirm that the address and marker identify the development location you want to assess.</p>
               <div class="site-selector-grid">
                 <div id="siteMapHome">
                   <div id="siteMapFrame">
@@ -118,7 +120,7 @@
                     <p class="map-attribution-note">Map data © OpenStreetMap contributors.</p>
                   </div>
                 </div>
-                <aside class="location-panel" aria-label="Selected assessment point">
+                <aside class="location-panel" aria-label="Location and assessment-point controls">
                   <div id="mapStatus" class="callout neutral" role="status">Choose a possible match or click the map to place the assessment point.</div>
                   <div id="selectedLocation" class="selected-location" hidden>
                     <strong>Assessment point selected</strong>
@@ -140,7 +142,7 @@
           </section>
 
           <section id="confirm-point-step-card" class="step-card" aria-labelledby="confirm-point-step">
-            <div class="step-number">3</div>
+            <div class="step-number">2</div>
             <div id="confirmSetupContent" class="step-content">
               <h3 id="confirm-point-step">Confirm the assessment point</h3>
               <p class="supporting">Only confirm when the marker is at the access or frontage you want later ATLAS assessments to use.</p>
@@ -153,35 +155,43 @@
           <section id="assessment-step-card" class="step-card" aria-labelledby="stops-step">
             <div class="step-number">4</div>
             <div id="assessmentSetupContent" class="step-content">
-              <h3 id="stops-step">Build the Bus assessment</h3>
-              <p class="supporting">Choose a full nearby-stop assessment or ask ATLAS for the nearest logical stop group. London starts at 400 m and other areas at 700 m; you can change the radius before searching.</p>
-              <div class="stop-controls">
+              <h3 id="stops-step">Assessment settings</h3>
+              <p class="supporting">Choose the area to assess. London starts at 400 m and other areas at 700 m; adjust the radius to suit the site.</p>
+              <div id="assessmentSettingsPanel" class="assessment-settings-panel">
                 <label for="radius">Radius (metres)<input id="radius" type="number" min="100" max="2000" step="50" value="700"></label>
-                <div class="assessment-actions"><button id="findNearestStops" class="secondary" type="button" disabled>Find nearest bus stop(s)</button><button id="findStops" class="primary" type="button" disabled>Build full Bus assessment</button><button id="refreshStops" class="secondary" type="button" disabled>Check again</button></div>
               </div>
-              <p class="control-hint">Nearest mode is based on routed walking access. ATLAS then keeps the complete logical stop group, including opposite directions or interchange stands where identified.</p>
-              <section id="taskStatus" class="task-status" aria-labelledby="task-status-heading" aria-busy="false">
-                <div><p class="eyebrow">ATLAS task status</p><h3 id="task-status-heading">Assessment progress</h3></div>
-                <p id="taskStatusMessage" role="status" aria-live="polite">Ready to check nearby bus stops.</p>
-                <div class="task-progress" aria-live="polite"><progress id="taskStatusProgress" max="1" value="0" aria-label="Assessment progress" hidden></progress><span id="taskStatusProgressText"></span></div>
-                <ol id="taskStatusStages" class="task-stages" aria-label="Assessment stages"><li data-task-stage="1">Stops</li><li data-task-stage="2">Access</li><li data-task-stage="3">Timetables</li><li data-task-stage="4">Evidence</li><li data-task-stage="5">Summary</li></ol>
-              </section>
-              <div id="assessmentScope" class="callout neutral" role="status" hidden></div>
-              <div id="stopStatus" class="callout neutral" role="status">Confirm the assessment point before checking nearby bus stops.</div>
-              <section class="data-status" aria-labelledby="data-status-heading">
-                <div class="planner-status-line"><p id="dataStatusMessage" role="status">Bus data: Checking current status…</p><button id="viewDataDetails" class="secondary compact" type="button">View data details</button></div>
-                <details id="dataStatusDetails"><summary>Data details</summary><div class="data-status-heading"><div><p class="eyebrow">Bus data status</p><h3 id="data-status-heading">Bus Data Status</h3></div><div class="data-status-actions"><button id="updateBusData" class="secondary compact" type="button" hidden>Update Bus data</button><button id="refreshDataStatus" class="secondary compact" type="button">Refresh data status</button></div></div>
-                <dl><dt>Last successful automatic check</dt><dd id="preparedDataDate">Not supplied</dd><dt>NaPTAN</dt><dd id="naptanDataState">Not supplied</dd><dt>BODS</dt><dd id="bodsDataState">Not supplied</dd><dt>TNDS supplementary</dt><dd id="tndsDataDate">Not supplied</dd><dt>TfL</dt><dd id="tflDataState">Live source — checked when a London assessment is run</dd><dt>Next scheduled refresh</dt><dd>Friday</dd></dl></details>
-              </section>
+              <div id="assessmentRunPanel" class="assessment-run-panel" hidden>
+                <h4>Run the assessment</h4>
+                <div class="assessment-actions">
+                  <button id="findNearestStops" class="primary" type="button" disabled><strong>Find nearest bus stop(s)</strong><small>Recommended · routed walking access · complete logical stop group</small></button>
+                  <button id="findStops" class="secondary" type="button" disabled><strong>Build full Bus assessment</strong><small>Assess all relevant stops within the selected radius</small></button>
+                  <button id="refreshStops" class="secondary compact" type="button" disabled>Recheck nearby stops</button>
+                </div>
+                <section id="taskStatus" class="task-status" aria-labelledby="task-status-heading" aria-busy="false">
+                  <div class="task-status-heading"><span class="task-loader-mark" aria-hidden="true"><img class="atlas-mark-loader-base" src="assets/branding/atlas-mark-primary.svg" alt=""><img class="atlas-mark-loader-draw" src="assets/branding/atlas-mark-primary.svg" alt=""></span><div><p class="eyebrow">Assessment progress</p><h3 id="task-status-heading">Stops · Access · Timetables · Evidence · Summary</h3></div></div>
+                  <p id="taskStatusMessage" role="status" aria-live="polite">Ready to check nearby bus stops.</p>
+                  <div class="task-progress" aria-live="polite"><progress id="taskStatusProgress" max="1" value="0" aria-label="Assessment progress" hidden></progress><span id="taskStatusProgressText"></span></div>
+                  <ol id="taskStatusStages" class="task-stages" aria-label="Assessment stages"><li data-task-stage="1">Stops</li><li data-task-stage="2">Access</li><li data-task-stage="3">Timetables</li><li data-task-stage="4">Evidence</li><li data-task-stage="5">Summary</li></ol>
+                </section>
+                <div id="assessmentScope" class="callout neutral" role="status" hidden></div>
+                <div id="stopStatus" class="callout neutral" role="status">Confirm the assessment point before checking nearby bus stops.</div>
+              </div>
             </div>
             <div id="assessmentStageSummary" class="stage-summary" hidden><strong id="assessmentStageSummaryText"></strong><button id="changeAssessment" class="secondary compact" type="button">Change assessment</button></div>
           </section>
         </div>
 
+        </div>
+        <aside id="persistentMapPanel" class="persistent-map-panel" aria-label="Site map">
+          <div class="persistent-map-heading"><div><span class="map-heading-icon" aria-hidden="true">◉</span><div><h3>Site location and nearby bus stops</h3><p id="mapStageHint">Search for a site or choose a point on the map.</p></div></div><span id="mapDataStatus" class="map-live-label">Map</span></div>
+          <div id="persistentMapHost"></div>
+        </aside>
+        </div>
+
         <section id="evidencePanel" class="evidence-panel" hidden aria-labelledby="evidence-heading">
-          <div class="evidence-heading"><div><p class="eyebrow">Bus assessment</p><h3 id="evidence-heading">Stops and services near the assessment point</h3></div><div class="evidence-actions"><div id="evidenceSummary"></div><button id="exportBusWord" class="secondary compact" type="button" disabled>Export Word (.docx)</button></div></div>
+          <div class="evidence-heading"><div><p class="eyebrow">Step 5 · Results</p><h3 id="evidence-heading">Assessment results</h3><p id="evidenceSummary"></p></div><div class="evidence-actions"><button id="goToExport" class="primary" type="button">Continue to Export</button><button id="editAssessment" class="secondary compact" type="button">Back to assessment</button></div></div>
           <div id="resultsMapHost" class="results-map-host"><p class="supporting">Map references are navigation aids only; authoritative stop names and indicators remain in the tables.</p></div>
-          <div class="check-summary" aria-label="Result source and status"><div><span>Source</span><strong id="resultSource">Authoritative source</strong></div><div><span>Checked</span><strong id="resultChecked"></strong></div><div><span>Status</span><strong id="resultFreshness"></strong></div></div>
+          <div class="result-meta"><strong id="busDataCurrent" class="current-badge">Bus data: Checking current status…</strong><span>Assessment data checked <time id="resultChecked"></time></span><span id="resultFreshness" class="review-badge"></span><span id="resultSource" class="sr-only">Authoritative source</span></div>
           <section class="assessment-output" aria-labelledby="stop-summary-heading">
             <div class="output-heading"><div><p class="eyebrow">Table 3.2</p><h4 id="stop-summary-heading">Bus Stop Summary</h4></div><button id="clearRoutes" class="secondary compact" type="button" hidden>Clear route lines</button></div>
           <p class="supporting planner-label-note">The map, stop table, service summary and Word export use the same deterministic map references A, B, C. Cycling access remains available in each stop’s map popup.</p>
@@ -200,14 +210,23 @@
             <section id="serviceDetailPanel" class="service-detail-panel" hidden aria-labelledby="service-detail-heading"><h5 id="service-detail-heading">Detailed timetable evidence</h5><p class="supporting">Underlying source records are shown for inspection; the consolidated Table 3.3 remains the planner-facing summary.</p><div id="serviceDetailRows"></div></section>
           </section>
           <section class="assessment-wording" aria-labelledby="wording-heading"><p class="eyebrow">Controlled wording</p><h4 id="wording-heading">Assessment wording</h4><p id="assessmentWording"></p></section>
-          <details><summary>Sources and checks</summary><div id="plannerChecks"></div></details>
+          <details id="sourceChecksDetails" class="source-checks"><summary>Sources &amp; Checks <span id="sourceReviewBadge" class="review-badge" hidden></span><span class="source-checks-hint">Review source evidence and qualifications</span></summary><div id="plannerChecks"></div><details id="dataStatusDetails"><summary>Bus data details</summary><section class="data-status"><div class="data-status-heading"><div><p class="eyebrow">Data currency</p><h3 id="data-status-heading">Bus data status</h3></div><div class="data-status-actions"><button id="updateBusData" class="secondary compact" type="button" hidden>Update Bus data</button><button id="refreshDataStatus" class="secondary compact" type="button">Refresh data status</button></div></div><dl><dt>Last successful automatic check</dt><dd id="preparedDataDate">Not supplied</dd><dt>NaPTAN</dt><dd id="naptanDataState">Not supplied</dd><dt>BODS</dt><dd id="bodsDataState">Not supplied</dd><dt>TNDS supplementary</dt><dd id="tndsDataDate">Not supplied</dd><dt>TfL</dt><dd id="tflDataState">Live source — checked when a London assessment is run</dd><dt>Current status</dt><dd id="dataStatusMessage">Checking current status…</dd></dl></section></details></details>
           <details id="developerDiagnostics" class="technical-details" hidden><summary>Developer diagnostics</summary><div id="diagnostics"></div></details>
+        </section>
+        <section id="exportWorkspace" class="export-workspace" hidden aria-labelledby="export-heading">
+          <div class="export-heading"><p class="eyebrow">Step 6 · Export</p><h2 id="export-heading">Prepare assessment outputs</h2><p>Both outputs use the current checked assessment and its selected stops and service summaries.</p></div>
+          <div class="export-grid">
+            <article class="export-card"><span class="export-icon" aria-hidden="true">▤</span><h3>Word assessment</h3><p>Download the planner-facing Bus assessment, including stop and service tables, qualifications and review notes.</p><button id="exportBusWord" class="primary" type="button" disabled>Export Word (.docx)</button></article>
+            <article class="export-card"><span class="export-icon" aria-hidden="true">⌖</span><h3>Assessment map</h3><p>Download a standalone SVG map using the assessment point, assessed stop locations, map references and available walking distances. No route geometry is invented.</p><button id="exportAssessmentMap" class="secondary" type="button" disabled>Export assessment map (.svg)</button></article>
+          </div>
+          <div id="exportStatus" class="callout neutral" role="status">Complete an assessment before exporting.</div>
+          <button id="returnToResults" class="secondary compact" type="button">Back to Results</button>
         </section>
       </section>
     </section>
   </main>
 
-  <footer><span>ATLAS 2.0.0-alpha.15 · Production-fidelity bus service abstraction sprint</span><span class="creator-credit">Created by Joe Freeman · EAS FORGE</span><span>Awaiting Technical Director review</span></footer>
+  <footer><span class="footer-brand"><img src="assets/branding/eas-forge-lockup-dark-with-tagline.svg" alt="EAS | FORGE — Framework for Operational Research, Governance &amp; Engineering"></span><span class="creator-credit">Created by Joe Freeman</span><span>ATLAS Bus Assessment · 2.0.0-alpha.15 · <a href="#about" data-view="about">About</a></span></footer>
   <script src="../assets/vendor/leaflet/leaflet.js"></script>
   <script type="module" src="assets/js/app.mjs?build=ATLAS-2.0.0-alpha.15-20260914"></script>
 </body>

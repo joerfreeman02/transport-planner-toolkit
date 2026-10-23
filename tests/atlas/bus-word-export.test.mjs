@@ -1,6 +1,6 @@
 import { docxBlob } from '../../assets/js/word-export.js';
 import assert from 'node:assert/strict';
-import { buildBusWordTables, busWordFilename } from '../../src/atlas/presentation/bus-word-export.mjs';
+import { buildBusTransportStatement, buildBusWordTables, busWordFilename } from '../../src/atlas/presentation/bus-word-export.mjs';
 import { stopRoutesPresentation } from '../../src/atlas/domain/bus-source-presentation.mjs';
 
 const result = {
@@ -24,6 +24,11 @@ const result = {
 };
 
 const tables = buildBusWordTables(result);
+assert.match(buildBusTransportStatement(result, 'Accepted wording.'), /^The assessment covers 2 assessed stops\. Accepted wording\.$/);
+assert.equal(tables[0].rows.length, 2, 'transport statement stop count matches the Word stop table');
+const countParityResult = { ...result, stops: [...result.stops, { transportMode: 'bus_coach', routes: [], timetableMatch: false, timetableEvidenceStatus: 'SOURCE_UNAVAILABLE' }] };
+assert.match(buildBusTransportStatement(countParityResult), /^The assessment covers 2 assessed stops\./, 'non-assessed nearby candidates are excluded from the narrative count');
+assert.equal(tables[1].widths.reduce((sum, width) => sum + width, 0), 100, 'Word service table widths fill the available table width');
 assert.equal(tables.length, 2);
 assert.doesNotMatch(JSON.stringify(tables[1]), /BODS|TNDS|TfL/, 'Word summary remains source-neutral when planner provenance is present');
 assert.equal(tables[0].caption, 'Table 3.2 - Bus Stop Summary');
@@ -66,6 +71,18 @@ const plannerInput = {
   }]
 };
 const plannerWord = buildBusWordTables(plannerInput);
+const semanticallyStyledWord = buildBusWordTables({
+  ...plannerInput,
+  reviewItems: [{ code: 'unresolved-timetable-request', route: '313', message: 'review' }],
+  plannerServiceSummaries: [{
+    routeNumber: '313', operator: '', directionPatternText: 'Towards Chingford Station', servedAtText: 'Enfield Town',
+    principalLocationsText: 'Chingford', typicalFrequencyText: 'Normal public service', operatingPeriodLines: ['Mon-Fri'],
+    publicRouteFamilyKey: '313', plannerNotes: { shortWorkings: 'school journeys remain subordinate' }
+  }]
+});
+assert.ok(semanticallyStyledWord[1].rows.some(row => !Array.isArray(row) && row.kind === 'section' && row.semantic === 'short-working'), 'short workings receive the existing pale-orange Word section treatment');
+assert.ok(semanticallyStyledWord[1].rows.some(row => !Array.isArray(row) && row.kind === 'section' && row.semantic === 'evidence-review'), 'planner review receives the existing pale-orange Word section treatment');
+assert.ok(semanticallyStyledWord[1].rows.some(row => !Array.isArray(row) && row.kind === 'summary' && row.semantic === 'presentation-note'), 'explanatory methodology remains neutral in Word');
 const plannerWordNotes = plannerWord[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
 assert.match(plannerWordNotes, /Additional source evidence remains available in the ATLAS assessment workspace/);
 assert.match(plannerWordNotes, /Planner review required: timetable\/source evidence requires review for routes 215, 397 at one or more assessed stops\./);

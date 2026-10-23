@@ -6,6 +6,16 @@ const app = fs.readFileSync(new URL('../../atlas/assets/js/app.mjs', import.meta
 const css = fs.readFileSync(new URL('../../atlas/assets/css/atlas-shell.css', import.meta.url), 'utf8');
 assert.match(html, /2\.0\.0-alpha\.15/);
 assert.match(html, /ATLAS-2\.0\.0-alpha\.15-20260914/);
+assert.match(html, /id="workflowRail"[\s\S]*data-workflow-step="6"/);
+assert.match(html, /id="persistentMapPanel"/);
+assert.match(html, /Find nearest bus stop\(s\)<\/strong><small>Recommended/);
+assert.match(html, /Build full Bus assessment<\/strong><small>Assess all relevant stops/);
+assert.match(html, /id="exportAssessmentMap"/);
+assert.match(html, /eas-forge-lockup-dark-with-tagline\.svg/);
+assert.match(html, /Sources &amp; Checks/);
+assert.match(html, /id="sourceReviewBadge"[^>]*hidden/);
+assert.doesNotMatch(html.match(/<header[\s\S]*?<\/header>/)?.[0] ?? '', /data-atlas-test-build|Development\/Test build/);
+assert.match(app, /\$\('sourceReviewBadge'\)\.hidden = reviewItems\.length === 0/);
 for (const id of ['dataStatusMessage', 'preparedDataDate', 'naptanDataState', 'bodsDataState', 'tndsDataDate', 'tflDataState', 'updateBusData', 'refreshDataStatus', 'recommendedSelection', 'selectAllRows', 'clearAllRows', 'toggleDetailedEvidence', 'serviceDetailPanel', 'assessmentScope', 'radius', 'taskStatus', 'taskStatusMessage', 'taskStatusProgress', 'taskStatusProgressText', 'taskStatusStages', 'serviceSummaryMethodology']) assert.match(html, new RegExp(`id="${id}"`));
 assert.match(html, /<progress id="taskStatusProgress"/);
 assert.equal((html.match(/data-task-stage=/g) ?? []).length, 5);

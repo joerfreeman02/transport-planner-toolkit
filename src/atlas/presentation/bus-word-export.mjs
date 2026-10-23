@@ -5,6 +5,16 @@ import { isOtherNearbyStopRecord, partialTimetableQualification, plannerFacingSe
 
 function text(value) { return String(value ?? '').trim(); }
 
+function assessedStopRecords(stops) {
+  return (Array.isArray(stops) ? stops : []).filter(stop => !isOtherNearbyStopRecord(stop));
+}
+
+export function buildBusTransportStatement(result, acceptedWording = '') {
+  const count = assessedStopRecords(result?.stops).length;
+  const sentence = `The assessment covers ${count} assessed stop${count === 1 ? '' : 's'}.`;
+  return [sentence, text(acceptedWording)].filter(Boolean).join(' ');
+}
+
 function accessText(route) {
   if (route?.status !== 'routed') return 'Route unavailable';
   const distance = Math.round(Number(route.distanceMetres));
@@ -27,6 +37,16 @@ function plannerAnnotationRows(service) {
     notes.circularService ? `Circular service: ${notes.circularService}` : null,
     notes.reviewNote ? `Review note: ${notes.reviewNote}` : null
   ].filter(Boolean);
+}
+
+function noteRow(note, semantic = 'explanatory-note') {
+  const shortWorking = /^Short workings:/i.test(note);
+  const review = /^Planner review required:/i.test(note);
+  return {
+    kind: shortWorking || review ? 'section' : 'summary',
+    semantic: shortWorking ? 'short-working' : review ? 'evidence-review' : semantic,
+    text: note
+  };
 }
 
 function reviewQualification(reviewItems) {
@@ -68,7 +88,7 @@ function reviewQualification(reviewItems) {
 
 export function buildBusWordTables(result) {
   if (!result?.ok) throw new Error('A completed Bus assessment is required for Word export.');
-  const stopRows = (result.stops ?? []).filter(stop => !isOtherNearbyStopRecord(stop)).map(stop => [
+  const stopRows = assessedStopRecords(result.stops).map(stop => [
     stop.mapReference || '?',
     stop.name,
     stop.displayDirection,
@@ -107,21 +127,21 @@ export function buildBusWordTables(result) {
     const duplicateTerminusNote = service.plannerNotes?.terminus && /\broute terminus\b/i.test(text(service.serviceNote));
     const structuredQualificationNote = /^(?:school[- ]day(?:s)?(?:[- ]only)?(?: journeys? only| service)?|runs? on school days only|operates? during term time only|term[- ]time service|runs? on non-school days only|non-school days only|operates? on holidays only|operating days could not be fully confirmed)(?:;.*)?\.?$/i.test(text(service.serviceNote));
     const visibleServiceNote = plannerFacingServiceNote(service.serviceNote);
-    if (visibleServiceNote && !duplicateTerminusNote && !structuredQualificationNote) serviceRows.push({ kind: 'summary', text: `Service note: ${visibleServiceNote}` });
+    if (visibleServiceNote && !duplicateTerminusNote && !structuredQualificationNote) serviceRows.push(noteRow(`Service note: ${visibleServiceNote}`));
     const plannerAnnotations = hasPlannerSummary ? plannerAnnotationRows(service) : [];
     const next = services[index + 1];
     if (hasPlannerSummary && (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey)) {
       if (plannerAnnotations.length) {
-        plannerAnnotations.forEach(textValue => serviceRows.push({ kind: 'summary', text: textValue }));
+        plannerAnnotations.forEach(textValue => serviceRows.push(noteRow(textValue)));
       }
-      else if (plannerFacingServiceNote(service.routeGroupNote)) serviceRows.push({ kind: 'summary', text: `Service note: ${plannerFacingServiceNote(service.routeGroupNote)}` });
+      else if (plannerFacingServiceNote(service.routeGroupNote)) serviceRows.push(noteRow(`Service note: ${plannerFacingServiceNote(service.routeGroupNote)}`));
     }
   });
   const qualification = reviewQualification(result.reviewItems);
-  if (qualification) serviceRows.push({ kind: 'summary', text: qualification });
+  if (qualification) serviceRows.push(noteRow(qualification));
   const partialQualification = partialTimetableQualification(result.stops);
-  if (partialQualification) serviceRows.push({ kind: 'summary', semantic: 'partial-timetable-qualification', text: partialQualification });
-  if (hasPlannerSummary) serviceRows.push({ kind: 'summary', text: PLANNER_METHODOLOGY_NOTE });
+  if (partialQualification) serviceRows.push(noteRow(partialQualification, 'partial-timetable-qualification'));
+  if (hasPlannerSummary) serviceRows.push({ kind: 'summary', semantic: 'presentation-note', text: PLANNER_METHODOLOGY_NOTE });
 
   return [
     {
@@ -136,7 +156,7 @@ export function buildBusWordTables(result) {
         ? ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']
         : ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period'],
       rows: serviceRows,
-      widths: hasPlannerSummary ? [7, 14, 18, 17, 13, 14, 17] : [7, 14, 22, 25, 17, 15]
+      widths: hasPlannerSummary ? [6, 12, 17, 17, 22, 13, 13] : [7, 14, 22, 25, 17, 15]
     }
   ];
 }

@@ -256,6 +256,26 @@ function sameServiceLineage(first, second) {
   return serviceLineageIds(second).some(value => left.has(normal(value)));
 }
 
+function operatorEvidenceConflicts(services, operatorNames) {
+  if (operatorNames.length < 2) return false;
+  const lineagesByOperator = new Map(operatorNames.map(name => [operatorIdentityKey(name), new Set()]));
+  for (const service of services) {
+    const identity = operatorIdentityKey(service?.operator);
+    const lineages = lineagesByOperator.get(identity);
+    if (!lineages) continue;
+    for (const lineage of serviceLineageIds(service).map(normal).filter(Boolean)) lineages.add(lineage);
+  }
+  const entries = [...lineagesByOperator.values()];
+  for (let leftIndex = 0; leftIndex < entries.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < entries.length; rightIndex += 1) {
+      const left = entries[leftIndex];
+      const right = entries[rightIndex];
+      if (!left.size || !right.size || ![...left].some(lineage => right.has(lineage))) return true;
+    }
+  }
+  return false;
+}
+
 function validLocation(value) {
   const valueText = text(value);
   if (!valueText || /^(?:origin|destination) not supplied|destination not resolved$/i.test(valueText)) return '';
@@ -1852,7 +1872,7 @@ function buildPlannerServiceGroup(component, stops, main, representative, public
   const rawOperatorNames = unique(component.map(service => service?.operator));
   const sourceRecordIds = unique(component.flatMap(service => service?.sourceRecordIds ?? [service?.id]));
   const operatorNames = operatorDisplayNames(component);
-  const operatorEvidenceConflict = operatorNames.length > 1;
+  const operatorEvidenceConflict = operatorEvidenceConflicts(component, operatorNames);
   const endpointEvidence = unique(component.map(service => `${text(service.origin)} → ${text(service.destination)}`)).sort();
   const endpointIdentity = endpointEvidence.map(value => normal(value)).join('~');
   const originDecision = preferredServiceEndpointDecision(component, 'origin', main);

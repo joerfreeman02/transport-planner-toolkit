@@ -345,6 +345,7 @@ try {
       assert.equal(await technical.getAttribute('hidden') !== null, true, 'Developer diagnostics must be absent from ordinary planner mode.');
       await page.locator('details > summary').filter({ hasText: 'Sources and checks' }).click();
       const checksText = await page.locator('#plannerChecks').innerText();
+      outcome.sourcesAndChecks = checksText;
       assert.doesNotMatch(checksText, /SpecialDaysOperation|TNDS .*special dates require review/i, 'Sources and checks exposes raw per-service special-day warnings.');
       const rendered = await serviceTable.locator('tbody tr:not(.service-note)').evaluateAll(rows => rows.map(row => Object.fromEntries([...row.querySelectorAll('td[data-label]')].map(cell => [cell.dataset.label, cell.innerText.replace(/\s+/g, ' ').trim()]))));
       const renderedServiceNotes = await serviceTable.locator('tbody tr.service-note').allInnerTexts();

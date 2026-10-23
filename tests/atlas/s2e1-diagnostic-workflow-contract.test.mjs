@@ -36,7 +36,11 @@ assert.match(c4PushWorkflow, /group: atlas-bus-beta-s2e1-c4-final-v2-\$\{\{ gith
 assert.match(c4PushWorkflow, /push:\r?\n\s+branches:\r?\n\s+-\s+codex\/atlas-bus-beta-s2e-1-c4-final-product-trace/);
 assert.match(c4PushWorkflow, /uses: \.\/\.github\/workflows\/atlas-bus-beta-s2e1-diagnosis\.yml[\s\S]*mode: normal_runtime_diagnosis/);
 assert.match(c4PushWorkflow, /workflow_dispatch:/, 'C4 frozen-candidate diagnostic supports a guarded self-dispatch if GitHub drops a push event.');
-assert.match(c4PushWorkflow, /github\.event_name == 'push' \|\| github\.event_name == 'workflow_dispatch'[\s\S]*github\.repository == 'joerfreeman02\/transport-planner-toolkit'[\s\S]*refs\/heads\/codex\/atlas-bus-beta-s2e-1-c4-final-product-trace/);
+assert.match(c4PushWorkflow, /github\.event_name == 'workflow_dispatch'[\s\S]*github\.event_name == 'push'[\s\S]*\[c4-evidence-only\]/);
+assert.match(c4PushWorkflow, /targeted-evidence-only:[\s\S]*\[c4-evidence-only\][\s\S]*s2e1-normal-runtime-candidate-diagnostic\.mjs restored\/candidate-site candidate-diagnostic\/pe1-route-202\.json pe1[\s\S]*ATLAS_C4_ENFIELD_EVIDENCE_ONLY:[\s\S]*s2e1-manual-product-audit\.mjs restored\/candidate-site candidate-diagnostic\/enfield-browser-word\.json/);
+assert.match(manualBrowserAudit, /route329Stop = \(stopResult\.data \?\? \[\]\)\.filter\(stop => \(stop\.routes \?\? \[\]\)\.some\(value => String\(value\) === '329'\)\)/);
+assert.match(manualBrowserAudit, /Enfield production Browser did not render the frozen-candidate BODS 329 service/);
+assert.match(manualBrowserAudit, /activeJourney\.operatorName/);
 assert.doesNotMatch(c4PushWorkflow, /atlas-bus-beta-candidate|force_refresh:\s*true|pages|deploy|publish/i, 'C4 validation calls only the frozen-candidate diagnostic with no acquisition or publication path');
 assert.match(dispatchWorkflow, /S2E-1 offline preflight accepts only the exact zero-download C1B selector/);
 assert.match(dispatchWorkflow, /tnds-trust-browser-offline-preflight:[\s\S]*atlas-bus-beta-s2e-1-intelligence-restoration[\s\S]*outputs\.trust_mode == 'offline_preflight'/);
@@ -108,7 +112,7 @@ assert.match(normalRuntime, /atlas-bus-s2e1-normal-runtime-diagnostic-failure-v1
 assert.match(normalRuntime, /compositionStage, error: error\.message/);
 const productAudit = await readFile(new URL('./s2e1-manual-product-audit.mjs', import.meta.url), 'utf8');
 for (const control of ['pipers-lane', 'waltham-cross', 'chingford', 'pe1']) assert.ok(productAudit.includes(`id: '${control}'`), `normal-product browser audit must cover ${control}`);
-assert.match(productAudit, /enfieldCoverage = 'Enfield term-time and operator controls are exercised by the exact-candidate prepared-adapter browser\/Word audit and candidate diagnostic/);
+assert.match(productAudit, /report\.enfieldCoverage = process\.env\.ATLAS_C4_ENFIELD_EVIDENCE_ONLY/);
 assert.match(candidateBrowserAudit, /id: 'enfield-town'/, 'the exact-candidate browser/Word audit must retain the Enfield control');
 for (const field of ['#coordinatesForm', '#confirmAssessmentPoint', '#findStops', '.bus-service-summary', '#developerDiagnostics', '#exportBusWord', 'word/document.xml', 'horizontal overflow']) assert.ok(productAudit.includes(field), `normal-product browser audit must inspect ${field}`);
 assert.match(productAudit, /candidateRun: '39430415441'/);

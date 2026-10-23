@@ -377,6 +377,62 @@ const rowConsolidationAudit = [...wanted].map(target => {
     retainedPlannerRows: finalRows.length > 2 ? compactPlannerRows(finalRows) : []
   };
 });
+const route202ForensicTrace = controlId === 'pe1' ? {
+  selectedStopIds: unique(assessment.stops.filter(stop => (stop.routes ?? []).some(value => route(value) === '202')).map(stop => stop.id)),
+  sourceServices: assessment.services.filter(service => route(service.routeNumber) === '202').map(service => ({
+    id: service.id,
+    sourceRecordIds: service.sourceRecordIds ?? [],
+    provider: service.provider ?? service.source?.provider ?? null,
+    primaryAuthority: service.primaryAuthority ?? service.source?.primaryAuthority ?? null,
+    timetableSource: service.timetableSource ?? null,
+    operator: service.operator ?? null,
+    origin: service.origin ?? null,
+    destination: service.destination ?? null,
+    direction: service.direction ?? null,
+    originStopPointId: service.originStopPointId ?? null,
+    originStopPointIds: service.originStopPointIds ?? [],
+    destinationStopPointId: service.destinationStopPointId ?? null,
+    destinationStopPointIds: service.destinationStopPointIds ?? [],
+    routePatternStopIds: service.routePatternStopIds ?? [],
+    patternVariants: service.patternVariants ?? [],
+    endpointDecision: {
+      origin: service.originEndpointDecision ?? null,
+      destination: service.destinationEndpointDecision ?? null
+    },
+    departureEvidenceByDay: Object.fromEntries(Object.entries(service.departureEvidenceByDay ?? {}).map(([day, entries]) => [day,
+      (entries ?? []).map(entry => ({
+        minute: entry.minute ?? entry.departureMinute ?? null,
+        stopPointId: entry.stopPointId ?? null,
+        journeyIdentity: entry.journeyIdentity ?? entry.journeyId ?? entry.sourceJourneyId ?? entry.vehicleJourneyCode ?? entry.tripId ?? entry.vehicleJourneyId ?? entry.journeyCode ?? null,
+        timetableJourneyId: entry.timetableJourneyId ?? entry.journeyId ?? null,
+        sourceRecordId: entry.sourceRecordId ?? service.id,
+        provider: entry.provider ?? service.provider ?? service.source?.provider ?? service.timetableSource ?? null,
+        operator: entry.operator ?? service.operator ?? null,
+        origin: entry.origin ?? service.origin ?? null,
+        destination: entry.destination ?? service.destination ?? null,
+        calendarProfileId: entry.calendarProfileId ?? entry.calendarProfileIds ?? null,
+        occurrenceRole: entry.occurrenceRole ?? null,
+        patternOccurrenceIndex: entry.patternOccurrenceIndex ?? null,
+        patternOccurrenceCount: entry.patternOccurrenceCount ?? null
+      }))
+    ])),
+    calendarEvidence: service.calendarEvidence ?? [],
+    sourceLineage: service.source ?? null
+  })),
+  groupedPlannerRows: plannerRowsFor('202').map(row => ({
+    id: row.id,
+    routeNumber: row.routeNumber,
+    operator: row.operator,
+    direction: row.direction,
+    origin: row.origin,
+    destination: row.destination,
+    servedAtStopId: row.servedAtStopId,
+    sourceRecordIds: row.sourceRecordIds,
+    groupedServiceEvidence: row.groupedServiceEvidence,
+    selectedDeparturePopulationByDay: row.selectedDeparturePopulationByDay,
+    groupingDecision: row.groupingDecision
+  }))
+} : null;
 
 const report = {
   schema: 'atlas-bus-s2e1-normal-runtime-diagnostic-v1',
@@ -398,6 +454,7 @@ const report = {
     plannerRowsByTargetRoute: Object.fromEntries([...wanted].map(r => [r, compactPlannerRows(plannerRowsFor(r))])),
     x4GroupingProbe,
     rowConsolidationAudit,
+    route202ForensicTrace,
     sourceProvenance: { sourceAuthorities: unique(serviceSummaries.map(row => row.timetableSource).filter(Boolean)), tflLiveRequests: 0 },
     warnings: (assessment.warnings ?? []).slice(0, 40) },
   sameCandidatePreparedOnlyComparison: {

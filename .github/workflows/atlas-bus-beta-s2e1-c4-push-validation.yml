@@ -16,10 +16,85 @@ concurrency:
 
 jobs:
   frozen-candidate-diagnosis:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.repository == 'joerfreeman02/transport-planner-toolkit' && github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c4-final-product-trace'
+    if: github.repository == 'joerfreeman02/transport-planner-toolkit' && github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c4-final-product-trace' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && !contains(github.event.head_commit.message, '[c4-evidence-only]')))
     uses: ./.github/workflows/atlas-bus-beta-s2e1-diagnosis.yml
     with:
       mode: normal_runtime_diagnosis
     permissions:
       actions: read
       contents: read
+
+  targeted-evidence-only:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[c4-evidence-only]') && github.repository == 'joerfreeman02/transport-planner-toolkit' && github.ref == 'refs/heads/codex/atlas-bus-beta-s2e-1-c4-final-product-trace'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: pnpm
+      - name: Install deterministic browser dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium for the targeted Browser and Word trace
+        run: pnpm exec playwright install chromium
+      - name: Verify immutable Run #75 artifact identity and provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY: ${{ github.repository }}
+        run: |
+          gh api "repos/$GH_REPOSITORY/actions/artifacts/12275615359" > "$RUNNER_TEMP/run75-artifact.json"
+          python - "$RUNNER_TEMP/run75-artifact.json" <<'PY'
+          import json, sys
+          from pathlib import Path
+          artifact = json.loads(Path(sys.argv[1]).read_text())
+          expected = {
+              'id': 12275615359,
+              'name': 'atlas-bus-beta-review-candidate-39430415441',
+              'digest': 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471',
+              'expired': False,
+              'workflow_run': {'id': 39430415441, 'head_sha': '151199cc914c235870f444d26b03c2309edbd035'},
+          }
+          for key, value in expected.items():
+              actual = artifact.get(key)
+              if isinstance(value, dict):
+                  for nested, expected_value in value.items():
+                      if (actual or {}).get(nested) != expected_value:
+                          raise SystemExit(f'Run #75 artifact {key}.{nested} mismatch')
+              elif actual != value:
+                  raise SystemExit(f'Run #75 artifact {key} mismatch')
+          print('Exact immutable Run #75 candidate artifact, digest and producer verified.')
+          PY
+      - name: Restore only immutable Run #75 candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: atlas-bus-beta-review-candidate-39430415441
+          run-id: 39430415441
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: restored
+      - name: Verify retained checkpoint provenance
+        run: node tools/atlas-data-publication/review-candidate-checkpoint.mjs verify --candidate-root restored/candidate-site --checkpoint-root restored/review-checkpoint --expected-run-id 39430415441 --expected-commit-sha 151199cc914c235870f444d26b03c2309edbd035
+      - name: Trace PE1 route 202 source and planner row lineage
+        run: node tests/atlas/s2e1-normal-runtime-candidate-diagnostic.mjs restored/candidate-site candidate-diagnostic/pe1-route-202.json pe1
+      - name: Exercise Enfield route 313 operator through Browser and Word
+        env:
+          ATLAS_C4_ENFIELD_EVIDENCE_ONLY: '1'
+        run: node tests/atlas/s2e1-manual-product-audit.mjs restored/candidate-site candidate-diagnostic/enfield-browser-word.json
+      - name: Upload targeted C4 evidence report
+        if: always() && hashFiles('candidate-diagnostic/*.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-bus-beta-s2e1-c4-targeted-evidence-${{ github.run_id }}
+          path: candidate-diagnostic/*.json
+          if-no-files-found: error
+          retention-days: 90

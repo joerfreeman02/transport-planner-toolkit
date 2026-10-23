@@ -112,7 +112,7 @@ assert.equal(route313Calendars[0].operator, 'Arriva London North');
 
 const route46Bods = {
   ...plannerBase, id: 'bods-route46-principal', routeNumber: '46', operator: 'Centrebus',
-  direction: 'outbound', directionFamily: 'outbound', origin: 'Park Square', destination: 'Bridge Street',
+  direction: 'Hemel Hempstead, Bridge Street (Stop A)', directionFamily: 'outbound', origin: 'Park Square', destination: 'Bridge Street',
   provider: 'BODS', timetableSource: 'BODS', source: { provider: 'BODS' }, routePatternStopIds: ['PARK', 'MID-A', 'PIPERS-A', 'MID-B', 'BRIDGE'],
   departureEvidenceByDay: departureEvidence(hourlyMinutes, 'BODS')
 };

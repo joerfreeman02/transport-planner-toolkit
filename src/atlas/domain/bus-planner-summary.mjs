@@ -1095,7 +1095,7 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
     && plannerEvidenceSourceRank(candidate) > plannerEvidenceSourceRank(service)
     && operatorFamilyCompatible(candidate, service)
     && !reverseEndpointRelationship(candidate, service)
-    && orderedPatternOverlap(candidate, service) >= 2));
+    && endpointDirectionCompatible(candidate, service)));
   const records = authoritativeRecords.length ? authoritativeRecords : populationRecords;
   const terminalEvidence = plannerServiceGroup?.terminusDecision?.proven
     && plannerServiceGroup.terminusDecision.terminalStopPointIds?.includes(representativeId)
@@ -1152,10 +1152,15 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
   return { entries: authoritativeEntries, schedules, eligible };
 }
 
-function orderedPatternOverlap(first, second) {
-  const left = explicitPattern(first).map(text).filter(Boolean);
-  const right = new Set(explicitPattern(second).map(text).filter(Boolean));
-  return left.filter((id, index) => right.has(id) && left.indexOf(id) === index).length;
+function endpointDirectionCompatible(first, second) {
+  const firstDestination = normal(plannerDestination(first));
+  const secondDestination = normal(plannerDestination(second));
+  if (firstDestination && secondDestination
+    && (firstDestination === secondDestination || firstDestination.includes(secondDestination) || secondDestination.includes(firstDestination))) return true;
+  const firstDestinationContext = normal(`${plannerDestination(first)} ${first?.direction ?? ''}`);
+  const secondDestinationContext = normal(`${plannerDestination(second)} ${second?.direction ?? ''}`);
+  return Boolean(firstDestination && secondDestination
+    && (firstDestinationContext.includes(secondDestination) || secondDestinationContext.includes(firstDestination)));
 }
 
 function hasDistinctSchoolNonSchoolPatterns(component) {
@@ -1179,7 +1184,7 @@ function higherAuthorityEquivalentPatterns(component, relatedServices, represent
       && operatorFamilyCompatible(candidate, service)
       && calendarProfileFromService(candidate) === calendarProfileFromService(service)
       && !reverseEndpointRelationship(candidate, service)
-      && orderedPatternOverlap(candidate, service) >= 2));
+        && endpointDirectionCompatible(candidate, service)));
   if (!peers.length) return [];
   const highestRank = Math.max(...peers.map(service => plannerEvidenceSourceRank(service)));
   return peers.filter(service => plannerEvidenceSourceRank(service) === highestRank);

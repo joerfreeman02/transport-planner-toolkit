@@ -5,7 +5,7 @@
 - Accepted frozen-intelligence baseline: `b3ad244dc98253da2f95a8ea9d0274ab32140f6f` (`atlas-bus-beta-intelligence-accepted-2026-10-23`).
 - Polish branch: `codex/atlas-bus-beta-polish`.
 - Polish worktree: `C:\Users\joe.freeman\AppData\Local\Packages\OpenAI.Codex_2p2nqsd0c76g0\LocalCache\Local\ATLAS\codex-workspaces\bus-polish`.
-- Validated polish runtime SHA: `30c303c219cf2d42a15682759269687b0f2dc9cd`.
+- Validated polish runtime SHA: `5c9307cc257a1387ceb0d2edc02a974cd2977832`.
 - Documentation handover is committed separately after runtime validation; no runtime files changed after validation.
 - This sprint changes presentation, wording, navigation, and presentation tests only. It does not change Bus source hierarchy, service identity, route arbitration, timetable composition, calendar, frequency, operator, qualification, warning, or fail-closed evidence logic.
 
@@ -17,7 +17,7 @@
 - Refined Results with a compact assessment summary, checked-data freshness, a calm clean-evidence state, and a review badge only when review items exist. Sources & checks retains the full trace with technical diagnostics behind disclosure.
 - Added a confirmed New assessment action that clears the selected site, result, address, and candidate state.
 - Refined map framing and made stop references deterministic numeric labels. Stop ordering and numeric references are presentation-only copies and are consistent between the stop summary, service “Served at” labels, and Word export; source evidence arrays are not mutated.
-- Moved the `*` assessed-stop frequency/operating-period explanation ahead of Word service rows. Qualification and review notes have semantic classifications for restrained report styling, and the awkward “additional additional” wording was removed without suppressing review evidence.
+- Moved the `*` assessed-stop frequency/operating-period explanation ahead of Word service rows. Service qualifications and material review notes use the existing restrained section-row style; the awkward “additional additional” wording was removed without suppressing review evidence.
 - Replaced mechanical Transport Statement text with a deterministic, concise summary of selected planner rows, route labels, timetable basis, and available qualifications. It makes no sustainability or unsupported service claims.
 - Kept version/build unchanged: `2.0.0-alpha.15`, `ATLAS-2.0.0-alpha.15-20260914`.
 

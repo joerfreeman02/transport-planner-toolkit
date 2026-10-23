@@ -52,11 +52,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPOSITORY: ${{ github.repository }}
         run: |
-          gh api "repos/$GH_REPOSITORY/actions/artifacts/12275615359" > "$RUNNER_TEMP/run75-artifact.json"
-          python - "$RUNNER_TEMP/run75-artifact.json" <<'PY'
+          gh api "repos/$GH_REPOSITORY/actions/runs/39430415441/artifacts?per_page=100" > "$RUNNER_TEMP/run75-artifacts.json"
+          python - "$RUNNER_TEMP/run75-artifacts.json" <<'PY'
           import json, sys
           from pathlib import Path
-          artifact = json.loads(Path(sys.argv[1]).read_text())
+          payload = json.loads(Path(sys.argv[1]).read_text())
+          artifact = next((item for item in payload.get('artifacts', []) if item.get('id') == 12275615359), None)
+          if artifact is None:
+              raise SystemExit('Exact Run #75 artifact ID 12275615359 is absent from the source-run artifact listing.')
           expected = {
               'id': 12275615359,
               'name': 'atlas-bus-beta-review-candidate-39430415441',

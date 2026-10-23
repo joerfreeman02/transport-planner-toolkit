@@ -6,7 +6,7 @@ Status: **C2 HISTORICAL; C3 MANUAL ACCEPTANCE REJECTED; C4 EVIDENCE CLOSEOUT BLO
 
 - Reviewed production SHA: `4408c790ca3ff88adee15f2da064c2002e0a4a7e`.
 - Branch: `codex/atlas-bus-beta-s2e-1-intelligence-restoration`.
-- Immutable candidate: Run `39430415441`, artifact `12275615359`, name `atlas-bus-beta-review-candidate-39430415441`, digest `sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`, producer SHA `151199cc914c235870f444d26b03c2309edbd035`.
+- Immutable candidate: Run `39430415441`, artifact `12275615359`, name `atlas-bus-beta-review-candidate-39430415441`, digest `sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`, producer SHA `151199cc914c235870f444d26b03c2309edbd035`.
 - The candidate was restored and inspected on hosted runners. It was not rebuilt or modified.
 - Version/build remain `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`.
 
@@ -198,6 +198,10 @@ Status: **BLOCKED — TECHNICAL DIRECTOR DECISION REQUIRED.** C3 manual acceptan
 - Hosted Run #23: ID 39804940981, conclusion success, exact head SHA 2cc207baea330664c743db027d9e11b3ed7959ee.
 - Run #23 report artifact: ID 12436993174, name atlas-bus-beta-s2e1-normal-runtime-diagnostic-39804940981, digest sha256:f2bebf1acd24f48c5c6e83ab87c9d8d0bbfefe6ac946fb4153eb7301d0eec7fb.
 - Immutable candidate: Run 39430415441, artifact 12275615359, digest sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471, producer SHA 151199cc914c235870f444d26b03c2309edbd035. It was restored and verified; it was not rebuilt or modified.
+
+## Run #75 provenance correction — 2026-10-23
+
+The canonical Run #75 artifact digest is `sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`. The previously transcribed value `sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471` was a provenance-record transcription error, not a change to or integrity failure of the candidate. Repository history traces its first occurrence to C3 handover commit `f31123a10ed4c188077a53ab1de1885f8eac4ca4`; C4’s targeted guard/report references were then added in evidence-only commit `485e4f2b5ae6b9bcb19a4619bc94b329d03cf862`. The original Run #75 upload log records the canonical SHA-256 for the uploaded artifact ZIP, and current GitHub artifact metadata reports the same digest. Artifact ID `12275615359`, name `atlas-bus-beta-review-candidate-39430415441`, producer Run `39430415441`, producer SHA `151199cc914c235870f444d26b03c2309edbd035`, and size `2,549,732,499` bytes are unchanged. No candidate bytes were rebuilt, replaced, or modified. Earlier dated handover entries retain their original wording for audit history; their transcribed digest is superseded by this correction.
 - Hosted gates passed: complete Bus-data Python suite; complete deterministic ATLAS suite; immutable candidate identity/provenance; actual-candidate planner diagnostic; six-control candidate Browser/Word audit; rendered normal-product Browser/generated-Word audit; and Chingford route 657 golden regression.
 - The normal-product Browser/Word audit covered Pipers, Waltham, Chingford, and PE1. The separate candidate Browser/Word audit covered six controls using the prepared national-data adapter; it did not compose Enfield TfL/iBus services through the production authoritative adapter.
 - No production code changed after Run #23. No fresh source acquisition, candidate rebuild/modification, publication, deployment, main merge, release, or version/build bump occurred. Version/build remain 2.0.0-alpha.15 / ATLAS-2.0.0-alpha.15-20260914.

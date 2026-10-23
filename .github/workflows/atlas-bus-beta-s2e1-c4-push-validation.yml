@@ -63,7 +63,7 @@ jobs:
           expected = {
               'id': 12275615359,
               'name': 'atlas-bus-beta-review-candidate-39430415441',
-              'digest': 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471',
+              'digest': 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471',
               'expired': False,
               'workflow_run': {'id': 39430415441, 'head_sha': '151199cc914c235870f444d26b03c2309edbd035'},
           }

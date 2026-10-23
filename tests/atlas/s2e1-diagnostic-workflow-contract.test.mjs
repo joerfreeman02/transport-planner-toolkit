@@ -21,7 +21,7 @@ assert.match(dispatchWorkflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-intelli
 assert.match(dispatchWorkflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-c1-manual-corrections/);
 assert.match(dispatchWorkflow, /refs\/heads\/codex\/atlas-bus-beta-s2e-1-c3-final-intelligence-correction/);
 assert.match(dispatchWorkflow, /s2e1-frozen-candidate-diagnosis:[\s\S]*s2e1_mode == 'normal_runtime_diagnosis'[\s\S]*mode: normal_runtime_diagnosis/);
-assert.match(dispatchWorkflow, /CANDIDATE_RUN" != '39430415441'[\s\S]*CANDIDATE_ID" != '12275615359'[\s\S]*CANDIDATE_DIGEST" != 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471/);
+assert.match(dispatchWorkflow, /CANDIDATE_RUN" != '39430415441'[\s\S]*CANDIDATE_ID" != '12275615359'[\s\S]*CANDIDATE_DIGEST" != 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471/);
 assert.match(dispatchWorkflow, /S2E-1 candidate diagnosis requires the exact Run #75 frozen-candidate restore selector with all acquisition\/source selectors blank\/default/);
 assert.match(c3PushWorkflow, /^name: ATLAS Bus Beta S2E-1 C3 frozen-candidate validation/m);
 assert.match(c3PushWorkflow, /push:\r?\n\s+branches:\r?\n\s+-\s+codex\/atlas-bus-beta-s2e-1-c3-final-intelligence-correction/);
@@ -38,6 +38,8 @@ assert.match(c4PushWorkflow, /uses: \.\/\.github\/workflows\/atlas-bus-beta-s2e1
 assert.match(c4PushWorkflow, /workflow_dispatch:/, 'C4 frozen-candidate diagnostic supports a guarded self-dispatch if GitHub drops a push event.');
 assert.match(c4PushWorkflow, /github\.event_name == 'workflow_dispatch'[\s\S]*github\.event_name == 'push'[\s\S]*\[c4-evidence-only\]/);
 assert.match(c4PushWorkflow, /targeted-evidence-only:[\s\S]*\[c4-evidence-only\][\s\S]*s2e1-normal-runtime-candidate-diagnostic\.mjs restored\/candidate-site candidate-diagnostic\/pe1-route-202\.json pe1[\s\S]*ATLAS_C4_ENFIELD_EVIDENCE_ONLY:[\s\S]*s2e1-manual-product-audit\.mjs restored\/candidate-site candidate-diagnostic\/enfield-browser-word\.json/);
+assert.match(c4PushWorkflow, /'digest': 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471'/, 'C4 restore guard must use the canonical Run #75 upload digest');
+assert.doesNotMatch(c4PushWorkflow, /5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471/);
 assert.match(manualBrowserAudit, /route329Stop = \(stopResult\.data \?\? \[\]\)\.filter\(stop => \(stop\.routes \?\? \[\]\)\.some\(value => String\(value\) === '329'\)\)/);
 assert.match(manualBrowserAudit, /Enfield production Browser did not render the frozen-candidate BODS 329 service/);
 assert.match(manualBrowserAudit, /activeJourney\.operatorName/);
@@ -76,7 +78,7 @@ assert.ok((await readFile(new URL('./run-all.mjs', import.meta.url), 'utf8')).in
 assert.match(await readFile(new URL('./s2e1-deterministic-empty-tfl.test.mjs', import.meta.url), 'utf8'), /stops\.ok, true[\s\S]*timetable\.ok, true/);
 assert.match(normalRuntime, /candidateProducerRun: '39430415441'/);
 assert.match(normalRuntime, /candidateArtifactId: '12275615359'/);
-assert.match(normalRuntime, /candidateArtifactDigest: 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471'/);
+assert.match(normalRuntime, /candidateArtifactDigest: 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471'/);
 assert.match(normalRuntime, /candidateModified: false/);
 assert.match(normalRuntime, /publicationAttempted: false, deploymentAttempted: false/);
 assert.match(normalRuntime, /sameCandidatePreparedOnlyComparison/);

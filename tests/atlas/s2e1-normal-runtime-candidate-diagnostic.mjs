@@ -440,7 +440,7 @@ const report = {
   candidateProducerRun: '39430415441',
   candidateProducerSha: '151199cc914c235870f444d26b03c2309edbd035',
   candidateArtifactId: '12275615359',
-  candidateArtifactDigest: 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471',
+  candidateArtifactDigest: 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471',
   controlId, control,
   diagnosticGateError: diagnosticGateError?.message ?? null,
   composition: 'Production createBusStopDiscovery + TfL/prepared adapters + createAuthoritativeBusTimetableAdapter + createBusAssessment.inspectScope/assess + production summary/planner grouping',

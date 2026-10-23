@@ -1,5 +1,5 @@
 import { buildServicePresentation, formatServiceOriginDestination } from '../domain/bus-service-assessment.mjs';
-import { buildBusTimetablePresentationNote, plannerRouteDisplayNumber, PLANNER_METHODOLOGY_NOTE, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../domain/bus-planner-summary.mjs';
+import { buildBusTimetablePresentationNote, plannerRouteDisplayNumber, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../domain/bus-planner-summary.mjs';
 import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
 import { isOtherNearbyStopRecord, partialTimetableQualification, plannerFacingServiceNote, stopRoutesPresentation } from '../domain/bus-source-presentation.mjs';
 
@@ -53,7 +53,7 @@ function reviewQualification(reviewItems) {
     'stop-source-coverage': 'stop-source coverage evidence',
     'access-routing': 'access-routing evidence',
     'timetable-source': 'timetable-source availability evidence',
-    'other-material': 'additional assessment evidence'
+    'other-material': 'assessment evidence'
   };
   for (const [category, entry] of categories) {
     if (category === 'timetable') continue;
@@ -80,6 +80,7 @@ export function buildBusWordTables(result) {
   const hasPlannerSummary = Array.isArray(result.plannerServiceSummaries);
   const services = hasPlannerSummary ? result.plannerServiceSummaries : buildServicePresentation(result.serviceSummaries ?? []);
   const serviceRows = [];
+  if (hasPlannerSummary) serviceRows.push({ kind: 'summary', semantic: 'frequency-basis', text: '* marks the assessed stop used for the frequency and operating-period information shown.' });
   const timetableNote = hasPlannerSummary ? buildBusTimetablePresentationNote(result, services) : null;
   if (timetableNote) serviceRows.push({ kind: 'summary', semantic: 'presentation-note', text: `Timetable note: ${timetableNote}` });
   if (hasPlannerSummary && services.some(service => service.plannerNotes?.terminus)) {
@@ -107,21 +108,21 @@ export function buildBusWordTables(result) {
     const duplicateTerminusNote = service.plannerNotes?.terminus && /\broute terminus\b/i.test(text(service.serviceNote));
     const structuredQualificationNote = /^(?:school[- ]day(?:s)?(?:[- ]only)?(?: journeys? only| service)?|runs? on school days only|operates? during term time only|term[- ]time service|runs? on non-school days only|non-school days only|operates? on holidays only|operating days could not be fully confirmed)(?:;.*)?\.?$/i.test(text(service.serviceNote));
     const visibleServiceNote = plannerFacingServiceNote(service.serviceNote);
-    if (visibleServiceNote && !duplicateTerminusNote && !structuredQualificationNote) serviceRows.push({ kind: 'summary', text: `Service note: ${visibleServiceNote}` });
+    if (visibleServiceNote && !duplicateTerminusNote && !structuredQualificationNote) serviceRows.push({ kind: 'summary', semantic: /school|term-time|holiday|short working/i.test(visibleServiceNote) ? 'qualification' : undefined, text: `Service note: ${visibleServiceNote}` });
     const plannerAnnotations = hasPlannerSummary ? plannerAnnotationRows(service) : [];
     const next = services[index + 1];
     if (hasPlannerSummary && (!next || next.publicRouteFamilyKey !== service.publicRouteFamilyKey)) {
       if (plannerAnnotations.length) {
-        plannerAnnotations.forEach(textValue => serviceRows.push({ kind: 'summary', text: textValue }));
+        plannerAnnotations.forEach(textValue => serviceRows.push({ kind: 'summary', semantic: /school|term-time|holiday|short working/i.test(textValue) ? 'qualification' : undefined, text: textValue }));
       }
-      else if (plannerFacingServiceNote(service.routeGroupNote)) serviceRows.push({ kind: 'summary', text: `Service note: ${plannerFacingServiceNote(service.routeGroupNote)}` });
+      else if (plannerFacingServiceNote(service.routeGroupNote)) serviceRows.push({ kind: 'summary', semantic: /school|term-time|holiday|short working/i.test(service.routeGroupNote) ? 'qualification' : undefined, text: `Service note: ${plannerFacingServiceNote(service.routeGroupNote)}` });
     }
   });
   const qualification = reviewQualification(result.reviewItems);
-  if (qualification) serviceRows.push({ kind: 'summary', text: qualification });
+  if (qualification) serviceRows.push({ kind: 'summary', semantic: 'review', text: qualification });
   const partialQualification = partialTimetableQualification(result.stops);
-  if (partialQualification) serviceRows.push({ kind: 'summary', semantic: 'partial-timetable-qualification', text: partialQualification });
-  if (hasPlannerSummary) serviceRows.push({ kind: 'summary', text: PLANNER_METHODOLOGY_NOTE });
+  if (partialQualification) serviceRows.push({ kind: 'summary', semantic: 'qualification', text: partialQualification });
+  if (hasPlannerSummary) serviceRows.push({ kind: 'summary', semantic: 'methodology', text: 'The “Served at” column lists assessed route stops within the search radius. Additional source evidence remains available in the ATLAS assessment workspace.' });
 
   return [
     {

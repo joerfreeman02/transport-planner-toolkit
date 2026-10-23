@@ -109,7 +109,7 @@ const word = buildBusWordTables({ ok: true, stops: fixture.stops, plannerService
 const wordServiceRows = word.find(table => table.caption.startsWith('Table 3.3')).rows;
 const wordText = wordServiceRows.map(row => Array.isArray(row) ? row.join(' ') : row.text).join(' ');
 const wordNotes = wordServiceRows.filter(row => !Array.isArray(row)).map(row => row.text);
-assert.ok(wordNotes[0].startsWith('Presentation note: Where an assessed stop is the route terminus'));
+assert.ok(wordNotes.find(note => note.startsWith('Presentation note: Where an assessed stop is the route terminus')));
 assert.equal(wordNotes.filter(note => note.startsWith('Presentation note:')).length, 1);
 assert.equal(wordNotes.at(-1).startsWith('Presentation note:'), false);
 assert.match(wordText, /Short workings: Some route 66 journeys operate to Hammond Street \(Smiths Lane\)\./);

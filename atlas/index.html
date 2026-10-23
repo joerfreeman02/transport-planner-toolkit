@@ -8,6 +8,7 @@
   <title>ATLAS — Transport and Location Assessment</title>
   <link rel="stylesheet" href="../assets/css/eas-theme.css">
   <link rel="stylesheet" href="../assets/vendor/leaflet/leaflet.css">
+  <link rel="icon" href="assets/branding/favicon.ico" sizes="any">
   <link rel="stylesheet" href="assets/css/atlas-shell.css?build=ATLAS-2.0.0-alpha.15-20260914">
 </head>
 <body>
@@ -15,8 +16,7 @@
   <header class="app-header">
     <div class="header-inner">
       <a class="brand" href="#modules" aria-label="ATLAS home">
-        <img src="../assets/images/eas-white.png" alt="EAS Transport Planning">
-        <span><b>ATLAS</b><small>Trusted transport information for development sites.</small></span>
+        <img src="assets/branding/atlas-logo-primary-on-white.png" alt="ATLAS — Trusted transport information for development sites">
       </a>
       <nav aria-label="ATLAS sections">
         <button type="button" data-view="report-builder">Report Builder</button>
@@ -24,7 +24,7 @@
         <button type="button" data-view="projects">Projects</button>
         <button type="button" data-view="about">About</button>
       </nav>
-      <div class="build" aria-label="ATLAS release and test build"><b>Release · 2.0.0-alpha.15</b><span>ATLAS-2.0.0-alpha.15-20260914</span><span data-atlas-test-build="BUS-TFL-COMPLETE · 737f26a">BUS-TFL-COMPLETE · 737f26a</span></div>
+      <span class="header-product-status">Bus Assessment · Beta</span>
     </div>
   </header>
 
@@ -40,16 +40,16 @@
     </section>
 
     <section class="view" data-view-panel="about" hidden>
-      <div class="page-heading"><p class="eyebrow">About ATLAS</p><h1>ATLAS — Automated Transport &amp; Location Assessment System</h1><p>ATLAS is EAS's internal transport-planning platform for faster, more consistent site assessment and research.</p></div>
+      <div class="page-heading"><p class="eyebrow">About ATLAS</p><h1>ATLAS — Automated Transport &amp; Location Assessment System</h1><p>Trusted transport information for development sites. ATLAS brings transport-planning assessment tools together within one consistent workflow.</p></div>
       <div class="about-grid">
         <article class="about-card product-identity">
-          <span class="status development">In development</span>
-          <h2>Authoritative research, controlled workflow</h2>
-          <p>ATLAS brings authoritative transport sources and controlled, repeatable calculations into one practical assessment workflow. It reduces repetitive research and makes the evidence behind each result easier to review.</p>
-          <p>ATLAS supports professional work; the transport planner checks the evidence, resolves uncertainty and retains responsibility for judgement.</p>
+          <span class="status beta">Bus Assessment · Beta</span>
+          <h2>Evidence-led transport assessment</h2>
+          <p>The Bus module identifies nearby stops and presents available route, timetable and access evidence in a consistent assessment workflow.</p>
+          <p>It supports professional work; planners remain responsible for checking evidence, resolving uncertainty and exercising judgement before formal use.</p>
         </article>
         <article class="about-card forge-card">
-          <p class="eyebrow">EAS FORGE</p>
+          <img class="forge-lockup" src="assets/branding/eas-forge-lockup-light-with-tagline-on-white.svg" alt="EAS FORGE — Framework for Operational Research, Governance &amp; Engineering">
           <h2>Built through EAS's internal R&amp;D programme</h2>
           <p><strong>Framework for Operational Research, Governance &amp; Engineering</strong></p>
           <p>EAS FORGE develops focused consultancy software that makes established workflows faster and more consistent while keeping professional judgement with EAS staff.</p>
@@ -64,29 +64,33 @@
             <strong>Created by Joe Freeman · EAS FORGE</strong>
           </div>
         </article>
-          <article class="about-card"><p class="eyebrow">Current status</p><h2>Alpha.15 production-fidelity bus service abstraction sprint</h2><dl><dt>Version</dt><dd>2.0.0-alpha.15</dd><dt>Release build</dt><dd>ATLAS-2.0.0-alpha.15-20260914</dd><dt>Development/test build</dt><dd data-atlas-test-build="BUS-TFL-COMPLETE · 737f26a">BUS-TFL-COMPLETE · 737f26a</dd><dt>Status</dt><dd>WIP / Technical Director review required</dd></dl></article>
+        <article class="about-card"><p class="eyebrow">Product and release information</p><h2>Bus Assessment — Beta</h2><p>The module combines authoritative source records and validated timetable summaries for planner review. Coverage and source availability vary by location; unresolved evidence is identified for review.</p><dl><dt>Version</dt><dd>2.0.0-alpha.15</dd><dt>Release build</dt><dd>ATLAS-2.0.0-alpha.15-20260914</dd><dt>Development/test build</dt><dd data-atlas-test-build="BUS-TFL-COMPLETE · 737f26a">BUS-TFL-COMPLETE · 737f26a</dd><dt>Status</dt><dd>Internal Beta · review outputs before formal use</dd></dl></article>
         <article class="about-card"><p class="eyebrow">Data acknowledgements</p><h2>Trusted sources used today</h2><p>Address search, maps and access routing use OpenStreetMap data. London stop discovery is provided by Transport for London. National stops use Department for Transport NaPTAN; timetables use the Department for Transport Bus Open Data Service and supplementary Traveline National Dataset (TNDS) information.</p><p class="acknowledgement">© OpenStreetMap contributors · Routed by OSRM · Data provided by Transport for London · NaPTAN and BODS © Department for Transport · Traveline National Dataset (TNDS) contains public sector information licensed under the Open Government Licence v3.0 · Contains National Statistics and Ordnance Survey data © Crown copyright and database right 2015</p></article>
       </div>
     </section>
 
     <section class="view" data-view-panel="modules">
+      <section class="atlas-hero" aria-labelledby="atlas-hero-title">
+        <img src="assets/branding/atlas-logo-primary-with-tagline-on-white.png" alt="ATLAS — Trusted transport information for development sites">
+        <div><p class="eyebrow">EAS transport planning platform</p><h1 id="atlas-hero-title">Assessment tools for development sites</h1><p>ATLAS brings transport-planning assessment tools together within one consistent workflow. Bus is the first available module.</p></div>
+      </section>
       <div class="page-heading heading-row">
-        <div><p class="eyebrow">Assessment tools</p><h1>Modules</h1><p>Establish the shared site assessment point, then use the available development workflow.</p></div>
+          <div><p class="eyebrow">Assessment tools</p><h2>Modules</h2><p>Choose an available assessment or open an existing Toolkit.</p></div>
         <a class="legacy-link" href="../">Open legacy Toolkit</a>
       </div>
 
       <section class="module-grid" aria-label="ATLAS module status">
-        <article><span class="status legacy">Existing Toolkit</span><h2>Accessibility</h2><p>Available in the existing Toolkit. Moving it into ATLAS is planned, not started.</p></article>
-        <article class="featured"><span class="status development">In development</span><h2>Bus</h2><p>Check authoritative nearby bus stops and available routes from the confirmed assessment point.</p><a href="#site-workspace">Establish the site</a></article>
-        <article><span class="status planned">Planned</span><h2>Rail</h2><p>The existing Railway Assessment remains available. Moving it into ATLAS has not started.</p></article>
-        <article><span class="status legacy">Existing Toolkit</span><h2>Road Safety</h2><p>The existing STATS19 tool remains available. Future ATLAS integration is planned.</p></article>
-        <article><span class="status wip">Under review</span><h2>Drawings</h2><p>The existing Drawing Generator is still being reviewed and is not approved for normal use.</p></article>
+        <article><span class="status legacy">Existing Toolkit</span><h2>Accessibility</h2><p>Available in the existing Toolkit. ATLAS integration is planned for later.</p></article>
+        <article class="featured"><span class="status beta">Beta</span><h2>Bus Assessment</h2><p>Assess nearby stops, route and timetable evidence, and walking access from a confirmed site point.</p><a href="#site-workspace">Start a Bus assessment</a></article>
+        <article><span class="status planned">Coming later</span><h2>Rail</h2><p>Rail assessment tools are not yet available in ATLAS.</p></article>
+        <article><span class="status legacy">Existing Toolkit</span><h2>Road Safety</h2><p>The existing STATS19 tool remains available in the legacy Toolkit.</p></article>
+        <article><span class="status planned">Coming later</span><h2>Drawings</h2><p>Drawing tools are not yet available in ATLAS.</p></article>
       </section>
 
       <section class="workspace" id="site-workspace" aria-labelledby="site-selector-title">
         <div class="workspace-header">
-          <div><p class="eyebrow">Shared ATLAS site</p><h2 id="site-selector-title">Establish the assessment point</h2><p>Identify the development, check its access on the map, then confirm the exact point ATLAS should use.</p></div>
-          <span class="status development">Alpha.15 production-fidelity bus service abstraction sprint</span>
+          <div><p class="eyebrow">Bus Assessment · Beta</p><h2 id="site-selector-title">Set up your assessment</h2><p>Find the site, check its location, confirm the assessment point and review the results.</p></div>
+          <button id="newAssessment" class="secondary compact" type="button">New assessment</button>
         </div>
 
         <div class="steps">
@@ -179,12 +183,12 @@
         </div>
 
         <section id="evidencePanel" class="evidence-panel" hidden aria-labelledby="evidence-heading">
-          <div class="evidence-heading"><div><p class="eyebrow">Bus assessment</p><h3 id="evidence-heading">Stops and services near the assessment point</h3></div><div class="evidence-actions"><div id="evidenceSummary"></div><button id="exportBusWord" class="secondary compact" type="button" disabled>Export Word (.docx)</button></div></div>
+          <div class="evidence-heading"><div><p class="eyebrow">Results</p><h3 id="evidence-heading">Bus assessment results</h3><p id="assessmentFreshness" class="assessment-freshness"></p></div><div class="evidence-actions"><div id="evidenceSummary"></div><button id="exportBusWord" class="primary compact" type="button" disabled>Export Word (.docx)</button></div></div>
           <div id="resultsMapHost" class="results-map-host"><p class="supporting">Map references are navigation aids only; authoritative stop names and indicators remain in the tables.</p></div>
           <div class="check-summary" aria-label="Result source and status"><div><span>Source</span><strong id="resultSource">Authoritative source</strong></div><div><span>Checked</span><strong id="resultChecked"></strong></div><div><span>Status</span><strong id="resultFreshness"></strong></div></div>
           <section class="assessment-output" aria-labelledby="stop-summary-heading">
             <div class="output-heading"><div><p class="eyebrow">Table 3.2</p><h4 id="stop-summary-heading">Bus Stop Summary</h4></div><button id="clearRoutes" class="secondary compact" type="button" hidden>Clear route lines</button></div>
-          <p class="supporting planner-label-note">The map, stop table, service summary and Word export use the same deterministic map references A, B, C. Cycling access remains available in each stop’s map popup.</p>
+          <p class="supporting planner-label-note">Numbered map references match the stop summary and Word export. Cycling access remains available in each stop’s map popup.</p>
           <div class="table-wrap">
             <table class="bus-stop-summary">
               <colgroup><col class="col-include"><col class="col-stop-label"><col class="col-stop-name"><col class="col-direction"><col class="col-walk"><col class="col-routes"></colgroup>
@@ -195,19 +199,19 @@
           </section>
           <section class="assessment-output" aria-labelledby="service-summary-heading">
             <div class="output-heading"><div><p class="eyebrow">Table 3.3</p><h4 id="service-summary-heading">Bus Service Summary</h4></div><div class="selection-actions"><button id="recommendedSelection" class="secondary compact" type="button">Recommended selection</button><button id="selectAllRows" class="secondary compact" type="button">Select all</button><button id="clearAllRows" class="secondary compact" type="button">Clear all</button><button id="toggleDetailedEvidence" class="secondary compact" type="button">Show detailed evidence</button></div></div>
+            <p id="serviceSummaryMethodology" class="supporting planner-methodology">* marks the assessed stop used for the frequency and operating-period information shown. “Served at” lists assessed route stops within the search radius. Detailed source records are available below.</p>
             <div class="table-wrap"><table class="bus-service-summary"><colgroup><col class="col-include"><col class="col-route"><col class="col-operator"><col class="col-direction"><col class="col-served-at"><col class="col-principal"><col class="col-frequency"><col class="col-operating-period"><col class="col-source"></colgroup><thead><tr><th>Include</th><th>Route</th><th>Operator</th><th>Direction / main service pattern</th><th>Served at</th><th>Principal locations</th><th>Typical frequency</th><th>Operating period at stop</th><th>Source</th></tr></thead><tbody id="serviceRows"></tbody></table></div>
-            <p id="serviceSummaryMethodology" class="supporting planner-methodology">* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence. Detailed source evidence is available under Show detailed evidence.</p>
             <section id="serviceDetailPanel" class="service-detail-panel" hidden aria-labelledby="service-detail-heading"><h5 id="service-detail-heading">Detailed timetable evidence</h5><p class="supporting">Underlying source records are shown for inspection; the consolidated Table 3.3 remains the planner-facing summary.</p><div id="serviceDetailRows"></div></section>
           </section>
           <section class="assessment-wording" aria-labelledby="wording-heading"><p class="eyebrow">Controlled wording</p><h4 id="wording-heading">Assessment wording</h4><p id="assessmentWording"></p></section>
-          <details><summary>Sources and checks</summary><div id="plannerChecks"></div></details>
+          <details id="sourceChecksDetails" class="source-checks"><summary><span>Sources &amp; checks</span><span id="sourceChecksBadge" class="review-badge" hidden></span><span id="sourceChecksHint" class="source-checks-hint">Source, freshness and assessment notes</span></summary><div id="plannerChecks"></div></details>
           <details id="developerDiagnostics" class="technical-details" hidden><summary>Developer diagnostics</summary><div id="diagnostics"></div></details>
         </section>
       </section>
     </section>
   </main>
 
-  <footer><span>ATLAS 2.0.0-alpha.15 · Production-fidelity bus service abstraction sprint</span><span class="creator-credit">Created by Joe Freeman · EAS FORGE</span><span>Awaiting Technical Director review</span></footer>
+  <footer><span>ATLAS · Bus Assessment Beta · 2.0.0-alpha.15</span><span class="forge-footer-brand"><img src="assets/branding/eas-forge-lockup-light-with-tagline-on-white.svg" alt="EAS FORGE — Framework for Operational Research, Governance &amp; Engineering"></span><span>Internal assessment support · planner review required</span></footer>
   <script src="../assets/vendor/leaflet/leaflet.js"></script>
   <script type="module" src="assets/js/app.mjs?build=ATLAS-2.0.0-alpha.15-20260914"></script>
 </body>

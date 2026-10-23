@@ -36,12 +36,26 @@ await page.route('https://nominatim.openstreetmap.org/**', route => {
 });
 await page.route('https://api.tfl.gov.uk/**', route => {
   tflRequests += 1;
-  route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(stops) });
+  const url = new URL(route.request().url());
+  if (/\/Line\/[^/]+\/Timetable\//i.test(url.pathname)) {
+    const [, lineId, stopPointId] = url.pathname.match(/\/Line\/([^/]+)\/Timetable\/([^/]+)/i) ?? [];
+    const fixture = structuredClone(tflTimetable);
+    fixture.lineId = decodeURIComponent(lineId ?? '322');
+    fixture.lineName = fixture.lineId;
+    fixture.timetable.departureStopId = decodeURIComponent(stopPointId ?? '490TEST001');
+    for (const route of fixture.timetable.routes ?? []) {
+      for (const stationIntervals of route.stationIntervals ?? []) {
+        for (const interval of stationIntervals.intervals ?? []) interval.stopId = fixture.timetable.departureStopId;
+      }
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(fixture) });
+  }
+  return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(stops) });
 });
 
 try {
   await page.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.15/);
+  assert.match(await page.locator('footer').innerText(), /2\.0\.0-alpha\.15/);
   for (const section of ['Report Builder', 'Modules', 'Projects', 'About']) {
     await page.getByRole('button', { name: section }).click();
     assert.equal(await page.getByRole('heading', { name: section === 'About' ? 'ATLAS — Automated Transport & Location Assessment System' : section, exact: true }).isVisible(), true);
@@ -70,7 +84,7 @@ try {
   assert.equal(await page.locator('#evidenceRows a[href*="google.com/maps/search"]').count(), 2);
   assert.match(await page.locator('#evidenceRows tr').first().innerText(), /322, 450/);
   assert.ok(await page.locator('#serviceRows tr:not(.service-note)').count() > 0);
-  assert.equal(await page.locator('.bus-service-summary thead th').count(), 8);
+  assert.equal(await page.locator('.bus-service-summary thead th').count(), 9);
   assert.match(await page.locator('.bus-service-summary').innerText(), /Served at/);
   assert.equal(await page.locator('#taskStatusMessage').innerText(), 'Complete');
   assert.match(await page.locator('#evidenceRows tr').first().innerText(), /m · \d+ mins?/);
@@ -78,13 +92,17 @@ try {
   const requestsAfterFirstAssessment = tflRequests;
   assert.match(await page.locator('#resultSource').innerText(), /Transport for London.*OpenStreetMap routing/);
   assert.match(await page.locator('#resultFreshness').innerText(), /^Assessment complete/);
-  await page.getByText('Sources and checks', { exact: true }).click();
+  await page.getByText('Sources & checks', { exact: true }).click();
   assert.match(await page.locator('#plannerChecks').innerText(), /Stops:\s*Transport for London/);
   assert.match(await page.locator('#plannerChecks').innerText(), /Result:\s*Complete/);
 
   const prohibited = /\b(?:HTTP|API|endpoint|TTL|JSON|schema|adapter|cache hit|payload|CORS|geocoder|query relaxation)\b/i;
   assert.doesNotMatch(await page.locator('body').innerText(), prohibited, 'Normal planner view exposed software terminology.');
-  assert.equal(await page.locator('.technical-details').last().getByText('View technical details', { exact: true }).isVisible(), true);
+  assert.equal(await page.locator('.technical-details').last().isVisible(), false, 'developer diagnostics remain hidden in normal planner view');
+  assert.equal(await page.locator('#sourceChecksBadge').isVisible(), false, 'resolved evidence shows no review badge');
+  assert.match(await page.locator('#assessmentFreshness').innerText(), /^Assessment data checked /);
+  const mapBounds = await page.locator('#resultsMapHost .site-map').boundingBox();
+  assert.ok(Math.abs(mapBounds.width - mapBounds.height) / mapBounds.width < .12, `Results map should be close to square: ${JSON.stringify(mapBounds)}`);
   if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'atlas-site-selector-desktop.png'), fullPage: true });
 
   await page.setViewportSize({ width: 1024, height: 768 });
@@ -98,7 +116,7 @@ try {
 
   await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await page.waitForFunction(() => /Complete - checked/.test(document.getElementById('stopStatus')?.textContent || ''), null, { timeout: 20000 });
-  assert.equal(tflRequests, requestsAfterFirstAssessment + 5, 'A repeated check retries the five failed TfL timetable requests rather than caching source failures.');
+  assert.equal(tflRequests, requestsAfterFirstAssessment, 'A repeated check reuses successful TfL timetable evidence.');
   assert.match(await page.locator('#stopStatus').innerText(), /Complete - checked/);
   assert.doesNotMatch(await page.locator('#stopStatus').innerText(), /cache/i);
 
@@ -156,7 +174,11 @@ try {
   assert.match(outsideResultSource, /Department for Transport NaPTAN \+ Transport for London StopPoint/);
   assert.match(outsideResultSource, /Transport for London scheduled timetables/);
   assert.doesNotMatch(outsideResultSource, /Department for Transport bus timetables|BODS|TNDS/);
-  await nonLondonPage.getByText('Sources and checks', { exact: true }).click();
+  const outsideReviewText = await nonLondonPage.locator('#resultFreshness').innerText();
+  const outsideBadge = nonLondonPage.locator('#sourceChecksBadge');
+  assert.equal(await outsideBadge.isVisible(), /needs review/.test(outsideReviewText), 'Sources & checks badge visibility follows actual review status.');
+  if (await outsideBadge.isVisible()) assert.match(await outsideBadge.innerText(), /^\d+ evidence item(?:s)? need(?:s)? review$/);
+  await nonLondonPage.getByText('Sources & checks', { exact: true }).click();
   const outsideChecks = await nonLondonPage.locator('#plannerChecks').innerText();
   assert.match(outsideChecks, /Stops:\s*Department for Transport NaPTAN \+ Transport for London StopPoint/);
   assert.match(outsideChecks, /Timetables:\s*Transport for London scheduled timetables/);
@@ -164,6 +186,18 @@ try {
   assert.ok(await nonLondonPage.locator('#serviceRows tr:not(.service-note)').count() > 0);
   assert.equal(nonLondonErrors.length, 0);
   await nonLondonPage.close();
+
+  let resetDialogAccepted = false;
+  page.on('dialog', async dialog => { resetDialogAccepted = true; await dialog.accept(); });
+  const [wordDownload] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Export Word (.docx)' }).click()
+  ]);
+  assert.match(wordDownload.suggestedFilename(), /ATLAS Bus Assessment.*\.docx$/);
+  await page.getByRole('button', { name: 'New assessment' }).click();
+  assert.equal(resetDialogAccepted, true, 'New assessment confirms before clearing existing work');
+  assert.equal(await page.locator('#evidencePanel').isVisible(), false);
+  assert.equal(await page.getByLabel('Site address or name').inputValue(), '');
 
   const legacyHref = await page.getByRole('link', { name: 'Open legacy Toolkit' }).getAttribute('href');
   assert.equal(new URL(legacyHref, page.url()).href, root);

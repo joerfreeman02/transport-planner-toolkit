@@ -232,8 +232,8 @@ const summary = {
   stopIds: ['B'], rawServiceSummaries: [resolvedService]
 };
 const word = buildBusWordTables({ ok: true, plannerServiceSummaries: [summary], serviceSummaries: [], stops: [], reviewItems: [] })[1];
-assert.equal(word.rows[0][1], resolvedService.operator, 'Word receives the same resolved operator value as the Browser service object');
-assert.equal(word.rows[0].length, 7, 'Word retains the seven-column planner-facing contract');
+assert.equal(word.rows.find(Array.isArray)[1], resolvedService.operator, 'Word receives the same resolved operator value as the Browser service object');
+assert.equal(word.rows.find(Array.isArray).length, 7, 'Word retains the seven-column planner-facing contract');
 assert.deepEqual(word.headers, ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']);
 assert.equal(operatorProvenanceLabel(summary), `TfL iBus Static Data · Base_Version ${currentIndex.baseVersion}`, 'Planner-row projection retains provenance in the engineering model and audit evidence');
 assert.equal(resolvedService.source.operatorProvenance.tier, 'tfl-ibus', 'removing the report column does not remove operator provenance');

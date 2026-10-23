@@ -16,9 +16,10 @@ import { createTflRequestScheduler } from '../../../src/atlas/adapters/tfl-reque
 import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-discovery.mjs';
 import { createBusAssessment, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/atlas/application/bus-assessment.mjs';
 import { buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
+import { numberedServicesForPresentation, numberedStopsForPresentation } from '../../../src/atlas/presentation/map-references.mjs';
 import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-task-status.mjs';
 import { buildBusTimetablePresentationNote, buildPlannerBusServiceSummaries, plannerRouteDisplayNumber, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
-import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, isOtherNearbyStopRecord, partialTimetableQualification, plannerFacingServiceNote, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { plannerStopWarning, recommendedBusStop } from '../../../src/atlas/domain/bus-planner-trust.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
@@ -92,7 +93,8 @@ function selectedResult() {
     : buildPlannerBusServiceSummaries(currentBusResult.serviceSummaries, currentBusResult.stops);
   const plannerServiceSummaries = sourceServices.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => stopIds.has(String(id))));
   const serviceSummaries = currentBusResult.serviceSummaries.filter(service => service.stopIds?.some(id => stopIds.has(String(id))));
-  return { ...currentBusResult, stops, serviceSummaries, plannerServiceSummaries, wording: buildControlledBusWording(plannerServiceSummaries, { nearestGroupName: currentBusResult.nearestGroup?.name ?? null }) };
+  const numberedStops = numberedStopsForPresentation(stops);
+  return { ...currentBusResult, stops: numberedStops, serviceSummaries, plannerServiceSummaries: numberedServicesForPresentation(plannerServiceSummaries, stops, numberedStops), wording: assessmentWording({ ...currentBusResult, stops }, plannerServiceSummaries) };
 }
 
 async function refreshDataStatus() {
@@ -166,9 +168,27 @@ function plannerFailure(kind, result) {
 
 function assessmentWording(result, services, selectedIds = null) {
   const presented = (services ?? []).filter(service => !selectedIds || (selectedIds.has(serviceKey(service)) && service.stopIds?.some(id => result.stops.some(stop => selectedIds.has(stopKey(stop)) && String(id) === stopKey(stop)))));
-  const base = buildControlledBusWording(presented, { nearestGroupName: result.nearestGroup?.name ?? null });
+  const routeLabels = [...new Set(presented.map(plannerRouteDisplayNumber).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right, 'en-GB', { numeric: true }));
+  const routeDescription = routeLabels.length === 1 ? `route ${routeLabels[0]}` : `${routeLabels.length} routes (${routeLabels.join(', ')})`;
+  const base = presented.length
+    ? `The assessment identified service information for ${routeDescription} at the assessed stops. Route directions, principal locations, typical frequencies and operating periods are set out in Table 3.3, based on the timetable evidence available at the selected assessed stops.`
+    : 'No matched timetable service summary is available for the selected assessed stops. Review Sources & checks before using this assessment.';
   const qualification = partialTimetableQualification(result.stops);
   return qualification ? `${base} ${qualification}` : base;
+}
+
+function startNewAssessment() {
+  const hasWork = Boolean(confirmedSite || currentBusResult || $('address').value.trim() || selector.getSnapshot().site);
+  if (hasWork && !window.confirm('Start a new assessment? The current site and results will be cleared.')) return;
+  clearSelection();
+  $('address').value = '';
+  $('candidateList').replaceChildren();
+  setCallout($('geocodeStatus'), 'Enter the site address or name and choose Find site.', 'neutral');
+  $('radius').value = '700';
+  radiusTouched = false;
+  if (map) map.setView([52.5, -1.5], 6);
+  $('address').focus();
 }
 
 function plannerAnnotationEntries(service) {
@@ -525,9 +545,11 @@ function evidenceReviewText(count) {
 
 function renderAssessment(result) {
   currentBusResult = result;
+  const presentationStops = numberedStopsForPresentation(result.stops);
   const presentedServices = Array.isArray(result.plannerServiceSummaries)
     ? result.plannerServiceSummaries
     : buildPlannerBusServiceSummaries(result.serviceSummaries, result.stops);
+  const presentationServices = numberedServicesForPresentation(presentedServices, result.stops, presentationStops);
   if (!selectionInitialised) {
     selectedStopIds = new Set(result.stops.filter(recommendedBusStop).map(stopKey));
     selectedServiceIds = new Set(presentedServices.map(serviceKey));
@@ -550,8 +572,8 @@ function renderAssessment(result) {
   rows.closest('.table-wrap')?.parentElement?.querySelector('.other-nearby-stop-records')?.remove();
   serviceRows.replaceChildren();
   if (detailRows) detailRows.replaceChildren();
-  const otherNearbyRecords = result.stops.filter(isOtherNearbyStopRecord);
-  for (const stop of result.stops.filter(stop => !isOtherNearbyStopRecord(stop))) {
+  const otherNearbyRecords = presentationStops.filter(isOtherNearbyStopRecord);
+  for (const stop of presentationStops.filter(stop => !isOtherNearbyStopRecord(stop))) {
     const row = document.createElement('tr');
     const selectedForReport = selectedStopIds.has(stopKey(stop));
     if (!selectedForReport) row.classList.add('diagnostic-candidate');
@@ -576,7 +598,7 @@ function renderAssessment(result) {
     });
     rows.append(row);
   }
-  if (!result.stops.some(stop => !isOtherNearbyStopRecord(stop))) {
+  if (!presentationStops.some(stop => !isOtherNearbyStopRecord(stop))) {
     const row = document.createElement('tr'); const cell = document.createElement('td'); cell.colSpan = 6; cell.textContent = 'No authoritative bus stops were found within the selected discovery radius.'; row.append(cell); rows.append(row);
   }
   if (otherNearbyRecords.length) {
@@ -621,7 +643,7 @@ function renderAssessment(result) {
     const label = document.createElement('strong'); label.textContent = 'Timetable note: ';
     noteCell.append(label, timetableNote); noteRow.append(noteCell); serviceRows.append(noteRow);
   }
-  presentedServices.forEach((service, index) => {
+  presentationServices.forEach((service, index) => {
     const row = document.createElement('tr');
     const supported = service.stopIds?.some(id => selectedStopIds.has(String(id)));
     const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedServiceIds.has(serviceKey(service)) && supported; include.disabled = !supported; include.setAttribute('aria-label', `Include route ${service.routeNumber}`);
@@ -715,7 +737,7 @@ function renderAssessment(result) {
       if (!(result.services ?? []).length) detailRows.textContent = 'No detailed timetable records were returned for this assessment.';
     }
   }
-  renderBusStopMarkers(result.stops);
+  renderBusStopMarkers(presentationStops);
   $('assessmentWording').textContent = assessmentWording(result, presentedServices.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => selectedStopIds.has(String(id)))));
   const stopProvenance = result.provenance.stops ?? {};
   const timetableProvenance = result.provenance.timetables ?? {};
@@ -730,6 +752,11 @@ function renderAssessment(result) {
   $('resultChecked').textContent = checked;
   const reviewItems = result.reviewItems ?? [];
   $('resultFreshness').textContent = result.status === 'complete' ? 'Assessment complete' : 'Assessment finished — ' + evidenceReviewText(reviewItems.length);
+  $('assessmentFreshness').textContent = checked === 'Not supplied' ? 'Assessment data check time was not supplied.' : `Assessment data checked ${checked}.`;
+  const reviewBadge = $('sourceChecksBadge');
+  reviewBadge.hidden = reviewItems.length === 0;
+  reviewBadge.textContent = reviewItems.length ? evidenceReviewText(reviewItems.length) : '';
+  $('sourceChecksHint').textContent = reviewItems.length ? 'Review flagged evidence before formal use.' : 'Source, freshness and assessment notes';
   const plannerChecks = $('plannerChecks');
   plannerChecks.replaceChildren();
   for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', result.status === 'complete' ? 'Complete for the information shown' : 'Assessment finished — ' + evidenceReviewText(reviewItems.length)]]) {
@@ -955,6 +982,7 @@ function initMap() {
 }
 
 document.querySelectorAll('nav [data-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
+$('newAssessment').addEventListener('click', startNewAssessment);
 $('addressForm').addEventListener('submit', searchAddress);
 $('chooseOnMap').addEventListener('click', () => {
   setCallout($('mapStatus'), 'Pan or zoom if needed, then click the map to place the assessment point.', 'warning');

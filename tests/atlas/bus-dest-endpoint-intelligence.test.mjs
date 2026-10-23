@@ -214,7 +214,7 @@ assert.deepEqual(after.map(row => row.calendarProfileId), before.map(row => row.
 const genericRow = after.find(row => row.routeNumber === '310');
 assert.equal(genericRow.destination, 'Waltham Cross Bus Station');
 assert.equal(genericRow.rawDestination, 'Bus Station');
-const wordRow = buildBusWordTables({ ok: true, stops, plannerServiceSummaries: [genericRow], serviceSummaries: [], reviewItems: [] })[1].rows[0];
+const wordRow = buildBusWordTables({ ok: true, stops, plannerServiceSummaries: [genericRow], serviceSummaries: [], reviewItems: [] })[1].rows.find(Array.isArray);
 assert.match(wordRow[2], /Waltham Cross Bus Station/);
 assert.match(genericRow.directionPatternText, /Waltham Cross Bus Station/);
 

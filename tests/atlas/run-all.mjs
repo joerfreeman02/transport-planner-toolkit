@@ -29,6 +29,7 @@ await import('./tfl-operating-period-1b.test.mjs');
 await import('./tfl-operating-period-1c.test.mjs');
 await import('./bus-word-export.test.mjs');
 await import('./bus-ui-contract.test.mjs');
+await import('./beta-polish-presentation.test.mjs');
 await import('./bus-planner-golden-rule.test.mjs');
 await import('./bus-dest-endpoint-intelligence.test.mjs');
 await import('./bus-endpoint-alias-closeout.test.mjs');

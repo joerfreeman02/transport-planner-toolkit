@@ -144,7 +144,7 @@ assert.match(productAudit, /Waltham route 217 must retain the fixture-backed ful
 assert.match(manualBrowserAudit, /Waltham route 217 must retain the fixture-backed full TfL span at the selected stop/);
 assert.match(productAudit, /rows46\.length >= 1/);
 assert.match(productAudit, /rows46\.every\(row => \/\\\*\/\.test\(row\['Served at'\]/);
-assert.match(productAudit, /page\.locator\('#radius'\)\.fill\(String\(control\.radius\)\)/);
+assert.match(productAudit, /coordinatesForm button\[type="submit"\][\s\S]*page\.locator\('#radius'\)\.fill\(String\(control\.radius\)\)[\s\S]*confirmAssessmentPoint/);
 assert.match(productAudit, /Pipers route 46 selected-stop population should present the candidate-supported broadly hourly service/);
 assert.match(productAudit, /Pipers Word route 46 should preserve the broadly hourly selected-stop frequency/);
 assert.doesNotMatch(productAudit, /accepted C2 Run #151 frequency baseline/);

@@ -2010,8 +2010,6 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const displayProfileId = schoolHolidayVariant
     ? separateTimetableProfiles.termTime[0]
     : effectiveProfileIds.includes('ordinary') ? 'ordinary'
-      : samePatternSchoolNonSchoolEvidence && effectiveProfileIds.some(isNonSchoolProfile)
-        ? effectiveProfileIds.find(isNonSchoolProfile)
       : [...effectiveProfileIds].sort((left, right) => profileResults.get(right).entries.length - profileResults.get(left).entries.length
         || CALENDAR_PROFILE_ORDER.indexOf(left) - CALENDAR_PROFILE_ORDER.indexOf(right))[0] ?? profileIds[0] ?? null;
   const selectedProfileResult = profileResults.get(displayProfileId) ?? calculateProfileResult(profileComponent, representative.id, displayProfileId, calendarPartition(canonical.entries, displayProfileId, ordinaryEntries, hasOrdinaryProfile));

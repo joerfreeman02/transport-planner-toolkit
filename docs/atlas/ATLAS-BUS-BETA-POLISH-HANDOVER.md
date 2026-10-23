@@ -60,4 +60,3 @@ No Bus intelligence was altered. The full Bus-data regression suite and determin
 - OpenSSF Scorecard: later security/release milestone.
 - Sentry: deferred pending telemetry and privacy architecture decisions.
 - Renovate: unnecessary alongside Dependabot.
-

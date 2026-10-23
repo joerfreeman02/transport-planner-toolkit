@@ -82,6 +82,7 @@ await import('./s2d1-candidate-audit-contract.test.mjs');
 await import('./s2e1-diagnostic-workflow-contract.test.mjs');
 await import('./s2e1-deterministic-empty-tfl.test.mjs');
 await import('./s2e1-planner-corrections.test.mjs');
+await import('./s2e1-enfield-313-multistop-composition.test.mjs');
 await import('./reference-data-workflow-contract.test.mjs');
 await import('./refresh-freshness.test.mjs');
 await import('./atlas-data-publication.test.mjs');

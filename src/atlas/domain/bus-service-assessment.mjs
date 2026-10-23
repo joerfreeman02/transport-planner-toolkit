@@ -613,7 +613,21 @@ export function buildServiceSummaries(stops, serviceRecords) {
   const summaries = [...groups.values()].map(records => {
     const stopIds = unique(records.flatMap(record => record.relevantStops));
     const first = representativeRecord(records, stopIds);
-    const identity = [first.routeNumber, first.operator, directionGroupKey(first), first.origin, first.destination].map(value => text(value).toLowerCase()).join('|');
+    // Planner grouping uses summary IDs as well as source-record IDs when it
+    // excludes identified short workings from principal frequency.  A single
+    // route can have separate summaries for calendar profiles and assessed
+    // stop groups, so the public route identity alone is not unique enough:
+    // a short-working decision for one summary could otherwise suppress the
+    // principal timetable in every summary sharing that route identity.
+    const identity = [
+      first.routeNumber,
+      first.operator,
+      directionGroupKey(first),
+      first.origin,
+      first.destination,
+      first.calendarProfileId || first.source?.calendarProfileId,
+      ...stopIds.slice().sort()
+    ].map(value => text(value).toLowerCase()).join('|');
     const frequencyStop = representativeStop(stops, records);
     const frequencyBasisStopId = text(frequencyStop?.id || frequencyStop?.sourceId) || stopIds[0] || null;
     const allDepartureEvidenceByDay = departureEvidenceForRecords(records, frequencyBasisStopId);

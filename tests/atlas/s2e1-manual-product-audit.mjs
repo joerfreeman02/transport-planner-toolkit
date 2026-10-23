@@ -22,6 +22,14 @@ const enfieldIbusIndex = JSON.parse(await readFile(path.join(repositoryRoot, 'at
 const enfieldTflCapture = JSON.parse(await readFile(path.join(repositoryRoot, 'tests/atlas/fixtures/enfield-route313-tfl-capture-2026-10-23.json'), 'utf8'));
 const enfieldTflResponses = new Map(enfieldTflCapture.responses.map(response => [response.path, response]));
 const capturedEnfieldStop = enfieldTflCapture.stopPoint;
+const enfieldStopKCapture = JSON.parse(await readFile(path.join(repositoryRoot, 'tests/atlas/fixtures/enfield-route313-stop-k-timetable-2026-10-23.json'), 'utf8'));
+const enfieldStopTCapture = JSON.parse(await readFile(path.join(repositoryRoot, 'tests/atlas/fixtures/tfl-313-inbound-stop-t-2026-10-23.json'), 'utf8'));
+const enfieldAssessmentStops = [
+  { id: '490001101K', name: 'Enfield Town Station', lat: 51.65241, lon: -0.07863, indicator: 'K', timetable: enfieldStopKCapture.response },
+  { id: '490006587E', name: 'Enfield Town / Church Street', lat: 51.65221, lon: -0.08306, indicator: 'E', timetable: enfieldTflResponses.get('/Line/313/Timetable/490006587E')?.body },
+  { id: '490008903E', name: 'Ladysmith Road', lat: 51.65226, lon: -0.07408, indicator: '->E', timetable: enfieldStopTCapture }
+];
+if (enfieldAssessmentStops.some(stop => !stop.timetable)) throw new Error('Captured Enfield multi-stop timetable responses are incomplete.');
 const capturedEnfieldRegular = enfieldTflCapture.observedServices.find(service => service.intervalId === '0' && service.direction === 'inbound' && service.calendarProfileId === 'non-school-day');
 const capturedEnfieldSchoolWorking = enfieldTflCapture.observedServices.find(service => service.intervalId === '1' && service.direction === 'inbound' && service.calendarProfileId === 'school-day');
 if (!capturedEnfieldRegular || !capturedEnfieldSchoolWorking || capturedEnfieldRegular.routeMetadata !== 'matched' || capturedEnfieldSchoolWorking.routeMetadata !== 'incomplete') throw new Error('Captured Enfield 313 regular and school-working evidence is incomplete.');
@@ -29,7 +37,7 @@ assert.deepEqual([capturedEnfieldRegular.departureCountsByDay.monday, capturedEn
 assert.equal(capturedEnfieldSchoolWorking.departureCountsByDay.monday, 1, 'Actual captured school-working interval must remain a separate one-journey/day record.');
 assert.equal(capturedEnfieldRegular.operatorEvidence?.operator?.name, 'Arriva London North', 'Actual captured iBus evidence must resolve the regular route-313 operator.');
 const enfieldControls = [
-  { id: 'enfield-313-e2e', label: 'Enfield route 313 captured TfL service control', latitude: capturedEnfieldStop.lat, longitude: capturedEnfieldStop.lon, radius: 250, focusRoutes: ['313'] },
+  { id: 'enfield-313-e2e', label: 'Enfield route 313 captured TfL service control', latitude: 51.651670, longitude: -0.079460, radius: 400, focusRoutes: ['313'] },
   { id: 'enfield-329-e2e', label: 'Enfield route 329 frozen candidate operator control', latitude: 51.65167, longitude: -0.07946, radius: 250, focusRoutes: ['329'] }
 ];
 const enfieldFixtures = new Map();
@@ -52,18 +60,21 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') {
   if (!stopResult.ok) throw new Error(`Frozen candidate Enfield stop lookup failed: ${stopResult.message}`);
   const route313Response = pathname => enfieldTflResponses.get(pathname)?.body ?? null;
   const route313Route = route313Response('/Line/313/Route');
-  const route313Timetable = route313Response('/Line/313/Timetable/' + capturedEnfieldStop.id);
   const route313Sequence = route313Response('/Line/313/Route/Sequence/inbound');
-  if (!route313Route || !route313Timetable || !route313Sequence) throw new Error('Captured Enfield TfL route-313 API responses are incomplete.');
+  if (!route313Route || !route313Sequence) throw new Error('Captured Enfield TfL route-313 API responses are incomplete.');
   const route313Operator = capturedEnfieldRegular.operator;
   if (route313Operator !== 'Arriva London North') throw new Error('Captured productive iBus identity bridge did not resolve Arriva London North.');
+  const route313StopPoints = enfieldAssessmentStops.map(stop => ({
+    id: stop.id, naptanId: stop.id, commonName: stop.name, name: stop.name, lat: stop.lat, lon: stop.lon,
+    stopType: 'NaptanPublicBusCoachTram', indicator: stop.indicator,
+    lines: [{ id: '313', name: '313' }]
+  }));
   enfieldFixtures.set('enfield-313-e2e', {
-    routeNumber: '313', stopId: String(capturedEnfieldStop.id), stopName: String(capturedEnfieldStop.name), operator: route313Operator,
-    operatorEvidence: capturedEnfieldRegular.operatorEvidence, stopPoints: [{ id: String(capturedEnfieldStop.id), naptanId: String(capturedEnfieldStop.id), commonName: String(capturedEnfieldStop.name), name: String(capturedEnfieldStop.name), lat: Number(capturedEnfieldStop.lat), lon: Number(capturedEnfieldStop.lon), stopType: capturedEnfieldStop.stopType, indicator: capturedEnfieldStop.stopLetter, towards: capturedEnfieldStop.towards, lines: (capturedEnfieldStop.lines ?? []).map(line => ({ id: String(line.id), name: String(line.name ?? line.id) })) }],
-    route: route313Route, timetable: route313Timetable, sequences: { inbound: route313Sequence },
-    fixtureProvenance: 'Exact captured TfL Route, TimetableResponse and RouteSequence responses from the bounded Enfield assessment on 2026-10-23; stop identity is copied from the captured MatchedStop. The normal interval and incomplete school-working interval remain unedited.'
+    routeNumber: '313', stopId: '490001101K', stopName: 'Enfield Town Station', operator: route313Operator,
+    operatorEvidence: capturedEnfieldRegular.operatorEvidence, stopPoints: route313StopPoints,
+    route: route313Route, timetables: new Map(enfieldAssessmentStops.map(stop => [stop.id, stop.timetable])), sequences: { inbound: route313Sequence },
+    fixtureProvenance: 'Exact captured TfL Route and RouteSequence responses plus unedited TimetableResponse bodies for Enfield stops K, E and T. The full assessment coordinates and 400 m radius reproduce the failed served assessment composition; the normal interval and incomplete school-working interval remain unedited.'
   });
-  Object.assign(enfieldControls[0], { latitude: Number(capturedEnfieldStop.lat), longitude: Number(capturedEnfieldStop.lon) });
   const candidate329Result = await prepared.servicesForStops(stopResult.data ?? []);
   if (!candidate329Result.ok) throw new Error(`Frozen candidate Enfield timetable lookup failed: ${candidate329Result.message}`);
   const candidate329Services = (candidate329Result.data ?? []).filter(service => String(service.routeNumber) === '329');
@@ -292,7 +303,7 @@ try {
       let body = [];
       if (url.pathname === '/StopPoint') body = { stopPoints: fixture.stopPoints };
       else if (url.pathname.endsWith('/Route') && decodeURIComponent(url.pathname.split('/')[2] ?? '').split(',').includes(String(fixture.routeNumber ?? '313'))) body = [fixture.route];
-      else if (url.pathname === `/Line/${fixture.routeNumber ?? '313'}/Timetable/${fixture.stopId}`) body = fixture.timetable;
+      else if (url.pathname.startsWith(`/Line/${fixture.routeNumber ?? '313'}/Timetable/`)) body = fixture.timetables?.get(decodeURIComponent(url.pathname.split('/').at(-1))) ?? [];
       else if (url.pathname.startsWith(`/Line/${fixture.routeNumber ?? '313'}/Route/Sequence/`)) body = fixture.sequences?.[url.pathname.split('/').at(-1)] ?? [];
       return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
     }
@@ -432,7 +443,7 @@ try {
         assert.ok(browser313.length, 'Enfield production Browser did not render the captured-response TfL 313 service.');
         assert.ok(browser313.some(row => /Typically every ~20 mins/.test(row['Typical frequency']) && /Every ~30 mins/.test(row['Typical frequency'])), 'Enfield production Browser did not retain the actual normal 313 timetable population.');
         assert.ok(browser313.every(row => !/1 journey\/day/i.test(row['Typical frequency'])), 'The incomplete one-trip school interval must not replace the normal 313 principal row.');
-        assert.match(renderedServiceNotes.join(' '), /Short workings: Some route 313 journeys operate to Crown Road \(EN1\) \(School-day journeys only\)\./i, 'The Run #75 school-day short working must remain visible as a subordinate route qualification.');
+        assert.match(renderedServiceNotes.join(' '), /Short workings: Some route 313 journeys operate to .*Crown Road \(EN1\) \(School-day journeys only\)\./i, 'The Run #75 school-day short working must remain visible as a subordinate route qualification, alongside any other evidenced short workings.');
         const route313BrowserText = `${browser313.map(row => `${row['Typical frequency']} ${row['Operating period at stop']}`).join(' ')} ${renderedServiceNotes.join(' ')}`;
         assert.doesNotMatch(route313BrowserText, /Non-school days only\. School-day journeys only\./i, 'Enfield Browser must not generate contradictory route-313 calendar wording.');
         assert.doesNotMatch(route313BrowserText, /313\s*[–-]\s*(?:School-day journeys only|Non-school days only)\./i, 'Enfield Browser must not classify the whole route-313 principal as school-only or non-school-only.');
@@ -443,7 +454,7 @@ try {
         assert.ok(word313.every(row => normalized(row.Operator) === expectedOperator313), `Enfield route 313 Word operator differs from the active iBus operator ${expectedOperator313}.`);
         assert.doesNotMatch(exportedWordText, /Non-school days only\. School-day journeys only\./i, 'Enfield Word must not generate contradictory route-313 calendar wording.');
         assert.doesNotMatch(exportedWordText, /313\s*[–-]\s*(?:School-day journeys only|Non-school days only)\./i, 'Enfield Word must not classify the whole route-313 principal as school-only or non-school-only.');
-        assert.match(exportedWordText, /Short workings: Some route 313 journeys operate to Crown Road \(EN1\) \(School-day journeys only\)\./i, 'Generated Word must preserve the same subordinate route-313 short-working qualification as Browser.');
+        assert.match(exportedWordText, /Short workings: Some route 313 journeys operate to .*Crown Road \(EN1\) \(School-day journeys only\)\./i, 'Generated Word must preserve the Run #75 subordinate route-313 short-working qualification, alongside any other evidenced short workings.');
         const browser329 = rendered.filter(row => normalized(row.Route) === '329');
         const word329 = wordRows.filter(row => normalized(row.Route) === '329');
         outcome.enfieldOperatorTrace = {

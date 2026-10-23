@@ -59,7 +59,7 @@ assert.match(manualBrowserAudit, /candidateOperatorsAtStop.length > 1/, 'Route 3
 assert.match(manualBrowserAudit, /browserSourcesAndChecksUnresolvedEvidence/);
 assert.match(manualBrowserAudit, /enfieldTflCapture\.responses/, 'Enfield 313 browser audit must replay captured TfL response bodies rather than synthesize a journey from iBus.');
 assert.match(manualBrowserAudit, /capturedEnfieldRegular\.operator/, 'Enfield 313 operator must be derived from the captured production identity bridge.');
-assert.match(manualBrowserAudit, /route313Timetable[\s\S]*route313Sequence/, 'Enfield 313 audit must use the captured timetable and route sequence through the production adapter.');
+assert.match(manualBrowserAudit, /timetables: new Map\(enfieldAssessmentStops\.map[\s\S]*route313Sequence/, 'Enfield 313 audit must replay all captured assessed-stop timetables and route sequence through the production adapter.');
 assert.doesNotMatch(manualBrowserAudit, /activeJourney\.operatorName/, 'The old one-journey iBus-only Enfield fixture must not return.');
 assert.doesNotMatch(c4PushWorkflow, /atlas-bus-beta-candidate|force_refresh:\s*true|pages|deploy|publish/i, 'C4 validation calls only the frozen-candidate diagnostic with no acquisition or publication path');
 assert.match(dispatchWorkflow, /S2E-1 offline preflight accepts only the exact zero-download C1B selector/);

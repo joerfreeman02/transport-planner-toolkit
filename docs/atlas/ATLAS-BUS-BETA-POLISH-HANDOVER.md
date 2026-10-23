@@ -5,7 +5,8 @@
 - Accepted frozen-intelligence baseline: `b3ad244dc98253da2f95a8ea9d0274ab32140f6f` (`atlas-bus-beta-intelligence-accepted-2026-10-23`).
 - Polish branch: `codex/atlas-bus-beta-polish`.
 - Polish worktree: `C:\Users\joe.freeman\AppData\Local\Packages\OpenAI.Codex_2p2nqsd0c76g0\LocalCache\Local\ATLAS\codex-workspaces\bus-polish`.
-- Final polish SHA: recorded after the implementation commit and push.
+- Validated polish runtime SHA: `30c303c219cf2d42a15682759269687b0f2dc9cd`.
+- Documentation handover is committed separately after runtime validation; no runtime files changed after validation.
 - This sprint changes presentation, wording, navigation, and presentation tests only. It does not change Bus source hierarchy, service identity, route arbitration, timetable composition, calendar, frequency, operator, qualification, warning, or fail-closed evidence logic.
 
 ## Work delivered

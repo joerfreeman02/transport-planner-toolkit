@@ -213,7 +213,7 @@ try {
         let appSource = bytes.toString('utf8');
         const assignment = '  currentBusResult = result;';
         if (appSource.split(assignment).length !== 2) throw new Error('Expected one production assessment result assignment for the C4 trace hook.');
-        const observer = `${assignment}\n  window.__ATLAS_C4_OPERATOR_TRACE__ = routeNumber => {\n    const routeRecords = records => (records ?? []).filter(record => String(record.routeNumber) === String(routeNumber)).map(record => ({ id: record.id ?? null, operator: record.operator ?? null, provider: record.provider ?? null, timetableSource: record.timetableSource ?? null, source: record.source ? { provider: record.source.provider ?? null, primaryAuthority: record.source.primaryAuthority ?? null, operatorProvenance: record.source.operatorProvenance ?? null, tflIbusOperatorEvidence: record.source.tflIbusOperatorEvidence ?? null } : null }));\n    return { routeNumber, composedServices: routeRecords(result.services), normalizedServiceSummaries: routeRecords(result.serviceSummaries), plannerRows: routeRecords(result.plannerServiceSummaries) };\n  };`;
+        const observer = `${assignment}\n  window.__ATLAS_C4_OPERATOR_TRACE__ = routeNumber => {\n    const routeRecords = records => (records ?? []).filter(record => String(record.routeNumber) === String(routeNumber)).map(record => ({ id: record.id ?? null, operator: record.operator ?? null, provider: record.provider ?? null, timetableSource: record.timetableSource ?? null, source: record.source ? { provider: record.source.provider ?? null, primaryAuthority: record.source.primaryAuthority ?? null, operatorProvenance: record.source.operatorProvenance ?? null, tflIbusOperatorEvidence: record.source.tflIbusOperatorEvidence ?? null } : null }));\n    return { routeNumber, stops: (result.stops ?? []).filter(stop => (stop.routes ?? []).some(route => String(route) === String(routeNumber))).map(stop => ({ id: stop.id ?? stop.sourceId ?? null, name: stop.name ?? null, routes: stop.routes ?? [], timetableAuthority: stop.timetableAuthority ?? null, timetableAuthorities: stop.timetableAuthorities ?? [], routeAuthorities: stop.routeAuthorities ?? null, timetableCallEligible: stop.timetableCallEligible ?? null })), composedServices: routeRecords(result.services), normalizedServiceSummaries: routeRecords(result.serviceSummaries), plannerRows: routeRecords(result.plannerServiceSummaries), timetableProvenance: result.provenance?.timetables ?? null };\n  };`;
         bytes = Buffer.from(appSource.replace(assignment, observer), 'utf8');
       }
       const extension = path.extname(file).toLowerCase();
@@ -332,6 +332,11 @@ try {
         }));
         throw new Error(`${error.message}; last normal-workflow state: ${JSON.stringify(lastStatus)}`);
       }
+      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id.startsWith('enfield-')) {
+        const tracedRoute = control.id === 'enfield-313-e2e' ? '313' : '329';
+        outcome.operatorStageTrace = await page.evaluate(route => window.__ATLAS_C4_OPERATOR_TRACE__?.(route) ?? null, tracedRoute);
+        assert.ok(outcome.operatorStageTrace, 'Production assessment result was not exposed to the test-only C4 trace observer.');
+      }
       const serviceTable = page.locator('.bus-service-summary');
       const wrap = serviceTable.locator('xpath=ancestor::div[contains(@class,"table-wrap")]');
       const scroll = await wrap.evaluate(element => ({ client: element.clientWidth, scroll: element.scrollWidth }));
@@ -360,11 +365,7 @@ try {
       await page.locator('details > summary').filter({ hasText: 'Sources and checks' }).click();
       const checksText = await page.locator('#plannerChecks').innerText();
       outcome.sourcesAndChecks = checksText;
-      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id.startsWith('enfield-')) {
-        const tracedRoute = control.id === 'enfield-313-e2e' ? '313' : '329';
-        outcome.operatorStageTrace = await page.evaluate(route => window.__ATLAS_C4_OPERATOR_TRACE__?.(route) ?? null, tracedRoute);
-        assert.ok(outcome.operatorStageTrace, 'Production assessment result was not exposed to the test-only C4 trace observer.');
-      }
+
 
       assert.doesNotMatch(checksText, /SpecialDaysOperation|TNDS .*special dates require review/i, 'Sources and checks exposes raw per-service special-day warnings.');
       const rendered = await serviceTable.locator('tbody tr:not(.service-note)').evaluateAll(rows => rows.map(row => Object.fromEntries([...row.querySelectorAll('td[data-label]')].map(cell => [cell.dataset.label, cell.innerText.replace(/\s+/g, ' ').trim()]))));

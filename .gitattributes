@@ -1,1 +1,2 @@
 tests/atlas/fixtures/alpha14-bus-planner-summary.mjs -text
+atlas/data/tfl-ibus/20261009/operator-index.json -text

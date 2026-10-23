@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { resolveTflIbusOperatorEvidence, validateTflIbusOperatorIndex, createTflIbusOperatorAdapter } from '../../src/atlas/adapters/tfl-ibus-operator-adapter.mjs';
 import { createAuthoritativeBusTimetableAdapter } from '../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
@@ -242,6 +243,8 @@ assert.equal(manifest.baseVersion, currentIndex.baseVersion);
 assert.equal(manifest.validFrom, currentIndex.validFrom);
 assert.equal(manifest.validTo, currentIndex.validTo);
 assert.equal(manifest.indexPath, '20261009/operator-index.json');
+const checkedInIndexBytes = fs.readFileSync(new URL('../../atlas/data/tfl-ibus/20261009/operator-index.json', import.meta.url));
+assert.equal(createHash('sha256').update(checkedInIndexBytes).digest('hex'), manifest.indexSha256, 'Manifest digest matches the exact cross-platform checked-in index bytes.');
 const tamperedManifestAdapter = createTflIbusOperatorAdapter({
   manifestUrl: 'https://atlas.invalid/manifest.json',
   fetchImpl: async url => url.endsWith('manifest.json')

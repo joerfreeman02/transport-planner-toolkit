@@ -44,6 +44,12 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') {
   const match = (stopResult.data ?? []).flatMap(stop => route313Patterns.filter(pattern => pattern.orderedStopPointIds.includes(String(stop.id))).map(pattern => ({ stop, pattern })))
     .sort((left, right) => Number(left.stop.distanceMetres ?? 0) - Number(right.stop.distanceMetres ?? 0) || left.pattern.patternIdx.localeCompare(right.pattern.patternIdx))[0];
   if (!match) throw new Error('Frozen Run #75 candidate has no Enfield stop that matches an active 2026-10-23 route-313 iBus ordered pattern.');
+  const candidate329Result = await prepared.servicesForStops(stopResult.data ?? []);
+  if (!candidate329Result.ok) throw new Error(`Frozen candidate Enfield timetable lookup failed: ${candidate329Result.message}`);
+  const candidate329Services = (candidate329Result.data ?? []).filter(service => String(service.routeNumber) === '329');
+  const candidate329UsableAtStops = candidate329Services.flatMap(service => Object.entries(service.stopSchedules ?? {})
+    .filter(([, schedule]) => Object.values(schedule ?? {}).some(day => Array.isArray(day) && day.length > 0))
+    .map(([stopId]) => ({ serviceId: service.id ?? null, stopId, operator: service.operator ?? null, provider: service.provider ?? service.timetableSource ?? service.source?.provider ?? null })));
   const route329Stop = (stopResult.data ?? []).filter(stop => (stop.routes ?? []).some(value => String(value) === '329'))
     .sort((left, right) => Number(left.distanceMetres ?? 0) - Number(right.distanceMetres ?? 0) || String(left.id).localeCompare(String(right.id)))[0];
   if (!route329Stop) throw new Error('Frozen Run #75 candidate has no Enfield BODS route-329 stop within 2,000 metres of the control point.');
@@ -66,11 +72,11 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') {
   });
   enfieldFixtures.set('enfield-329-e2e', {
     stopId: String(route329Stop.id), stopName: String(route329Stop.name), routeNumber: '329',
-    stopPoints: [{ id: String(route329Stop.id), naptanId: String(route329Stop.id), commonName: String(route329Stop.name), lat: Number(route329Stop.latitude), lon: Number(route329Stop.longitude), stopType: 'NaptanPublicBusCoachTram', lines: [{ id: '329', name: '329' }] }],
+    stopPoints: [],
     route: [],
     timetable: { lineId: '329', lineName: '329', direction: '', timetable: { departureStopId: String(route329Stop.id), routes: [] } },
     sequence: { lineId: '329', direction: 'outbound', stopPointSequences: [] },
-    candidateStopRoutes: route329Stop.routes ?? []
+    candidateStopRoutes: route329Stop.routes ?? [], candidateServices: candidate329Services.map(service => ({ id: service.id ?? null, operator: service.operator ?? null, provider: service.provider ?? service.timetableSource ?? service.source?.provider ?? null, stopsWithSchedules: Object.entries(service.stopSchedules ?? {}).filter(([, schedule]) => Object.values(schedule ?? {}).some(day => Array.isArray(day) && day.length > 0)).map(([stopId]) => stopId) })), usableCandidateEvidenceAtStops: candidate329UsableAtStops
   });
 }
 const controls = [
@@ -125,7 +131,7 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') report.enfieldIbusFixtur
   route329ProductivePatterns: enfieldIbusIndex.patterns.filter(pattern => String(pattern.serviceLineNo) === '329' && Number(pattern.patternType) === 1).length
 };
 report.enfieldCoverage = process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1'
-  ? 'Dedicated evidence-only mode selects exact Run #75 candidate stops for routes 313 and 329, uses the checked-in 20261009 iBus index for a controlled TfL 313 response, returns deterministic no-current TfL evidence for 329, and checks the final production Browser and Word outputs. No live TfL request is made.'
+  ? 'Dedicated evidence-only mode selects exact Run #75 candidate stops for routes 313 and 329, uses the checked-in 20261009 iBus index for a controlled TfL 313 response, and lets the route-329 control use the actual frozen-candidate stop/timetable evidence without injecting a synthetic TfL StopPoint or timetable. No live TfL request is made.'
   : 'The normal-shell audit intentionally does not fabricate TfL StopPoint records; with live TfL disabled, the frozen candidate contains no TfL StopPoint response fixture for Enfield.';
 const errors = [];
 report.chingfordFixtureNote = 'Chingford route 657 browser regression uses the existing fixture-backed timetable golden. Fixture StopPoint coordinates are anchored at the confirmed control point solely for deterministic radius matching and are not represented as live TfL location evidence.';
@@ -206,7 +212,7 @@ try {
         let appSource = bytes.toString('utf8');
         const assignment = '  currentBusResult = result;';
         if (appSource.split(assignment).length !== 2) throw new Error('Expected one production assessment result assignment for the C4 trace hook.');
-        const observer = `${assignment}\n  window.__ATLAS_C4_OPERATOR_TRACE__ = () => {\n    const route313 = records => (records ?? []).filter(record => String(record.routeNumber) === '313').map(record => ({ id: record.id ?? null, operator: record.operator ?? null, provider: record.provider ?? null, timetableSource: record.timetableSource ?? null, source: record.source ? { provider: record.source.provider ?? null, primaryAuthority: record.source.primaryAuthority ?? null, operatorProvenance: record.source.operatorProvenance ?? null, tflIbusOperatorEvidence: record.source.tflIbusOperatorEvidence ?? null } : null }));\n    return { composedServices: route313(result.services), normalizedServiceSummaries: route313(result.serviceSummaries), plannerRows: route313(result.plannerServiceSummaries) };\n  };`;
+        const observer = `${assignment}\n  window.__ATLAS_C4_OPERATOR_TRACE__ = routeNumber => {\n    const routeRecords = records => (records ?? []).filter(record => String(record.routeNumber) === String(routeNumber)).map(record => ({ id: record.id ?? null, operator: record.operator ?? null, provider: record.provider ?? null, timetableSource: record.timetableSource ?? null, source: record.source ? { provider: record.source.provider ?? null, primaryAuthority: record.source.primaryAuthority ?? null, operatorProvenance: record.source.operatorProvenance ?? null, tflIbusOperatorEvidence: record.source.tflIbusOperatorEvidence ?? null } : null }));\n    return { routeNumber, composedServices: routeRecords(result.services), normalizedServiceSummaries: routeRecords(result.serviceSummaries), plannerRows: routeRecords(result.plannerServiceSummaries) };\n  };`;
         bytes = Buffer.from(appSource.replace(assignment, observer), 'utf8');
       }
       const extension = path.extname(file).toLowerCase();
@@ -353,8 +359,9 @@ try {
       await page.locator('details > summary').filter({ hasText: 'Sources and checks' }).click();
       const checksText = await page.locator('#plannerChecks').innerText();
       outcome.sourcesAndChecks = checksText;
-      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id === 'enfield-313-e2e') {
-        outcome.operatorStageTrace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.() ?? null);
+      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id.startsWith('enfield-')) {
+        const tracedRoute = control.id === 'enfield-313-e2e' ? '313' : '329';
+        outcome.operatorStageTrace = await page.evaluate(route => window.__ATLAS_C4_OPERATOR_TRACE__?.(route) ?? null, tracedRoute);
         assert.ok(outcome.operatorStageTrace, 'Production assessment result was not exposed to the test-only C4 trace observer.');
       }
 

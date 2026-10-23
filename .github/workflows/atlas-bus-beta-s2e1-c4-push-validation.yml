@@ -92,6 +92,7 @@ jobs:
       - name: Exercise Enfield route 313 operator through Browser and Word
         env:
           ATLAS_C4_ENFIELD_EVIDENCE_ONLY: '1'
+          ATLAS_C4_TRACE_OPERATOR_STAGES: '1'
         run: node tests/atlas/s2e1-manual-product-audit.mjs restored/candidate-site candidate-diagnostic/enfield-browser-word.json
       - name: Upload targeted C4 evidence report
         if: always() && hashFiles('candidate-diagnostic/*.json') != ''

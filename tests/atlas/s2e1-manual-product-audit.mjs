@@ -201,7 +201,14 @@ try {
       const target = relative.endsWith('/') ? `${relative}index.html` : relative || 'index.html';
       const file = path.resolve(root, target);
       if (file !== root && !file.startsWith(`${root}${path.sep}`)) throw new Error('Unsafe static path.');
-      const bytes = await readFile(file);
+      let bytes = await readFile(file);
+      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && pathname === '/atlas/assets/js/app.mjs') {
+        let appSource = bytes.toString('utf8');
+        const assignment = '  currentBusResult = result;';
+        if (appSource.split(assignment).length !== 2) throw new Error('Expected one production assessment result assignment for the C4 trace hook.');
+        const observer = `${assignment}\n  window.__ATLAS_C4_OPERATOR_TRACE__ = () => {\n    const route313 = records => (records ?? []).filter(record => String(record.routeNumber) === '313').map(record => ({ id: record.id ?? null, operator: record.operator ?? null, provider: record.provider ?? null, timetableSource: record.timetableSource ?? null, source: record.source ? { provider: record.source.provider ?? null, primaryAuthority: record.source.primaryAuthority ?? null, operatorProvenance: record.source.operatorProvenance ?? null, tflIbusOperatorEvidence: record.source.tflIbusOperatorEvidence ?? null } : null }));\n    return { composedServices: route313(result.services), normalizedServiceSummaries: route313(result.serviceSummaries), plannerRows: route313(result.plannerServiceSummaries) };\n  };`;
+        bytes = Buffer.from(appSource.replace(assignment, observer), 'utf8');
+      }
       const extension = path.extname(file).toLowerCase();
       const type = ({ '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.gz': 'application/gzip', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json' })[extension] || 'application/octet-stream';
       response.writeHead(200, { 'content-type': `${type}; charset=utf-8`, 'content-length': bytes.length });
@@ -346,6 +353,7 @@ try {
       await page.locator('details > summary').filter({ hasText: 'Sources and checks' }).click();
       const checksText = await page.locator('#plannerChecks').innerText();
       outcome.sourcesAndChecks = checksText;
+
       assert.doesNotMatch(checksText, /SpecialDaysOperation|TNDS .*special dates require review/i, 'Sources and checks exposes raw per-service special-day warnings.');
       const rendered = await serviceTable.locator('tbody tr:not(.service-note)').evaluateAll(rows => rows.map(row => Object.fromEntries([...row.querySelectorAll('td[data-label]')].map(cell => [cell.dataset.label, cell.innerText.replace(/\s+/g, ' ').trim()]))));
       const renderedServiceNotes = await serviceTable.locator('tbody tr.service-note').allInnerTexts();
@@ -427,6 +435,10 @@ try {
       outcome.sourceColumn = { visibleOnTopMiddleBottom: true, samples: sourceSamples, overflow: scroll };
       outcome.technicalDetailsHidden = true;
       outcome.sourcesAndChecks = checksText;
+      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id === 'enfield-313-e2e') {
+        outcome.operatorStageTrace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.() ?? null);
+        assert.ok(outcome.operatorStageTrace, 'Production assessment result was not exposed to the test-only C4 trace observer.');
+      }
       outcome.wordFilename = download.suggestedFilename();
       outcome.wordArtifact = wordPath;
       outcome.wordText = exportedWordText;

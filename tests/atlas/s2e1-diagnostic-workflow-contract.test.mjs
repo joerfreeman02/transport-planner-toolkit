@@ -40,8 +40,10 @@ assert.match(c4PushWorkflow, /github\.event_name == 'workflow_dispatch'[\s\S]*gi
 assert.match(c4PushWorkflow, /targeted-evidence-only:[\s\S]*\[c4-evidence-only\][\s\S]*s2e1-normal-runtime-candidate-diagnostic\.mjs restored\/candidate-site candidate-diagnostic\/pe1-route-202\.json pe1[\s\S]*ATLAS_C4_ENFIELD_EVIDENCE_ONLY:[\s\S]*s2e1-manual-product-audit\.mjs restored\/candidate-site candidate-diagnostic\/enfield-browser-word\.json/);
 assert.match(c4PushWorkflow, /'digest': 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471'/, 'C4 restore guard must use the canonical Run #75 upload digest');
 assert.doesNotMatch(c4PushWorkflow, /5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471/);
-assert.match(manualBrowserAudit, /route329Stop = \(stopResult\.data \?\? \[\]\)\.filter\(stop => \(stop\.routes \?\? \[\]\)\.some\(value => String\(value\) === '329'\)\)/);
-assert.match(manualBrowserAudit, /Enfield production Browser did not render the frozen-candidate BODS 329 service/);
+assert.match(manualBrowserAudit, /prepared\.servicesForStops\(stopResult\.data \?\? \[\]\)/, 'Route 329 control inspects actual frozen-candidate timetable services.');
+assert.match(manualBrowserAudit, /candidate329UsableAtStops/, 'Route 329 control records candidate schedule evidence at selected stops.');
+assert.match(manualBrowserAudit, /route329ServiceStopIds/, 'Route 329 control prefers a stop with scheduled candidate evidence.');
+assert.match(manualBrowserAudit, /stopPoints: \[\]/, 'Route 329 control does not inject a synthetic TfL StopPoint.');assert.match(manualBrowserAudit, /Enfield production Browser did not render the frozen-candidate BODS 329 service/);
 assert.match(manualBrowserAudit, /activeJourney\.operatorName/);
 assert.doesNotMatch(c4PushWorkflow, /atlas-bus-beta-candidate|force_refresh:\s*true|pages|deploy|publish/i, 'C4 validation calls only the frozen-candidate diagnostic with no acquisition or publication path');
 assert.match(dispatchWorkflow, /S2E-1 offline preflight accepts only the exact zero-download C1B selector/);

@@ -116,10 +116,25 @@ button.secondary:hover:not(:disabled), .secondary:hover:not(:disabled) { border-
 .task-loader-mark { position: relative; display: block; width: 42px; height: 42px; flex: 0 0 42px; overflow: hidden; }
 .task-loader-mark img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .atlas-mark-loader-base { filter: grayscale(1); opacity: .28; }
-.atlas-mark-loader-draw { clip-path: inset(0 100% 0 0); }
-#taskStatus[aria-busy="true"] .atlas-mark-loader-draw { animation: atlas-a-draw 1.5s steps(5,end) infinite; }
-@keyframes atlas-a-draw { 0% { clip-path: inset(0 100% 0 0); } 100% { clip-path: inset(0 0 0 0); } }
-@media (prefers-reduced-motion: reduce) { #taskStatus[aria-busy="true"] .atlas-mark-loader-draw { animation-duration: 3s; } }
+.atlas-mark-loader-segment { opacity: 0; }
+.atlas-mark-node-one { clip-path: circle(8% at 58% 19%); }
+.atlas-mark-path-one { clip-path: polygon(53% 18%, 63% 19%, 52% 56%, 45% 55%); }
+.atlas-mark-node-two { clip-path: circle(8% at 49% 55%); }
+.atlas-mark-path-two { clip-path: polygon(45% 51%, 53% 55%, 16% 89%, 7% 85%); }
+.atlas-mark-path-three { clip-path: polygon(47% 52%, 54% 52%, 84% 70%, 77% 79%); }
+#taskStatus[aria-busy="true"] .atlas-mark-node-one { animation: atlas-a-stage-one 2.4s steps(1,end) infinite; }
+#taskStatus[aria-busy="true"] .atlas-mark-path-one { animation: atlas-a-stage-two 2.4s steps(1,end) infinite; }
+#taskStatus[aria-busy="true"] .atlas-mark-node-two { animation: atlas-a-stage-three 2.4s steps(1,end) infinite; }
+#taskStatus[aria-busy="true"] .atlas-mark-path-two { animation: atlas-a-stage-four 2.4s steps(1,end) infinite; }
+#taskStatus[aria-busy="true"] .atlas-mark-path-three { animation: atlas-a-stage-five 2.4s steps(1,end) infinite; }
+#taskStatus[aria-busy="true"] .atlas-mark-complete { animation: atlas-a-stage-complete 2.4s steps(1,end) infinite; }
+@keyframes atlas-a-stage-one { 0%, 4%, 100% { opacity: 0; } 5%, 99% { opacity: 1; } }
+@keyframes atlas-a-stage-two { 0%, 19%, 100% { opacity: 0; } 20%, 99% { opacity: 1; } }
+@keyframes atlas-a-stage-three { 0%, 34%, 100% { opacity: 0; } 35%, 99% { opacity: 1; } }
+@keyframes atlas-a-stage-four { 0%, 49%, 100% { opacity: 0; } 50%, 99% { opacity: 1; } }
+@keyframes atlas-a-stage-five { 0%, 64%, 100% { opacity: 0; } 65%, 99% { opacity: 1; } }
+@keyframes atlas-a-stage-complete { 0%, 84%, 100% { opacity: 0; } 85%, 99% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { #taskStatus[aria-busy="true"] .atlas-mark-loader-segment { animation-duration: 4.8s; } }
 .task-status > p { color: #26394d; font-size: .78rem; text-align: left; }
 .task-stages li { color: #50647a; }
 .task-stages li[data-state="active"] { border-color: var(--atlas-orange); color: #8b3c05; }

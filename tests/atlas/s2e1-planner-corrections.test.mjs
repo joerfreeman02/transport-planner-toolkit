@@ -86,7 +86,8 @@ assert.ok(calendarSupplement[0].typicalFrequencyLines.some(line => /school/i.tes
 
 const schoolOnlyBranch = {
   ...plannerBase, id: 'tfl-school-short-working', routeNumber: '313', operator: 'Arriva London North',
-  direction: 'Chingford', directionFamily: 'outbound', origin: 'Potters Bar', destination: 'Chingford',
+  direction: 'Chingford', directionFamily: 'outbound', origin: 'Potters Bar', destination: 'Chingford School',
+  routePatternStopIds: ['ORIGIN', 'PIPERS-A', 'SCHOOL-END'],
   provider: 'TfL', timetableSource: 'TfL', source: { provider: 'TfL' }, calendarProfileId: 'school-day',
   serviceNote: 'School-day journeys only.',
   departureEvidenceByDay: Object.fromEntries(Object.keys(weekdays).map(day => [day,
@@ -96,6 +97,7 @@ const schoolOnlyBranch = {
 const nonSchoolPublicPattern = {
   ...plannerBase, id: 'tfl-non-school-public', routeNumber: '313', operator: 'Arriva London North',
   direction: 'Chingford', directionFamily: 'outbound', origin: 'Potters Bar', destination: 'Chingford',
+  routePatternStopIds: ['ORIGIN', 'PIPERS-A', 'DESTINATION'],
   provider: 'TfL', timetableSource: 'TfL', source: { provider: 'TfL' }, calendarProfileId: 'non-school-day',
   departureEvidenceByDay: Object.fromEntries(Object.keys(weekdays).map(day => [day,
     ['saturday', 'sunday'].includes(day) ? [] : Array.from({ length: 12 }, (_value, index) => ({ minute: 360 + index * 60, stopPointId: 'PIPERS-A', journeyIdentity: `313-public-${day}-${index}`, provider: 'TfL', calendarProfileId: 'non-school-day' }))

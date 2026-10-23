@@ -1158,6 +1158,19 @@ function orderedPatternOverlap(first, second) {
   return left.filter((id, index) => right.has(id) && left.indexOf(id) === index).length;
 }
 
+function hasDistinctSchoolNonSchoolPatterns(component) {
+  const school = component.filter(service => isTermTimeProfile(calendarProfileFromService(service)));
+  const nonSchool = component.filter(service => isNonSchoolProfile(calendarProfileFromService(service)));
+  const samePattern = (first, second) => {
+    const left = explicitPattern(first).map(text).filter(Boolean);
+    const right = explicitPattern(second).map(text).filter(Boolean);
+    if (left.length && right.length) return left.length === right.length && left.every((id, index) => id === right[index]);
+    return normal(plannerOrigin(first)) === normal(plannerOrigin(second))
+      && normal(plannerDestination(first)) === normal(plannerDestination(second));
+  };
+  return school.some(first => nonSchool.some(second => !samePattern(first, second)));
+}
+
 function higherAuthorityEquivalentPatterns(component, relatedServices, representativeId) {
   const peers = (relatedServices ?? []).filter(candidate => !component.includes(candidate)
     && text(candidate?.routeNumber) === text(component[0]?.routeNumber)
@@ -1985,11 +1998,15 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const allComponentProfiles = new Set(component.map(calendarProfileFromService));
   const hasSchoolNonSchoolEvidence = [...allComponentProfiles].some(isTermTimeProfile)
     && [...allComponentProfiles].some(isNonSchoolProfile);
+  const hasDistinctSchoolNonSchoolPattern = hasSchoolNonSchoolEvidence && hasDistinctSchoolNonSchoolPatterns(component);
+  const samePatternSchoolNonSchoolEvidence = hasSchoolNonSchoolEvidence && !hasDistinctSchoolNonSchoolPattern;
   const hasSchoolHolidayProfiles = separateTimetableProfiles.termTime.length > 0 && separateTimetableProfiles.nonSchool.length > 0;
   const schoolHolidayVariant = hasSchoolHolidayProfiles && hasOrdinaryProfile;
   const displayProfileId = schoolHolidayVariant
     ? separateTimetableProfiles.termTime[0]
     : effectiveProfileIds.includes('ordinary') ? 'ordinary'
+      : samePatternSchoolNonSchoolEvidence && effectiveProfileIds.some(isNonSchoolProfile)
+        ? effectiveProfileIds.find(isNonSchoolProfile)
       : [...effectiveProfileIds].sort((left, right) => profileResults.get(right).entries.length - profileResults.get(left).entries.length
         || CALENDAR_PROFILE_ORDER.indexOf(left) - CALENDAR_PROFILE_ORDER.indexOf(right))[0] ?? profileIds[0] ?? null;
   const selectedProfileResult = profileResults.get(displayProfileId) ?? calculateProfileResult(profileComponent, representative.id, displayProfileId, calendarPartition(canonical.entries, displayProfileId, ordinaryEntries, hasOrdinaryProfile));
@@ -1999,8 +2016,9 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
       profileResults.get('ordinary')
     )
     : selectedProfileResult;
-  const mixedProfileOutput = (effectiveProfileIds.length > 1 && !schoolHolidayVariant)
-    || (hasSchoolNonSchoolEvidence && !hasOrdinaryProfile);
+  const mixedProfileOutput = (effectiveProfileIds.length > 1 && !schoolHolidayVariant
+    && (!hasSchoolNonSchoolEvidence || hasDistinctSchoolNonSchoolPattern))
+    || (hasSchoolNonSchoolEvidence && !hasOrdinaryProfile && hasDistinctSchoolNonSchoolPattern);
   const outputProfileIds = mixedProfileOutput ? effectiveProfileIds : [displayProfileId];
   const principalProfileIds = orderedCalendarProfiles([
     ...principalProfileComponent.map(calendarProfileFromService),
@@ -2015,7 +2033,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   if (mixedProfileOutput) {
     frequencyLines = outputProfileIds.flatMap(profileId => calendarQualifiedLines(profileResults.get(profileId).frequencyLines, profileId, hasOrdinaryProfile && profileId !== 'ordinary'));
     operatingLines = outputProfileIds.flatMap(profileId => calendarQualifiedLines(profileResults.get(profileId).operatingLines, profileId, hasOrdinaryProfile && profileId !== 'ordinary'));
-  } else if (!schoolHolidayVariant && displayProfileId !== 'ordinary' && (displayProfileId !== UNKNOWN_CALENDAR_PROFILE || unresolvedNeedsQualification)) {
+  } else if (!schoolHolidayVariant && !samePatternSchoolNonSchoolEvidence && displayProfileId !== 'ordinary' && (displayProfileId !== UNKNOWN_CALENDAR_PROFILE || unresolvedNeedsQualification)) {
     frequencyLines = profileLines(displayFrequencyLines, displayProfileId);
     operatingLines = profileLines(displayOperatingLines, displayProfileId);
   }

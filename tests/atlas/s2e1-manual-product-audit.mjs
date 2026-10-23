@@ -50,8 +50,9 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') {
   const candidate329UsableAtStops = candidate329Services.flatMap(service => Object.entries(service.stopSchedules ?? {})
     .filter(([, schedule]) => Object.values(schedule ?? {}).some(day => Array.isArray(day) && day.length > 0))
     .map(([stopId]) => ({ serviceId: service.id ?? null, stopId, operator: service.operator ?? null, provider: service.provider ?? service.timetableSource ?? service.source?.provider ?? null })));
-  const route329Stop = (stopResult.data ?? []).filter(stop => (stop.routes ?? []).some(value => String(value) === '329'))
-    .sort((left, right) => Number(left.distanceMetres ?? 0) - Number(right.distanceMetres ?? 0) || String(left.id).localeCompare(String(right.id)))[0];
+  const route329ServiceStopIds = new Set(candidate329UsableAtStops.map(evidence => String(evidence.stopId)));
+  const route329StopCandidates = (stopResult.data ?? []).filter(stop => (stop.routes ?? []).some(value => String(value) === '329'));
+  const route329Stop = [...route329StopCandidates].sort((left, right) => Number(route329ServiceStopIds.has(String(right.id)))-Number(route329ServiceStopIds.has(String(left.id))) || Number(left.distanceMetres ?? 0)-Number(right.distanceMetres ?? 0) || String(left.id).localeCompare(String(right.id)))[0];
   if (!route329Stop) throw new Error('Frozen Run #75 candidate has no Enfield BODS route-329 stop within 2,000 metres of the control point.');
   Object.assign(enfieldControls[0], { latitude: Number(match.stop.latitude), longitude: Number(match.stop.longitude) });
   Object.assign(enfieldControls[1], { latitude: Number(route329Stop.latitude), longitude: Number(route329Stop.longitude) });
@@ -126,7 +127,7 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') report.enfieldIbusFixtur
     operatorName: enfieldFixtures.get('enfield-313-e2e').activeJourney.operatorName,
     orderedStopPointIds: enfieldFixtures.get('enfield-313-e2e').ids
   },
-  route329CandidateStop: { stopId: enfieldFixtures.get('enfield-329-e2e').stopId, name: enfieldFixtures.get('enfield-329-e2e').stopName, candidateRoutes: enfieldFixtures.get('enfield-329-e2e').candidateStopRoutes },
+  route329CandidateStop: { stopId: enfieldFixtures.get('enfield-329-e2e').stopId, name: enfieldFixtures.get('enfield-329-e2e').stopName, candidateRoutes: enfieldFixtures.get('enfield-329-e2e').candidateStopRoutes, candidateServices: enfieldFixtures.get('enfield-329-e2e').candidateServices, usableCandidateEvidenceAtStops: enfieldFixtures.get('enfield-329-e2e').usableCandidateEvidenceAtStops },
   route329ServiceLineMappings: enfieldIbusIndex.serviceLines.filter(line => String(line.serviceLineNo) === '329'),
   route329ProductivePatterns: enfieldIbusIndex.patterns.filter(pattern => String(pattern.serviceLineNo) === '329' && Number(pattern.patternType) === 1).length
 };

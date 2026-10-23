@@ -252,3 +252,57 @@ Run #23 presents three route-202 rows at Queensgate: outbound toward Peterboroug
 - Renovate: not required alongside Dependabot.
 
 **C4 gate: BLOCKED — TECHNICAL DIRECTOR DECISION REQUIRED.**
+
+## S2E-1-C4 — final correction and evidence closeout — 2026-10-23
+
+This append-only record supersedes the earlier C4 “blocked / unresolved” status above. Historical C1–C3 and earlier C4 findings remain intact for audit history. The reviewed production/runtime SHA is `ae59a3db383a9eb6a89ff1ba0ea0c12248b8f525`; it passed the complete hosted C4 regression as Run #40 before this documentation-only append.
+
+### Run #75 provenance reconciliation
+
+The canonical immutable identity remains Run `39430415441`, artifact `12275615359`, name `atlas-bus-beta-review-candidate-39430415441`, producer SHA `151199cc914c235870f444d26b03c2309edbd035`, size `2,549,732,499` bytes, digest `sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`. The earlier value `sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471` was a transcription error. Its earliest traceable C4 record is the C3 formal handover commit `f31123a10ed4c188077a53ab1de1885f8eac4ca4`; C4 guard/report references using that value followed in evidence-only commit `485e4f2b5ae6b9bcb19a4619bc94b329d03cf862`. The original Run #75 upload log and GitHub's current artifact metadata agree on the canonical digest. Artifact/run/name/producer/size are unchanged; no candidate bytes were rebuilt, replaced, or modified. Earlier dated handovers are preserved rather than silently rewritten.
+
+### Route 313 — proven integrity-gate root cause and general correction
+
+The first loss was the iBus operator-index integrity check, before operator enrichment. The Windows working-tree index bytes were CRLF and matched the manifest's old SHA-256 `39b0eae384ec7a44115f898b940b3f35213577195706d38a82fa97707d2610de`; the committed GitHub/Linux blob is LF and hashes to `5efcf64bfe1e158ecac52a8df8609984600b90ddd9b1b25b5112de7f6e24ebc1`. The manifest therefore rejected the valid index in the hosted Browser path, making the iBus operator adapter unavailable; later layers had no enriched operator to propagate. The adapter-level match had already demonstrated productive 313 pattern `6018`, journey `438477`, code `MN`, operator `Arriva London North`.
+
+The smallest platform-independent correction is in commit `3dceeabd0d1fe736ed2e3f16508abda78dc745e5`: update `atlas/data/tfl-ibus/manifest.json` to the canonical committed-blob digest and mark `atlas/data/tfl-ibus/20261009/operator-index.json -text` in `.gitattributes`, so raw bytes remain stable across Windows and Linux. `tests/atlas/bus-robustness-1a4f-tfl-ibus-operator.test.mjs` now checks the exact raw-byte hash against the manifest. No route/operator/stop-specific production rule was added, and the indexed operator data file itself was not changed.
+
+Successful hosted Enfield Browser/Word evidence is Run #39 (`39926450647`) on SHA `ae59a3db383a9eb6a89ff1ba0ea0c12248b8f525`: the production route-313 Browser row and generated Word row both show **Arriva London North**. The focused report records zero Browser console errors, failed requests, and failed responses.
+
+### Route 329 — legitimate candidate-backed control and safe unresolved result
+
+The control is Enfield Town / Genotin Road, `51.65167, -0.07946`, assessed stop `490006588R`. This point is inside Greater London, where the production app selects TfL stop discovery. The deterministic local API-boundary fixture projects only the exact Run #75 NaPTAN candidate stop identity, coordinates, and route associations; it supplies no timetable or operator. The full production stop discovery, timetable composition, planner, Browser, and Word paths then run against the immutable candidate. No live TfL HTTP request is made and no service evidence is fabricated.
+
+Run #75 has scheduled route-329 BODS evidence at this stop in two distinct records: `london:10984346:0:fba58a0087c5` reports Arriva London North and `london:138490:0:619f986f0e42` reports Arriva London. The applicable 20261009 iBus index has zero route-329 `Service_Line` mappings and zero productive patterns. The production composer therefore cannot select one unambiguous approved operator from the available evidence. It retains the exact unresolved item `Route 329 · Stop 490006588R · timetable source: ... remained unresolved`; the Browser has no resolved 329 service row and exposes the evidence in Sources & checks, while generated Word contains the explicit route-329 review row with Operator blank. This is evidence-driven fail-safe behavior, not proof of a route-329 operator defect. No operator is inferred. A future source record that disambiguates the applicable public service can be evaluated through the same general path.
+
+The targeted C4 Browser/Word report is Run #39, artifact `12489976011`, digest `sha256:10c7a56649c0bcdb770b079dc73c2684d982f032d452da6f902a363cf85c2ceb`. Its readiness is `READY_FOR_TECHNICAL_DIRECTOR_REVIEW_BEFORE_MANUAL_RE-ACCEPTANCE`; this does not authorize manual acceptance.
+
+### Preserved PE1 route 202 result
+
+Run #40 retained three defensible planner rows: one outbound toward Peterborough Bus Station, one inbound toward Austerby/Helpston, and a separate inbound toward Bourne Bus Station via Bainton. They remain distinct because their candidate pattern/branch identities and principal locations differ. Similar selected-stop times do not establish duplicate public journeys. The Run #40 actual-candidate planner diagnostic and six-control Browser/Word audit passed; the three visible route-202 rows remain in Browser and Word.
+
+### Complete hosted C4 regression
+
+Run #40 (`39926708107`) succeeded as `workflow_dispatch` on exact runtime SHA `ae59a3db383a9eb6a89ff1ba0ea0c12248b8f525`. Every required job step passed:
+
+- full Bus-data Python suite: **309 tests passed**;
+- full deterministic ATLAS Alpha.15 suite: **passed**;
+- immutable Run #75 identity/expiry verification, exact restore, and retained checkpoint provenance: **passed**;
+- actual-candidate planner diagnostic and six-control actual-candidate Browser/Word audit: **passed**;
+- rendered normal-product Browser/generated-Word acceptance audit for Pipers, Waltham, Chingford, and PE1: **passed**;
+- fixture-backed Chingford route 657 golden regression: **passed**;
+- deterministic empty-TfL diagnostic boundary and candidate control-matrix artifact upload: **passed**.
+
+Run #40 report artifact `12489174997`, name `atlas-bus-beta-s2e1-normal-runtime-diagnostic-39926708107`, digest `sha256:748ae02b9747e82e8e49e9809bb4e6239d9b4f6bc35861a91ecee036705bedf8`, was unexpired at verification. The report identifies Run #75 as its candidate and reports acquisition, publication, and deployment as false. Run #40 keeps the Chingford route 657 school-day golden, the Waltham 13/13A/13B/13C family, Pipers 230 circular/231 supplementary presentation, PE1 frequencies/short workings, and the accepted three-row route-202 result under the full gates.
+
+### Final branch, files, limits, and governance
+
+- Branch: `codex/atlas-bus-beta-s2e-1-c4-final-product-trace`.
+- Starting branch HEAD before this final correction cycle: `85154a2568d821ece17c9332f388d3571bf42008`.
+- C4 runtime SHA tested by Run #40: `ae59a3db383a9eb6a89ff1ba0ea0c12248b8f525`. This formal handover append advances documentation HEAD only; it does not change that tested runtime SHA.
+- Exact runtime/evidence files changed since the accepted C4 baseline: `.gitattributes`; `.github/workflows/atlas-bus-beta-s2e1-c4-push-validation.yml`; `.github/workflows/atlas-bus-data-refresh.yml`; `atlas/data/tfl-ibus/manifest.json`; `tests/atlas/bus-robustness-1a4f-tfl-ibus-operator.test.mjs`; `tests/atlas/s2e1-diagnostic-workflow-contract.test.mjs`; `tests/atlas/s2e1-manual-product-audit.mjs`; and `tests/atlas/s2e1-normal-runtime-candidate-diagnostic.mjs`. This formal handover file is the documentation-only addition. No application `.mjs` Bus behavior or candidate data was changed in this correction.
+- The isolated checkout is outside OneDrive; local HEAD matched origin and the worktree was clean at Run #40 dispatch. The protected dirty OneDrive `main` checkout was not touched.
+- No live national/TfL acquisition, candidate rebuild or modification, publication, deployment, main merge, release, version/build bump, or BUS-POLISH work occurred. Version/build remain `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`.
+- Dependabot: configured. Codecov: deferred pending coverage baseline. OpenSSF Scorecard: later security/release milestone. Sentry: deferred pending telemetry/privacy architecture. Renovate: not required alongside Dependabot.
+
+**C4 gate: READY FOR TECHNICAL DIRECTOR REVIEW. Product Owner manual acceptance remains unauthorized until that review is complete.**

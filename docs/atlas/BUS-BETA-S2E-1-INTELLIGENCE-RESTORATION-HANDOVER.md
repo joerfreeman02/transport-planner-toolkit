@@ -306,3 +306,30 @@ Run #40 report artifact `12489174997`, name `atlas-bus-beta-s2e1-normal-runtime-
 - Dependabot: configured. Codecov: deferred pending coverage baseline. OpenSSF Scorecard: later security/release milestone. Sentry: deferred pending telemetry/privacy architecture. Renovate: not required alongside Dependabot.
 
 **C4 gate: READY FOR TECHNICAL DIRECTOR REVIEW. Product Owner manual acceptance remains unauthorized until that review is complete.**
+## S2E-1-C4 — Pipers route 46 selected-stop frequency correction — 2026-10-23
+
+This append-only addendum records the final narrow Pipers route 46 correction and its full hosted regression. It does not rewrite earlier audit entries. Tested runtime SHA: `c23c7aa16e549ab3f9f48154f3816865af372928`.
+
+### Root cause and correction
+
+The Run #75 candidate contains three BODS route-46 records and 38 TNDS route-46 records at the Pipers extended-radius control. The TNDS candidate contains repeated journey/pattern representations that can create apparent short gaps when treated as additive departures. The defect entered planner composition: a BODS record whose candidate pattern metadata contained only its two endpoints was compared with the longer TNDS pattern as if those endpoints proved a complete strict-subsequence short working. That false inference, combined with unmatched calendar qualification and endpoint display aliases, prevented the higher-authority BODS evidence from winning same-service arbitration; the resulting TNDS-composed summary exposed the misleading `5–60` / `15–60` minute ranges.
+
+The general correction is limited to evidence semantics. Strict-subsequence short-working proof now requires an explicit complete route pattern, not an endpoint pair alone. Unqualified ordinary calendars are comparable with ordinary profile evidence, and matching canonical endpoint identities take precedence over text aliases in direction compatibility. This lets source authority select the BODS-primary direction where the candidate proves the same public service, while retaining TNDS records as supplementary/raw evidence and preserving a real short-working branch only where complete pattern evidence supports it. There is no route-46 or hourly-service special case.
+
+Frequency evidence is the unique applicable departure population at each planner row's selected assessed stop (`frequencyBasisStopId`), evaluated by service day; other stops and repeated cross-source journey representations do not create extra headways. The Run #48 actual-candidate report confirms every selected departure entry is at that row's basis stop and is BODS-primary.
+
+### Frozen-candidate result through planner, Browser, and Word
+
+The exact Run #75 candidate produced two route-46 rows. The Luton-bound row selected Woodside Animal Farm StopPoint `021024644`: 14 unique BODS departure minutes on each weekday, 12 on Saturday, none Sunday; the displayed frequency is `Mon-Sat: Every ~60 mins; Sun: No scheduled service`, with weekday operating span approximately 07:17–20:32. The Hemel Hempstead row selected Woodside Animal Farm StopPoint `021024645`: 13 unique BODS departure minutes on each weekday and Saturday, none Sunday; the displayed frequency is the same, with weekday operating span approximately 06:56–19:19. The normal Browser rows and generated Word rows both star the basis stop and show those hourly summaries. Caddington Hall is also within the 1,200 m control radius and is listed as another served stop, but the app selects the nearer Woodside Animal Farm stops for the frequency basis.
+
+The regression also confirms the previously accepted route-230 presentation is unchanged: one Centrebus BODS principal circular row via Caddington Woods / Chaul End Road, `Mon-Sat: Every ~60 mins; Sun: No scheduled service`, with the same operating-period summary in Browser and Word. Route 231 remains as two TNDS directional rows.
+
+### Hosted validation and provenance
+
+GitHub Actions Run #48 (`39940404238`, event `push`) succeeded on branch `codex/atlas-bus-beta-s2e-1-c4-final-product-trace`, exact SHA `c23c7aa16e549ab3f9f48154f3816865af372928`. All job steps passed: 309 Bus-data Python tests; full deterministic ATLAS suite; prepared-bus-data integrity (375,514 active NaPTAN stops, 1,370 referenced shards, 9 BODS regions); exact immutable Run #75 verification and restore; actual-candidate planner diagnostic; actual-candidate Browser/Word audit; rendered normal-product Browser/generated-Word audit including route 46; and fixture-backed Chingford route 657 golden regression. Browser audit reported no console errors, failed requests, failed responses, or external requests.
+
+Run #48 reverified the unchanged candidate identity: Run `39430415441`, artifact `12275615359`, name `atlas-bus-beta-review-candidate-39430415441`, producer SHA `151199cc914c235870f444d26b03c2309edbd035`, size `2,549,732,499` bytes, canonical digest `sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`. Its normal-runtime diagnostic artifact is `12496351356`, name `atlas-bus-beta-s2e1-normal-runtime-diagnostic-39940404238`, size `12,249,023` bytes, digest `sha256:6e528d2d555c1372e55ace2a6b9ec27142a29607d853707e91360b163cdaf198` (unexpired when checked).
+
+The diagnostic used the restored Run #75 candidate and did not attempt source acquisition or modify candidate files. No candidate rebuild, publication, deployment, merge, release, or version/build change occurred. Version/build remain `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`. Route 46 is no longer an unresolved C4 frequency defect. This evidence is ready for Technical Director review; it does not authorize Product Owner manual acceptance.
+
+**C4 gate: READY FOR TECHNICAL DIRECTOR REVIEW. Product Owner manual acceptance remains unauthorized until that review is complete.**

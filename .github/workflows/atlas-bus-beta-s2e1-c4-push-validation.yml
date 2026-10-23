@@ -74,7 +74,7 @@ jobs:
                       if (actual or {}).get(nested) != expected_value:
                           raise SystemExit(f'Run #75 artifact {key}.{nested} mismatch')
               elif actual != value:
-                  raise SystemExit(f'Run #75 artifact {key} mismatch')
+                  raise SystemExit(f'Run #75 artifact {key} mismatch: expected {value!r}; received {actual!r}')
           print('Exact immutable Run #75 candidate artifact, digest and producer verified.')
           PY
       - name: Restore only immutable Run #75 candidate

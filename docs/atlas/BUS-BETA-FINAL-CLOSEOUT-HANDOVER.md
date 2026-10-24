@@ -187,3 +187,55 @@ Frozen manifest SHA-256 values: Bus `1195f19b55d476600060d89b4a56517e039032f39f9
 No national acquisition, candidate rebuild, merge, publication, deployment, or version/build change occurred. Version remains `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`. Dependabot is configured; Codecov and Sentry remain deferred; OpenSSF Scorecard belongs to a later security/release milestone; Renovate remains unnecessary alongside Dependabot.
 
 No product-level semantic blocker remains in Pipers 230 or PE1 202. Technical Director review remains the release gate before final Product Owner acceptance. The previously recorded native Word-page render and external-basemap visual review remain outstanding visual QA items; the automated Browser/Word audit passed, but those visual checks are not claimed complete. Do not treat this handover as Product Owner acceptance or production release approval.
+
+## Final overnight UI closeout — 24 October 2026
+
+This section supersedes earlier revision, validation, and open-visual-gate statements in this handover. Historical checkpoints remain above for audit history.
+
+### Exact revisions and scope
+
+- Repository: `joerfreeman02/transport-planner-toolkit`.
+- Branch: `codex/atlas-bus-beta-final-closeout`.
+- Starting runtime SHA: `0e37dd7812eb7d53a95a7a57bb7f2b6517a524c2`.
+- Final code-bearing runtime SHA: `caac7b070f1295ade51f7a2cff30accfd5b6ba8a`.
+- The hosted validation below tested that exact runtime SHA. This handover is a documentation-only change; the final documentation HEAD is recorded after its commit.
+- Code commit changed only HTML, CSS, app presentation/controller code, Word/PDF presentation code, and related tests/audit coverage. No Bus-domain, source adapter, data, acquisition, workflow, or version file changed. No transport intelligence changed.
+- Local worktree: `C:\Users\joe.freeman\AppData\Local\ATLAS\codex-workspaces\bus-beta-final-ui`. The retained `.tmp/` QA artefacts remain untracked and were not cleaned or staged.
+- Run #75 remains run `39430415441`, artifact `12275615359`, name `atlas-bus-beta-review-candidate-39430415441`, producer SHA `151199cc914c235870f444d26b03c2309edbd035`, size `2549732499` bytes, canonical digest `sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`. Frozen Bus and TNDS manifest digests remain `sha256:1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f` and `sha256:2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f` respectively. The hosted run verified the artifact metadata, restored that artifact, and verified its retained checkpoint. No candidate bytes were rebuilt or modified; no national acquisition occurred.
+
+### Final UI and export result
+
+- Header/footer use the same `#061D37` navy; the header reads `ATLAS · Bus Beta`, with detailed version/build on About. Repository version/build remains `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`.
+- Home structure remains intact; supplied module illustrations are materially larger, and the Bus workspace has restrained headline artwork. Step 1 compactly presents selected address evidence with a primary `Use this result` control and a real secondary map-choice button. Step 2 site and assessment-point cards stay within their column. The selected assessment radius appears before running, updates with the selected value, and uses the supporting-blue map treatment.
+- Six guided stages remain. The rail separates active, completed, and future steps. After a successful run, Steps 1–4 compact into completion summaries and Step 5 appears inline with the map/results context. Step 6 remains dedicated to export and preserves Word map on/off, the standalone assessment-map PDF, planner-review acknowledgement, and Back to Results.
+- Assessment Progress displays `Assessment complete`, a separate review-count badge, and five equal-width stages on one row without duplicated review copy. Desktop and 390 px screenshots were inspected; no stage wraps or overlaps.
+- Results explicitly identify full-radius versus nearest logical-group mode. Full Waltham reports `16 stops assessed · 22 service summaries`; nearest Waltham reports `16 stops found · 3 assessed · 17 service summaries` and `Nearest stop group · Waltham Cross Railway Station`. The nearest Word wording identifies the nearest logical group and does not describe a full-radius assessment.
+- Planner report wording begins with `Bus Services`, uses concise result-derived prose, and de-duplicates equivalent destination labels only in presentation. Word tables retain 6 pt text, semantic row styling, numeric references, a wider Principal locations column, neutral external wording/filename, and no visible ATLAS/internal QA content. Map ON embeds the map and reference column; map OFF removes the map and all map references. Standalone PDFs are valid A3 landscape exports with a full stop-name key for full-radius use; nearest-mode PDF does not imply that a radius selected its group.
+- Dense map clusters use deterministic offsets and leader lines without changing source coordinates; all closely grouped Waltham markers 1–5 remain separately visible. Browser, Word, PDF, About, Home, and responsive screenshots were visually checked. Word exports were rendered for page inspection. Assessment Progress desktop/narrow screenshots are in the Codex visual-QA directory; generated Word/PDF and audit artefacts are under the retained worktree `.tmp/` directory.
+- The existing About composition and creator recognition remain. The status-manifest file is absent from the frozen candidate and normal product reports that separate platform freshness status as unavailable; assessment evidence and checked timestamps remain available through Sources & Checks. No false current-data claim was added.
+
+### Frozen-candidate controls
+
+- **Waltham full radius:** Browser/Word audit passed with 16 assessed stops and 22 service summaries. Route 66 at Stop C remains typically 30–40 minutes weekdays and about 30 minutes Saturdays, with the 05:29–19:05 weekday span; Word materially matches. Route 251 remains typically 30–40 minutes weekdays and about 30 minutes Saturdays, operating approximately 06:37–19:21 weekdays and 08:05–19:35 Saturdays. Routes 217, 279, 310, 317, 327, 491, A1 and N279 retain their checked rows, periods, and qualifications. No audit failures or browser/request errors were reported.
+- **Waltham nearest:** The same confirmed point returned a three-stop Waltham Cross Railway Station logical group, rather than the full-radius population. Browser mode label, Word nearest-group wording, and standalone PDF passed; full and nearest counts remain explicitly distinct.
+- **Pipers:** Route 46 presents approximately hourly service in both directions at the selected assessed stop. Route 230 remains one circular Centrebus row, approximately hourly Monday–Saturday with no scheduled Sunday service, with its circular qualification in Browser and Word. Route 231 supplementary service remains present.
+- **PE1:** Route 202 remains three distinct Browser and Word rows: Peterborough Bus Station (two Mon–Sat departures around 17:04 and 18:04), Austerby (two weekday departures around 07:10 and 07:45), and Bourne Bus Station via the distinct Bainton branch (one weekday departure around 07:45). Distinct direction, stop population, endpoint/branch, and calendar evidence justify all three rows.
+- **Chingford:** Route 657 remains school-day-only in both directions, one journey per direction, with the established 07:56 and 16:22 fixture-backed times.
+- **Enfield:** A captured-response Browser/Word audit on the final runtime passed with no external requests. Route 313 toward Chingford Station remains principal and normal: Arriva London North; Mon–Sat typically every ~20 minutes and Sunday every ~30 minutes. Route 329 remains unresolved without a fabricated service/operator row; competing candidate operator records remain conflicting and the iBus service-line/productive-pattern mapping is absent. The audit recorded 44 captured TfL replay requests and zero live TfL requests.
+
+### Validation
+
+- Full local deterministic ATLAS suite: passed, ending `ATLAS Alpha.15 deterministic suite passed.`
+- Full Bus-data Python suite: 309 tests passed (`OK`) locally and again in hosted validation.
+- Focused UI, map layout/reference/PDF, and Word export tests passed. Browser review-environment smoke passed with zero page errors and failed local requests. `git diff --check` passed before the code commit.
+- Local frozen-candidate production Browser/Word audit: no failures; full Waltham and nearest Waltham controls, Pipers 46/230/231, Chingford 657, and PE1 202 passed. Enfield captured-evidence Browser/Word audit also had no failures. The no-live-TfL boundary was respected.
+- Hosted Run `40139961867`: **success**, workflow `ATLAS Bus Beta S2E-1 C4 final product trace`, branch `codex/atlas-bus-beta-final-closeout`, exact head SHA `caac7b070f1295ade51f7a2cff30accfd5b6ba8a`. It passed the 309-test Python suite, deterministic ATLAS suite, empty-TfL boundary, Run #75 metadata and checkpoint verification, actual-candidate diagnostics, actual-candidate Browser/Word audit, rendered normal-product Browser/Word acceptance audit, and fixture-backed Chingford 657 regression. Evidence artifact: `atlas-bus-beta-s2e1-normal-runtime-diagnostic-40139961867` (downloaded under `.tmp/hosted-run-40139961867`).
+- Local/origin runtime branch parity was verified after push. The only later commit changes this handover; no product code changed after the hosted validation.
+
+### Local acceptance environment and release state
+
+- The final review server reuses the supported server already running for this isolated worktree at PID `12564`, bound only to `127.0.0.1:8772`. It serves this worktree's application files and maps `/__atlas-review/v2-data/` to the unchanged Run #75 data root `C:\Users\joe.freeman\AppData\Local\ATLAS\manual-acceptance\bus-s2d1\review-root\atlas\data`. Verified Product Owner review URL: `http://127.0.0.1:8772/atlas/?review=v2#modules`. HTTP smoke returned 200 for the ATLAS page, Bus and TNDS manifests, and Bus workspace CSS. This is a local review environment, not production.
+- No merge to `main`, publication, deployment, release, version/build bump, candidate rebuild, or fresh national acquisition occurred. The Bus-data updater was untouched.
+- Dependabot: configured. Codecov: deferred. OpenSSF Scorecard: later security/release milestone. Sentry: deferred. Renovate: unnecessary alongside Dependabot.
+- Recommended post-acceptance version: `2.0.0-beta.1`, using the actual Product Owner acceptance/release date.
+- This is a release-candidate handover for Product Owner Beta acceptance, not production deployment or a declaration that the Product Owner has accepted it. Any newly observed issue should be recorded for review before further correction.

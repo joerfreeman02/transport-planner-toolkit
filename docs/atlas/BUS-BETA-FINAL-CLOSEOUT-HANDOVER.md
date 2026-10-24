@@ -7,12 +7,12 @@
 - Repository: `joerfreeman02/transport-planner-toolkit`
 - Correction branch: `codex/atlas-bus-beta-final-closeout`
 - Starting acceptance-candidate SHA: `4281875d9e9b108dee35081d6627d93f8facd6f1`
-- Runtime SHA: `898615b86578944be9070eca044e58e12f303f83`
-- Current branch HEAD before this documentation commit: `abf491e59a353e9a665dd0e4cff160bc0fcf13a0`
+- Runtime SHA: `abf491e59a353e9a665dd0e4cff160bc0fcf13a0`
+- Code-bearing implementation checkpoint: `abf491e59a353e9a665dd0e4cff160bc0fcf13a0`
 - Frozen Run #75: workflow run `39430415441`; artifact `12275615359`; name `atlas-bus-beta-review-candidate-39430415441`; producer SHA `151199cc914c235870f444d26b03c2309edbd035`; size `2549732499` bytes; canonical GitHub upload digest `sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`.
 - Candidate files were read from the existing local review root. No candidate bytes were rebuilt, replaced, or modified. No live acquisition or national rebuild was performed.
 
-The runtime SHA contains the product changes in this closeout. The later `abf491e` commit updates only the diagnostic test wiring and removes an accidental literal `\\n` text at the end of the app file; it does not change application behavior. This handover is documentation-only.
+The code-bearing checkpoint `abf491e` includes the product changes, the valid app-file EOF cleanup, and the corrected diagnostic wiring. The complete frozen-candidate Browser-to-Word product audit was rerun against this checkout and passed with zero audit failures, browser errors, failed requests, external requests, acquisitions, publication attempts, or deployment attempts. This handover update is documentation-only.
 
 ## Route 66 correction
 

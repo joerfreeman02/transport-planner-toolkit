@@ -4,8 +4,8 @@ const PHASE_LABELS = Object.freeze({
   'checking-timetables': 'Checking timetables',
   'reconciling-evidence': 'Reconciling timetable evidence',
   'preparing-assessment': 'Preparing assessment',
-  complete: 'Complete',
-  partial: 'Assessment finished',
+  complete: 'Assessment complete',
+  partial: 'Assessment complete',
   unavailable: 'Assessment unavailable',
   idle: 'Ready to check nearby bus stops'
 });
@@ -14,8 +14,8 @@ const PHASE_NUMBERS = Object.freeze({ 'finding-stops': 1, 'routing-stops': 2, 'c
 export function formatAtlasTaskStatus({ phase = 'idle', detail = '', completed = null, total = null, waiting = false } = {}) {
   const label = PHASE_LABELS[phase] || 'Working';
   if (phase === 'idle') return label;
-  if (phase === 'complete') return label;
-  if (phase === 'partial' || phase === 'unavailable') return detail ? label + ' — ' + detail : label;
+  if (phase === 'complete' || phase === 'partial') return label;
+  if (phase === 'unavailable') return detail ? label + ' — ' + detail : label;
   const hasProgress = Number.isFinite(Number(completed)) && Number.isFinite(Number(total)) && Number(total) > 0;
   const progress = hasProgress ? ' — ' + Number(completed) + ' of ' + Number(total) : '';
   const waitText = waiting ? ' — Waiting briefly for the timetable source request allowance…' : '';
@@ -24,8 +24,8 @@ export function formatAtlasTaskStatus({ phase = 'idle', detail = '', completed =
   return stage + label + progress + (waitText || detailText);
 }
 
-export function createAtlasTaskStatus({ messageElement, regionElement = null, progressElement = null, countElement = null, stageElements = [] } = {}) {
-  let state = Object.freeze({ phase: 'idle', detail: '', completed: null, total: null, waiting: false, lastStage: 0 });
+export function createAtlasTaskStatus({ messageElement, regionElement = null, progressElement = null, countElement = null, reviewElement = null, stageElements = [] } = {}) {
+  let state = Object.freeze({ phase: 'idle', detail: '', completed: null, total: null, waiting: false, reviewCount: 0, lastStage: 0 });
   const render = () => {
     if (messageElement) messageElement.textContent = formatAtlasTaskStatus(state);
     const measurable = Number.isFinite(Number(state.completed)) && Number.isFinite(Number(state.total)) && Number(state.total) > 0;
@@ -43,6 +43,11 @@ export function createAtlasTaskStatus({ messageElement, regionElement = null, pr
       }
     }
     if (countElement) countElement.textContent = measurable ? `${Number(state.completed)} of ${Number(state.total)}` : '';
+    if (reviewElement) {
+      const reviewCount = Math.max(0, Number(state.reviewCount) || 0);
+      reviewElement.hidden = !(['complete', 'partial'].includes(state.phase) && reviewCount > 0);
+      reviewElement.textContent = reviewCount ? String(reviewCount) + ' item' + (reviewCount === 1 ? '' : 's') + ' require' + (reviewCount === 1 ? 's' : '') + ' review' : '';
+    }
     const activeStage = PHASE_NUMBERS[state.phase] || 0;
     stageElements.forEach((element, index) => {
       const number = index + 1;
@@ -73,7 +78,7 @@ export function createAtlasTaskStatus({ messageElement, regionElement = null, pr
     render();
     return state;
   };
-  const reset = () => update({ phase: 'idle', detail: '', completed: null, total: null, waiting: false, lastStage: 0 });
+  const reset = () => update({ phase: 'idle', detail: '', completed: null, total: null, waiting: false, reviewCount: 0, lastStage: 0 });
   render();
   return Object.freeze({ update, reset, getState: () => state });
 }

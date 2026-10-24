@@ -376,6 +376,40 @@ try {
         }));
         throw new Error(`${error.message}; last normal-workflow state: ${JSON.stringify(lastStatus)}`);
       }
+      if (control.id === 'waltham-cross') {
+        assert.equal(await page.locator('#taskStatus').isVisible(), true, 'The completed progress card must remain visible with Results.');
+        assert.equal(await page.locator('#taskStatusMessage').innerText(), 'Assessment complete', 'A successful Waltham assessment must have a concise completion label.');
+        assert.equal(await page.locator('#stopStatus').isHidden(), true, 'The completed assessment must not repeat review wording in the adjacent callout.');
+        const reviewBadge = (await page.locator('#taskStatusReviewBadge').innerText()).trim();
+        const cardReviewCount = Number(reviewBadge.match(/^([0-9]+) items? require review$/)?.[1] || 0);
+        assert.ok(cardReviewCount > 0, 'The frozen Waltham review case must show its review count in the completion card.');
+        assert.equal(await page.locator('#resultFreshness').innerText(), 'Assessment complete', 'Results freshness must not repeat the card review count.');
+        const sourceReviewBadge = await page.locator('#sourceReviewBadge').evaluate(element => element.textContent.trim());
+        const sourceReviewCount = Number(sourceReviewBadge.match(/^([0-9]+) items? require review$/)?.[1] || 0);
+        assert.equal(cardReviewCount, sourceReviewCount, 'The progress card must agree with the Sources & Checks review count.');
+        const desktopLayout = await page.locator('#taskStatus').evaluate(element => ({
+          cardWidth: element.clientWidth, cardScrollWidth: element.scrollWidth,
+          stages: [...element.querySelectorAll('.task-stages li')].map(stage => ({ label: stage.textContent.trim(), width: stage.clientWidth, scrollWidth: stage.scrollWidth, whiteSpace: getComputedStyle(stage).whiteSpace }))
+        }));
+        assert.ok(desktopLayout.cardWidth > 0 && desktopLayout.cardScrollWidth <= desktopLayout.cardWidth + 1, `Desktop progress card overflows: ${JSON.stringify(desktopLayout)}`);
+        assert.ok(desktopLayout.stages.every(stage => stage.whiteSpace === 'nowrap' && stage.scrollWidth <= stage.width + 1), `Desktop stage labels wrap or overlap: ${JSON.stringify(desktopLayout.stages)}`);
+        const screenshotDirectory = process.env.ATLAS_PROGRESS_SCREENSHOT_DIR ? path.resolve(process.env.ATLAS_PROGRESS_SCREENSHOT_DIR) : null;
+        if (screenshotDirectory) {
+          await mkdir(screenshotDirectory, { recursive: true });
+          await page.locator('#taskStatus').screenshot({ path: path.join(screenshotDirectory, 'assessment-progress-desktop.png') });
+        }
+        await page.setViewportSize({ width: 390, height: 844 });
+        const narrowLayout = await page.locator('#taskStatus').evaluate(element => ({
+          cardWidth: element.clientWidth, cardScrollWidth: element.scrollWidth,
+          stages: [...element.querySelectorAll('.task-stages li')].map(stage => ({ label: stage.textContent.trim(), width: stage.clientWidth, scrollWidth: stage.scrollWidth, whiteSpace: getComputedStyle(stage).whiteSpace }))
+        }));
+        assert.ok(narrowLayout.cardWidth > 0 && narrowLayout.cardScrollWidth <= narrowLayout.cardWidth + 1, `Narrow progress card overflows: ${JSON.stringify(narrowLayout)}`);
+        assert.equal(narrowLayout.stages.length, 5, 'Narrow progress card must retain all five assessment stages.');
+        assert.ok(narrowLayout.stages.every(stage => stage.whiteSpace === 'nowrap' && stage.scrollWidth <= stage.width + 1), `Narrow stage labels wrap or overlap: ${JSON.stringify(narrowLayout.stages)}`);
+        if (screenshotDirectory) await page.locator('#taskStatus').screenshot({ path: path.join(screenshotDirectory, 'assessment-progress-narrow.png') });
+        await page.setViewportSize({ width: 1440, height: 1000 });
+        outcome.progressCardVisualChecks = { completedLabel: 'Assessment complete', reviewBadge, duplicateCallout: false, desktopStages: desktopLayout.stages, narrowStages: narrowLayout.stages, screenshotsCaptured: Boolean(screenshotDirectory) };
+      }
       if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id.startsWith('enfield-')) {
         const tracedRoute = control.id === 'enfield-313-e2e' ? '313' : '329';
         outcome.operatorStageTrace = await page.evaluate(route => window.__ATLAS_C4_OPERATOR_TRACE__?.(route) ?? null, tracedRoute);

@@ -47,18 +47,19 @@ assert.equal(formatAtlasTaskStatus({ phase: 'finding-stops' }), 'Step 1 of 5 · 
 assert.equal(formatAtlasTaskStatus({ phase: 'routing-stops', completed: 2, total: 4 }), 'Step 2 of 5 · Routing stops — 2 of 4');
 assert.equal(formatAtlasTaskStatus({ phase: 'checking-timetables', completed: 12, total: 31 }), 'Step 3 of 5 · Checking timetables — 12 of 31');
 assert.match(formatAtlasTaskStatus({ phase: 'checking-timetables', waiting: true }), /Waiting briefly/);
-assert.equal(formatAtlasTaskStatus({ phase: 'complete' }), 'Complete');
-assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: 'one source was unavailable' }), 'Assessment finished — one source was unavailable');
-assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '1 evidence item needs review' }), 'Assessment finished — 1 evidence item needs review');
-assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '2 evidence items need review' }), 'Assessment finished — 2 evidence items need review');
+assert.equal(formatAtlasTaskStatus({ phase: 'complete' }), 'Assessment complete');
+assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: 'one source was unavailable' }), 'Assessment complete');
+assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '1 evidence item needs review' }), 'Assessment complete');
+assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '2 evidence items need review' }), 'Assessment complete');
 assert.equal(formatAtlasTaskStatus({ phase: 'unavailable' }), 'Assessment unavailable');
 
 const statusMessage = { textContent: '' };
 const statusRegion = { dataset: {}, attributes: {}, setAttribute(name, value) { this.attributes[name] = value; } };
 const statusProgress = { hidden: false, max: 0, value: 0, dataset: {}, attributes: {}, setAttribute(name, value) { this.attributes[name] = value; }, removeAttribute(name) { delete this.attributes[name]; } };
 const statusCount = { textContent: '' };
+const statusReviewBadge = { hidden: true, textContent: '' };
 const statusStages = Array.from({ length: 5 }, () => ({ dataset: {}, attributes: {}, setAttribute(name, value) { this.attributes[name] = value; }, removeAttribute(name) { delete this.attributes[name]; } }));
-const taskStatus = createAtlasTaskStatus({ messageElement: statusMessage, regionElement: statusRegion, progressElement: statusProgress, countElement: statusCount, stageElements: statusStages });
+const taskStatus = createAtlasTaskStatus({ messageElement: statusMessage, regionElement: statusRegion, progressElement: statusProgress, countElement: statusCount, reviewElement: statusReviewBadge, stageElements: statusStages });
 taskStatus.update({ phase: 'checking-timetables', completed: 12, total: 31 });
 assert.equal(statusMessage.textContent, 'Step 3 of 5 · Checking timetables — 12 of 31');
 assert.equal(statusProgress.hidden, false);
@@ -68,10 +69,15 @@ assert.equal(statusProgress.dataset.progressMode, 'determinate');
 assert.equal(statusCount.textContent, '12 of 31');
 assert.equal(statusRegion.attributes['aria-busy'], 'true');
 assert.deepEqual(statusStages.map(stage => stage.dataset.state), ['complete', 'complete', 'active', 'upcoming', 'upcoming']);
-taskStatus.update({ phase: 'partial', detail: 'one timetable request failed' });
+taskStatus.update({ phase: 'partial', detail: 'one timetable request failed', reviewCount: 3 });
+assert.equal(statusMessage.textContent, 'Assessment complete');
+assert.equal(statusReviewBadge.hidden, false);
+assert.equal(statusReviewBadge.textContent, '3 items require review');
 assert.equal(statusProgress.hidden, true);
 assert.equal(statusRegion.attributes['aria-busy'], 'false');
 assert.deepEqual(statusStages.map(stage => stage.dataset.state), ['complete', 'complete', 'complete', 'complete', 'complete']);
+taskStatus.reset();
+assert.equal(statusReviewBadge.hidden, true);
 
 const evidence = (minutes, prefix, extra = {}) => minutes.map((minute, index) => ({ minute, journeyIdentity: `${prefix}-${index}`, ...extra }));
 const plannerRecord = ({ routeNumber = '279', destination = 'Theobalds Grove', direction = 'outbound', pattern = ['A', 'B', 'C'], departures = [], ids = 'journey', serviceNote = '', ...extra } = {}) => ({

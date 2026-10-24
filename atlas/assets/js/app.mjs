@@ -33,7 +33,7 @@ const declaredTestBuild = String(document.body.dataset.atlasTestBuild || documen
 document.querySelectorAll('body [data-atlas-test-build]').forEach(element => {
   element.textContent = declaredTestBuild ? `Development/Test build · ${declaredTestBuild}` : 'Development/Test build · not declared';
 });
-const taskStatus = createAtlasTaskStatus({ messageElement: $('taskStatusMessage'), regionElement: $('taskStatus'), progressElement: $('taskStatusProgress'), countElement: $('taskStatusProgressText'), stageElements: [...document.querySelectorAll('[data-task-stage]')] });
+const taskStatus = createAtlasTaskStatus({ messageElement: $('taskStatusMessage'), regionElement: $('taskStatus'), progressElement: $('taskStatusProgress'), countElement: $('taskStatusProgressText'), reviewElement: $('taskStatusReviewBadge'), stageElements: [...document.querySelectorAll('[data-task-stage]')] });
 const cache = createJsonCache({ storage: localStorage, namespace: 'atlas.alpha13' });
 const geocoder = createNominatimGeocodingAdapter({ cache });
 const tflRequestScheduler = createTflRequestScheduler({ onEvent: event => taskStatus.update(event) });
@@ -173,6 +173,9 @@ function activateWorkflowStage(stage) {
   const layout = document.querySelector('.workflow-layout');
   const evidencePanel = $('evidencePanel');
   const exportPanel = $('exportWorkspace');
+  const taskStatusHost = next === 5 ? $('resultsTaskStatusHost') : next === 6 ? $('exportTaskStatusHost') : null;
+  if (taskStatusHost) taskStatusHost.append($('taskStatus'));
+  else $('taskStatusHome').after($('taskStatus'));
   layout.hidden = next >= 5;
   evidencePanel.hidden = next !== 5;
   exportPanel.hidden = next !== 6;
@@ -212,6 +215,7 @@ function activateWorkflowStage(stage) {
 }
 
 function setCallout(element, message, state = 'neutral') {
+  element.hidden = false;
   element.className = `callout ${state}`;
   element.textContent = message;
 }
@@ -622,9 +626,6 @@ function reviewItemText(item) {
   return scope ? scope + ': ' + item.message : item.message;
 }
 
-function evidenceReviewText(count) {
-  return `${count} evidence item${count === 1 ? '' : 's'} ${count === 1 ? 'needs' : 'need'} review`;
-}
 
 function renderAssessment(result) {
   currentBusResult = result;
@@ -841,7 +842,8 @@ function renderAssessment(result) {
   $('plannerReviewAcknowledgement').checked = false;
   $('plannerReviewGateStatus').textContent = reviewItems.length ? `${reviewItems.length} flagged item${reviewItems.length === 1 ? '' : 's'} remain visible in Sources & Checks.` : 'No flagged evidence requires acknowledgement.';
   updateFormalExportAvailability();
-  $('resultFreshness').textContent = reviewItems.length ? `${reviewItems.length} evidence item${reviewItems.length === 1 ? '' : 's'} require${reviewItems.length === 1 ? 's' : ''} review` : 'Assessment complete';
+  $('resultFreshness').textContent = 'Assessment complete';
+  $('resultFreshness').className = 'completion-badge';
   $('sourceReviewBadge').textContent = reviewItems.length ? `${reviewItems.length} item${reviewItems.length === 1 ? '' : 's'} require review` : 'No review items';
   $('sourceReviewBadge').hidden = reviewItems.length === 0;
   $('sourceChecksDetails').open = false;
@@ -849,7 +851,7 @@ function renderAssessment(result) {
   $('busDataCurrent').className = `current-badge${$('dataStatusMessage').classList.contains('warning') ? ' warning' : ''}`;
   const plannerChecks = $('plannerChecks');
   plannerChecks.replaceChildren();
-  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', result.status === 'complete' ? 'Complete for the information shown' : 'Assessment finished — ' + evidenceReviewText(reviewItems.length)]]) {
+  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', 'Assessment complete']]) {
     const line = document.createElement('p'); const label = document.createElement('strong'); label.textContent = `${labelText}: `; line.append(label, value); plannerChecks.append(line);
   }
   const plannerWarnings = [...new Set(result.warnings.map(warning => plannerStopWarning(warning, result)).filter(Boolean))];
@@ -1030,11 +1032,9 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
     }
     renderAssessment(result);
     syncRadiusCircle(result.provenance.stops?.actualDiscoveryRadiusMetres ?? result.provenance.stops?.radiusMetres ?? selectedRadius());
-    const checked = formatTime(result.provenance.stops?.retrievedAt || result.provenance.timetables?.retrievedAt);
-    const modeText = result.assessmentMode === 'nearest' ? `Nearest stop group "${result.nearestGroup?.name || 'selected group'}"` : `${result.stops.length} nearby stop${result.stops.length === 1 ? '' : 's'}`;
     const reviewCount = result.reviewItems?.length ?? 0;
-    const message = result.status === 'complete' ? `${modeText} assessed. Complete - checked ${checked}.` : `${modeText} assessed. Assessment finished — ${evidenceReviewText(reviewCount)}.`;
-    setCallout($('stopStatus'), message, result.status === 'complete' && !result.warnings.length ? 'success' : 'warning');
+    taskStatus.update({ phase: result.status, reviewCount });
+    $('stopStatus').hidden = true;
   } catch {
     taskStatus.update({ phase: 'unavailable', detail: 'The assessment could not be completed.' });
     setCallout($('stopStatus'), 'The assessment could not be completed. No successful-looking result has been shown.', 'error');

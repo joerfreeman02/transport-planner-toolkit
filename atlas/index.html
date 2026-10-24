@@ -181,9 +181,9 @@
                   <button id="findStops" class="secondary" type="button" disabled><strong>Build full Bus assessment</strong><small>Assess all relevant stops within the selected radius</small></button>
                   <button id="refreshStops" class="secondary compact" type="button" disabled>Recheck nearby stops</button>
                 </div>
-                <section id="taskStatus" class="task-status" aria-labelledby="task-status-heading" aria-busy="false">
-                  <div class="task-status-heading"><span class="task-loader-mark" aria-hidden="true"><img class="atlas-mark-loader-base" src="assets/branding/atlas-mark-primary.svg" alt=""><img class="atlas-mark-loader-segment atlas-mark-node-one" src="assets/branding/atlas-mark-primary.svg" alt=""><img class="atlas-mark-loader-segment atlas-mark-path-one" src="assets/branding/atlas-mark-primary.svg" alt=""><img class="atlas-mark-loader-segment atlas-mark-node-two" src="assets/branding/atlas-mark-primary.svg" alt=""><img class="atlas-mark-loader-segment atlas-mark-path-two" src="assets/branding/atlas-mark-primary.svg" alt=""><img class="atlas-mark-loader-segment atlas-mark-path-three" src="assets/branding/atlas-mark-primary.svg" alt=""><img class="atlas-mark-loader-segment atlas-mark-complete" src="assets/branding/atlas-mark-primary.svg" alt=""></span><div><p class="eyebrow">Assessment progress</p><h3 id="task-status-heading">Stops · Access · Timetables · Evidence · Summary</h3></div></div>
-                  <p id="taskStatusMessage" role="status" aria-live="polite">Ready to check nearby bus stops.</p>
+                <div id="taskStatusHome"></div><section id="taskStatus" class="task-status" aria-labelledby="task-status-heading" aria-busy="false">
+                  <div class="task-status-heading"><span class="task-loader-mark" aria-hidden="true"><img class="atlas-mark-loader-base" src="assets/branding/atlas-mark-primary.svg" alt=""><img class="atlas-mark-loader-segment atlas-mark-node-one" src="assets/branding/atlas-mark-primary.svg" alt=""><img class="atlas-mark-loader-segment atlas-mark-path-one" src="assets/branding/atlas-mark-primary.svg" alt=""><img class="atlas-mark-loader-segment atlas-mark-node-two" src="assets/branding/atlas-mark-primary.svg" alt=""><img class="atlas-mark-loader-segment atlas-mark-path-two" src="assets/branding/atlas-mark-primary.svg" alt=""><img class="atlas-mark-loader-segment atlas-mark-path-three" src="assets/branding/atlas-mark-primary.svg" alt=""><img class="atlas-mark-loader-segment atlas-mark-complete" src="assets/branding/atlas-mark-primary.svg" alt=""></span><div><p class="eyebrow">Assessment progress</p><h3 id="task-status-heading">Assessment stages</h3></div></div>
+                  <div class="task-status-message-row"><p id="taskStatusMessage" role="status" aria-live="polite">Ready to check nearby bus stops.</p><span id="taskStatusReviewBadge" class="task-status-review-badge" hidden></span></div>
                   <div class="task-progress" aria-live="polite"><progress id="taskStatusProgress" max="1" value="0" aria-label="Assessment progress" hidden></progress><span id="taskStatusProgressText"></span></div>
                   <ol id="taskStatusStages" class="task-stages" aria-label="Assessment stages"><li data-task-stage="1">Stops</li><li data-task-stage="2">Access</li><li data-task-stage="3">Timetables</li><li data-task-stage="4">Evidence</li><li data-task-stage="5">Summary</li></ol>
                 </section>
@@ -202,7 +202,7 @@
         </aside>
         </div>
 
-        <section id="evidencePanel" class="evidence-panel" hidden aria-labelledby="evidence-heading">
+        <section id="evidencePanel" class="evidence-panel" hidden aria-labelledby="evidence-heading"><div id="resultsTaskStatusHost" class="results-task-status-host"></div>
           <div class="evidence-heading"><div><p class="eyebrow">Step 5 · Results</p><h3 id="evidence-heading">Assessment results</h3><p id="evidenceSummary"></p></div><div class="evidence-actions"><button id="goToExport" class="primary" type="button">Continue to Export →</button><button id="editAssessment" class="secondary compact" type="button">Back to assessment</button></div></div>
           <section class="assessment-wording assessment-summary" aria-labelledby="wording-heading"><div><p class="eyebrow">Assessment summary</p><h4 id="wording-heading">Transport Statement wording</h4><p id="assessmentWording"></p></div><button id="copyAssessmentWording" class="secondary compact" type="button" disabled>Copy wording</button></section>
           <div id="resultsMapHost" class="results-map-host"><p class="supporting">Map references are navigation aids only; authoritative stop names and indicators remain in the tables.</p></div>
@@ -228,7 +228,7 @@
           <div class="results-bottom-actions"><button id="goToExportBottom" class="primary" type="button">Continue to Export →</button></div>
           <details id="developerDiagnostics" class="technical-details" hidden><summary>Developer diagnostics</summary><div id="diagnostics"></div></details>
         </section>
-        <section id="exportWorkspace" class="export-workspace" hidden aria-labelledby="export-heading">
+        <section id="exportWorkspace" class="export-workspace" hidden aria-labelledby="export-heading"><div id="exportTaskStatusHost" class="export-task-status-host"></div>
           <div class="export-heading"><p class="eyebrow">Step 6 · Export</p><h2 id="export-heading">Prepare assessment outputs</h2><p>Both outputs use the current checked assessment and its selected stops and service summaries.</p></div>
           <div class="export-grid">
             <article class="export-card"><span class="export-icon" aria-hidden="true">▤</span><h3>Word assessment</h3><p>Prepare a planning-facing assessment with transport findings, service tables and applicable qualifications.</p><label class="export-option"><input id="includeMapInWord" type="checkbox" checked> Include assessment map in Word report</label><button id="exportBusWord" class="primary" type="button" disabled>Export Word (.docx)</button></article>

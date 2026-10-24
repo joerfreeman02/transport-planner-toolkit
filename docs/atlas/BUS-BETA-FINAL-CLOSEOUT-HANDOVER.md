@@ -112,3 +112,48 @@ This section supersedes the earlier statements above that described the Browser-
 - `.tmp/` remains untracked and untouched; it was neither staged nor cleaned. The protected OneDrive/main checkout was not used.
 - No merge, deployment, publication, version/build bump, candidate rebuild, or fresh national acquisition occurred.
 - Product Owner Beta acceptance is **not authorized by this handover**. Remaining gates: Technical Director decision on Pipers 230 and PE1 202, exact-final-SHA hosted validation, origin parity, and rendered Word/map visual review.
+
+## Superseding semantic closeout — 24 October 2026
+
+This section supersedes the two-control failure statement above. The closeout controls have now been rerun against the verified Run #75 extraction through the normal production Browser and Word path. No production or intelligence code correction was justified.
+
+### Revision and frozen-data identity
+
+- Starting branch HEAD for this semantic closeout: `eb053e848627e190a915a7d435851479189204f6`.
+- Production/runtime SHA remains `d865ff035e05cbe1ce34b224398893734508e9c0`; only the manual acceptance audit and this handover changed during this closeout.
+- Run #75 remains workflow run `39430415441`, artifact `12275615359`, name `atlas-bus-beta-review-candidate-39430415441`, producer SHA `151199cc914c235870f444d26b03c2309edbd035`, size `2549732499` bytes, and canonical uploaded digest `sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`.
+- The frozen extracted Bus manifest SHA-256 is `1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f`; its TNDS manifest SHA-256 is `2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f`.
+- No national data was acquired, rebuilt, replaced, or modified.
+
+### Audit divergence and guard
+
+The earlier `NOT READY` result was produced with `candidateRoot` pointing at the production code checkout, not the Run #75 review root. The checkout Bus manifest hash was `9012fe478ec507cb4611ef55541e02feb608031b5677f21d0f600ac688d695ae`; its TNDS manifest hash was `5bd417ac90d50eeb43abb6d105439945c4f291dd1188c25425b5be3833f50ff2`. They differ from the immutable candidate manifests above. The audit nevertheless stamped the Run #75 identity into its report, so its missing Pipers circular classification and two-row PE1 output were not evidence about Run #75.
+
+The permanent product audit now fails before launching the Browser unless its candidate data root is separate from the code checkout and both manifest hashes match the frozen Run #75 manifests. This prevents another code/data-root mismatch from being mislabeled as candidate evidence.
+
+### Pipers route 230 — resolved without a production correction
+
+- Run #75 BODS record `south_east:118723:0:b7eada5524c4` identifies the Lyons Community Centre loop through Caddington Woods. The production composition retains the circular pattern while reconciling the supplementary TNDS row.
+- Browser presents one BODS principal row: `Circular — Caddington Woods via Chaul End Road (Southeastbound)`, Centrebus, Mon–Sat approximately every 60 minutes, with Sunday no scheduled service.
+- Browser carries the circular-service qualification. The generated Word contains the same qualification and one route-230 service row; circularity does not create a duplicate row.
+- The current exact-candidate runtime therefore preserves the classification and qualification. The apparent regression came from the wrong data root, not a dropped planner annotation.
+
+### PE1 route 202 — THREE ROWS REQUIRED
+
+Run #75 evidence supports three planner-relevant patterns at the selected Queensgate stops:
+
+1. Toward Peterborough Bus Station, served at Queensgate arrivals: two Mon–Sat departures, approximately 17:04 and 18:04; Sunday has no scheduled service.
+2. Toward Austerby, served at Bay 9: two weekday departures, approximately 07:10 and 07:45; no weekend service. BODS records `east_midlands:4866:1:d15e1d4bfd6c` and `east_midlands:4866:1:7dc60243305e` preserve the principal and branch timetable evidence.
+3. Toward Bourne Bus Station, also served at Bay 9: one weekday departure at approximately 07:45, with the distinct Bainton intermediate branch retained in principal locations. TNDS patterns `JP_PF0007016:2-46` and `JP_PF0007016:2-48` support this path; the route-202 ordinary calendar applies on weekdays.
+
+The outbound Peterborough pattern has a different direction, stop population, weekend calendar and operating period from the two Bay 9 inbound patterns. The Austerby and Bourne rows share the 07:45 clock time but identify different endpoints and intermediate branch evidence. The Bourne/Bainton path is therefore not safely replaced by a vague additional-service note. Three rows are the minimum representation that retains the evidenced endpoint and path distinctions. The separate branch row retains its one-journey weekday population while the Austerby row retains both distinct weekday times; Browser and Word show the same selected stop, directions, counts and operating periods.
+
+### Validation and handover state
+
+- Full deterministic ATLAS suite passed after the audit guard and semantic assertions were added.
+- Full Bus-data Python suite: 309 tests passed (`OK`, 94.350 seconds); temporary files stayed under the isolated checkout's retained `.tmp` folder.
+- Full frozen-candidate Browser/Word audit passed with `failures: []`, no browser errors, failed requests, failed responses, external requests, live TfL replay requests, acquisition, publication, or deployment. It covers Pipers 46/230/231, Waltham, Chingford 657 and PE1 202. Run #75 candidate identity and both manifest hashes are present in the report.
+- The separate captured-evidence Enfield 313/329 Browser/Word audit passed with zero audit failures or failed requests. It used the captured 313 TfL Route/Timetable/RouteSequence responses and Run #75 candidate evidence for 329, with no live TfL HTTP. Browser and Word showed the normal Chingford-bound 313 service under Arriva London North; school journeys remained a scoped short-working note. Route 329 produced no resolved planner row and retained conflicting operator evidence in Sources & Checks, without an invented operator.
+- No production Bus, source-composition, frequency, operator, calendar, or intelligence file changed. The only scoped code change is stronger production-audit coverage and Run #75 root verification.
+- The local review server remains PID `12156`, bound to `127.0.0.1:8774`; URL `http://127.0.0.1:8774/atlas/?review=v2#modules`. It serves the isolated closeout worktree, not production.
+- Exact-final-SHA hosted validation and origin parity remain infrastructure gates. The local result does not authorize Product Owner acceptance or release. The previously recorded Word/map rendered visual checks remain open.

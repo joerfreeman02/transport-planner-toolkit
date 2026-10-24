@@ -1,0 +1,18 @@
+name: ATLAS Bus Beta final semantic closeout validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  frozen-candidate-diagnosis:
+    if: github.repository == 'joerfreeman02/transport-planner-toolkit' && github.ref == 'refs/heads/codex/atlas-bus-beta-final-closeout' && github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/atlas-bus-beta-s2e1-diagnosis.yml
+    with:
+      mode: normal_runtime_diagnosis
+    permissions:
+      actions: read
+      contents: read

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile, mkdir } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
@@ -14,6 +15,17 @@ const [candidateArg, reportArg] = process.argv.slice(2);
 if (!candidateArg) throw new Error('Usage: node tests/atlas/s2e1-manual-product-audit.mjs <Run-75-candidate-root> [report.json]');
 const candidateRoot = path.resolve(candidateArg);
 const repositoryRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
+assert.notEqual(candidateRoot, repositoryRoot, 'The frozen candidate data root must be separate from the production code checkout.');
+const candidateManifestPaths = {
+  bus: path.join(candidateRoot, 'atlas', 'data', 'bus', 'manifest.json'),
+  tnds: path.join(candidateRoot, 'atlas', 'data', 'bus-tnds', 'manifest.json')
+};
+const candidateManifestDigests = Object.fromEntries(await Promise.all(Object.entries(candidateManifestPaths).map(async ([source, manifestPath]) => {
+  const bytes = await readFile(manifestPath);
+  return [source, `sha256:${createHash('sha256').update(bytes).digest('hex')}`];
+})));
+assert.equal(candidateManifestDigests.bus, 'sha256:1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f', 'Bus-data manifest is not the one from immutable Run #75.');
+assert.equal(candidateManifestDigests.tnds, 'sha256:2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f', 'TNDS manifest is not the one from immutable Run #75.');
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const tflWalthamOperatingFixture = JSON.parse(await readFile(path.join(repositoryRoot, 'tests/atlas/fixtures/tfl-waltham-stop-a-operating-period-1a.json'), 'utf8'));
@@ -134,7 +146,7 @@ const chingfordTimetables657 = {
   'GROVE-P': chingfordTimetable657({ stopId: 'GROVE-P', direction: 'outbound', patternId: '657-out', destination: "Bancroft's School", time: 476, adjacentTime: 478, adjacentId: 'MAPLETON-HA' }),
   'GROVE-N': chingfordTimetable657({ stopId: 'GROVE-N', direction: 'inbound', patternId: '657-in', destination: "Salisbury Hall Sainsbury's", time: 982, adjacentTime: 984, adjacentId: '657-ORIGIN' })
 };
-const report = { schema: 'atlas-bus-s2e1-normal-product-browser-word-audit-v1', candidateRoot, candidateRun: '39430415441', candidateArtifactId: '12275615359', candidateDigest: 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471', candidateProducerSha: '151199cc914c235870f444d26b03c2309edbd035', acquisitionAttempted: false, publicationAttempted: false, deploymentAttempted: false, controls: {}, failures: [] };
+const report = { schema: 'atlas-bus-s2e1-normal-product-browser-word-audit-v1', candidateRoot, candidateRun: '39430415441', candidateArtifactId: '12275615359', candidateDigest: 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471', candidateProducerSha: '151199cc914c235870f444d26b03c2309edbd035', candidateManifestDigests, acquisitionAttempted: false, publicationAttempted: false, deploymentAttempted: false, controls: {}, failures: [] };
 if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') report.enfieldIbusFixture = {
   source: 'Exact captured Enfield TfL Route, TimetableResponse and RouteSequence bodies plus checked-in 20261009 iBus evidence; route 329 stop identity and timetable/operator evidence remain candidate-backed; no live TfL requests.',
   baseVersion: enfieldIbusIndex.baseVersion,
@@ -373,6 +385,14 @@ try {
         outcome.route66Trace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('66') ?? null);
         assert.ok(outcome.route66Trace, 'Production assessment result was not exposed to the test-only route-66 trace observer.');
       }
+      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id === 'pipers-lane') {
+        outcome.pipers230StageTrace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('230') ?? null);
+        assert.ok(outcome.pipers230StageTrace, 'Production assessment result was not exposed to the test-only Pipers route-230 trace observer.');
+      }
+      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id === 'pe1') {
+        outcome.pe1202StageTrace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('202') ?? null);
+        assert.ok(outcome.pe1202StageTrace, 'Production assessment result was not exposed to the test-only PE1 route-202 trace observer.');
+      }
       const serviceTable = page.locator('.bus-service-summary');
       const wrap = serviceTable.locator('xpath=ancestor::div[contains(@class,"table-wrap")]');
       const scroll = await wrap.evaluate(element => ({ client: element.clientWidth, scroll: element.scrollWidth }));
@@ -540,11 +560,14 @@ try {
         assert.match(rows230[0].Source, /BODS/i, 'Pipers route 230 must identify BODS as its primary displayed timetable source.');
         assert.match(rows230[0]['Served at'] || '', /\*/i, 'Pipers route 230 row must identify the selected assessed stop that controls its frequency.');
         assert.ok(renderedServiceNotes.some(note => /230.*Circular service/i.test(note)), 'Pipers route 230 circular evidence is missing from the normal service presentation.');
+        assert.match(rows230[0]['Direction / main service pattern'], /^Circular\b/i, 'Pipers route 230 Browser row must retain its proven circular classification.');
         assert.ok(rendered.some(row => row.Route === '231'), 'Pipers TNDS-only route 231 must remain available in the normal planner.');
         assert.doesNotMatch(rows230[0]['Typical frequency'], /5\s*mins/i, 'Pipers rendered route 230 must not show five-minute inflation.');
         assert.match(rows230[0]['Typical frequency'], /Sun: No scheduled service/i, 'Pipers rendered BODS-primary route 230 must retain the frozen Sunday no-service calendar.');
         assert.match(exportedWordText, /230[\s\S]{0,500}Sun: No scheduled service/i, 'Generated Word export does not preserve the route 230 Sunday no-service calendar.');
         assert.match(exportedWordText, /230.*60\s*mins/i, 'Generated Word export does not preserve the hourly route 230 frequency.');
+        assert.match(exportedWordText, /Circular service: Route 230 operates as a circular service/i, 'Generated Word export is missing the route-230 circular qualification.');
+        assert.equal(wordRows.filter(row => row.Route === '230').length, 1, 'Pipers Word export must express circularity without creating a duplicate route-230 service row.');
         assert.doesNotMatch(exportedWordText, /(?:every|~)\s*5\s*mins/i, 'Pipers Word export must not retain five-minute route frequency inflation.');
       }
       if (control.id === 'pipers-route46') {
@@ -619,6 +642,30 @@ try {
         assert.ok(route202Labels.some(value => /Peterborough Bus Station/i.test(value)), 'PE1 route 202 Peterborough Bus Station principal pattern is missing.');
         assert.ok(route202Labels.some(value => /Austerby|Helpston/i.test(value)), 'PE1 route 202 Austerby/Helpston pattern is missing.');
         assert.ok(route202Labels.some(value => /Bourne|Bainton/i.test(value)), 'PE1 route 202 separate Bourne/Bainton pattern is missing.');
+        const peterborough202 = rows202.find(row => /Peterborough Bus Station/i.test(row['Direction / main service pattern'] || ''));
+        const austerby202 = rows202.find(row => /Austerby/i.test(row['Direction / main service pattern'] || ''));
+        const bourne202 = rows202.find(row => /Bourne Bus Station/i.test(row['Direction / main service pattern'] || '') || /Bainton/i.test(row['Principal locations'] || ''));
+        assert.ok(peterborough202 && austerby202 && bourne202, 'PE1 route 202 must preserve outbound Peterborough, inbound Austerby/Helpston and the distinct Bourne/Bainton branch.');
+        assert.notEqual(austerby202, bourne202, 'PE1 Bourne/Bainton branch is distinct from the Austerby principal pattern.');
+        assert.match(peterborough202['Served at'] || '', /Arrivals/i, 'PE1 outbound pattern must retain the Queensgate arrivals assessed-stop population.');
+        assert.match(peterborough202['Typical frequency'] || '', /Mon-Sat: 2 journeys\/day/i, 'PE1 outbound pattern must preserve its two unique Mon-Sat departures.');
+        assert.match(peterborough202['Operating period at stop'] || '', /17:04.*18:04/i, 'PE1 outbound pattern must preserve its 17:04–18:04 operating span.');
+        assert.match(austerby202['Served at'] || '', /Bay 9/i, 'PE1 Austerby pattern must retain the Queensgate Bay 9 assessed-stop population.');
+        assert.match(austerby202['Typical frequency'] || '', /Mon-Fri: 2 journeys\/day/i, 'PE1 Austerby pattern must preserve both distinct weekday departure times.');
+        assert.match(austerby202['Operating period at stop'] || '', /07:10.*07:45/i, 'PE1 Austerby pattern must preserve its weekday 07:10–07:45 span.');
+        assert.match(bourne202['Served at'] || '', /Bay 9/i, 'PE1 Bourne/Bainton branch must retain the Queensgate Bay 9 selected stop.');
+        assert.match(bourne202['Principal locations'] || '', /Bainton/i, 'PE1 Bourne/Bainton branch must retain its distinct intermediate Bainton path.');
+        assert.match(bourne202['Typical frequency'] || '', /Mon-Fri: 1 journey\/day/i, 'PE1 Bourne/Bainton branch must remain a distinct weekday journey population.');
+        assert.match(bourne202['Operating period at stop'] || '', /07:45/i, 'PE1 Bourne/Bainton branch must retain its selected-stop 07:45 departure.');
+        for (const [label, browserRow] of [['Peterborough', peterborough202], ['Austerby', austerby202], ['Bourne', bourne202]]) {
+          const wordRow = word202.find(candidate => candidate['Direction / main service pattern'] === browserRow['Direction / main service pattern']);
+          assert.ok(wordRow, `PE1 Word export is missing the ${label} route-202 pattern.`);
+          for (const field of ['Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']) {
+            const normalizedWord = wordRow[field].replace(/;\s*/g, ' ').replace(/\s+/g, ' ').trim();
+            const normalizedBrowser = browserRow[field].replace(/;\s*/g, ' ').replace(/\s+/g, ' ').trim();
+            assert.equal(normalizedWord, normalizedBrowser, `PE1 Browser/Word ${label} route-202 ${field} diverged.`);
+          }
+        }
         assert.doesNotMatch(renderedServiceNotes.join(' '), /Additional services: Some route 202 journeys also serve Bourne Bus Station\./i, 'PE1 Browser must not repeat the Bourne destination as an additional-services note.');
         assert.doesNotMatch(exportedWordText, /Additional services: Some route 202 journeys also serve Bourne Bus Station\./i, 'PE1 Word must not repeat the Bourne destination as an additional-services note.');
         const rows102 = rendered.filter(row => row.Route === '102');

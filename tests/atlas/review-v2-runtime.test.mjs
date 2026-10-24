@@ -9,19 +9,26 @@ const rootDir = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'atlas-v2-review-'));
 const dataRoot = path.join(temporary, 'data');
 await mkdir(path.join(dataRoot, 'bus'), { recursive: true });
+await mkdir(path.join(dataRoot, 'bus-tnds'), { recursive: true });
 await writeFile(path.join(dataRoot, 'bus', 'manifest.json'), JSON.stringify({ schema: 'atlas-prepared-bus-data-v2', review: true }));
+await writeFile(path.join(dataRoot, 'bus-tnds', 'manifest.json'), JSON.stringify({ schema: 'atlas-prepared-bus-tnds-v2', review: true }));
 const review = await startReviewServer({ rootDir, v2DataRoot: dataRoot, preferredPort: 0, maximumPort: 0, stateFile: path.join(temporary, 'state.json'), openBrowser: false });
 try {
   const base = `http://127.0.0.1:${review.port}`;
   const v2 = await fetch(`${base}/__atlas-review/v2-data/bus/manifest.json`);
   assert.equal(v2.status, 200);
   assert.equal((await v2.json()).schema, 'atlas-prepared-bus-data-v2');
+  const tnds = await fetch(`${base}/__atlas-review/v2-data/bus-tnds/manifest.json`);
+  assert.equal(tnds.status, 200);
+  assert.equal((await tnds.json()).schema, 'atlas-prepared-bus-tnds-v2');
   const traversal = await fetch(`${base}/__atlas-review/v2-data/%2e%2e/index.html`);
   assert.equal(traversal.status, 404);
   const defaultConfig = await readFile(new URL('../../atlas/config/atlas-data-sources.json', import.meta.url), 'utf8');
   assert.match(defaultConfig, /"nptg": null/);
   const app = await readFile(new URL('../../atlas/assets/js/app.mjs', import.meta.url), 'utf8');
   assert.match(app, /searchParams\.get\('review'\) === 'v2'/);
+  assert.match(app, /tnds: \{ \.\.\.atlasDataSources\.datasets\.tnds, baseUrl: `\$\{v2DataBaseUrl\}bus-tnds\/` \}/, 'review mode restores supplementary TNDS from the frozen v2 candidate');
+  assert.match(app, /tndsBaseUrl: atlasData\.baseUrl\('tnds'\)/, 'review mode must not disable candidate TNDS');
   assert.match(app, /querySelectorAll\('body \[data-atlas-test-build\]'\)/, 'Build identity updates must not include the body metadata marker.');
   const requiredAssets = [
     '/atlas/',
@@ -31,7 +38,8 @@ try {
     '/atlas/assets/js/app.mjs',
     '/src/atlas/application/site-selector.mjs',
     '/src/atlas/domain/site.mjs',
-    '/__atlas-review/v2-data/bus/manifest.json'
+    '/__atlas-review/v2-data/bus/manifest.json',
+    '/__atlas-review/v2-data/bus-tnds/manifest.json'
   ];
   for (const asset of requiredAssets) {
     const response = await fetch(`${base}${asset}`);

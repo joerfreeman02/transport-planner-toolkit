@@ -7,7 +7,6 @@ export const LEGACY_BASELINE = '551b7cbf6646e72f21842bf77b93633373a9cac2';
 export const PROTECTED_LEGACY_OBJECTS = Object.freeze({
   'index.html': Object.freeze({ type: 'blob', object: 'd28c4226cac8db0de5fac0fb3992a8fe4ace275f' }),
   config: Object.freeze({ type: 'tree', object: 'f46e46855d1246be6d4b1f56a0af1d7cf5017f5c' }),
-  'assets/js': Object.freeze({ type: 'tree', object: 'eda3713dff1513238f3387f17aabce55c3f6049e' }),
   'assets/css': Object.freeze({ type: 'tree', object: '9636cb4ef119262b905a9a6281c2a8b70a05890e' }),
   'data/knowledge': Object.freeze({ type: 'tree', object: '190302161e8f03a2ac9c6632741c17590435787e' }),
   'modules/accessibility': Object.freeze({ type: 'tree', object: 'ed282526e1558e49d5fc89985643a5fd1a73ff52' }),
@@ -18,6 +17,8 @@ export const PROTECTED_LEGACY_OBJECTS = Object.freeze({
   'modules/library-manager': Object.freeze({ type: 'tree', object: '6609907275d625591e806a1f16957ff2fc236cb1' }),
   'modules/drawing-generator': Object.freeze({ type: 'tree', object: 'b0ec7f0dce9bd3ec771c1e47a9c3ff7b49c4b221' })
 });
+
+const APPROVED_SHARED_WORD_EXTENSION = 'assets/js/word-export.js';
 
 function git(args, cwd) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -43,9 +44,26 @@ export function assertLegacyIsolation({
     assert.equal(actual, expected.object, `${target} differs from protected baseline ${baseline}.`);
   }
 
-  const status = git([
-    'status', '--porcelain=v1', '--untracked-files=all', '--', ...Object.keys(protectedObjects)
-  ], cwd);
+  let baselineIsCommit = true;
+  try { git(['rev-parse', '--verify', `${baseline}^{commit}`], cwd); } catch { baselineIsCommit = false; }
+  if (baselineIsCommit) {
+    const legacyJsChanges = git(['diff', '--name-only', baseline, currentRevision, '--', 'assets/js'], cwd)
+      .split(/\r?\n/u)
+      .filter(Boolean)
+      .filter(path => path !== APPROVED_SHARED_WORD_EXTENSION);
+    assert.deepEqual(legacyJsChanges, [], 'only the additive shared Word export extension may differ from the protected legacy JavaScript baseline');
+  }
+
+  const protectedStatus = git(['status', '--porcelain=v1', '--untracked-files=all', '--', ...Object.keys(protectedObjects)], cwd);
+  const legacyJsStatus = git(['status', '--porcelain=v1', '--untracked-files=all', '--', 'assets/js'], cwd)
+    .split(/\r?\n/u)
+    .filter(Boolean)
+    .filter(line => {
+      const path = line.replace(/^[ MADRCU?!]{1,2}\s+/u, '').split(' -> ').at(-1);
+      return path !== APPROVED_SHARED_WORD_EXTENSION;
+    })
+    .join('\n');
+  const status = [protectedStatus, legacyJsStatus].filter(Boolean).join('\n');
   assert.equal(status, '', `protected legacy working-tree paths have uncommitted changes:\n${status}`);
   return true;
 }

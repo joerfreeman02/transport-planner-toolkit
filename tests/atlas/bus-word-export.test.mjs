@@ -6,8 +6,8 @@ import { stopRoutesPresentation } from '../../src/atlas/domain/bus-source-presen
 const result = {
   ok: true,
   stops: [
-    { name: 'Balaam Street', displayDirection: 'Stop S (Eastbound)', walking: { status: 'routed', distanceMetres: 58, durationSeconds: 60 }, cycling: { status: 'routed', distanceMetres: 80, durationSeconds: 60 }, routes: ['262', '473'] },
-    { name: 'Balaam Street', displayDirection: 'Stop T (Westbound)', walking: { status: 'routed', distanceMetres: 39, durationSeconds: 60 }, cycling: { status: 'routed', distanceMetres: 39, durationSeconds: 60 }, routes: ['241', '262', '325', '473', '678'] }
+    { id: 'stop-1', mapReference: 'A', name: 'Balaam Street', displayDirection: 'Stop S (Eastbound)', walking: { status: 'routed', distanceMetres: 58, durationSeconds: 60 }, cycling: { status: 'routed', distanceMetres: 80, durationSeconds: 60 }, routes: ['262', '473'] },
+    { id: 'stop-2', mapReference: 'B', name: 'Balaam Street', displayDirection: 'Stop T (Westbound)', walking: { status: 'routed', distanceMetres: 39, durationSeconds: 60 }, cycling: { status: 'routed', distanceMetres: 39, durationSeconds: 60 }, routes: ['241', '262', '325', '473', '678'] }
   ],
   serviceSummaries: [{
     routeNumber: '241',
@@ -24,7 +24,10 @@ const result = {
 };
 
 const tables = buildBusWordTables(result);
-assert.match(buildBusTransportStatement(result, 'Accepted wording.'), /^The assessment covers 2 assessed stops\. Accepted wording\.$/);
+const narrative = buildBusTransportStatement(result);
+assert.match(narrative, /^The assessment covers 2 assessed stops\./);
+assert.match(narrative, /1 bus route across 1 planner-facing service summary/);
+assert.equal(narrative.split('\n\n').length, 2, 'transport wording is limited to two concise paragraphs');
 assert.equal(tables[0].rows.length, 2, 'transport statement stop count matches the Word stop table');
 const countParityResult = { ...result, stops: [...result.stops, { transportMode: 'bus_coach', routes: [], timetableMatch: false, timetableEvidenceStatus: 'SOURCE_UNAVAILABLE' }] };
 assert.match(buildBusTransportStatement(countParityResult), /^The assessment covers 2 assessed stops\./, 'non-assessed nearby candidates are excluded from the narrative count');
@@ -33,7 +36,8 @@ assert.equal(tables.length, 2);
 assert.doesNotMatch(JSON.stringify(tables[1]), /BODS|TNDS|TfL/, 'Word summary remains source-neutral when planner provenance is present');
 assert.equal(tables[0].caption, 'Table 3.2 - Bus Stop Summary');
 assert.deepEqual(tables[0].headers, ['Map reference', 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop']);
-assert.equal(tables[0].rows[0][0], '?');
+assert.equal(tables[0].rows[0][0], '1');
+assert.equal(tables[0].rows[1][0], '2');
 assert.equal(tables[0].rows[0][1], 'Balaam Street');
 assert.equal(tables[0].rows[0][2], 'Stop S (Eastbound)');
 assert.equal(tables[0].rows[0][5], '262, 473');
@@ -71,6 +75,7 @@ const plannerInput = {
   }]
 };
 const plannerWord = buildBusWordTables(plannerInput);
+assert.match(plannerWord[1].prelude, /^\* Stop used for the frequency/);
 const semanticallyStyledWord = buildBusWordTables({
   ...plannerInput,
   reviewItems: [{ code: 'unresolved-timetable-request', route: '313', message: 'review' }],
@@ -83,6 +88,10 @@ const semanticallyStyledWord = buildBusWordTables({
 assert.ok(semanticallyStyledWord[1].rows.some(row => !Array.isArray(row) && row.kind === 'section' && row.semantic === 'short-working'), 'short workings receive the existing pale-orange Word section treatment');
 assert.ok(semanticallyStyledWord[1].rows.some(row => !Array.isArray(row) && row.kind === 'section' && row.semantic === 'evidence-review'), 'planner review receives the existing pale-orange Word section treatment');
 assert.ok(semanticallyStyledWord[1].rows.some(row => !Array.isArray(row) && row.kind === 'summary' && row.semantic === 'presentation-note'), 'explanatory methodology remains neutral in Word');
+const styledDocx = docxBlob('ATLAS Bus Assessment', semanticallyStyledWord);
+const styledDocxXml = new TextDecoder().decode(new Uint8Array(await styledDocx.arrayBuffer()));
+assert.match(styledDocxXml, /w:fill="FFF1DD"/, 'short workings retain pale orange semantic styling in Word');
+assert.match(styledDocxXml, /w:fill="FCE8E6"/, 'planner review retains pale warning styling in Word');
 const plannerWordNotes = plannerWord[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
 assert.match(plannerWordNotes, /Additional source evidence remains available in the ATLAS assessment workspace/);
 assert.match(plannerWordNotes, /Planner review required: timetable\/source evidence requires review for routes 215, 397 at one or more assessed stops\./);
@@ -122,4 +131,15 @@ const decoded = new TextDecoder().decode(bytes);
 assert.match(decoded, /Table 3\.2 - Bus Stop Summary/);
 assert.match(decoded, /Balaam Street/);
 assert.match(decoded, /Table 3\.3 - Bus Service Summary/);
+const defaultCompatible = docxBlob('Legacy report', [{ caption: 'Legacy table', headers: ['Item'], rows: [{ kind: 'summary', text: 'Existing summary note' }], widths: [100] }], 'Existing trailing wording');
+const defaultCompatibleXml = new TextDecoder().decode(new Uint8Array(await defaultCompatible.arrayBuffer()));
+assert.ok(defaultCompatibleXml.indexOf('Legacy table') < defaultCompatibleXml.indexOf('Existing trailing wording'), 'existing callers keep wording after tables unless they opt into summary-first ordering');
+assert.match(defaultCompatibleXml, /w:fill="EFEFEF"/, 'existing summary rows keep the neutral gray fill');
+assert.doesNotMatch(defaultCompatibleXml, /w:fill="FFF1DD"|w:fill="FCE8E6"/, 'Bus semantic colors appear only on explicitly tagged Bus rows');
+const summaryFirst = docxBlob('ATLAS Bus Assessment', plannerWord, narrative, { wordingPlacement: 'before' });
+const summaryFirstText = new TextDecoder().decode(new Uint8Array(await summaryFirst.arrayBuffer()));
+assert.ok(summaryFirstText.indexOf('Transport Statement wording') < summaryFirstText.indexOf('Table 3.2 - Bus Stop Summary'), 'Word transport statement precedes evidence tables');
+const serviceCaptionIndex = summaryFirstText.indexOf('Table 3.3 - Bus Service Summary');
+const serviceTableIndex = summaryFirstText.indexOf('<w:tbl>', serviceCaptionIndex);
+assert.ok(serviceCaptionIndex < summaryFirstText.indexOf('* Stop used for the frequency') && summaryFirstText.indexOf('* Stop used for the frequency') < serviceTableIndex, 'Word frequency basis note follows the service caption and precedes its header and rows');
 console.log('PASS Alpha.5 shared DOCX package contains the Plaistow-style Bus tables.');

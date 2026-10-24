@@ -16,9 +16,10 @@ import { createTflRequestScheduler } from '../../../src/atlas/adapters/tfl-reque
 import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-discovery.mjs';
 import { createBusAssessment, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/atlas/application/bus-assessment.mjs';
 import { buildBusTransportStatement, buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
+import { withNumericMapReferences } from '../../../src/atlas/presentation/bus-map-references.mjs';
 import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-task-status.mjs';
 import { buildBusTimetablePresentationNote, buildPlannerBusServiceSummaries, plannerRouteDisplayNumber, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
-import { buildControlledBusWording, buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
+import { buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, isOtherNearbyStopRecord, partialTimetableQualification, plannerFacingServiceNote, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { plannerStopWarning, recommendedBusStop } from '../../../src/atlas/domain/bus-planner-trust.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
@@ -39,11 +40,15 @@ const isV2Review = new URL(window.location.href).searchParams.get('review') === 
 const v2DataBaseUrl = isV2Review ? `${window.location.origin}/__atlas-review/v2-data/` : null;
 const atlasData = createAtlasDataSourceResolver(isV2Review ? {
   ...atlasDataSources,
-  datasets: { ...atlasDataSources.datasets, bus: { ...atlasDataSources.datasets.bus, baseUrl: `${v2DataBaseUrl}bus/` } }
+  datasets: {
+    ...atlasDataSources.datasets,
+    bus: { ...atlasDataSources.datasets.bus, baseUrl: `${v2DataBaseUrl}bus/` },
+    tnds: { ...atlasDataSources.datasets.tnds, baseUrl: `${v2DataBaseUrl}bus-tnds/` }
+  }
 } : atlasDataSources);
 const preparedBusData = createPreparedBusDataAdapter({
   baseUrl: atlasData.baseUrl('bus'),
-  tndsBaseUrl: isV2Review ? null : atlasData.baseUrl('tnds'),
+  tndsBaseUrl: atlasData.baseUrl('tnds'),
   busFileUrl: relativePath => atlasData.fileUrl('bus', relativePath),
   tndsFileUrl: relativePath => atlasData.fileUrl('tnds', relativePath)
 });
@@ -67,6 +72,7 @@ const METHOD_LABELS = Object.freeze({
 });
 let confirmedSite = null;
 let map = null;
+let mapExportContext = null;
 let assessmentMarker = null;
 let radiusCircle = null;
 let busStopMarkers = [];
@@ -152,11 +158,15 @@ function showView(name) {
 
 function activateWorkflowStage(stage) {
   const next = Math.max(1, Math.min(6, Number(stage) || 1));
-  if (next >= 5 && !currentBusResult) return;
-  if (next >= 2 && !selector.getSnapshot().site) return;
-  if (next >= 3 && !confirmedSite) return;
+  if (next >= 5 && !currentBusResult) { setCallout($('workflowHint'), 'Run the assessment before viewing Results.'); return; }
+  if (next >= 2 && !selector.getSnapshot().site) { setCallout($('workflowHint'), 'Find a location before confirming the assessment point.'); return; }
+  if (next >= 3 && !confirmedSite) { setCallout($('workflowHint'), 'Confirm the assessment point before choosing assessment settings.'); return; }
   workflowStage = next;
+  $('workflowHint').textContent = '';
   if (next === 5 || next === 6) showView('bus');
+  if (next === 6) {
+    try { mapExportContext = captureMapExportContext() || mapExportContext; } catch { /* Export context is best-effort; it must not block the workflow. */ }
+  }
   document.body.dataset.busWorkflowStage = String(next);
   const layout = document.querySelector('.workflow-layout');
   const evidencePanel = $('evidencePanel');
@@ -184,7 +194,8 @@ function activateWorkflowStage(stage) {
     button.classList.toggle('complete', buttonStage < next);
     button.disabled = (buttonStage === 2 && !selector.getSnapshot().site)
       || ((buttonStage === 3 || buttonStage === 4) && !confirmedSite)
-      || ((buttonStage === 5 || buttonStage === 6) && !currentBusResult);
+      ;
+    button.setAttribute('aria-disabled', String((buttonStage === 5 || buttonStage === 6) && !currentBusResult));
     if (buttonStage === next) button.setAttribute('aria-current', 'step'); else button.removeAttribute('aria-current');
   });
   $('mapStageHint').textContent = ({
@@ -222,10 +233,7 @@ function plannerFailure(kind, result) {
 
 function assessmentWording(result, services, selectedIds = null) {
   const presented = (services ?? []).filter(service => !selectedIds || (selectedIds.has(serviceKey(service)) && service.stopIds?.some(id => result.stops.some(stop => selectedIds.has(stopKey(stop)) && String(id) === stopKey(stop)))));
-  const base = buildControlledBusWording(presented, { nearestGroupName: result.nearestGroup?.name ?? null });
-  const qualification = partialTimetableQualification(result.stops);
-  const statement = qualification ? `${base} ${qualification}` : base;
-  return buildBusTransportStatement(result, statement);
+  return buildBusTransportStatement(result, { services: presented, nearestGroupName: result.nearestGroup?.name ?? null });
 }
 
 function plannerAnnotationEntries(service) {
@@ -263,6 +271,25 @@ function moveResultsMap(showResults) {
   setTimeout(() => map?.invalidateSize({ pan: false, animate: false }), 0);
 }
 
+function captureMapExportContext() {
+  const leafletMap = map;
+  const tileLayer = Object.values(leafletMap?._layers ?? {}).find(layer => layer instanceof window.L.TileLayer);
+  const zoom = leafletMap?.getZoom();
+  const pixelOrigin = leafletMap?.getPixelOrigin();
+  const measuredSize = leafletMap?.getSize();
+  if (!tileLayer || !pixelOrigin || !zoom || !measuredSize?.x || !measuredSize?.y) return null;
+  const tiles = Object.values(tileLayer._tiles ?? {})
+    .filter(tile => tile.coords?.z === zoom && tile.el?.complete && tile.el.naturalWidth)
+    .map(tile => ({ x: Number(tile.coords.x), y: Number(tile.coords.y), src: tile.el.src }));
+  if (!tiles.length) return null;
+  return {
+    zoom,
+    pixelOrigin: { x: Number(pixelOrigin.x), y: Number(pixelOrigin.y) },
+    size: { x: Number(measuredSize.x), y: Number(measuredSize.y) },
+    tiles
+  };
+}
+
 function collapseSiteSetup(collapsed) {
   $('siteStageSummary').hidden = !collapsed;
   if (collapsed) $('siteStageSummaryText').textContent = `${confirmedSite?.displayAddress || confirmedSite?.suppliedAddress || 'Assessment point'} · Assessment point confirmed`;
@@ -279,6 +306,7 @@ function clearBusEvidence(message = 'Confirm the assessment point before checkin
   radiusTouched = false;
   detailedEvidenceVisible = false;
   currentBusResult = null;
+  mapExportContext = null;
   pendingScopeDiscovery = null;
   pendingScopeContext = null;
   busStopMarkers.forEach(marker => map?.removeLayer(marker));
@@ -392,7 +420,7 @@ async function showAccessRoute(stop, mode) {
 }
 
 function plannerStopLabel(stop) {
-  return stop?.mapReference || '?';
+  return stop?.displayMapReference || stop?.mapReference || '?';
 }
 
 function renderBusStopMarkers(stops) {
@@ -586,6 +614,7 @@ function evidenceReviewText(count) {
 
 function renderAssessment(result) {
   currentBusResult = result;
+  result = withNumericMapReferences(result);
   const presentedServices = Array.isArray(result.plannerServiceSummaries)
     ? result.plannerServiceSummaries
     : buildPlannerBusServiceSummaries(result.serviceSummaries, result.stops);
@@ -778,7 +807,9 @@ function renderAssessment(result) {
     }
   }
   renderBusStopMarkers(result.stops);
-  $('assessmentWording').textContent = assessmentWording(result, presentedServices.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => selectedStopIds.has(String(id)))));
+  const wording = assessmentWording(result, presentedServices.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => selectedStopIds.has(String(id)))));
+  $('assessmentWording').textContent = wording;
+  $('copyAssessmentWording').disabled = !wording;
   const stopProvenance = result.provenance.stops ?? {};
   const timetableProvenance = result.provenance.timetables ?? {};
   const checked = formatTime(stopProvenance.retrievedAt || timetableProvenance.retrievedAt);
@@ -1000,7 +1031,8 @@ function exportBusWord() {
   if (!currentBusResult?.ok || !confirmedSite) return setCallout($('exportStatus'), 'Build a Bus assessment before exporting to Word.', 'warning');
   const report = selectedResult();
   if (!report.stops.length && !(report.plannerServiceSummaries ?? report.serviceSummaries).length) return setCallout($('exportStatus'), 'Select at least one stop or service before exporting.', 'warning');
-  downloadWordDocument(busWordFilename(confirmedSite), 'ATLAS Bus Assessment', buildBusWordTables(report), report.wording);
+  const presentationReport = withNumericMapReferences(report, { referenceStops: currentBusResult.stops });
+  downloadWordDocument(busWordFilename(confirmedSite), 'ATLAS Bus Assessment', buildBusWordTables(presentationReport), report.wording, { wordingPlacement: 'before' });
   setCallout($('exportStatus'), 'Word export created from the checked Bus assessment.', 'success');
 }
 
@@ -1008,38 +1040,80 @@ function escapeSvg(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[character]);
 }
 
-function exportAssessmentMap() {
+async function exportAssessmentMap() {
   if (!currentBusResult?.ok || !confirmedSite) return setCallout($('exportStatus'), 'Build a Bus assessment before exporting the map.', 'warning');
-  const report = selectedResult();
+  const report = withNumericMapReferences(selectedResult(), { referenceStops: currentBusResult.stops });
   const stops = report.stops.filter(stop => !isOtherNearbyStopRecord(stop) && Number.isFinite(Number(stop.latitude)) && Number.isFinite(Number(stop.longitude)));
-  const site = { latitude: Number(confirmedSite.latitude), longitude: Number(confirmedSite.longitude) };
-  const points = [site, ...stops.map(stop => ({ latitude: Number(stop.latitude), longitude: Number(stop.longitude) }))];
-  const meanLatitude = points.reduce((sum, point) => sum + point.latitude, 0) / points.length;
-  const projectX = longitude => longitude * Math.cos(meanLatitude * Math.PI / 180);
-  const xs = points.map(point => projectX(point.longitude));
-  const ys = points.map(point => point.latitude);
-  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-  const width = 1100, height = 740, padding = 105;
-  const spanX = Math.max(maxX - minX, .002), spanY = Math.max(maxY - minY, .002);
-  const scale = Math.min((width - 2 * padding) / spanX, (height - 2 * padding) / spanY);
-  const project = point => ({ x: padding + (projectX(point.longitude) - minX) * scale, y: height - padding - (point.latitude - minY) * scale });
-  const sitePoint = project(site);
-  const stopMarkup = stops.map(stop => {
-    const point = project(stop);
-    const reference = escapeSvg(plannerStopLabel(stop));
-    const name = escapeSvg(stop.name || 'Bus stop');
-    const walk = stop.walking?.status === 'routed' && Number.isFinite(Number(stop.walking.distanceMetres)) ? ` · ${Math.round(Number(stop.walking.distanceMetres))} m walk` : '';
-    return `<g><circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="13" fill="#002761" stroke="#fff" stroke-width="4"/><text x="${point.x.toFixed(1)}" y="${(point.y + 4).toFixed(1)}" text-anchor="middle" font-family="Roboto,Arial,sans-serif" font-size="10" font-weight="700" fill="#fff">${reference}</text><text x="${(point.x + 18).toFixed(1)}" y="${(point.y - 8).toFixed(1)}" font-family="Roboto,Arial,sans-serif" font-size="13" font-weight="700" fill="#0f172a">${reference} · ${name}${escapeSvg(walk)}</text></g>`;
-  }).join('');
-  const radius = Number(report.provenance?.stops?.actualDiscoveryRadiusMetres || report.provenance?.stops?.radiusMetres || selectedRadius());
-  const radiusPx = report.assessmentMode === 'nearest' ? 0 : Math.min(260, radius / (111320 * spanY) * (height - 2 * padding));
-  const ring = radiusPx > 0 ? `<circle cx="${sitePoint.x.toFixed(1)}" cy="${sitePoint.y.toFixed(1)}" r="${radiusPx.toFixed(1)}" fill="#fc7315" fill-opacity=".06" stroke="#fc7315" stroke-width="2" stroke-dasharray="8 7"/>` : '';
-  const identity = escapeSvg(confirmedSite.displayAddress || confirmedSite.suppliedAddress || 'Bus assessment');
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc"><title id="title">ATLAS Bus assessment map — ${identity}</title><desc id="desc">Assessment point and ${stops.length} assessed bus stop references. Routed walking distances are shown where available. No route or walking geometry is invented.</desc><rect width="100%" height="100%" fill="#f4f7fb"/><text x="42" y="48" font-family="Roboto,Arial,sans-serif" font-size="25" font-weight="700" fill="#061d37">Bus assessment map</text><text x="42" y="76" font-family="Roboto,Arial,sans-serif" font-size="15" fill="#475b70">${identity}</text>${ring}${stopMarkup}<path d="M ${sitePoint.x - 14} ${sitePoint.y} L ${sitePoint.x} ${sitePoint.y + 24} L ${sitePoint.x + 14} ${sitePoint.y} L ${sitePoint.x + 14} ${sitePoint.y - 15} A 14 14 0 1 0 ${sitePoint.x - 14} ${sitePoint.y - 15} Z" fill="#fc7315" stroke="#fff" stroke-width="4"/><circle cx="${sitePoint.x}" cy="${sitePoint.y - 15}" r="4" fill="#fff"/><text x="${sitePoint.x + 20}" y="${sitePoint.y + 28}" font-family="Roboto,Arial,sans-serif" font-size="14" font-weight="800" fill="#873800">Assessment point</text><g transform="translate(42 ${height - 76})"><circle cx="10" cy="0" r="8" fill="#fc7315"/><text x="25" y="5" font-family="Roboto,Arial,sans-serif" font-size="13" fill="#26394d">Assessment point</text><circle cx="185" cy="0" r="8" fill="#002761"/><text x="200" y="5" font-family="Roboto,Arial,sans-serif" font-size="13" fill="#26394d">Assessed bus stop (map reference)</text>${ring ? `<line x1="470" y1="0" x2="500" y2="0" stroke="#fc7315" stroke-width="2" stroke-dasharray="6 5"/><text x="508" y="5" font-family="Roboto,Arial,sans-serif" font-size="13" fill="#26394d">${radius} m assessment radius</text>` : ''}</g><text x="42" y="${height - 28}" font-family="Roboto,Arial,sans-serif" font-size="11" fill="#64748b">Checked site and stop coordinates · walking distance shown where routed · © OpenStreetMap contributors for address and map services</text></svg>`;
-  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-  const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = busWordFilename(confirmedSite).replace(/\.docx$/i, '.svg'); link.click();
-  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-  setCallout($('exportStatus'), `Standalone map exported with ${stops.length} stop reference${stops.length === 1 ? '' : 's'}.`, 'success');
+  const leafletMap = map;
+  let context = mapExportContext;
+  if (!context) {
+    try { context = captureMapExportContext(); } catch { /* Report an unavailable map context below. */ }
+  }
+  if (!context) return setCallout($('exportStatus'), 'The browser map context is not available yet. Return to Results, wait for the map, and try again.', 'warning');
+  const { zoom, pixelOrigin } = context;
+  const mapSize = context.size;
+  setCallout($('exportStatus'), 'Preparing the standalone map from the displayed OpenStreetMap tiles…', 'neutral');
+  try {
+    const tiles = [];
+    for (const tile of context.tiles) {
+      const response = await fetch(tile.src, { mode: 'cors' });
+      if (!response.ok) continue;
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      let binary = '';
+      for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+      const contentType = response.headers.get('content-type') || 'image/png';
+      tiles.push({ x: tile.x * 256 - pixelOrigin.x, y: tile.y * 256 - pixelOrigin.y, uri: `data:${contentType};base64,${btoa(binary)}` });
+    }
+    if (!tiles.length) throw new Error('No readable map tiles were available.');
+    const scale = Math.min(1.5, 1500 / mapSize.x);
+    const width = Math.round(mapSize.x * scale);
+    const mapHeight = Math.round(mapSize.y * scale);
+    const top = 88;
+    const keyColumns = 2;
+    const keyRows = Math.ceil(stops.length / keyColumns);
+    const height = top + mapHeight + 72 + Math.max(1, keyRows) * 21 + 34;
+    const project = point => {
+      const pixel = leafletMap.project([Number(point.latitude), Number(point.longitude)], zoom);
+      return { x: (pixel.x - pixelOrigin.x) * scale, y: top + (pixel.y - pixelOrigin.y) * scale };
+    };
+    const site = { latitude: Number(confirmedSite.latitude), longitude: Number(confirmedSite.longitude) };
+    const sitePoint = project(site);
+    const pointMarkup = stops.map(stop => {
+      const point = project(stop);
+      const reference = escapeSvg(plannerStopLabel(stop));
+      return `<g><circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="13" fill="#002761" stroke="#fff" stroke-width="4"/><text x="${point.x.toFixed(1)}" y="${(point.y + 4).toFixed(1)}" text-anchor="middle" font-family="Roboto,Arial,sans-serif" font-size="10" font-weight="700" fill="#fff">${reference}</text></g>`;
+    }).join('');
+    const radius = Number(report.provenance?.stops?.actualDiscoveryRadiusMetres || report.provenance?.stops?.radiusMetres || selectedRadius());
+    const metresPerPixel = 156543.03392 * Math.max(.15, Math.cos(site.latitude * Math.PI / 180)) / (2 ** zoom);
+    const radiusPx = report.assessmentMode === 'nearest' ? 0 : radius / metresPerPixel * scale;
+    const ring = radiusPx > 0 ? `<circle cx="${sitePoint.x.toFixed(1)}" cy="${sitePoint.y.toFixed(1)}" r="${radiusPx.toFixed(1)}" fill="#fc7315" fill-opacity=".045" stroke="#fc7315" stroke-opacity=".72" stroke-width="2" stroke-dasharray="8 7"/>` : '';
+    const tileMarkup = tiles.map(tile => `<image x="${(tile.x * scale).toFixed(1)}" y="${(top + tile.y * scale).toFixed(1)}" width="${(256 * scale).toFixed(1)}" height="${(256 * scale).toFixed(1)}" href="${tile.uri}"/>`).join('');
+    const siteMarker = `<path d="M ${sitePoint.x - 14} ${sitePoint.y} L ${sitePoint.x} ${sitePoint.y + 24} L ${sitePoint.x + 14} ${sitePoint.y} L ${sitePoint.x + 14} ${sitePoint.y - 15} A 14 14 0 1 0 ${sitePoint.x - 14} ${sitePoint.y - 15} Z" fill="#fc7315" stroke="#fff" stroke-width="4"/><circle cx="${sitePoint.x}" cy="${sitePoint.y - 15}" r="4" fill="#fff"/>`;
+    const identity = escapeSvg(confirmedSite.displayAddress || confirmedSite.suppliedAddress || 'Bus assessment');
+    const key = stops.map((stop, index) => {
+      const column = index < keyRows ? 0 : 1;
+      const row = index % keyRows;
+      const x = 40 + column * Math.round(width / keyColumns);
+      const y = top + mapHeight + 66 + row * 21;
+      const name = escapeSvg(`${plannerStopLabel(stop)} · ${stop.name || 'Bus stop'}${stop.indicator ? ` — ${stop.indicator}` : ''}`.slice(0, 72));
+      return `<circle cx="${x + 8}" cy="${y - 4}" r="8" fill="#002761"/><text x="${x + 8}" y="${y}" text-anchor="middle" font-family="Roboto,Arial,sans-serif" font-size="9" font-weight="700" fill="#fff">${plannerStopLabel(stop)}</text><text x="${x + 22}" y="${y}" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">${name}</text>`;
+    }).join('');
+    const leafletOrigin = leafletMap.unproject([pixelOrigin.x + mapSize.x - 100, pixelOrigin.y + mapSize.y - 35], zoom);
+    const leafletScaleEnd = leafletMap.unproject([pixelOrigin.x + mapSize.x, pixelOrigin.y + mapSize.y - 35], zoom);
+    const measuredMetres = leafletMap.distance(leafletOrigin, leafletScaleEnd);
+    const roundedScale = 10 ** Math.floor(Math.log10(measuredMetres));
+    const scaleLabelMetres = Math.max(1, Math.round(measuredMetres / roundedScale)) * roundedScale;
+    const scaleWidth = Math.min(100, (scaleLabelMetres / measuredMetres) * 100) * scale;
+    const scaleMarkup = `<g transform="translate(${width - scaleWidth - 28} ${top + mapHeight - 22})"><rect width="${scaleWidth.toFixed(1)}" height="5" fill="#061d37"/><text x="0" y="-6" font-family="Roboto,Arial,sans-serif" font-size="11" font-weight="700" fill="#061d37">${scaleLabelMetres >= 1000 ? `${(scaleLabelMetres / 1000).toLocaleString('en-GB')} km` : `${scaleLabelMetres.toLocaleString('en-GB')} m`}</text></g>`;
+    const north = `<g transform="translate(${width - 34} ${top + 20})"><text x="0" y="0" text-anchor="middle" font-family="Roboto,Arial,sans-serif" font-size="12" font-weight="700" fill="#061d37">N</text><path d="M 0 8 L -7 27 L 0 23 L 7 27 Z" fill="#061d37"/></g>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc"><title id="title">ATLAS Bus assessment map — ${identity}</title><desc id="desc">OpenStreetMap context from the assessment browser, with an orange assessment point, numeric assessed-stop references, and a subdued discovery-radius overlay. Route geometry is not invented.</desc><rect width="100%" height="100%" fill="#fff"/><text x="32" y="34" font-family="Roboto,Arial,sans-serif" font-size="23" font-weight="700" fill="#061d37">Bus assessment map</text><text x="32" y="59" font-family="Roboto,Arial,sans-serif" font-size="13" fill="#475b70">${identity}</text><defs><clipPath id="mapClip"><rect x="0" y="${top}" width="${width}" height="${mapHeight}" rx="7"/></clipPath></defs><rect x="0" y="${top}" width="${width}" height="${mapHeight}" fill="#e8eef2"/><g clip-path="url(#mapClip)">${tileMarkup}${ring}${pointMarkup}${siteMarker}${north}${scaleMarkup}</g><rect x="0" y="${top}" width="${width}" height="${mapHeight}" rx="7" fill="none" stroke="#aab8c4"/><g transform="translate(32 ${top + mapHeight + 28})"><circle cx="8" cy="0" r="8" fill="#fc7315"/><text x="22" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">Assessment point</text><circle cx="150" cy="0" r="8" fill="#002761"/><text x="164" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">Assessed stop</text>${ring ? `<line x1="285" y1="0" x2="320" y2="0" stroke="#fc7315" stroke-width="2" stroke-dasharray="6 5"/><text x="328" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">${radius} m assessment radius</text>` : ''}</g>${key}<text x="32" y="${height - 13}" font-family="Roboto,Arial,sans-serif" font-size="10" fill="#64748b">Map data © OpenStreetMap contributors · Assessment point and stop positions from the checked assessment</text></svg>`;
+    const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = busWordFilename(confirmedSite).replace(/\.docx$/i, '.svg'); link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    setCallout($('exportStatus'), `Standalone map exported with ${stops.length} numbered stop references and the displayed map context.`, 'success');
+  } catch {
+    setCallout($('exportStatus'), 'A standalone map could not be prepared from the current browser map tiles. Return to Results, wait for the map to finish loading, and try again.', 'error');
+  }
 }
 
 function initMap() {
@@ -1082,6 +1156,21 @@ $('newAssessment').addEventListener('click', () => {
   activateWorkflowStage(1);
 });
 $('goToExport').addEventListener('click', () => activateWorkflowStage(6));
+$('goToExportBottom').addEventListener('click', () => activateWorkflowStage(6));
+$('continueToRunAssessment').addEventListener('click', () => {
+  activateWorkflowStage(4);
+  $('findNearestStops').focus({ preventScroll: false });
+});
+$('copyAssessmentWording').addEventListener('click', async () => {
+  const wording = $('assessmentWording').textContent.trim();
+  if (!wording) return;
+  try {
+    await navigator.clipboard.writeText(wording);
+    setCallout($('workflowHint'), 'Assessment wording copied.');
+  } catch {
+    setCallout($('workflowHint'), 'Copying is unavailable in this browser. Select the assessment wording to copy it.');
+  }
+});
 $('editAssessment').addEventListener('click', () => activateWorkflowStage(4));
 $('returnToResults').addEventListener('click', () => activateWorkflowStage(5));
 $('exportAssessmentMap').addEventListener('click', exportAssessmentMap);

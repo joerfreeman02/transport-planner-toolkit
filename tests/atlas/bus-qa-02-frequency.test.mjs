@@ -144,10 +144,11 @@ assert.equal(mixedQualification.serviceNote, 'Timetable varies between school an
 assert.doesNotMatch(mixedQualification.serviceNote, /School-day journeys only|Non-school days only/);
 
 const html = fs.readFileSync(new URL('../../atlas/index.html', import.meta.url), 'utf8');
-const css = fs.readFileSync(new URL('../../atlas/assets/css/atlas-shell.css', import.meta.url), 'utf8');
+const css = fs.readFileSync(new URL('../../atlas/assets/css/bus-beta-workspace.css', import.meta.url), 'utf8');
+const shellCss = fs.readFileSync(new URL('../../atlas/assets/css/atlas-shell.css', import.meta.url), 'utf8');
 assert.deepEqual((html.match(/<th>/g) ?? []).slice(-8).length, 8);
-for (const [className, width] of [['col-include', '4%'], ['col-route', '6%'], ['col-operator', '11%'], ['col-direction', '18%'], ['col-served-at', '11%'], ['col-principal', '17%'], ['col-frequency', '12%'], ['col-operating-period', '13%'], ['col-source', '8%']]) assert.ok(css.includes('.' + className + ' { width: ' + width + '; }'), className);
-assert.match(css, /input\[type="checkbox"\].*width: 17px/);
+for (const [className, width] of [['col-include', '3%'], ['col-route', '5%'], ['col-operator', '10%'], ['col-direction', '16%'], ['col-served-at', '16%'], ['col-principal', '22%'], ['col-frequency', '11%'], ['col-operating-period', '10%'], ['col-source', '7%']]) assert.ok(css.includes('.' + className + ' { width: ' + width + '; }'), className);
+assert.match(shellCss, /input\[type="checkbox"\].*width: 17px/);
 
 const word = buildBusWordTables({ ok: true, stops: [], serviceSummaries: [varied] });
 assert.deepEqual(word[1].headers, ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period']);

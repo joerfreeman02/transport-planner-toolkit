@@ -2,6 +2,7 @@ import { buildServicePresentation, formatServiceOriginDestination } from '../dom
 import { buildBusTimetablePresentationNote, plannerRouteDisplayNumber, PLANNER_METHODOLOGY_NOTE, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../domain/bus-planner-summary.mjs';
 import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
 import { isOtherNearbyStopRecord, partialTimetableQualification, plannerFacingServiceNote, stopRoutesPresentation } from '../domain/bus-source-presentation.mjs';
+import { withNumericMapReferences } from './bus-map-references.mjs';
 
 function text(value) { return String(value ?? '').trim(); }
 
@@ -9,10 +10,33 @@ function assessedStopRecords(stops) {
   return (Array.isArray(stops) ? stops : []).filter(stop => !isOtherNearbyStopRecord(stop));
 }
 
-export function buildBusTransportStatement(result, acceptedWording = '') {
+export function buildBusTransportStatement(result, { services = result?.plannerServiceSummaries ?? result?.serviceSummaries ?? [], nearestGroupName = result?.nearestGroup?.name ?? null } = {}) {
   const count = assessedStopRecords(result?.stops).length;
-  const sentence = `The assessment covers ${count} assessed stop${count === 1 ? '' : 's'}.`;
-  return [sentence, text(acceptedWording)].filter(Boolean).join(' ');
+  const routeNumbers = [...new Set((services ?? []).flatMap(service => service.publicRouteNumbers ?? service.routeNumbers ?? [service.routeNumber]).map(text).filter(Boolean))];
+  const serviceCount = (services ?? []).length;
+  const stopSentence = nearestGroupName
+    ? `The assessment covers ${count} assessed stop${count === 1 ? '' : 's'} within the nearest stop group at ${text(nearestGroupName)}.`
+    : `The assessment covers ${count} assessed stop${count === 1 ? '' : 's'}.`;
+  const routeSentence = serviceCount
+    ? `The checked evidence identifies ${routeNumbers.length} bus route${routeNumbers.length === 1 ? '' : 's'} across ${serviceCount} planner-facing service summar${serviceCount === 1 ? 'y' : 'ies'}. Principal locations, timetable frequency and operating periods are set out in the service summary.`
+    : 'No matched planner-facing timetable summaries are available for the selected stop evidence.';
+  const frequencies = (services ?? []).map(service => String(service.typicalFrequencyText || service.typicalFrequencyLines?.join(' ') || '')).filter(Boolean);
+  const frequentCount = frequencies.filter(value => /(?:every\s+(?:5|10|12|15)\s*(?:minutes?|mins?)|(?:4|5|6|7|8|9|10|\d{2,})\s*buses?\s*\/\s*hour)/i.test(value)).length;
+  const days = (services ?? []).flatMap(service => service.operatingPeriodLines ?? []).join(' ').toLowerCase();
+  const operatingDays = [
+    /mon(?:day)?\s*[-–]\s*fri(?:day)?|weekdays?/.test(days) ? 'weekdays' : null,
+    /saturdays?|\bsat\b/.test(days) ? 'Saturdays' : null,
+    /sundays?|\bsun\b/.test(days) ? 'Sundays' : null
+  ].filter(Boolean);
+  const reviewCount = Array.isArray(result?.reviewItems) ? result.reviewItems.length : 0;
+  const coverage = operatingDays.length ? ` Timetable evidence covers ${operatingDays.join(', ')}.` : '';
+  const frequency = frequentCount ? ` The timetable summaries include ${frequentCount} service row${frequentCount === 1 ? '' : 's'} with stated intervals of 15 minutes or less.` : '';
+  const qualification = reviewCount ? ` ${reviewCount} evidence item${reviewCount === 1 ? ' requires' : 's require'} planner review before formal use.` : ' No evidence items require review.';
+  return [stopSentence, routeSentence + frequency + coverage + qualification].join('\n\n');
+}
+
+function remapStopReference(value, references) {
+  return String(value ?? '').replace(/\[([^\]]+)\]/gu, (match, previous) => references.get(previous) ? `[${references.get(previous)}]` : match);
 }
 
 function accessText(route) {
@@ -42,9 +66,15 @@ function plannerAnnotationRows(service) {
 function noteRow(note, semantic = 'explanatory-note') {
   const shortWorking = /^Short workings:/i.test(note);
   const review = /^Planner review required:/i.test(note);
+  const annotationSemantic = /^Additional services:/i.test(note) ? 'additional-services'
+    : /^Circular service:/i.test(note) ? 'circular-service'
+      : /^Service qualification:/i.test(note) ? 'service-qualification'
+        : /^Review note:/i.test(note) ? 'review-note'
+          : /^Route terminus:/i.test(note) ? 'terminus'
+            : semantic;
   return {
     kind: shortWorking || review ? 'section' : 'summary',
-    semantic: shortWorking ? 'short-working' : review ? 'evidence-review' : semantic,
+    semantic: shortWorking ? 'short-working' : review ? 'evidence-review' : annotationSemantic,
     text: note
   };
 }
@@ -88,8 +118,10 @@ function reviewQualification(reviewItems) {
 
 export function buildBusWordTables(result) {
   if (!result?.ok) throw new Error('A completed Bus assessment is required for Word export.');
+  if (!(result.stops ?? []).every(stop => stop.displayMapReference)) result = withNumericMapReferences(result);
+  const referenceByPrevious = new Map(assessedStopRecords(result.stops).map(stop => [String(stop.originalMapReference ?? ''), String(stop.displayMapReference ?? stop.mapReference ?? '')]).filter(([previous]) => previous));
   const stopRows = assessedStopRecords(result.stops).map(stop => [
-    stop.mapReference || '?',
+    String(stop.displayMapReference || stop.mapReference || '?'),
     stop.name,
     stop.displayDirection,
     accessText(stop.walking),
@@ -111,7 +143,7 @@ export function buildBusWordTables(result) {
         plannerRouteDisplayNumber(service),
         service.operator,
         service.directionPatternText || formatServiceOriginDestination(service, ' – '),
-        service.servedAtText || 'Representative stop not supplied',
+        remapStopReference(service.servedAtText || 'Representative stop not supplied', referenceByPrevious),
         principalLocationsText(service),
         service.typicalFrequencyText || 'Frequency unavailable',
         (service.operatingPeriodLines ?? []).join('\n')
@@ -141,7 +173,7 @@ export function buildBusWordTables(result) {
   if (qualification) serviceRows.push(noteRow(qualification));
   const partialQualification = partialTimetableQualification(result.stops);
   if (partialQualification) serviceRows.push(noteRow(partialQualification, 'partial-timetable-qualification'));
-  if (hasPlannerSummary) serviceRows.push({ kind: 'summary', semantic: 'presentation-note', text: PLANNER_METHODOLOGY_NOTE });
+  if (hasPlannerSummary) serviceRows.push({ kind: 'summary', semantic: 'presentation-note', text: 'Additional source evidence remains available in the ATLAS assessment workspace.' });
 
   return [
     {
@@ -156,6 +188,7 @@ export function buildBusWordTables(result) {
         ? ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']
         : ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period'],
       rows: serviceRows,
+      prelude: hasPlannerSummary ? PLANNER_METHODOLOGY_NOTE : null,
       widths: hasPlannerSummary ? [6, 12, 17, 17, 22, 13, 13] : [7, 14, 22, 25, 17, 15]
     }
   ];

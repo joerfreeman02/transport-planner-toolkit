@@ -32,11 +32,13 @@
       <div class="page-heading"><p class="eyebrow">About ATLAS</p><h1>ATLAS — Automated Transport &amp; Location Assessment System</h1><p>ATLAS is EAS's internal transport-planning platform for faster, more consistent site assessment and research.</p></div>
       <div class="about-grid">
         <article class="about-card product-identity">
-          <span class="status development">In development</span>
+          <div class="product-hierarchy"><strong>EAS</strong><span>›</span><strong>FORGE</strong><span>›</span><strong>ATLAS</strong><span>›</span><strong>Bus Assessment</strong></div>
+          <span class="status development">Bus Beta · Internal Beta</span>
           <h2>Authoritative research, controlled workflow</h2>
           <p>ATLAS brings authoritative transport sources and controlled, repeatable calculations into one practical assessment workflow. It reduces repetitive research and makes the evidence behind each result easier to review.</p>
           <p>ATLAS supports professional work; the transport planner checks the evidence, resolves uncertainty and retains responsibility for judgement.</p>
         </article>
+        <article class="about-card brand-identities"><div><p class="eyebrow">EAS | ATLAS</p><img src="assets/branding/eas-atlas-header-lockup-transparent.svg" alt="EAS | ATLAS identity"><h3>ATLAS</h3><p>Automated Transport &amp; Location Assessment System</p><small>EAS's internal transport-planning platform</small></div><div><p class="eyebrow">EAS FORGE</p><img src="assets/branding/eas-forge-lockup-dark-with-tagline.svg" alt="EAS | FORGE — Framework for Operational Research, Governance &amp; Engineering"><h3>FORGE</h3><p>Framework for Operational Research, Governance &amp; Engineering</p><small>EAS's internal R&amp;D programme</small></div></article>
         <article class="about-card forge-card">
           <p class="eyebrow">EAS FORGE</p>
           <h2>Built through EAS's internal R&amp;D programme</h2>
@@ -53,14 +55,19 @@
             <strong>Created by Joe Freeman · EAS FORGE</strong>
           </div>
         </article>
-          <article class="about-card"><p class="eyebrow">Current status</p><h2>Bus Beta UI release candidate</h2><dl><dt>Version</dt><dd>2.0.0-alpha.15</dd><dt>Release build</dt><dd>ATLAS-2.0.0-alpha.15-20260914</dd><dt>Development/test build</dt><dd data-atlas-test-build="BUS-TFL-COMPLETE · 737f26a">BUS-TFL-COMPLETE · 737f26a</dd><dt>Status</dt><dd>Technical Director review required before Product Owner acceptance</dd></dl></article>
+          <article class="about-card"><p class="eyebrow">Current status</p><h2>Bus Beta · Internal Beta</h2><dl><dt>Version</dt><dd>2.0.0-alpha.15</dd><dt>Release build</dt><dd>ATLAS-2.0.0-alpha.15-20260914</dd><dt>Status</dt><dd>Internal Beta candidate · Product Owner acceptance required</dd></dl></article>
         <article class="about-card"><p class="eyebrow">Data acknowledgements</p><h2>Trusted sources used today</h2><p>Address search, maps and access routing use OpenStreetMap data. London stop discovery is provided by Transport for London. National stops use Department for Transport NaPTAN; timetables use the Department for Transport Bus Open Data Service and supplementary Traveline National Dataset (TNDS) information.</p><p class="acknowledgement">© OpenStreetMap contributors · Routed by OSRM · Data provided by Transport for London · NaPTAN and BODS © Department for Transport · Traveline National Dataset (TNDS) contains public sector information licensed under the Open Government Licence v3.0 · Contains National Statistics and Ordnance Survey data © Crown copyright and database right 2015</p></article>
       </div>
     </section>
 
     <section class="view" data-view-panel="modules">
+      <div class="modules-hero">
+        <div class="modules-intro"><p class="eyebrow">EAS transport planning platform</p><h1>Assessment tools for development sites</h1><p>ATLAS brings trusted transport evidence and practical site assessment into one consistent workflow.</p><span class="modules-purpose">Automated Transport &amp; Location Assessment System</span></div>
+        <aside class="quick-start"><p class="eyebrow">Start a new assessment</p><h2>Begin with Bus</h2><p>Find the site, confirm the access point, then review nearby stops, services and timetable evidence.</p><a class="primary" href="#bus">Start Bus Assessment <span aria-hidden="true">→</span></a></aside>
+      </div>
+      <div class="module-family-heading"><div><p class="eyebrow">ATLAS module family</p><h2>Choose an assessment tool</h2></div><span class="module-native-status"><i aria-hidden="true"></i> Bus is the active ATLAS Beta module</span></div>
       <div class="page-heading heading-row">
-        <div><p class="eyebrow">Assessment tools</p><h1>Modules</h1><p>Establish the shared site assessment point, then use the available development workflow.</p></div>
+        <div><p>Other module status labels describe the current toolkit accurately.</p></div>
         <a class="legacy-link" href="../">Open legacy Toolkit</a>
       </div>
 
@@ -88,6 +95,7 @@
           <button type="button" data-workflow-step="4"><span>4</span><b>Run assessment</b><small>Analyse stops and services</small></button>
           <button type="button" data-workflow-step="5" disabled><span>5</span><b>Results</b><small>Review evidence and services</small></button>
           <button type="button" data-workflow-step="6" disabled><span>6</span><b>Export</b><small>Prepare report and map</small></button>
+          <p id="workflowHint" class="workflow-hint" role="status" aria-live="polite"></p>
         </nav>
 
         <div class="workflow-main">
@@ -159,6 +167,7 @@
               <p class="supporting">Choose the area to assess. London starts at 400 m and other areas at 700 m; adjust the radius to suit the site.</p>
               <div id="assessmentSettingsPanel" class="assessment-settings-panel">
                 <label for="radius">Radius (metres)<input id="radius" type="number" min="100" max="2000" step="50" value="700"></label>
+                <button id="continueToRunAssessment" class="primary" type="button">Continue to Run assessment →</button>
               </div>
               <div id="assessmentRunPanel" class="assessment-run-panel" hidden>
                 <h4>Run the assessment</h4>
@@ -189,12 +198,13 @@
         </div>
 
         <section id="evidencePanel" class="evidence-panel" hidden aria-labelledby="evidence-heading">
-          <div class="evidence-heading"><div><p class="eyebrow">Step 5 · Results</p><h3 id="evidence-heading">Assessment results</h3><p id="evidenceSummary"></p></div><div class="evidence-actions"><button id="goToExport" class="primary" type="button">Continue to Export</button><button id="editAssessment" class="secondary compact" type="button">Back to assessment</button></div></div>
+          <div class="evidence-heading"><div><p class="eyebrow">Step 5 · Results</p><h3 id="evidence-heading">Assessment results</h3><p id="evidenceSummary"></p></div><div class="evidence-actions"><button id="goToExport" class="primary" type="button">Continue to Export →</button><button id="editAssessment" class="secondary compact" type="button">Back to assessment</button></div></div>
+          <section class="assessment-wording assessment-summary" aria-labelledby="wording-heading"><div><p class="eyebrow">Assessment summary</p><h4 id="wording-heading">Transport Statement wording</h4><p id="assessmentWording"></p></div><button id="copyAssessmentWording" class="secondary compact" type="button" disabled>Copy wording</button></section>
           <div id="resultsMapHost" class="results-map-host"><p class="supporting">Map references are navigation aids only; authoritative stop names and indicators remain in the tables.</p></div>
           <div class="result-meta"><strong id="busDataCurrent" class="current-badge">Bus data: Checking current status…</strong><span>Assessment data checked <time id="resultChecked"></time></span><span id="resultFreshness" class="review-badge"></span><span id="resultSource" class="sr-only">Authoritative source</span></div>
           <section class="assessment-output" aria-labelledby="stop-summary-heading">
             <div class="output-heading"><div><p class="eyebrow">Table 3.2</p><h4 id="stop-summary-heading">Bus Stop Summary</h4></div><button id="clearRoutes" class="secondary compact" type="button" hidden>Clear route lines</button></div>
-          <p class="supporting planner-label-note">The map, stop table, service summary and Word export use the same deterministic map references A, B, C. Cycling access remains available in each stop’s map popup.</p>
+          <p class="supporting planner-label-note">The map, stop table, service summary and Word export use the same deterministic numeric map references. Cycling access remains available in each stop’s map popup.</p>
           <div class="table-wrap">
             <table class="bus-stop-summary">
               <colgroup><col class="col-include"><col class="col-stop-label"><col class="col-stop-name"><col class="col-direction"><col class="col-walk"><col class="col-routes"></colgroup>
@@ -205,12 +215,12 @@
           </section>
           <section class="assessment-output" aria-labelledby="service-summary-heading">
             <div class="output-heading"><div><p class="eyebrow">Table 3.3</p><h4 id="service-summary-heading">Bus Service Summary</h4></div><div class="selection-actions"><button id="recommendedSelection" class="secondary compact" type="button">Recommended selection</button><button id="selectAllRows" class="secondary compact" type="button">Select all</button><button id="clearAllRows" class="secondary compact" type="button">Clear all</button><button id="toggleDetailedEvidence" class="secondary compact" type="button">Show detailed evidence</button></div></div>
-            <div class="table-wrap"><table class="bus-service-summary"><colgroup><col class="col-include"><col class="col-route"><col class="col-operator"><col class="col-direction"><col class="col-served-at"><col class="col-principal"><col class="col-frequency"><col class="col-operating-period"><col class="col-source"></colgroup><thead><tr><th>Include</th><th>Route</th><th>Operator</th><th>Direction / main service pattern</th><th>Served at</th><th>Principal locations</th><th>Typical frequency</th><th>Operating period at stop</th><th>Source</th></tr></thead><tbody id="serviceRows"></tbody></table></div>
             <p id="serviceSummaryMethodology" class="supporting planner-methodology">* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence. Detailed source evidence is available under Show detailed evidence.</p>
+            <div class="table-wrap"><table class="bus-service-summary"><colgroup><col class="col-include"><col class="col-route"><col class="col-operator"><col class="col-direction"><col class="col-served-at"><col class="col-principal"><col class="col-frequency"><col class="col-operating-period"><col class="col-source"></colgroup><thead><tr><th>Include</th><th>Route</th><th>Operator</th><th>Direction / main service pattern</th><th>Served at</th><th>Principal locations</th><th>Typical frequency</th><th>Operating period at stop</th><th>Source</th></tr></thead><tbody id="serviceRows"></tbody></table></div>
             <section id="serviceDetailPanel" class="service-detail-panel" hidden aria-labelledby="service-detail-heading"><h5 id="service-detail-heading">Detailed timetable evidence</h5><p class="supporting">Underlying source records are shown for inspection; the consolidated Table 3.3 remains the planner-facing summary.</p><div id="serviceDetailRows"></div></section>
           </section>
-          <section class="assessment-wording" aria-labelledby="wording-heading"><p class="eyebrow">Controlled wording</p><h4 id="wording-heading">Assessment wording</h4><p id="assessmentWording"></p></section>
           <details id="sourceChecksDetails" class="source-checks"><summary>Sources &amp; Checks <span id="sourceReviewBadge" class="review-badge" hidden></span><span class="source-checks-hint">Review source evidence and qualifications</span></summary><div id="plannerChecks"></div><details id="dataStatusDetails"><summary>Bus data details</summary><section class="data-status"><div class="data-status-heading"><div><p class="eyebrow">Data currency</p><h3 id="data-status-heading">Bus data status</h3></div><div class="data-status-actions"><button id="updateBusData" class="secondary compact" type="button" hidden>Update Bus data</button><button id="refreshDataStatus" class="secondary compact" type="button">Refresh data status</button></div></div><dl><dt>Last successful automatic check</dt><dd id="preparedDataDate">Not supplied</dd><dt>NaPTAN</dt><dd id="naptanDataState">Not supplied</dd><dt>BODS</dt><dd id="bodsDataState">Not supplied</dd><dt>TNDS supplementary</dt><dd id="tndsDataDate">Not supplied</dd><dt>TfL</dt><dd id="tflDataState">Live source — checked when a London assessment is run</dd><dt>Current status</dt><dd id="dataStatusMessage">Checking current status…</dd></dl></section></details></details>
+          <div class="results-bottom-actions"><button id="goToExportBottom" class="primary" type="button">Continue to Export →</button></div>
           <details id="developerDiagnostics" class="technical-details" hidden><summary>Developer diagnostics</summary><div id="diagnostics"></div></details>
         </section>
         <section id="exportWorkspace" class="export-workspace" hidden aria-labelledby="export-heading">

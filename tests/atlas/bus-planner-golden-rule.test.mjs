@@ -37,8 +37,11 @@ assert.match(row.directionPatternText, /Towards Waltham Cross/);
 assert.match(row.servedAtText, /Waltham Cross Bus Station — A .*\[A\]\*/);
 assert.match(row.servedAtText, /Waltham Cross Bus Station — B .*\[B\]/);
 const wordStopRows = buildBusWordTables({ ok: true, stops: presented, plannerServiceSummaries: [row], serviceSummaries: [] })[0].rows;
-assert.deepEqual(wordStopRows.find(stopRow => stopRow[1] === 'Waltham Cross Bus Station' && stopRow[0] === 'A').slice(0, 2), ['A', 'Waltham Cross Bus Station']);
-assert.equal(buildBusWordTables({ ok: true, stops: presented, plannerServiceSummaries: [row], serviceSummaries: [] })[1].rows[0][3], row.servedAtText);
+assert.deepEqual(wordStopRows.find(stopRow => stopRow[1] === 'Waltham Cross Bus Station' && stopRow[0] === '2').slice(0, 2), ['2', 'Waltham Cross Bus Station']);
+const wordServiceRows = buildBusWordTables({ ok: true, stops: presented, plannerServiceSummaries: [row], serviceSummaries: [] })[1].rows;
+const wordServiceRow = wordServiceRows.find(serviceRow => Array.isArray(serviceRow) && serviceRow[0] === '310');
+assert.match(wordServiceRow[3], /\[2\]\*/);
+assert.match(wordServiceRow[3], /\[3\]/);
 
 const familyRows = buildPlannerBusServiceSummaries([
   { ...service, id: '13', routeNumber: '13', serviceLineageId: 'public-13', sourceRouteIds: ['public-13'], recordActivity: 20 },

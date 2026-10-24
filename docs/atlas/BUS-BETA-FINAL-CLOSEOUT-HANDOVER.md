@@ -75,3 +75,40 @@ Exact-final-SHA hosted validation was not dispatched, and this local branch has 
 ## Local review URL
 
 The local review root is the isolated closeout checkout with unchanged Run #75 prepared data. The localhost-only server is listening on PID `12156`, bound to `127.0.0.1:8774`. URL: `http://127.0.0.1:8774/atlas/?review=v2#modules`. Preferred port 8773 was occupied, so the adjacent available port 8774 is used. Browser smoke returned HTTP 200, loaded the Bus entry, and recorded zero console errors, failed requests, or non-tile external requests; the standard transparent map-tile fixture was used to avoid external traffic. Bus and TNDS candidate manifests both returned HTTP 200. This is a local review environment, not production. It is not Product Owner acceptance authorization.
+## Superseding closeout update — 24 October 2026
+
+This section supersedes the earlier statements above that described the Browser-to-Word audit and full Python suite as green. Those statements are historical results for runtime `abf491e`; they do not describe the final local presentation checkpoint or current release readiness.
+
+### Current revisions and scope
+
+- Current code-bearing runtime SHA: `d865ff035e05cbe1ce34b224398893734508e9c0` on `codex/atlas-bus-beta-final-closeout`.
+- This update is documentation-only. The final documentation SHA is the branch HEAD containing this section.
+- Only presentation/export and responsive-layout files changed in the code-bearing commit, with focused tests. No Bus-domain/service composition, source authority, candidate, or data-preparation files changed.
+- Run #75 remains the immutable identity and canonical digest recorded above. The local Browser-to-Word audit restored and verified the candidate against that canonical digest. No national acquisition or candidate rebuild occurred.
+- Version/build remains `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`.
+
+### Presentation changes in this checkpoint
+
+- Improved narrow viewport workflow navigation and stage-label spacing, compact address presentation, map selection button styling, assessment-radius styling, and unnamed-stop labels.
+- Reworked the Transport Statement prose and removed duplicate destination suffixes while preserving the same service rows and source evidence.
+- Kept the Word-embedded map compact with numeric references and provided the complete stop key on the standalone map export.
+- Changed the standalone map export to a one-page A3 landscape PDF. The generated PDF uses the displayed map image and the existing assessment/stop references; it does not invent route geometry.
+
+### Validation and remaining product gates
+
+- Full deterministic ATLAS suite: passed (`ATLAS Alpha.15 deterministic suite passed`).
+- Full Bus-data Python suite: 309 tests passed (`OK`, 92.713 seconds) when temporary files were directed to the isolated checkout's retained `.tmp` area. No `.tmp` contents were removed.
+- Focused Word, PDF, marker-layout, map-reference and UI-contract tests: passed. `git diff --check`: passed before the code-bearing commit.
+- Responsive browser check at 617 px: all six workflow stages are visible; progress-stage labels do not overlap; no horizontal document overflow; no page errors. External map tiles were blocked for this layout diagnostic, so its blank map is expected and is not basemap visual evidence.
+- Latest frozen-candidate production Browser-to-Word audit: **NOT READY FOR MANUAL RE-ACCEPTANCE**. Candidate restore/provenance passed; browser/request errors and acquisition/publication/deployment attempts were zero. Two evidence gates failed and remain unresolved: Pipers route 230's circular evidence note is absent from the planner-facing normal-service row; PE1 route 202 produced two patterns where the audit requires three distinct evidence-backed patterns. No service-composition changes were made in response. Both require Technical Director review before any further product change.
+- Waltham Route 66 retained its expected principal service result in Browser and Word: weekday typically 30–40 minutes, Saturday typically 30 minutes, weekday span approximately 05:29–19:05, Saturday approximately 06:05–18:50. The audit also showed a separate Smiths Lane direction row; retain that fact in review rather than claiming Route 66 is a single row.
+- User-supplied DOCX reports were structurally inspected and showed the Waltham 66/251 results, but rendered-page QA could not be performed because the approved document-rendering environment does not provide LibreOffice. No user report was modified.
+- No exact-final-SHA hosted validation was dispatched. The configured GitHub CLI authentication is invalid, the remote branch was not discoverable through the available GitHub read connector, and no workflow-dispatch capability is available in this session. No credential retry was made. Local results do not substitute for hosted validation or origin parity.
+
+### Environment and release status
+
+- Isolated worktree: `C:\Users\joe.freeman\AppData\Local\ATLAS\codex-workspaces\bus-beta-final-ui`.
+- Local review server remains PID `12156`, bound to `127.0.0.1:8774`: `http://127.0.0.1:8774/atlas/?review=v2#modules`. This serves the isolated local checkout, not a hosted or production build.
+- `.tmp/` remains untracked and untouched; it was neither staged nor cleaned. The protected OneDrive/main checkout was not used.
+- No merge, deployment, publication, version/build bump, candidate rebuild, or fresh national acquisition occurred.
+- Product Owner Beta acceptance is **not authorized by this handover**. Remaining gates: Technical Director decision on Pipers 230 and PE1 202, exact-final-SHA hosted validation, origin parity, and rendered Word/map visual review.

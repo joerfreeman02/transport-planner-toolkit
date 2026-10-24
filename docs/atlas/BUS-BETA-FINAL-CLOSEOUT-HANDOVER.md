@@ -62,7 +62,7 @@ Two visual checks remain incomplete:
 1. A native rendered-page review of the generated DOCX was not completed because the approved bundled environment had no supported document renderer available.
 2. A full basemap QA export using public OpenStreetMap tiles was blocked by automatic approval review because the request would send location-derived map-tile traffic to an external provider. No alternate route was used. The automated audit used local tile stubs, so its exported raster is not evidence of actual basemap appearance.
 
-Exact-final-SHA hosted validation was not dispatched. `gh auth status` reported the configured GitHub CLI token for `joerfreeman02` is invalid. No credential retry or credential request was made. The available GitHub connector provides read operations but no workflow-dispatch operation. Therefore the local evidence is not a substitute for the required hosted exact-SHA gate.
+Exact-final-SHA hosted validation was not dispatched, and this local branch has not been pushed. GitHub branch search returned no `codex/atlas-bus-beta-final-closeout` branch, so origin parity is not established. `gh auth status` reported the configured GitHub CLI token for `joerfreeman02` is invalid. No credential retry or credential request was made. The available GitHub connector provides read operations but no workflow-dispatch operation. Therefore the local evidence is not a substitute for the required hosted exact-SHA gate.
 
 ## Safety and release state
 

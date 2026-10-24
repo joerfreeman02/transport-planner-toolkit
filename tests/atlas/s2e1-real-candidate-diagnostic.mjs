@@ -3,6 +3,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPreparedBusDataAdapter } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
+import { createAuthoritativeBusTimetableAdapter } from '../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
+import { sourceSuccess } from '../../src/atlas/adapters/source-adapter.mjs';
+import { createAtlasReferenceData } from '../../src/atlas/reference-data/atlas-reference-data.mjs';
 import { createBusAssessment } from '../../src/atlas/application/bus-assessment.mjs';
 import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
@@ -289,6 +292,19 @@ const adapter = createPreparedBusDataAdapter({
   tndsBaseUrl: 'http://candidate.local/atlas/data/bus-tnds/',
   timeoutMs: 120000
 });
+const referenceData = createAtlasReferenceData({ adapter });
+const deterministicNoTfL = {
+  servicesForStop: async ({ lineId, stopPointId }) => sourceSuccess({
+    data: [],
+    warnings: [],
+    provenance: { source: 'deterministic offline diagnostic', routeNumber: lineId, stopId: stopPointId, timetableConclusion: 'NO_CURRENT_MATCH' }
+  })
+};
+const authoritativeTimetable = createAuthoritativeBusTimetableAdapter({
+  tflAdapter: deterministicNoTfL,
+  nationalAdapter: adapter,
+  londonSupplementAdapter: adapter
+});
 
 const results = {};
 for (const control of controls) {
@@ -302,9 +318,11 @@ for (const control of controls) {
   }), { confirmedAt: '2026-10-20T00:00:00Z' });
   let servicesResult = null;
   try {
+  const timetableAdapter = control.id === 'waltham' ? authoritativeTimetable : adapter;
   const app = createBusAssessment({
     stopDiscovery: { nearbyStops: (...args) => adapter.nearbyStops(...args) },
-    timetableData: { servicesForStops: async (...args) => (servicesResult = await adapter.servicesForStops(...args)) },
+    timetableData: { servicesForStops: async (...args) => (servicesResult = await timetableAdapter.servicesForStops(...args)) },
+    ...(control.id === 'waltham' ? { referenceData } : {}),
     accessRouting: { matrix: async (_site, stops) => ({ ok: true, routes: stops.map(() => ({ status: 'routed', distanceMetres: 100, durationSeconds: 60 })), warnings: [], provenance: { source: 'hosted frozen-candidate diagnostic' } }) }
   });
   const assessment = await app.assess(site, { radius: control.radius, mode: 'full' });
@@ -316,16 +334,17 @@ for (const control of controls) {
   const wordTables = buildBusWordTables(assessment);
   const wordRows = wordTables[1]?.rows ?? [];
   if (control.id === 'waltham') {
-    const route66 = (assessment.plannerServiceSummaries ?? []).filter(row => String(row.routeNumber) === '66' && String(row.frequencyBasisStopId) === '210021703430' && String(row.timetableSource) === 'BODS');
-    assert.ok(route66.length >= 1, 'the frozen Run #75 selected Waltham Stop C population must produce a BODS route-66 principal row');
-    assert.ok((route66[0].canonicalDeparturePopulation?.monday?.length ?? 0) > 2, 'full frozen-candidate weekday route-66 population cannot collapse to the historical two-journey subset');
-    assert.ok((route66[0].canonicalDeparturePopulation?.saturday?.length ?? 0) > 1, 'full frozen-candidate Saturday route-66 population cannot collapse to the historical one-journey subset');
-    assert.equal(route66[0].operatingPeriods?.monday?.first, '05:29', 'route-66 weekday start must reflect the selected-stop frozen population');
-    assert.equal(route66[0].operatingPeriods?.monday?.last, '19:05', 'route-66 weekday end must reflect the selected-stop frozen population');
+    const route66 = (assessment.plannerServiceSummaries ?? []).filter(row => String(row.routeNumber) === '66' && String(row.frequencyBasisStopId) === '210021703430');
+    assert.equal(route66.length, 1, 'the production timetable/reference composition must produce one Route 66 principal row at Waltham Stop C');
+    assert.ok((route66[0].canonicalDeparturePopulation?.monday?.length ?? 0) > 2, 'the complete frozen-candidate weekday Route 66 population cannot collapse to the historical two-journey subset');
+    assert.ok((route66[0].canonicalDeparturePopulation?.saturday?.length ?? 0) > 1, 'the complete frozen-candidate Saturday Route 66 population cannot collapse to the historical one-journey subset');
+    assert.equal(route66[0].operatingPeriods?.monday?.first, '05:29', 'Route 66 weekday start must reflect the selected-stop frozen population');
+    assert.equal(route66[0].operatingPeriods?.monday?.last, '19:05', 'Route 66 weekday end must reflect the selected-stop frozen population');
+    assert.ok(route66[0].sourceRecordIds.some(id => String(id).startsWith('tnds:')) && route66[0].sourceRecordIds.some(id => String(id).startsWith('south_east:')), 'the Route 66 principal row must retain both frozen TNDS and BODS provenance');
     const route66WordRow = wordRows.find(row => Array.isArray(row) && String(row[0]) === '66' && String(row[1]).includes('Arriva Herts'));
-    assert.ok(route66WordRow, 'the frozen-candidate route-66 principal service must reach the real Word table composition path');
-    assert.match(String(route66WordRow[5]), /Typically every/i, 'the route-66 Word summary must include its full principal frequency, not the historical 2/1 subset');
-    assert.match(String(route66WordRow[6]), /05:29[\s\S]*19:05/, 'the route-66 Word summary must retain the full operating period');
+    assert.ok(route66WordRow, 'the frozen-candidate Route 66 principal service must reach the real Word table composition path');
+    assert.match(String(route66WordRow[5]), /Typically every/i, 'the Route 66 Word summary must include its full principal frequency, not the historical 2/1 subset');
+    assert.match(String(route66WordRow[6]), /05:29[\s\S]*19:05/, 'the Route 66 Word summary must retain the full operating period');
   }
   const plannerRouteNumbers = unique(plannerRows.flatMap(row => [row.routeNumber, ...row.routeNumbers, ...row.memberRouteNumbers, ...row.publicRouteNumbers]));
   const wordText = (wordRows ?? []).map(row => Array.isArray(row) ? String(row[0] ?? '') : String(row?.text ?? '')).join('\n');
@@ -431,7 +450,3 @@ const report = {
 await mkdir(path.dirname(reportPath), { recursive: true });
 await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 process.stdout.write(`${JSON.stringify({ schema: report.schema, reportPath, controls: Object.fromEntries(Object.entries(results).map(([id, value]) => [id, { status: value.status, stopCount: value.stopCount, rawRows: value.rawServiceRecords.length, summaryRows: value.serviceSummaries.length, plannerRows: value.plannerRows.length, routesOverTwo: value.rowCounts.routesOverTwoPlannerRows }])) })}\n`);
-
-
-
-\n

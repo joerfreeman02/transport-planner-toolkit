@@ -309,3 +309,23 @@ footer a { color: #fff; }
   footer { display: grid; justify-items: start; gap: 9px; padding: 14px; }
   .footer-brand { width: 180px; }
 }
+
+/* Home module-family artwork and truthful platform guidance. */
+.module-grid article { min-height: 250px; }
+.module-illustration { display:block; width:100%; height:92px; margin:3px auto 0; object-fit:contain; object-position:center; }
+.module-grid article h2 { margin-top:7px; }
+.home-guidance-grid { display:grid; grid-template-columns:1.15fr .85fr; gap:16px; margin:4px 0 24px; }
+.home-guidance-card { padding:22px 24px; border:1px solid var(--atlas-border); border-radius:10px; background:#fff; box-shadow:0 4px 14px rgba(6,29,55,.05); }
+.home-guidance-card h2 { margin:4px 0; color:var(--atlas-navy); font-size:1.3rem; }
+.home-guidance-card>p:not(.eyebrow) { margin:4px 0 14px; color:#52657b; }
+.home-process { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:18px 0 0; padding:0; list-style:none; }
+.home-process li { display:grid; grid-template-columns:34px minmax(0,1fr); gap:4px 8px; align-content:start; }
+.home-process li>span { grid-row:1 / span 2; display:grid; place-items:center; width:32px; height:32px; border-radius:50%; background:#e8f2fc; color:var(--atlas-app-blue); font-weight:800; }
+.home-process b,.home-benefits b { color:var(--atlas-navy); font-size:.86rem; }
+.home-process small,.home-benefits span { color:#52657b; font-size:.76rem; line-height:1.4; }
+.home-benefits { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin:18px 0 0; padding:0; list-style:none; }
+.home-benefits li { display:grid; gap:3px; padding-left:13px; border-left:3px solid var(--atlas-orange); }
+@media(max-width:900px){.home-guidance-grid{grid-template-columns:1fr}.home-process{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.module-illustration{height:110px}.home-process,.home-benefits{grid-template-columns:1fr}}
+
+.export-option{display:flex;align-items:flex-start;gap:8px;margin:14px 0;color:#334b65;font-size:.82rem;font-weight:650}.export-option input,.planner-review-gate input{accent-color:var(--atlas-orange)}.planner-review-gate{display:grid;gap:5px;margin:14px 0;padding:14px 16px;border:1px solid #e0a36e;border-radius:8px;background:#fff7f0;color:#334b65}.planner-review-gate label{display:flex;align-items:center;gap:9px;font-weight:750}.planner-review-gate span{font-size:.8rem}

@@ -19,7 +19,7 @@ const matchedCoach = { ...coachRecord, id: 'COACH-MATCHED', timetableMatch: true
 const wordStopRows = buildBusWordTables({ ok: true, stops: [routeStop, coachRecord, matchedCoach], plannerServiceSummaries: [], serviceSummaries: [] })[0].rows;
 assert.equal(wordStopRows.length, 2, 'Word excludes only the non-route-evidenced coach record');
 assert.ok(wordStopRows.some(row => row[1] === 'Enfield Town Station'));
-assert.ok(wordStopRows.some(row => row[1] === 'Cecil Road' && row[5].includes('Timetable evidence matched')));
+assert.ok(wordStopRows.some(row => row[1] === 'Cecil Road' && row[5] === 'No route recorded'), 'Word retains the stop but omits internal timetable-evidence status wording.');
 const app = fs.readFileSync(new URL('../../atlas/assets/js/app.mjs', import.meta.url), 'utf8');
 assert.match(app, /Other nearby stop records — no route information currently available \(\$\{otherNearbyRecords\.length\}\)/);
 assert.match(app, /These records remain on the map and in the detailed source evidence/);

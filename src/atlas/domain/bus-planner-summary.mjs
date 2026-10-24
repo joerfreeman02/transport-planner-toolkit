@@ -28,8 +28,8 @@ import {
 } from './circular-service-decision.mjs';
 import { operatorFamilyCompatible, operatorTokens } from './operator-family.mjs';
 
-export const PLANNER_METHODOLOGY_NOTE = '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence. Additional source evidence remains available in the ATLAS assessment workspace.';
-export const PLANNER_TERMINUS_PRESENTATION_NOTE = 'Where an assessed stop is the route terminus, ATLAS shows the useful departing direction only; arriving journeys terminating at that stop are not listed separately.';
+export const PLANNER_METHODOLOGY_NOTE = '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence.';
+export const PLANNER_TERMINUS_PRESENTATION_NOTE = 'Where an assessed stop is the route terminus, the table shows the useful departing direction only; arriving journeys terminating at that stop are not listed separately.';
 export const SCHOOL_HOLIDAY_VARIATION_NOTE = 'Timetable may vary during school holidays.';
 export const SEPARATE_TIMETABLE_MARKER = '†';
 
@@ -182,7 +182,7 @@ export function buildBusTimetablePresentationNote(result = {}, rows = []) {
   if (!(rows ?? []).some(row => row?.hasSeparateTimetablePair)) return null;
   const assessmentDate = assessmentDateForBusPresentation(result);
   if (!assessmentDate) return null;
-  return `Where separate term-time and school-holiday timetables are published, the term-time timetable is shown. Routes marked ${SEPARATE_TIMETABLE_MARKER} have separate timetables. Timetable information reflects the data available to ATLAS on ${assessmentDate} and services may vary during school holidays.`;
+  return `Where separate term-time and school-holiday timetables are published, the term-time timetable is shown. Routes marked ${SEPARATE_TIMETABLE_MARKER} have separate timetables. Timetable information reflects the data available on ${assessmentDate} and services may vary during school holidays.`;
 }
 
 function directionKey(service) {
@@ -1208,14 +1208,20 @@ function hasDistinctSchoolNonSchoolPatterns(component) {
 }
 
 function higherAuthorityEquivalentPatterns(component, relatedServices, representativeId) {
+  // A peer may replace this component's population only when it outranks the
+  // strongest source already represented here. Comparing against any one
+  // weaker member lets an equal-rank record from a different route pattern
+  // displace the component's own primary timetable (for example a sparse
+  // endpoint pattern replacing the full through service).
+  const componentHighestRank = Math.max(0, ...component.map(plannerEvidenceSourceRank));
   const peers = (relatedServices ?? []).filter(candidate => !component.includes(candidate)
     && text(candidate?.routeNumber) === text(component[0]?.routeNumber)
     && hasTimetableEvidenceAt(candidate, representativeId)
-    && component.some(service => plannerEvidenceSourceRank(candidate) > plannerEvidenceSourceRank(service)
-      && operatorFamilyCompatible(candidate, service)
+    && plannerEvidenceSourceRank(candidate) > componentHighestRank
+    && component.some(service => operatorFamilyCompatible(candidate, service)
       && calendarProfileAuthorityKey(candidate) === calendarProfileAuthorityKey(service)
       && !reverseEndpointRelationship(candidate, service)
-        && endpointDirectionCompatible(candidate, service)));
+      && endpointDirectionCompatible(candidate, service)));
   if (!peers.length) return [];
   const highestRank = Math.max(...peers.map(service => plannerEvidenceSourceRank(service)));
   return peers.filter(service => plannerEvidenceSourceRank(service) === highestRank);

@@ -1,145 +1,48 @@
 import { docxBlob } from '../../assets/js/word-export.js';
 import assert from 'node:assert/strict';
 import { buildBusTransportStatement, buildBusWordTables, busWordFilename } from '../../src/atlas/presentation/bus-word-export.mjs';
-import { stopRoutesPresentation } from '../../src/atlas/domain/bus-source-presentation.mjs';
 
 const result = {
   ok: true,
   stops: [
-    { id: 'stop-1', mapReference: 'A', name: 'Balaam Street', displayDirection: 'Stop S (Eastbound)', walking: { status: 'routed', distanceMetres: 58, durationSeconds: 60 }, cycling: { status: 'routed', distanceMetres: 80, durationSeconds: 60 }, routes: ['262', '473'] },
-    { id: 'stop-2', mapReference: 'B', name: 'Balaam Street', displayDirection: 'Stop T (Westbound)', walking: { status: 'routed', distanceMetres: 39, durationSeconds: 60 }, cycling: { status: 'routed', distanceMetres: 39, durationSeconds: 60 }, routes: ['241', '262', '325', '473', '678'] }
+    { id:'stop-1', mapReference:'A', displayMapReference:'1', name:'Balaam Street', displayDirection:'Stop S (Eastbound)', walking:{status:'routed',distanceMetres:58,durationSeconds:60}, cycling:{status:'routed',distanceMetres:80,durationSeconds:60}, routes:['262','473'] },
+    { id:'stop-2', mapReference:'B', displayMapReference:'2', name:'Balaam Street', displayDirection:'Stop T (Westbound)', walking:{status:'routed',distanceMetres:39,durationSeconds:60}, cycling:{status:'routed',distanceMetres:39,durationSeconds:60}, routes:['241','262','325','473','678'] }
   ],
-  serviceSummaries: [{
-    routeNumber: '241',
-    operator: 'Stagecoach London',
-    origin: 'Here East, Hackney Wick',
-    destination: 'Royal Crest Avenue, Silvertown',
-    principalLocations: ['Stratford City', 'Stratford', 'Plaistow', 'Custom House'],
-    stopDirection: 'Southbound',
-    typicalFrequencyText: 'Wednesday: Approx. 4 buses/hour (every 15 mins)',
-    timetableSource: 'BODS',
-    operatingPeriodLines: ['Mon-Fri: Approx. 05:11–01:29 (next day)', 'Saturday: Approx. 05:09–01:29 (next day)', 'Sunday: Approx. 06:19–01:29 (next day)'],
-    serviceNote: ''
+  reviewItems:[{code:'unresolved-timetable-request',route:'397',message:'Private raw source failure'}],
+  plannerServiceSummaries:[{
+    routeNumber:'66',operator:'Arriva Herts and Essex',directionPatternText:'Towards Loughton Station',servedAtText:'Bus Station — Stop C [1]*',
+    principalLocationsText:'Waltham Cross, Waltham Abbey, Loughton',typicalFrequencyText:'Mon-Fri: Typically every ~30–40 mins',operatingPeriodLines:['Mon-Fri: Approx. 05:29–19:05'],publicRouteFamilyKey:'66',
+    plannerNotes:{shortWorkings:'Some journeys operate to Hammond Street (Smiths Lane)',reviewNote:'Private internal warning'}
   }]
 };
-
-const tables = buildBusWordTables(result);
+const mapOn = buildBusWordTables(result);
+const mapOff = buildBusWordTables(result,{includeMap:false});
 const narrative = buildBusTransportStatement(result);
-assert.match(narrative, /^The assessment covers 2 assessed stops\./);
-assert.match(narrative, /1 bus route across 1 planner-facing service summary/);
-assert.equal(narrative.split('\n\n').length, 2, 'transport wording is limited to two concise paragraphs');
-assert.equal(tables[0].rows.length, 2, 'transport statement stop count matches the Word stop table');
-const countParityResult = { ...result, stops: [...result.stops, { transportMode: 'bus_coach', routes: [], timetableMatch: false, timetableEvidenceStatus: 'SOURCE_UNAVAILABLE' }] };
-assert.match(buildBusTransportStatement(countParityResult), /^The assessment covers 2 assessed stops\./, 'non-assessed nearby candidates are excluded from the narrative count');
-assert.equal(tables[1].widths.reduce((sum, width) => sum + width, 0), 100, 'Word service table widths fill the available table width');
-assert.equal(tables.length, 2);
-assert.doesNotMatch(JSON.stringify(tables[1]), /BODS|TNDS|TfL/, 'Word summary remains source-neutral when planner provenance is present');
-assert.equal(tables[0].caption, 'Table 3.2 - Bus Stop Summary');
-assert.deepEqual(tables[0].headers, ['Map reference', 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop']);
-assert.equal(tables[0].rows[0][0], '1');
-assert.equal(tables[0].rows[1][0], '2');
-assert.equal(tables[0].rows[0][1], 'Balaam Street');
-assert.equal(tables[0].rows[0][2], 'Stop S (Eastbound)');
-assert.equal(tables[0].rows[0][5], '262, 473');
-const diagnosticCandidate = { name: 'Enfield Town / Cecil Road', displayDirection: 'Stop Z1 (Westbound)', walking: { status: 'routed', distanceMetres: 454, durationSeconds: 360 }, cycling: { status: 'routed', distanceMetres: 510, durationSeconds: 180 }, routes: [], timetableMatch: false, timetableEvidenceStatus: 'SOURCE_UNAVAILABLE', groupCompleted: true };
-const candidateText = buildBusWordTables({ ...result, stops: [diagnosticCandidate], serviceSummaries: [] })[0].rows[0][5];
-assert.match(candidateText, /No routes recorded by NaPTAN/);
-assert.match(candidateText, /candidate not assessed in detail/);
-assert.match(stopRoutesPresentation(diagnosticCandidate, { selectedForReport: false }), /not included in report/, 'Browser identifies an unselected diagnostic candidate as outside the report population');
-const unassessedText = buildBusWordTables({ ...result, stops: [{ ...diagnosticCandidate, timetableEvidenceStatus: null }], serviceSummaries: [] })[0].rows[0][5];
-assert.match(unassessedText, /candidate not assessed in detail/);
-assert.equal(tables[1].caption, 'Table 3.3 - Bus Service Summary');
-assert.deepEqual(tables[1].headers, ['Route', 'Operator', 'Origin / destination', 'Principal locations', 'Typical frequency', 'Operating period']);
-assert.match(tables[1].rows[0][2], /Here East, Hackney Wick – Royal Crest Avenue, Silvertown/);
-assert.match(tables[1].rows[0][2], /\(Southbound\)$/);
-assert.match(tables[1].rows[0][4], /Approx\. 4 buses\/hour/);
-assert.match(tables[1].rows[0][5], /next day/);
-assert.equal(busWordFilename({ displayAddress: '100 High Street, Plaistow' }), 'ATLAS Bus Assessment - 100 High Street, Plaistow.docx');
-assert.equal(busWordFilename({ latitude: 51.7, longitude: -0.1 }), 'ATLAS Bus Assessment.docx');
-const filtered = buildBusWordTables({ ...result, stops: [result.stops[1]], serviceSummaries: [] });
-assert.equal(filtered[0].rows.length, 1);
-assert.equal(filtered[0].rows[0][2], 'Stop T (Westbound)');
-assert.equal(filtered[1].rows.length, 0);
-const reviewItems = [
-  { code: 'unresolved-timetable-request', route: '397', stop: '490TEST003', source: 'timetable source', message: 'Raw timetable request diagnostic.' },
-  { code: 'unresolved-timetable-request', route: '215', stop: '490TEST004', source: 'timetable source', message: 'Another raw diagnostic.' },
-  { code: 'unresolved-timetable-request', route: '397', stop: '490TEST005', source: 'timetable source', message: 'Duplicate route diagnostic.' }
-];
-const plannerInput = {
-  ok: true,
-  stops: [],
-  reviewItems,
-  plannerServiceSummaries: [{
-    routeNumber: '310', operator: 'Arriva', directionPatternText: 'Towards Waltham Cross', servedAtText: 'Hertford Bus Station',
-    principalLocationsText: 'Hoddesdon', typicalFrequencyText: 'Mon-Fri: 2 journeys/day', operatingPeriodLines: ['Mon-Fri: Approx. 08:00–18:00']
-  }]
-};
-const plannerWord = buildBusWordTables(plannerInput);
-assert.match(plannerWord[1].prelude, /^\* Stop used for the frequency/);
-const semanticallyStyledWord = buildBusWordTables({
-  ...plannerInput,
-  reviewItems: [{ code: 'unresolved-timetable-request', route: '313', message: 'review' }],
-  plannerServiceSummaries: [{
-    routeNumber: '313', operator: '', directionPatternText: 'Towards Chingford Station', servedAtText: 'Enfield Town',
-    principalLocationsText: 'Chingford', typicalFrequencyText: 'Normal public service', operatingPeriodLines: ['Mon-Fri'],
-    publicRouteFamilyKey: '313', plannerNotes: { shortWorkings: 'school journeys remain subordinate' }
-  }]
-});
-assert.ok(semanticallyStyledWord[1].rows.some(row => !Array.isArray(row) && row.kind === 'section' && row.semantic === 'short-working'), 'short workings receive the existing pale-orange Word section treatment');
-assert.ok(semanticallyStyledWord[1].rows.some(row => !Array.isArray(row) && row.kind === 'section' && row.semantic === 'evidence-review'), 'planner review receives the existing pale-orange Word section treatment');
-assert.ok(semanticallyStyledWord[1].rows.some(row => !Array.isArray(row) && row.kind === 'summary' && row.semantic === 'presentation-note'), 'explanatory methodology remains neutral in Word');
-const styledDocx = docxBlob('ATLAS Bus Assessment', semanticallyStyledWord);
-const styledDocxXml = new TextDecoder().decode(new Uint8Array(await styledDocx.arrayBuffer()));
-assert.match(styledDocxXml, /w:fill="FFF1DD"/, 'short workings retain pale orange semantic styling in Word');
-assert.match(styledDocxXml, /w:fill="FCE8E6"/, 'planner review retains pale warning styling in Word');
-const plannerWordNotes = plannerWord[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
-assert.match(plannerWordNotes, /Additional source evidence remains available in the ATLAS assessment workspace/);
-assert.match(plannerWordNotes, /Planner review required: timetable\/source evidence requires review for routes 215, 397 at one or more assessed stops\./);
-assert.equal((plannerWord[1].rows.filter(row => !Array.isArray(row) && /^Planner review required:/.test(row.text))).length, 1, 'Word emits one concise material qualification');
-assert.doesNotMatch(plannerWordNotes, /490TEST003|490TEST004|490TEST005|Raw timetable request diagnostic|Another raw diagnostic|Duplicate route diagnostic/);
-assert.doesNotMatch(plannerWordNotes, /Show detailed evidence/);
-assert.deepEqual(plannerInput.reviewItems, reviewItems, 'Word export retains internal reviewItems unchanged');
-assert.equal(buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [], serviceSummaries: [], reviewItems: [] })[1].rows.some(row => !Array.isArray(row) && /^Planner review required:/.test(row.text)), false, 'Complete assessment without review items gets no qualification');
-
-const qualificationCases = [
-  ['unresolved timetable only', [{ code: 'unresolved-timetable-request', route: '215', message: 'diagnostic' }], /timetable\/source evidence requires review for routes 215/, [/access-routing evidence/, /stop-source coverage evidence/]],
-  ['national route evidence', [{ code: 'national-route-evidence', route: '385', message: 'diagnostic' }], /timetable\/source evidence requires review for routes 385/, [/access-routing evidence/]],
-  ['planner route identity only', [{ code: 'planner-route-identity', route: '397', message: 'diagnostic' }], /planner route\/destination identity evidence also requires planner review for routes 397/, [/timetable\/source evidence/]],
-  ['access routing only', [{ code: 'access-routing', stop: 'STOP', message: 'diagnostic' }], /access-routing evidence also requires planner review/, [/490TEST|diagnostic/]],
-  ['stop source coverage only', [{ code: 'stop-source-coverage', stop: 'STOP', message: 'diagnostic' }], /stop-source coverage evidence also requires planner review/, [/490TEST|diagnostic/]],
-  ['timetable plus access routing', [{ code: 'unresolved-timetable-request', route: '215', message: 'diagnostic' }, { code: 'access-routing', stop: 'STOP', message: 'diagnostic' }], /timetable\/source evidence requires review for routes 215.*Additional access-routing evidence also requires planner review/s, []],
-  ['timetable plus stop source coverage', [{ code: 'unresolved-timetable-request', route: '215', message: 'diagnostic' }, { code: 'stop-source-coverage', stop: 'STOP', message: 'diagnostic' }], /timetable\/source evidence requires review for routes 215.*Additional stop-source coverage evidence also requires planner review/s, []],
-  ['duplicate routes', [{ code: 'unresolved-timetable-request', route: '397', message: 'one' }, { code: 'national-route-evidence', route: '215', message: 'two' }, { code: 'unresolved-timetable-request', route: '397', message: 'three' }], /routes 215, 397/, []],
-  ['no review items', [], null, [/Planner review required:/]]
-];
-for (const [label, items, expected, forbidden] of qualificationCases) {
-  const rows = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [], serviceSummaries: [], reviewItems: items })[1].rows;
-  const qualifications = rows.filter(row => !Array.isArray(row) && /^Planner review required:/.test(row.text));
-  assert.ok(qualifications.length <= 1, `${label}: at most one client-facing qualification block`);
-  const note = qualifications.map(row => row.text).join(' ');
-  if (expected) assert.match(note, expected, `${label}: expected structured qualification`);
-  for (const pattern of forbidden) assert.doesNotMatch(note, pattern, `${label}: no material category or raw diagnostic is hidden/leaked`);
-  if (!items.length) assert.equal(qualifications.length, 0, `${label}: no qualification for no review items`);
-}
-console.log('PASS Word export respects planner-selected stop and service rows.');
-console.log('PASS Alpha.5 Plaistow Word export contract.');
-
-const blob = docxBlob('ATLAS Bus Assessment', tables, 'The site is served by bus routes 241, 262 and 473.');
-const bytes = new Uint8Array(await blob.arrayBuffer());
-assert.equal(String.fromCharCode(bytes[0], bytes[1]), 'PK');
-const decoded = new TextDecoder().decode(bytes);
-assert.match(decoded, /Table 3\.2 - Bus Stop Summary/);
-assert.match(decoded, /Balaam Street/);
-assert.match(decoded, /Table 3\.3 - Bus Service Summary/);
-const defaultCompatible = docxBlob('Legacy report', [{ caption: 'Legacy table', headers: ['Item'], rows: [{ kind: 'summary', text: 'Existing summary note' }], widths: [100] }], 'Existing trailing wording');
-const defaultCompatibleXml = new TextDecoder().decode(new Uint8Array(await defaultCompatible.arrayBuffer()));
-assert.ok(defaultCompatibleXml.indexOf('Legacy table') < defaultCompatibleXml.indexOf('Existing trailing wording'), 'existing callers keep wording after tables unless they opt into summary-first ordering');
-assert.match(defaultCompatibleXml, /w:fill="EFEFEF"/, 'existing summary rows keep the neutral gray fill');
-assert.doesNotMatch(defaultCompatibleXml, /w:fill="FFF1DD"|w:fill="FCE8E6"/, 'Bus semantic colors appear only on explicitly tagged Bus rows');
-const summaryFirst = docxBlob('ATLAS Bus Assessment', plannerWord, narrative, { wordingPlacement: 'before' });
-const summaryFirstText = new TextDecoder().decode(new Uint8Array(await summaryFirst.arrayBuffer()));
-assert.ok(summaryFirstText.indexOf('Transport Statement wording') < summaryFirstText.indexOf('Table 3.2 - Bus Stop Summary'), 'Word transport statement precedes evidence tables');
-const serviceCaptionIndex = summaryFirstText.indexOf('Table 3.3 - Bus Service Summary');
-const serviceTableIndex = summaryFirstText.indexOf('<w:tbl>', serviceCaptionIndex);
-assert.ok(serviceCaptionIndex < summaryFirstText.indexOf('* Stop used for the frequency') && summaryFirstText.indexOf('* Stop used for the frequency') < serviceTableIndex, 'Word frequency basis note follows the service caption and precedes its header and rows');
-console.log('PASS Alpha.5 shared DOCX package contains the Plaistow-style Bus tables.');
+assert.equal(narrative.split('\n\n').length,2);
+assert.match(narrative,/The assessment identified 2 bus stops/);
+assert.doesNotMatch(narrative,/checked evidence|planner-facing|ATLAS/i);
+assert.deepEqual(mapOn[0].headers,['Map reference','Stop name','Direction','Walking distance / time','Cycling distance / time','Routes serving stop']);
+assert.equal(mapOn[0].rows[0][0],'1');
+assert.ok(mapOn[1].rows.some(row=>Array.isArray(row)&&row[0]==='66'&&row[3].includes('[1]')));
+assert.deepEqual(mapOff[0].headers,['Stop name','Direction','Walking distance / time','Cycling distance / time','Routes serving stop']);
+assert.equal(mapOff[0].rows[0].length,5);
+assert.ok(mapOff[1].rows.some(row=>Array.isArray(row)&&row[0]==='66'&&!row[3].includes('[1]')));
+assert.doesNotMatch(JSON.stringify([...mapOn,narrative]),/ATLAS|Private raw source failure|Private internal warning|Planner review required/i);
+assert.ok(mapOn[1].rows.some(row=>!Array.isArray(row)&&row.semantic==='short-working'));
+assert.equal(busWordFilename({displayAddress:'100 High Street, Plaistow'}),'Bus Assessment - 100 High Street, Plaistow.docx');
+assert.equal(busWordFilename({latitude:51.7,longitude:-0.1}),'Bus Assessment.docx');
+assert.equal(mapOn[0].widths.reduce((a,b)=>a+b,0),100);
+const mapPng='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pysAAAAASUVORK5CYII=';
+const blob=docxBlob('Bus Assessment',mapOn,narrative,{wordingPlacement:'before',mapPngDataUrl:mapPng});
+const decoded=new TextDecoder().decode(new Uint8Array(await blob.arrayBuffer()));
+assert.equal(String.fromCharCode(...new Uint8Array(await blob.arrayBuffer()).slice(0,2)),'PK');
+assert.ok(decoded.indexOf('Transport Statement wording')<decoded.indexOf('Bus Assessment Map')&&decoded.indexOf('Bus Assessment Map')<decoded.indexOf('Table 3.2 - Bus Stop Summary'));
+assert.match(decoded,/word\/media\/assessment-map\.png/);
+assert.match(decoded,/w:sz w:val="12"/,'table cells and notes use 6 pt Word text');
+assert.doesNotMatch(decoded,/ATLAS|Private raw source failure|Planner review required/i);
+const noMapBlob=docxBlob('Bus Assessment',mapOff,narrative,{wordingPlacement:'before'});
+const noMapXml=new TextDecoder().decode(new Uint8Array(await noMapBlob.arrayBuffer()));
+assert.doesNotMatch(noMapXml,/assessment-map\.png|rId2/);
+assert.doesNotMatch(JSON.stringify(mapOff),/\[1\]/);
+console.log('PASS external Word export is neutral, compact, and review-safe.');
+console.log('PASS map-on DOCX embeds the PNG after wording; map-off DOCX omits the map column and map references.');

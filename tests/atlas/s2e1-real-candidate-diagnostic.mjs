@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,7 +17,7 @@ const requests = [];
 let activeControl = null;
 
 const controls = [
-  { id: 'waltham', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700, focusRoutes: ['13', '13A', '13B', '13C', '217', '279', '317', '327', '491', 'N279'] },
+  { id: 'waltham', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700, focusRoutes: ['13', '13A', '13B', '13C', '66', '217', '279', '317', '327', '491', 'N279'] },
   { id: 'pipers', label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700, focusRoutes: ['46', '230', '231', 'C'] },
   { id: 'chingford', label: 'Normanshire Drive, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250, focusRoutes: ['357', '444', '657', 'W16'] },
   { id: 'pe1', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '5A', '37', '101', '102'] },
@@ -152,6 +153,8 @@ function compactGroupingDecision(value = {}) {
     groupedRecordCount: value.groupedSourceRecordIds?.length ?? 0,
     deduplicatedRecordCount: value.deduplicatedSourceRecordIds?.length ?? 0,
     shortWorkingRecordCount: value.shortWorkingRecordIds?.length ?? 0,
+    shortWorkingRecordIds: value.shortWorkingRecordIds ?? [],
+    branchVariantRecordIds: value.branchVariantRecordIds ?? [],
     branchVariantRecordCount: value.branchVariantRecordIds?.length ?? 0,
     calendarVariantRecordCount: value.calendarVariantRecordIds?.length ?? 0,
     alternateDestinations: (value.alternateDestinations ?? []).slice(0, 20),
@@ -257,7 +260,10 @@ function compactPlannerRow(row = {}) {
     publicRouteFamilyDecision: compactFamilyDecision(decision),
     routeFamilyMembers: compactRouteFamilyMembers(row.routeFamilyMembers),
     sourceRecordIds: row.sourceRecordIds ?? [],
-    sourceWarnings: row.sourceWarnings ?? []
+    sourceWarnings: row.sourceWarnings ?? [],
+    debugKeys: { row: Object.keys(row), group: Object.keys(group) },
+    groupingDetail: group.publicServiceGroupingDecision ? { shortWorkingRecordIds: group.publicServiceGroupingDecision.shortWorkingRecordIds, branchVariantRecordIds: group.publicServiceGroupingDecision.branchVariantRecordIds, calendarVariantRecordIds: group.publicServiceGroupingDecision.calendarVariantRecordIds, principalPattern: group.publicServiceGroupingDecision.principalPattern } : null,
+    componentServices: (group.services ?? []).map(service => ({ id: service.id, sourceRecordIds: service.sourceRecordIds, origin: service.origin, destination: service.destination, direction: service.direction, routePatternStopIds: service.routePatternStopIds, calendarProfileId: service.calendarProfileId, schedulesAtBasis: service.stopSchedules?.[row.frequencyBasisStopId] ?? service.departuresByDay }))
   };
 }
 
@@ -309,6 +315,18 @@ for (const control of controls) {
   const focusPlannerRows = plannerRows.filter(row => control.focusRoutes.map(routeKey).includes(routeKey(row.routeNumber)) || [...row.routeNumbers, ...row.memberRouteNumbers, ...row.publicRouteNumbers].some(route => control.focusRoutes.map(routeKey).includes(routeKey(route))));
   const wordTables = buildBusWordTables(assessment);
   const wordRows = wordTables[1]?.rows ?? [];
+  if (control.id === 'waltham') {
+    const route66 = (assessment.plannerServiceSummaries ?? []).filter(row => String(row.routeNumber) === '66' && String(row.frequencyBasisStopId) === '210021703430' && String(row.timetableSource) === 'BODS');
+    assert.ok(route66.length >= 1, 'the frozen Run #75 selected Waltham Stop C population must produce a BODS route-66 principal row');
+    assert.ok((route66[0].canonicalDeparturePopulation?.monday?.length ?? 0) > 2, 'full frozen-candidate weekday route-66 population cannot collapse to the historical two-journey subset');
+    assert.ok((route66[0].canonicalDeparturePopulation?.saturday?.length ?? 0) > 1, 'full frozen-candidate Saturday route-66 population cannot collapse to the historical one-journey subset');
+    assert.equal(route66[0].operatingPeriods?.monday?.first, '05:29', 'route-66 weekday start must reflect the selected-stop frozen population');
+    assert.equal(route66[0].operatingPeriods?.monday?.last, '19:05', 'route-66 weekday end must reflect the selected-stop frozen population');
+    const route66WordRow = wordRows.find(row => Array.isArray(row) && String(row[0]) === '66' && String(row[1]).includes('Arriva Herts'));
+    assert.ok(route66WordRow, 'the frozen-candidate route-66 principal service must reach the real Word table composition path');
+    assert.match(String(route66WordRow[5]), /Typically every/i, 'the route-66 Word summary must include its full principal frequency, not the historical 2/1 subset');
+    assert.match(String(route66WordRow[6]), /05:29[\s\S]*19:05/, 'the route-66 Word summary must retain the full operating period');
+  }
   const plannerRouteNumbers = unique(plannerRows.flatMap(row => [row.routeNumber, ...row.routeNumbers, ...row.memberRouteNumbers, ...row.publicRouteNumbers]));
   const wordText = (wordRows ?? []).map(row => Array.isArray(row) ? String(row[0] ?? '') : String(row?.text ?? '')).join('\n');
   const wordRouteNumbers = plannerRouteNumbers.filter(route => new RegExp(`(^|[^A-Za-z0-9])${route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^A-Za-z0-9])`, 'i').test(wordText));
@@ -317,7 +335,7 @@ for (const control of controls) {
   const summaryCounts = Object.fromEntries([...new Set(serviceSummaries.map(row => text(row.routeNumber)))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map(route => [route, serviceSummaries.filter(row => routeKey(row.routeNumber) === routeKey(route)).length]));
   const overTwo = Object.entries(plannerRowCounts).filter(([, count]) => count > 2).map(([route, count]) => ({ route, count, rows: plannerRows.filter(row => row.routeNumber === route) }));
   const overTwoRows = overTwo.flatMap(item => item.rows);
-  const capturedRows = [...new Map([...focusPlannerRows, ...overTwoRows.map(compactPlannerRow)].map(row => [row.id, row])).values()];
+  const capturedRows = [...new Map([...focusPlannerRows, ...overTwoRows].map(row => [row.id, row])).values()];
   const reviewItems = assessment.reviewItems ?? assessment.sourceChecks ?? [];
   const reviewItemsByCode = Object.fromEntries([...new Set(reviewItems.map(item => text(item.code ?? item.id ?? 'unknown')))].map(code => [code, reviewItems.filter(item => text(item.code ?? item.id ?? 'unknown') === code).length]));
   results[control.id] = {
@@ -361,7 +379,7 @@ for (const control of controls) {
     })),
     plannerRows: capturedRows,
     rowCounts: { rawEvidenceRecordsByRoute: rawCounts, serviceSummariesByRoute: summaryCounts, plannerRowsByRoute: plannerRowCounts, routesOverTwoPlannerRows: overTwo.map(({ route, count }) => ({ route, count })) },
-    routesOverTwoPlannerRows: overTwo.map(({ route, count, rows }) => ({ route, count, rows: rows.map(compactPlannerRow) })),
+    routesOverTwoPlannerRows: overTwo.map(({ route, count, rows }) => ({ route, count, rows })),
     qaReviewItems: reviewItems.slice(0, 100).map(item => ({ code: item.code ?? item.id ?? null, route: item.route ?? null, stop: item.stop ?? item.stopId ?? null, source: item.source ?? null, severity: item.severity ?? null, message: item.message ?? item.label ?? null })),
     qaSummary: { reviewItemCount: reviewItems.length, reviewItemsByCode, status: assessment.status },
     wordRouteParity: { plannerRoutes: plannerRouteNumbers, wordRoutes: wordRouteNumbers, missingFromWord: plannerRouteNumbers.filter(route => !wordRouteNumbers.includes(route)) }
@@ -413,3 +431,7 @@ const report = {
 await mkdir(path.dirname(reportPath), { recursive: true });
 await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 process.stdout.write(`${JSON.stringify({ schema: report.schema, reportPath, controls: Object.fromEntries(Object.entries(results).map(([id, value]) => [id, { status: value.status, stopCount: value.stopCount, rawRows: value.rawServiceRecords.length, summaryRows: value.serviceSummaries.length, plannerRows: value.plannerRows.length, routesOverTwo: value.rowCounts.routesOverTwoPlannerRows }])) })}\n`);
+
+
+
+\n

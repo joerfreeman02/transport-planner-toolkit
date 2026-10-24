@@ -47,6 +47,29 @@ const authorityPriority = buildPlannerBusServiceSummaries([
 assert.equal(authorityPriority.length, 1, 'matching BODS/TNDS public timetable evidence remains one planner row');
 assert.deepEqual(authorityPriority[0].canonicalDeparturePopulation.monday.map(entry => entry.minute), hourlyMinutes, 'BODS primary departures define the ordinary frequency population when equivalent TNDS supplementation repeats the same public service');
 assert.match(authorityPriority[0].typicalFrequencyText, /Every ~60 mins/i, 'supplementary national journey identities cannot inflate the BODS-led hourly headway');
+
+const endpointPeerEvidence = (minutes, provider, prefix) => Object.fromEntries(Object.keys(weekdays).map(day => [day,
+  ['saturday', 'sunday'].includes(day) ? [] : minutes.map((minute, index) => ({
+    minute, stopPointId: 'PIPERS-A', journeyIdentity: `${prefix}-${day}-${index}`, provider, calendarProfileId: 'ordinary'
+  }))
+]));
+const strongestSourceInComponent = buildPlannerBusServiceSummaries([
+  { ...plannerBase, id: 'component-bods-through', routeNumber: '66', origin: 'A', destination: 'Loughton', direction: 'outbound',
+    routePatternStopIds: ['A', 'PIPERS-A', 'MID', 'LOUGHTON'], departureEvidenceByDay: endpointPeerEvidence([360, 420, 480], 'BODS', 'through'),
+    sourceRecordIds: ['component-bods-through'] },
+  { ...plannerBase, id: '66-component-tnds-through', routeNumber: '66', origin: 'A', destination: 'Loughton', direction: 'outbound',
+    routePatternStopIds: ['A', 'PIPERS-A', 'MID', 'LOUGHTON'], departureEvidenceByDay: endpointPeerEvidence([355, 385, 415, 445], 'TNDS', 'supplement'),
+    sourceRecordIds: ['component-tnds-through'] },
+  { ...plannerBase, id: '66-external-bods-endpoint', routeNumber: '66', origin: 'Elsewhere', destination: 'Loughton', direction: 'outbound',
+    routePatternStopIds: ['ELSEWHERE', 'OTHER', 'MID', 'LOUGHTON'], departureEvidenceByDay: endpointPeerEvidence([500], 'BODS', 'endpoint'),
+    sourceRecordIds: ['external-bods-endpoint'] }
+], [stop]);
+const route66Through = strongestSourceInComponent.find(row => row.routeNumber === '66' && row.destination === 'Loughton');
+assert.ok(route66Through, 'the full route-66 through component remains a planner row');
+assert.ok(route66Through.canonicalDeparturePopulation.monday.every(entry => entry.sourceRecordId !== 'external-bods-endpoint'),
+  'an equal-rank BODS peer outside the component cannot replace an existing BODS primary population merely because the component also contains TNDS');
+assert.ok(route66Through.canonicalDeparturePopulation.monday.some(entry => entry.sourceRecordId === 'component-bods-through'),
+  'the component’s own full through timetable remains the canonical source');
 const pipersBodsWeekly = Object.fromEntries(Object.keys(weekdays).map(day => [day,
   day === 'sunday' ? [] : Array.from({ length: day === 'saturday' ? 9 : 15 }, (_value, index) => ({ minute: 360 + index * 60, stopPointId: 'PIPERS-A', journeyIdentity: `BODS-${day}-${index}`, provider: 'BODS' }))
 ]));

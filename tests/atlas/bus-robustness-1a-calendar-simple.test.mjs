@@ -107,7 +107,7 @@ assert.equal(splitTermTime.serviceNote, '');
 assert.equal(plannerRouteDisplayNumber(splitTermTime), 'SPLIT†');
 
 const presentationResult = { provenance: { stops: { retrievedAt: '2026-10-07T12:34:56Z' } } };
-assert.equal(buildBusTimetablePresentationNote(presentationResult, [ordinaryWithVariants]), 'Where separate term-time and school-holiday timetables are published, the term-time timetable is shown. Routes marked † have separate timetables. Timetable information reflects the data available to ATLAS on 2026-10-07 and services may vary during school holidays.');
+assert.equal(buildBusTimetablePresentationNote(presentationResult, [ordinaryWithVariants]), 'Where separate term-time and school-holiday timetables are published, the term-time timetable is shown. Routes marked † have separate timetables. Timetable information reflects the data available on 2026-10-07 and services may vary during school holidays.');
 const word = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [ordinaryWithVariants], serviceSummaries: [], ...presentationResult });
 const wordTableRow = word[1].rows.find(row => Array.isArray(row));
 assert.equal(wordTableRow[0], 'CONTROL†', 'Word adds the presentation-only dagger without changing routeNumber');
@@ -115,7 +115,8 @@ assert.equal(wordTableRow[5], ordinaryWithVariants.typicalFrequencyText, 'Word f
 assert.equal(wordTableRow[6], ordinaryWithVariants.operatingPeriodLines.join('\n'), 'Word operating period matches Browser planner output');
 const wordNotes = word[1].rows.filter(row => !Array.isArray(row)).map(row => row.text).join(' ');
 assert.equal(word[1].rows.filter(row => !Array.isArray(row) && row.text.startsWith('Timetable note:')).length, 1, 'Word emits one table-wide timetable note');
-assert.match(wordNotes, /Timetable information reflects the data available to ATLAS on 2026-10-07/);
+assert.match(wordNotes, /Timetable information reflects the data available on 2026-10-07/);
+assert.doesNotMatch(wordNotes, /ATLAS/);
 assert.doesNotMatch(wordNotes, /Service note: Timetable may vary during school holidays\./);
 assert.doesNotMatch(wordNotes, /School-day journeys only|Non-school days only|Standard days|additional/);
 

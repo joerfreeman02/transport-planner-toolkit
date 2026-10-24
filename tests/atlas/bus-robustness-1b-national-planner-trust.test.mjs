@@ -171,11 +171,12 @@ test('station access infrastructure is not reported as a missing timetable call 
   assert.equal(assessment.reviewItems.some(item => item.code === 'timetable-shard-failure' && item.stop === entrance.id), false);
 });
 
-test('Word export carries the same partial national qualification as the planner wording', () => {
+test('Word export keeps internal partial-national QA wording out of the planning report while retaining route numbers', () => {
   const result = { ok: true, stops: [{ id: 'BBBBB', name: 'Beta Stop', routes: ['20'], timetableEvidenceStatus: 'SOURCE_UNAVAILABLE', timetableMatch: false, walking: { status: 'routed', distanceMetres: 100, durationSeconds: 60 }, cycling: { status: 'routed', distanceMetres: 200, durationSeconds: 120 } }], plannerServiceSummaries: [], serviceSummaries: [], reviewItems: [] };
   const tables = buildBusWordTables(result);
   const texts = tables.flatMap(table => table.rows).flatMap(row => Array.isArray(row) ? row : [row.text]).filter(Boolean).join(' ');
-  assert.match(texts, /not been treated as absent/);
+  assert.match(texts, /20/);
+  assert.doesNotMatch(texts, /not been treated as absent|Timetable data unavailable\/incomplete/i);
 });
 
 for (const [name, fn] of tests) {

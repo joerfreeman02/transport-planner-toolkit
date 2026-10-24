@@ -48,7 +48,7 @@ assert.match(manualBrowserAudit, /candidate329Services/, 'Route 329 control reco
 assert.match(manualBrowserAudit, /accepted Enfield route-329 control must not fabricate a resolved planner service row/);
 assert.match(manualBrowserAudit, /accepted Enfield route-329 control must not fabricate a resolved Word summary row/);
 assert.match(manualBrowserAudit, /Browser Sources & checks must expose the accepted route-329 unresolved timetable evidence/);
-assert.match(manualBrowserAudit, /Generated Word must preserve the accepted route-329 unresolved-evidence review row/);
+assert.match(manualBrowserAudit, /Internal route-329 evidence review stays in Sources & Checks, not the planning report/);
 assert.match(manualBrowserAudit, /PE1 route 202 must preserve its three evidence-backed patterns/);
 assert.match(manualBrowserAudit, /PE1 Browser must not repeat the Bourne destination as an additional-services note/);
 assert.match(manualBrowserAudit, /PE1 Word must not repeat the Bourne destination as an additional-services note/);
@@ -102,7 +102,7 @@ assert.match(normalRuntime, /publicationAttempted: false, deploymentAttempted: f
 assert.match(normalRuntime, /sameCandidatePreparedOnlyComparison/);
 for (const site of ['waltham', 'pipers', 'pe1', 'enfield', 'queensgate']) assert.ok(new RegExp('^\\s*' + site + ':', 'm').test(normalRuntime));
 assert.doesNotMatch(normalRuntime, /^\s*chingford:/m, 'Chingford must not be represented by an empty-TfL national control');
-assert.match(manualBrowserAudit, /Continue full staged assessment/, 'normal browser audit must continue staged Waltham/PE1 assessments');
+assert.match(manualBrowserAudit, /Continue full assessment/, 'normal browser audit must continue staged Waltham/PE1 assessments');
 assert.match(manualBrowserAudit, /GROVE-P[\s\S]*GROVE-N[\s\S]*657-out[\s\S]*657-in/, 'rendered Chingford control must use the fixture-backed route 657 golden evidence');
 assert.match(manualBrowserAudit, /Normal rendered Bus assessment has no service rows/);
 assert.match(normalRuntime, /createDeterministicEmptyTflFetch/);
@@ -137,7 +137,7 @@ const productAudit = await readFile(new URL('./s2e1-manual-product-audit.mjs', i
 for (const control of ['pipers-lane', 'pipers-route46', 'waltham-cross', 'chingford', 'pe1']) assert.ok(productAudit.includes(`id: '${control}'`), `normal-product browser audit must cover ${control}`);
 assert.match(productAudit, /report\.enfieldCoverage = process\.env\.ATLAS_C4_ENFIELD_EVIDENCE_ONLY/);
 assert.match(candidateBrowserAudit, /id: 'enfield-town'/, 'the exact-candidate browser/Word audit must retain the Enfield control');
-for (const field of ['#coordinatesForm', '#confirmAssessmentPoint', '#findStops', '.bus-service-summary', '#developerDiagnostics', '#exportBusWord', 'word/document.xml', 'horizontal overflow']) assert.ok(productAudit.includes(field), `normal-product browser audit must inspect ${field}`);
+for (const field of ['#addressForm', '#candidateList', '#confirmAssessmentPoint', '#findStops', '#taskStatusMessage', '.bus-service-summary', '#exportBusWord', 'word/document.xml', 'horizontal overflow']) assert.ok(productAudit.includes(field), `normal-product browser audit must inspect ${field}`);
 assert.match(productAudit, /candidateRun: '39430415441'/);
 assert.match(productAudit, /acquisitionAttempted: false/);
 assert.match(productAudit, /publicationAttempted: false/);
@@ -147,7 +147,7 @@ assert.match(productAudit, /Waltham route 217 must retain the fixture-backed ful
 assert.match(manualBrowserAudit, /Waltham route 217 must retain the fixture-backed full TfL span at the selected stop/);
 assert.match(productAudit, /rows46\.length >= 1/);
 assert.match(productAudit, /rows46\.every\(row => \/\\\*\/\.test\(row\['Served at'\]/);
-assert.match(productAudit, /coordinatesForm button\[type="submit"\][\s\S]*page\.locator\('#radius'\)\.fill\(String\(control\.radius\)\)[\s\S]*confirmAssessmentPoint/);
+assert.match(productAudit, /addressForm button\[type="submit"\][\s\S]*candidateList button[\s\S]*confirmAssessmentPoint/);
 assert.match(productAudit, /Pipers route 46 selected-stop population should present the candidate-supported broadly hourly service/);
 assert.match(productAudit, /Pipers Word route 46 should preserve the broadly hourly selected-stop frequency/);
 assert.doesNotMatch(productAudit, /accepted C2 Run #151 frequency baseline/);

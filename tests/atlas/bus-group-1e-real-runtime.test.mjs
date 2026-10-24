@@ -46,7 +46,8 @@ assert.ok(mixedDecision.publicServiceEquivalenceEvidence.some(evidence => eviden
 
 const word = buildBusWordTables({ ok: true, stops: fixture.stops, plannerServiceSummaries: rows, serviceSummaries: [] });
 const wordText = word.flatMap(table => table.rows ?? []).map(row => Array.isArray(row) ? row.join(' ') : String(row?.text ?? '')).join(' ');
-assert.match(wordText, /Presentation note: Where an assessed stop is the route terminus, ATLAS shows the useful departing direction only/);
+assert.match(wordText, /Presentation note: Where an assessed stop is the route terminus, the table shows the useful departing direction only/);
+assert.doesNotMatch(wordText, /ATLAS/i, 'Planning-facing Word text remains independent of internal product branding.');
 assert.match(wordText, /Additional services: Route 13A also serves/);
 assert.doesNotMatch(wordText, /Operator not supplied/);
 

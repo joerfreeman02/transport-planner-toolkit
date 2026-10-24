@@ -157,3 +157,33 @@ The outbound Peterborough pattern has a different direction, stop population, we
 - No production Bus, source-composition, frequency, operator, calendar, or intelligence file changed. The only scoped code change is stronger production-audit coverage and Run #75 root verification.
 - The local review server remains PID `12156`, bound to `127.0.0.1:8774`; URL `http://127.0.0.1:8774/atlas/?review=v2#modules`. It serves the isolated closeout worktree, not production.
 - Exact-final-SHA hosted validation and origin parity remain infrastructure gates. The local result does not authorize Product Owner acceptance or release. The previously recorded Word/map rendered visual checks remain open.
+
+## Final semantic closeout — 24 October 2026
+
+### Provenance and audit-root correction
+
+The two latest apparent semantic failures were caused by the frozen-candidate audit receiving the code checkout as `candidateRoot` while labeling its report as Run #75. The actual immutable review root is `C:\Users\joe.freeman\AppData\Local\ATLAS\manual-acceptance\bus-s2d1\review-root`. The manual-product audit now refuses the checkout as a candidate root and verifies both frozen manifests before composing reports. Run #75 remains workflow `39430415441`, artifact `12275615359`, producer `151199cc914c235870f444d26b03c2309edbd035`, 2,549,732,499 bytes, canonical uploaded zip digest `sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471`. No candidate bytes were changed, rebuilt, or reacquired.
+
+Frozen manifest SHA-256 values: Bus `1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f`; TNDS `2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f`. The audit was rerun against that exact root and its Browser and generated Word views agree.
+
+### Semantic decisions
+
+**Pipers route 230 — circular qualification retained; no production correction required.** Frozen BODS/Centrebus evidence identifies one circular service: `Circular — Caddington Woods via Chaul End Road (Southeastbound)`, approximately hourly Monday–Saturday with no scheduled Sunday service. The circular classification remains in the service identity and summary; the qualification was present in both Browser and Word. It remains one planner row. The previous apparent loss was an audit-root mismatch, not a presentation/composition regression. The regression now asserts the row count, approximate hourly frequency, circular classification, and Browser/Word qualification parity generically.
+
+**PE1 route 202 — THREE ROWS REQUIRED.** The frozen evidence contains three distinct planner-relevant patterns: (1) toward Peterborough Bus Station, Queensgate arrivals, two Monday–Saturday departures around 17:04 and 18:04; (2) toward Austerby, Bay 9, two weekday departures around 07:10 and 07:45; and (3) toward Bourne Bus Station via Bainton, Bay 9, one weekday departure around 07:45, with TNDS patterns `JP_PF0007016:2-46` and `JP_PF0007016:2-48`. The third pattern has a different destination/branch and its own source pattern identities; collapsing it into a generic note would conceal a genuine endpoint/path distinction. Browser and Word retain all three rows and their direction, endpoint, stop, journey-count/time, and calendar evidence. Permanent assertions cover those semantics rather than row count alone.
+
+### Final validation and identities
+
+- Production/runtime SHA remains `d865ff035e05cbe1ce34b224398893734508e9c0`. No production or Bus-intelligence code changed for these two controls.
+- Hosted validation Run `40124639130` completed successfully on branch `codex/atlas-bus-beta-final-closeout`, exact tested SHA `70f18106f3fdd4ebd42a0596943fed00a3e5b714`. It passed the complete 309-test Bus-data Python suite, the complete deterministic ATLAS suite, exact Run #75 metadata verification and artifact restore, retained-checkpoint provenance, candidate diagnostics, Browser/Word audits, and the Chingford 657 fixture-backed regression. Report artifact was uploaded by the run.
+- The preceding hosted Run `40124053449` stopped at a stale test assertion that included the `<body>` marker in a check intended to cover only `<header>`. The assertion was narrowed to the actual header element; this test-only correction passed locally and in Run `40124639130`.
+- Local complete deterministic ATLAS suite passed. Local frozen-candidate Browser/Word audit passed with zero failures. Pipers controls 46/230/231, Waltham, Chingford 657, PE1, and Enfield regressions passed. Enfield 313 used captured TfL evidence; 329 retained safe unresolved-operator handling. No live TfL replay was used.
+- `git diff --check` passed. Changes from production/runtime SHA `d865ff0` are limited to workflow, documentation, and tests. The semantic changes are audit-root safeguards and test coverage; no product behavior changed.
+- Final documentation SHA is the branch HEAD after this handover update. The closeout branch is pushed and will be checked for origin parity after the documentation commit.
+- Existing local Product Owner review server: PID `12156`, bound only to `127.0.0.1:8774`; URL `http://127.0.0.1:8774/atlas/?review=v2#modules`. It serves the isolated closeout runtime plus the unchanged Run #75 candidate root. App, Bus manifest, and TNDS manifest return HTTP 200. This is a localhost review environment, not production.
+
+### Release and remaining review
+
+No national acquisition, candidate rebuild, merge, publication, deployment, or version/build change occurred. Version remains `2.0.0-alpha.15` / `ATLAS-2.0.0-alpha.15-20260914`. Dependabot is configured; Codecov and Sentry remain deferred; OpenSSF Scorecard belongs to a later security/release milestone; Renovate remains unnecessary alongside Dependabot.
+
+No product-level semantic blocker remains in Pipers 230 or PE1 202. Technical Director review remains the release gate before final Product Owner acceptance. The previously recorded native Word-page render and external-basemap visual review remain outstanding visual QA items; the automated Browser/Word audit passed, but those visual checks are not claimed complete. Do not treat this handover as Product Owner acceptance or production release approval.

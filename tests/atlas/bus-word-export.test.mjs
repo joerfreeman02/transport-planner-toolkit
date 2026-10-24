@@ -11,7 +11,7 @@ const result = {
   reviewItems:[{code:'unresolved-timetable-request',route:'397',message:'Private raw source failure'}],
   plannerServiceSummaries:[{
     routeNumber:'66',operator:'Arriva Herts and Essex',directionPatternText:'Towards Loughton Station',servedAtText:'Bus Station — Stop C [1]*',
-    principalLocationsText:'Waltham Cross, Waltham Abbey, Loughton',typicalFrequencyText:'Mon-Fri: Typically every ~30–40 mins',operatingPeriodLines:['Mon-Fri: Approx. 05:29–19:05'],publicRouteFamilyKey:'66',
+    principalLocations:['Waltham Cross Railway Station','Railway Station','St Margaret\'s Hospital','Waltham Abbey','Loughton'],principalLocationsText:'Waltham Cross, Waltham Abbey, Loughton',typicalFrequencyText:'Mon-Fri: Typically every ~30–40 mins',operatingPeriodLines:['Mon-Fri: Approx. 05:29–19:05'],publicRouteFamilyKey:'66',
     plannerNotes:{shortWorkings:'Some journeys operate to Hammond Street (Smiths Lane)',reviewNote:'Private internal warning'}
   }]
 };
@@ -19,7 +19,9 @@ const mapOn = buildBusWordTables(result);
 const mapOff = buildBusWordTables(result,{includeMap:false});
 const narrative = buildBusTransportStatement(result);
 assert.equal(narrative.split('\n\n').length,2);
-assert.match(narrative,/The assessment identified 2 bus stops/);
+assert.match(narrative,/assessment covers 2 bus stops/i);
+assert.match(narrative,/Waltham Cross Railway Station/);
+assert.doesNotMatch(narrative,/Waltham Cross Railway Station, Railway Station/);
 assert.doesNotMatch(narrative,/checked evidence|planner-facing|ATLAS/i);
 assert.deepEqual(mapOn[0].headers,['Map reference','Stop name','Direction','Walking distance / time','Cycling distance / time','Routes serving stop']);
 assert.equal(mapOn[0].rows[0][0],'1');
@@ -40,6 +42,7 @@ assert.ok(decoded.indexOf('Transport Statement wording')<decoded.indexOf('Bus As
 assert.match(decoded,/word\/media\/assessment-map\.png/);
 assert.match(decoded,/w:sz w:val="12"/,'table cells and notes use 6 pt Word text');
 assert.doesNotMatch(decoded,/ATLAS|Private raw source failure|Planner review required/i);
+assert.doesNotMatch(decoded,/\?\?\?/,'Broken stop label placeholders must never appear in Word output.');
 const noMapBlob=docxBlob('Bus Assessment',mapOff,narrative,{wordingPlacement:'before'});
 const noMapXml=new TextDecoder().decode(new Uint8Array(await noMapBlob.arrayBuffer()));
 assert.doesNotMatch(noMapXml,/assessment-map\.png|rId2/);

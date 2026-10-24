@@ -328,4 +328,48 @@ footer a { color: #fff; }
 @media(max-width:900px){.home-guidance-grid{grid-template-columns:1fr}.home-process{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.module-illustration{height:110px}.home-process,.home-benefits{grid-template-columns:1fr}}
 
+/* Final closeout refinements: retain the workflow while improving narrow layouts. */
+.workflow-rail button { background: #102b49; }
+.workflow-rail button:hover:not(:disabled) { background: #1b3b5d; }
+.workflow-rail button.active { background: #234565; }
+.workspace-module-art { display: block; width: 74px; height: 74px; flex: 0 0 74px; object-fit: contain; }
+.workspace-header-copy { min-width: 0; flex: 1 1 auto; }
+.candidate > div { min-width: 0; }
+.candidate-address-primary { display: block; margin-bottom: 3px; font-size: .9rem; }
+.candidate-address-secondary { display: block; color: #52657b; font-size: .78rem; font-weight: 500; line-height: 1.4; }
+.task-stages { gap: 7px; }
+.task-stages li { min-width: 0; line-height: 1.25; overflow-wrap: anywhere; }
+.map-fallback { width: max-content; max-width: 100%; text-decoration: none !important; }
+.site-selector-grid, .location-panel, .step-content { min-width: 0; max-width: 100%; }
+
+@media (max-width: 720px) {
+  .workflow-rail { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); overflow: visible; }
+  .workflow-rail button { min-width: 0; flex: initial; grid-template-columns: 26px minmax(0,1fr); }
+  .workflow-rail button small { display: block; font-size: .58rem; line-height: 1.25; }
+  .workspace-header { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: 9px; }
+  .workspace-module-art { width: 42px; height: 42px; }
+  .workspace-header .workspace-header-copy h1 { font-size: 1.12rem; }
+  .candidate { display: grid; grid-template-columns: minmax(0,1fr); gap: 10px; }
+  .candidate button { justify-self: start; }
+  .task-stages { gap: 5px; }
+  .task-stages li { padding-top: 6px; font-size: .6rem; }
+  .task-status { min-width: 0; }
+  .task-progress { min-width: 0; }
+  .task-progress progress { min-width: 0; flex: 1 1 auto; }
+  .map-fallback { width: 100%; justify-content: center; text-align: center; }
+}
+@media (max-width: 1320px) {
+  .site-selector-grid { grid-template-columns: minmax(0,1fr); }
+  #siteMapHome, .location-panel { min-width: 0; width: 100%; }
+}
+@media (max-width: 430px) {
+  .workflow-rail { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .task-status-heading { align-items: flex-start; }
+  .task-status-heading h3 { font-size: .78rem; }
+  .task-progress { width: 100%; }
+  .selected-location, .confirmed-site, .coordinate-details { max-width: 100%; overflow-wrap: anywhere; }
+  .selected-location dl, .confirmed-site dl { grid-template-columns: 1fr; gap: 2px; }
+  .selected-location dd, .confirmed-site dd { margin-bottom: 6px; }
+}
+
 .export-option{display:flex;align-items:flex-start;gap:8px;margin:14px 0;color:#334b65;font-size:.82rem;font-weight:650}.export-option input,.planner-review-gate input{accent-color:var(--atlas-orange)}.planner-review-gate{display:grid;gap:5px;margin:14px 0;padding:14px 16px;border:1px solid #e0a36e;border-radius:8px;background:#fff7f0;color:#334b65}.planner-review-gate label{display:flex;align-items:center;gap:9px;font-weight:750}.planner-review-gate span{font-size:.8rem}

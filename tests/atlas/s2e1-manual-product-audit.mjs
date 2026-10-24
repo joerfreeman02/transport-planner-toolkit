@@ -594,13 +594,15 @@ try {
         const standaloneMapPromise = page.waitForEvent('download', { timeout: 30000 });
         await page.locator('#exportAssessmentMap').click();
         const standaloneMap = await standaloneMapPromise;
-        const standaloneMapPath = path.join(wordDirectory, `atlas-s2e1-${control.id}-standalone-map.png`);
+        const standaloneMapPath = path.join(wordDirectory, `atlas-s2e1-${control.id}-standalone-map.pdf`);
         await standaloneMap.saveAs(standaloneMapPath);
         const standaloneMapBytes = await readFile(standaloneMapPath);
-        assert.deepEqual(standaloneMapBytes.subarray(0, 8), Buffer.from('89504e470d0a1a0a', 'hex'), 'Standalone assessment map must be a valid PNG.');
+        assert.equal(standaloneMapBytes.subarray(0, 8).toString('ascii'), '%PDF-1.4', 'Standalone assessment map must be a generated PDF.');
+        assert.ok(standaloneMapBytes.includes(Buffer.from('/MediaBox [0 0 1190.55 841.89]')), 'Standalone map PDF must use a landscape A3 page.');
         assert.match(standaloneMap.suggestedFilename(), /^Bus Assessment Map/i, 'Standalone map must use a neutral planning-facing filename.');
         assert.doesNotMatch(standaloneMap.suggestedFilename(), /ATLAS/i, 'Standalone map filename must not expose the internal product name.');
-        outcome.standaloneMap = { format: 'PNG', validSignature: true, neutralFilename: standaloneMap.suggestedFilename() };
+        assert.doesNotMatch(await page.locator('body').innerText(), /\?\?\?/,'Browser output must never expose broken stop labels.');
+        outcome.standaloneMap = { format: 'PDF', page: 'A3 landscape', validSignature: true, neutralFilename: standaloneMap.suggestedFilename() };
       }
       if (control.id === 'chingford') {
         const route657 = rendered.find(row => row.Route === '657');

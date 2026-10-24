@@ -18,21 +18,35 @@ function stopRouteNumbers(stop) {
 export function buildBusTransportStatement(result, { services = result?.plannerServiceSummaries ?? result?.serviceSummaries ?? [], nearestGroupName = result?.nearestGroup?.name ?? null } = {}) {
   const count = assessedStopRecords(result?.stops).length;
   const routeNumbers = [...new Set((services ?? []).flatMap(service => service.publicRouteNumbers ?? service.routeNumbers ?? [service.routeNumber]).map(text).filter(Boolean))];
-  const stopSentence = nearestGroupName
-    ? `The assessment covers ${count} assessed stop${count === 1 ? '' : 's'} within the nearest stop group at ${text(nearestGroupName)}.`
-    : `The assessment covers ${count} assessed stop${count === 1 ? '' : 's'}.`;
-  const destinationValues = [...new Set((services ?? []).flatMap(service => [service.destination, ...(service.principalLocations ?? [])]).map(text).filter(Boolean))];
-  const destinations = destinationValues.slice(0, 6);
-  const connectionText = destinations.length ? ` connecting the site with ${destinations.join(', ')}${destinationValues.length > destinations.length ? ' and other surrounding destinations' : ''}` : '';
+  const destinationValues = (services ?? []).flatMap(service => [service.destination, ...(service.principalLocations ?? [])]).map(text).filter(Boolean);
+  const destinationKey = value => value.toLocaleLowerCase('en-GB').replace(/[^a-z0-9]+/gu, ' ').trim().replace(/\s+/gu, ' ');
+  const destinations = [];
+  for (const destination of destinationValues) {
+    const key = destinationKey(destination);
+    if (!key) continue;
+    const duplicateIndex = destinations.findIndex(existing => {
+      const existingKey = destinationKey(existing);
+      return existingKey === key || existingKey.endsWith(` ${key}`) || key.endsWith(` ${existingKey}`);
+    });
+    if (duplicateIndex < 0) destinations.push(destination);
+    else if (destinationKey(destination).length > destinationKey(destinations[duplicateIndex]).length) destinations[duplicateIndex] = destination;
+  }
+  const shownDestinations = destinations.slice(0, 6);
+  const connectionText = shownDestinations.length ? `, including connections towards ${shownDestinations.join(', ')}${destinations.length > shownDestinations.length ? ' and other nearby destinations' : ''}` : '';
   const serviceCount = (services ?? []).length;
-  const routeSentence = serviceCount
-    ? `These stops provide access to ${routeNumbers.length} bus route${routeNumbers.length === 1 ? '' : 's'}${connectionText}. Route destinations, typical frequencies and operating periods are summarised in Table 3.3.`
-    : 'No usable bus service timetable was identified for the selected stops.';
   const frequencies = (services ?? []).map(service => String(service.typicalFrequencyText || service.typicalFrequencyLines?.join(' ') || '')).filter(Boolean);
-  const frequentCount = frequencies.filter(value => /(?:every\s+(?:5|10|12|15)\s*(?:minutes?|mins?)|(?:4|5|6|7|8|9|10|\d{2,})\s*buses?\s*\/\s*hour)/i.test(value)).length;
-  const frequency = frequentCount ? ` Several services operate at regular intervals, with ${frequentCount} service row${frequentCount === 1 ? '' : 's'} showing intervals of 15 minutes or less.` : ' Services operate at a range of frequencies.';
-  const qualification = (result?.reviewItems?.length ?? 0) ? ' Some evidence requires professional review; relevant service qualifications are shown in the tables.' : '';
-  return [`The assessment identified ${count} bus stop${count === 1 ? '' : 's'}${nearestGroupName ? ` within the nearest stop group at ${text(nearestGroupName)}` : ''}.`, `${routeSentence}${frequency}${qualification}`].join('\n\n');
+  const hasRegularService = frequencies.some(value => /typically every|every\s+\d+\s*(?:minutes?|mins?)/i.test(value));
+  const hasQualifications = (services ?? []).some(service => Boolean(service.serviceNote || Object.values(service.plannerNotes ?? {}).some(Boolean))) || (result?.reviewItems?.length ?? 0) > 0;
+  const population = nearestGroupName
+    ? `${count} assessed stop${count === 1 ? '' : 's'} in the nearest stop group at ${text(nearestGroupName)}`
+    : `${count} bus stop${count === 1 ? '' : 's'} within the assessed area`;
+  const first = serviceCount
+    ? `The assessment covers ${population}, providing access to ${routeNumbers.length} bus route${routeNumbers.length === 1 ? '' : 's'}${connectionText}.`
+    : `The assessment covers ${population}. No usable bus timetable was available for the selected stops.`;
+  const second = serviceCount
+    ? `${hasRegularService ? 'Services operate at a range of frequencies' : 'Available services operate at varying frequencies'}${hasQualifications ? ', with relevant qualifications set out in the service summary' : ''}. Destinations, typical frequencies and operating periods are summarised in Table 3.3.`
+    : 'The stops and their access information are summarised in Table 3.2.';
+  return `${first}\n\n${second}`;
 }
 
 function remapStopReference(value, references) {
@@ -83,8 +97,8 @@ export function buildBusWordTables(result, { includeMap = true } = {}) {
   if (!(result.stops ?? []).every(stop => stop.displayMapReference)) result = withNumericMapReferences(result);
   const referenceByPrevious = new Map(assessedStopRecords(result.stops).map(stop => [String(stop.originalMapReference ?? ''), String(stop.displayMapReference ?? stop.mapReference ?? '')]).filter(([previous]) => previous));
   const stopRows = assessedStopRecords(result.stops).map(stop => [
-    ...(includeMap ? [String(stop.displayMapReference || stop.mapReference || '?')] : []),
-    stop.name,
+    ...(includeMap ? [String(stop.displayMapReference || stop.mapReference || 'Unnumbered')] : []),
+    text(stop.name) || 'Unnamed bus stop',
     stop.displayDirection,
     accessText(stop.walking),
     accessText(stop.cycling),

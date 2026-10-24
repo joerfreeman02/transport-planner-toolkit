@@ -18,6 +18,7 @@ import { createBusAssessment, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/
 import { buildBusTransportStatement, buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
 import { withNumericMapReferences } from '../../../src/atlas/presentation/bus-map-references.mjs';
 import { layoutNumberedMapMarkers } from '../../../src/atlas/presentation/bus-map-layout.mjs';
+import { buildAssessmentMapPdf } from '../../../src/atlas/presentation/bus-map-pdf.mjs';
 import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-task-status.mjs';
 import { buildBusTimetablePresentationNote, buildPlannerBusServiceSummaries, plannerRouteDisplayNumber, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
@@ -378,10 +379,11 @@ function syncRadiusCircle(radiusOverride = null) {
   if (!radiusCircle) {
     radiusCircle = window.L.circle([site.latitude, site.longitude], {
       radius,
-      color: '#146b63',
-      weight: 2,
-      fillColor: '#44bba4',
-      fillOpacity: 0.12,
+        color: '#FC7315',
+        weight: 2,
+        dashArray: '7 6',
+        fillColor: '#FC7315',
+        fillOpacity: 0.1,
       interactive: false
     }).addTo(map);
   } else {
@@ -408,7 +410,7 @@ function clearRouteLines() {
 
 async function showAccessRoute(stop, mode) {
   const label = mode === 'walk' ? 'walking' : 'cycling';
-  setCallout($('stopStatus'), `Checking the ${label} route to map reference ${stop.mapReference || 'the selected stop'} — ${stop.name}…`, 'neutral');
+  setCallout($('stopStatus'), `Checking the ${label} route to map reference ${stop.mapReference || 'the selected stop'} — ${stop.name || 'Unnamed bus stop'}…`, 'neutral');
   const result = await accessRouting.geometry(confirmedSite, stop, mode);
   if (!result.ok) {
     setCallout($('stopStatus'), `The ${label} route line is temporarily unavailable. The assessment results have not been changed.`, 'warning');
@@ -419,11 +421,11 @@ async function showAccessRoute(stop, mode) {
   routeLayers.push(layer);
   $('clearRoutes').hidden = false;
   map.fitBounds(layer.getBounds().pad(.2));
-  setCallout($('stopStatus'), `${mode === 'walk' ? 'Walking' : 'Cycling'} route shown for map reference ${stop.mapReference || 'the selected stop'} — ${stop.name}.`, 'success');
+  setCallout($('stopStatus'), `${mode === 'walk' ? 'Walking' : 'Cycling'} route shown for map reference ${stop.mapReference || 'the selected stop'} — ${stop.name || 'Unnamed bus stop'}.`, 'success');
 }
 
 function plannerStopLabel(stop) {
-  return stop?.displayMapReference || stop?.mapReference || '?';
+  return stop?.displayMapReference || stop?.mapReference || 'Unnumbered';
 }
 
 function renderBusStopMarkers(stops) {
@@ -431,14 +433,14 @@ function renderBusStopMarkers(stops) {
   busStopMarkers = [];
   for (const stop of stops) {
     const marker = window.L.marker([stop.latitude, stop.longitude], {
-      title: `Map reference ${plannerStopLabel(stop)} — ${stop.name}`,
+      title: `Map reference ${plannerStopLabel(stop)} — ${stop.name || 'Unnamed bus stop'}`,
       icon: window.L.divIcon({ className: '', html: `<div class="bus-stop-marker" aria-label="Map reference ${plannerStopLabel(stop)}"><span>${plannerStopLabel(stop)}</span></div>`, iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -17] })
     }).addTo(map);
     marker.__atlasStopId = stopKey(stop);
     const popup = document.createElement('div');
     popup.className = 'bus-stop-popup';
     const name = document.createElement('strong');
-    name.textContent = `${plannerStopLabel(stop)} — ${stop.name}`;
+    name.textContent = `${plannerStopLabel(stop)} — ${stop.name || 'Unnamed bus stop'}`;
     const detail = document.createElement('p');
     detail.textContent = [stop.logicalGroupLabel, stop.indicator, stop.direction].filter(Boolean).join(' · ') || 'Direction not provided';
     const services = document.createElement('p');
@@ -547,8 +549,17 @@ function renderCandidates(result) {
     const card = document.createElement('article');
     card.className = 'candidate';
     const detail = document.createElement('div');
+    const parts = String(candidate.displayAddress || candidate.suppliedAddress || '').split(',').map(part => part.trim()).filter(Boolean);
+    const compactParts = parts.filter(part => !/^(?:England|United Kingdom)$/i.test(part));
     const address = document.createElement('p');
-    address.textContent = candidate.displayAddress;
+    address.className = 'candidate-address';
+    const primaryAddress = document.createElement('strong');
+    primaryAddress.className = 'candidate-address-primary';
+    primaryAddress.textContent = compactParts.shift() || 'Selected location';
+    const secondaryAddress = document.createElement('span');
+    secondaryAddress.className = 'candidate-address-secondary';
+    secondaryAddress.textContent = compactParts.join(', ');
+    address.append(primaryAddress, secondaryAddress);
     detail.append(address);
     const button = document.createElement('button');
     button.type = 'button';
@@ -650,12 +661,13 @@ function renderAssessment(result) {
     const selectedForReport = selectedStopIds.has(stopKey(stop));
     if (!selectedForReport) row.classList.add('diagnostic-candidate');
     row.dataset.stopId = stopKey(stop);
-    const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedStopIds.has(stopKey(stop)); include.setAttribute('aria-label', `Include ${stop.name}`);
+    const displayName = stop.name || 'Unnamed bus stop';
+    const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedStopIds.has(stopKey(stop)); include.setAttribute('aria-label', `Include ${displayName}`);
     include.addEventListener('change', () => { if (include.checked) selectedStopIds.add(stopKey(stop)); else selectedStopIds.delete(stopKey(stop)); renderAssessment(result); });
     appendCell(row, 'Include', include);
     appendCell(row, 'Map reference', plannerStopLabel(stop));
     const stopCell = document.createElement('span');
-    const stopName = document.createElement('strong'); stopName.textContent = stop.name;
+    const stopName = document.createElement('strong'); stopName.textContent = displayName;
     const mapLink = document.createElement('a'); mapLink.href = googleMapsUrl(stop); mapLink.target = '_blank'; mapLink.rel = 'noopener noreferrer'; mapLink.textContent = 'Open in Google Maps';
     stopCell.append(stopName, document.createElement('br'), mapLink);
     appendCell(row, 'Stop name', stopCell);
@@ -693,7 +705,7 @@ function renderAssessment(result) {
     const body = document.createElement('tbody');
     for (const stop of otherNearbyRecords) {
       const row = document.createElement('tr');
-      for (const value of [stop.mapReference || '?', stop.name || 'Stop name not supplied', stop.displayDirection || stop.indicator || 'Not supplied', formatAccess(stop.walking), 'No route information is currently available in the source']) {
+      for (const value of [stop.mapReference || 'Unnumbered', stop.name || 'Unnamed bus stop', stop.displayDirection || stop.indicator || 'Not supplied', formatAccess(stop.walking), 'No route information is currently available in the source']) {
         const cell = document.createElement('td'); cell.textContent = value; row.append(cell);
       }
       row.dataset.stopId = stopKey(stop);
@@ -1061,7 +1073,7 @@ async function exportBusWord() {
   if ((report.reviewItems?.length ?? 0) && !$('plannerReviewAcknowledgement').checked) return setCallout($('exportStatus'), 'Review the flagged Sources & Checks and acknowledge them before formal export.', 'warning');
   const includeMap = $('includeMapInWord').checked;
   let mapPngDataUrl = null;
-  try { if (includeMap) mapPngDataUrl = await exportAssessmentMap({ download: false }); }
+  try { if (includeMap) mapPngDataUrl = await exportAssessmentMap({ download: false, includeStopKey: false }); }
   catch { return setCallout($('exportStatus'), 'The assessment map could not be prepared for the Word report. Turn off the map option or return to Results and try again.', 'error'); }
   if (includeMap && !mapPngDataUrl) return setCallout($('exportStatus'), 'The assessment map could not be prepared for the Word report.', 'error');
   const presentationReport = withNumericMapReferences(report, { referenceStops: currentBusResult.stops });
@@ -1073,7 +1085,7 @@ function escapeSvg(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[character]);
 }
 
-async function exportAssessmentMap({ download = true } = {}) {
+async function exportAssessmentMap({ download = true, includeStopKey = download } = {}) {
   if (!currentBusResult?.ok || !confirmedSite) { if (download) setCallout($('exportStatus'), 'Build a Bus assessment before exporting the map.', 'warning'); return null; }
   if ((currentBusResult.reviewItems?.length ?? 0) && !$('plannerReviewAcknowledgement').checked) { if (download) setCallout($('exportStatus'), 'Review the flagged Sources & Checks and acknowledge them before formal export.', 'warning'); return null; }
   const report = withNumericMapReferences(selectedResult(), { referenceStops: currentBusResult.stops });
@@ -1104,7 +1116,7 @@ async function exportAssessmentMap({ download = true } = {}) {
     const mapHeight = Math.round(mapSize.y * scale);
     const top = 88;
     const keyColumns = 2;
-    const keyRows = Math.ceil(stops.length / keyColumns);
+    const keyRows = includeStopKey ? Math.ceil(stops.length / keyColumns) : 0;
     const height = top + mapHeight + 72 + Math.max(1, keyRows) * 21 + 34;
     const project = point => {
       const pixel = leafletMap.project([Number(point.latitude), Number(point.longitude)], zoom);
@@ -1126,14 +1138,14 @@ async function exportAssessmentMap({ download = true } = {}) {
     const tileMarkup = tiles.map(tile => `<image x="${(tile.x * scale).toFixed(1)}" y="${(top + tile.y * scale).toFixed(1)}" width="${(256 * scale).toFixed(1)}" height="${(256 * scale).toFixed(1)}" href="${tile.uri}"/>`).join('');
     const siteMarker = `<path d="M ${sitePoint.x - 14} ${sitePoint.y} L ${sitePoint.x} ${sitePoint.y + 24} L ${sitePoint.x + 14} ${sitePoint.y} L ${sitePoint.x + 14} ${sitePoint.y - 15} A 14 14 0 1 0 ${sitePoint.x - 14} ${sitePoint.y - 15} Z" fill="#fc7315" stroke="#fff" stroke-width="4"/><circle cx="${sitePoint.x}" cy="${sitePoint.y - 15}" r="4" fill="#fff"/>`;
     const identity = escapeSvg(confirmedSite.displayAddress || confirmedSite.suppliedAddress || 'Bus assessment');
-    const key = stops.map((stop, index) => {
+    const key = includeStopKey ? stops.map((stop, index) => {
       const column = index < keyRows ? 0 : 1;
       const row = index % keyRows;
       const x = 40 + column * Math.round(width / keyColumns);
       const y = top + mapHeight + 66 + row * 21;
-      const name = escapeSvg(`${plannerStopLabel(stop)} · ${stop.name || 'Bus stop'}${stop.indicator ? ` — ${stop.indicator}` : ''}`.slice(0, 72));
+      const name = escapeSvg(`${plannerStopLabel(stop)} · ${stop.name || 'Unnamed bus stop'}${stop.indicator ? ` — ${stop.indicator}` : ''}`.slice(0, 120));
       return `<circle cx="${x + 8}" cy="${y - 4}" r="8" fill="#002761"/><text x="${x + 8}" y="${y}" text-anchor="middle" font-family="Roboto,Arial,sans-serif" font-size="9" font-weight="700" fill="#fff">${plannerStopLabel(stop)}</text><text x="${x + 22}" y="${y}" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">${name}</text>`;
-    }).join('');
+    }).join('') : '';
     const leafletOrigin = leafletMap.unproject([pixelOrigin.x + mapSize.x - 100, pixelOrigin.y + mapSize.y - 35], zoom);
     const leafletScaleEnd = leafletMap.unproject([pixelOrigin.x + mapSize.x, pixelOrigin.y + mapSize.y - 35], zoom);
     const measuredMetres = leafletMap.distance(leafletOrigin, leafletScaleEnd);
@@ -1142,11 +1154,19 @@ async function exportAssessmentMap({ download = true } = {}) {
     const scaleWidth = Math.min(100, (scaleLabelMetres / measuredMetres) * 100) * scale;
     const scaleMarkup = `<g transform="translate(${width - scaleWidth - 28} ${top + mapHeight - 22})"><rect width="${scaleWidth.toFixed(1)}" height="5" fill="#061d37"/><text x="0" y="-6" font-family="Roboto,Arial,sans-serif" font-size="11" font-weight="700" fill="#061d37">${scaleLabelMetres >= 1000 ? `${(scaleLabelMetres / 1000).toLocaleString('en-GB')} km` : `${scaleLabelMetres.toLocaleString('en-GB')} m`}</text></g>`;
     const north = `<g transform="translate(${width - 34} ${top + 20})"><text x="0" y="0" text-anchor="middle" font-family="Roboto,Arial,sans-serif" font-size="12" font-weight="700" fill="#061d37">N</text><path d="M 0 8 L -7 27 L 0 23 L 7 27 Z" fill="#061d37"/></g>`;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc"><title id="title">Bus Assessment Map — ${identity}</title><desc id="desc">OpenStreetMap context with an orange assessment point, numbered assessed stops, and a subdued assessment-radius overlay. Route geometry is not shown.</desc><rect width="100%" height="100%" fill="#fff"/><text x="32" y="34" font-family="Roboto,Arial,sans-serif" font-size="23" font-weight="700" fill="#061d37">Bus Assessment Map</text><text x="32" y="59" font-family="Roboto,Arial,sans-serif" font-size="13" fill="#475b70">${identity}</text><defs><clipPath id="mapClip"><rect x="0" y="${top}" width="${width}" height="${mapHeight}" rx="7"/></clipPath></defs><rect x="0" y="${top}" width="${width}" height="${mapHeight}" fill="#e8eef2"/><g clip-path="url(#mapClip)">${tileMarkup}${ring}${pointMarkup}${siteMarker}${north}${scaleMarkup}</g><rect x="0" y="${top}" width="${width}" height="${mapHeight}" rx="7" fill="none" stroke="#aab8c4"/><g transform="translate(32 ${top + mapHeight + 28})"><circle cx="8" cy="0" r="8" fill="#fc7315"/><text x="22" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">Assessment point</text><circle cx="150" cy="0" r="8" fill="#002761"/><text x="164" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">Assessed stop</text>${ring ? `<line x1="285" y1="0" x2="320" y2="0" stroke="#fc7315" stroke-width="2" stroke-dasharray="6 5"/><text x="328" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">${radius} m assessment radius</text>` : ''}</g>${key}<text x="32" y="${height - 13}" font-family="Roboto,Arial,sans-serif" font-size="10" fill="#64748b">Map data © OpenStreetMap contributors · Assessment point and stop positions from the checked assessment</text></svg>`;
+    const radiusLegend = `<line x1="285" y1="0" x2="320" y2="0" stroke="#fc7315" stroke-width="2" stroke-dasharray="6 5"/><text x="328" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">Assessment radius${report.assessmentMode === 'nearest' ? ' (where applicable)' : ` · ${radius} m`}</text>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc"><title id="title">Bus Assessment Map — ${identity}</title><desc id="desc">OpenStreetMap context with an orange assessment point, numbered assessed stops, and a subdued assessment-radius overlay. Route geometry is not shown.</desc><rect width="100%" height="100%" fill="#fff"/><text x="32" y="34" font-family="Roboto,Arial,sans-serif" font-size="23" font-weight="700" fill="#061d37">Bus Assessment Map</text><text x="32" y="59" font-family="Roboto,Arial,sans-serif" font-size="13" fill="#475b70">${identity}</text><defs><clipPath id="mapClip"><rect x="0" y="${top}" width="${width}" height="${mapHeight}" rx="7"/></clipPath></defs><rect x="0" y="${top}" width="${width}" height="${mapHeight}" fill="#e8eef2"/><g clip-path="url(#mapClip)">${tileMarkup}${ring}${pointMarkup}${siteMarker}${north}${scaleMarkup}</g><rect x="0" y="${top}" width="${width}" height="${mapHeight}" rx="7" fill="none" stroke="#aab8c4"/><g transform="translate(32 ${top + mapHeight + 28})"><circle cx="8" cy="0" r="8" fill="#fc7315"/><text x="22" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">Assessment point</text><circle cx="150" cy="0" r="8" fill="#002761"/><text x="164" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">Assessed stop</text>${radiusLegend}</g>${key}<text x="32" y="${height - 13}" font-family="Roboto,Arial,sans-serif" font-size="10" fill="#64748b">Map data © OpenStreetMap contributors · Assessment point and stop positions from the checked assessment</text></svg>`;
     const png = await svgToPngDataUrl(svg);
     if (!download) return png;
-    const link = document.createElement('a'); link.href = png; link.download = busWordFilename(confirmedSite).replace(/\.docx$/i, '').replace(/^Bus Assessment - /, 'Bus Assessment Map - ') + '.png'; link.click();
-    setCallout($('exportStatus'), `Standalone PNG map exported with ${stops.length} numbered stop references and the displayed map context.`, 'success');
+    const image = new Image(); image.src = png; await image.decode();
+    const canvas = document.createElement('canvas'); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+    canvas.getContext('2d', { alpha: false }).drawImage(image, 0, 0);
+    const jpeg = await new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Map image encoding failed.')), 'image/jpeg', .94));
+    const pdfBytes = buildAssessmentMapPdf(new Uint8Array(await jpeg.arrayBuffer()), canvas.width, canvas.height);
+    const objectUrl = URL.createObjectURL(new Blob([pdfBytes], { type: 'application/pdf' }));
+    const link = document.createElement('a'); link.href = objectUrl; link.download = busWordFilename(confirmedSite).replace(/\.docx$/i, '').replace(/^Bus Assessment - /, 'Bus Assessment Map - ') + '.pdf'; link.click();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    setCallout($('exportStatus'), `Standalone A3 PDF map exported with ${stops.length} numbered stop references and the displayed map context.`, 'success');
   } catch {
     if (download) setCallout($('exportStatus'), 'A standalone map could not be prepared from the displayed assessment map tiles. Return to Results, wait for the map to finish loading, and try again.', 'error');
     return null;

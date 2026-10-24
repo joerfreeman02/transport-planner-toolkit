@@ -23,7 +23,7 @@
         <button type="button" data-view="modules" class="active">Modules</button>
         <button type="button" data-view="about">About</button>
       </nav>
-      <div class="build" aria-label="ATLAS release build"><b>Release · 2.0.0-alpha.15</b><span>ATLAS-2.0.0-alpha.15-20260914</span></div>
+      <div class="build" aria-label="Current product"><b>ATLAS · Bus Beta</b><span>Version details in About</span></div>
     </div>
   </header>
 
@@ -87,7 +87,8 @@
     <section class="view" data-view-panel="bus" hidden>
       <section class="workspace" id="site-workspace" aria-labelledby="site-selector-title">
         <div class="workspace-header">
-          <div><p class="eyebrow">ATLAS Bus Assessment</p><h1 id="site-selector-title">Assess nearby bus access</h1><p>Use trusted stop, route and timetable evidence to prepare a reviewable site assessment.</p></div>
+          <img class="workspace-module-art" src="assets/images/modules/bus.png" alt="" aria-hidden="true">
+          <div class="workspace-header-copy"><p class="eyebrow">ATLAS Bus Assessment</p><h1 id="site-selector-title">Assess nearby bus access</h1><p>Use trusted stop, route and timetable evidence to prepare a reviewable site assessment.</p></div>
           <button id="newAssessment" class="secondary" type="button">New assessment</button>
         </div>
 
@@ -115,7 +116,7 @@
               </form>
               <div id="geocodeStatus" class="callout neutral" role="status">Enter the site address or name and choose Find site.</div>
               <div id="candidateList" class="candidate-list" aria-live="polite"></div>
-              <button id="chooseOnMap" class="map-fallback" type="button">Can't find the site? Choose it on the map</button>
+              <button id="chooseOnMap" class="secondary map-fallback" type="button">Choose location on map</button>
             </div>
             <div id="siteStageSummary" class="stage-summary" hidden><strong id="siteStageSummaryText"></strong><button id="changeSite" class="secondary compact" type="button">Change site</button></div>
           </section>
@@ -231,7 +232,7 @@
           <div class="export-heading"><p class="eyebrow">Step 6 · Export</p><h2 id="export-heading">Prepare assessment outputs</h2><p>Both outputs use the current checked assessment and its selected stops and service summaries.</p></div>
           <div class="export-grid">
             <article class="export-card"><span class="export-icon" aria-hidden="true">▤</span><h3>Word assessment</h3><p>Prepare a planning-facing assessment with transport findings, service tables and applicable qualifications.</p><label class="export-option"><input id="includeMapInWord" type="checkbox" checked> Include assessment map in Word report</label><button id="exportBusWord" class="primary" type="button" disabled>Export Word (.docx)</button></article>
-            <article class="export-card"><span class="export-icon" aria-hidden="true">⌖</span><h3>Assessment map</h3><p>Download a high-resolution map with the assessment point, numbered assessed stops, symbology and a stop-name key. No route geometry is invented.</p><button id="exportAssessmentMap" class="secondary" type="button" disabled>Export assessment map (.png)</button></article>
+            <article class="export-card"><span class="export-icon" aria-hidden="true">⌖</span><h3>Assessment map</h3><p>Download a report-ready map with the assessment point, numbered assessed stops, symbology and a stop-name key. No route geometry is invented.</p><button id="exportAssessmentMap" class="secondary" type="button" disabled>Export assessment map (.pdf)</button></article>
           </div>
           <div id="plannerReviewGate" class="planner-review-gate" hidden><label><input id="plannerReviewAcknowledgement" type="checkbox"> I have reviewed the flagged Sources &amp; Checks</label><span id="plannerReviewGateStatus">Review the evidence drawer before formal export.</span></div><div id="exportStatus" class="callout neutral" role="status">Complete an assessment before exporting.</div>
           <button id="returnToResults" class="secondary compact" type="button">Back to Results</button>

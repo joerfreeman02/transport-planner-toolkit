@@ -176,10 +176,12 @@ function activateWorkflowStage(stage) {
   const taskStatusHost = next === 5 ? $('resultsTaskStatusHost') : next === 6 ? $('exportTaskStatusHost') : null;
   if (taskStatusHost) taskStatusHost.append($('taskStatus'));
   else $('taskStatusHome').after($('taskStatus'));
-  layout.hidden = next >= 5;
+  layout.hidden = next === 6;
   evidencePanel.hidden = next !== 5;
   exportPanel.hidden = next !== 6;
+  $('persistentMapPanel').hidden = next >= 5;
   $('site-step-card').classList.toggle('workflow-active', next === 1);
+  $('site-step-card').classList.toggle('workflow-supporting', Boolean(confirmedSite) && next >= 2);
   $('location-step-card').classList.toggle('workflow-active', next === 2);
   $('confirm-point-step-card').classList.toggle('workflow-active', next === 2);
   $('confirm-point-step-card').classList.toggle('workflow-supporting', next === 2);
@@ -188,11 +190,23 @@ function activateWorkflowStage(stage) {
   $('assessmentSettingsPanel').hidden = next !== 3;
   $('assessmentRunPanel').hidden = next !== 4;
   $('assessmentSetupContent').hidden = false;
-  $('siteSetupContent').hidden = false;
+  $('siteSetupContent').hidden = Boolean(confirmedSite);
   $('locationSetupContent').hidden = false;
   $('confirmSetupContent').hidden = false;
-  $('siteStageSummary').hidden = true;
-  $('assessmentStageSummary').hidden = true;
+  $('location-step-card').classList.toggle('workflow-supporting', next === 5);
+  $('assessment-step-card').classList.toggle('workflow-supporting', next === 5);
+  $('confirm-point-step-card').classList.toggle('workflow-supporting', false);
+  $('siteStageSummary').hidden = !confirmedSite;
+  $('locationStageSummary').hidden = next !== 5;
+  $('assessmentStageSummary').hidden = next !== 5;
+  if (next === 5) {
+    $('locationSetupContent').hidden = true;
+    $('confirmSetupContent').hidden = true;
+    $('assessmentSetupContent').hidden = true;
+    $('siteStageSummaryText').textContent = `Site confirmed · ${compactSiteLabel(confirmedSite)}`;
+    $('locationStageSummaryText').textContent = 'Assessment point confirmed';
+    collapseAssessmentSetup(true);
+  }
   document.querySelectorAll('[data-workflow-step]').forEach(button => {
     const buttonStage = Number(button.dataset.workflowStep);
     button.classList.toggle('active', buttonStage === next);
@@ -211,7 +225,10 @@ function activateWorkflowStage(stage) {
   })[next] || 'Assessment map and deterministic stop references.';
   if (next < 5) moveResultsMap(false);
   if (next === 5) moveResultsMap(true);
-  setTimeout(() => map?.invalidateSize({ pan: false, animate: false }), 0);
+  setTimeout(() => {
+    map?.invalidateSize({ pan: false, animate: false });
+    if (next === 5) evidencePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 0);
 }
 
 function setCallout(element, message, state = 'neutral') {
@@ -240,6 +257,11 @@ function plannerFailure(kind, result) {
 function assessmentWording(result, services, selectedIds = null) {
   const presented = (services ?? []).filter(service => !selectedIds || (selectedIds.has(serviceKey(service)) && service.stopIds?.some(id => result.stops.some(stop => selectedIds.has(stopKey(stop)) && String(id) === stopKey(stop)))));
   return buildBusTransportStatement(result, { services: presented, nearestGroupName: result.nearestGroup?.name ?? null });
+}
+
+function compactSiteLabel(site) {
+  const address = String(site?.displayAddress || site?.suppliedAddress || '').split(',').map(part => part.trim()).filter(Boolean);
+  return address.slice(0, 2).join(', ') || 'Selected location';
 }
 
 function plannerAnnotationEntries(service) {
@@ -298,12 +320,14 @@ function captureMapExportContext() {
 
 function collapseSiteSetup(collapsed) {
   $('siteStageSummary').hidden = !collapsed;
-  if (collapsed) $('siteStageSummaryText').textContent = `${confirmedSite?.displayAddress || confirmedSite?.suppliedAddress || 'Assessment point'} · Assessment point confirmed`;
+  if (collapsed) $('siteStageSummaryText').textContent = `Site confirmed · ${compactSiteLabel(confirmedSite)}`;
 }
 
 function collapseAssessmentSetup(collapsed) {
   $('assessmentStageSummary').hidden = !collapsed;
-  if (collapsed) $('assessmentStageSummaryText').textContent = `${lastAssessmentMode === 'nearest' ? 'Nearest stop assessment' : 'Full assessment'} · ${selectedRadius()} m radius`;
+  if (collapsed) $('assessmentStageSummaryText').textContent = lastAssessmentMode === 'nearest'
+    ? `Nearest stop group · ${currentBusResult?.nearestGroup?.name || 'selected logical stop group'}`
+    : `Full Bus assessment · ${selectedRadius()} m`;
 }
 
 function clearBusEvidence(message = 'Confirm the assessment point before checking nearby bus stops.') {
@@ -383,16 +407,19 @@ function syncRadiusCircle(radiusOverride = null) {
   if (!radiusCircle) {
     radiusCircle = window.L.circle([site.latitude, site.longitude], {
       radius,
-        color: '#FC7315',
+        color: '#154A8B',
         weight: 2,
         dashArray: '7 6',
-        fillColor: '#FC7315',
-        fillOpacity: 0.1,
+        fillColor: '#154A8B',
+      fillOpacity: 0.08,
       interactive: false
     }).addTo(map);
   } else {
     radiusCircle.setLatLng([site.latitude, site.longitude]);
     radiusCircle.setRadius(radius);
+  }
+  if (Number.isFinite(radius) && radius > 0) {
+    map.fitBounds(radiusCircle.getBounds(), { padding: [24, 24], maxZoom: 15, animate: false });
   }
 }
 
@@ -832,7 +859,10 @@ function renderAssessment(result) {
   const stopSource = providerLabel({ provenance: stopProvenance });
   const foundStopCount = Number(result.discoveredStopCount ?? result.discoveredStops?.length ?? result.stops.length);
   const stopCountText = foundStopCount !== result.stops.length ? `${foundStopCount} stops found · ${result.stops.length} assessed` : `${result.stops.length} stops assessed`;
-  $('evidenceSummary').textContent = `${result.assessmentMode === 'nearest' ? `Nearest stop group: ${result.nearestGroup?.name || 'selected group'} · ` : ''}${stopCountText} · ${presentedServices.length} service summar${presentedServices.length === 1 ? 'y' : 'ies'}`;
+  $('evidenceSummary').textContent = `${stopCountText} · ${presentedServices.length} service summar${presentedServices.length === 1 ? 'y' : 'ies'}`;
+  $('assessmentModeSummary').textContent = result.assessmentMode === 'nearest'
+    ? `Nearest stop group · ${result.nearestGroup?.name || 'selected logical stop group'}`
+    : `Full Bus assessment · ${selectedRadius()} m`;
   const timetablePresentation = buildTimetableSourcePresentation(timetableProvenance, result.services ?? []);
   const timetableLabel = timetablePresentation.label;
   $('resultSource').textContent = `${stopSource}; ${timetableLabel}; OpenStreetMap routing`;
@@ -1089,7 +1119,14 @@ async function exportAssessmentMap({ download = true, includeStopKey = download 
   if (!currentBusResult?.ok || !confirmedSite) { if (download) setCallout($('exportStatus'), 'Build a Bus assessment before exporting the map.', 'warning'); return null; }
   if ((currentBusResult.reviewItems?.length ?? 0) && !$('plannerReviewAcknowledgement').checked) { if (download) setCallout($('exportStatus'), 'Review the flagged Sources & Checks and acknowledge them before formal export.', 'warning'); return null; }
   const report = withNumericMapReferences(selectedResult(), { referenceStops: currentBusResult.stops });
-  const stops = report.stops.filter(stop => !isOtherNearbyStopRecord(stop) && Number.isFinite(Number(stop.latitude)) && Number.isFinite(Number(stop.longitude)));
+  const assessedStops = report.stops.filter(stop => !isOtherNearbyStopRecord(stop));
+  const mapReferenceByStopId = new Map(assessedStops.map((stop, index) => {
+    const displayReference = String(stop.displayMapReference ?? '');
+    const storedReference = String(stop.mapReference ?? '');
+    const reference = /^\d+$/u.test(displayReference) ? displayReference : /^\d+$/u.test(storedReference) ? storedReference : String(index + 1);
+    return [String(stop.id ?? stop.sourceId ?? ''), reference];
+  }));
+  const stops = assessedStops.filter(stop => Number.isFinite(Number(stop.latitude)) && Number.isFinite(Number(stop.longitude)));
   const leafletMap = map;
   let context = mapExportContext;
   if (!context) {
@@ -1126,15 +1163,17 @@ async function exportAssessmentMap({ download = true, includeStopKey = download 
     const sitePoint = project(site);
     const projectedStops = stops.map(stop => ({ stop, ...project(stop) }));
     const positionedStops = layoutNumberedMapMarkers(projectedStops.map(({ stop, ...point }) => ({ ...point, item: stop })), { width, top, mapHeight });
-    const pointMarkup = positionedStops.map(({ item: stop, point, original, displaced }) => {
-      const reference = escapeSvg(plannerStopLabel(stop));
+    const pointMarkup = positionedStops.map(({ item: marker, point, original, displaced }) => {
+      const stop = marker.item;
+      const stopId = String(stop.id ?? stop.sourceId ?? '');
+      const reference = escapeSvg(mapReferenceByStopId.get(stopId) || stop.displayMapReference || stop.mapReference || 'Unnumbered');
       const leader = displaced ? `<line x1="${original.x.toFixed(1)}" y1="${original.y.toFixed(1)}" x2="${point.x.toFixed(1)}" y2="${point.y.toFixed(1)}" stroke="#061d37" stroke-opacity=".7" stroke-width="1"/>` : '';
       return `<g>${leader}<circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="13" fill="#002761" stroke="#fff" stroke-width="4"/><text x="${point.x.toFixed(1)}" y="${(point.y + 4).toFixed(1)}" text-anchor="middle" font-family="Roboto,Arial,sans-serif" font-size="10" font-weight="700" fill="#fff">${reference}</text></g>`;
     }).join('');
     const radius = Number(report.provenance?.stops?.actualDiscoveryRadiusMetres || report.provenance?.stops?.radiusMetres || selectedRadius());
     const metresPerPixel = 156543.03392 * Math.max(.15, Math.cos(site.latitude * Math.PI / 180)) / (2 ** zoom);
     const radiusPx = report.assessmentMode === 'nearest' ? 0 : radius / metresPerPixel * scale;
-    const ring = radiusPx > 0 ? `<circle cx="${sitePoint.x.toFixed(1)}" cy="${sitePoint.y.toFixed(1)}" r="${radiusPx.toFixed(1)}" fill="#fc7315" fill-opacity=".045" stroke="#fc7315" stroke-opacity=".72" stroke-width="2" stroke-dasharray="8 7"/>` : '';
+    const ring = radiusPx > 0 ? `<circle cx="${sitePoint.x.toFixed(1)}" cy="${sitePoint.y.toFixed(1)}" r="${radiusPx.toFixed(1)}" fill="#154a8b" fill-opacity=".08" stroke="#154a8b" stroke-opacity=".8" stroke-width="2" stroke-dasharray="8 7"/>` : '';
     const tileMarkup = tiles.map(tile => `<image x="${(tile.x * scale).toFixed(1)}" y="${(top + tile.y * scale).toFixed(1)}" width="${(256 * scale).toFixed(1)}" height="${(256 * scale).toFixed(1)}" href="${tile.uri}"/>`).join('');
     const siteMarker = `<path d="M ${sitePoint.x - 14} ${sitePoint.y} L ${sitePoint.x} ${sitePoint.y + 24} L ${sitePoint.x + 14} ${sitePoint.y} L ${sitePoint.x + 14} ${sitePoint.y - 15} A 14 14 0 1 0 ${sitePoint.x - 14} ${sitePoint.y - 15} Z" fill="#fc7315" stroke="#fff" stroke-width="4"/><circle cx="${sitePoint.x}" cy="${sitePoint.y - 15}" r="4" fill="#fff"/>`;
     const identity = escapeSvg(confirmedSite.displayAddress || confirmedSite.suppliedAddress || 'Bus assessment');
@@ -1143,8 +1182,9 @@ async function exportAssessmentMap({ download = true, includeStopKey = download 
       const row = index % keyRows;
       const x = 40 + column * Math.round(width / keyColumns);
       const y = top + mapHeight + 66 + row * 21;
-      const name = escapeSvg(`${plannerStopLabel(stop)} · ${stop.name || 'Unnamed bus stop'}${stop.indicator ? ` — ${stop.indicator}` : ''}`.slice(0, 120));
-      return `<circle cx="${x + 8}" cy="${y - 4}" r="8" fill="#002761"/><text x="${x + 8}" y="${y}" text-anchor="middle" font-family="Roboto,Arial,sans-serif" font-size="9" font-weight="700" fill="#fff">${plannerStopLabel(stop)}</text><text x="${x + 22}" y="${y}" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">${name}</text>`;
+      const stopId = String(stop.id ?? stop.sourceId ?? '');
+      const reference = mapReferenceByStopId.get(stopId) || stop.displayMapReference || stop.mapReference || String(index + 1);
+      return `<circle cx="${x + 8}" cy="${y - 4}" r="8" fill="#002761"/><text x="${x + 8}" y="${y}" text-anchor="middle" font-family="Roboto,Arial,sans-serif" font-size="9" font-weight="700" fill="#fff">${reference}</text><text x="${x + 22}" y="${y}" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">${reference} · ${escapeSvg(stop.name || 'Unnamed bus stop')}${stop.indicator ? ` — ${escapeSvg(stop.indicator)}` : ''}</text>`;
     }).join('') : '';
     const leafletOrigin = leafletMap.unproject([pixelOrigin.x + mapSize.x - 100, pixelOrigin.y + mapSize.y - 35], zoom);
     const leafletScaleEnd = leafletMap.unproject([pixelOrigin.x + mapSize.x, pixelOrigin.y + mapSize.y - 35], zoom);
@@ -1154,8 +1194,8 @@ async function exportAssessmentMap({ download = true, includeStopKey = download 
     const scaleWidth = Math.min(100, (scaleLabelMetres / measuredMetres) * 100) * scale;
     const scaleMarkup = `<g transform="translate(${width - scaleWidth - 28} ${top + mapHeight - 22})"><rect width="${scaleWidth.toFixed(1)}" height="5" fill="#061d37"/><text x="0" y="-6" font-family="Roboto,Arial,sans-serif" font-size="11" font-weight="700" fill="#061d37">${scaleLabelMetres >= 1000 ? `${(scaleLabelMetres / 1000).toLocaleString('en-GB')} km` : `${scaleLabelMetres.toLocaleString('en-GB')} m`}</text></g>`;
     const north = `<g transform="translate(${width - 34} ${top + 20})"><text x="0" y="0" text-anchor="middle" font-family="Roboto,Arial,sans-serif" font-size="12" font-weight="700" fill="#061d37">N</text><path d="M 0 8 L -7 27 L 0 23 L 7 27 Z" fill="#061d37"/></g>`;
-    const radiusLegend = `<line x1="285" y1="0" x2="320" y2="0" stroke="#fc7315" stroke-width="2" stroke-dasharray="6 5"/><text x="328" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">Assessment radius${report.assessmentMode === 'nearest' ? ' (where applicable)' : ` · ${radius} m`}</text>`;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc"><title id="title">Bus Assessment Map — ${identity}</title><desc id="desc">OpenStreetMap context with an orange assessment point, numbered assessed stops, and a subdued assessment-radius overlay. Route geometry is not shown.</desc><rect width="100%" height="100%" fill="#fff"/><text x="32" y="34" font-family="Roboto,Arial,sans-serif" font-size="23" font-weight="700" fill="#061d37">Bus Assessment Map</text><text x="32" y="59" font-family="Roboto,Arial,sans-serif" font-size="13" fill="#475b70">${identity}</text><defs><clipPath id="mapClip"><rect x="0" y="${top}" width="${width}" height="${mapHeight}" rx="7"/></clipPath></defs><rect x="0" y="${top}" width="${width}" height="${mapHeight}" fill="#e8eef2"/><g clip-path="url(#mapClip)">${tileMarkup}${ring}${pointMarkup}${siteMarker}${north}${scaleMarkup}</g><rect x="0" y="${top}" width="${width}" height="${mapHeight}" rx="7" fill="none" stroke="#aab8c4"/><g transform="translate(32 ${top + mapHeight + 28})"><circle cx="8" cy="0" r="8" fill="#fc7315"/><text x="22" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">Assessment point</text><circle cx="150" cy="0" r="8" fill="#002761"/><text x="164" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">Assessed stop</text>${radiusLegend}</g>${key}<text x="32" y="${height - 13}" font-family="Roboto,Arial,sans-serif" font-size="10" fill="#64748b">Map data © OpenStreetMap contributors · Assessment point and stop positions from the checked assessment</text></svg>`;
+    const radiusLegend = report.assessmentMode === 'nearest' ? '' : `<line x1="285" y1="0" x2="320" y2="0" stroke="#154a8b" stroke-width="2" stroke-dasharray="6 5"/><text x="328" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">Assessment radius · ${radius} m</text>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc"><title id="title">Bus Assessment Map — ${identity}</title><desc id="desc">OpenStreetMap context with an orange assessment point, numbered assessed stops${report.assessmentMode === 'nearest' ? '' : ', and a supporting-blue assessment-radius overlay'}. Route geometry is not shown.</desc><rect width="100%" height="100%" fill="#fff"/><text x="32" y="34" font-family="Roboto,Arial,sans-serif" font-size="23" font-weight="700" fill="#061d37">Bus Assessment Map</text><text x="32" y="59" font-family="Roboto,Arial,sans-serif" font-size="13" fill="#475b70">${identity}</text><defs><clipPath id="mapClip"><rect x="0" y="${top}" width="${width}" height="${mapHeight}" rx="7"/></clipPath></defs><rect x="0" y="${top}" width="${width}" height="${mapHeight}" fill="#e8eef2"/><g clip-path="url(#mapClip)">${tileMarkup}${ring}${siteMarker}${pointMarkup}${north}${scaleMarkup}</g><rect x="0" y="${top}" width="${width}" height="${mapHeight}" rx="7" fill="none" stroke="#aab8c4"/><g transform="translate(32 ${top + mapHeight + 28})"><circle cx="8" cy="0" r="8" fill="#fc7315"/><text x="22" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">Assessment point</text><circle cx="150" cy="0" r="8" fill="#002761"/><text x="164" y="4" font-family="Roboto,Arial,sans-serif" font-size="12" fill="#26394d">Assessed stop</text>${radiusLegend}</g>${key}<text x="32" y="${height - 13}" font-family="Roboto,Arial,sans-serif" font-size="10" fill="#64748b">Map data © OpenStreetMap contributors · Assessment point and stop positions from the checked assessment</text></svg>`;
     const png = await svgToPngDataUrl(svg);
     if (!download) return png;
     const image = new Image(); image.src = png; await image.decode();
@@ -1241,7 +1281,7 @@ $('chooseOnMap').addEventListener('click', () => {
 $('coordinatesForm').addEventListener('submit', enterCoordinates);
 $('confirmAssessmentPoint').addEventListener('click', confirmAssessmentPoint);
 $('changeSite').addEventListener('click', clearSelection);
-$('changeAssessment').addEventListener('click', () => { clearStaleBusAssessment(); $('assessmentSetupContent').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+$('changeAssessment').addEventListener('click', () => { clearStaleBusAssessment(); activateWorkflowStage(3); $('assessmentSetupContent').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
 $('radius').addEventListener('input', () => { radiusTouched = true; clearStaleBusAssessment(); syncRadiusCircle(); });
 $('findNearestStops').addEventListener('click', () => loadStops(false, 'nearest'));
 $('findStops').addEventListener('click', () => loadStops(false, 'full'));

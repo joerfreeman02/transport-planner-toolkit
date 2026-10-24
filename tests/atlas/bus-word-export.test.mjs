@@ -19,7 +19,7 @@ const mapOn = buildBusWordTables(result);
 const mapOff = buildBusWordTables(result,{includeMap:false});
 const narrative = buildBusTransportStatement(result);
 assert.equal(narrative.split('\n\n').length,2);
-assert.match(narrative,/assessment covers 2 bus stops/i);
+assert.match(narrative,/A total of 2 bus stops are located within the assessed area/i);
 assert.match(narrative,/Waltham Cross Railway Station/);
 assert.doesNotMatch(narrative,/Waltham Cross Railway Station, Railway Station/);
 assert.doesNotMatch(narrative,/checked evidence|planner-facing|ATLAS/i);
@@ -38,7 +38,8 @@ const mapPng='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC
 const blob=docxBlob('Bus Assessment',mapOn,narrative,{wordingPlacement:'before',mapPngDataUrl:mapPng});
 const decoded=new TextDecoder().decode(new Uint8Array(await blob.arrayBuffer()));
 assert.equal(String.fromCharCode(...new Uint8Array(await blob.arrayBuffer()).slice(0,2)),'PK');
-assert.ok(decoded.indexOf('Transport Statement wording')<decoded.indexOf('Bus Assessment Map')&&decoded.indexOf('Bus Assessment Map')<decoded.indexOf('Table 3.2 - Bus Stop Summary'));
+assert.ok(decoded.indexOf('Bus Services')<decoded.indexOf('Bus Assessment Map')&&decoded.indexOf('Bus Assessment Map')<decoded.indexOf('Table 3.2 - Bus Stop Summary'));
+assert.doesNotMatch(decoded,/Transport Statement wording/i);
 assert.match(decoded,/word\/media\/assessment-map\.png/);
 assert.match(decoded,/w:sz w:val="12"/,'table cells and notes use 6 pt Word text');
 assert.doesNotMatch(decoded,/ATLAS|Private raw source failure|Planner review required/i);

@@ -8,6 +8,12 @@ const workspaceCss = fs.readFileSync(new URL('../../atlas/assets/css/bus-beta-wo
 assert.match(html, /2\.0\.0-alpha\.15/);
 assert.match(html, /ATLAS-2\.0\.0-alpha\.15-20260914/);
 assert.match(html, /id="workflowRail"[\s\S]*data-workflow-step="6"/);
+assert.match(html, /id="assessmentModeSummary"/);
+assert.match(html, /<h4 id="wording-heading">Bus Services<\/h4>/);
+assert.match(workspaceCss, /body\[data-bus-workflow-stage="5"\] \.workflow-layout/);
+assert.match(app, /layout\.hidden = next === 6/);
+assert.match(app, /Nearest stop group ·/);
+assert.match(app, /Full Bus assessment ·/);
 assert.match(html, /id="persistentMapPanel"/);
 assert.match(html, /Find nearest bus stop\(s\)<\/strong><small>Recommended/);
 assert.match(html, /Build full Bus assessment<\/strong><small>Assess all relevant stops/);
@@ -56,6 +62,12 @@ assert.match(css, /@media \(max-width: 1050px\)[\s\S]*\.bus-service-summary tbod
 assert.match(app, /Map reference/);
 assert.match(app, /Typical frequency/);
 assert.match(app, /syncRadiusCircle/);
+assert.match(app, /color: '#154A8B',[\s\S]*fillColor: '#154A8B'/, 'the live assessment radius uses supporting blue');
+assert.match(app, /stroke="#154a8b"[\s\S]*Assessment radius · \$\{radius\} m/, 'the standalone full-radius PDF uses the same blue radius key');
+assert.match(app, /report\.assessmentMode === 'nearest' \? '' : `<line/, 'nearest-group PDF does not imply a radius-based selection');
+assert.match(app, /const mapReferenceByStopId = new Map\(assessedStops\.map\(/, 'standalone map marker labels use stable stop identities');
+assert.match(app, /positionedStops\.map\(\(\{ item: marker, point, original, displaced \}\) => \{\s*const stop = marker\.item;/, 'numbered map markers unwrap the layout helper payload before resolving the stop reference');
+assert.match(app, /mapReferenceByStopId\.get\(stopId\) \|\| stop\.displayMapReference \|\| stop\.mapReference/, 'standalone PDF marker labels resolve through the same numeric stop reference as the key');
 assert.match(app, /syncRadiusCircle\(result\.provenance\.stops\?\.actualDiscoveryRadiusMetres/);
 assert.match(app, /if \(next === 6\) \{\s*try \{ mapExportContext = captureMapExportContext\(\)/);
 assert.match(app, /function captureMapExportContext\(\) \{\s*const leafletMap = map;/);

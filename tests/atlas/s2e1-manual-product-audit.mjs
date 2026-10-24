@@ -115,6 +115,7 @@ const controls = [
   { id: 'pipers-lane', label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700 },
   { id: 'pipers-route46', label: 'Pipers Lane route 46 frequency control', latitude: 51.852700, longitude: -0.454343, radius: 1200 },
   { id: 'waltham-cross', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700 },
+  { id: 'waltham-cross-nearest', label: '47 Berkley Avenue, Waltham Cross nearest logical stop group', latitude: 51.6857829, longitude: -0.0330001, radius: 700, assessmentMode: 'nearest' },
   { id: 'chingford', label: 'Normanshire Drive, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250 },
   { id: 'pe1', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500 }
 ];
@@ -355,7 +356,7 @@ try {
       await page.locator('#radius').fill(String(control.radius));
       await page.locator('[data-workflow-step="4"]').click();
       assert.equal(await page.locator('#findStops').isEnabled(), true, 'Normal workflow did not enable Bus assessment after confirming the site.');
-      await page.locator('#findStops').click();
+      await page.locator(control.assessmentMode === 'nearest' ? '#findNearestStops' : '#findStops').click();
       await page.locator('#taskStatusMessage').waitFor({ state: 'visible', timeout: 180000 });
       const continueStaged = page.locator('#assessmentScope button').filter({ hasText: 'Continue full assessment' });
       await page.waitForFunction(() => {
@@ -409,6 +410,17 @@ try {
         if (screenshotDirectory) await page.locator('#taskStatus').screenshot({ path: path.join(screenshotDirectory, 'assessment-progress-narrow.png') });
         await page.setViewportSize({ width: 1440, height: 1000 });
         outcome.progressCardVisualChecks = { completedLabel: 'Assessment complete', reviewBadge, duplicateCallout: false, desktopStages: desktopLayout.stages, narrowStages: narrowLayout.stages, screenshotsCaptured: Boolean(screenshotDirectory) };
+      }
+      if (control.id === 'waltham-cross-nearest') {
+        const modeLabel = (await page.locator('#assessmentModeSummary').innerText()).trim();
+        assert.match(modeLabel, /^Nearest stop group · /, 'Nearest Waltham results must identify the selected logical stop-group mode.');
+        assert.doesNotMatch(modeLabel, /radius|\b700\s*m\b/i, 'Nearest Waltham results must not imply that a configured radius selected the stop group.');
+        const evidenceSummary = (await page.locator('#evidenceSummary').innerText()).trim();
+        const assessedStopCount = Number(evidenceSummary.match(/([0-9]+) assessed\b/)?.[1] || evidenceSummary.match(/([0-9]+) stops? assessed\b/)?.[1] || 0);
+        assert.ok(assessedStopCount > 0, `Nearest Waltham assessment must report an assessed stop population: ${evidenceSummary}`);
+        outcome.nearestModeLabel = modeLabel;
+        outcome.evidenceSummary = evidenceSummary;
+        outcome.assessedStopCount = assessedStopCount;
       }
       if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id.startsWith('enfield-')) {
         const tracedRoute = control.id === 'enfield-313-e2e' ? '313' : '329';
@@ -501,6 +513,10 @@ try {
       assert.match(documentXml, /w:sz w:val="12"/, 'Word table cells must use 6 pt text.');
       const exportedWordText = wordText(documentXml);
       outcome.wordText = exportedWordText;
+      if (control.id === 'waltham-cross-nearest') {
+        assert.match(exportedWordText, /in the nearest logical stop group at /i, 'Nearest Waltham Word wording must state that the assessed stops are from the nearest logical stop group.');
+        assert.doesNotMatch(exportedWordText, /within the assessed area/i, 'Nearest Waltham Word wording must not describe the assessment as a full-radius area.');
+      }
       assert.doesNotMatch(exportedWordText, /ATLAS|Planner review required|Additional source evidence remains available/i, 'Planning-facing Word must exclude internal platform and review language.');
       assert.doesNotMatch(download.suggestedFilename(), /ATLAS/i, 'External Word filename must not contain the internal product name.');
       const exportedWordParagraphs = wordParagraphs(documentXml);
@@ -578,6 +594,7 @@ try {
         }
       }
       outcome.status = await page.locator('#taskStatusMessage').innerText();
+      outcome.evidenceSummary = (await page.locator('#evidenceSummary').innerText()).trim();
       outcome.renderedRows = rendered;
       outcome.renderedServiceNotes = renderedServiceNotes;
       outcome.routesWithMoreThanTwoRows = [...byRoute].filter(([, rows]) => rows.length > 2).map(([route, rows]) => ({ route, rows }));
@@ -660,6 +677,17 @@ try {
         assert.doesNotMatch(standaloneMap.suggestedFilename(), /ATLAS/i, 'Standalone map filename must not expose the internal product name.');
         assert.doesNotMatch(await page.locator('body').innerText(), /\?\?\?/,'Browser output must never expose broken stop labels.');
         outcome.standaloneMap = { format: 'PDF', page: 'A3 landscape', validSignature: true, neutralFilename: standaloneMap.suggestedFilename() };
+      }
+      if (control.id === 'waltham-cross-nearest') {
+        const standaloneMapPromise = page.waitForEvent('download', { timeout: 30000 });
+        await page.locator('#exportAssessmentMap').click();
+        const standaloneMap = await standaloneMapPromise;
+        const standaloneMapPath = path.join(wordDirectory, `atlas-s2e1-${control.id}-standalone-map.pdf`);
+        await standaloneMap.saveAs(standaloneMapPath);
+        const standaloneMapBytes = await readFile(standaloneMapPath);
+        assert.equal(standaloneMapBytes.subarray(0, 8).toString('ascii'), '%PDF-1.4', 'Nearest-group assessment must provide a valid standalone map PDF.');
+        assert.match(standaloneMap.suggestedFilename(), /^Bus Assessment Map/i, 'Nearest-group map must use a neutral planning-facing filename.');
+        outcome.standaloneMap = { format: 'PDF', validSignature: true, assessmentRadiusImplied: false, neutralFilename: standaloneMap.suggestedFilename() };
       }
       if (control.id === 'chingford') {
         const route657 = rendered.find(row => row.Route === '657');
@@ -782,6 +810,12 @@ try {
 }
 
 report.browserErrors = errors;
+const fullWalthamCount = Number(report.controls['waltham-cross']?.evidenceSummary?.match(/([0-9]+) assessed\b/)?.[1] || 0);
+const nearestWalthamCount = Number(report.controls['waltham-cross-nearest']?.assessedStopCount || 0);
+if (fullWalthamCount && nearestWalthamCount) {
+  try { assert.ok(nearestWalthamCount < fullWalthamCount, `Nearest Waltham must retain a smaller logical stop group than the full-radius assessment (${nearestWalthamCount} vs ${fullWalthamCount}).`); }
+  catch (error) { report.failures.push({ id: 'waltham-cross-nearest', reason: error.message }); }
+}
 report.tflReplayRequests = tflReplayRequests;
 report.failedRequests = failedRequests;
 report.failedResponses = failedResponses;

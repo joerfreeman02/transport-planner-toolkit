@@ -34,17 +34,15 @@ export function buildBusTransportStatement(result, { services = result?.plannerS
   const shownDestinations = destinations.slice(0, 6);
   const connectionText = shownDestinations.length ? `, including connections towards ${shownDestinations.join(', ')}${destinations.length > shownDestinations.length ? ' and other nearby destinations' : ''}` : '';
   const serviceCount = (services ?? []).length;
-  const frequencies = (services ?? []).map(service => String(service.typicalFrequencyText || service.typicalFrequencyLines?.join(' ') || '')).filter(Boolean);
-  const hasRegularService = frequencies.some(value => /typically every|every\s+\d+\s*(?:minutes?|mins?)/i.test(value));
   const hasQualifications = (services ?? []).some(service => Boolean(service.serviceNote || Object.values(service.plannerNotes ?? {}).some(Boolean))) || (result?.reviewItems?.length ?? 0) > 0;
   const population = nearestGroupName
-    ? `${count} assessed stop${count === 1 ? '' : 's'} in the nearest stop group at ${text(nearestGroupName)}`
-    : `${count} bus stop${count === 1 ? '' : 's'} within the assessed area`;
+    ? `in the nearest logical stop group at ${text(nearestGroupName)}`
+    : 'within the assessed area';
   const first = serviceCount
-    ? `The assessment covers ${population}, providing access to ${routeNumbers.length} bus route${routeNumbers.length === 1 ? '' : 's'}${connectionText}.`
-    : `The assessment covers ${population}. No usable bus timetable was available for the selected stops.`;
+    ? `A total of ${count} bus stop${count === 1 ? ' is' : 's are'} located ${population}, providing access to ${routeNumbers.length} bus route${routeNumbers.length === 1 ? '' : 's'}${connectionText}.`
+    : `${count} bus stop${count === 1 ? ' is' : 's are'} located ${population}. No usable timetable evidence was available for the selected stops.`;
   const second = serviceCount
-    ? `${hasRegularService ? 'Services operate at a range of frequencies' : 'Available services operate at varying frequencies'}${hasQualifications ? ', with relevant qualifications set out in the service summary' : ''}. Destinations, typical frequencies and operating periods are summarised in Table 3.3.`
+    ? `Services operate at a range of frequencies${hasQualifications ? ', with material qualifications shown alongside the relevant rows' : ''}. Assessed stops are summarised in Table 3.2; principal destinations, typical frequencies and operating periods are provided in Table 3.3.`
     : 'The stops and their access information are summarised in Table 3.2.';
   return `${first}\n\n${second}`;
 }

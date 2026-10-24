@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,6 +21,11 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 const pageErrors = [];
 const failedLocalRequests = [];
 const localResponses = [];
+const screenshotDirectory = process.env.ATLAS_UI_QA_DIR || null;
+if (screenshotDirectory) await mkdir(screenshotDirectory, { recursive: true });
+const capture = async (targetPage, name, fullPage = false) => {
+  if (screenshotDirectory) await targetPage.screenshot({ path: path.join(screenshotDirectory, name), fullPage });
+};
 
 page.on('pageerror', error => pageErrors.push(error.message));
 page.on('requestfailed', request => {
@@ -41,29 +46,112 @@ await page.route('https://api.tfl.gov.uk/**', route => route.fulfill({ status: 2
 try {
   await page.goto(review.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   assert.equal(page.url(), review.url);
-  assert.match(await page.locator('.build').innerText(), /2\.0\.0-alpha\.15/);
+  assert.match(await page.locator('.build').innerText(), /ATLAS · Bus Beta/);
+  assert.match(await page.locator('.build').innerText(), /Version details in About/);
   assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--atlas-blue').trim()), '#002060');
-  for (const section of ['Report Builder', 'Modules', 'Projects', 'About']) {
+  const shellColors = await page.evaluate(() => ({ header: getComputedStyle(document.querySelector('.app-header')).backgroundColor, footer: getComputedStyle(document.querySelector('footer')).backgroundColor }));
+  assert.deepEqual(shellColors, { header: 'rgb(6, 29, 55)', footer: 'rgb(6, 29, 55)' }, 'application header and footer share exact #061D37 navy');
+  for (const section of ['Modules', 'About']) {
     await page.getByRole('button', { name: section }).click();
-    const heading = section === 'About' ? 'ATLAS — Automated Transport & Location Assessment System' : section;
+    const heading = section === 'About' ? 'ATLAS — Automated Transport & Location Assessment System' : 'Choose an assessment tool';
     assert.equal(await page.getByRole('heading', { name: heading, exact: true }).isVisible(), true);
   }
   await page.getByRole('button', { name: 'Modules' }).click();
-  assert.equal(await page.getByRole('heading', { name: 'Establish the assessment point', exact: true }).isVisible(), true);
+  await capture(page, 'home-modules.png', true);
+  await page.getByRole('link', { name: /Start Bus Assessment/ }).click();
+  await page.getByRole('heading', { name: 'Assess nearby bus access', exact: true }).waitFor({ state: 'visible' });
+  assert.equal(await page.getByRole('heading', { name: 'Assess nearby bus access', exact: true }).isVisible(), true);
   assert.equal(await page.locator('#siteMap.leaflet-container').isVisible(), true);
+  await capture(page, 'step1-find-location.png');
   await page.getByLabel('Site address or name').fill('33 Westow Street, Crystal Palace');
   await page.getByRole('button', { name: 'Find site' }).click();
-  await chooseFirstCandidateAndConfirm(page);
+  await page.getByRole('button', { name: 'Use this result' }).waitFor({ timeout: 10000 });
+  await capture(page, 'step1-site-result.png');
+  await page.getByRole('button', { name: 'Use this result' }).first().click();
+  await page.locator('.assessment-point-marker').waitFor({ timeout: 5000 });
+  const pointColor = await page.locator('.assessment-point-marker').evaluate(element => getComputedStyle(element, '::before').backgroundColor);
+  assert.equal(pointColor, 'rgb(252, 115, 21)', 'the assessment point uses transport orange');
+  const selectedLocationBounds = await page.locator('#selectedLocation').boundingBox();
+  const locationContentBounds = await page.locator('#location-step-card .step-content').boundingBox();
+  assert.ok(selectedLocationBounds && locationContentBounds && selectedLocationBounds.x + selectedLocationBounds.width <= locationContentBounds.x + locationContentBounds.width + 1, 'selected-site card remains within the content column');
+  await capture(page, 'step2-confirm-point.png');
+  await page.getByRole('button', { name: 'Confirm assessment point' }).click();
   assert.equal(await page.locator('#radius').inputValue(), '400');
   assert.equal(await page.locator('#siteMap svg').count(), 1);
+  await page.locator('#assessmentSettingsPanel').waitFor({ state: 'visible' });
+  await capture(page, 'step3-assessment-settings.png');
+  const radiusView = await page.evaluate(() => {
+    const map = window.__ATLAS_SITE_SELECTOR__?.getMap();
+    const layer = Object.values(map?._layers ?? {}).find(candidate => typeof candidate?.setRadius === 'function' && typeof candidate.getBounds === 'function');
+    if (!layer || !map) return null;
+    const bounds = layer.getBounds();
+    const northWest = map.latLngToContainerPoint(bounds.getNorthWest());
+    const southEast = map.latLngToContainerPoint(bounds.getSouthEast());
+    const size = map.getSize();
+    return { exists: window.__ATLAS_BUS_UI__?.hasRadiusCircle(), color: layer.options.color, fillColor: layer.options.fillColor, fillOpacity: layer.options.fillOpacity, withinMap: northWest.x >= 0 && northWest.y >= 0 && southEast.x <= size.x && southEast.y <= size.y };
+  });
+  assert.equal(radiusView?.exists, true, 'the radius overlay is created when the confirmed point is set');
+  assert.equal(radiusView?.color, '#154A8B', 'the selected map radius uses supporting blue before assessment');
+  assert.equal(radiusView?.fillColor, '#154A8B');
+  assert.equal(radiusView?.withinMap, true, 'the complete radius is framed within the map before assessment');
+  await page.getByRole('button', { name: /Continue to Run assessment/ }).click();
+  await capture(page, 'step4-run-assessment.png');
+  const step4DesktopStageOverflow = await page.locator('#taskStatusStages li').evaluateAll(items => items.map(item => item.scrollWidth > item.clientWidth + 1));
+  assert.equal(step4DesktopStageOverflow.some(Boolean), false, 'Step 4 progress labels fit the constrained desktop workflow column');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(150);
+  const step4NarrowStageOverflow = await page.locator('#taskStatusStages li').evaluateAll(items => items.map(item => item.scrollWidth > item.clientWidth + 1));
+  assert.equal(step4NarrowStageOverflow.some(Boolean), false, 'Step 4 progress labels fit on a supported narrow screen');
+  await capture(page, 'step4-run-assessment-narrow.png');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.waitForTimeout(150);
   await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.equal(await page.locator('#evidenceRows tr').count(), 2);
-  assert.equal(await page.locator('#exportBusWord').isDisabled(), false);
+  await page.waitForFunction(() => document.getElementById('taskStatus')?.getAttribute('aria-busy') === 'false');
+  assert.equal(await page.locator('#plannerReviewAcknowledgement').isChecked(), false, 'formal export acknowledgement belongs to Step 6');
   assert.equal(await page.locator('#siteStageSummary').isVisible(), true);
+  assert.equal(await page.locator('.workflow-layout').isVisible(), true, 'Step 5 remains in the guided assessment workspace');
+  assert.equal(await page.locator('#persistentMapPanel').isHidden(), true, 'the persistent map is carried into the Results workspace');
+  assert.equal(await page.locator('#siteMapFrame').evaluate(element => element.parentElement.id), 'resultsMapHost');
+  assert.match(await page.locator('#assessmentModeSummary').innerText(), /^Full Bus assessment · 400 m$/);
+  assert.equal(await page.locator('#locationStageSummary').isVisible(), true);
+  assert.equal(await page.locator('#assessmentStageSummary').isVisible(), true);
+  assert.equal(await page.locator('[data-workflow-step="5"]').getAttribute('aria-current'), 'step');
+  await capture(page, 'results-desktop.png');
+  await page.locator('#sourceChecksDetails > summary').click();
+  await capture(page, 'sources-checks-desktop.png', true);
+  await page.locator('#sourceChecksDetails > summary').click();
+  const desktopStageOverflow = await page.locator('#taskStatusStages li').evaluateAll(items => items.map(item => ({ label: item.textContent.trim(), overflow: item.scrollWidth > item.clientWidth + 1 })));
+  assert.equal(desktopStageOverflow.some(item => item.overflow), false, 'desktop assessment stages stay within equal-width columns');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(150);
+  const narrowStageOverflow = await page.locator('#taskStatusStages li').evaluateAll(items => items.map(item => ({ label: item.textContent.trim(), overflow: item.scrollWidth > item.clientWidth + 1 })));
+  assert.equal(narrowStageOverflow.some(item => item.overflow), false, 'narrow assessment stages stay on one row without overflow');
+  await capture(page, 'results-narrow.png');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.waitForTimeout(150);
+  await page.locator('#goToExport').click();
+  assert.equal(await page.locator('#exportWorkspace').isVisible(), true, 'Step 6 remains a dedicated export state');
+  assert.equal(await page.locator('#evidencePanel').isHidden(), true);
+  assert.equal(await page.locator('#exportStatus').isHidden(), true, 'Step 6 does not show a stale pre-assessment warning after results are complete');
+  await capture(page, 'step6-export.png');
+  if (await page.locator('#plannerReviewGate').isVisible()) {
+    await page.getByRole('button', { name: 'Back to Results' }).click();
+    await page.locator('#sourceChecksDetails > summary').click();
+    assert.notEqual((await page.locator('#plannerChecks').innerText()).trim(), '', 'review evidence remains available before formal export');
+    await page.locator('#goToExport').click();
+    await page.locator('#plannerReviewAcknowledgement').check();
+  }
+  await page.waitForFunction(() => !document.getElementById('exportBusWord')?.disabled);
+  assert.equal(await page.locator('#exportBusWord').isDisabled(), false);
+  await page.getByRole('button', { name: 'Back to Results' }).click();
+  assert.equal(await page.locator('#evidencePanel').isVisible(), true);
 
-  await page.getByRole('button', { name: 'Change assessment' }).click();
+  await page.getByRole('button', { name: 'Change assessment settings' }).click();
+  assert.equal(await page.locator('#assessment-step-card').isVisible(), true);
   await page.locator('#radius').fill('500');
+  await page.getByRole('button', { name: /Continue to Run assessment/ }).click();
   await page.locator('#stopStatus').waitFor({ timeout: 5000 });
   assert.equal(await page.locator('#stopStatus').innerText(), 'The assessment radius changed. Build the Bus assessment again to update the evidence.');
   assert.equal(await page.locator('#evidencePanel').isHidden(), true);
@@ -74,7 +162,7 @@ try {
   await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.equal(await page.locator('#evidenceRows tr').count(), 2, 'a rebuilt assessment restores evidence after radius invalidation');
-  assert.equal(await page.locator('#exportBusWord').isDisabled(), false);
+  assert.match(await page.locator('#assessmentModeSummary').innerText(), /^Full Bus assessment · 500 m$/);
 
   const expansionPage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   let expansionStopRequests = 0;
@@ -101,15 +189,34 @@ try {
   });
   await expansionPage.goto(review.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await expansionPage.getByRole('button', { name: 'Modules' }).click();
+  await expansionPage.getByRole('link', { name: /Start Bus Assessment/ }).click();
+  await expansionPage.getByRole('heading', { name: 'Assess nearby bus access', exact: true }).waitFor({ state: 'visible' });
   await expansionPage.getByLabel('Site address or name').fill('33 Westow Street, Crystal Palace');
   await expansionPage.getByRole('button', { name: 'Find site' }).click();
   await chooseFirstCandidateAndConfirm(expansionPage);
+  await expansionPage.getByRole('button', { name: /Continue to Run assessment/ }).click();
   await expansionPage.getByRole('button', { name: 'Find nearest bus stop(s)' }).click();
   await expansionPage.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.equal(expansionStopRequests, 1, 'nearest assessment retains the nearest group after unresolved timetable evidence instead of expanding to a farther group');
   assert.doesNotMatch(await expansionPage.locator('#diagnostics').textContent(), /2000/);
-  await expansionPage.getByRole('button', { name: 'Change assessment' }).click();
+  assert.match(await expansionPage.locator('#assessmentModeSummary').innerText(), /^Nearest stop group ·/);
+  await expansionPage.locator('#goToExport').click();
+  assert.equal(await expansionPage.locator('#exportWorkspace').isVisible(), true, 'nearest assessments keep the dedicated export state');
+  if (await expansionPage.locator('#plannerReviewGate').isVisible()) await expansionPage.locator('#plannerReviewAcknowledgement').check();
+  const nearestMapDownloadPromise = expansionPage.waitForEvent('download');
+  await expansionPage.locator('#exportAssessmentMap').click();
+  const nearestMapDownload = await nearestMapDownloadPromise;
+  assert.match(nearestMapDownload.suggestedFilename(), /\.pdf$/u, 'nearest assessment can export its standalone map PDF');
+  const nearestMapPath = await nearestMapDownload.path();
+  assert.ok(nearestMapPath, 'nearest PDF download is available for rendering');
+  if (process.env.ATLAS_VISUAL_QA_DIR) {
+    await mkdir(process.env.ATLAS_VISUAL_QA_DIR, { recursive: true });
+    await nearestMapDownload.saveAs(path.join(process.env.ATLAS_VISUAL_QA_DIR, 'nearest-stop-group-map.pdf'));
+  }
+  await expansionPage.getByRole('button', { name: 'Back to Results' }).click();
+  await expansionPage.getByRole('button', { name: 'Change assessment settings' }).click();
   await expansionPage.locator('#radius').fill('550');
+  await expansionPage.getByRole('button', { name: /Continue to Run assessment/ }).click();
   assert.equal(await expansionPage.locator('#stopStatus').innerText(), 'The assessment radius changed. Build the Bus assessment again to update the evidence.');
   assert.equal(await expansionPage.locator('#evidencePanel').isHidden(), true);
   assert.equal(await expansionPage.locator('#exportBusWord').isDisabled(), true);
@@ -151,23 +258,27 @@ try {
   });
   await densePage.goto(review.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await densePage.getByRole('button', { name: 'Modules' }).click();
+  await densePage.getByRole('link', { name: /Start Bus Assessment/ }).click();
+  await densePage.getByRole('heading', { name: 'Assess nearby bus access', exact: true }).waitFor({ state: 'visible' });
   await densePage.getByLabel('Site address or name').fill('33 Westow Street, Crystal Palace');
   await densePage.getByRole('button', { name: 'Find site' }).click();
   await chooseFirstCandidateAndConfirm(densePage);
+  await densePage.getByRole('button', { name: /Continue to Run assessment/ }).click();
   await densePage.getByRole('button', { name: 'Build full Bus assessment' }).click();
-  await densePage.getByRole('button', { name: 'Continue full staged assessment' }).waitFor({ timeout: 20000 });
+  await densePage.getByRole('button', { name: 'Continue full assessment' }).waitFor({ timeout: 20000 });
   assert.equal(await densePage.locator('#assessmentScope').isHidden(), false);
   assert.equal(await densePage.locator('#radius').inputValue(), '400');
-  const denseChangeAssessment = densePage.getByRole('button', { name: 'Change assessment' });
-  if (await denseChangeAssessment.isVisible()) await denseChangeAssessment.click();
+  await densePage.locator('[data-workflow-step="3"]').click();
+  assert.equal(await densePage.locator('#assessmentSettingsPanel').isVisible(), true);
   await densePage.locator('#radius').fill('500');
   assert.equal(await densePage.locator('#assessmentScope').isHidden(), true, 'radius change hides a stale dense scope preview');
-  assert.equal(await densePage.getByRole('button', { name: 'Continue full staged assessment' }).count(), 0, 'radius change removes stale scope actions');
+  assert.equal(await densePage.getByRole('button', { name: 'Continue full assessment' }).count(), 0, 'radius change removes stale scope actions');
+  await densePage.locator('[data-workflow-step="4"]').click();
   assert.equal(await densePage.locator('#stopStatus').innerText(), 'The assessment radius changed. Build the Bus assessment again to update the evidence.');
-  await densePage.getByRole('button', { name: 'Check again' }).click();
-  await densePage.getByRole('button', { name: 'Continue full staged assessment' }).waitFor({ timeout: 20000 });
+  await densePage.getByRole('button', { name: 'Recheck nearby stops' }).click();
+  await densePage.getByRole('button', { name: 'Continue full assessment' }).waitFor({ timeout: 20000 });
   const firstDetailedRequest = densePage.waitForRequest(request => request.url().includes('/Line/') && request.url().includes('/Timetable/'), { timeout: 20000 });
-  await densePage.getByRole('button', { name: 'Continue full staged assessment' }).click();
+  await densePage.getByRole('button', { name: 'Continue full assessment' }).click();
   await firstDetailedRequest;
   assert.equal(denseStopRequests, 2, 'force-refresh scope to Continue workflow uses one uncached StopPoint discovery');
   await densePage.close();
@@ -181,7 +292,7 @@ try {
     directAtlasRoute: new URL(review.url).pathname,
     cssAndLeafletLoaded: true,
     javascriptModulesLoaded: true,
-    navigation: ['Report Builder', 'Modules', 'Projects', 'About'],
+    navigation: ['Modules', 'About'],
     siteSelectorAccessible: true,
     fixtureEvidenceRows: 2,
     pageErrors,

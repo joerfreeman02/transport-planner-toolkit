@@ -152,6 +152,7 @@
                 </aside>
               </div>
             </div>
+            <div id="locationStageSummary" class="stage-summary" hidden><strong id="locationStageSummaryText"></strong></div>
           </section>
 
           <section id="confirm-point-step-card" class="step-card" aria-labelledby="confirm-point-step">
@@ -191,7 +192,7 @@
                 <div id="stopStatus" class="callout neutral" role="status">Confirm the assessment point before checking nearby bus stops.</div>
               </div>
             </div>
-            <div id="assessmentStageSummary" class="stage-summary" hidden><strong id="assessmentStageSummaryText"></strong><button id="changeAssessment" class="secondary compact" type="button">Change assessment</button></div>
+            <div id="assessmentStageSummary" class="stage-summary" hidden><strong id="assessmentStageSummaryText"></strong><button id="changeAssessment" class="secondary compact" type="button">Change assessment settings</button></div>
           </section>
         </div>
 
@@ -203,8 +204,8 @@
         </div>
 
         <section id="evidencePanel" class="evidence-panel" hidden aria-labelledby="evidence-heading"><div id="resultsTaskStatusHost" class="results-task-status-host"></div>
-          <div class="evidence-heading"><div><p class="eyebrow">Step 5 · Results</p><h3 id="evidence-heading">Assessment results</h3><p id="evidenceSummary"></p></div><div class="evidence-actions"><button id="goToExport" class="primary" type="button">Continue to Export →</button><button id="editAssessment" class="secondary compact" type="button">Back to assessment</button></div></div>
-          <section class="assessment-wording assessment-summary" aria-labelledby="wording-heading"><div><p class="eyebrow">Assessment summary</p><h4 id="wording-heading">Transport Statement wording</h4><p id="assessmentWording"></p></div><button id="copyAssessmentWording" class="secondary compact" type="button" disabled>Copy wording</button></section>
+          <div class="evidence-heading"><div><p class="eyebrow">Step 5 · Review results</p><h3 id="evidence-heading">Assessment results</h3><p id="evidenceSummary"></p><p id="assessmentModeSummary" class="assessment-mode-summary"></p></div><div class="evidence-actions"><button id="goToExport" class="primary" type="button">Continue to Export →</button><button id="editAssessment" class="secondary compact" type="button">Back to assessment</button></div></div>
+          <section class="assessment-wording assessment-summary" aria-labelledby="wording-heading"><div><p class="eyebrow">Assessment summary</p><h4 id="wording-heading">Bus Services</h4><p id="assessmentWording"></p></div><button id="copyAssessmentWording" class="secondary compact" type="button" disabled>Copy wording</button></section>
           <div id="resultsMapHost" class="results-map-host"><p class="supporting">Map references are navigation aids only; authoritative stop names and indicators remain in the tables.</p></div>
           <div class="result-meta"><strong id="busDataCurrent" class="current-badge">Bus data: Checking current status…</strong><span>Assessment data checked <time id="resultChecked"></time></span><span id="resultFreshness" class="review-badge"></span><span id="resultSource" class="sr-only">Authoritative source</span></div>
           <section class="assessment-output" aria-labelledby="stop-summary-heading">
@@ -234,7 +235,7 @@
             <article class="export-card"><span class="export-icon" aria-hidden="true">▤</span><h3>Word assessment</h3><p>Prepare a planning-facing assessment with transport findings, service tables and applicable qualifications.</p><label class="export-option"><input id="includeMapInWord" type="checkbox" checked> Include assessment map in Word report</label><button id="exportBusWord" class="primary" type="button" disabled>Export Word (.docx)</button></article>
             <article class="export-card"><span class="export-icon" aria-hidden="true">⌖</span><h3>Assessment map</h3><p>Download a report-ready map with the assessment point, numbered assessed stops, symbology and a stop-name key. No route geometry is invented.</p><button id="exportAssessmentMap" class="secondary" type="button" disabled>Export assessment map (.pdf)</button></article>
           </div>
-          <div id="plannerReviewGate" class="planner-review-gate" hidden><label><input id="plannerReviewAcknowledgement" type="checkbox"> I have reviewed the flagged Sources &amp; Checks</label><span id="plannerReviewGateStatus">Review the evidence drawer before formal export.</span></div><div id="exportStatus" class="callout neutral" role="status">Complete an assessment before exporting.</div>
+          <div id="plannerReviewGate" class="planner-review-gate" hidden><label><input id="plannerReviewAcknowledgement" type="checkbox"> I have reviewed the flagged Sources &amp; Checks</label><span id="plannerReviewGateStatus">Review the evidence drawer before formal export.</span></div><div id="exportStatus" class="callout neutral" role="status" hidden></div>
           <button id="returnToResults" class="secondary compact" type="button">Back to Results</button>
         </section>
       </section>

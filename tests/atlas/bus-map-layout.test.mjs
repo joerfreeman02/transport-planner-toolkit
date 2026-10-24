@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { layoutNumberedMapMarkers } from '../../src/atlas/presentation/bus-map-layout.mjs';
 const clustered = layoutNumberedMapMarkers(Array.from({length:8},(_,index)=>({id:String(index),x:120,y:180})),{width:240,top:20,mapHeight:240});
-assert.ok(clustered.slice(1).every(item=>item.displaced),'clustered stops receive deterministic offsets and leader lines');
+assert.ok(clustered.every(item=>item.displaced),'every stop in a dense cluster receives a deterministic offset and leader line');
 assert.equal(new Set(clustered.map(item=>`${item.point.x.toFixed(2)},${item.point.y.toFixed(2)}`)).size,clustered.length,'clustered numeric markers remain distinct');
 assert.ok(clustered.every(({point})=>point.x>=16&&point.x<=224&&point.y>=36&&point.y<=244),'all markers remain inside padded map bounds');
 assert.deepEqual(layoutNumberedMapMarkers(Array.from({length:8},(_,index)=>({id:String(index),x:120,y:180})),{width:240,top:20,mapHeight:240}),clustered,'marker offsets are stable across repeated renders');

@@ -1,4 +1,14 @@
 # ATLAS version and build record
+## ATLAS Bus Assessment Internal Beta — 25 October 2026
+
+| Version | `2.0.0-beta.1` |
+|---|---|
+| Visible build | `ATLAS-2.0.0-beta.1-20261025` |
+| Accepted engineering SHA | `672aeb8c103f4d586f21d24094c10b504fa1428c` |
+| Status | Product Owner and Technical Director accepted for controlled Internal Beta; see release record for validated SHA and checks |
+| Release record | `docs/atlas/ATLAS-BUS-BETA-2.0.0-BETA.1-RELEASE.md` |
+
+This release preserves the accepted Run #75 frozen candidate and the Bus intelligence baseline. Automatic national-data refresh remains outside this release and is not yet operationally closed. Earlier Alpha records below are retained as historical records.
 
 ## BUS-QA-06 Alpha.15 production-fidelity bus service abstraction
 

@@ -114,8 +114,8 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') {
 const controls = [
   { id: 'pipers-lane', label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700 },
   { id: 'pipers-route46', label: 'Pipers Lane route 46 frequency control', latitude: 51.852700, longitude: -0.454343, radius: 1200 },
-  { id: 'waltham-cross', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700 },
-  { id: 'waltham-cross-nearest', label: '47 Berkley Avenue, Waltham Cross nearest logical stop group', latitude: 51.6857829, longitude: -0.0330001, radius: 700, assessmentMode: 'nearest' },
+  { id: 'waltham-cross', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.686144, longitude: -0.035707, radius: 700 },
+  { id: 'waltham-cross-nearest', label: '47 Berkley Avenue, Waltham Cross nearest logical stop group', latitude: 51.686144, longitude: -0.035707, radius: 700, assessmentMode: 'nearest' },
   { id: 'chingford', label: 'Normanshire Drive, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250 },
   { id: 'pe1', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500 }
 ];
@@ -148,6 +148,7 @@ const chingfordTimetables657 = {
   'GROVE-N': chingfordTimetable657({ stopId: 'GROVE-N', direction: 'inbound', patternId: '657-in', destination: "Salisbury Hall Sainsbury's", time: 982, adjacentTime: 984, adjacentId: '657-ORIGIN' })
 };
 const report = { schema: 'atlas-bus-s2e1-normal-product-browser-word-audit-v1', candidateRoot, candidateRun: '39430415441', candidateArtifactId: '12275615359', candidateDigest: 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471', candidateProducerSha: '151199cc914c235870f444d26b03c2309edbd035', candidateManifestDigests, acquisitionAttempted: false, publicationAttempted: false, deploymentAttempted: false, controls: {}, failures: [] };
+const acceptanceVisualDirectory = process.env.ATLAS_ACCEPTANCE_SCREENSHOT_DIR ? path.resolve(process.env.ATLAS_ACCEPTANCE_SCREENSHOT_DIR) : null;
 if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') report.enfieldIbusFixture = {
   source: 'Exact captured Enfield TfL Route, TimetableResponse and RouteSequence bodies plus checked-in 20261009 iBus evidence; route 329 stop identity and timetable/operator evidence remain candidate-backed; no live TfL requests.',
   baseVersion: enfieldIbusIndex.baseVersion,
@@ -173,6 +174,14 @@ const failedResponses = [];
 const externalRequests = [];
 const statusManifestFallbacks = [];
 const tflReplayRequests = [];
+const walthamNearestStopDistances = new Map([
+  ['-0.03109,51.68560', 510],
+  ['-0.03135,51.68573', 522],
+  ['-0.03135,51.68563', 535],
+  ['-0.03112,51.68551', 548],
+  ['-0.03113,51.68546', 561]
+]);
+report.walthamNearestRoutingFixtureNote = 'Nearest-mode Browser/Word regression uses the Product Owner-confirmed five Waltham Cross Bus Station StopPoints and their reported approximate 510–561 m routed-walk range as deterministic matrix evidence. It does not claim a fresh live OSRM calculation.';
 let server;
 let browser;
 let activeControl = null;
@@ -245,10 +254,11 @@ try {
       if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && pathname === '/atlas/assets/js/app.mjs') {
         let appSource = bytes.toString('utf8');
         const assignment = '  currentBusResult = result;';
-        if (appSource.split(assignment).length !== 2) throw new Error('Expected one production assessment result assignment for the C4 trace hook.');
-        const observer = `${assignment}\n  window.__ATLAS_C4_OPERATOR_TRACE__ = (routeNumber, selectedStopId = null) => {\n    const routeRecords = (records, selectedStopId) => (records ?? []).filter(record => String(record.routeNumber) === String(routeNumber)).map(record => { const schedule = record.stopSchedules?.[selectedStopId] ?? record.departuresByStopAndDay?.[selectedStopId] ?? {}; const population = record.canonicalDeparturePopulationAll ?? record.canonicalDeparturePopulation ?? {}; const counts = value => Array.isArray(value) ? value.length : null; return { id: record.id ?? null, operator: record.operator ?? null, provider: record.provider ?? null, timetableSource: record.timetableSource ?? null, origin: record.origin ?? null, destination: record.destination ?? null, direction: record.direction ?? null, sourceRecordIds: record.sourceRecordIds ?? [], stopIds: record.stopIds ?? [], servedAtStopId: record.servedAtStopId ?? null, frequencyBasisStopId: record.frequencyBasisStopId ?? null, canonicalCounts: Object.fromEntries(Object.entries(population).map(([day,value]) => [day, counts(value)])), selectedStopCounts: Object.fromEntries(Object.entries(schedule).map(([day,value]) => [day, counts(value)])), typicalFrequencyLines: record.typicalFrequencyLines ?? null, operatingPeriodLines: record.operatingPeriodLines ?? null, shortWorkingClassification: record.shortWorkingClassification ?? null, grouping: record.publicServiceGroupingDecision ? { principalPattern: record.publicServiceGroupingDecision.principalPattern ?? null, shortWorkingRecordIds: record.publicServiceGroupingDecision.shortWorkingRecordIds ?? [], branchVariantRecordIds: record.publicServiceGroupingDecision.branchVariantRecordIds ?? [], deduplicatedSourceRecordIds: record.publicServiceGroupingDecision.deduplicatedSourceRecordIds ?? [] } : null, canonicalSamples: Object.fromEntries(Object.entries(record.canonicalDeparturePopulationAll ?? {}).map(([day, entries]) => [day, (entries ?? []).slice(0, 8).map(entry => ({ minute: entry.minute, sourceRecordId: entry.sourceRecordId, authorityProvider: entry.authorityProvider, provider: entry.provider, primaryAuthority: entry.primaryAuthority, journeyIdentity: entry.journeyIdentity }))])) }; });\n    const summarizeStop = stop => ({ id: stop.id ?? stop.sourceId ?? null, name: stop.name ?? null, latitude: stop.latitude ?? null, longitude: stop.longitude ?? null, distanceMetres: stop.distanceMetres ?? null, routes: stop.routes ?? [], timetableAuthority: stop.timetableAuthority ?? null, timetableAuthorities: stop.timetableAuthorities ?? [], routeAuthorities: stop.routeAuthorities ?? null, timetableCallEligible: stop.timetableCallEligible ?? null });
+        const assignmentIndex = appSource.indexOf(assignment);
+        if (assignmentIndex < 0) throw new Error('Expected a production assessment result assignment for the C4 trace hook.');
+        const observer = `${assignment}\n  window.__ATLAS_C4_OPERATOR_TRACE__ = (routeNumber, selectedStopId = null) => {\n    const routeRecords = (records, selectedStopId) => (records ?? []).filter(record => String(record.routeNumber) === String(routeNumber)).map(record => { const schedule = record.stopSchedules?.[selectedStopId] ?? record.departuresByStopAndDay?.[selectedStopId] ?? {}; const population = record.canonicalDeparturePopulationAll ?? record.canonicalDeparturePopulation ?? {}; const counts = value => Array.isArray(value) ? value.length : null; return { id: record.id ?? null, routeNumber: record.routeNumber ?? null, operator: record.operator ?? null, provider: record.provider ?? null, timetableSource: record.timetableSource ?? null, origin: record.origin ?? null, destination: record.destination ?? null, direction: record.direction ?? null, directionFamily: record.directionFamily ?? null, directionPatternText: record.directionPatternText ?? null, calendarProfileId: record.calendarProfileId ?? null, routePatternStopIds: record.routePatternStopIds ?? [], routePatternStopNames: record.routePatternStopNames ?? [], serviceNote: record.serviceNote ?? null, sourceRecordIds: record.sourceRecordIds ?? [], stopIds: record.stopIds ?? [], servedAtStopId: record.servedAtStopId ?? null, frequencyBasisStopId: record.frequencyBasisStopId ?? null, calendarProfileIds: record.calendarProfileIds ?? [], calendarProfileLabel: record.calendarProfileLabel ?? null, plannerNotes: record.plannerNotes ?? null, principalLocationsText: record.principalLocationsText ?? null, canonicalCounts: Object.fromEntries(Object.entries(population).map(([day,value]) => [day, counts(value)])), selectedStopCounts: Object.fromEntries(Object.entries(schedule).map(([day,value]) => [day, counts(value)])), typicalFrequencyLines: record.typicalFrequencyLines ?? null, operatingPeriodLines: record.operatingPeriodLines ?? null, shortWorkingClassification: record.shortWorkingClassification ?? null, grouping: record.publicServiceGroupingDecision ? { principalPattern: record.publicServiceGroupingDecision.principalPattern ?? null, shortWorkingRecordIds: record.publicServiceGroupingDecision.shortWorkingRecordIds ?? [], branchVariantRecordIds: record.publicServiceGroupingDecision.branchVariantRecordIds ?? [], deduplicatedSourceRecordIds: record.publicServiceGroupingDecision.deduplicatedSourceRecordIds ?? [] } : null, canonicalSamples: Object.fromEntries(Object.entries(record.canonicalDeparturePopulationAll ?? {}).map(([day, entries]) => [day, (entries ?? []).slice(0, 8).map(entry => ({ minute: entry.minute, sourceRecordId: entry.sourceRecordId, authorityProvider: entry.authorityProvider, provider: entry.provider, primaryAuthority: entry.primaryAuthority, journeyIdentity: entry.journeyIdentity }))])) }; });\n    const summarizeStop = stop => ({ id: stop.id ?? stop.sourceId ?? null, name: stop.name ?? null, latitude: stop.latitude ?? null, longitude: stop.longitude ?? null, distanceMetres: stop.distanceMetres ?? null, routes: stop.routes ?? [], timetableAuthority: stop.timetableAuthority ?? null, timetableAuthorities: stop.timetableAuthorities ?? [], routeAuthorities: stop.routeAuthorities ?? null, timetableCallEligible: stop.timetableCallEligible ?? null });
     return { routeNumber, allDiscoveredStops: (result.stops ?? []).map(summarizeStop), stops: (result.stops ?? []).filter(stop => (stop.routes ?? []).some(route => String(route) === String(routeNumber))).map(summarizeStop), stopProvenance: result.provenance?.stops ?? null, composedServices: routeRecords(result.services, selectedStopId), normalizedServiceSummaries: routeRecords(result.serviceSummaries, selectedStopId), plannerRows: routeRecords(result.plannerServiceSummaries, selectedStopId), timetableProvenance: result.provenance?.timetables ?? null };\n  };`;
-        bytes = Buffer.from(appSource.replace(assignment, observer), 'utf8');
+        bytes = Buffer.from(`${appSource.slice(0, assignmentIndex)}${observer}${appSource.slice(assignmentIndex + assignment.length)}`, 'utf8');
       }
       const extension = path.extname(file).toLowerCase();
       const type = ({ '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.gz': 'application/gzip', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json' })[extension] || 'application/octet-stream';
@@ -280,12 +290,20 @@ try {
       address: { road: control.label, city: control.label, country: 'United Kingdom' }
     }]) });
   });
-  await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+Av3nGQAAAABJRU5ErkJggg==', 'base64') }));
+  await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ status: 200, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGN48e4TAAWKAskksmNxAAAAAElFTkSuQmCC', 'base64') }));
   await page.route('https://routing.openstreetmap.de/**', route => {
     const url = route.request().url();
     if (url.includes('/table/')) {
       const points = decodeURIComponent(url.split('/').at(-1).split('?')[0]).split(';');
-      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'Ok', distances: [points.map((_p, index) => index ? 100 : 0)], durations: [points.map((_p, index) => index ? 60 : 0)] }) });
+      const nearestControl = activeControl?.id === 'waltham-cross-nearest';
+      const distances = points.map((point, index) => {
+        if (!nearestControl) return index ? 100 : 0;
+        const [longitude, latitude] = point.split(',').map(Number);
+        const key = `${longitude.toFixed(5)},${latitude.toFixed(5)}`;
+        return index === 0 ? 0 : walthamNearestStopDistances.get(key) ?? 900;
+      });
+      const durations = distances.map(distance => Math.round(distance / 1.2));
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'Ok', distances: [distances], durations: [durations] }) });
     }
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'Ok', routes: [{ distance: 100, duration: 60, geometry: { type: 'LineString', coordinates: [[-0.03, 51.68], [-0.031, 51.681]] } }] }) });
   });
@@ -348,13 +366,68 @@ try {
     const outcome = { label: control.label, assessmentCoordinates: { latitude: control.latitude, longitude: control.longitude } };
     try {
       await page.goto(new URL('atlas/', baseUrl).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      if (acceptanceVisualDirectory && control.id === 'pipers-lane') {
+        await mkdir(acceptanceVisualDirectory, { recursive: true });
+        await page.screenshot({ path: path.join(acceptanceVisualDirectory, '01-home-header.png'), fullPage: true });
+        const aboutNav = page.locator('button[data-view="about"]');
+        await aboutNav.hover();
+        const hoverBackground = await aboutNav.evaluate(button => getComputedStyle(button).backgroundColor);
+        assert.equal(hoverBackground, 'rgba(0, 0, 0, 0)', `Top navigation hover must stay transparent on the navy shell (got ${hoverBackground}).`);
+        await aboutNav.click();
+        assert.match(await page.locator('[data-view-panel="about"]').innerText(), /National Public Transport Gazetteer \(NPTG\)/);
+        await page.mouse.move(0, 0);
+        const navBackgrounds = await page.locator('.app-header nav button').evaluateAll(buttons => buttons.map(button => ({ label: button.innerText, className: button.className, style: button.getAttribute('style'), background: getComputedStyle(button).backgroundColor, focused: document.activeElement === button, hovered: button.matches(':hover'), matchedBackgroundRules: [...document.styleSheets].flatMap(sheet => { try { return [...sheet.cssRules]; } catch { return []; } }).filter(rule => { try { return rule.selectorText && button.matches(rule.selectorText) && rule.style?.background; } catch { return false; } }).map(rule => ({ selector: rule.selectorText, background: rule.style.background, important: rule.style.getPropertyPriority('background') })) })));
+        assert.ok(navBackgrounds.every(button => button.background === 'rgba(0, 0, 0, 0)'), `Header navigation buttons must remain transparent outside the orange active underline: ${JSON.stringify(navBackgrounds)}`);
+        await page.screenshot({ path: path.join(acceptanceVisualDirectory, '02-about-nptg.png'), fullPage: true });
+        await page.locator('button[data-view="modules"]').click();
+      }
       await page.locator('.quick-start a[href="#bus"]').click();
+      if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.screenshot({ path: path.join(acceptanceVisualDirectory, '03-step1-initial.png'), fullPage: true });
       await page.locator('#address').fill(control.label);
       await page.locator('#addressForm button[type="submit"]').click();
+      if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.locator('#candidateList button').filter({ hasText: 'Use this result' }).waitFor({ state: 'visible' });
+      if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.screenshot({ path: path.join(acceptanceVisualDirectory, '04-step1-candidate.png'), fullPage: true });
       await page.locator('#candidateList button').filter({ hasText: 'Use this result' }).click();
+      if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.screenshot({ path: path.join(acceptanceVisualDirectory, '05-step2-adjustable-point.png'), fullPage: true });
+      const step2Containment = await page.evaluate(() => {
+        const panel = document.querySelector('#location-step-card').getBoundingClientRect();
+        const map = document.querySelector('#siteMapFrame').getBoundingClientRect();
+        const viewportWidth = document.documentElement.clientWidth;
+        return { panelRight: panel.right, mapLeft: map.left, mapRight: map.right, viewportWidth, clipped: panel.right > viewportWidth + 1 || map.right > viewportWidth + 1 || (panel.left < map.right && panel.right > map.left && Math.min(panel.bottom, map.bottom) > Math.max(panel.top, map.top)) };
+      });
+      if (control.id === 'waltham-cross') assert.equal(step2Containment.clipped, false, `Step 2 encroaches on/clips against map: ${JSON.stringify(step2Containment)}`);
+      outcome.step2Containment = step2Containment;
       await page.locator('#confirmAssessmentPoint').click();
+      if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.screenshot({ path: path.join(acceptanceVisualDirectory, '06-step1-confirmed-compact-step2.png'), fullPage: true });
       await page.locator('#radius').fill(String(control.radius));
+      await page.locator('[data-workflow-step="3"]').click();
+      if (control.id === 'waltham-cross') {
+        await page.waitForTimeout(100);
+        assert.equal(await page.locator('#stops-step').innerText(), 'Assessment settings', 'Stage 3 must identify the assessment settings stage.');
+        const radiusState = await page.evaluate(() => ({
+          value: Number(document.querySelector('#radius').value),
+          hasCircle: window.__ATLAS_BUS_UI__.hasRadiusCircle(),
+          circle: window.__ATLAS_BUS_UI__.getRadiusCircleState(),
+          canvas: [...document.querySelectorAll('#siteMap .leaflet-overlay-pane canvas')].some(element => {
+            const bounds = element.getBoundingClientRect();
+            return bounds.width > 0 && bounds.height > 0;
+          })
+        }));
+        assert.equal(radiusState.hasCircle, true, 'The selected radius remains visible on the persistent site map.');
+        assert.ok(radiusState.circle, 'The actual Leaflet radius overlay must be inspectable.');
+        assert.equal(radiusState.circle.radius, radiusState.value, 'The displayed circle uses the selected assessment radius.');
+        assert.equal(radiusState.circle.color.toLowerCase(), '#154a8b', 'The persistent assessment radius uses the approved supporting blue.');
+        assert.equal(radiusState.canvas, true, 'The Leaflet canvas that renders the persistent radius must be visible.');
+        const circleBounds = radiusState.circle.bounds;
+        const mapBounds = radiusState.circle.viewBounds;
+        const fitsMap = circleBounds.south >= mapBounds.south && circleBounds.west >= mapBounds.west && circleBounds.north <= mapBounds.north && circleBounds.east <= mapBounds.east;
+        assert.equal(fitsMap, true, `The map did not fit the selected radius: ${JSON.stringify(radiusState)}`);
+        outcome.persistentRadius = radiusState;
+      }
+      if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.screenshot({ path: path.join(acceptanceVisualDirectory, '07-settings-visible-radius.png'), fullPage: true });
       await page.locator('[data-workflow-step="4"]').click();
+      if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.screenshot({ path: path.join(acceptanceVisualDirectory, '08-run-assessment.png'), fullPage: true });
+      if (control.id === 'waltham-cross') assert.equal(await page.locator('#stops-step').innerText(), 'Run assessment', 'Stage 4 must identify the run-assessment stage.');
       assert.equal(await page.locator('#findStops').isEnabled(), true, 'Normal workflow did not enable Bus assessment after confirming the site.');
       await page.locator(control.assessmentMode === 'nearest' ? '#findNearestStops' : '#findStops').click();
       await page.locator('#taskStatusMessage').waitFor({ state: 'visible', timeout: 180000 });
@@ -410,6 +483,7 @@ try {
         if (screenshotDirectory) await page.locator('#taskStatus').screenshot({ path: path.join(screenshotDirectory, 'assessment-progress-narrow.png') });
         await page.setViewportSize({ width: 1440, height: 1000 });
         outcome.progressCardVisualChecks = { completedLabel: 'Assessment complete', reviewBadge, duplicateCallout: false, desktopStages: desktopLayout.stages, narrowStages: narrowLayout.stages, screenshotsCaptured: Boolean(screenshotDirectory) };
+        if (acceptanceVisualDirectory) await page.screenshot({ path: path.join(acceptanceVisualDirectory, '09-step5-complete-desktop.png'), fullPage: true });
       }
       if (control.id === 'waltham-cross-nearest') {
         const modeLabel = (await page.locator('#assessmentModeSummary').innerText()).trim();
@@ -421,15 +495,22 @@ try {
         outcome.nearestModeLabel = modeLabel;
         outcome.evidenceSummary = evidenceSummary;
         outcome.assessedStopCount = assessedStopCount;
+        outcome.assessedStopRows = await page.locator('#evidenceRows tr[data-stop-id]').evaluateAll(rows => rows.map(row => ({ id: row.dataset.stopId, name: row.querySelector('[data-label="Stop name"]')?.innerText.trim() || '', walking: row.querySelector('[data-label="Walking distance / time"]')?.innerText.trim() || '' })));
+        assert.deepEqual(outcome.assessedStopRows.map(stop => stop.id).sort(), ['210021703420', '210021703425', '210021703430', '210021703435', '210021703440'].sort(), 'Waltham nearest assessment must retain the Product Owner-confirmed five-stop Bus Station logical group.');
+        assert.ok(outcome.assessedStopRows.every(stop => Number(stop.walking.match(/[0-9]+/g)?.[0]) >= 510 && Number(stop.walking.match(/[0-9]+/g)?.[0]) <= 561), 'Waltham nearest stop walking distances must match the Product Owner-reported 510–561 m range.');
+        if (acceptanceVisualDirectory) await page.screenshot({ path: path.join(acceptanceVisualDirectory, 'nearest-step5-results.png'), fullPage: true });
       }
       if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id.startsWith('enfield-')) {
         const tracedRoute = control.id === 'enfield-313-e2e' ? '313' : '329';
         outcome.operatorStageTrace = await page.evaluate(route => window.__ATLAS_C4_OPERATOR_TRACE__?.(route) ?? null, tracedRoute);
         assert.ok(outcome.operatorStageTrace, 'Production assessment result was not exposed to the test-only C4 trace observer.');
       }
-      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id === 'waltham-cross') {
-        outcome.route66Trace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('66') ?? null);
-        assert.ok(outcome.route66Trace, 'Production assessment result was not exposed to the test-only route-66 trace observer.');
+      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && ['waltham-cross', 'waltham-cross-nearest'].includes(control.id)) {
+        if (control.id === 'waltham-cross') {
+          outcome.route66Trace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('66') ?? null);
+          assert.ok(outcome.route66Trace, 'Production assessment result was not exposed to the test-only route-66 trace observer.');
+        }
+        outcome.route242Trace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('242') ?? null);
       }
       if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id === 'pipers-lane') {
         outcome.pipers230StageTrace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('230') ?? null);
@@ -450,6 +531,38 @@ try {
       const sourceRows = serviceTable.locator('tbody tr:not(.service-note) td[data-label="Source"]');
       const rowCount = await sourceRows.count();
       assert.ok(rowCount > 0, 'Normal rendered Bus assessment has no service rows.');
+      if (control.id === 'waltham-cross') {
+        const routeCheckbox = page.getByRole('checkbox', { name: 'Include route 242', exact: true }).first();
+        await routeCheckbox.scrollIntoViewIfNeeded();
+        if (acceptanceVisualDirectory) await routeCheckbox.locator('xpath=ancestor::tr[1]').screenshot({ path: path.join(acceptanceVisualDirectory, '10-route242-checkbox-before.png') });
+        await routeCheckbox.focus();
+        const routeControl = await routeCheckbox.elementHandle();
+        const routeBefore = await page.evaluate(() => ({ y: window.scrollY, stage: document.body.dataset.busWorkflowStage, count: document.querySelector('#evidenceSummary').innerText, wording: document.querySelector('#assessmentWording').innerText }));
+        await routeCheckbox.uncheck();
+        const routeAfter = await page.evaluate(element => ({ y: window.scrollY, stage: document.body.dataset.busWorkflowStage, focused: document.activeElement === element, count: document.querySelector('#evidenceSummary').innerText, wording: document.querySelector('#assessmentWording').innerText }), routeControl);
+        assert.ok(Math.abs(routeAfter.y - routeBefore.y) <= 2, `Route checkbox changed page scroll by ${routeAfter.y - routeBefore.y}px.`);
+        assert.equal(routeAfter.stage, routeBefore.stage, 'Route selection must not navigate the workflow stage.');
+        assert.equal(routeAfter.focused, true, 'Route checkbox focus must remain on the interacted control.');
+        if (acceptanceVisualDirectory) await routeCheckbox.locator('xpath=ancestor::tr[1]').screenshot({ path: path.join(acceptanceVisualDirectory, '11-route242-checkbox-after.png') });
+        assert.notEqual(routeAfter.count, routeBefore.count, 'Selected service count must update after route exclusion.');
+        assert.notEqual(routeAfter.wording, routeBefore.wording, 'Assessment Summary wording must update after route exclusion.');
+        await routeCheckbox.check();
+        const routeRestored = await page.evaluate(element => ({ y: window.scrollY, stage: document.body.dataset.busWorkflowStage, focused: document.activeElement === element }), routeControl);
+        assert.ok(Math.abs(routeRestored.y - routeAfter.y) <= 2, 'Restoring the route must not move the page.');
+        assert.equal(routeRestored.stage, routeBefore.stage, 'Restoring a route must not navigate the workflow stage.');
+        assert.equal(routeRestored.focused, true, 'Route checkbox focus must remain after re-inclusion.');
+        const stopCheckbox = page.locator('#evidenceRows input[type=checkbox]').first();
+        await stopCheckbox.scrollIntoViewIfNeeded();
+        await stopCheckbox.focus();
+        const stopControl = await stopCheckbox.elementHandle();
+        const stopBefore = await page.evaluate(() => ({ y: window.scrollY, count: document.querySelector('#evidenceSummary').innerText }));
+        await stopCheckbox.uncheck();
+        const stopAfter = await page.evaluate(element => ({ y: window.scrollY, focused: document.activeElement === element, count: document.querySelector('#evidenceSummary').innerText }), stopControl);
+        assert.ok(Math.abs(stopAfter.y - stopBefore.y) <= 2, `Stop checkbox changed page scroll by ${stopAfter.y - stopBefore.y}px.`);
+        assert.equal(stopAfter.focused, true, 'Stop checkbox focus must remain on the interacted control.');
+        await stopCheckbox.check();
+        assert.equal(await page.evaluate(element => document.activeElement === element, stopControl), true, 'Stop checkbox focus must remain after re-inclusion.');
+      }
       const sourceSamples = [];
       for (const index of [...new Set([0, Math.floor((rowCount - 1) / 2), rowCount - 1])]) {
         const cell = sourceRows.nth(index);
@@ -466,6 +579,7 @@ try {
       assert.equal(await technical.getAttribute('hidden') !== null, true, 'Developer diagnostics must be absent from ordinary planner mode.');
       await page.locator('details > summary').filter({ hasText: /Sources\s*&\s*Checks/i }).click();
       const checksText = await page.locator('#plannerChecks').innerText();
+      if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.locator('#sourceChecksDetails').screenshot({ path: path.join(acceptanceVisualDirectory, '12-sources-checks.png') });
       outcome.sourcesAndChecks = checksText;
       const resultFreshnessText = await page.locator('#resultFreshness').innerText();
       if (/0 evidence items? need review/i.test(resultFreshnessText)) {
@@ -491,6 +605,7 @@ try {
       assert.equal(unexplainedMultiRows.length, 0, `Routes with more than two rows need visible direction and principal-branch labels: ${unexplainedMultiRows.map(([route]) => route).join(', ')}.`);
       await page.locator('#goToExportBottom').click();
       await page.locator('#includeMapInWord').waitFor({ state: 'visible' });
+      if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.screenshot({ path: path.join(acceptanceVisualDirectory, '13-step6-export.png'), fullPage: true });
       const reviewGate = page.locator('#plannerReviewGate');
       if (!(await reviewGate.isHidden())) {
         assert.equal(await page.locator('#plannerReviewAcknowledgement').isChecked(), false, 'Review acknowledgement must reset for each newly composed assessment.');
@@ -511,6 +626,7 @@ try {
       const documentXml = zipEntry(docxBytes, 'word/document.xml');
       assert.ok(docxBytes.includes(Buffer.from('word/media/assessment-map.png')), 'Map-on Word export must embed the generated assessment PNG.');
       assert.match(documentXml, /w:sz w:val="12"/, 'Word table cells must use 6 pt text.');
+      assert.match(documentXml, /<w:trPr><w:cantSplit\/><\/w:trPr>/, 'Word service table rows must stay together across page breaks.');
       const exportedWordText = wordText(documentXml);
       outcome.wordText = exportedWordText;
       if (control.id === 'waltham-cross-nearest') {
@@ -533,7 +649,9 @@ try {
       for (const browserRow of rendered) {
         const wordRow = wordRows.find(candidate => normalized(candidate.Route) === normalized(browserRow.Route)
           && normalized(candidate['Direction / main service pattern']) === normalized(browserRow['Direction / main service pattern'])
-          && normalized(candidate['Served at']) === normalized(browserRow['Served at']));
+          && normalized(candidate['Served at']) === normalized(browserRow['Served at'])
+          && normalized(candidate['Typical frequency']) === normalized(browserRow['Typical frequency'])
+          && normalized(candidate['Operating period at stop']) === normalized(browserRow['Operating period at stop']));
         assert.ok(wordRow, `Generated Word row is missing browser route/direction/assessed-stop row ${browserRow.Route} ${browserRow['Direction / main service pattern']} ${browserRow['Served at']}.`);
         for (const field of parityFields) assert.equal(normalized(wordRow[field]), normalized(browserRow[field]), `Browser/Word ${field} differs for route ${browserRow.Route}.`);
       }

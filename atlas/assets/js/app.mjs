@@ -158,7 +158,7 @@ function showView(name) {
   if ((selected === 'modules' || selected === 'bus') && map) setTimeout(() => map.invalidateSize({ pan: false, animate: false }), 0);
 }
 
-function activateWorkflowStage(stage) {
+function activateWorkflowStage(stage, { scrollToStage = true } = {}) {
   const next = Math.max(1, Math.min(6, Number(stage) || 1));
   if (next >= 5 && !currentBusResult) { setCallout($('workflowHint'), 'Run the assessment before viewing Results.'); return; }
   if (next >= 2 && !selector.getSnapshot().site) { setCallout($('workflowHint'), 'Find a location before confirming the assessment point.'); return; }
@@ -187,6 +187,10 @@ function activateWorkflowStage(stage) {
   $('confirm-point-step-card').classList.toggle('workflow-supporting', next === 2);
   $('assessment-step-card').classList.toggle('workflow-active', next === 3 || next === 4);
   $('assessment-step-card').querySelector('.step-number').textContent = next === 3 ? '3' : '4';
+  $('stops-step').textContent = next === 4 ? 'Run assessment' : 'Assessment settings';
+  $('stops-step').nextElementSibling.textContent = next === 4
+    ? 'Analyse nearby stops, routes and timetable evidence using the selected assessment settings.'
+    : 'Choose the area to assess. London starts at 400 m and other areas at 700 m; adjust the radius to suit the site.';
   $('assessmentSettingsPanel').hidden = next !== 3;
   $('assessmentRunPanel').hidden = next !== 4;
   $('assessmentSetupContent').hidden = false;
@@ -227,7 +231,7 @@ function activateWorkflowStage(stage) {
   if (next === 5) moveResultsMap(true);
   setTimeout(() => {
     map?.invalidateSize({ pan: false, animate: false });
-    if (next === 5) evidencePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (scrollToStage && next === 5) evidencePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 0);
 }
 
@@ -403,7 +407,7 @@ function selectedRadius() {
 function syncRadiusCircle(radiusOverride = null) {
   const site = confirmedSite || selector.getSnapshot().site;
   if (!site || !map || !window.L) return;
-  const radius = Number.isFinite(Number(radiusOverride)) ? Number(radiusOverride) : selectedRadius();
+  const radius = radiusOverride != null && Number.isFinite(Number(radiusOverride)) ? Number(radiusOverride) : selectedRadius();
   if (!radiusCircle) {
     radiusCircle = window.L.circle([site.latitude, site.longitude], {
       radius,
@@ -691,7 +695,11 @@ function renderAssessment(result) {
     row.dataset.stopId = stopKey(stop);
     const displayName = stop.name || 'Unnamed bus stop';
     const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedStopIds.has(stopKey(stop)); include.setAttribute('aria-label', `Include ${displayName}`);
-    include.addEventListener('change', () => { if (include.checked) selectedStopIds.add(stopKey(stop)); else selectedStopIds.delete(stopKey(stop)); renderAssessment(result); });
+    include.addEventListener('change', () => {
+      if (include.checked) selectedStopIds.add(stopKey(stop)); else selectedStopIds.delete(stopKey(stop));
+      row.classList.toggle('diagnostic-candidate', !include.checked);
+      updateSelectionPresentation(result);
+    });
     appendCell(row, 'Include', include);
     appendCell(row, 'Map reference', plannerStopLabel(stop));
     const stopCell = document.createElement('span');
@@ -757,9 +765,13 @@ function renderAssessment(result) {
   }
   presentedServices.forEach((service, index) => {
     const row = document.createElement('tr');
+    row.dataset.serviceId = serviceKey(service);
     const supported = service.stopIds?.some(id => selectedStopIds.has(String(id)));
     const include = document.createElement('input'); include.type = 'checkbox'; include.checked = selectedServiceIds.has(serviceKey(service)) && supported; include.disabled = !supported; include.setAttribute('aria-label', `Include route ${service.routeNumber}`);
-    include.addEventListener('change', () => { if (include.checked) selectedServiceIds.add(serviceKey(service)); else selectedServiceIds.delete(serviceKey(service)); renderAssessment(result); });
+    include.addEventListener('change', () => {
+      if (include.checked) selectedServiceIds.add(serviceKey(service)); else selectedServiceIds.delete(serviceKey(service));
+      updateSelectionPresentation(result);
+    });
     appendCell(row, 'Include', include);
     appendCell(row, 'Route', plannerRouteDisplayNumber(service));
     appendCell(row, 'Operator', service.operator);
@@ -833,7 +845,9 @@ function renderAssessment(result) {
           const label = side[0].toUpperCase() + side.slice(1);
           if (!decision) return `${label}: ${service[side] || 'not supplied'} · source resolution not available`;
           const state = decision.conflict ? 'conflicting evidence' : decision.unresolved ? 'needs review' : 'resolved';
-          return `${label}: ${decision.chosenDisplayName || service[side] || 'not supplied'} · ${state}`;
+          const reason = decision.reason ? ` · ${decision.reason}` : '';
+          const unresolvedIds = decision.unresolvedEndpointStopPointIds?.length ? ` · unresolved StopPoints ${decision.unresolvedEndpointStopPointIds.join(', ')}` : '';
+          return `${label}: ${decision.chosenDisplayName || service[side] || 'not supplied'} · ${state}${reason}${unresolvedIds}`;
         });
         const calendar = service.calendarProfileLabel || service.calendarProfileId || 'not supplied';
         const servedStopCount = Object.keys(service.stopSchedules ?? {}).length;
@@ -858,8 +872,10 @@ function renderAssessment(result) {
   const checked = formatTime(stopProvenance.retrievedAt || timetableProvenance.retrievedAt);
   const stopSource = providerLabel({ provenance: stopProvenance });
   const foundStopCount = Number(result.discoveredStopCount ?? result.discoveredStops?.length ?? result.stops.length);
-  const stopCountText = foundStopCount !== result.stops.length ? `${foundStopCount} stops found · ${result.stops.length} assessed` : `${result.stops.length} stops assessed`;
-  $('evidenceSummary').textContent = `${stopCountText} · ${presentedServices.length} service summar${presentedServices.length === 1 ? 'y' : 'ies'}`;
+  const assessedStopCount = result.stops.filter(stop => !isOtherNearbyStopRecord(stop)).length;
+  const stopCountText = foundStopCount !== assessedStopCount ? `${foundStopCount} stops found · ${assessedStopCount} assessed` : `${assessedStopCount} stops assessed`;
+  const selectedServices = presentedServices.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => selectedStopIds.has(String(id))));
+  $('evidenceSummary').textContent = `${stopCountText} · ${selectedServices.length} service summar${selectedServices.length === 1 ? 'y' : 'ies'} selected`;
   $('assessmentModeSummary').textContent = result.assessmentMode === 'nearest'
     ? `Nearest stop group · ${result.nearestGroup?.name || 'selected logical stop group'}`
     : `Full Bus assessment · ${selectedRadius()} m`;
@@ -868,6 +884,27 @@ function renderAssessment(result) {
   $('resultSource').textContent = `${stopSource}; ${timetableLabel}; OpenStreetMap routing`;
   $('resultChecked').textContent = checked;
   const reviewItems = result.reviewItems ?? [];
+  const rawEndpointEvidence = $('rawEndpointEvidence');
+  if (rawEndpointEvidence) {
+    rawEndpointEvidence.replaceChildren();
+    const decisions = (result.serviceSummaries ?? []).flatMap(service => ['origin', 'destination'].map(side => ({ service, side, decision: service[side + 'EndpointDecision'] })).filter(item => item.decision));
+    rawEndpointEvidence.hidden = decisions.length === 0;
+    if (decisions.length) {
+      const heading = document.createElement('h4');
+      heading.textContent = `Raw endpoint resolution evidence (${decisions.length} endpoint decisions)`;
+      rawEndpointEvidence.append(heading);
+      const list = document.createElement('ul');
+      for (const { service, side, decision } of decisions) {
+        const line = document.createElement('li');
+        const requested = decision.requestedEndpointStopPointIds ?? decision.endpointStopPointIds ?? [];
+        const hydrated = decision.hydratedEndpointStopPointIds ?? [];
+        const unresolved = decision.unresolvedEndpointStopPointIds ?? [];
+        line.textContent = `Route ${service.routeNumber || 'not supplied'} · ${service.directionFamily || service.direction || 'direction not supplied'} · ${side}: raw ${decision.rawEndpointText || service[side] || 'not supplied'}; chosen ${decision.chosenDisplayName || 'unresolved'}; state ${decision.conflict ? 'conflict' : decision.unresolved ? 'unresolved' : 'resolved'}; reason ${decision.reason || 'none'}; requested StopPoints ${requested.join(', ') || 'none'}; hydrated ${hydrated.join(', ') || 'none'}; unresolved ${unresolved.join(', ') || 'none'}; source ${decision.provider || service.frequencyEvidenceSource || 'not supplied'}`;
+        list.append(line);
+      }
+      rawEndpointEvidence.append(list);
+    }
+  }
   $('plannerReviewGate').hidden = reviewItems.length === 0;
   $('plannerReviewAcknowledgement').checked = false;
   $('plannerReviewGateStatus').textContent = reviewItems.length ? `${reviewItems.length} flagged item${reviewItems.length === 1 ? '' : 's'} remain visible in Sources & Checks.` : 'No flagged evidence requires acknowledgement.';
@@ -940,6 +977,31 @@ function renderAssessment(result) {
   diagnostics.append(stopAreaList);
   }
   activateWorkflowStage(5);
+}
+
+function updateSelectionPresentation(result) {
+  currentBusResult = result;
+  const selectedStops = result.stops.filter(stop => selectedStopIds.has(stopKey(stop)));
+  const selectedStopSet = new Set(selectedStops.map(stopKey));
+  const sourceServices = result.plannerServiceSummaries ?? result.serviceSummaries ?? [];
+  const services = sourceServices.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => selectedStopSet.has(String(id))));
+  for (const row of $('evidenceRows').querySelectorAll('tr[data-stop-id]')) row.classList.toggle('diagnostic-candidate', !selectedStopIds.has(row.dataset.stopId));
+  for (const row of $('serviceRows').querySelectorAll('tr[data-service-id]')) {
+    const service = sourceServices.find(item => serviceKey(item) === row.dataset.serviceId);
+    const checkbox = row.querySelector('input[type=checkbox]');
+    if (!service || !checkbox) continue;
+    const supported = service.stopIds?.some(id => selectedStopSet.has(String(id)));
+    checkbox.disabled = !supported;
+    checkbox.checked = Boolean(supported && selectedServiceIds.has(serviceKey(service)));
+  }
+  const foundStopCount = Number(result.discoveredStopCount ?? result.discoveredStops?.length ?? result.stops.length);
+  const assessedStopCount = result.stops.filter(stop => !isOtherNearbyStopRecord(stop)).length;
+  const stopCountText = foundStopCount !== assessedStopCount ? `${foundStopCount} stops found · ${assessedStopCount} assessed` : `${assessedStopCount} stops assessed`;
+  $('evidenceSummary').textContent = `${stopCountText} · ${services.length} service summar${services.length === 1 ? 'y' : 'ies'} selected`;
+  const wording = assessmentWording(result, services);
+  $('assessmentWording').textContent = wording;
+  $('copyAssessmentWording').disabled = !wording;
+  updateFormalExportAvailability();
 }
 
 async function searchAddress(event) {
@@ -1305,4 +1367,23 @@ activateWorkflowStage(1);
 refreshDataStatus();
 
 window.__ATLAS_SITE_SELECTOR__ = Object.freeze({ getSnapshot: selector.getSnapshot, getMap: () => map });
-window.__ATLAS_BUS_UI__ = Object.freeze({ hasRadiusCircle: () => Boolean(radiusCircle), getTaskStatus: () => taskStatus.getState() });
+window.__ATLAS_BUS_UI__ = Object.freeze({
+  hasRadiusCircle: () => Boolean(radiusCircle),
+  getRadiusCircleState: () => {
+    if (!radiusCircle || !map) return null;
+    const circle = radiusCircle.getBounds();
+    const view = map.getBounds();
+    const southWest = circle.getSouthWest();
+    const northEast = circle.getNorthEast();
+    const viewSouthWest = view.getSouthWest();
+    const viewNorthEast = view.getNorthEast();
+    return {
+      radius: radiusCircle.getRadius(),
+      color: radiusCircle.options.color,
+      fillColor: radiusCircle.options.fillColor,
+      bounds: { south: southWest.lat, west: southWest.lng, north: northEast.lat, east: northEast.lng },
+      viewBounds: { south: viewSouthWest.lat, west: viewSouthWest.lng, north: viewNorthEast.lat, east: viewNorthEast.lng }
+    };
+  },
+  getTaskStatus: () => taskStatus.getState()
+});

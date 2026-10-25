@@ -20,6 +20,40 @@ const audit = buildPlannerSummaryAudit(rows, expectedRowCounts);
 const routeCounts = plannerRows => Object.fromEntries(Object.keys(expectedRowCounts).map(routeNumber => [routeNumber, plannerRows.filter(row => row.routeNumber === routeNumber).length]));
 assert.deepEqual(routeCounts(alpha14Rows), expectedAlpha14RedShape, 'Alpha14 must be red on the identical prepared input');
 assert.deepEqual(routeCounts(rows), expectedRowCounts, 'Alpha15 must recover the required concise public row shape');
+const walthamBusStationStopIds = new Set(['210021703440', '210021703425', '210021703420', '210021703430', '210021703435']);
+const nearestStops = fixture.stops.filter(stop => walthamBusStationStopIds.has(stop.id));
+assert.equal(nearestStops.length, 5, 'the Product Owner nearest control is the five-stop Waltham Cross Bus Station logical group');
+const nearestRecords = records.map(record => ({
+  ...record,
+  stopSchedules: Object.fromEntries(Object.entries(record.stopSchedules ?? {}).filter(([stopId]) => walthamBusStationStopIds.has(stopId)))
+})).filter(record => Object.values(record.stopSchedules ?? {}).some(days => Object.values(days ?? {}).some(times => Array.isArray(times) && times.length)));
+const nearestSummaries = buildServiceSummaries(nearestStops, nearestRecords);
+const nearestRows = buildPlannerBusServiceSummaries(nearestSummaries, nearestStops);
+const nearest242Rows = nearestRows.filter(row => row.routeNumber === '242');
+assert.equal(nearest242Rows.length, 2, 'nearest-mode evidence uses the canonical two-direction planner composition instead of a separate supplementary-source principal row');
+assert.deepEqual(nearest242Rows.map(row => row.directionPatternText).sort(), rows.filter(row => row.routeNumber === '242').map(row => row.directionPatternText).sort(), 'nearest and full mode retain the same Route 242 public directions');
+const nearest242Text = nearest242Rows.map(row => [row.plannerNotes?.shortWorkings, row.plannerNotes?.additionalServices, row.routeGroupNote, ...row.sourceRecordIds].join(' ')).join(' ');
+assert.match(nearest242Text, /Dame Alice Owen's School/i, 'nearest mode retains the Dame Alice Owen’s school-working evidence as a subordinate qualification');
+assert.match(nearest242Text, /Welham Green|Brookfield Centre/i, 'nearest mode retains Welham Green and Brookfield Centre branch evidence');
+assert.ok(nearest242Rows.some(row => row.rawServiceSummaries.some(summary => /TNDS/i.test(summary.timetableSource || summary.source?.provider || ''))), 'supplementary TNDS source records remain available under the consolidated planner row');
+
+const shortWorkingStop = { id: 'SHORT-WORKING', name: 'Bus Station' };
+const regularSchoolControl = {
+  id: 'regular-school-control', routeNumber: 'R99', operator: 'Uno', origin: 'Bus Station', destination: 'Market Town',
+  direction: 'inbound', directionFamily: 'headsign:inbound', timetableSource: 'BODS', calendarProfileId: 'ordinary',
+  stopSchedules: { 'SHORT-WORKING': { monday: [360, 420, 480, 540], saturday: [420, 480], sunday: [] } }, source: { provider: 'BODS' }
+};
+const schoolVariantControl = {
+  ...regularSchoolControl, id: 'school-variant-control', timetableSource: 'TNDS', destination: 'Town School',
+  stopSchedules: { 'SHORT-WORKING': { monday: [425], tuesday: [425], wednesday: [425], thursday: [425], friday: [425], saturday: [], sunday: [] } },
+  source: { provider: 'TNDS', calendarProfileId: 'ordinary' }
+};
+const schoolVariantSummaries = buildServiceSummaries([shortWorkingStop], [regularSchoolControl, schoolVariantControl]);
+const schoolVariantRows = buildPlannerBusServiceSummaries(schoolVariantSummaries, [shortWorkingStop]);
+assert.equal(schoolVariantRows.length, 1, 'a weekday-only school destination stays subordinate to a same-direction regular service with weekend service');
+assert.match(schoolVariantRows[0].plannerNotes.shortWorkings, /Town School \(weekdays only\)/, 'the school-only trip remains as a visible, scoped short-working qualification');
+assert.match(schoolVariantRows[0].typicalFrequencyLines.join(' '), /Sat: 2 journeys\/day/);
+assert.doesNotMatch(schoolVariantRows[0].typicalFrequencyLines.join(' '), /Sat \(School days\)/);
 assert.deepEqual(baseline.alpha14.rowCounts, expectedAlpha14RedShape);
 assert.deepEqual(baseline.alpha15RequiredGreenShape, expectedRowCounts);
 assert.equal(baseline.sameInputIdentity.identical, true);

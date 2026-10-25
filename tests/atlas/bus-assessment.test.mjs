@@ -137,6 +137,35 @@ test('all assessment review paths carry deterministic taxonomy categories', asyn
   assert.equal(future.category, 'other-material');
 });
 
+test('Chingford repeated origin endpoint evidence is grouped by public route issue while all raw stop records remain', async () => {
+  const chingfordStops = Array.from({ length: 5 }, (_, index) => ({
+    ...stop, id: `CHINGFORD-${index + 1}`, name: `Grove Road ${index + 1}`,
+    routes: ['215', '385', '397'], timetableAuthority: 'TfL'
+  }));
+  const rawRecords = chingfordStops.flatMap(item => ['215', '385', '397'].map(routeNumber => ({
+    ...service, id: `tfl-${routeNumber}-${item.id}`, routeNumber, operator: 'TfL', origin: '', destination: `Route ${routeNumber} destination`, direction: 'outbound',
+    sourceRecordIds: [`tfl-${routeNumber}-${item.id}`], plannerEndpointMateriality: 'material',
+    originStopPointIds: [`UNRESOLVED-${routeNumber}-${item.id}`], destinationStopPointId: `DEST-${routeNumber}`,
+    tflRouteSequenceEvidence: { status: 'ambiguous-or-incomplete-link' },
+    source: { provider: 'TfL', lineId: routeNumber, directionId: 'outbound', intervalId: `${routeNumber}-${item.id}` },
+    stopSchedules: { [item.id]: service.stopSchedules['2100A'] }
+  })));
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: chingfordStops, warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: rawRecords, warnings: [], provenance: { source: 'TfL' } }) },
+    accessRouting: { matrix: async (_site, stops) => ({ ok: true, routes: stops.map(() => ({ status: 'routed', distanceMetres: 120, durationSeconds: 90 })), warnings: [], provenance: { source: 'OSRM' } }) }
+  });
+  const result = await assessment.assess({ latitude: 51.6, longitude: -0.01 }, { radius: 250 });
+  const endpointIssues = result.reviewItems.filter(item => item.code === 'planner-endpoint-resolution');
+  assert.equal(result.services.length, 15, 'all per-StopPoint source records remain in the assessment evidence');
+  assert.equal(result.reviewItems.length, 3, 'the main review badge counts only the three actionable route-level endpoint issue groups');
+  assert.equal(endpointIssues.length, 3, 'the review count is one actionable origin-endpoint issue for each of Routes 215, 385 and 397, not one per StopPoint');
+  assert.deepEqual(endpointIssues.map(item => item.route).sort(), ['215', '385', '397']);
+  assert.ok(endpointIssues.every(item => item.actionability === 'review'));
+  assert.ok(result.services.every(record => record.originStopPointIds?.length === 1 && record.sourceRecordIds?.length === 1), 'grouping review items leaves every raw source record and unresolved origin StopPoint identity accessible');
+  assert.ok(result.services.some(record => record.originStopPointIds[0].startsWith('UNRESOLVED-')), 'raw unresolved StopPoint identity is preserved');
+});
+
 for (const [name, fn] of tests) {
   await fn();
   console.log(`PASS Bus assessment - ${name}`);

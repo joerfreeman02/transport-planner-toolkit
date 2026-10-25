@@ -421,6 +421,15 @@ function reversePatternRelationship(first, second) {
   return longestCommonSubsequenceLength(left, [...right].reverse()) >= 2;
 }
 
+function compatibleSchoolSpecificWorking(first, second) {
+  if (schoolEndpoint(first) === schoolEndpoint(second)) return false;
+  if (routeGroupKey(first) !== routeGroupKey(second) || !operatorFamilyCompatible(first, second)) return false;
+  if (directionKey(first) === 'direction-not-supplied' || directionKey(first) !== directionKey(second)) return false;
+  const left = endpointPair(first), right = endpointPair(second);
+  if (!left.origin || left.origin !== right.origin || sharedStopIds(first, second).size === 0) return false;
+  return schoolRestrictedLocalVariants([first, second]).length === 1;
+}
+
 function sharedPatternValues(first, second) {
   const right = new Set(explicitPattern(second));
   return new Set(explicitPattern(first).filter(value => right.has(value)));
@@ -501,7 +510,6 @@ function connectedServiceComponents(services) {
   const compatiblePairs = new Set();
   for (let left = 0; left < services.length; left += 1) {
     for (let right = left + 1; right < services.length; right += 1) {
-      if (hardCorridorSeparation(services[left], services[right])) continue;
       if (!compatibleDirection(services[left], services[right], aliases)) continue;
       compatiblePairs.add(`${left}:${right}`);
     }
@@ -607,6 +615,7 @@ function compatibleDirection(first, second, aliases = []) {
   // Operator and feed identity are evidence fields, not public direction
   // identity.  The same route-direction can therefore be represented by
   // more than one current operator or prepared feed.
+  if (compatibleSchoolSpecificWorking(first, second)) return true;
   if (hardCorridorSeparation(first, second)) return false;
   if (reverseEndpointRelationship(first, second)) return false;
   if (hasPublicServiceCopyEvidence(first, second)) return true;
@@ -785,7 +794,8 @@ function serviceRunsOnDay(service, day) {
   }[day];
   const labels = [service?.typicalFrequencyLines, service?.frequency, service?.operatingPeriodLines, service?.operatingPeriod]
     .flatMap(value => Array.isArray(value) ? value : value ? [value] : []).map(text);
-  return labels.some(line => new RegExp(`^\\s*${dayLabel}(?:\\s*[-–]\\s*(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))?\\s*:\\s*(?!no scheduled service|no timetable|not scheduled)`, 'i').test(line));
+  return labels.some(line => !/^\s*[^:]+:\s*(?:no scheduled service|no timetable|not scheduled)\b/i.test(line)
+    && new RegExp(`^\\s*${dayLabel}(?:\\s*[-–]\\s*(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))?\\s*:`, 'i').test(line));
 }
 
 function schoolRestrictedLocalVariants(component = []) {
@@ -2563,10 +2573,49 @@ function plannerCopyKey(row) {
   ]);
 }
 
+function routeStopDirectionCalendarKey(row) {
+  const direction = normal(text(row?.directionPatternText).replace(/\s*\([^()]*\)/g, ' '));
+  const stopId = text(row?.servedAtStopId || row?.frequencyBasisStopId);
+  const destination = normal(row?.destinationDecision?.chosenDisplayName || row?.destinationEndpointDecision?.chosenDisplayName || row?.destination);
+  if (!direction || !destination || !stopId || row?.unresolvedPublicIdentity) return null;
+  return JSON.stringify([normal(row?.routeNumber), stopId, direction, destination]);
+}
+
+function plannerCalendarProfiles(row) {
+  return unique(row?.calendarProfileIds?.length ? row.calendarProfileIds : ['ordinary']).map(normal).sort();
+}
+
+function plannerActiveDays(row) {
+  const frequencyDays = row?.frequencyByDay;
+  if (frequencyDays && typeof frequencyDays === 'object') {
+    return DAY_ORDER.filter(day => frequencyDays[day]?.noService === false || Number(frequencyDays[day]?.departureCount) > 0);
+  }
+  return DAY_ORDER.filter(day => (row?.typicalFrequencyLines ?? []).some(line => {
+    const noService = /^\s*[^:]+:\s*(?:no scheduled service|no timetable|not scheduled)\b/i.test(String(line));
+    const dayLabel = {
+      monday: '(?:Mon|Monday)', tuesday: '(?:Tue|Tuesday)', wednesday: '(?:Wed|Wednesday)',
+      thursday: '(?:Thu|Thursday)', friday: '(?:Fri|Friday)', saturday: '(?:Sat|Saturday)', sunday: '(?:Sun|Sunday)'
+    }[day];
+    return !noService && new RegExp(`^\\s*${dayLabel}(?:\\s*[-–]\\s*(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday))?\\s*:`, 'i').test(String(line));
+  }));
+}
+
+function canonicalDepartureKeys(row) {
+  return Object.entries(row?.canonicalDeparturePopulationAll ?? {}).flatMap(([day, entries]) => (entries ?? []).map(entry => JSON.stringify([
+    day, Number(entry?.minute), text(entry?.sourceRecordId), text(entry?.journeyIdentity)
+  ])));
+}
+
+function populationContainsAll(container, candidate) {
+  const containerKeys = new Set(canonicalDepartureKeys(container));
+  const candidateKeys = canonicalDepartureKeys(candidate);
+  return candidateKeys.length > 0 && candidateKeys.every(key => containerKeys.has(key));
+}
+
 function collapseCrossProviderPlannerCopies(rows = []) {
   const buckets = new Map();
   for (const row of rows) {
-    const key = plannerCopyKey(row);
+    const key = routeStopDirectionCalendarKey(row);
     const source = plannerSourceKind(row);
     if (!key || !source) continue;
     const members = buckets.get(key) ?? [];
@@ -2578,14 +2627,29 @@ function collapseCrossProviderPlannerCopies(rows = []) {
   for (const members of buckets.values()) {
     const bods = members.filter(row => plannerSourceKind(row) === 'BODS');
     const tnds = members.filter(row => plannerSourceKind(row) === 'TNDS');
-    // This is a planner presentation reconciliation only: it requires an
-    // exact route/operator/assessed-stop/direction/principal-place/calendar
-    // match across the two national feeds.  Keep the BODS timetable as the
-    // visible authority and retain all TNDS rows as structured evidence.
-    if (bods.length !== 1 || !tnds.length || bods.length + tnds.length !== members.length) continue;
-    const principal = bods[0];
-    const copies = tnds.map(row => Object.freeze({
-      source: 'TNDS',
+    // This is a planner presentation reconciliation only. Exact copies can
+    // collapse as before. A TNDS row already classified as a short working
+    // may also join the BODS principal when route, assessed stop, public
+    // direction, destination and calendar agree; source/operator labels and
+    // extra branch wording remain in the retained source evidence.
+    if (bods.length !== 1 || tnds.length !== 1 || bods.length + tnds.length !== members.length) continue;
+    const bodsRow = bods[0], tndsRow = tnds[0];
+    const exactCopies = plannerCopyKey(tndsRow) === plannerCopyKey(bodsRow);
+    const subordinateSupplementary = (() => {
+      const row = tndsRow;
+      const annotations = plannerAnnotationTaxonomy(row);
+      return (annotations.shortWorkingEntries?.length ?? 0) > 0 || (annotations.additionalServiceEntries?.length ?? 0) > 0;
+    })();
+    const samePublicOperator = operatorFamilyCompatible(bodsRow, tndsRow);
+    const sameCalendar = JSON.stringify(plannerCalendarProfiles(bodsRow)) === JSON.stringify(plannerCalendarProfiles(tndsRow));
+    const sameOperatingDays = JSON.stringify(plannerActiveDays(bodsRow)) === JSON.stringify(plannerActiveDays(tndsRow));
+    const sameDaySupplementary = samePublicOperator && sameCalendar && sameOperatingDays;
+    const tndsCarriesBodsPopulation = samePublicOperator && sameCalendar && populationContainsAll(tndsRow, bodsRow);
+    if (!exactCopies && !subordinateSupplementary && !sameDaySupplementary && !tndsCarriesBodsPopulation) continue;
+    const principal = tndsCarriesBodsPopulation ? tndsRow : bodsRow;
+    const supplementary = principal === bodsRow ? [tndsRow] : [bodsRow];
+    const copies = supplementary.map(row => Object.freeze({
+      source: plannerSourceKind(row),
       sourceRowId: row.id,
       sourceRecordIds: Object.freeze([...(row.sourceRecordIds ?? [])]),
       endpointDecision: row.destinationDecision ?? null,
@@ -2595,11 +2659,12 @@ function collapseCrossProviderPlannerCopies(rows = []) {
     }));
     replacements.set(principal.id, Object.freeze({
       ...principal,
-      sourceRecordIds: Object.freeze(unique([...principal.sourceRecordIds, ...tnds.flatMap(row => row.sourceRecordIds ?? [])])),
+      timetableSource: 'BODS',
+      sourceRecordIds: Object.freeze(unique([...principal.sourceRecordIds, ...supplementary.flatMap(row => row.sourceRecordIds ?? [])])),
       crossProviderPlannerCopies: Object.freeze(copies),
       rawServiceSummaries: Object.freeze([...new Map([
         ...(principal.rawServiceSummaries ?? []),
-        ...tnds.flatMap(row => row.rawServiceSummaries ?? [])
+        ...supplementary.flatMap(row => row.rawServiceSummaries ?? [])
       ].map(service => [text(service?.id) || JSON.stringify(service), service])).values()])
     }));
     for (const row of members) consumed.add(row.id);

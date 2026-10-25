@@ -22,8 +22,8 @@ main { flex: 1 0 auto; width: 100%; max-width: 1760px; box-sizing: border-box; p
 .brand { width: min(300px, 100%); }
 .brand img { display: block; width: 100%; max-height: 52px; object-fit: contain; object-position: left center; }
 .app-header nav { align-self: stretch; align-items: stretch; gap: 9px; }
-.app-header nav button { position: relative; min-width: 82px; border-radius: 0; color: #f8fafc; background: transparent; }
-.app-header nav button:hover, .app-header nav button.active { background: transparent; }
+.app-header nav button { position: relative; min-width: 82px; border-radius: 0; color: #f8fafc; background: transparent !important; background-color: transparent !important; background-image: none !important; box-shadow: none !important; }
+.app-header nav button:hover, .app-header nav button:focus, .app-header nav button:focus-visible, .app-header nav button:active, .app-header nav button.active { background: transparent !important; background-color: transparent !important; background-image: none !important; box-shadow: none !important; }
 .app-header nav button.active::after { position: absolute; right: 9px; bottom: 0; left: 9px; height: 3px; background: var(--atlas-orange); content: ""; }
 .build { border-color: rgba(255,255,255,.22); color: #e2e8f0; }
 .build b { color: #fff; }
@@ -329,9 +329,9 @@ footer a { color: #fff; }
 @media(max-width:560px){.module-illustration{height:118px}.home-process,.home-benefits{grid-template-columns:1fr}}
 
 /* Final closeout refinements: retain the workflow while improving narrow layouts. */
-.workflow-rail button { background: #102b49; }
-.workflow-rail button:hover:not(:disabled) { background: #1b3b5d; }
-.workflow-rail button.active { background: #234565; }
+.workflow-rail button { background: transparent; }
+.workflow-rail button:hover:not(:disabled) { background: rgba(255,255,255,.06); }
+.workflow-rail button.active { background: rgba(255,255,255,.09); }
 .workspace-module-art { display: block; width: 74px; height: 74px; flex: 0 0 74px; object-fit: contain; }
 .workspace-header-copy { min-width: 0; flex: 1 1 auto; }
 .candidate > div { min-width: 0; }

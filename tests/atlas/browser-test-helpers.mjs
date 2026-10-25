@@ -1,7 +1,9 @@
-const TRANSPARENT_TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+Av3nGQAAAABJRU5ErkJggg==', 'base64');
+// Valid neutral tile keeps layout screenshots readable when external OSM tiles
+// are deliberately stubbed. It contains no fabricated roads or map features.
+const NEUTRAL_QA_TILE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGN48e4TAAWKAskksmNxAAAAAElFTkSuQmCC', 'base64');
 
 export async function mockMapTiles(page) {
-  await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ status: 200, contentType: 'image/png', body: TRANSPARENT_TILE }));
+  await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ status: 200, contentType: 'image/png', body: NEUTRAL_QA_TILE }));
 }
 
 export async function mockAccessRouting(page, { fail = false } = {}) {

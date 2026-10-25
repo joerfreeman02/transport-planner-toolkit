@@ -175,10 +175,12 @@ export function createReviewItem({ code, severity = 'warning', actionability = '
 
 function buildReviewItems({ selectedStops = [], services = [], serviceSummaries = [], plannerServiceSummaries = [], servicesResult = null, warnings = [], prepared = null, stopCoverageComplete = true, routingComplete = true } = {}) {
   const items = new Map();
-  const add = ({ code, severity = 'warning', actionability = 'review', route = null, stop = null, source = 'timetable source', message, factKey = null }) => {
+  const add = ({ code, severity = 'warning', actionability = 'review', route = null, stop = null, source = 'timetable source', message, factKey = null, groupKey = null }) => {
     const item = createReviewItem({ code, severity, actionability, route, stop, source, message, id: code + ':' + items.size });
     if (!item) return;
-    const key = [code, route, factKey ?? stop, source, item.message].map(value => String(value ?? '').toLowerCase()).join('|');
+    const key = groupKey
+      ? [code, route, groupKey, item.message].map(value => String(value ?? '').toLowerCase()).join('|')
+      : [code, route, factKey ?? stop, source, item.message].map(value => String(value ?? '').toLowerCase()).join('|');
     if (!items.has(key)) items.set(key, item);
   };
   const provenance = servicesResult?.provenance ?? {};
@@ -234,7 +236,17 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     const factIdentity = decision.conflict
       ? conflictEndpointFactIdentity(service, side, decision)
       : `${side}:${sourceIdentity || 'no-source-record'}:${intervalIdentity}`;
-    add({ code: 'planner-endpoint-resolution', route: service.routeNumber, stop: decision.endpointStopPointId || service.frequencyBasisStopId, source: decision.provider || service.frequencyEvidenceSource || 'timetable source', factKey: factIdentity, message: `${side[0].toUpperCase() + side.slice(1)} endpoint decision requires review: ${decision.reason}` });
+    const routeIdentity = String(service.routeNumber ?? '').trim();
+    const directionIdentity = String(service.directionFamily || service.direction || '').trim().toLowerCase();
+    const destinationIdentity = String(resolvedPlannerDestination(service) || service.destination || '').trim().toLowerCase();
+    const routeSequence = service.tflRouteSequenceEvidence ?? {};
+    const topologyIdentity = JSON.stringify(routeSequence.routeTopologyIdentities?.length
+      ? routeSequence.routeTopologyIdentities.map(identity => ({ branchId: String(identity?.branchId ?? '').trim(), sectionIds: [...(identity?.sectionIds ?? [])].map(String).map(value => value.trim()).filter(Boolean).sort() })).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)))
+      : { branchId: String(routeSequence.matchedSequence?.branchId ?? routeSequence.branchId ?? '').trim(), sectionIds: (routeSequence.matchedSections ?? routeSequence.matchedRouteSections ?? []).map(section => String(section?.id ?? section?.routeSectionId ?? '').trim()).filter(Boolean).sort() });
+    const repeatedOriginGroup = side === 'origin' && decision.unresolved && !decision.conflict && routeIdentity && directionIdentity
+      ? `public-service-origin:${routeIdentity}:${directionIdentity}:${destinationIdentity}:${topologyIdentity}:${String(decision.reason || '').trim().toLowerCase()}`
+      : null;
+    add({ code: 'planner-endpoint-resolution', route: service.routeNumber, stop: decision.endpointStopPointId || service.frequencyBasisStopId, source: decision.provider || service.frequencyEvidenceSource || 'timetable source', factKey: factIdentity, groupKey: repeatedOriginGroup, message: `${side[0].toUpperCase() + side.slice(1)} endpoint decision requires review: ${decision.reason}` });
   }
   if (!stopCoverageComplete) add({ code: 'stop-source-coverage', stop: selectedStops[0]?.id, source: 'NaPTAN', message: 'Stop-source coverage was incomplete; the returned stop set does not establish an authoritative zero-stop conclusion.' });
   if (!routingComplete) for (const stop of selectedStops.filter(item => item.walking?.status !== 'routed' || item.cycling?.status !== 'routed')) add({ code: 'access-routing', stop: stop.id, source: 'OSRM', message: 'Walking or cycling access could not be routed for this stop; review access distances before formal use.' });

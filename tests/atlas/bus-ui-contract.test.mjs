@@ -5,8 +5,8 @@ const html = fs.readFileSync(new URL('../../atlas/index.html', import.meta.url),
 const app = fs.readFileSync(new URL('../../atlas/assets/js/app.mjs', import.meta.url), 'utf8');
 const css = fs.readFileSync(new URL('../../atlas/assets/css/atlas-shell.css', import.meta.url), 'utf8');
 const workspaceCss = fs.readFileSync(new URL('../../atlas/assets/css/bus-beta-workspace.css', import.meta.url), 'utf8');
-assert.match(html, /2\.0\.0-alpha\.15/);
-assert.match(html, /ATLAS-2\.0\.0-alpha\.15-20260914/);
+assert.match(html, /2\.0\.0-beta\.1/);
+assert.match(html, /ATLAS-2\.0\.0-beta\.1-20261025/);
 assert.match(html, /id="workflowRail"[\s\S]*data-workflow-step="6"/);
 assert.match(html, /id="assessmentModeSummary"/);
 assert.match(html, /<h4 id="wording-heading">Bus Services<\/h4>/);

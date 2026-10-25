@@ -20,7 +20,7 @@ try {
   assert.equal(review.reused, false);
   assert.match(review.url, /^http:\/\/127\.0\.0\.1:\d+\/atlas\/#modules$/);
   assert.equal(existsSync(stateFile), true);
-  assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).version, '2.0.0-alpha.15');
+  assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).version, '2.0.0-beta.1');
   pass('starts on an available loopback address');
 
   const atlas = await fetch(review.url);
@@ -28,8 +28,8 @@ try {
   assert.match(atlas.headers.get('content-type'), /^text\/html/);
   const atlasHtml = await atlas.text();
   assert.match(atlasHtml, /ATLAS — Transport and Location Assessment/);
-  assert.match(atlasHtml, /2\.0\.0-alpha\.15/);
-  assert.match(atlasHtml, /ATLAS-2\.0\.0-alpha\.15-20260914/);
+  assert.match(atlasHtml, /2\.0\.0-beta\.1/);
+  assert.match(atlasHtml, /ATLAS-2\.0\.0-beta\.1-20261025/);
   const headerStart = atlasHtml.indexOf('<header');
   const headerEnd = atlasHtml.indexOf('</header>', headerStart);
   assert.notEqual(headerStart, -1);

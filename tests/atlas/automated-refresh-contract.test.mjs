@@ -18,8 +18,8 @@ const preflight = fs.readFileSync(path.join(root, 'tools/atlas-data-publication/
 const checkpoint = fs.readFileSync(path.join(root, 'tools/atlas-data-publication/candidate-checkpoint.mjs'), 'utf8');
 const release = JSON.parse(fs.readFileSync(path.join(root, 'atlas/config/atlas-release.json'), 'utf8'));
 
-assert.equal(release.version, '2.0.0-alpha.15');
-assert.equal(release.build, 'ATLAS-2.0.0-alpha.15-20260914');
+assert.equal(release.version, '2.0.0-beta.1');
+assert.equal(release.build, 'ATLAS-2.0.0-beta.1-20261025');
 assert.match(workflow, /workflow_dispatch/);
 assert.match(workflow, /prepared_schema:/);
 assert.match(workflow, /default: v1/);

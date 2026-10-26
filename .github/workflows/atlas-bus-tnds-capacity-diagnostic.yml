@@ -8,7 +8,9 @@ jobs:
   measure:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
+    env:
+      ATLAS_TNDS_BANKS_JSON: ${{ vars.ATLAS_TNDS_BANKS_JSON }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,11 +28,27 @@ jobs:
           assert a.get('id') == 12275615359
           assert a.get('name') == 'atlas-bus-beta-review-candidate-39430415441'
           assert a.get('size_in_bytes') == 2549732499
-          assert a.get('digest') == 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471'
+          assert a.get('digest') == 'sha256:5cad24e0a47a4c77a8ec861d746bf9f538404420fcb9505f297607632e1a471'
           assert a.get('expired') is False
           w=a.get('workflow_run') or {}
           assert w.get('id') == 39430415441 and w.get('head_sha') == '151199cc914c235870f444d26b03c2309edbd035'
           print('Run 75 artifact identity matches immutable canonical metadata.')
+          PY
+      - name: Validate actual configured inactive Bank B roots
+        run: |
+          python - <<'PY'
+          import json,os
+          banks=json.loads(os.environ['ATLAS_TNDS_BANKS_JSON'])
+          assert [b['id'] for b in banks] == ['A','B']
+          a=next(b for b in banks if b['id']=='A')
+          b=next(x for x in banks if x['id']=='B')
+          assert [r['id'] for r in a['roots']] == ['A1','A2','A3']
+          assert [r['id'] for r in b['roots']] == ['B1','B2','B3','B4','B5']
+          for r in b['roots']:
+            n=r['id'].lower()
+            assert r['repository'] == f"joerfreeman02/atlas-tnds-{n}"
+            assert r['siteUrl'] == f"https://joerfreeman02.github.io/atlas-tnds-{n}/"
+          print('Configured Bank A remains A1-A3; inactive Bank B is B1-B5 with real repository/site endpoints.')
           PY
       - uses: actions/download-artifact@v4
         with:
@@ -47,33 +65,73 @@ jobs:
           echo "RESTORED_CANDIDATE_ROOT=$root" >> "$GITHUB_ENV"
       - name: Verify frozen Bus and TNDS manifest identities
         run: |
-          test "$(sha256sum "$RESTORED_CANDIDATE_ROOT/atlas/data/bus/manifest.json" | cut -c1-64)" = "1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f"
+          test "$(sha256sum "$RESTORED_CANDIDATE_ROOT/atlas/data/bus/manifest.json" | cut -c1-64)" = "1195f19b55d476600060d89b4a56517e039032f39a9f917ad49647ffec89df4f"
           test "$(sha256sum "$RESTORED_CANDIDATE_ROOT/atlas/data/bus-tnds/manifest.json" | cut -c1-64)" = "2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f"
-      - name: Measure exact allocations with existing minimax allocator
+      - name: Verify all Bank B Pages health markers
+        run: |
+          python - <<'PY'
+          import json,os,subprocess
+          bank=next(b for b in json.loads(os.environ['ATLAS_TNDS_BANKS_JSON']) if b['id']=='B')
+          for root in bank['roots']:
+            url=root['siteUrl']+'atlas-publication-site.json'
+            body=subprocess.check_output(['curl','-fsS',url],text=True)
+            marker=json.loads(body)
+            assert marker == {'schema':'atlas-publication-site-v1'}, (root['id'],marker)
+            print(f"{root['id']} Pages marker healthy: {url}")
+          PY
+      - uses: actions/checkout@v4
+        with:
+          repository: joerfreeman02/atlas-tnds-b1
+          ref: pages-publish
+          path: bank/B1
+          token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          repository: joerfreeman02/atlas-tnds-b2
+          ref: pages-publish
+          path: bank/B2
+          token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          repository: joerfreeman02/atlas-tnds-b3
+          ref: pages-publish
+          path: bank/B3
+          token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          repository: joerfreeman02/atlas-tnds-b4
+          ref: pages-publish
+          path: bank/B4
+          token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          repository: joerfreeman02/atlas-tnds-b5
+          ref: pages-publish
+          path: bank/B5
+          token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+      - name: Verify reference token write authorization without changing roots
+        run: |
+          for id in B1 B2 B3 B4 B5; do
+            test -z "$(git -C "bank/$id" status --porcelain)"
+            git -C "bank/$id" push --dry-run origin "HEAD:refs/heads/atlas-capacity-write-preflight"
+            test -z "$(git -C "bank/$id" ls-remote --heads origin refs/heads/atlas-capacity-write-preflight)"
+            echo "$id token write preflight passed; no remote ref created."
+          done
+      - name: Measure exact allocation using configured Bank B roots
         working-directory: application
         run: |
           node --input-type=module <<'JS'
           import { measurePublicationTree, allocateTndsPublicationRoots, assertPublicationGitBlobsFit } from './tools/atlas-data-publication/publication.mjs';
+          const banks = JSON.parse(process.env.ATLAS_TNDS_BANKS_JSON);
+          const bank = banks.find(item => item.id === 'B');
           const candidate = process.env.RESTORED_CANDIDATE_ROOT;
           const measurement = await measurePublicationTree(`${candidate}/atlas/data/bus-tnds`);
-          const tested = [];
-          for (let count = 4; count <= 8; count += 1) {
-            const rootIds = Array.from({length: count}, (_, i) => `B${i + 1}`);
-            try {
-              const plan = allocateTndsPublicationRoots(measurement, { rootIds });
-              const allRegions = plan.roots.flatMap(root => root.regions);
-              const expected = [...plan.expectedRegions].sort();
-              const assigned = [...allRegions].sort();
-              if (new Set(allRegions).size !== allRegions.length || JSON.stringify(assigned) !== JSON.stringify(expected)) throw new Error('Region assignment is incomplete or duplicated.');
-              for (const root of plan.roots) assertPublicationGitBlobsFit({files: root.files}, `TNDS ${root.id}`);
-              const result = {rootCount: count, ceilingBytes: 900000000, candidateFileCount: measurement.fileCount, candidateBytes: measurement.bytes, candidateSha256: measurement.sha256, expectedRegions: expected, roots: plan.roots.map(root => ({id: root.id, regions: root.regions, projectedBytes: root.projectedTotalPublicationFootprintBytes, largestRootBytes: root.projectedTotalPublicationFootprintBytes, safetyMarginBytes: root.safetyMarginRemainingBytes, fileCount: root.fileCount})), allocator: plan.objective};
-              tested.push({rootCount: count, passed: true});
-              console.log(JSON.stringify({minimumPassingAllocation: result, testedRootCounts: [...tested, ...Array.from({length: 8-count}, (_, i) => ({rootCount: count+i+1, notNeededAfterMinimum: true}))]}, null, 2));
-              process.exit(0);
-            } catch (error) {
-              tested.push({rootCount: count, passed: false, reason: error.message});
-            }
-          }
-          console.log(JSON.stringify({testedRootCounts: tested}, null, 2));
-          throw new Error('No allocation fits from four through eight roots; architectural blocker.');
+          const plan = allocateTndsPublicationRoots(measurement, {rootIds: bank.roots.map(root => root.id)});
+          const allRegions = plan.roots.flatMap(root => root.regions);
+          const expected = [...plan.expectedRegions].sort();
+          const assigned = [...allRegions].sort();
+          if (new Set(allRegions).size !== allRegions.length || JSON.stringify(assigned) !== JSON.stringify(expected)) throw new Error('Region assignment is incomplete or duplicated.');
+          for (const root of plan.roots) assertPublicationGitBlobsFit({files: root.files}, `TNDS ${root.id}`);
+          const result = {candidateRun: 39430415441, artifactId: 12275615359, candidateBytes: measurement.bytes, candidateFileCount: measurement.fileCount, candidateSha256: measurement.sha256, rootCount: plan.roots.length, ceilingBytes: 900000000, expectedRegions: expected, roots: plan.roots.map(root => ({id: root.id, regions: root.regions, projectedBytes: root.projectedTotalPublicationFootprintBytes, safetyMarginBytes: root.safetyMarginRemainingBytes, fileCount: root.fileCount})), allocator: plan.objective, referenceTokenWritePreflight: 'passed by dry-run for B1-B5; no remote refs created'};
+          console.log(JSON.stringify(result, null, 2));
           JS

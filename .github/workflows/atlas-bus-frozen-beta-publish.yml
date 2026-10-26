@@ -113,6 +113,27 @@ jobs:
           cp -a "$RESTORED_CANDIDATE_ROOT/atlas/data/status" pages-site/atlas/data/status
           test -f pages-site/index.html
           test -f pages-site/atlas/index.html
+      - name: Add cleanup retries to runner-only snapshot publisher
+        run: |
+          PUBLISHER="application/tools/atlas-data-publication/publish-snapshot.mjs"
+          DEPLOYED_PUBLISHER="pages-site/tools/atlas-data-publication/publish-snapshot.mjs"
+          test -f "$PUBLISHER"
+          test -f "$DEPLOYED_PUBLISHER"
+          cmp -s "$PUBLISHER" "$DEPLOYED_PUBLISHER"
+          DEPLOYED_PUBLISHER_SHA=$(sha256sum "$DEPLOYED_PUBLISHER" | cut -d ' ' -f1)
+          python - <<'PY'
+          from pathlib import Path
+
+          runner_path = Path("application/tools/atlas-data-publication/publish-snapshot.mjs")
+          source = runner_path.read_text()
+          original = "await fs.rm(temporaryRoot, { recursive: true, force: true });"
+          replacement = "await fs.rm(temporaryRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });"
+          if source.count(original) != 1:
+              raise SystemExit("Expected one snapshot cleanup call; refusing the runner-only patch.")
+          runner_path.write_text(source.replace(original, replacement, 1))
+          PY
+          ! grep -q "maxRetries: 10, retryDelay: 200" "$DEPLOYED_PUBLISHER"
+          test "$DEPLOYED_PUBLISHER_SHA" = "$(sha256sum "$DEPLOYED_PUBLISHER" | cut -d ' ' -f1)"
       - name: Adapt temporary preflight for configurable TNDS root count
         run: |
           python - <<'PY'

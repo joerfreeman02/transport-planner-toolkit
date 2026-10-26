@@ -28,7 +28,7 @@ jobs:
           assert a.get('id') == 12275615359
           assert a.get('name') == 'atlas-bus-beta-review-candidate-39430415441'
           assert a.get('size_in_bytes') == 2549732499
-          assert a.get('digest') == 'sha256:5cad24e0a47a4c77a8ec861d746bf9f538404420fcb9505f297607632e1a471'
+          assert a.get('digest') == 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471' and len(a.get('digest','').removeprefix('sha256:')) == 64
           assert a.get('expired') is False
           w=a.get('workflow_run') or {}
           assert w.get('id') == 39430415441 and w.get('head_sha') == '151199cc914c235870f444d26b03c2309edbd035'

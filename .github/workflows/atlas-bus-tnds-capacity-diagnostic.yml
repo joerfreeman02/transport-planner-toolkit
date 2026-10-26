@@ -1,0 +1,75 @@
+name: ATLAS frozen Run 75 TNDS capacity diagnostic
+on:
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  measure:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 108d898221f84c78c061db4f81335dcd911d6a0e
+          path: application
+          persist-credentials: false
+      - name: Verify immutable Run 75 artifact metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/12275615359" > "$RUNNER_TEMP/run75.json"
+          python - "$RUNNER_TEMP/run75.json" <<'PY'
+          import json,sys
+          a=json.load(open(sys.argv[1]))
+          assert a.get('id') == 12275615359
+          assert a.get('name') == 'atlas-bus-beta-review-candidate-39430415441'
+          assert a.get('size_in_bytes') == 2549732499
+          assert a.get('digest') == 'sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471'
+          assert a.get('expired') is False
+          w=a.get('workflow_run') or {}
+          assert w.get('id') == 39430415441 and w.get('head_sha') == '151199cc914c235870f444d26b03c2309edbd035'
+          print('Run 75 artifact identity matches immutable canonical metadata.')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 12275615359
+          run-id: 39430415441
+          repository: joerfreeman02/transport-planner-toolkit
+          github-token: ${{ github.token }}
+          path: restored
+      - name: Assert restored immutable candidate layout
+        run: |
+          root="$GITHUB_WORKSPACE/restored/atlas-bus-beta-review-candidate-39430415441/candidate-site"
+          test -f "$root/atlas/data/bus-tnds/manifest.json"
+          test -f "$root/atlas/data/bus/manifest.json"
+          echo "RESTORED_CANDIDATE_ROOT=$root" >> "$GITHUB_ENV"
+      - name: Measure exact allocations with existing minimax allocator
+        working-directory: application
+        run: |
+          node --input-type=module <<'JS'
+          import { measurePublicationTree, allocateTndsPublicationRoots, assertPublicationGitBlobsFit } from './tools/atlas-data-publication/publication.mjs';
+          const candidate = process.env.RESTORED_CANDIDATE_ROOT;
+          const measurement = await measurePublicationTree(`${candidate}/atlas/data/bus-tnds`);
+          const tested = [];
+          for (let count = 4; count <= 8; count += 1) {
+            const rootIds = Array.from({length: count}, (_, i) => `B${i + 1}`);
+            try {
+              const plan = allocateTndsPublicationRoots(measurement, { rootIds });
+              const allRegions = plan.roots.flatMap(root => root.regions);
+              const expected = [...plan.expectedRegions].sort();
+              const assigned = [...allRegions].sort();
+              if (new Set(allRegions).size !== allRegions.length || JSON.stringify(assigned) !== JSON.stringify(expected)) throw new Error('Region assignment is incomplete or duplicated.');
+              for (const root of plan.roots) assertPublicationGitBlobsFit({files: root.files}, `TNDS ${root.id}`);
+              const result = {rootCount: count, ceilingBytes: 900000000, candidateFileCount: measurement.fileCount, candidateBytes: measurement.bytes, candidateSha256: measurement.sha256, expectedRegions: expected, roots: plan.roots.map(root => ({id: root.id, regions: root.regions, projectedBytes: root.projectedTotalPublicationFootprintBytes, largestRootBytes: root.projectedTotalPublicationFootprintBytes, safetyMarginBytes: root.safetyMarginRemainingBytes, fileCount: root.fileCount})), allocator: plan.objective};
+              tested.push({rootCount: count, passed: true});
+              console.log(JSON.stringify({minimumPassingAllocation: result, testedRootCounts: [...tested, ...Array.from({length: 8-count}, (_, i) => ({rootCount: count+i+1, notNeededAfterMinimum: true}))]}, null, 2));
+              process.exit(0);
+            } catch (error) {
+              tested.push({rootCount: count, passed: false, reason: error.message});
+            }
+          }
+          console.log(JSON.stringify({testedRootCounts: tested}, null, 2));
+          throw new Error('No allocation fits from four through eight roots; architectural blocker.');
+          JS

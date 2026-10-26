@@ -65,8 +65,11 @@ jobs:
           echo "RESTORED_CANDIDATE_ROOT=$root" >> "$GITHUB_ENV"
       - name: Verify frozen Bus and TNDS manifest identities
         run: |
-          test "$(sha256sum "$RESTORED_CANDIDATE_ROOT/atlas/data/bus/manifest.json" | cut -c1-64)" = "1195f19b55d476600060d89b4a56517e039032f39a9f917ad49647ffec89df4f"
-          test "$(sha256sum "$RESTORED_CANDIDATE_ROOT/atlas/data/bus-tnds/manifest.json" | cut -c1-64)" = "2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f"
+          bus="$(sha256sum "$RESTORED_CANDIDATE_ROOT/atlas/data/bus/manifest.json" | cut -c1-64)"
+          tnds="$(sha256sum "$RESTORED_CANDIDATE_ROOT/atlas/data/bus-tnds/manifest.json" | cut -c1-64)"
+          printf 'BUS_MANIFEST_SHA256=%s\nTNDS_MANIFEST_SHA256=%s\n' "$bus" "$tnds"
+          test "$bus" = "1195f19b55d476600060d89b4a56517e039032f39a9f917ad49647ffec89df4f"
+          test "$tnds" = "2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f"
       - name: Verify all Bank B Pages health markers
         run: |
           python - <<'PY'

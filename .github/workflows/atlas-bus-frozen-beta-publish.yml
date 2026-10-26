@@ -159,7 +159,7 @@ jobs:
         run: |
           cp publication-config/atlas-data-sources.mjs pages-site/atlas/config/atlas-data-sources.mjs
           cp publication-config/atlas-data-sources.json pages-site/atlas/config/atlas-data-sources.json
-          rm -rf pages-site/atlas/data/bus" pages-site/atlas/data/bus-tnds
+          rm -rf "pages-site/atlas/data/bus" "pages-site/atlas/data/bus-tnds"
           test -f pages-site/atlas/config/atlas-release.json
           test -f pages-site/atlas/data/status/manifest.json
       - uses: actions/configure-pages@v5

@@ -1,0 +1,193 @@
+name: ATLAS Bus frozen Beta publication
+on:
+  workflow_dispatch:
+    inputs:
+      authorize_publication:
+        description: Explicitly authorize publishing the accepted frozen Run #75 candidate
+        required: true
+        default: false
+        type: boolean
+permissions:
+  actions: read
+  contents: read
+concurrency:
+  group: atlas-bus-pages
+  cancel-in-progress: false
+env:
+  ACCEPTED_SHA: 108d898221f84c78c061db4f81335dcd911d6a0e
+  CANDIDATE_RUN_ID: 39430415441
+  CANDIDATE_ARTIFACT_ID: 12275615359
+  CANDIDATE_PRODUCER_SHA: 151199cc914c235870f444d26b03c2309edbd035
+  CANDIDATE_ARTIFACT_DIGEST: sha256:5cad24e0a47c4a77a8ec8616d746bf9f538404420fcb9505f297607632e1a471
+  CANDIDATE_ARTIFACT_SIZE: 2549732499
+  BUS_MANIFEST_SHA256: 1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f
+  TNDS_MANIFEST_SHA256: 2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f
+  ATLAS_BUS_DATA_REPOSITORY: ${{ vars.ATLAS_BUS_DATA_REPOSITORY }}
+  ATLAS_BUS_DATA_SITE_URL: ${{ vars.ATLAS_BUS_DATA_SITE_URL }}
+  ATLAS_TNDS_BANKS_JSON: ${{ vars.ATLAS_TNDS_BANKS_JSON }}
+  ATLAS_REFERENCE_DATA_BRANCH: ${{ vars.ATLAS_REFERENCE_DATA_BRANCH || 'pages-publish' }}
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.authorize_publication == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      actions: read
+      contents: read
+      pages: write
+      id-token: write
+    outputs:
+      publication_version: ${{ steps.prepare.outputs.publication_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 108d898221f84c78c061db4f81335dcd911d6a0e
+          path: application
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Verify accepted Beta
+        working-directory: application
+        run: |
+          test "$(git rev-parse HEAD)" = "$ACCEPTED_SHA"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('atlas/config/atlas-release.json').read_text())
+          if r!={'version':'2.0.0-beta.1','build':'ATLAS-2.0.0-beta.1-20261025'}: raise SystemExit(f'Unexpected release identity: {r}')
+          PY
+      - name: Verify Run #75 artifact metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$CANDIDATE_ARTIFACT_ID" > "$RUNNER_TEMP/run75.json"
+          python - "$RUNNER_TEMP/run75.json" <<'PY'
+          import json,os,sys
+          a=json.load(open(sys.argv[1]))
+          e={'id':int(os.environ['CANDIDATE_ARTIFACT_ID']),'name':'atlas-bus-beta-review-candidate-39430415441','size_in_bytes':int(os.environ['CANDIDATE_ARTIFACT_SIZE']),'digest':os.environ['CANDIDATE_ARTIFACT_DIGEST'],'expired':False}
+          if any(a.get(k)!=v for k,v in e.items()): raise SystemExit('Run #75 artifact metadata mismatch.')
+          w=a.get('workflow_run') or {}
+          if w.get('id')!=int(os.environ['CANDIDATE_RUN_ID']) or w.get('head_sha')!=os.environ['CANDIDATE_PRODUCER_SHA']: raise SystemExit('Run #75 producer identity mismatch.')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 12275615359
+          run-id: 39430415441
+          repository: joerfreeman02/transport-planner-toolkit
+          github-token: ${{ github.token }}
+          path: restored
+      - name: Verify restored checkpoint, candidate, and canonical manifests
+        working-directory: application
+        run: |
+          node tools/atlas-data-publication/review-candidate-checkpoint.mjs verify --candidate-root ../restored/candidate-site --checkpoint-root ../restored/review-checkpoint --expected-run-id "$CANDIDATE_RUN_ID" --expected-commit-sha "$CANDIDATE_PRODUCER_SHA"
+          python tools/atlas-bus-data/validate_candidate.py --site-root ../restored/candidate-site
+          test "$(sha256sum ../restored/candidate-site/atlas/data/bus/manifest.json | cut -d' ' -f1)" = "$BUS_MANIFEST_SHA256"
+          test "$(sha256sum ../restored/candidate-site/atlas/data/bus-tnds/manifest.json | cut -d' ' -f1)" = "$TNDS_MANIFEST_SHA256"
+      - name: Assemble accepted runtime with frozen data
+        run: |
+          mkdir pages-site
+          rsync -a --exclude='.git' --exclude='atlas/data/bus' --exclude='atlas/data/bus-tnds' application/ pages-site/
+          mkdir -p pages-site/atlas/data
+          cp -a restored/candidate-site/atlas/data/bus pages-site/atlas/data/bus
+          cp -a restored/candidate-site/atlas/data/bus-tnds pages-site/atlas/data/bus-tnds
+          cp -a restored/candidate-site/atlas/data/status pages-site/atlas/data/status
+          test -f pages-site/index.html
+          test -f pages-site/atlas/index.html
+      - name: Preflight and capture rollback configuration
+        env:
+          ATLAS_REFERENCE_DATA_TOKEN: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+        run: |
+          test -n "$ATLAS_BUS_DATA_REPOSITORY"
+          test -n "$ATLAS_BUS_DATA_SITE_URL"
+          test -n "$ATLAS_TNDS_BANKS_JSON"
+          test -n "$ATLAS_REFERENCE_DATA_TOKEN"
+          mkdir -p publication-config
+          node application/tools/atlas-data-publication/fetch-last-known-good.mjs 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/' last-known-good
+          node application/tools/atlas-data-publication/preflight-publication.mjs --config last-known-good/atlas/config/atlas-data-sources.json
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.ATLAS_BUS_DATA_REPOSITORY }}
+          token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+          persist-credentials: false
+          path: reference-data/bus
+          ref: ${{ env.ATLAS_REFERENCE_DATA_BRANCH }}
+      - name: Select inactive TNDS bank
+        env:
+          ATLAS_REFERENCE_DATA_TOKEN: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+        run: |
+          node application/tools/atlas-data-publication/select-bank.mjs --config last-known-good/atlas/config/atlas-data-sources.json --banks-json "$ATLAS_TNDS_BANKS_JSON" --output publication-config/bank-plan.json --repository-root reference-data/tnds
+          node application/tools/atlas-data-publication/checkout-bank.mjs --plan publication-config/bank-plan.json --branch "$ATLAS_REFERENCE_DATA_BRANCH"
+      - name: Prepare publication and generated data config
+        id: prepare
+        run: |
+          GENERATED_AT=$(node -e "const x=require('./restored/candidate-site/atlas/data/bus/manifest.json');if(!x.generatedAt)process.exit(2);process.stdout.write(x.generatedAt)")
+          ACTIVE_BUS_SLOT=$(node -e "const x=require('./last-known-good/active-publication.json');process.stdout.write(x.bus.activeSlot||'')")
+          VERSION="$GITHUB_RUN_ID-$ACCEPTED_SHA"
+          echo "publication_version=$VERSION" >> "$GITHUB_OUTPUT"
+          node application/tools/atlas-data-publication/publication.mjs --candidate-site pages-site --bus-repository reference-data/bus --version "$VERSION" --generated-at "$GENERATED_AT" --bus-site-url "$ATLAS_BUS_DATA_SITE_URL" --active-bus-slot "$ACTIVE_BUS_SLOT" --tnds-bank-plan publication-config/bank-plan.json --config-output publication-config/atlas-data-sources.mjs
+      - name: Publish inactive TNDS bank and Bus slot
+        env:
+          ATLAS_REFERENCE_DATA_TOKEN: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+        run: |
+          node application/tools/atlas-data-publication/publish-bank.mjs --plan publication-config/bank-plan.json --branch "$ATLAS_REFERENCE_DATA_BRANCH"
+          node application/tools/atlas-data-publication/publish-snapshot.mjs --repository reference-data/bus --branch "$ATLAS_REFERENCE_DATA_BRANCH" --message "Publish frozen Bus Beta $GITHUB_RUN_ID"
+      - name: Validate published roots
+        run: |
+          node application/tools/atlas-data-publication/wait-for-bank.mjs --config publication-config/atlas-data-sources.json
+          node application/tools/atlas-data-publication/validate-publication.mjs --config publication-config/atlas-data-sources.json
+      - name: Install generated config and upload Pages artifact
+        run: |
+          cp publication-config/atlas-data-sources.mjs pages-site/atlas/config/atlas-data-sources.mjs
+          cp publication-config/atlas-data-sources.json pages-site/atlas/config/atlas-data-sources.json
+          rm -rf pages-site/atlas/data/bus pages-site/atlas/data/bus-tnds
+          test -f pages-site/atlas/config/atlas-release.json
+          test -f pages-site/atlas/data/status/manifest.json
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-site
+  deploy:
+    needs: publish
+    if: needs.publish.result == 'success' && github.ref == 'refs/heads/main' && inputs.authorize_publication == true
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/deploy-pages@v4
+  verify-live:
+    needs: [publish, deploy]
+    if: needs.publish.result == 'success' && needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify live Beta and exact Run #75 manifests
+        env:
+          EXPECTED_PUBLICATION_VERSION: ${{ needs.publish.outputs.publication_version }}
+        run: |
+          for n in $(seq 1 30); do
+            curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/config/atlas-release.json' -o "$RUNNER_TEMP/release.json" && break
+            sleep 10
+          done
+          curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/config/atlas-data-sources.json' -o "$RUNNER_TEMP/config.json"
+          python - "$RUNNER_TEMP/release.json" "$RUNNER_TEMP/config.json" <<'PY'
+          import hashlib,json,os,sys,urllib.request
+          r=json.load(open(sys.argv[1])); c=json.load(open(sys.argv[2]))
+          if r.get('version')!='2.0.0-beta.1' or r.get('build')!='ATLAS-2.0.0-beta.1-20261025': raise SystemExit('Wrong live Beta version/build.')
+          if c.get('publicationVersion')!=os.environ['EXPECTED_PUBLICATION_VERSION']: raise SystemExit('Live config is not this publication.')
+          def get(u):
+            with urllib.request.urlopen(u,timeout=45) as x: return x.read()
+          b=get(c['datasets']['bus']['baseUrl'].rstrip('/')+'/manifest.json')
+          if hashlib.sha256(b).hexdigest()!=os.environ['BUS_MANIFEST_SHA256']: raise SystemExit('Live Bus manifest mismatch.')
+          roots=c['datasets']['tnds'].get('activeRoots') or c['datasets']['tnds'].get('roots') or []
+          if not roots: raise SystemExit('Live TNDS roots missing.')
+          for root in roots:
+            if hashlib.sha256(get(root['baseUrl'].rstrip('/')+'/manifest.json')).hexdigest()!=os.environ['TNDS_MANIFEST_SHA256']: raise SystemExit('Live TNDS manifest mismatch.')
+          get('https://joerfreeman02.github.io/transport-planner-toolkit/atlas/')
+          print('Live Beta, generated configuration, and Run #75 manifests verified.')
+          PY

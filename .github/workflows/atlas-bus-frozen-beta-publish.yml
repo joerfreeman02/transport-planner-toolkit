@@ -169,24 +169,51 @@ jobs:
         run: |
           node application/tools/atlas-data-publication/publish-bank.mjs --plan publication-config/bank-plan.json --branch "$ATLAS_REFERENCE_DATA_BRANCH"
           node application/tools/atlas-data-publication/publish-snapshot.mjs --repository reference-data/bus --branch "$ATLAS_REFERENCE_DATA_BRANCH" --message "Publish frozen Bus Beta $GITHUB_RUN_ID"
+      - name: Add transient retries to runner-only publication validator
+        run: |
+          VALIDATOR="application/tools/atlas-data-publication/validate-publication.mjs"
+          DEPLOYED_VALIDATOR="pages-site/tools/atlas-data-publication/validate-publication.mjs"
+          test -f "$VALIDATOR"
+          test -f "$DEPLOYED_VALIDATOR"
+          cmp -s "$VALIDATOR" "$DEPLOYED_VALIDATOR"
+          DEPLOYED_VALIDATOR_SHA=$(sha256sum "$DEPLOYED_VALIDATOR" | cut -d ' ' -f1)
+          python - <<'PY'
+          from pathlib import Path
+
+          runner_path = Path("application/tools/atlas-data-publication/validate-publication.mjs")
+          source = runner_path.read_text()
+          if "fetchWithTransientRetry" in source:
+              raise SystemExit("Runner validator already has the temporary retry helper.")
+          helper = """async function fetchWithTransientRetry(fetchImpl, url, options) {
+            let response;
+            for (let attempt = 1; attempt <= 5; attempt += 1) {
+              response = await fetchImpl(url, options);
+              if (response.ok || response.status < 500 || attempt === 5) return response;
+              await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+            }
+            return response;
+          }
+
+          """
+          anchor = "function normaliseUrl(value) {"
+          if source.count(anchor) != 1:
+              raise SystemExit("Unexpected validator source; refusing the runner-only patch.")
+          source = source.replace(anchor, helper + anchor, 1)
+          old_manifest = "  const response = await fetchImpl(url, { headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' } });"
+          new_manifest = "  const response = await fetchWithTransientRetry(fetchImpl, url, { headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' } });"
+          old_payload = "    const response = await fetchImpl(new URL(expected.path, root), { headers: { 'Cache-Control': 'no-cache' } });"
+          new_payload = "    const response = await fetchWithTransientRetry(fetchImpl, new URL(expected.path, root), { headers: { 'Cache-Control': 'no-cache' } });"
+          if source.count(old_manifest) != 1 or source.count(old_payload) != 1:
+              raise SystemExit("Expected fetch sites not found exactly once; refusing the runner-only patch.")
+          source = source.replace(old_manifest, new_manifest, 1).replace(old_payload, new_payload, 1)
+          runner_path.write_text(source)
+          PY
+          ! grep -q "fetchWithTransientRetry" "$DEPLOYED_VALIDATOR"
+          test "$DEPLOYED_VALIDATOR_SHA" = "$(sha256sum "$DEPLOYED_VALIDATOR" | cut -d ' ' -f1)"
       - name: Validate published roots
         run: |
           node application/tools/atlas-data-publication/wait-for-bank.mjs --config publication-config/atlas-data-sources.json
-          set +e
-          for attempt in 1 2 3 4 5; do
-            node application/tools/atlas-data-publication/validate-publication.mjs --config publication-config/atlas-data-sources.json >"$RUNNER_TEMP/atlas-published-validation.log" 2>&1
-            result=$?
-            cat "$RUNNER_TEMP/atlas-published-validation.log"
-            if [ "$result" -eq 0 ]; then
-              exit 0
-            fi
-            if ! grep -Eq 'returned HTTP 5[0-9]{2}' "$RUNNER_TEMP/atlas-published-validation.log" || [ "$attempt" -eq 5 ]; then
-              exit "$result"
-            fi
-            echo "Published-root validation returned a transient HTTP 5xx; retrying in 20 seconds (attempt $attempt/5)."
-            sleep 20
-          done
-          exit 1
+          node application/tools/atlas-data-publication/validate-publication.mjs --config publication-config/atlas-data-sources.json
       - name: Install generated config and upload Pages artifact
         run: |
           cp publication-config/atlas-data-sources.mjs pages-site/atlas/config/atlas-data-sources.mjs

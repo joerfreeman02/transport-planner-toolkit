@@ -18,17 +18,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 240
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.x'
           cache: pnpm
@@ -79,7 +79,7 @@ jobs:
           print('Exact immutable Run #75 candidate artifact, digest and producer verified.')
           PY
       - name: Restore only the immutable Run #75 candidate
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: atlas-bus-beta-review-candidate-39430415441
           run-id: 39430415441
@@ -110,7 +110,7 @@ jobs:
         run: node tests/atlas/tfl-bus-timetable.test.mjs
       - name: Upload normal-runtime candidate control-matrix report
         if: always() && hashFiles('candidate-diagnostic/*.json') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-bus-beta-s2e1-normal-runtime-diagnostic-${{ github.run_id }}
           path: candidate-diagnostic/**/*

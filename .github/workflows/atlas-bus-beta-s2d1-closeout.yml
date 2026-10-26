@@ -18,17 +18,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.x'
           cache: pnpm
@@ -65,7 +65,7 @@ jobs:
           }
           Path(os.environ['RUNNER_TEMP'], 's2d1-evidence', 'preflight.json').write_text(json.dumps(record, indent=2) + '\n')
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: atlas-bus-s2d1-zero-download-preflight-${{ github.run_id }}
@@ -78,13 +78,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.x'
       - name: Verify immutable Run #75 candidate artifact identity
@@ -115,7 +115,7 @@ jobs:
           print('Exact unexpired Run #75 candidate artifact ID, digest and producer verified.')
           PY
       - name: Restore immutable Run #75 candidate on hosted runner
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: atlas-bus-beta-review-candidate-39430415441
           run-id: 39430415441
@@ -127,7 +127,7 @@ jobs:
       - name: Recheck immutable candidate structure
         run: python tools/atlas-bus-data/validate_candidate.py --site-root restored/candidate-site
       - name: Install locked browser audit dependencies
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10
       - run: pnpm install --frozen-lockfile
@@ -139,7 +139,7 @@ jobs:
           node tests/atlas/s2c3-real-candidate-runtime-audit.mjs restored/candidate-site candidate-audit/runtime-audit.json
       - name: Upload complete audit report, including failed controls
         if: always() && hashFiles('candidate-audit/*.json') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-bus-beta-s2d1-candidate-audit-${{ github.run_id }}
           path: candidate-audit

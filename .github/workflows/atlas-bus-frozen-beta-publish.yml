@@ -80,7 +80,7 @@ jobs:
           repository: joerfreeman02/transport-planner-toolkit
           github-token: ${{ github.token }}
           path: restored
-      - name: Inspect restored Run #75 artifact layout
+      - name: 'Inspect restored Run #75 artifact layout'
         run: |
           RESTORED_ARTIFACT_ROOT="$GITHUB_WORKSPACE/restored/atlas-bus-beta-review-candidate-$CANDIDATE_RUN_ID"
           RESTORED_CANDIDATE_ROOT="$RESTORED_ARTIFACT_ROOT/candidate-site"
@@ -108,9 +108,9 @@ jobs:
           mkdir pages-site
           rsync -a --exclude='.git' --exclude='atlas/data/bus' --exclude='atlas/data/bus-tnds' application/ pages-site/
           mkdir -p pages-site/atlas/data
-          cp -a $RESTORED_CANDIDATE_ROOT/atlas/data/bus pages-site/atlas/data/bus
-          cp -a $RESTORED_CANDIDATE_ROOT/atlas/data/bus-tnds pages-site/atlas/data/bus-tnds
-          cp -a $RESTORED_CANDIDATE_ROOT/atlas/data/status pages-site/atlas/data/status
+          cp -a "$RESTORED_CANDIDATE_ROOT/atlas/data/bus" pages-site/atlas/data/bus
+          cp -a "$RESTORED_CANDIDATE_ROOT/atlas/data/bus-tnds" pages-site/atlas/data/bus-tnds
+          cp -a "$RESTORED_CANDIDATE_ROOT/atlas/data/status" pages-site/atlas/data/status
           test -f pages-site/index.html
           test -f pages-site/atlas/index.html
       - name: Preflight and capture rollback configuration
@@ -159,7 +159,7 @@ jobs:
         run: |
           cp publication-config/atlas-data-sources.mjs pages-site/atlas/config/atlas-data-sources.mjs
           cp publication-config/atlas-data-sources.json pages-site/atlas/config/atlas-data-sources.json
-          rm -rf pages-site/atlas/data/bus pages-site/atlas/data/bus-tnds
+          rm -rf pages-site/atlas/data/bus" pages-site/atlas/data/bus-tnds
           test -f pages-site/atlas/config/atlas-release.json
           test -f pages-site/atlas/data/status/manifest.json
       - uses: actions/configure-pages@v5

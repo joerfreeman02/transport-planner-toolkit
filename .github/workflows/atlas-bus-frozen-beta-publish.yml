@@ -80,21 +80,37 @@ jobs:
           repository: joerfreeman02/transport-planner-toolkit
           github-token: ${{ github.token }}
           path: restored
+      - name: Inspect restored Run #75 artifact layout
+        run: |
+          RESTORED_ARTIFACT_ROOT="$GITHUB_WORKSPACE/restored/atlas-bus-beta-review-candidate-$CANDIDATE_RUN_ID"
+          RESTORED_CANDIDATE_ROOT="$RESTORED_ARTIFACT_ROOT/candidate-site"
+          RESTORED_CHECKPOINT_ROOT="$RESTORED_ARTIFACT_ROOT/review-checkpoint"
+          echo 'Restored Run #75 artifact directories:'
+          find "$GITHUB_WORKSPACE/restored" -maxdepth 2 -mindepth 1 -type d | sort
+          test -d "$RESTORED_ARTIFACT_ROOT"
+          test -f "$RESTORED_CANDIDATE_ROOT/atlas/data/bus/manifest.json"
+          test -f "$RESTORED_CANDIDATE_ROOT/atlas/data/bus-tnds/manifest.json"
+          test -f "$RESTORED_CHECKPOINT_ROOT/manifest.json"
+          {
+            echo "RESTORED_ARTIFACT_ROOT=$RESTORED_ARTIFACT_ROOT"
+            echo "RESTORED_CANDIDATE_ROOT=$RESTORED_CANDIDATE_ROOT"
+            echo "RESTORED_CHECKPOINT_ROOT=$RESTORED_CHECKPOINT_ROOT"
+          } >> "$GITHUB_ENV"
       - name: Verify restored checkpoint, candidate, and canonical manifests
         working-directory: application
         run: |
-          node tools/atlas-data-publication/review-candidate-checkpoint.mjs verify --candidate-root ../restored/candidate-site --checkpoint-root ../restored/review-checkpoint --expected-run-id "$CANDIDATE_RUN_ID" --expected-commit-sha "$CANDIDATE_PRODUCER_SHA"
-          python tools/atlas-bus-data/validate_candidate.py --site-root ../restored/candidate-site
-          test "$(sha256sum ../restored/candidate-site/atlas/data/bus/manifest.json | cut -d' ' -f1)" = "$BUS_MANIFEST_SHA256"
-          test "$(sha256sum ../restored/candidate-site/atlas/data/bus-tnds/manifest.json | cut -d' ' -f1)" = "$TNDS_MANIFEST_SHA256"
+          node tools/atlas-data-publication/review-candidate-checkpoint.mjs verify --candidate-root "$RESTORED_CANDIDATE_ROOT" --checkpoint-root "$RESTORED_CHECKPOINT_ROOT" --expected-run-id "$CANDIDATE_RUN_ID" --expected-commit-sha "$CANDIDATE_PRODUCER_SHA"
+          python tools/atlas-bus-data/validate_candidate.py --site-root "$RESTORED_CANDIDATE_ROOT"
+          test "$(sha256sum "$RESTORED_CANDIDATE_ROOT/atlas/data/bus/manifest.json" | cut -d' ' -f1)" = "$BUS_MANIFEST_SHA256"
+          test "$(sha256sum "$RESTORED_CANDIDATE_ROOT/atlas/data/bus-tnds/manifest.json" | cut -d' ' -f1)" = "$TNDS_MANIFEST_SHA256"
       - name: Assemble accepted runtime with frozen data
         run: |
           mkdir pages-site
           rsync -a --exclude='.git' --exclude='atlas/data/bus' --exclude='atlas/data/bus-tnds' application/ pages-site/
           mkdir -p pages-site/atlas/data
-          cp -a restored/candidate-site/atlas/data/bus pages-site/atlas/data/bus
-          cp -a restored/candidate-site/atlas/data/bus-tnds pages-site/atlas/data/bus-tnds
-          cp -a restored/candidate-site/atlas/data/status pages-site/atlas/data/status
+          cp -a $RESTORED_CANDIDATE_ROOT/atlas/data/bus pages-site/atlas/data/bus
+          cp -a $RESTORED_CANDIDATE_ROOT/atlas/data/bus-tnds pages-site/atlas/data/bus-tnds
+          cp -a $RESTORED_CANDIDATE_ROOT/atlas/data/status pages-site/atlas/data/status
           test -f pages-site/index.html
           test -f pages-site/atlas/index.html
       - name: Preflight and capture rollback configuration
@@ -124,7 +140,7 @@ jobs:
       - name: Prepare publication and generated data config
         id: prepare
         run: |
-          GENERATED_AT=$(node -e "const x=require('./restored/candidate-site/atlas/data/bus/manifest.json');if(!x.generatedAt)process.exit(2);process.stdout.write(x.generatedAt)")
+          GENERATED_AT=$(node -e "const x=require(process.env.RESTORED_CANDIDATE_ROOT+'/atlas/data/bus/manifest.json');if(!x.generatedAt)process.exit(2);process.stdout.write(x.generatedAt)")
           ACTIVE_BUS_SLOT=$(node -e "const x=require('./last-known-good/active-publication.json');process.stdout.write(x.bus.activeSlot||'')")
           VERSION="$GITHUB_RUN_ID-$ACCEPTED_SHA"
           echo "publication_version=$VERSION" >> "$GITHUB_OUTPUT"

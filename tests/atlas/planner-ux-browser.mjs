@@ -193,7 +193,7 @@ try {
   assert.ok(failedRequests.every(request => request.url === 'http://127.0.0.1:8769/atlas/data/bus-tnds/manifest.json' && request.error === 'net::ERR_ABORTED'), JSON.stringify(failedRequests));
   console.log(JSON.stringify({
     productAndVersionIdentified: true,
-    navigation: ['Report Builder', 'Modules', 'Projects', 'About'],
+    navigation: ['Modules', 'About'],
     creatorAttribution: 'Joe Freeman',
     siteSearchObvious: true,
     mapComfortableAtDesktopAndLaptop: true,

@@ -222,14 +222,57 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     const targets = exactStops.length ? exactStops : [null];
     for (const stop of targets) add({ code: 'national-route-evidence', route, stop, source: 'BODS/TNDS', message: 'Required national timetable evidence could not be checked for this route; do not infer zero service.' });
   }
+  const specialDayProfileIssues = new Map();
   for (const service of services) for (const warning of [...(service.sourceWarnings ?? []), ...(service.qualifications ?? [])]) {
+    const specialDayProfile = String(warning).match(/unsupported complex operating profile \(SpecialDaysOperation\)/i);
+    if (specialDayProfile) {
+      const route = String(service.routeNumber ?? '').trim();
+      const source = String(service.timetableSource || service.source?.provider || 'timetable source').trim();
+      const key = [route, source].map(value => value.toLowerCase()).join('|');
+      const issue = specialDayProfileIssues.get(key) ?? { route, source, stops: new Set(), profiles: new Set() };
+      const stop = String(service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0] || '').trim();
+      if (stop) issue.stops.add(stop);
+      const profile = String(warning).match(/\b(?:TNDS\s+)?([^\s]+)\s+has an unsupported complex operating profile/i)?.[1];
+      const identity = profile || (service.sourceRecordIds ?? []).map(String).sort().join(',') || String(service.id ?? warning);
+      issue.profiles.add(identity);
+      specialDayProfileIssues.set(key, issue);
+      continue;
+    }
     if (!/could not|unresolved|unsupported|quarantin|incomplete|not supplied|no deterministically/i.test(String(warning))) continue;
     add({ code: 'service-source-evidence', route: service.routeNumber, stop: service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0], source: service.timetableSource || service.source?.provider || 'timetable source', message: String(warning) });
   }
+  for (const issue of specialDayProfileIssues.values()) {
+    const count = issue.profiles.size;
+    add({
+      code: 'service-source-evidence',
+      route: issue.route,
+      stop: [...issue.stops].sort((left, right) => left.localeCompare(right)).join(', ') || null,
+      source: issue.source,
+      groupKey: `special-days-profile:${issue.source}`,
+      message: `${issue.source} supplied ${count} timetable pattern${count === 1 ? '' : 's'} with unsupported complex special-day operating profiles; operating days remain unresolved and no timetable days were fabricated.`
+    });
+  }
+  const directionalLocationIssues = new Map();
   for (const service of serviceSummaries) for (const warning of service.sourceWarnings ?? []) {
     if (!/principal locations could not be safely mapped/i.test(String(warning))) continue;
-    add({ code: 'directional-principal-location', route: service.routeNumber, stop: service.frequencyBasisStopId, source: service.timetableSource || service.frequencyEvidenceSource || 'timetable source', factKey: warning, message: String(warning) });
+    const route = String(service.routeNumber ?? '').trim();
+    const message = String(warning).trim();
+    const key = [route, message.toLowerCase()].join('|');
+    const issue = directionalLocationIssues.get(key) ?? { route, message, sources: new Set(), stops: new Set() };
+    const stop = String(service.frequencyBasisStopId ?? '').trim();
+    if (stop) issue.stops.add(stop);
+    const source = service.timetableSource || service.frequencyEvidenceSource || service.provider || service.source?.provider || 'timetable source';
+    issue.sources.add(String(source).trim());
+    directionalLocationIssues.set(key, issue);
   }
+  for (const issue of directionalLocationIssues.values()) add({
+    code: 'directional-principal-location',
+    route: issue.route,
+    stop: [...issue.stops].sort((left, right) => left.localeCompare(right)).join(', ') || null,
+    source: [...issue.sources].sort((left, right) => left.localeCompare(right)).join(' + '),
+    factKey: issue.message,
+    message: issue.message
+  });
   for (const service of serviceSummaries) if (!service.routeNumber || !resolvedPlannerDestination(service)) add({ code: 'planner-route-identity', route: service.routeNumber, stop: service.frequencyBasisStopId, source: service.frequencyEvidenceSource || 'timetable source', message: 'The timetable pattern did not provide a complete planner-facing destination; review Detailed Evidence before using the row.' });
   for (const service of serviceSummaries) for (const side of ['origin', 'destination']) {
     const decision = service[`${side}EndpointDecision`];

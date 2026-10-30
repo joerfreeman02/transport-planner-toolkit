@@ -153,6 +153,62 @@ test('usable BODS evidence is not challenged by differing TNDS effective dates',
   assert.equal(result.plannerServiceSummaries[0].timetableSource, 'BODS');
 });
 
+test('same-route principal-location uncertainty is grouped across sources, stops and directions', async () => {
+  const warning = 'Principal locations could not be safely mapped to ordered calls at the assessed stop; review the source journey pattern.';
+  const secondStop = { ...stop, id: '2100B', name: 'Another Stop' };
+  const records = [stop, secondStop].flatMap((assessedStop, index) => ['BODS', 'TfL'].map(provider => ({
+    ...service,
+    id: `${provider.toLowerCase()}-direction-${index}`,
+    timetableSource: provider,
+    source: { provider },
+    direction: index === 0 ? 'outbound' : 'inbound',
+    origin: index === 0 ? 'Alpha' : 'Gamma',
+    destination: index === 0 ? 'Beta' : 'Delta',
+    stopSchedules: { [assessedStop.id]: service.stopSchedules['2100A'] },
+    sourceWarnings: [warning]
+  })));
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop, secondStop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: records, warnings: [], provenance: { source: 'BODS/TfL' } }) },
+    accessRouting: { matrix: async (_site, stops) => ({ ...route, routes: stops.map(() => ({ ...route.routes[0] })) }) }
+  });
+  const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  const directionIssues = result.reviewItems.filter(item => item.code === 'directional-principal-location');
+  assert.equal(directionIssues.length, 1, 'the same public-route location issue is not repeated for each source, stop or direction');
+  assert.equal(directionIssues[0].route, '10');
+  assert.equal(directionIssues[0].stop, '2100A, 2100B', 'all affected assessed stops remain attached to the grouped issue');
+  assert.equal(directionIssues[0].source, 'BODS + TfL', 'the grouped item preserves every source that raised the issue');
+  assert.equal(directionIssues[0].message, warning);
+});
+
+test('repeated special-day profile warnings group to one material calendar issue per route', async () => {
+  const secondStop = { ...stop, id: '2100B', name: 'Another Stop' };
+  const records = ['555', 'N555'].flatMap(routeNumber => Array.from({ length: 6 }, (_, index) => {
+    const assessedStop = index % 2 ? secondStop : stop;
+    const profile = `JP_${routeNumber}-${index + 1}`;
+    return {
+      ...service,
+      id: `${routeNumber}-${profile}-${assessedStop.id}`,
+      routeNumber,
+      timetableSource: 'TNDS',
+      source: { provider: 'TNDS' },
+      stopSchedules: { [assessedStop.id]: service.stopSchedules['2100A'] },
+      sourceWarnings: [`TNDS ${profile} has an unsupported complex operating profile (SpecialDaysOperation); operating days remain unresolved and no timetable days were fabricated.`]
+    };
+  }));
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop, secondStop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: records, warnings: [], provenance: { source: 'TNDS' } }) },
+    accessRouting: { matrix: async (_site, stops) => ({ ...route, routes: stops.map(() => ({ ...route.routes[0] })) }) }
+  });
+  const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  const calendarIssues = result.reviewItems.filter(item => item.code === 'service-source-evidence' && /special-day operating profiles/i.test(item.message));
+  assert.equal(calendarIssues.length, 2, 'the material calendar uncertainty remains once for each public route');
+  assert.deepEqual(calendarIssues.map(item => item.route).sort(), ['555', 'N555']);
+  assert.ok(calendarIssues.every(item => /6 timetable patterns/.test(item.message)));
+  assert.ok(calendarIssues.every(item => item.stop === '2100A, 2100B'), 'all affected stops remain attached to each grouped issue');
+});
+
 test('Chingford repeated origin endpoint evidence is grouped by public route issue while all raw stop records remain', async () => {
   const chingfordStops = Array.from({ length: 5 }, (_, index) => ({
     ...stop, id: `CHINGFORD-${index + 1}`, name: `Grove Road ${index + 1}`,

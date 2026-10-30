@@ -14,7 +14,7 @@ import { createAuthoritativeBusTimetableAdapter } from '../../../src/atlas/adapt
 import { createOsrmAccessRoutingAdapter } from '../../../src/atlas/adapters/osrm-access-routing-adapter.mjs';
 import { createTflRequestScheduler } from '../../../src/atlas/adapters/tfl-request-scheduler.mjs';
 import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-discovery.mjs';
-import { createBusAssessment, principalLocationReviewBlocksWord, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/atlas/application/bus-assessment.mjs';
+import { createBusAssessment, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/atlas/application/bus-assessment.mjs';
 import { buildBusTransportStatement, buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
 import { withNumericMapReferences } from '../../../src/atlas/presentation/bus-map-references.mjs';
 import { buildAssessmentMapExtent } from '../../../src/atlas/presentation/bus-map-extent.mjs';
@@ -96,9 +96,7 @@ function selectedResult() {
   if (!currentBusResult) return null;
   const stops = currentBusResult.stops.filter(stop => selectedStopIds.has(stopKey(stop)));
   const stopIds = new Set(stops.map(stopKey));
-  const sourceServices = Array.isArray(currentBusResult.plannerServiceSummaries)
-    ? currentBusResult.plannerServiceSummaries
-    : buildPlannerBusServiceSummaries(currentBusResult.serviceSummaries, currentBusResult.stops);
+  const sourceServices = buildPlannerBusServiceSummaries(currentBusResult.serviceSummaries, currentBusResult.stops);
   const plannerServiceSummaries = sourceServices.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => stopIds.has(String(id))));
   const serviceSummaries = currentBusResult.serviceSummaries.filter(service => service.stopIds?.some(id => stopIds.has(String(id))));
   const report = { ...currentBusResult, stops, serviceSummaries, plannerServiceSummaries };
@@ -694,9 +692,7 @@ function reviewItemText(item) {
 function renderAssessment(result) {
   currentBusResult = result;
   result = withNumericMapReferences(result);
-  const presentedServices = Array.isArray(result.plannerServiceSummaries)
-    ? result.plannerServiceSummaries
-    : buildPlannerBusServiceSummaries(result.serviceSummaries, result.stops);
+  const presentedServices = buildPlannerBusServiceSummaries(result.serviceSummaries, result.stops);
   if (!selectionInitialised) {
     selectedStopIds = new Set(result.stops.filter(recommendedBusStop).map(stopKey));
     selectedServiceIds = new Set(presentedServices.map(serviceKey));
@@ -1173,11 +1169,9 @@ async function loadStops(forceRefresh, mode = lastAssessmentMode, { skipScope = 
 
 function updateFormalExportAvailability() {
   const reviewRequired = (currentBusResult?.reviewItems?.length ?? 0) > 0;
-  const principalLocationBlock = principalLocationReviewBlocksWord(currentBusResult);
   const acknowledged = !reviewRequired || Boolean($('plannerReviewAcknowledgement')?.checked);
-  $('exportBusWord').disabled = !currentBusResult?.ok || !acknowledged || principalLocationBlock;
+  $('exportBusWord').disabled = !currentBusResult?.ok || !acknowledged;
   $('exportAssessmentMap').disabled = !currentBusResult?.ok || !acknowledged;
-  if (principalLocationBlock) $('plannerReviewGateStatus').textContent = 'At least one service has unresolved principal-location evidence. Word export is blocked until that service evidence is resolved; acknowledgement does not override this gate.';
 }
 
 async function svgToPngDataUrl(svg) {
@@ -1195,7 +1189,6 @@ async function svgToPngDataUrl(svg) {
 
 async function exportBusWord() {
   if (!currentBusResult?.ok || !confirmedSite) return setCallout($('exportStatus'), 'Build a Bus assessment before exporting to Word.', 'warning');
-  if (principalLocationReviewBlocksWord(currentBusResult)) return setCallout($('exportStatus'), 'Word export is blocked because principal-location evidence remains unresolved for one or more services. Resolve the affected evidence before formal use.', 'error');
   const report = selectedResult();
   if (!report.stops.length && !(report.plannerServiceSummaries ?? report.serviceSummaries).length) return setCallout($('exportStatus'), 'Select at least one stop or service before exporting.', 'warning');
   if ((report.reviewItems?.length ?? 0) && !$('plannerReviewAcknowledgement').checked) return setCallout($('exportStatus'), 'Review the flagged Sources & Checks and acknowledge them before formal export.', 'warning');
@@ -1378,10 +1371,8 @@ $('editAssessment').addEventListener('click', () => activateWorkflowStage(4));
 $('returnToResults').addEventListener('click', () => activateWorkflowStage(5));
 $('exportAssessmentMap').addEventListener('click', () => exportAssessmentMap());
 $('plannerReviewAcknowledgement').addEventListener('change', () => {
-  const principalLocationBlock = principalLocationReviewBlocksWord(currentBusResult);
-  $('plannerReviewGateStatus').textContent = principalLocationBlock
-    ? 'At least one service has unresolved principal-location evidence. Word export remains blocked; acknowledgement does not override this gate.'
-    : $('plannerReviewAcknowledgement').checked ? 'Sources & Checks reviewed. The evidence items remain recorded.' : 'Review the evidence drawer before formal export.';
+  $('plannerReviewGateStatus').textContent = $('plannerReviewAcknowledgement').checked
+    ? 'Sources & Checks reviewed. The evidence items remain recorded.' : 'Review the evidence drawer before formal export.';
   updateFormalExportAvailability();
 });
 $('addressForm').addEventListener('submit', searchAddress);

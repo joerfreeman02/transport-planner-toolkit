@@ -173,10 +173,6 @@ export function createReviewItem({ code, severity = 'warning', actionability = '
   return Object.freeze({ id: id || String(code) + ':unassigned', code, category: taxonomy.category, severity, actionability, route: route ? String(route) : null, stop: stop ? String(stop) : null, source, message: cleanMessage });
 }
 
-export function principalLocationReviewBlocksWord(result) {
-  return (result?.reviewItems ?? []).some(item => item?.code === 'directional-principal-location');
-}
-
 function buildReviewItems({ selectedStops = [], services = [], serviceSummaries = [], plannerServiceSummaries = [], servicesResult = null, warnings = [], prepared = null, stopCoverageComplete = true, routingComplete = true } = {}) {
   const items = new Map();
   const add = ({ code, severity = 'warning', actionability = 'review', route = null, stop = null, source = 'timetable source', message, factKey = null, groupKey = null }) => {

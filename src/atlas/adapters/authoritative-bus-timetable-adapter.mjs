@@ -3,6 +3,7 @@ import { deriveTimetableConclusion, hasScheduledEvidenceAt, scheduledStopIds, sc
 import { timetableProviderLabelsFromText } from '../domain/bus-source-presentation.mjs';
 import { sourceFailure, sourceSuccess } from './source-adapter.mjs';
 import { tflRouteSequenceEvidenceForService } from './tfl-bus-timetable-adapter.mjs';
+import { operatorFamilyCompatible, operatorTokens } from '../domain/operator-family.mjs';
 
 const text = value => String(value ?? '').trim();
 const normal = value => text(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -86,6 +87,19 @@ function matchBods(tfl, bods) {
   const tflStopIds = scheduledStopIds(tfl);
   const candidates = (bods ?? []).filter(service => normal(service.routeNumber) === normal(tfl.routeNumber) && tflStopIds.some(id => hasScheduledEvidenceAt(service, id)));
   if (!candidates.length) return null;
+  const tflPattern = tfl?.routePatternStopIds ?? [];
+  const exactPatternMatches = tflPattern.length > 1 ? candidates.filter(service => {
+    const pattern = service?.routePatternStopIds ?? [];
+    return pattern.length === tflPattern.length
+      && sameSequence(pattern, tflPattern)
+      && operatorFamilyCompatible(tfl, service)
+      && operatorTokens(service.operator).size > 0;
+  }) : [];
+  if (exactPatternMatches.length === 1) return exactPatternMatches[0];
+  if (exactPatternMatches.length > 1) {
+    const signatures = new Set(exactPatternMatches.map(service => JSON.stringify(service.principalLocations ?? [])));
+    if (signatures.size === 1) return exactPatternMatches[0];
+  }
   const sameDirection = candidates.filter(service => normal(service.direction || service.destination || service.origin) === normal(tfl.direction || tfl.destination || tfl.origin));
   return sameDirection.length === 1 ? sameDirection[0] : candidates.length === 1 ? candidates[0] : null;
 }
@@ -238,6 +252,40 @@ function supplement(tfl, bods) {
   else if (match && service.principalLocations?.length && match.principalLocations?.length && !sameSequence(service.principalLocations, match.principalLocations)) conflictFields.push('principalLocations');
   if (match && (!Array.isArray(service.routePatternStopIds) || !service.routePatternStopIds.length) && Array.isArray(match.routePatternStopIds) && match.routePatternStopIds.length) { service.routePatternStopIds = [...match.routePatternStopIds]; supplemented = true; }
   else if (match && service.routePatternStopIds?.length && match.routePatternStopIds?.length && !sameSequence(service.routePatternStopIds, match.routePatternStopIds)) conflictFields.push('routePatternStopIds');
+  const effectiveTfLOperator = text(service.operator) || text(operatorConsensus?.operator);
+  const alignedCompletePattern = Boolean(match
+    && service.routePatternStopIds?.length > 1
+    && sameSequence(service.routePatternStopIds, match.routePatternStopIds)
+    && operatorFamilyCompatible({ ...service, operator: effectiveTfLOperator }, match)
+    && operatorTokens(effectiveTfLOperator).size > 0
+    && operatorTokens(match.operator).size > 0
+    && Array.isArray(match.routePatternStops)
+    && match.routePatternStops.length === service.routePatternStopIds.length
+    && match.routePatternStops.every((call, index) => text(call?.id ?? call?.stopPointId ?? call?.sourceId) === text(service.routePatternStopIds[index])
+      && Boolean(text(call?.name ?? call?.commonName ?? call?.locality ?? call?.nptgLocalityName))));
+  if (alignedCompletePattern) {
+    const existingCalls = service.routePatternStops ?? [];
+    const existingLabelsUnavailable = existingCalls.length !== service.routePatternStopIds.length
+      || existingCalls.some((call, index) => {
+        const label = text(call?.name ?? call?.commonName ?? call?.locality ?? call?.nptgLocalityName);
+        return !label || label === text(service.routePatternStopIds[index]);
+      });
+    if (existingLabelsUnavailable) {
+      service.routePatternStops = match.routePatternStops.map(call => ({ ...call }));
+      supplemented = true;
+    }
+    if ((!service.principalLocations?.length) && Array.isArray(match.principalLocations) && match.principalLocations.length) {
+      service.principalLocations = [...match.principalLocations];
+      supplemented = true;
+    }
+    service.source = {
+      ...(service.source ?? {}),
+      alignedBodsCallLabelSupplement: Object.freeze({
+        provider: 'BODS', status: 'exact-ordered-stop-pattern-and-operator-aligned',
+        sourceRecordId: text(match.id) || null, authorityUnchanged: 'TfL'
+      })
+    };
+  }
   const withSupplementaryDepartures = match ? retainSupplementaryDepartures(service, match) : { service, addedDeparture: false, retained: false };
   if (withSupplementaryDepartures.service !== service) service = withSupplementaryDepartures.service;
   service.provider = 'TfL';

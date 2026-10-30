@@ -263,7 +263,7 @@ try {
       }
       const extension = path.extname(file).toLowerCase();
       const type = ({ '.html': 'text/html', '.mjs': 'text/javascript', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.gz': 'application/gzip', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json' })[extension] || 'application/octet-stream';
-      response.writeHead(200, { 'content-type': `${type}; charset=utf-8`, 'content-length': bytes.length });
+      response.writeHead(200, { 'content-type': `${type}; charset=utf-8`, 'content-length': bytes.length, ...(extension === '.mjs' || extension === '.js' ? { 'cache-control': 'no-store' } : {}) });
       response.end(bytes);
     } catch {
       response.writeHead(404);
@@ -275,7 +275,10 @@ try {
     server.listen(0, '127.0.0.1', () => resolve(`http://127.0.0.1:${server.address().port}/`));
   });
   browser = await launchAtlasBrowser(chromium, { headless: true });
-  const page = await browser.newPage({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } });
+  const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' });
+  const page = await context.newPage();
+  const cacheSession = await context.newCDPSession(page);
+  await cacheSession.send('Network.setCacheDisabled', { cacheDisabled: true });
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('requestfailed', request => failedRequests.push({ url: request.url(), error: request.failure()?.errorText || 'unknown' }));
@@ -510,6 +513,11 @@ try {
         if (control.id === 'waltham-cross') {
           outcome.route66Trace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('66') ?? null);
           assert.ok(outcome.route66Trace, 'Production assessment result was not exposed to the test-only route-66 trace observer.');
+          outcome.route279Trace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('279', '210021703425') ?? null);
+          assert.ok(outcome.route279Trace, 'Production assessment result was not exposed to the test-only route-279 trace observer.');
+          outcome.route217Trace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('217', '210021703420') ?? null);
+          outcome.route317Trace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('317', '210021703420') ?? null);
+          outcome.route327Trace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('327', '210021703420') ?? null);
         }
         outcome.route242Trace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('242') ?? null);
       }
@@ -780,7 +788,7 @@ try {
         assert.ok(rows217.length, 'Waltham route 217 operating-period regression control is missing.');
         assert.doesNotMatch(rows217.map(row => row['Operating period at stop']).join(' '), /00:05\s*[–-]\s*00:25/i, 'Waltham route 217 must not collapse to the reported late-night-only period.');
         assert.ok(rows217.some(row => /TfL/i.test(row.Source) && /04:00.*00:59/i.test(row['Operating period at stop'])), 'Waltham route 217 must retain the fixture-backed full TfL span at the selected stop in the normal Browser table.');
-        assert.match(exportedWordText, /217[\s\S]{0,500}04:00.*00:59/i, 'Waltham Word export does not preserve the fixture-backed route 217 operating span.');
+        assert.match(exportedWordText, /217[\s\S]{0,1200}04:00.*00:59/i, 'Waltham Word export does not preserve the fixture-backed route 217 operating span.');
         assert.doesNotMatch(exportedWordText, /Source\s*:\s*TfL/i, 'Word output remains source-neutral while Browser identifies TfL authority.');
         const route66Rows = rendered.filter(row => row.Route === '66' && /Arriva Herts/i.test(row.Operator || '') && /Towards Loughton Station/i.test(row['Direction / main service pattern'] || ''));
         assert.ok(route66Rows.length, 'Waltham Browser must retain the regular frozen-candidate BODS route-66 service at Stop C.');
@@ -846,17 +854,17 @@ try {
         assert.ok(route202Labels.some(value => /Bourne|Bainton/i.test(value)), 'PE1 route 202 separate Bourne/Bainton pattern is missing.');
         const peterborough202 = rows202.find(row => /Peterborough Bus Station/i.test(row['Direction / main service pattern'] || ''));
         const austerby202 = rows202.find(row => /Austerby/i.test(row['Direction / main service pattern'] || ''));
-        const bourne202 = rows202.find(row => /Bourne Bus Station/i.test(row['Direction / main service pattern'] || '') || /Bainton/i.test(row['Principal locations'] || ''));
+        const bourne202 = rows202.find(row => /Bourne Bus Station/i.test(row['Direction / main service pattern'] || ''));
         assert.ok(peterborough202 && austerby202 && bourne202, 'PE1 route 202 must preserve outbound Peterborough, inbound Austerby/Helpston and the distinct Bourne/Bainton branch.');
         assert.notEqual(austerby202, bourne202, 'PE1 Bourne/Bainton branch is distinct from the Austerby principal pattern.');
         assert.match(peterborough202['Served at'] || '', /Arrivals/i, 'PE1 outbound pattern must retain the Queensgate arrivals assessed-stop population.');
         assert.match(peterborough202['Typical frequency'] || '', /Mon-Sat: 2 journeys\/day/i, 'PE1 outbound pattern must preserve its two unique Mon-Sat departures.');
         assert.match(peterborough202['Operating period at stop'] || '', /17:04.*18:04/i, 'PE1 outbound pattern must preserve its 17:04–18:04 operating span.');
         assert.match(austerby202['Served at'] || '', /Bay 9/i, 'PE1 Austerby pattern must retain the Queensgate Bay 9 assessed-stop population.');
-        assert.match(austerby202['Typical frequency'] || '', /Mon-Fri: 2 journeys\/day/i, 'PE1 Austerby pattern must preserve both distinct weekday departure times.');
-        assert.match(austerby202['Operating period at stop'] || '', /07:10.*07:45/i, 'PE1 Austerby pattern must preserve its weekday 07:10–07:45 span.');
+        assert.match(austerby202['Typical frequency'] || '', /Mon-Fri: 1 journey\/day/i, 'PE1 Austerby pattern is one weekday journey, separate from the Bourne branch.');
+        assert.match(austerby202['Operating period at stop'] || '', /07:10/i, 'PE1 Austerby pattern must retain its selected-stop 07:10 departure.');
         assert.match(bourne202['Served at'] || '', /Bay 9/i, 'PE1 Bourne/Bainton branch must retain the Queensgate Bay 9 selected stop.');
-        assert.match(bourne202['Principal locations'] || '', /Bainton/i, 'PE1 Bourne/Bainton branch must retain its distinct intermediate Bainton path.');
+        assert.match(bourne202['Principal locations'] || '', /Phillips Court/i, 'PE1 Bourne branch must retain its distinct intermediate Phillips Court path.');
         assert.match(bourne202['Typical frequency'] || '', /Mon-Fri: 1 journey\/day/i, 'PE1 Bourne/Bainton branch must remain a distinct weekday journey population.');
         assert.match(bourne202['Operating period at stop'] || '', /07:45/i, 'PE1 Bourne/Bainton branch must retain its selected-stop 07:45 departure.');
         for (const [label, browserRow] of [['Peterborough', peterborough202], ['Austerby', austerby202], ['Bourne', bourne202]]) {

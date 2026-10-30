@@ -19,6 +19,7 @@ import {
   isUnspecifiedOperator,
   makePublicServiceGroupingDecision,
   makeTerminusDecision,
+  recurringContainedShortWorking,
   sourceAuthorityRank
 } from './bus-grouping.mjs';
 import {
@@ -450,6 +451,7 @@ function sharedStopIds(first, second) {
 }
 
 function patternCorridorRelationship(first, second) {
+  if (recurringContainedShortWorking(first, second) || recurringContainedShortWorking(second, first)) return true;
   if (reverseEndpointRelationship(first, second) || reversePatternRelationship(first, second)) return false;
   const sameLineage = sameServiceLineage(first, second);
   const sameDirection = directionKey(first) === directionKey(second) && directionKey(first) !== 'direction-not-supplied';
@@ -556,8 +558,10 @@ function connectedServiceComponents(services) {
           && connectorEndpoints.destination === rightEndpoints.destination;
         const markerEvidenceIsAmbiguous = !connectorMarker
           || (leftMarker && rightMarker && connectorMarker === leftMarker && connectorMarker === rightMarker);
-        const connectorIsACommonShortWorking = provenPatternRelationship(services[connector], services[left])
-          && provenPatternRelationship(services[connector], services[right]);
+        const connectorIsACommonShortWorking = (provenPatternRelationship(services[connector], services[left])
+          && provenPatternRelationship(services[connector], services[right]))
+          || recurringContainedShortWorking(services[connector], services[left])
+          || recurringContainedShortWorking(services[connector], services[right]);
         if (compatiblePairs.has(rightPair) && hardCorridorSeparation(services[left], services[right])
           && markerEvidenceIsAmbiguous && (sharesCommonOrigin || sharesCommonDestination)
           && connectorIsACommonShortWorking) {
@@ -587,7 +591,9 @@ function connectedServiceComponents(services) {
         // order when a hard corridor conflict is present.
         const reservedConflict = [...componentIndexes, ...queue]
           .some(index => hardCorridorSeparation(services[index], services[candidate]));
-        const queuedContinuation = queue.some(index => provenPatternRelationship(services[index], services[candidate]));
+        const queuedContinuation = queue.some(index => provenPatternRelationship(services[index], services[candidate])
+          || recurringContainedShortWorking(services[index], services[candidate])
+          || recurringContainedShortWorking(services[candidate], services[index]));
         if (reservedConflict && !queuedContinuation) continue;
         const currentChoice = ambiguousMarkerChoice.get(current);
         const candidateChoice = ambiguousMarkerChoice.get(candidate);
@@ -616,6 +622,7 @@ function compatibleDirection(first, second, aliases = []) {
   // identity.  The same route-direction can therefore be represented by
   // more than one current operator or prepared feed.
   if (compatibleSchoolSpecificWorking(first, second)) return true;
+  if (recurringContainedShortWorking(first, second) || recurringContainedShortWorking(second, first)) return true;
   if (hardCorridorSeparation(first, second)) return false;
   if (reverseEndpointRelationship(first, second)) return false;
   if (hasPublicServiceCopyEvidence(first, second)) return true;
@@ -1466,6 +1473,8 @@ function circularPrincipal(component, main, representativeId) {
 }
 
 function compareMain(first, second, representativeId, component = [first, second]) {
+  if (recurringContainedShortWorking(first, second)) return 1;
+  if (recurringContainedShortWorking(second, first)) return -1;
   const firstSupport = principalSupport(first, component, representativeId);
   const secondSupport = principalSupport(second, component, representativeId);
   const profiles = new Set(component.map(calendarProfileFromService));
@@ -3289,6 +3298,85 @@ function attachRouteNotes(rows) {
   return prepared.map((row, index) => Object.freeze({ ...row, ...(updates.get(index) ?? { routeGroupNote: null }) }));
 }
 
+function rowSourceRecords(row) {
+  return row?.plannerServiceGroup?.services ?? row?.services ?? [];
+}
+
+function rowEndpointNames(row, side) {
+  return unique(rowSourceRecords(row).flatMap(service => [
+    service?.[`${side}EndpointDecision`]?.chosenDisplayName,
+    service?.[`${side}EndpointDecision`]?.chosen,
+    service?.[side]
+  ]).map(text).filter(value => value && !/^(?:origin|destination) not supplied|destination not resolved$/i.test(value)));
+}
+
+function exactDepartureAnchor(row, stopId) {
+  if (!stopId) return false;
+  return rowSourceRecords(row).some(service => {
+    const ids = explicitPattern(service);
+    return ids[0] === stopId
+      && (text(service.frequencyBasisStopId) === stopId
+        || (service.stopIds ?? service.assessedStops ?? []).map(text).includes(stopId));
+  });
+}
+
+function pairedReciprocalTerminusDeparture(departing, arriving) {
+  if (!departing || !arriving || departing === arriving) return false;
+  if (text(departing.routeNumber).toUpperCase() !== text(arriving.routeNumber).toUpperCase()) return false;
+  const stopId = text(arriving.frequencyBasisStopId || arriving.servedAtStopId);
+  if (!stopId || text(departing.frequencyBasisStopId || departing.servedAtStopId) !== stopId) return false;
+  if (!exactDepartureAnchor(departing, stopId)) return false;
+  const arrivalServices = rowSourceRecords(arriving);
+  const departureServices = rowSourceRecords(departing);
+  const hasCompatibleOperator = departureServices.some(outbound => arrivalServices.some(inbound => operatorFamilyCompatible(outbound, inbound)));
+  if (!hasCompatibleOperator) return false;
+  const originNames = new Set(rowEndpointNames(arriving, 'origin').map(normal));
+  const reciprocalDestination = rowEndpointNames(departing, 'destination').some(name => originNames.has(normal(name)));
+  const exactEndpointIdentity = departureServices.some(outbound => arrivalServices.some(inbound => {
+    return hasResolvedExactEndpointEvidence(outbound, 'destination')
+      && endpointIdentity(outbound, 'destination') === endpointIdentity(inbound, 'origin');
+  }));
+  return reciprocalDestination || exactEndpointIdentity;
+}
+
+function promotePairedDepartureRows(rows) {
+  const provenArrivals = rows.filter(row => row.terminusDecision?.proven
+    && row.terminusDecision.presentation === 'arrival-only-suppress');
+  if (!provenArrivals.length) return rows;
+  return rows.map(row => {
+    if (row.terminusDecision?.proven) return row;
+    const paired = provenArrivals.filter(arrival => pairedReciprocalTerminusDeparture(row, arrival));
+    if (!paired.length) return row;
+    const arrivalIds = unique([
+      ...(row.terminusDecision?.arrivalEvidence ?? []),
+      ...paired.flatMap(arrival => arrival.terminusDecision.arrivalEvidence ?? []),
+      ...paired.flatMap(arrival => arrival.sourceRecordIds ?? [])
+    ]);
+    const stopId = text(row.frequencyBasisStopId || row.servedAtStopId);
+    const place = text(paired[0].terminusDecision.assessedPlace);
+    const terminusDecision = Object.freeze({
+      ...(row.terminusDecision ?? {}),
+      type: 'TerminusDecision',
+      status: 'proven-terminus',
+      presentation: 'departing-only',
+      proven: true,
+      assessedPlace: place,
+      terminalSides: Object.freeze(['origin']),
+      terminalStopPointIds: Object.freeze(unique([...(row.terminusDecision?.terminalStopPointIds ?? []), stopId])),
+      arrivalEvidence: Object.freeze(arrivalIds),
+      departureEvidence: Object.freeze(unique([...(row.sourceRecordIds ?? []), ...(row.terminusDecision?.departureEvidence ?? [])])),
+      reason: 'The departing ordered pattern starts at the exact assessed StopPoint and its reciprocal destination matches the proven arriving public-service pattern.',
+      note: `${place} is the route terminus.`,
+      evidence: Object.freeze({
+        ...(row.terminusDecision?.evidence ?? {}),
+        pairedArrivalSourceRecordIds: Object.freeze(paired.flatMap(arrival => arrival.sourceRecordIds ?? [])),
+        exactDepartingStopPointAnchor: stopId
+      })
+    });
+    return Object.freeze({ ...row, terminusDecision });
+  });
+}
+
 export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = []) {
   const sourceRecords = serviceSummaries ?? [];
   // Keep every source summary in the domain grouping input.  Supplementary
@@ -3314,7 +3402,7 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
       if (!representedByResolvedRow) provisionalRows.push(Object.freeze({ ...row, destination: 'Destination requires review', directionPatternText: 'Destination requires review', unresolvedPublicIdentity: true, serviceNote: unique([row.serviceNote, 'Destination requires review before formal use.']).join(' ') }));
     }
   }
-  let familyRows = collapseCrossProviderPlannerCopies(collapsePublicRouteFamilies(provisionalRows));
+  let familyRows = promotePairedDepartureRows(collapseCrossProviderPlannerCopies(collapsePublicRouteFamilies(provisionalRows)));
   const plannerRouteNumbers = row => new Set(row?.publicRouteNumbers ?? row?.routeNumbers ?? [row?.routeNumber]);
   const sharesPlannerRouteNumber = (first, second) => [...plannerRouteNumbers(first)].some(route => plannerRouteNumbers(second).has(route));
   const hasDepartingTerminus = row => familyRows.some(candidate => candidate !== row

@@ -9,6 +9,13 @@
 function text(value) { return String(value ?? '').trim(); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
 function unique(values) { return [...new Set((values ?? []).map(text).filter(Boolean))]; }
+function compatibleOperatorFamily(first, second) {
+  if (isUnspecifiedOperator(first?.operator) || isUnspecifiedOperator(second?.operator)) return true;
+  const tokens = value => new Set(normal(value).split(' ').filter(token => token && !['and', 'the', 'bus', 'buses', 'company', 'co', 'ltd', 'limited', 'travel', 'transport', 'in', 'of'].includes(token)));
+  const left = tokens(first?.operator), right = tokens(second?.operator);
+  const subset = (small, large) => small.size > 0 && [...small].every(token => large.has(token));
+  return subset(left, right) || subset(right, left);
+}
 
 function endpointEvidenceEntries(service = {}, side = 'destination') {
   const evidence = service?.endpointEvidence?.[side];
@@ -233,7 +240,70 @@ function completeRoutePattern(service) {
   return names.length > 2 ? names : [];
 }
 
+const SERVICE_DAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
+
+function recurringDepartureDays(service) {
+  const records = [service, ...(service?.rawServiceSummaries ?? []), ...(service?.sourceServices ?? [])].filter(Boolean);
+  const counts = new Map();
+  for (const day of SERVICE_DAYS) {
+    let count = 0;
+    for (const record of records) {
+      count = Math.max(count, (record?.departuresByDay?.[day] ?? []).length, (record?.departureEvidenceByDay?.[day] ?? []).length);
+      for (const schedule of Object.values(record?.stopSchedules ?? {})) count = Math.max(count, (schedule?.[day] ?? []).length);
+      for (const schedule of Object.values(record?.departuresByStopAndDay ?? {})) count = Math.max(count, (schedule?.[day] ?? []).length);
+    }
+    if (count >= 12) counts.set(day, count);
+  }
+  const lines = records.flatMap(record => [record?.typicalFrequencyLines, record?.frequency])
+    .flatMap(value => Array.isArray(value) ? value : value ? [value] : []).map(text);
+  const frequencyEvidence = records.flatMap(record => record?.frequencyEvidence ?? record?.departureFrequencyEvidence ?? []);
+  for (const item of frequencyEvidence) {
+    const day = text(item?.day).toLowerCase();
+    const headway = Number(item?.headwayMinutes ?? item?.typicalHeadwayMinutes ?? item?.intervalMinutes ?? item?.minutes);
+    if (headway > 0 && headway <= 20 && SERVICE_DAYS.includes(day)) counts.set(day, Math.max(counts.get(day) ?? 0, 12));
+  }
+  for (const day of SERVICE_DAYS) {
+    const label = day.slice(0, 3);
+    const frequencyLines = lines.filter(line => new RegExp(`^\\s*${label}(?:day)?(?:\\s*[-–]\\s*(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:day)?)?\\s*:`, 'i').test(line));
+    if (frequencyLines.some(line => {
+      const values = line.match(/(\d+)\s*(?:-|–|to\s*)(\d+)\s*(?:mins?|minutes?)\b/i);
+      if (values) return Number(values[2]) <= 20;
+      const single = line.match(/(\d+)\s*(?:mins?|minutes?)\b/i);
+      return Boolean(single && Number(single[1]) <= 20);
+    })) counts.set(day, Math.max(counts.get(day) ?? 0, 12));
+  }
+  if (lines.some(line => /^\s*(?:Mon|Monday)\s*[-–]\s*(?:Fri|Friday)\s*:/i.test(line)
+    && /\d+\s*(?:-|–|to\s*)?\d*\s*(?:mins?|minutes?)\b/i.test(line))) {
+    for (const day of SERVICE_DAYS.slice(0, 5)) counts.set(day, Math.max(counts.get(day) ?? 0, 12));
+  }
+  return counts;
+}
+
+function alignedDirection(first, second) {
+  const marker = service => {
+    const value = text(service?.directionFamily || service?.direction || service?.stopDirection).toLowerCase();
+    return /^(?:inbound|outbound|northbound|southbound|eastbound|westbound|clockwise|anticlockwise|north|south|east|west)$/.test(value) ? value : '';
+  };
+  const left = marker(first), right = marker(second);
+  if (left && right) return left === right;
+  const leftPattern = completeRoutePattern(first), rightPattern = completeRoutePattern(second);
+  return Boolean(leftPattern[0] && leftPattern[0] === rightPattern[0]);
+}
+
+/** Strong recurring short-working evidence for a long common ordered trunk. */
+export function recurringContainedShortWorking(shorterService = {}, longerService = {}) {
+  if (text(shorterService?.routeNumber).toUpperCase() !== text(longerService?.routeNumber).toUpperCase()) return false;
+  if (!compatibleOperatorFamily(shorterService, longerService) || !alignedDirection(shorterService, longerService)) return false;
+  const shorter = completeRoutePattern(shorterService), longer = completeRoutePattern(longerService);
+  if (shorter.length < 30 || longer.length <= shorter.length) return false;
+  let common = 0;
+  while (common < shorter.length && common < longer.length && shorter[common] === longer[common]) common += 1;
+  if (common < 30 || common / shorter.length < 0.75 || common / longer.length < 0.6) return false;
+  return recurringDepartureDays(shorterService).size >= 2 && recurringDepartureDays(longerService).size >= 2;
+}
+
 function containedEndpointShortWorking(shorterService, longerService) {
+  if (recurringContainedShortWorking(shorterService, longerService)) return true;
   if (text(shorterService?.routeNumber).toUpperCase() !== text(longerService?.routeNumber).toUpperCase()) return false;
   if (!sharedDirectionMarker(shorterService, longerService)) return false;
   if (!lineageIds(shorterService).some(value => lineageIds(longerService).map(normal).includes(normal(value)))) return false;
@@ -386,6 +456,11 @@ export function hasPublicServiceCopyEvidence(first = {}, second = {}) {
   if (text(first.routeNumber).toUpperCase() !== text(second.routeNumber).toUpperCase()) return false;
   const authorityPair = [sourceAuthorityRank(first), sourceAuthorityRank(second)].sort((left, right) => right - left);
   if (authorityPair[0] !== 3 || authorityPair[1] !== 2) return false;
+  const firstPattern = pattern(first), secondPattern = pattern(second);
+  if (firstPattern.length > 1 && firstPattern.length === secondPattern.length
+    && firstPattern.every((stopId, index) => normal(stopId) === normal(secondPattern[index]))
+    && !isUnspecifiedOperator(first.operator) && !isUnspecifiedOperator(second.operator)
+    && compatibleOperatorFamily(first, second)) return true;
   if (endpointIdentity(first, 'origin') && endpointIdentity(second, 'origin')
     && endpointIdentity(first, 'destination') && endpointIdentity(second, 'destination')
     && endpointIdentity(first, 'origin') === endpointIdentity(second, 'destination')

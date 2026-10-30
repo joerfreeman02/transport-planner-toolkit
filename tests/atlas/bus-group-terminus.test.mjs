@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { buildPlannerBusServiceSummaries, buildPlannerServiceGroups } from '../../src/atlas/domain/bus-planner-summary.mjs';
 import { makeTerminusDecision } from '../../src/atlas/domain/bus-grouping.mjs';
+import { recurringContainedShortWorking } from '../../src/atlas/domain/bus-grouping.mjs';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
 
 const week = Object.freeze({ monday: [420], tuesday: [420], wednesday: [420], thursday: [420], friday: [420], saturday: [], sunday: [] });
@@ -66,6 +67,14 @@ const numeric279 = record({ id: 'numeric-279', routeNumber: '279', origin: 'Walt
 assert.equal(rows([n279Tfl, numeric279]).length, 2, '279 and N279 remain separate');
 assert.equal(rows([record({ id: 'other-end', routeNumber: '310', destination: 'Ware Railway Station', destinationStopPointId: 'L', pattern: ['H', 'M', 'L'] }), record({ id: 'different-operator', routeNumber: '310', operator: 'Uno', destination: 'Waltham Cross Bus Station', destinationStopPointId: 'W-A', pattern: ['H', 'M', 'W-A'] })]).length, 2, 'different endpoints/operators do not collapse unsafely');
 
+const exactTfl = record({ id: '217-tfl', routeNumber: '217', operator: 'Arriva London North', provider: 'TfL', origin: 'Origin not supplied', destination: 'Destination not supplied', originStopPointId: 'W-A', destinationStopPointId: 'L', pattern: ['W-A', 'A', 'B', 'L'], direction: 'outbound' });
+const exactBods = record({ id: '217-bods', routeNumber: '217', operator: 'Arriva London North', provider: 'BODS', origin: 'Origin not supplied', destination: 'Destination not supplied', originStopPointId: 'W-A', destinationStopPointId: 'L', pattern: ['W-A', 'A', 'B', 'L'], direction: 'gtfs:0' });
+exactTfl.originEndpointDecision = {};
+exactTfl.destinationEndpointDecision = {};
+exactBods.originEndpointDecision = {};
+exactBods.destinationEndpointDecision = {};
+assert.equal(rows([exactTfl, exactBods]).length, 1, 'identical ordered StopPoint patterns with known compatible operators reconcile across feed-local direction markers');
+
 // Principal pattern, short-working and genuine branch evidence.
 const full66 = record({ id: '66-full', routeNumber: '66', origin: 'Waltham Cross Bus Station', destination: 'Loughton Station', originStopPointId: 'W-A', destinationStopPointId: 'L', pattern: ['W-A', 'M', 'L'], direction: 'outbound' });
 const short66 = record({ id: '66-short', routeNumber: '66', origin: 'Waltham Cross Bus Station', destination: 'Hammond Street', originStopPointId: 'W-C', destinationStopPointId: 'M', pattern: ['W-C', 'M'], direction: 'outbound' });
@@ -120,6 +129,36 @@ assert.equal(rows([through])[0].terminusDecision.status, 'through-service', 'thr
 const uncertain = record({ id: 'uncertain', routeNumber: '15', origin: 'Bus Station', destination: 'Harlow Town Centre', originStopPointId: 'W-A', destinationStopPointId: 'H', pattern: ['W-A', 'M', 'H'] });
 uncertain.originEndpointDecision = { chosen: 'Waltham Cross Bus Station', chosenDisplayName: 'Waltham Cross Bus Station', primaryEndpointStopPointId: 'W-A', stopArea: { id: 'area:WALTHAM', name: 'Waltham Cross Bus Station' } };
 assert.equal(rows([uncertain])[0].terminusDecision.proven, false, 'uncertain endpoint proof fails safe');
+
+// A departing pattern with an unresolved origin can inherit the paired
+// terminus only when its exact ordered pattern starts at the assessed stop
+// and its resolved destination reciprocates the proven arriving pattern.
+const pairedArrival = record({ id: '217-arrival', routeNumber: '217', origin: 'Turnpike Lane Bus Station', destination: 'Waltham Cross Bus Station', originStopPointId: 'TPL', destinationStopPointId: 'W-A', pattern: ['TPL', 'MID', 'W-A'], direction: 'inbound' });
+const pairedDeparture = record({ id: '217-departure', routeNumber: '217', origin: 'Bus Station', destination: 'Turnpike Lane Bus Station', originStopPointId: 'W-A', destinationStopPointId: 'TPL', pattern: ['W-A', 'MID', 'TPL'], direction: 'outbound' });
+pairedDeparture.originEndpointDecision = { chosen: 'Waltham Cross Bus Station', chosenDisplayName: 'Waltham Cross Bus Station', primaryEndpointStopPointId: 'W-A', stopArea: { id: 'area:WALTHAM', name: 'Waltham Cross Bus Station' } };
+const pairedRows = rows([pairedArrival, pairedDeparture]);
+assert.equal(pairedRows.length, 1, 'proven arrival is consolidated into its exact anchored reciprocal departure');
+assert.equal(pairedRows[0].destination, 'Turnpike Lane Bus Station');
+assert.ok(pairedRows[0].terminusDecision.arrivalEvidence.includes('217-arrival'), 'paired arrival remains in terminus evidence');
+
+// A long recurring short pattern may end on a distinct call while sharing a
+// strong ordered prefix with the full route. One-off shared-trunk branches
+// remain independent public services.
+const route279Trunk = Array.from({ length: 39 }, (_, index) => `279-${index}`);
+const frequent279 = ['Mon-Fri: Typically every ~5 mins', 'Sat: Typically every ~5–10 mins', 'Sun: Typically every ~10 mins'];
+const full279 = record({ id: '279-manor', routeNumber: '279', operator: 'Arriva London North', origin: 'Waltham Cross Bus Station', destination: 'Manor House Station', originStopPointId: 'W-A', destinationStopPointId: 'MANOR', pattern: [...route279Trunk, 'STAMFORD', 'MANOR'], direction: 'outbound', departuresByDay: {}, typicalFrequencyLines: frequent279 });
+const short279 = record({ id: '279-rookwood', routeNumber: '279', operator: 'Arriva London North', origin: 'Waltham Cross Bus Station', destination: 'Stamford Hill (Rookwood Road)', originStopPointId: 'W-A', destinationStopPointId: 'ROOKWOOD', pattern: [...route279Trunk, 'ROOKWOOD'], direction: 'outbound', departuresByDay: {}, typicalFrequencyLines: frequent279 });
+assert.equal(recurringContainedShortWorking(short279, full279), true);
+const route279Rows = rows([short279, full279]);
+assert.equal(route279Rows.length, 1, 'recurring same-route contained tail is shown as one public-service row');
+assert.equal(route279Rows[0].destination, 'Manor House Station');
+assert.ok(route279Rows[0].publicServiceGroupingDecision.shortWorkingRecordIds.includes('279-rookwood'));
+assert.match(`${route279Rows[0].serviceNote} ${route279Rows[0].routeGroupNote || ''}`, /Rookwood Road|Stamford Hill/i);
+
+const onceDaily202Short = record({ id: '202-bourne', routeNumber: '202', operator: 'Central Connect', origin: 'Queensgate', destination: 'Bourne Bus Station', originStopPointId: 'W-A', destinationStopPointId: 'BOURNE', pattern: [...route279Trunk, 'BOURNE-1', 'BOURNE'], direction: 'outbound', departuresByDay: { ...week, monday: [465], tuesday: [465], wednesday: [465], thursday: [465], friday: [465] } });
+const onceDaily202Full = record({ id: '202-austerby', routeNumber: '202', operator: 'Central Connect', origin: 'Queensgate', destination: 'Austerby', originStopPointId: 'W-A', destinationStopPointId: 'AUSTERBY', pattern: [...route279Trunk, 'AUSTERBY-1', 'AUSTERBY'], direction: 'outbound', departuresByDay: { ...week, monday: [430], tuesday: [430], wednesday: [430], thursday: [430], friday: [430] } });
+assert.equal(recurringContainedShortWorking(onceDaily202Short, onceDaily202Full), false);
+assert.equal(rows([onceDaily202Short, onceDaily202Full]).length, 2, 'daily branch journeys with a shared trunk are not collapsed without recurring frequency evidence');
 
 const clippedPattern = record({ id: 'clipped-pattern', routeNumber: '121', origin: 'Waltham Cross Bus Station', destination: 'Loughton Station', originStopPointId: 'ELSEWHERE', destinationStopPointId: 'L', pattern: ['W-A', 'L'] });
 clippedPattern.originEndpointDecision = endpoint('Waltham Cross Bus Station', 'ELSEWHERE', 'area:WALTHAM');

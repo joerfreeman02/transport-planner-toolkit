@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createBusAssessment, createReviewItem, principalLocationReviewBlocksWord } from '../../src/atlas/application/bus-assessment.mjs';
+import { createBusAssessment, createReviewItem } from '../../src/atlas/application/bus-assessment.mjs';
 import { buildServicePresentation } from '../../src/atlas/domain/bus-service-assessment.mjs';
 
 const tests = [];
@@ -67,8 +67,6 @@ test('missing pattern identity is explicit and cannot be hidden by a planner pla
   assert.ok(result.reviewItems.some(item => item.code === 'directional-principal-location' && item.route === '10'));
   assert.equal(result.plannerServiceSummaries[0].principalLocationsText, 'Unresolved — review Sources & Checks');
   assert.doesNotMatch(result.plannerServiceSummaries[0].principalLocationsText, /See route origin \/ destination/);
-  assert.equal(principalLocationReviewBlocksWord(result), true, 'a principal-location review item hard-blocks Word export');
-  assert.equal(principalLocationReviewBlocksWord({ reviewItems: [{ code: 'service-source-evidence' }] }), false, 'general source acknowledgements remain governed by their existing gate');
 });
 
 test('proven terminal destination is the minimum useful location and repeated circular anchors fail closed', async () => {

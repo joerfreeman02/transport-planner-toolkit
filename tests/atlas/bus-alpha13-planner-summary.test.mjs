@@ -38,6 +38,14 @@ assert.match(main.plannerNotes?.shortWorkings ?? '', /Enfield/i, 'the excluded s
 assert.equal(main.directionPatternText, 'Towards Chingford');
 assert.equal(planner.filter(row => row.routeNumber === '657').length, 3);
 
+const conflictingCrossSourceRows = buildPlannerBusServiceSummaries([
+  { ...base, id: 'bods-current-overlap', routeNumber: 'X5', timetableSource: 'BODS', validFrom: '2026-01-01', validTo: '2026-12-31', destination: 'Town Centre', principalLocations: ['Northgate'], sourceRecordIds: ['bods-current-overlap'] },
+  { ...base, id: 'tnds-overlapping-revision', routeNumber: 'X5', timetableSource: 'TNDS', validFrom: '2026-06-01', validTo: '2027-05-31', destination: 'Town Centre', principalLocations: ['Northgate'], sourceRecordIds: ['tnds-overlapping-revision'] }
+], [stop]);
+assert.equal(conflictingCrossSourceRows.length, 1, 'the established public family remains consolidated while its source-date conflict is exposed');
+assert.ok(conflictingCrossSourceRows.every(row => /overlapping but different effective-date intervals/.test(row.sourceWarnings.join(' '))));
+assert.ok(conflictingCrossSourceRows[0].crossSourceConflictKey, 'the material cross-source conflict has a deterministic review grouping key');
+
 const word = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [main], serviceSummaries: [] });
 assert.deepEqual(word[1].headers, ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']);
 assert.equal(word[1].rows[0][3], main.servedAtText);

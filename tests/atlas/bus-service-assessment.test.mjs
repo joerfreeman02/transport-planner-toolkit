@@ -81,6 +81,16 @@ test('circular, school-day and limited qualifications remain visible', () => {
   assert.match(summary.serviceNote, /Circular service\./);
 });
 
+test('calendar restrictions are withheld from a mixed-profile source row', () => {
+  const [summary] = buildServiceSummaries([{ id: 'A' }], [{
+    id: 'mixed-calendar', routeNumber: 'S2', operator: 'Example', origin: 'A', destination: 'B', direction: 'B',
+    serviceNotes: ['Non-school days only.'], qualifications: ['Non-school days only.'],
+    calendarEvidence: [{ calendarProfileId: 'ordinary' }, { calendarProfileId: 'non-school-day', nonSchoolDayOnly: true }],
+    stopSchedules: { A: { monday: [480] } }
+  }]);
+  assert.doesNotMatch(summary.serviceNote, /Non-school days only/i, 'a mixed calendar source record cannot elevate its restricted journey subset to the entire row');
+});
+
 test('empty timetable records do not become planner-facing services', () => {
   const summaries = buildServiceSummaries([{ id: 'A' }], [{ id: 'incomplete', routeNumber: '5', operator: '', origin: '', destination: '', principalLocations: [], qualifications: [], stopSchedules: { A: {} } }]);
   assert.deepEqual(summaries, []);

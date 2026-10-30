@@ -705,7 +705,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
       ...calendarQualificationNotes(calendarEvidence),
       ...records.flatMap(record => [...(record.serviceNotes ?? []), ...(record.qualifications ?? [])].map(plannerQualificationNote))
     ])
-      .filter(note => qualificationAppliesToFinalRow(note, departuresByDay));
+      .filter(note => qualificationAppliesToFinalRow(note, departuresByDay) && qualificationScopeProven(note, records, frequencyBasisStopId));
     const operatingPeriodWarnings = unique([...operatingEvidence.warnings, ...combinedPeriods.warnings]);
     const endpointPatterns = unique(records.map(record => `${text(record.origin)} → ${text(record.destination)}`));
     if (endpointPatterns.length > 1) notes.push('Includes scheduled short workings or route variants in this direction; the main origin/destination shown is the most extensive pattern in the source timetable.');
@@ -847,6 +847,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
         record.source?.provider,
         record.source?.supplementaryProvider
       ]))),
+      rawServiceSummaries: Object.freeze(records),
       frequencyRepresentativeDay,
       frequencyEvidence: Object.freeze(frequencyEvidence),
       sourceWarnings: Object.freeze(sourceWarnings),
@@ -1165,6 +1166,25 @@ function qualificationAppliesToFinalRow(note, departuresByDay = {}) {
   }
   if (!/non[- ]school/i.test(note) && /school\s*days?/i.test(note) && representedDays.some(day => day === 'saturday' || day === 'sunday')) return false;
   return true;
+}
+
+function qualificationScopeProven(note, records, evidenceStopId) {
+  if (!/non[- ]school|school[- ]day|term[- ]time/i.test(note)) return true;
+  const represented = records.filter(record => hasScheduledEvidence(record.stopSchedules?.[evidenceStopId]));
+  return represented.length > 0 && represented.every(record => {
+    const profiles = unique([
+      record.calendarProfileId,
+      record.source?.calendarProfileId,
+      ...(record.calendarEvidence ?? record.operatingCalendarEvidence ?? []).map(item => item?.calendarProfileId)
+    ]);
+    if (profiles.length > 1) return false;
+    const recordNotes = unique([
+      ...(record.serviceNotes ?? []),
+      ...(record.qualifications ?? []),
+      ...calendarQualificationNotes(record.calendarEvidence ?? record.operatingCalendarEvidence ?? [])
+    ].map(plannerQualificationNote));
+    return recordNotes.includes(note);
+  });
 }
 
 function representativeDay(departuresByDay = {}) { return REPRESENTATIVE_DAY_ORDER.find(day => numeric(departuresByDay[day] ?? []).length) || null; }

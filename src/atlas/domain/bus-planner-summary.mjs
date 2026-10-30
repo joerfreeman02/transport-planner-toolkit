@@ -2612,7 +2612,45 @@ function populationContainsAll(container, candidate) {
   return candidateKeys.length > 0 && candidateKeys.every(key => containerKeys.has(key));
 }
 
+function serviceValidityIntervals(row) {
+  const records = (Array.isArray(row?.rawServiceSummaries) ? row.rawServiceSummaries : [row])
+    .flatMap(record => Array.isArray(record?.rawServiceSummaries) ? record.rawServiceSummaries : [record]);
+  return unique(records.flatMap(record => {
+    const from = text(record?.validFrom ?? record?.validity?.from).slice(0, 10);
+    const to = text(record?.validTo ?? record?.validity?.to).slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from <= to
+      ? [`${from}/${to}`]
+      : [];
+  }));
+}
+
+function overlappingValidityDisagreement(first, second) {
+  return serviceValidityIntervals(first).some(left => serviceValidityIntervals(second).some(right => {
+    if (left === right) return false;
+    const [leftFrom, leftTo] = left.split('/');
+    const [rightFrom, rightTo] = right.split('/');
+    return leftFrom <= rightTo && rightFrom <= leftTo;
+  }));
+}
+
+function crossProviderMaterialDisagreement(bods, tnds) {
+  return overlappingValidityDisagreement(bods, tnds);
+}
+
+function embeddedCrossProviderMaterialDisagreement(row) {
+  const records = (row?.rawServiceSummaries ?? []).flatMap(record => Array.isArray(record?.rawServiceSummaries) ? record.rawServiceSummaries : [record]);
+  const bods = records.filter(record => plannerSourceKind(record) === 'BODS');
+  const tnds = records.filter(record => plannerSourceKind(record) === 'TNDS');
+  return bods.some(primary => tnds.some(supplementary => overlappingValidityDisagreement(primary, supplementary)));
+}
+
 function collapseCrossProviderPlannerCopies(rows = []) {
+  rows = rows.map(row => {
+    if (!embeddedCrossProviderMaterialDisagreement(row)) return row;
+    const conflictKey = `${row.routeNumber}|${row.frequencyBasisStopId}|${[...(row.sourceRecordIds ?? [])].map(text).sort().join(',')}`;
+    const warning = 'BODS and TNDS evidence for this local route has overlapping but different effective-date intervals. Review both source records before deciding which service is current.';
+    return Object.freeze({ ...row, sourceWarnings: Object.freeze(unique([...(row.sourceWarnings ?? []), warning])), crossSourceConflictKey: conflictKey });
+  });
   const buckets = new Map();
   for (const row of rows) {
     const key = routeStopDirectionCalendarKey(row);
@@ -2624,7 +2662,8 @@ function collapseCrossProviderPlannerCopies(rows = []) {
   }
   const consumed = new Set();
   const replacements = new Map();
-  for (const members of buckets.values()) {
+  const conflicts = new Map();
+  for (const [key, members] of buckets) {
     const bods = members.filter(row => plannerSourceKind(row) === 'BODS');
     const tnds = members.filter(row => plannerSourceKind(row) === 'TNDS');
     // This is a planner presentation reconciliation only. Exact copies can
@@ -2634,6 +2673,13 @@ function collapseCrossProviderPlannerCopies(rows = []) {
     // extra branch wording remain in the retained source evidence.
     if (bods.length !== 1 || tnds.length !== 1 || bods.length + tnds.length !== members.length) continue;
     const bodsRow = bods[0], tndsRow = tnds[0];
+    if (crossProviderMaterialDisagreement(bodsRow, tndsRow)) {
+      const conflictKey = `${key}|${[...(bodsRow.sourceRecordIds ?? []), ...(tndsRow.sourceRecordIds ?? [])].map(text).sort().join(',')}`;
+      const warning = 'BODS and TNDS evidence for this local route has overlapping but different effective-date intervals. Review both source records before deciding which service is current.';
+      conflicts.set(bodsRow.id, { warning, conflictKey });
+      conflicts.set(tndsRow.id, { warning, conflictKey });
+      continue;
+    }
     const exactCopies = plannerCopyKey(tndsRow) === plannerCopyKey(bodsRow);
     const subordinateSupplementary = (() => {
       const row = tndsRow;
@@ -2669,9 +2715,11 @@ function collapseCrossProviderPlannerCopies(rows = []) {
     }));
     for (const row of members) consumed.add(row.id);
   }
-  return rows.flatMap(row => consumed.has(row.id)
-    ? (replacements.has(row.id) ? [replacements.get(row.id)] : [])
-    : [row]);
+  return rows.flatMap(row => {
+    if (consumed.has(row.id)) return replacements.has(row.id) ? [replacements.get(row.id)] : [];
+    const conflict = conflicts.get(row.id);
+    return [conflict ? Object.freeze({ ...row, sourceWarnings: Object.freeze(unique([...(row.sourceWarnings ?? []), conflict.warning])), crossSourceConflictKey: conflict.conflictKey }) : row];
+  });
 }
 
 function endpointLocationKeys(decision = {}) {

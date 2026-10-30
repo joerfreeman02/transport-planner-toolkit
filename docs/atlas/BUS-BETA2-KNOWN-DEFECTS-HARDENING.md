@@ -15,6 +15,16 @@ The service assessment previously combined principal-location lists from the rou
 
 This is an ATLAS interpretation correction. It does not certify the underlying BODS or TNDS pattern. When the source cannot prove order or stop identity, the summary is deliberately incomplete and reviewable.
 
+### TNDS review and effective dates
+
+The data adapter already had a conservative local-family check: route number, operator family, local scheduled StopPoint set, ordered physical pattern, circular status, and explicit direction all need to agree before a TNDS source record is discarded as a BODS copy. TNDS-only route 231 remains separate from Pipers route 230. At planner-copy reconciliation, however, evidence with complete, overlapping but different validity intervals could still be folded into a single BODS row without a material warning. The candidate retains the public row while adding one grouped Sources & Checks item for this effective-date conflict. Original source records remain attached to the row for inspection.
+
+This is a fail-safe conflict marker. It does not decide which conflicting feed is current, resolve non-overlapping superseded records against an assessment date, detect every operating-day/timetable disagreement, or reconcile 555 and N555 as a cross-route identity. Frequency similarity is not used as a fuzzy service-identity bridge.
+
+### Qualification scope
+
+The summary builder could map qualifications from records onto a combined row after observing only the merged departure week. It now confirms that each record with departures at the representative evidence stop supports the same school/non-school or term-time restriction, and withholds a whole-row restriction when a record contains multiple calendar profiles. Neutral calendar variation notes and per-profile planner lines remain available. VehicleJourney overrides continue to be handled by the TNDS adapter's existing precedence and profile splitting.
+
 ### Stop references and map exports
 
 Numeric references are now generated against the report's selected stop set for both Word and PDF export. Orphan references are removed from presentation text; evidence stops without an exported marker have no map reference. A pure extent helper frames the confirmed site, report stops, and requested radius. PDF export creates a temporary Leaflet map using that extent and disposes it after capture, so the user's last interactive pan/zoom does not choose the exported framing.
@@ -31,8 +41,8 @@ Principal-location display derivation removes only a case-insensitive trailing `
 
 - Principal locations require a named, identity-aligned ordered pattern containing the representative assessed stop. The downstream segment starts at that stop. Ambiguous repeated calls are withheld for review.
 - A map reference is valid only for a stop included in the selected export set. Word, map key, and marker assignment use the same deterministic reference view.
-- Outside London, BODS remains primary and TNDS remains supplementary. Exact local duplicate arbitration retains BODS; unique TNDS services remain. This candidate has not yet completed the required review-noise and material cross-source conflict audit, including effective dates, operating profiles, and timetable differences. No national source should be treated as error-free.
-- Qualification metadata remains attached to source records and planner rows. This candidate has not yet completed the required journey-level audit proving mixed qualified/unqualified journeys cannot elevate a restriction to the whole service row. School-day controls require the existing 657 regression to pass in the complete suite.
+- Outside London, BODS remains primary and TNDS remains supplementary. Exact local duplicate arbitration retains BODS; unique TNDS services remain. A focused overlapping-effective-date conflict is now reviewable, but operating-day/timetable comparison, stale records, non-overlapping supersession, and 555/N555 cross-route identity still need source-shaped regression and manual acceptance. No national source should be treated as error-free.
+- Qualification metadata remains attached to source records. Mixed-profile restriction notes are withheld at the summary boundary; the existing TNDS VehicleJourney > JourneyPattern > Service precedence and 657 school-only regression remain in scope for complete-suite verification.
 
 ## Regression evidence available in this checkout
 
@@ -47,7 +57,7 @@ Focused controls added or updated:
 
 Commands that passed locally:
 
-- `node tests/atlas/bus-service-assessment.test.mjs` — 20 tests.
+- `node tests/atlas/bus-service-assessment.test.mjs` — 21 tests.
 - `node tests/atlas/bus-map-references.test.mjs` — pass.
 - `node tests/atlas/bus-map-extent.test.mjs` — pass.
 - `node tests/atlas/bus-map-layout.test.mjs` — pass.
@@ -58,7 +68,7 @@ Commands that passed locally:
 - `node tests/atlas/tnds-transxchange.test.mjs`, `node tests/atlas/tnds-operating-profile-standard.test.mjs`, `node tests/atlas/tnds-semantic-fragmentation.test.mjs`, `node tests/atlas/alpha13-calendar-safety.test.mjs`, `node tests/atlas/alpha12-source-completeness.test.mjs`, `node tests/atlas/alpha12-source-presentation.test.mjs`, `node tests/atlas/bus-presentation.test.mjs`, `node tests/atlas/bus-planner-golden-rule.test.mjs`, `node tests/atlas/bus-dest-endpoint-intelligence.test.mjs`, `node tests/atlas/bus-endpoint-alias-closeout.test.mjs`, and `node tests/atlas/v2-review-cache.test.mjs` — pass.
 - `node tests/atlas/bus-robustness-1b-national-planner-trust.test.mjs` — 10 tests passed.
 - With `TEMP`, `TMP`, and `TMPDIR` pointed to a temporary folder within the checkout: `node tests/atlas/tnds-preparation-multiservice.test.mjs`, `node tests/atlas/tnds-preparation-coverage.test.mjs`, `node tests/atlas/tnds-preparation-scale.test.mjs`, and `node tests/atlas/alpha12-evidence-integrity-audit.test.mjs` — pass, including 1,800-record scale preparation.
-- `node tests/atlas/bus-assessment.test.mjs` — pass after updating the review count to separately assert the new fail-safe directional-principal-location items.
+- `node tests/atlas/bus-assessment.test.mjs` — 11 tests, including one grouped effective-date conflict item and the fail-safe directional-principal-location review count.
 - `node --check atlas/assets/js/app.mjs` — pass.
 
 Not completed in this environment:

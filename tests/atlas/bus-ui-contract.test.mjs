@@ -74,9 +74,13 @@ assert.match(app, /const mapReferenceByStopId = new Map\(assessedStops\.map\(/, 
 assert.match(app, /positionedStops\.map\(\(\{ item: marker, point, original, displaced \}\) => \{\s*const stop = marker\.item;/, 'numbered map markers unwrap the layout helper payload before resolving the stop reference');
 assert.match(app, /mapReferenceByStopId\.get\(stopId\) \|\| stop\.displayMapReference \|\| stop\.mapReference/, 'standalone PDF marker labels resolve through the same numeric stop reference as the key');
 assert.match(app, /syncRadiusCircle\(result\.provenance\.stops\?\.actualDiscoveryRadiusMetres/);
-assert.match(app, /if \(next === 6\) \{\s*try \{ mapExportContext = captureMapExportContext\(\)/);
-assert.match(app, /function captureMapExportContext\(\) \{\s*const leafletMap = map;/);
-assert.match(app, /const context = mapExportContext|let context = mapExportContext/);
+assert.match(app, /function createDeterministicMapExportContext\(/, 'exports construct a dedicated assessment-framed map context');
+assert.match(app, /buildAssessmentMapExtent\(/);
+assert.match(app, /function captureMapExportContext\(leafletMap = map\)/);
+assert.match(app, /const context = exportContext\.context/);
+assert.match(app, /function invalidateMapAfterLayout\(/, 'map layout changes are measured after browser layout frames');
+assert.match(app, /new ResizeObserver\(invalidateMapAfterLayout\)/, 'map resizes are observed across workflow host changes');
+assert.match(app, /getMapLayout:/, 'browser acceptance can compare Leaflet size with the visible map container');
 assert.match(app, /for \(const tile of context\.tiles\)/);
 assert.doesNotMatch(app, /selector\.getMap\(\)/);
 assert.match(app, /TFL_SAFE_DETAILED_PAIR_LIMIT/);

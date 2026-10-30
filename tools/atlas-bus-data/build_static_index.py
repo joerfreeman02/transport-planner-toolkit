@@ -560,6 +560,13 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             "direction": clean(trip.get("trip_headsign")) or (f"towards {last_name}" if last_name else ""),
             "circular": circular,
             "principalLocations": principal_locations(calls),
+            # Retain stop labels beside the ordered pattern identity so the
+            # planner can derive locations downstream of its representative
+            # evidence stop instead of reusing a route-wide list.
+            "routePatternStops": [
+                {"id": stop_id, "name": clean(call.get("name")), "locality": clean(call.get("locality"))}
+                for stop_id, call in zip(route_pattern_stop_ids, calls)
+            ],
             # Keep the complete ordered BODS call sequence available to the
             # circular-service assessor without changing the historical
             # GROUP-facing routePatternStopIds contract.  Before CIRC, BODS

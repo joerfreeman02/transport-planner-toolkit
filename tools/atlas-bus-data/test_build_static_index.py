@@ -286,6 +286,8 @@ class CircularIdentityTests(unittest.TestCase):
         record = next(iter(services.values()))
         self.assertNotIn("routePatternStopIds", record)
         self.assertEqual(record["circularPatternStopIds"], ["490000001A", "gtfs:frozen_region:missing-gtfs", "490000001A"])
+        self.assertEqual([call["id"] for call in record["routePatternStops"]], record["circularPatternStopIds"])
+        self.assertEqual([call["name"] for call in record["routePatternStops"]], ["Loop origin", "Unmatched call", "Loop origin"])
         self.assertEqual(record["source"]["orderedPatternEndpoints"], ["490000001A", "490000001A"])
         self.assertEqual(record["circularPatternStopIds"][0], record["circularPatternStopIds"][-1])
 

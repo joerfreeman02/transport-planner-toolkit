@@ -157,9 +157,11 @@ test('Chingford repeated origin endpoint evidence is grouped by public route iss
   });
   const result = await assessment.assess({ latitude: 51.6, longitude: -0.01 }, { radius: 250 });
   const endpointIssues = result.reviewItems.filter(item => item.code === 'planner-endpoint-resolution');
+  const directionIssues = result.reviewItems.filter(item => item.code === 'directional-principal-location');
   assert.equal(result.services.length, 15, 'all per-StopPoint source records remain in the assessment evidence');
-  assert.equal(result.reviewItems.length, 3, 'the main review badge counts only the three actionable route-level endpoint issue groups');
+  assert.equal(result.reviewItems.length, 6, 'review counts include three route-level endpoint issues and three unproven directional summaries');
   assert.equal(endpointIssues.length, 3, 'the review count is one actionable origin-endpoint issue for each of Routes 215, 385 and 397, not one per StopPoint');
+  assert.equal(directionIssues.length, 3, 'unmapped principal locations remain actionable without being repeated for every StopPoint record');
   assert.deepEqual(endpointIssues.map(item => item.route).sort(), ['215', '385', '397']);
   assert.ok(endpointIssues.every(item => item.actionability === 'review'));
   assert.ok(result.services.every(record => record.originStopPointIds?.length === 1 && record.sourceRecordIds?.length === 1), 'grouping review items leaves every raw source record and unresolved origin StopPoint identity accessible');

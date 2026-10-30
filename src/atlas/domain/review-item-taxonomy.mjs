@@ -6,6 +6,7 @@ export const REVIEW_ITEM_CATEGORIES = Object.freeze({
   'national-route-evidence': Object.freeze({ category: 'timetable', routeBearing: true }),
   'timetable-shard-failure': Object.freeze({ category: 'timetable-source', routeBearing: false }),
   'service-source-evidence': Object.freeze({ category: 'service-source', routeBearing: true }),
+  'directional-principal-location': Object.freeze({ category: 'service-source', routeBearing: true }),
   'unresolved-operator-evidence': Object.freeze({ category: 'operator', routeBearing: true }),
   'material-assessment-warning': Object.freeze({ category: 'other-material', routeBearing: false }),
   'planner-route-identity': Object.freeze({ category: 'planner-route-identity', routeBearing: true }),

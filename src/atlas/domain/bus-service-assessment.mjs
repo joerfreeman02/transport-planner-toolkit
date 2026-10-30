@@ -281,9 +281,12 @@ export function calculateScheduledFrequency(departures, { startMinute, endMinute
 export function derivePrincipalLocations(calls, { maximum = 7 } = {}) {
   const clean = (calls ?? []).map((call, index) => ({
     index,
-    name: text(call?.name),
+    // TransXChange may append a terminal-arrival annotation to the public
+    // location label. Keep the raw call in source evidence; this is display
+    // wording only and is safe only for the unambiguous trailing suffix.
+    name: text(call?.name).replace(/\s+arrival\s*$/i, ''),
     locality: text(call?.locality || call?.localityQualifier || call?.parentLocality),
-    major: /(?:bus|coach|rail(?:way)?|metro) station|town centre|city centre|hospital|airport|university|interchange|shopping centre/i.test(text(call?.name))
+    major: /(?:bus|coach|rail(?:way)?|metro) station|transport hub|town centre|city centre|hospital|airport|university|interchange|shopping centre/i.test(text(call?.name))
   })).filter(call => call.name);
   if (clean.length <= 2) return [];
   const endpoints = new Set([clean[0].name.toLowerCase(), clean.at(-1).name.toLowerCase()]);
@@ -542,6 +545,45 @@ function representativeRecord(records, stopIds) {
   })[0];
 }
 
+function directionalPrincipalLocations(record, evidenceStopId) {
+  const sourceLocations = unique(record?.principalLocations ?? []);
+  if (!sourceLocations.length) return { locations: [], warning: null };
+  const patternIds = (record?.routePatternStopIds?.length
+    ? record.routePatternStopIds
+    : record?.circularPatternStopIds ?? []).map(text);
+  const calls = Array.isArray(record?.routePatternStops) ? record.routePatternStops : [];
+  if (!patternIds.length || calls.length !== patternIds.length) return {
+    locations: [],
+    warning: 'Principal locations could not be safely mapped to ordered calls at the assessed stop; review the source journey pattern.'
+  };
+  const callIds = calls.map(call => text(typeof call === 'string' ? '' : call?.id || call?.stopPointId));
+  if (callIds.some((id, index) => id && id !== patternIds[index])) return {
+    locations: [],
+    warning: 'Principal locations could not be safely mapped because ordered call identities disagree with the journey pattern; review the source evidence.'
+  };
+  const evidencePositions = patternIds.flatMap((id, index) => id === text(evidenceStopId) ? [index] : []);
+  if (!evidencePositions.length) return {
+    locations: [],
+    warning: 'Principal locations could not be safely mapped because the assessed stop was not found in the ordered journey pattern; review the source evidence.'
+  };
+  const repeatedClosure = Boolean(record?.circular || (patternIds.length > 1 && patternIds[0] === patternIds.at(-1)));
+  const hasRepeatedEndpoint = patternIds.length > 1 && patternIds[0] === patternIds.at(-1);
+  const loopIds = hasRepeatedEndpoint ? patternIds.slice(0, -1) : patternIds;
+  const loopCalls = hasRepeatedEndpoint ? calls.slice(0, -1) : calls;
+  const loopPositions = loopIds.flatMap((id, index) => id === text(evidenceStopId) ? [index] : []);
+  let start = evidencePositions[0];
+  if (repeatedClosure && loopPositions.length === 1) start = loopPositions[0];
+  else if (evidencePositions.length > 1) return {
+    locations: [],
+    warning: 'Principal locations could not be safely mapped because the assessed stop occurs more than once in this journey pattern; review the loop or repeated-call evidence.'
+  };
+  if (repeatedClosure) {
+    const downstream = [...loopCalls.slice(start + 1), ...loopCalls.slice(0, start), loopCalls[start]];
+    return { locations: derivePrincipalLocations(downstream), warning: null };
+  }
+  return { locations: derivePrincipalLocations(calls.slice(start)), warning: null };
+}
+
 function operatingPeriodScopeKey(record, entry) {
   return [
     providerOfRecord(record, entry),
@@ -669,7 +711,10 @@ export function buildServiceSummaries(stops, serviceRecords) {
     if (endpointPatterns.length > 1) notes.push('Includes scheduled short workings or route variants in this direction; the main origin/destination shown is the most extensive pattern in the source timetable.');
     if (records.some(record => record.circular)) notes.push('Circular service.');
     if (!DAY_ORDER.some(day => periods[day])) notes.push('No scheduled departures are available for the prepared representative week.');
-    const principalLocations = unique(records.flatMap(record => record.principalLocations ?? []));
+    const principalRecord = records.find(record => hasScheduledEvidence(record.stopSchedules?.[frequencyBasisStopId])) || first;
+    const principalResult = directionalPrincipalLocations(principalRecord, frequencyBasisStopId);
+    const principalLocations = principalResult.locations;
+    if (principalResult.warning) sourceWarnings.push(principalResult.warning);
     const assessedStops = stopIds.map(id => selectedStopsById.get(id)).filter(Boolean);
     const stopLabel = stop => [text(stop?.name), text(stop?.indicator)].filter(Boolean).join(' — ') || text(stop?.id || stop?.sourceId);
     const servedAtStops = unique(assessedStops.map(stopLabel)).sort((a, b) => a.localeCompare(b));

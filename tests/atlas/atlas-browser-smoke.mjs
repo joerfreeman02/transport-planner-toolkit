@@ -58,6 +58,22 @@ try {
   assert.equal(await page.locator('.bus-service-summary thead th').count(), 8);
   assert.match(await page.locator('.bus-service-summary').innerText(), /Served at/);
   assert.equal(await page.locator('#taskStatusMessage').innerText(), 'Complete');
+  const resultMapIdentity = await page.locator('#siteMap').evaluate(element => element._leaflet_id);
+  await page.waitForFunction(() => {
+    const layout = window.__ATLAS_BUS_UI__?.getMapLayout?.();
+    return layout?.hostId === 'resultsMapHost' && layout.width > 0 && Math.abs(layout.width - layout.leafletWidth) <= 1;
+  }, null, { timeout: 5000 });
+  await page.locator('#editAssessment').click();
+  await page.waitForFunction(() => {
+    const layout = window.__ATLAS_BUS_UI__?.getMapLayout?.();
+    return layout?.hostId === 'persistentMapHost' && layout.width > 0 && Math.abs(layout.width - layout.leafletWidth) <= 1;
+  }, null, { timeout: 5000 });
+  await page.locator('[data-workflow-step="5"]').click();
+  await page.waitForFunction(() => {
+    const layout = window.__ATLAS_BUS_UI__?.getMapLayout?.();
+    return layout?.hostId === 'resultsMapHost' && layout.width > 0 && Math.abs(layout.width - layout.leafletWidth) <= 1;
+  }, null, { timeout: 5000 });
+  assert.equal(await page.locator('#siteMap').evaluate(element => element._leaflet_id), resultMapIdentity, 'workflow host movement preserves the same Leaflet map instance');
   assert.match(await page.locator('#evidenceRows tr').first().innerText(), /m · \d+ mins?/);
   assert.ok(tflRequests > 0);
   const requestsAfterFirstAssessment = tflRequests;

@@ -30,6 +30,17 @@ test('principal locations favour actual major calls and locality changes', () =>
   assert.deepEqual(result, ['Central Hospital', 'Town Centre', 'Alpha', 'Beta']);
 });
 
+test('principal location display removes only an unambiguous trailing arrival annotation', () => {
+  const locations = derivePrincipalLocations([
+    { id: 'A', name: 'Origin' },
+    { id: 'B', name: 'Gloucester Transport Hub arrival', locality: 'Gloucester' },
+    { id: 'C', name: 'Stonehouse', locality: 'Stonehouse' },
+    { id: 'D', name: 'Terminus' }
+  ]);
+  assert.ok(locations.includes('Gloucester Transport Hub'));
+  assert.ok(!locations.includes('Gloucester Transport Hub arrival'));
+});
+
 test('opposite stop records are never grouped by name', () => {
   const stops = groupStopsForPresentation([{ id: 'A', name: 'High Street', indicator: 'Stop A', direction: 'N' }, { id: 'B', name: 'High Street', indicator: 'Stop B', direction: 'S' }]);
   assert.deepEqual(stops.map(stop => stop.presentationKey), ['A', 'B']);
@@ -101,6 +112,81 @@ test('service summary direction comes from its representative selected stop', ()
   assert.equal(summary.frequencyBasisStopId, 'S');
   assert.equal(summary.stopDirection, 'Southbound');
   assert.equal(formatServiceOriginDestination(summary), 'A - B (Southbound)');
+});
+
+test('principal locations are clipped to the downstream ordered pattern at the representative stop', () => {
+  const calls = [
+    { id: 'G0', name: 'Gloucester', locality: 'Gloucester' },
+    { id: 'G1', name: 'Tredworth', locality: 'Gloucester' },
+    { id: 'E', name: 'Wycliffe College', locality: 'Stroud' },
+    { id: 'S1', name: 'Stonehouse Town Centre', locality: 'Stonehouse' },
+    { id: 'S2', name: 'Cainscross Bus Station', locality: 'Stroud' },
+    { id: 'D1', name: 'Merrywalks', locality: 'Stroud' },
+    { id: 'D2', name: 'Dursley Bus Station', locality: 'Dursley' }
+  ];
+  const schedule = { monday: [420], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] };
+  const [summary] = buildServiceSummaries([{ id: 'E', name: 'Wycliffe College' }], [{
+    id: '64-east', routeNumber: '64', operator: 'Example', origin: 'Gloucester', destination: 'Dursley', direction: 'outbound',
+    circularPatternStopIds: calls.map(call => call.id), routePatternStops: calls,
+    principalLocations: ['Gloucester', 'Tredworth', 'Stonehouse', 'Cainscross Bus Station'], stopSchedules: { E: schedule }
+  }]);
+  assert.ok(summary.principalLocations.includes('Stonehouse'));
+  assert.ok(summary.principalLocations.includes('Cainscross Bus Station'));
+  assert.ok(!summary.principalLocations.includes('Gloucester'));
+  assert.ok(!summary.principalLocations.includes('Tredworth'));
+  assert.deepEqual(summary.sourceWarnings, []);
+});
+
+test('directional location clipping covers 310, 203, 62, 64 and 65 without route-specific rules', () => {
+  const schedule = { monday: [420], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] };
+  const cases = [
+    { route: '310', stop: 'Hoddesdon', upstream: 'Hertford', downstream: 'Waltham Cross' },
+    { route: '203', stop: 'Hounslow West', upstream: 'Heathrow Airport', downstream: 'Staines' },
+    { route: '62', stop: 'Wycliffe College', upstream: 'Gloucester', downstream: 'Stonehouse' },
+    { route: '64', stop: 'Wycliffe College', upstream: 'Gloucester', downstream: 'Merrywalks' },
+    { route: '65', stop: 'Wycliffe College', upstream: 'Gloucester', downstream: 'Stroud' }
+  ];
+  for (const { route, stop, upstream, downstream } of cases) {
+    const calls = [
+      { id: 'before', name: upstream, locality: upstream },
+      { id: 'basis', name: stop, locality: stop },
+      { id: 'after', name: downstream, locality: downstream },
+      { id: 'end', name: `${downstream} Terminus`, locality: downstream }
+    ];
+    const [summary] = buildServiceSummaries([{ id: 'basis' }], [{
+      id: `control-${route}`, routeNumber: route, operator: 'Example', origin: upstream, destination: downstream, direction: `towards ${downstream}`,
+      routePatternStopIds: calls.map(call => call.id), routePatternStops: calls, principalLocations: [upstream, stop, downstream],
+      stopSchedules: { basis: schedule }
+    }]);
+    assert.ok(summary.principalLocations.includes(downstream), `${route} retains downstream locations`);
+    assert.ok(!summary.principalLocations.includes(upstream), `${route} excludes upstream locations`);
+  }
+});
+
+test('circular principal locations follow the ordered loop from the assessed stop', () => {
+  const calls = [
+    { id: 'A', name: 'Town Centre', locality: 'Town' },
+    { id: 'B', name: 'Central Hospital', locality: 'Town' },
+    { id: 'C', name: 'Assessed Stop', locality: 'Town' },
+    { id: 'D', name: 'Railway Station', locality: 'Village' },
+    { id: 'A', name: 'Town Centre', locality: 'Town' }
+  ];
+  const [summary] = buildServiceSummaries([{ id: 'C' }], [{
+    id: 'loop', routeNumber: 'L1', operator: 'Example', origin: 'Town Centre', destination: 'Town Centre', direction: 'Clockwise', circular: true,
+    circularPatternStopIds: calls.map(call => call.id), routePatternStops: calls,
+    principalLocations: ['Central Hospital', 'Railway Station'], stopSchedules: { C: { monday: [420] } }
+  }]);
+  assert.ok(summary.principalLocations.includes('Central Hospital'));
+  assert.ok(summary.principalLocations.includes('Town Centre'), 'the loop wraps after reaching its terminal closure');
+});
+
+test('unmapped principal locations are withheld and flagged for review', () => {
+  const [summary] = buildServiceSummaries([{ id: 'A' }], [{
+    id: 'uncertain', routeNumber: 'U', operator: 'Example', origin: 'A', destination: 'B', direction: 'B',
+    principalLocations: ['Somewhere upstream'], stopSchedules: { A: { monday: [420] } }
+  }]);
+  assert.deepEqual(summary.principalLocations, []);
+  assert.match(summary.sourceWarnings.join(' '), /could not be safely mapped/i);
 });
 
 test('opposite selected stop directions remain separate service rows', () => {

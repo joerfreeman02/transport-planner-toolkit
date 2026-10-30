@@ -226,6 +226,10 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     if (!/could not|unresolved|unsupported|quarantin|incomplete|not supplied|no deterministically/i.test(String(warning))) continue;
     add({ code: 'service-source-evidence', route: service.routeNumber, stop: service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0], source: service.timetableSource || service.source?.provider || 'timetable source', message: String(warning) });
   }
+  for (const service of serviceSummaries) for (const warning of service.sourceWarnings ?? []) {
+    if (!/principal locations could not be safely mapped/i.test(String(warning))) continue;
+    add({ code: 'directional-principal-location', route: service.routeNumber, stop: service.frequencyBasisStopId, source: service.timetableSource || service.frequencyEvidenceSource || 'timetable source', factKey: warning, message: String(warning) });
+  }
   for (const service of serviceSummaries) if (!service.routeNumber || !resolvedPlannerDestination(service)) add({ code: 'planner-route-identity', route: service.routeNumber, stop: service.frequencyBasisStopId, source: service.frequencyEvidenceSource || 'timetable source', message: 'The timetable pattern did not provide a complete planner-facing destination; review Detailed Evidence before using the row.' });
   for (const service of serviceSummaries) for (const side of ['origin', 'destination']) {
     const decision = service[`${side}EndpointDecision`];

@@ -1171,6 +1171,21 @@ function qualificationAppliesToFinalRow(note, departuresByDay = {}) {
 function qualificationScopeProven(note, records, evidenceStopId) {
   if (!/non[- ]school|school[- ]day|term[- ]time/i.test(note)) return true;
   const represented = records.filter(record => hasScheduledEvidence(record.stopSchedules?.[evidenceStopId]));
+  // A neutral mixed-calendar note describes the combined row. Its supporting
+  // evidence is necessarily split across individual school and non-school
+  // records, so requiring every record to carry the combined note drops it.
+  if (/^Timetable varies between school and non-school days\.$/i.test(note)) {
+    const profiles = represented.flatMap(record => [
+      record.calendarProfileId,
+      record.source?.calendarProfileId,
+      ...(record.calendarEvidence ?? record.operatingCalendarEvidence ?? []).map(item => item?.calendarProfileId)
+    ]).map(value => text(value).toLowerCase());
+    const evidence = represented.flatMap(record => record.calendarEvidence ?? record.operatingCalendarEvidence ?? []);
+    const hasSchool = profiles.includes('school-day') || evidence.some(item => item?.schoolDayOnly);
+    const hasNonSchool = profiles.some(profile => ['non-school-day', 'holiday'].includes(profile))
+      || evidence.some(item => item?.nonSchoolDayOnly || item?.holidayOnly);
+    return represented.length > 0 && represented.length === records.length && hasSchool && hasNonSchool;
+  }
   return represented.length > 0 && represented.every(record => {
     const profiles = unique([
       record.calendarProfileId,

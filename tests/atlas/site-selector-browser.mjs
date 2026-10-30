@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startReviewServer } from '../../tools/atlas-review/review-server.mjs';
 import { mockAccessRouting, mockMapTiles, mockPreparedBusTimetables } from './browser-test-helpers.mjs';
+import { launchAtlasBrowser } from './playwright-launch.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -16,7 +17,7 @@ const stops = JSON.parse(fs.readFileSync(new URL('./fixtures/tfl-nearby-stops.js
 const millersFixture = [{ ...baseFixture[0], display_name: 'Millers House, High Street, Stanstead Abbotts, SG12 8AA, United Kingdom', lat: '51.790100', lon: '0.012300', osm_id: 775533 }];
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'atlas-site-selector-browser-'));
 const review = await startReviewServer({ rootDir, preferredPort: 0, maximumPort: 0, stateFile: path.join(temporary, 'review-state.json'), openBrowser: false });
-const browser = await chromium.launch({ headless: true });
+const browser = await launchAtlasBrowser(chromium, { headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const pageErrors = [];
 const failedRequests = [];

@@ -1848,7 +1848,12 @@ export function plannerSourceWarning(service) {
 
 function principalText(main) {
   const locations = unique(main?.principalLocations ?? []);
-  return locations.length ? locations.join(', ') : 'See route origin / destination';
+  if (locations.length) return locations.join(', ');
+  if (main?.principalLocationState === 'unresolved') return 'Unresolved — review Sources & Checks';
+  const destination = text(main?.destinationEndpointDecision?.chosenDisplayName || main?.destinationEndpointDecision?.chosen || main?.destination);
+  return destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination)
+    ? destination
+    : 'Unresolved — review Sources & Checks';
 }
 
 function plannerStopLabel(stop, { basis = false } = {}) {
@@ -2141,6 +2146,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     frequencyBasisStopId: representative.id,
     frequencyBasisStopName: representative.name,
     principalLocations: Object.freeze(principalLocations),
+    principalLocationState: main.principalLocationState || 'resolved',
     principalLocationsText: principalText(main),
     typicalFrequency: displayResult.frequencyByDay[DAY_ORDER.find(day => !displayResult.frequencyByDay[day].noService) ?? 'monday'],
     typicalFrequencyLines: Object.freeze(frequencyLines),

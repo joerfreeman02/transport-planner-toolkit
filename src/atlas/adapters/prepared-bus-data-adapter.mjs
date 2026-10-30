@@ -593,6 +593,39 @@ export function createPreparedBusDataAdapter({
         tndsProvenance = { source: 'Traveline National Dataset supplementary data', dataPreparedAt: manifest.generatedAt, regions: manifest.regions, serving: legacy ? 'bounded-legacy-manifest' : 'stop-prefix-subshards', shardRequests: [...new Set(shardPaths.map(row => row.descriptor.path))].length, unresolvedRequestIdentities };
       }
     }
+    const orderedPatternIds = service => {
+      if (service.routePatternStopIds?.length > 1) return service.routePatternStopIds.map(String);
+      const candidate = (service.circularPatternStopIds ?? []).map(String);
+      const originId = String(service.originStopPointId ?? service.originStopPointIds?.[0] ?? '');
+      const destinationId = String(service.destinationStopPointId ?? service.destinationStopPointIds?.[0] ?? '');
+      // Some frozen GTFS projections retain the full ordered call sequence in
+      // circularPatternStopIds. Accept it as route direction evidence only
+      // when its exact endpoint identities agree with this service record.
+      return candidate.length > 1 && candidate[0] === originId && candidate.at(-1) === destinationId ? candidate : [];
+    };
+    const patternsNeedingCalls = mergedServices.filter(service => !service.routePatternStops?.length && orderedPatternIds(service).length > 1);
+    const referenceIds = [...new Set(patternsNeedingCalls.flatMap(orderedPatternIds))];
+    const referenceResult = referenceIds.length ? await referenceStopPointsByIds(referenceIds, { forceRefresh }) : null;
+    if (referenceResult?.ok) {
+      const byId = new Map(referenceResult.data.map(stop => [String(stop.id), stop]));
+      const localityResult = await localitiesForStops(referenceResult.data, { forceRefresh });
+      const localityByCode = new Map((localityResult?.ok ? localityResult.data : []).map(locality => [String(locality.id).replace(/^nptg:/, ''), locality]));
+      for (const service of patternsNeedingCalls) {
+        const ids = orderedPatternIds(service);
+        service.routePatternStopIds = ids;
+        service.routePatternStops = ids.map(id => {
+          const stop = byId.get(id);
+          const locality = stop ? localityByCode.get(String(stop.nptgLocalityCode ?? '')) : null;
+          return stop ? {
+            id,
+            name: String(stop.commonName ?? stop.name ?? '').trim(),
+            locality: String(locality?.name ?? stop.nptgLocalityName ?? stop.locality ?? '').trim(),
+            localityQualifier: String(stop.localityQualifier ?? '').trim(),
+            parentLocality: String(locality?.parentLocalityName ?? stop.parentLocalityName ?? '').trim()
+          } : { id, name: '' };
+        });
+      }
+    }
     const checkedAt = clock().toISOString();
     const partial = failedShardDiagnostics.length > 0;
     const warnings = [...snapshotWarnings(index), ...tndsWarnings];

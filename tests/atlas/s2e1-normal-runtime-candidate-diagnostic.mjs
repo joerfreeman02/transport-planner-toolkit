@@ -27,6 +27,7 @@ const controls = {
   pipers46: { label: 'Pipers Lane route 46 selected-stop frequency control', latitude: 51.852700, longitude: -0.454343, radius: 1200, focusRoutes: ['46'] },
   pe1: { label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '6', '23', '24', '25', '27', '33', '37', '60', '61', '62', '63', '101', '102', '201', '202', '415', '904', '4P', 'A', 'B', 'C'] },
   enfield: { label: 'Enfield Town', latitude: 51.6522, longitude: -0.0809, radius: 500, focusRoutes: ['121', '191', '313', '329', '629', 'W8'] },
+  longlane: { label: 'Long Lane, Hounslow', latitude: 51.456210, longitude: -0.462970, radius: 400, focusRoutes: ['203'] },
   queensgate: { label: 'Queensgate Bus Station', latitude: 52.5701, longitude: -0.2498, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '6', '23', '24', '25', '27', '33', '60', '61', '62', '63', '202', '415', '904', '5A', 'A', 'B', 'C'] }
 };
 const control = controls[controlId];
@@ -163,23 +164,9 @@ const plannerRows = assessment.plannerServiceSummaries.filter(row => wanted.has(
     id: service.id, sourceRecordIds: service.sourceRecordIds, routeNumber: service.routeNumber, operator: service.operator,
     provider: service.provider, timetableSource: service.timetableSource, origin: service.origin, destination: service.destination,
     direction: service.direction, stopIds: service.stopIds, frequencyBasisStopId: service.frequencyBasisStopId,
-    calendarProfileId: service.calendarProfileId, departuresByDay: service.departuresByDay,
-    departureEvidenceByDay: service.departureEvidenceByDay
-  })),
-  selectedDeparturePopulationByDay: Object.fromEntries(Object.entries(row.canonicalDeparturePopulation ?? {}).map(([day, entries]) => [day, entries.map(entry => ({
-    minute: entry.minute, stopPointId: entry.stopPointId, routeNumber: entry.routeNumber, journeyIdentity: entry.journeyIdentity,
-    sourceRecordId: entry.sourceRecordId, provider: entry.provider, calendarProfileIds: entry.calendarProfileIds
-  }))])),
-  canonicalDeparturePopulationByDay: Object.fromEntries(Object.entries(row.canonicalDeparturePopulationAll ?? {}).map(([day, entries]) => [day, entries.map(entry => ({
-    minute: entry.minute, stopPointId: entry.stopPointId, routeNumber: entry.routeNumber, journeyIdentity: entry.journeyIdentity,
-    sourceRecordId: entry.sourceRecordId, provider: entry.provider, calendarProfileIds: entry.calendarProfileIds
-  }))])),
-  rawServiceEvidence: (row.rawServiceSummaries ?? []).map(service => ({
-    id: service.id, sourceRecordIds: service.sourceRecordIds, routeNumber: service.routeNumber, operator: service.operator,
-    provider: service.provider, timetableSource: service.timetableSource, origin: service.origin, destination: service.destination,
-    direction: service.direction, stopIds: service.stopIds, frequencyBasisStopId: service.frequencyBasisStopId,
-    calendarProfileId: service.calendarProfileId, departuresByDay: service.departuresByDay,
-    departureEvidenceByDay: service.departureEvidenceByDay
+    principalLocations: service.principalLocations, routePatternStopIds: service.routePatternStopIds,
+    routePatternStops: service.routePatternStops,
+    calendarProfileId: service.calendarProfileId
   })),
   serviceNote: row.serviceNote, routeVariantNote: row.routeVariantNote, routeGroupNote: row.routeGroupNote, plannerNotes: row.plannerNotes,
   groupingDecision: row.publicServiceGroupingDecision,
@@ -353,6 +340,7 @@ const compactPlannerRows = rows => rows.map(row => ({
   id: row.id, routeNumber: row.routeNumber, routeNumbers: row.routeNumbers, operator: row.operator,
   direction: row.direction, origin: row.origin, destination: row.destination,
   directionPatternText: row.directionPatternText, principalLocations: row.principalLocations,
+  principalLocationState: row.principalLocationState, principalLocationsText: row.principalLocationsText,
   serviceNote: row.serviceNote, routeVariantNote: row.routeVariantNote, routeGroupNote: row.routeGroupNote, plannerNotes: row.plannerNotes,
   servedAtStopId: row.servedAtStopId, timetableBasisStopLabel: row.timetableBasisStopLabel,
   frequencyBasisStopId: row.frequencyBasisStopId, calendarProfileIds: row.calendarProfileIds,
@@ -482,6 +470,7 @@ const report = {
     route202ForensicTrace,
     sourceProvenance: { sourceAuthorities: unique(serviceSummaries.map(row => row.timetableSource).filter(Boolean)), tflLiveRequests: 0 },
     warnings: (assessment.warnings ?? []).slice(0, 40) },
+  reviewItems: assessment.reviewItems,
   sameCandidatePreparedOnlyComparison: {
     rawTargetCounts: Object.fromEntries([...wanted].map(r => [r, preparedOnly.services.filter(row => route(row.routeNumber) === r).length])),
     summaryTargetCounts: Object.fromEntries([...wanted].map(r => [r, preparedOnly.serviceSummaries.filter(row => route(row.routeNumber) === r).length])),
@@ -504,5 +493,8 @@ process.stdout.write(`${JSON.stringify({ schema: report.schema, reportPath, stat
   rawSourcesByRoute: Object.fromEntries([...wanted].map(r => [r, Object.fromEntries([...new Set(rawRows.filter(row => route(row.routeNumber) === r).map(row => row.timetableSource))].map(source => [source, rawRows.filter(row => route(row.routeNumber) === r && row.timetableSource === source).length]))])),
   targetPlannerRows: [...wanted].flatMap(r => plannerRowsFor(r).map(row => ({ route: row.routeNumber, members: row.routeNumbers,
     family: row.routeFamilyDecision?.state, principal: row.routeFamilyDecision?.principalRouteNumber,
-    frequency: row.typicalFrequencyLines, circular: row.circularClassification }))) })}\n`);
+    principalLocationState: row.principalLocationState, principalLocations: row.principalLocations,
+    frequency: row.typicalFrequencyLines, circular: row.circularClassification }))),
+  reviewItemCounts: { total: assessment.reviewItems.length, principalLocations: assessment.reviewItems.filter(item => item.code === 'directional-principal-location').length },
+  principalLocationReviewItems: assessment.reviewItems.filter(item => item.code === 'directional-principal-location').map(({ route, stop, source, message }) => ({ route, stop, source, message })) })}\n`);
 if (diagnosticGateError) throw diagnosticGateError;

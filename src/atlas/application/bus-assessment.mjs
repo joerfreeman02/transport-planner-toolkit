@@ -173,6 +173,10 @@ export function createReviewItem({ code, severity = 'warning', actionability = '
   return Object.freeze({ id: id || String(code) + ':unassigned', code, category: taxonomy.category, severity, actionability, route: route ? String(route) : null, stop: stop ? String(stop) : null, source, message: cleanMessage });
 }
 
+export function principalLocationReviewBlocksWord(result) {
+  return (result?.reviewItems ?? []).some(item => item?.code === 'directional-principal-location');
+}
+
 function buildReviewItems({ selectedStops = [], services = [], serviceSummaries = [], plannerServiceSummaries = [], servicesResult = null, warnings = [], prepared = null, stopCoverageComplete = true, routingComplete = true } = {}) {
   const items = new Map();
   const add = ({ code, severity = 'warning', actionability = 'review', route = null, stop = null, source = 'timetable source', message, factKey = null, groupKey = null }) => {
@@ -261,8 +265,9 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     if (!/principal locations could not be safely mapped/i.test(String(warning))) continue;
     const route = String(service.routeNumber ?? '').trim();
     const message = String(warning).trim();
-    const key = [route, message.toLowerCase()].join('|');
-    const issue = directionalLocationIssues.get(key) ?? { route, message, sources: new Set(), stops: new Set() };
+    const key = route || message.toLowerCase();
+    const issue = directionalLocationIssues.get(key) ?? { route, messages: new Set(), sources: new Set(), stops: new Set() };
+    issue.messages.add(message);
     const stop = String(service.frequencyBasisStopId ?? '').trim();
     if (stop) issue.stops.add(stop);
     const source = service.timetableSource || service.frequencyEvidenceSource || service.provider || service.source?.provider || 'timetable source';
@@ -274,8 +279,8 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     route: issue.route,
     stop: [...issue.stops].sort((left, right) => left.localeCompare(right)).join(', ') || null,
     source: [...issue.sources].sort((left, right) => left.localeCompare(right)).join(' + '),
-    factKey: issue.message,
-    message: issue.message
+    factKey: 'principal-location-unresolved',
+    message: issue.messages.size === 1 ? [...issue.messages][0] : 'Principal locations could not be safely mapped for one or more timetable patterns; review the source journey pattern.'
   });
   for (const service of serviceSummaries) if (!service.routeNumber || !resolvedPlannerDestination(service)) add({ code: 'planner-route-identity', route: service.routeNumber, stop: service.frequencyBasisStopId, source: service.frequencyEvidenceSource || 'timetable source', message: 'The timetable pattern did not provide a complete planner-facing destination; review Detailed Evidence before using the row.' });
   for (const service of serviceSummaries) for (const side of ['origin', 'destination']) {

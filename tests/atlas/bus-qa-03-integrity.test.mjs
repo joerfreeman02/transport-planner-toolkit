@@ -151,7 +151,7 @@ assert.equal(scheduler.snapshot().requestsInWindow, 1, 'the rolling window never
 
 const partialAssessment = createBusAssessment({
   stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [{ id: 'PARTIAL', name: 'Partial stop', routes: ['10'] }], evidence: [], warnings: [], provenance: {} }) },
-  timetableData: { servicesForStops: async () => ({ ok: true, data: [{ id: 'partial', routeNumber: '10', operator: 'Example', origin: 'A', destination: 'B', direction: 'B', stopSchedules: { PARTIAL: schedule({ monday: [420] }) } }], warnings: [], provenance: { processedRequests: 1, unprocessedRequests: 1, unresolvedRequests: 0 } }) },
+  timetableData: { servicesForStops: async () => ({ ok: true, data: [{ id: 'partial', routeNumber: '10', operator: 'Example', origin: 'A', destination: 'B', direction: 'B', routePatternStopIds: ['ORIGIN', 'PARTIAL', 'DEST'], routePatternStops: [{ id: 'ORIGIN', name: 'A' }, { id: 'PARTIAL', name: 'Partial stop' }, { id: 'DEST', name: 'B' }], stopSchedules: { PARTIAL: schedule({ monday: [420] }) } }], warnings: [], provenance: { processedRequests: 1, unprocessedRequests: 1, unresolvedRequests: 0 } }) },
   accessRouting: { matrix: routed }
 });
 const partialProgress = [];

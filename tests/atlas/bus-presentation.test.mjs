@@ -15,7 +15,7 @@ const summaries = [
   { ...base, id: 'same', origin: 'Harlow', destination: 'Waltham Cross', routePatternStopIds: ['A', 'B', 'C'], routePatternExtent: 3, recordActivity: 8, principalLocations: ['Hoddesdon', 'Cheshunt'] },
   { ...base, id: 'main', origin: 'Harlow', destination: 'Waltham Cross', routePatternStopIds: ['A', 'B', 'C', 'D', 'E'], routePatternExtent: 5, recordActivity: 20, principalLocations: ['Hoddesdon', 'Cheshunt'] },
   { ...base, id: 'extra', origin: 'Harlow', destination: 'Waltham Cross', routePatternStopIds: ['A', 'B', 'C', 'D'], routePatternExtent: 4, recordActivity: 10, principalLocations: ['Hoddesdon', 'Cheshunt', 'Roydon'] },
-  { ...base, id: 'unproven', directionFamily: 'headsign:unproven', origin: 'Harlow', destination: 'Waltham Cross', routePatternStopIds: ['X', 'Y', 'Z'], routePatternExtent: 3, recordActivity: 3, principalLocations: [] },
+  { ...base, id: 'unproven', directionFamily: 'headsign:unproven', origin: 'Harlow', destination: 'Waltham Cross', routePatternStopIds: ['X', 'Y', 'Z'], routePatternExtent: 3, recordActivity: 3, principalLocations: [], principalLocationState: 'unresolved' },
   { ...base, id: 'inbound', directionFamily: 'headsign:inbound', origin: 'Waltham Cross', destination: 'Harlow', routePatternStopIds: ['D', 'C', 'B', 'A'], routePatternExtent: 4, recordActivity: 18, principalLocations: ['Cheshunt'] }
 ];
 
@@ -26,18 +26,18 @@ assert.equal(presented.length, summaries.length, 'Presentation must retain every
 assert.equal(presented.find(service => service.id === 'same').presentation.principalLocationsText, 'As main 25C service');
 assert.equal(presented.find(service => service.id === 'extra').presentation.principalLocationsText, 'As main 25C service, plus Roydon');
 assert.equal(presented.find(service => service.id === 'short').presentation.principalLocationsText, 'Short working of main 25C service');
-assert.equal(presented.find(service => service.id === 'unproven').presentation.principalLocationsText, 'See route origin / destination');
+assert.equal(presented.find(service => service.id === 'unproven').presentation.principalLocationsText, 'Unresolved — review Sources & Checks');
 assert.notEqual(presented.find(service => service.id === 'inbound').directionFamily, presented.find(service => service.id === 'main').directionFamily);
 assert.ok(presented.every(service => !service.presentation.principalLocationsText.includes('No additional principal locations identified')));
 
 const fallbackRows = buildServicePresentation([
-  { ...base, id: 'two-stop', directionFamily: 'headsign:two-stop', routePatternStopIds: ['T1', 'T2'], routePatternExtent: 2, principalLocations: [] },
+  { ...base, id: 'two-stop', directionFamily: 'headsign:two-stop', destination: 'Known terminus', routePatternStopIds: ['T1', 'T2'], routePatternExtent: 2, principalLocations: [], principalLocationState: 'resolved' },
   { ...base, id: 'multi-stop', directionFamily: 'headsign:multi-stop', routePatternStopIds: ['M1', 'M2', 'M3'], routePatternExtent: 3, principalLocations: [] },
   { ...base, id: 'unknown-extent', directionFamily: 'headsign:unknown', routePatternStopIds: [], routePatternExtent: 0, principalLocations: [] }
 ]);
-assert.equal(fallbackRows.find(service => service.id === 'two-stop').presentation.principalLocationsText, 'Route endpoints only');
-assert.equal(fallbackRows.find(service => service.id === 'multi-stop').presentation.principalLocationsText, 'See route origin / destination');
-assert.equal(fallbackRows.find(service => service.id === 'unknown-extent').presentation.principalLocationsText, 'See route origin / destination');
+assert.equal(fallbackRows.find(service => service.id === 'two-stop').presentation.principalLocationsText, 'Known terminus');
+assert.equal(fallbackRows.find(service => service.id === 'multi-stop').presentation.principalLocationsText, 'Unresolved — review Sources & Checks');
+assert.equal(fallbackRows.find(service => service.id === 'unknown-extent').presentation.principalLocationsText, 'Unresolved — review Sources & Checks');
 
 const ruralCalls = ['Town A', 'Village B', 'Village C', 'Village D', 'Village E', 'Town F'].map(name => ({ name, locality: name }));
 const ruralLocations = derivePrincipalLocations(ruralCalls);
@@ -49,7 +49,7 @@ const manyRuralCalls = ['Town A', ...Array.from({ length: 10 }, (_, index) => `V
 assert.ok(derivePrincipalLocations(manyRuralCalls).length <= 7);
 const ruralPresentation = buildServicePresentation([{ ...base, id: 'rural', routeNumber: 'R1', routePatternStopIds: ['A', 'B', 'C', 'D', 'E', 'F'], routePatternExtent: 6, principalLocations: ruralLocations }])[0];
 assert.equal(ruralPresentation.presentation.principalLocationsText, ruralLocations.join(', '));
-assert.doesNotMatch(ruralPresentation.presentation.principalLocationsText, /Route endpoints only|See route origin \/ destination/);
+assert.doesNotMatch(ruralPresentation.presentation.principalLocationsText, /Unresolved|See route origin \/ destination/);
 
 const sparseCalls = ['Origin', 'Stop B', 'Stop C', 'Stop D', 'Stop E', 'Destination'].map(name => ({ name }));
 const sparseLocations = derivePrincipalLocations(sparseCalls);

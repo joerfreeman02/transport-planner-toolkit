@@ -537,8 +537,6 @@ function representativeRecord(records, stopIds) {
   return [...records].sort((a, b) => {
     const patternDifference = orderedPatternEndpoints(b).length - orderedPatternEndpoints(a).length;
     if (patternDifference) return patternDifference;
-    const locationDifference = (b.principalLocations?.length ?? 0) - (a.principalLocations?.length ?? 0);
-    if (locationDifference) return locationDifference;
     const activityDifference = recordActivity(b, stopIds) - recordActivity(a, stopIds);
     if (activityDifference) return activityDifference;
     return `${text(a.origin)}|${text(a.destination)}`.localeCompare(`${text(b.origin)}|${text(b.destination)}`);
@@ -546,26 +544,21 @@ function representativeRecord(records, stopIds) {
 }
 
 function directionalPrincipalLocations(record, evidenceStopId) {
-  const sourceLocations = unique(record?.principalLocations ?? []);
-  if (!sourceLocations.length) return { locations: [], warning: null };
   const patternIds = (record?.routePatternStopIds?.length
     ? record.routePatternStopIds
     : record?.circularPatternStopIds ?? []).map(text);
   const calls = Array.isArray(record?.routePatternStops) ? record.routePatternStops : [];
-  if (!patternIds.length || calls.length !== patternIds.length) return {
-    locations: [],
-    warning: 'Principal locations could not be safely mapped to ordered calls at the assessed stop; review the source journey pattern.'
-  };
-  const callIds = calls.map(call => text(typeof call === 'string' ? '' : call?.id || call?.stopPointId));
+  const unresolved = reason => ({ locations: [], state: 'unresolved', warning: `Principal locations could not be safely mapped ${reason}; review the source journey pattern.` });
+  if (patternIds.length < 2 || calls.length !== patternIds.length) return unresolved('because a complete ordered call pattern is unavailable');
+  if (!text(evidenceStopId)) return unresolved('because the assessed stop identity is unavailable');
+  const callIds = calls.map(call => text(typeof call === 'string' ? '' : call?.id || call?.stopPointId || call?.sourceId));
   if (callIds.some((id, index) => id && id !== patternIds[index])) return {
     locations: [],
+    state: 'unresolved',
     warning: 'Principal locations could not be safely mapped because ordered call identities disagree with the journey pattern; review the source evidence.'
   };
   const evidencePositions = patternIds.flatMap((id, index) => id === text(evidenceStopId) ? [index] : []);
-  if (!evidencePositions.length) return {
-    locations: [],
-    warning: 'Principal locations could not be safely mapped because the assessed stop was not found in the ordered journey pattern; review the source evidence.'
-  };
+  if (!evidencePositions.length) return unresolved('because the assessed stop was not found in the ordered journey pattern');
   const repeatedClosure = Boolean(record?.circular || (patternIds.length > 1 && patternIds[0] === patternIds.at(-1)));
   const hasRepeatedEndpoint = patternIds.length > 1 && patternIds[0] === patternIds.at(-1);
   const loopIds = hasRepeatedEndpoint ? patternIds.slice(0, -1) : patternIds;
@@ -573,15 +566,63 @@ function directionalPrincipalLocations(record, evidenceStopId) {
   const loopPositions = loopIds.flatMap((id, index) => id === text(evidenceStopId) ? [index] : []);
   let start = evidencePositions[0];
   if (repeatedClosure && loopPositions.length === 1) start = loopPositions[0];
-  else if (evidencePositions.length > 1) return {
-    locations: [],
-    warning: 'Principal locations could not be safely mapped because the assessed stop occurs more than once in this journey pattern; review the loop or repeated-call evidence.'
-  };
+  else if (evidencePositions.length > 1) return unresolved('because the assessed stop occurs more than once in this journey pattern');
+  let downstream;
   if (repeatedClosure) {
-    const downstream = [...loopCalls.slice(start + 1), ...loopCalls.slice(0, start), loopCalls[start]];
-    return { locations: derivePrincipalLocations(downstream), warning: null };
+    downstream = [...loopCalls.slice(start + 1), ...loopCalls.slice(0, start)];
+  } else {
+    downstream = calls.slice(start + 1);
   }
-  return { locations: derivePrincipalLocations(calls.slice(start)), warning: null };
+  const place = call => {
+    const label = typeof call === 'string'
+      ? text(call)
+      : text(call?.name || call?.commonName || call?.locality || call?.localityName || call?.nptgLocalityName || call?.parentLocalityName);
+    return label.replace(/\s+arrival\s*$/i, '');
+  };
+  const downstreamNamed = downstream.filter(call => place(call));
+  // An assessed terminal is a proven direct/minimal service; on a loop the
+  // rotation above always has downstream calls and never repeats the anchor.
+  if (!downstreamNamed.length) {
+    const terminal = calls[start];
+    const terminalName = text(record?.destinationStopPointId || record?.destinationStopPointIds?.[0]) === patternIds[start]
+      && !/^(?:destination not supplied|destination not resolved)$/i.test(text(record?.destination))
+      ? text(record.destination)
+      : place(terminal);
+    return terminalName
+      ? { locations: [terminalName], state: 'resolved', warning: null }
+      : unresolved('because no downstream call or destination label is available');
+  }
+  const chosen = [];
+  const add = value => {
+    const label = text(value);
+    if (label && !chosen.some(existing => normal(existing) === normal(label))) chosen.push(label);
+  };
+  const legacyPrincipalNames = new Set(derivePrincipalLocations(downstreamNamed).map(normal));
+  const locality = call => typeof call === 'string' ? '' : text(call?.locality || call?.localityName || call?.nptgLocalityName || call?.localityQualifier || call?.parentLocalityName);
+  const usefulName = (call, index) => {
+    const name = place(call);
+    if (!name) return '';
+    if (!locality(call)) return legacyPrincipalNames.has(normal(name)) ? name : '';
+    const facility = /hospital|airport|university|interchange|shopping centre|town centre|city centre|post office/i.test(name);
+    const station = /(?:bus|coach|rail(?:way)?) station/i.test(name);
+    const stationPlace = normal(name.replace(/\b(?:bus|coach|rail(?:way)?) station\b/ig, ''));
+    const sameStationLocality = station && stationPlace === normal(locality(call));
+    return facility || (station && index < downstreamNamed.length - 1 && !sameStationLocality) ? name : '';
+  };
+  add(locality(downstreamNamed[0]) || place(downstreamNamed[0]));
+  let previousLocality = normal(locality(downstreamNamed[0]));
+  for (const [index, call] of downstreamNamed.entries()) {
+    const namedPlace = usefulName(call, index);
+    if (namedPlace && normal(namedPlace) !== previousLocality) add(namedPlace);
+    const callLocality = locality(call);
+    if (callLocality && normal(callLocality) !== previousLocality) add(callLocality);
+    if (callLocality) previousLocality = normal(callLocality);
+  }
+  add(locality(downstreamNamed.at(-1)) || place(downstreamNamed.at(-1)));
+  const useful = chosen;
+  return useful.length
+    ? { locations: useful, state: 'resolved', warning: null }
+    : unresolved('because downstream calls contain no usable place labels');
 }
 
 function operatingPeriodScopeKey(record, entry) {
@@ -729,7 +770,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const integrityWarnings = unique(records.flatMap(record => record.scheduleIntegrityWarnings ?? []));
     if (integrityWarnings.length) notes.push(`Schedule integrity note: ${integrityWarnings.join(' ')}`);
     const endpointEvidence = records.reduce((merged, record) => mergeEndpointEvidence(merged, record.endpointEvidence), { origin: {}, destination: {} });
-    const principalPattern = orderedPatternEndpoints(first);
+    const principalPattern = orderedPatternEndpoints(principalRecord);
     const circularPatternSource = [...records].sort((left, right) => {
       const lengthDifference = (right.circularPatternStopIds?.length ?? 0) - (left.circularPatternStopIds?.length ?? 0);
       return lengthDifference || text(left.id).localeCompare(text(right.id));
@@ -802,11 +843,12 @@ export function buildServiceSummaries(stops, serviceRecords) {
       source,
       orderedPatternEndpoints: Object.freeze(principalPattern),
       principalLocations,
-      routePatternStops: Object.freeze([...(first.routePatternStops ?? [])]),
+      principalLocationState: principalResult.state || 'resolved',
+      routePatternStops: Object.freeze([...(principalRecord.routePatternStops ?? [])]),
       circularPatternStopIds: Object.freeze([...(circularPatternSource.circularPatternStopIds ?? [])].map(text).filter(Boolean)),
       calendarEvidence: Object.freeze(calendarEvidence),
       directionFamily: directionGroupKey(first),
-      routePatternStopIds: Object.freeze([...(first.routePatternStopIds ?? [])]),
+      routePatternStopIds: Object.freeze([...(principalRecord.routePatternStopIds ?? [])]),
       routePatternExtent: Math.max(0, ...records.map(record => orderedPatternEndpoints(record).length)),
       recordActivity: Math.max(0, ...records.map(record => recordActivity(record, stopIds))),
       operatingPeriods: periods,
@@ -923,14 +965,11 @@ function routeLabel(service) {
 }
 
 function independentPrincipalLocationsText(service) {
-  const pattern = Array.isArray(service?.routePatternStopIds)
-    ? service.routePatternStopIds.map(text).filter(Boolean)
-    : [];
-  const extent = service?.routePatternExtent;
-  const extentConfirmsTwoStops = extent === undefined || extent === null || Number(extent) === 2;
-  return pattern.length === 2 && extentConfirmsTwoStops
-    ? 'Route endpoints only'
-    : 'See route origin / destination';
+  if (service?.principalLocationState === 'resolved') {
+    const destination = text(service?.destination);
+    if (destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination)) return destination;
+  }
+  return 'Unresolved — review Sources & Checks';
 }
 
 function finalPrincipalLocationsText(service, main) {
@@ -949,7 +988,7 @@ function finalPrincipalLocationsText(service, main) {
     const additions = locations.filter((location, index) => !mainNames.includes(candidateNames[index])).map(text).filter(Boolean);
     if (additions.length && additions.length <= 3) return `As main ${routeLabel(main)} service, plus ${additions.join(', ')}`;
   }
-  return locations.length ? locations.join(', ') : `Short working of main ${routeLabel(main)} service`;
+  return locations.length ? locations.join(', ') : independentPrincipalLocationsText(service);
 }
 
 /**

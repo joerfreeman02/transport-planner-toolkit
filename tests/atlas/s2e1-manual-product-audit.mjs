@@ -116,6 +116,7 @@ const controls = [
   { id: 'pipers-route46', label: 'Pipers Lane route 46 frequency control', latitude: 51.852700, longitude: -0.454343, radius: 1200 },
   { id: 'waltham-cross', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.686144, longitude: -0.035707, radius: 700 },
   { id: 'waltham-cross-nearest', label: '47 Berkley Avenue, Waltham Cross nearest logical stop group', latitude: 51.686144, longitude: -0.035707, radius: 700, assessmentMode: 'nearest' },
+  { id: 'long-lane-route203', label: 'Long Lane, Hounslow', latitude: 51.456210, longitude: -0.462970, radius: 400 },
   { id: 'chingford', label: 'Normanshire Drive, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250 },
   { id: 'pe1', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500 }
 ];
@@ -590,6 +591,17 @@ try {
 
       assert.doesNotMatch(checksText, /SpecialDaysOperation|TNDS .*special dates require review/i, 'Sources and checks exposes raw per-service special-day warnings.');
       const rendered = await serviceTable.locator('tbody tr:not(.service-note)').evaluateAll(rows => rows.map(row => Object.fromEntries([...row.querySelectorAll('td[data-label]')].map(cell => [cell.dataset.label, cell.innerText.replace(/\s+/g, ' ').trim()]))));
+      if (control.id === 'long-lane-route203') {
+        const route203Rows = rendered.filter(row => row.Route === '203');
+        assert.equal(route203Rows.length, 2, 'Long Lane must show both Route 203 directions.');
+        const staines = route203Rows.find(row => /Staines|Elmsleigh/i.test(row['Direction / main service pattern']));
+        const hounslow = route203Rows.find(row => /Hounslow/i.test(row['Direction / main service pattern']));
+        assert.ok(staines && hounslow, 'Route 203 planner rows must expose their direction-specific destinations.');
+        assert.match(staines['Principal locations'], /Ashford Hospital Entrance.*Stanwell.*Ashford.*Staines|Stanwell.*Ashford Hospital Entrance.*Ashford.*Staines/i);
+        assert.match(hounslow['Principal locations'], /East Bedfont.*Hatton.*Hatton Cross.*Cranford.*Hounslow West.*Hounslow/i);
+        assert.doesNotMatch(`${staines['Principal locations']} ${hounslow['Principal locations']}`, /See route origin \/ destination|Unresolved/i);
+        outcome.route203BrowserRows = route203Rows;
+      }
       const renderedServiceNotes = await serviceTable.locator('tbody tr.service-note').allInnerTexts();
       const byRoute = new Map();
       for (const row of rendered) {
@@ -641,6 +653,16 @@ try {
       assert.ok(wordServiceTable, 'Generated Word export has no planner-facing Bus Service Summary table.');
       const wordHeaders = wordServiceTable[0];
       const wordRows = wordServiceTable.slice(1).map(cells => Object.fromEntries(wordHeaders.map((header, index) => [header, cells[index] ?? ''])));
+      if (control.id === 'long-lane-route203') {
+        const word203Rows = wordRows.filter(row => row.Route === '203');
+        assert.equal(word203Rows.length, 2, 'Word must retain both Route 203 directions.');
+        for (const browserRow of outcome.route203BrowserRows) {
+          const wordRow = word203Rows.find(row => row['Direction / main service pattern'] === browserRow['Direction / main service pattern']);
+          assert.ok(wordRow, `Word is missing Route 203 direction ${browserRow['Direction / main service pattern']}.`);
+          assert.equal(wordRow['Principal locations'], browserRow['Principal locations'], 'Word and Browser Route 203 principal locations must materially match.');
+        }
+        outcome.route203WordRows = word203Rows;
+      }
       outcome.renderedRows = rendered;
       outcome.renderedServiceNotes = renderedServiceNotes;
       outcome.generatedWordRows = wordRows;

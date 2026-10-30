@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { createBusAssessment, createReviewItem } from '../../src/atlas/application/bus-assessment.mjs';
+import { createBusAssessment, createReviewItem, principalLocationReviewBlocksWord } from '../../src/atlas/application/bus-assessment.mjs';
+import { buildServicePresentation } from '../../src/atlas/domain/bus-service-assessment.mjs';
 
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
@@ -18,6 +19,74 @@ test('complete assessment joins stops, timetable services and separate routed mo
   assert.equal(result.stops[0].walking.distanceMetres, 250);
   assert.equal(result.stops[0].cycling.distanceMetres, 300);
   assert.equal(result.serviceSummaries[0].routeNumber, '10');
+});
+
+test('ordered pattern independently derives downstream principal locations without prepared principalLocations', async () => {
+  const patternService = {
+    ...service,
+    id: 'pattern-derived',
+    principalLocations: undefined,
+    origin: 'Upstream origin',
+    destination: 'Downstream terminus',
+    direction: 'Downstream terminus',
+    routePatternStopIds: ['UPSTREAM', '2100A', 'FIRST-DOWNSTREAM', 'HOSPITAL', 'TERMINUS'],
+    routePatternStops: [
+      { id: 'UPSTREAM', name: 'Upstream place', locality: 'Upstream' },
+      { id: '2100A', name: 'High Street', locality: 'Assessed locality' },
+      { id: 'FIRST-DOWNSTREAM', name: 'East Bedfont', locality: 'East Bedfont' },
+      { id: 'HOSPITAL', name: 'Central Hospital', locality: 'Cranford' },
+      { id: 'TERMINUS', name: 'Hounslow arrival', locality: 'Hounslow' }
+    ],
+    stopSchedules: { '2100A': service.stopSchedules['2100A'] }
+  };
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [patternService], warnings: [], provenance: { source: 'BODS' } }) },
+    accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 60 }], warnings: [], provenance: {} }) }
+  });
+  const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  const summary = result.serviceSummaries[0];
+  assert.deepEqual(summary.principalLocations, ['East Bedfont', 'Central Hospital', 'Cranford', 'Hounslow']);
+  assert.equal(summary.principalLocationState, 'resolved');
+  assert.ok(!summary.principalLocations.includes('High Street'), 'the assessed evidence stop is excluded');
+  assert.ok(!summary.principalLocations.includes('Upstream place'), 'upstream locations never enter the planner row');
+  const presented = buildServicePresentation([summary])[0];
+  assert.equal(presented.principalLocationsDisplay, 'East Bedfont, Central Hospital, Cranford, Hounslow');
+  assert.doesNotMatch(presented.principalLocationsDisplay, /See route origin \/ destination/);
+});
+
+test('missing pattern identity is explicit and cannot be hidden by a planner placeholder', async () => {
+  const unresolvedService = { ...service, id: 'no-pattern', principalLocations: undefined, routePatternStopIds: [], routePatternStops: [], stopSchedules: { '2100A': service.stopSchedules['2100A'] } };
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [unresolvedService], warnings: [], provenance: { source: 'BODS' } }) },
+    accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 60 }], warnings: [], provenance: {} }) }
+  });
+  const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  assert.equal(result.serviceSummaries[0].principalLocationState, 'unresolved');
+  assert.ok(result.reviewItems.some(item => item.code === 'directional-principal-location' && item.route === '10'));
+  assert.equal(result.plannerServiceSummaries[0].principalLocationsText, 'Unresolved — review Sources & Checks');
+  assert.doesNotMatch(result.plannerServiceSummaries[0].principalLocationsText, /See route origin \/ destination/);
+  assert.equal(principalLocationReviewBlocksWord(result), true, 'a principal-location review item hard-blocks Word export');
+  assert.equal(principalLocationReviewBlocksWord({ reviewItems: [{ code: 'service-source-evidence' }] }), false, 'general source acknowledgements remain governed by their existing gate');
+});
+
+test('proven terminal destination is the minimum useful location and repeated circular anchors fail closed', async () => {
+  const assessRecord = async record => {
+    const assessment = createBusAssessment({
+      stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+      timetableData: { servicesForStops: async () => ({ ok: true, data: [record], warnings: [], provenance: { source: 'BODS' } }) },
+      accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 60 }], warnings: [], provenance: {} }) }
+    });
+    return assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  };
+  const terminalResult = await assessRecord({ ...service, id: 'terminal-pattern', routePatternStopIds: ['UPSTREAM', '2100A'], routePatternStops: [{ id: 'UPSTREAM', name: 'Upstream' }, { id: '2100A', name: 'High Street' }], destinationStopPointId: '2100A', destination: 'Terminus', stopSchedules: { '2100A': service.stopSchedules['2100A'] } });
+  assert.deepEqual(terminalResult.serviceSummaries[0].principalLocations, ['Terminus']);
+  assert.equal(terminalResult.serviceSummaries[0].principalLocationState, 'resolved');
+  const repeatedResult = await assessRecord({ ...service, id: 'repeated-loop-anchor', circular: true, routePatternStopIds: ['UPSTREAM', '2100A', 'MID', '2100A', 'TERMINUS'], routePatternStops: ['UPSTREAM', '2100A', 'MID', '2100A', 'TERMINUS'].map(id => ({ id, name: id })), stopSchedules: { '2100A': service.stopSchedules['2100A'] } });
+  assert.deepEqual(repeatedResult.serviceSummaries[0].principalLocations, []);
+  assert.equal(repeatedResult.serviceSummaries[0].principalLocationState, 'unresolved');
+  assert.ok(repeatedResult.reviewItems.some(item => item.code === 'directional-principal-location'));
 });
 
 test('timetable and routing failures produce an honest partial assessment', async () => {
@@ -178,7 +247,7 @@ test('same-route principal-location uncertainty is grouped across sources, stops
   assert.equal(directionIssues[0].route, '10');
   assert.equal(directionIssues[0].stop, '2100A, 2100B', 'all affected assessed stops remain attached to the grouped issue');
   assert.equal(directionIssues[0].source, 'BODS + TfL', 'the grouped item preserves every source that raised the issue');
-  assert.equal(directionIssues[0].message, warning);
+  assert.equal(directionIssues[0].message, 'Principal locations could not be safely mapped for one or more timetable patterns; review the source journey pattern.');
 });
 
 test('repeated special-day profile warnings group to one material calendar issue per route', async () => {

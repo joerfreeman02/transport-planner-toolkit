@@ -367,6 +367,7 @@ footer a { color: #fff; }
   .task-status-heading { align-items: flex-start; }
   .task-status-heading h3 { font-size: .78rem; }
   .task-progress { width: 100%; }
+  .bus-stop-summary, .bus-service-summary { min-width: 0; table-layout: auto; }
   .selected-location, .confirmed-site, .coordinate-details { max-width: 100%; overflow-wrap: anywhere; }
   .selected-location dl, .confirmed-site dl { grid-template-columns: 1fr; gap: 2px; }
   .selected-location dd, .confirmed-site dd { margin-bottom: 6px; }

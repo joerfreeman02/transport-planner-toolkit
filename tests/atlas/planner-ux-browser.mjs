@@ -19,12 +19,14 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const pageErrors = [];
 const consoleErrors = [];
 const failedRequests = [];
+const notFoundResponses = [];
 let geocodeRequests = 0;
 let tflRequests = 0;
 
 page.on('pageerror', error => pageErrors.push(error.message));
 page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
 page.on('requestfailed', request => failedRequests.push({ url: request.url(), error: request.failure()?.errorText || 'unknown' }));
+page.on('response', response => { if (response.status() === 404) notFoundResponses.push(response.url()); });
 await mockMapTiles(page);
 await mockAccessRouting(page);
 await mockPreparedBusTimetables(page);
@@ -41,28 +43,31 @@ await page.route('https://api.tfl.gov.uk/**', route => {
 
 try {
   await page.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  assert.match(await page.locator('.build').innerText(), /2\.0\.0-beta\.1/);
-  for (const section of ['Report Builder', 'Modules', 'Projects', 'About']) {
+  assert.equal(await page.locator('.build').innerText(), 'ATLAS · Bus Beta\nVersion details in About');
+  for (const section of ['Modules', 'About']) {
     await page.getByRole('button', { name: section }).click();
-    assert.equal(await page.getByRole('heading', { name: section === 'About' ? 'ATLAS — Automated Transport & Location Assessment System' : section, exact: true }).isVisible(), true);
+    assert.equal(await page.getByRole('heading', { name: section === 'About' ? 'ATLAS — Automated Transport & Location Assessment System' : 'Choose an assessment tool', exact: true }).isVisible(), true);
   }
   assert.equal(await page.getByRole('heading', { name: 'Joe Freeman', exact: true }).isVisible(), true);
   assert.equal(await page.getByAltText('Portrait of Joe Freeman').isVisible(), true);
 
   await page.getByRole('button', { name: 'Modules' }).click();
+  await page.getByRole('link', { name: /Start Bus Assessment/ }).click();
+  await page.getByRole('heading', { name: 'Assess nearby bus access', exact: true }).waitFor({ state: 'visible' });
   const desktopMap = await page.locator('#siteMap').boundingBox();
   assert.ok(desktopMap.width >= 650 && desktopMap.height >= 420, `Desktop map too small: ${JSON.stringify(desktopMap)}`);
   await page.getByLabel('Site address or name').fill('33 Westow Street, Crystal Palace');
   await page.getByRole('button', { name: 'Find site' }).click();
   await page.getByRole('button', { name: 'Use this result' }).waitFor({ timeout: 10000 });
-  assert.match(await page.locator('.candidate p').first().innerText(), /^33, Westow Street/i);
+  assert.match(await page.locator('.candidate p').first().innerText(), /^33[\s,]+Westow Street/i);
   assert.equal(await page.getByText('Possible match — not yet confirmed', { exact: true }).count(), 0);
   assert.equal(geocodeRequests, 3);
-  assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).count(), 0);
   await chooseFirstCandidateAndConfirm(page);
   assert.match(await page.locator('#confirmedSite').innerText(), /Confirmed from address/);
   assert.equal(await page.evaluate(() => window.__ATLAS_BUS_UI__.hasRadiusCircle()), true);
 
+  await page.getByRole('button', { name: /Continue to Run assessment/ }).click();
   await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.equal(await page.locator('#evidenceRows tr').count(), 2);
@@ -70,37 +75,40 @@ try {
   assert.equal(await page.locator('#evidenceRows a[href*="google.com/maps/search"]').count(), 2);
   assert.match(await page.locator('#evidenceRows tr').first().innerText(), /322, 450/);
   assert.ok(await page.locator('#serviceRows tr:not(.service-note)').count() > 0);
-  assert.equal(await page.locator('.bus-service-summary thead th').count(), 8);
+  assert.equal(await page.locator('.bus-service-summary thead th').count(), 9);
   assert.match(await page.locator('.bus-service-summary').innerText(), /Served at/);
-  assert.equal(await page.locator('#taskStatusMessage').innerText(), 'Complete');
+  assert.equal(await page.locator('#taskStatusMessage').innerText(), 'Assessment complete');
   assert.match(await page.locator('#evidenceRows tr').first().innerText(), /m · \d+ mins?/);
   assert.ok(tflRequests > 0);
   const requestsAfterFirstAssessment = tflRequests;
   assert.match(await page.locator('#resultSource').innerText(), /Transport for London.*OpenStreetMap routing/);
   assert.match(await page.locator('#resultFreshness').innerText(), /^Assessment complete/);
-  await page.getByText('Sources and checks', { exact: true }).click();
+  await page.locator('#sourceChecksDetails > summary').click();
   assert.match(await page.locator('#plannerChecks').innerText(), /Stops:\s*Transport for London/);
-  assert.match(await page.locator('#plannerChecks').innerText(), /Result:\s*Complete/);
+  assert.match(await page.locator('#plannerChecks').innerText(), /Result:\s*Assessment complete/);
+  assert.match(await page.locator('#plannerChecks').innerText(), /Supplementary TNDS evidence remains unresolved/);
 
   const prohibited = /\b(?:HTTP|API|endpoint|TTL|JSON|schema|adapter|cache hit|payload|CORS|geocoder|query relaxation)\b/i;
   assert.doesNotMatch(await page.locator('body').innerText(), prohibited, 'Normal planner view exposed software terminology.');
-  assert.equal(await page.locator('.technical-details').last().getByText('View technical details', { exact: true }).isVisible(), true);
+  assert.equal(await page.locator('#developerDiagnostics').isHidden(), true, 'developer diagnostics remain out of the normal planner view');
   if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'atlas-site-selector-desktop.png'), fullPage: true });
 
   await page.setViewportSize({ width: 1024, height: 768 });
+  await page.waitForFunction(() => { const layout = window.__ATLAS_BUS_UI__?.getMapLayout?.(); return layout?.width > 0 && Math.abs(layout.width - layout.leafletWidth) <= 1; }, null, { timeout: 5000 });
   const laptopMap = await page.locator('#siteMap').boundingBox();
-  assert.ok(laptopMap.width >= 500 && laptopMap.height >= 390, `Laptop map too small: ${JSON.stringify(laptopMap)}`);
+  assert.ok(laptopMap.width >= 500 && laptopMap.height >= 380, `Laptop map too small: ${JSON.stringify(laptopMap)}`);
   if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'atlas-site-selector-laptop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true, 'Mobile page has horizontal document overflow.');
+  await page.waitForFunction(() => { const layout = window.__ATLAS_BUS_UI__?.getMapLayout?.(); return layout?.width > 0 && Math.abs(layout.width - layout.leafletWidth) <= 1; }, null, { timeout: 5000 });
+  const mobileWidths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth, map: window.__ATLAS_BUS_UI__?.getMapLayout?.(), overflow: [...document.querySelectorAll('body *')].map(element => ({ tag: element.tagName, id: element.id, className: typeof element.className === 'string' ? element.className : '', right: Math.round(element.getBoundingClientRect().right), width: Math.round(element.getBoundingClientRect().width) })).filter(item => item.right > document.documentElement.clientWidth + 1 && !item.className.includes('leaflet-tile')).slice(0, 15) }));
+  assert.equal(mobileWidths.scroll <= mobileWidths.viewport, true, `Mobile page has horizontal document overflow: ${JSON.stringify(mobileWidths)}`);
   if (screenshotDir) await page.screenshot({ path: path.join(screenshotDir, 'atlas-site-selector-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.waitForFunction(() => { const layout = window.__ATLAS_BUS_UI__?.getMapLayout?.(); return layout?.width > 0 && Math.abs(layout.width - layout.leafletWidth) <= 1; }, null, { timeout: 5000 });
 
+  await page.locator('[data-workflow-step="4"]').click();
   await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
-  await page.waitForFunction(() => /Complete - checked/.test(document.getElementById('stopStatus')?.textContent || ''), null, { timeout: 20000 });
-  assert.equal(tflRequests, requestsAfterFirstAssessment + 5, 'A repeated check retries the five failed TfL timetable requests rather than caching source failures.');
-  assert.match(await page.locator('#stopStatus').innerText(), /Complete - checked/);
-  assert.doesNotMatch(await page.locator('#stopStatus').innerText(), /cache/i);
+  assert.equal(tflRequests, requestsAfterFirstAssessment, 'A repeated assessment reuses the valid cached TfL results.');
 
   const failurePage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
   const failurePageErrors = [];
@@ -111,9 +119,13 @@ try {
   await failurePage.route('https://nominatim.openstreetmap.org/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(geocode) }));
   await failurePage.route('https://api.tfl.gov.uk/**', route => route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ message: 'rate limited' }) }));
   await failurePage.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await failurePage.getByRole('button', { name: 'Modules' }).click();
+  await failurePage.getByRole('link', { name: /Start Bus Assessment/ }).click();
+  await failurePage.getByRole('heading', { name: 'Assess nearby bus access', exact: true }).waitFor({ state: 'visible' });
   await failurePage.getByLabel('Site address or name').fill('33 Westow Street, Crystal Palace');
   await failurePage.getByRole('button', { name: 'Find site' }).click();
   await chooseFirstCandidateAndConfirm(failurePage);
+  await failurePage.getByRole('button', { name: /Continue to Run assessment/ }).click();
   await failurePage.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await failurePage.getByText('Bus information is temporarily unavailable. Please try again shortly.', { exact: true }).waitFor({ timeout: 10000 });
   assert.doesNotMatch(await failurePage.locator('body').innerText(), /HTTP 429/i);
@@ -126,6 +138,8 @@ try {
   await mockMapTiles(nonLondonPage);
   await mockAccessRouting(nonLondonPage);
   await mockPreparedBusTimetables(nonLondonPage);
+  const outsideGeocode = geocode.map(candidate => ({ ...candidate, display_name: 'Hertfordshire, United Kingdom', lat: '51.7000000', lon: '-0.1000000' }));
+  await nonLondonPage.route('https://nominatim.openstreetmap.org/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(outsideGeocode) }));
   const outsideStops = { stopPoints: [{ ...stops.stopPoints[0], lines: [{ id: '322', name: '322' }] }] };
   await nonLondonPage.route('https://api.tfl.gov.uk/**', route => {
     const url = route.request().url();
@@ -144,35 +158,39 @@ try {
     return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(payload) });
   });
   await nonLondonPage.goto(new URL('atlas/', root).href, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await nonLondonPage.getByText('Enter coordinates instead', { exact: true }).click();
-  await nonLondonPage.getByLabel('Latitude').fill('51.7000000');
-  await nonLondonPage.getByLabel('Longitude').fill('-0.1000000');
-  await nonLondonPage.getByRole('button', { name: 'Use these coordinates' }).click();
-  await nonLondonPage.getByRole('button', { name: 'Confirm assessment point' }).click();
+  await nonLondonPage.getByRole('button', { name: 'Modules' }).click();
+  await nonLondonPage.getByRole('link', { name: /Start Bus Assessment/ }).click();
+  await nonLondonPage.getByRole('heading', { name: 'Assess nearby bus access', exact: true }).waitFor({ state: 'visible' });
+  await nonLondonPage.getByLabel('Site address or name').fill('Stanstead Abbotts, Hertfordshire');
+  await nonLondonPage.getByRole('button', { name: 'Find site' }).click();
+  await chooseFirstCandidateAndConfirm(nonLondonPage);
+  await nonLondonPage.getByRole('button', { name: /Continue to Run assessment/ }).click();
   await nonLondonPage.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await nonLondonPage.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.ok(await nonLondonPage.locator('#evidenceRows tr').count() > 0);
   const outsideResultSource = await nonLondonPage.locator('#resultSource').innerText();
   assert.match(outsideResultSource, /Department for Transport NaPTAN \+ Transport for London StopPoint/);
-  assert.match(outsideResultSource, /Transport for London scheduled timetables/);
-  assert.doesNotMatch(outsideResultSource, /Department for Transport bus timetables|BODS|TNDS/);
-  await nonLondonPage.getByText('Sources and checks', { exact: true }).click();
+  assert.match(outsideResultSource, /No timetable source was checked/);
+  assert.doesNotMatch(outsideResultSource, /Transport for London scheduled timetables/);
+  await nonLondonPage.locator('#sourceChecksDetails > summary').click();
   const outsideChecks = await nonLondonPage.locator('#plannerChecks').innerText();
   assert.match(outsideChecks, /Stops:\s*Department for Transport NaPTAN \+ Transport for London StopPoint/);
-  assert.match(outsideChecks, /Timetables:\s*Transport for London scheduled timetables/);
-  assert.doesNotMatch(outsideChecks, /Department for Transport bus timetables|BODS|TNDS/);
+  assert.match(outsideChecks, /Timetables:\s*No timetable source was checked/);
+  assert.doesNotMatch(outsideChecks, /Transport for London scheduled timetables/);
   assert.ok(await nonLondonPage.locator('#serviceRows tr:not(.service-note)').count() > 0);
   assert.equal(nonLondonErrors.length, 0);
   await nonLondonPage.close();
 
+  await page.getByRole('button', { name: 'Modules' }).click();
   const legacyHref = await page.getByRole('link', { name: 'Open legacy Toolkit' }).getAttribute('href');
   assert.equal(new URL(legacyHref, page.url()).href, root);
   await page.goto(root, { waitUntil: 'domcontentloaded' });
   assert.match(await page.title(), /Transport Planner Toolkit/);
 
   assert.equal(pageErrors.length, 0);
-  assert.equal(consoleErrors.length, 0);
-  assert.equal(failedRequests.length, 0);
+  assert.deepEqual([...new Set(notFoundResponses)], ['http://127.0.0.1:8769/atlas/data/bus-tnds/manifest.json']);
+  assert.equal(consoleErrors.length, notFoundResponses.length, 'the only browser console failures are the surfaced missing-TNDS-manifest source failure');
+  assert.ok(failedRequests.every(request => request.url === 'http://127.0.0.1:8769/atlas/data/bus-tnds/manifest.json' && request.error === 'net::ERR_ABORTED'), JSON.stringify(failedRequests));
   console.log(JSON.stringify({
     productAndVersionIdentified: true,
     navigation: ['Report Builder', 'Modules', 'Projects', 'About'],

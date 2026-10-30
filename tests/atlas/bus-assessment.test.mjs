@@ -137,7 +137,7 @@ test('all assessment review paths carry deterministic taxonomy categories', asyn
   assert.equal(future.category, 'other-material');
 });
 
-test('overlapping BODS and TNDS effective-date disagreement is consolidated into one material review item', async () => {
+test('usable BODS evidence is not challenged by differing TNDS effective dates', async () => {
   const records = [
     { ...service, id: 'bods-effective', timetableSource: 'BODS', validFrom: '2026-01-01', validTo: '2026-12-31' },
     { ...service, id: 'tnds-effective', timetableSource: 'TNDS', source: { provider: 'TNDS' }, validFrom: '2026-06-01', validTo: '2027-05-31' }
@@ -148,10 +148,9 @@ test('overlapping BODS and TNDS effective-date disagreement is consolidated into
     accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 90 }], warnings: [], provenance: {} }) }
   });
   const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
-  const conflicts = result.reviewItems.filter(item => item.code === 'cross-source-service-conflict');
-  assert.equal(conflicts.length, 1, 'both source records produce one grouped planner review item');
-  assert.match(conflicts[0].message, /overlapping but different effective-date intervals/);
-  assert.ok(result.plannerServiceSummaries.some(row => row.crossSourceConflictKey), 'the consolidated public row retains a link to the conflicting source evidence');
+  assert.equal(result.reviewItems.some(item => /cross-source-service-conflict|BODS and TNDS evidence/i.test(`${item.code} ${item.message}`)), false);
+  assert.equal(result.plannerServiceSummaries.length, 1, 'the locally equivalent services remain one BODS-led planner row');
+  assert.equal(result.plannerServiceSummaries[0].timetableSource, 'BODS');
 });
 
 test('Chingford repeated origin endpoint evidence is grouped by public route issue while all raw stop records remain', async () => {

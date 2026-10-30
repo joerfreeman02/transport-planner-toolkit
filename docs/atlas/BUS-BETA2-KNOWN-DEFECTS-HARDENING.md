@@ -1,107 +1,102 @@
-# ATLAS Bus Beta.2 known defects hardening
+# ATLAS Bus Beta.2 known-defects hardening
 
 ## Controlled change record
 
 - Branch: `codex/atlas-bus-beta2-known-defects-hardening`
-- Starting `main` SHA: `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`
-- Release status: engineering candidate only; Beta.1 remains frozen and Beta.2 is not released.
-- Current review status: **not ready for Technical Director review** until the remaining source-arbitration, calendar, Browser, full regression, and CI gates below have evidence.
+- Continuation starting candidate: `291c526cf4d71c7650c8eb218df6a6f7bee65342`
+- Frozen Beta.1 `main`: `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`
+- Status: engineering candidate. No merge, Beta.2 release, or Beta.1 baseline change is authorized by this work.
+- Technical Director review: **not ready**; the full Bus suite has two unrelated failing controls, actual assessment Word parity and TNDS-heavy before/after counts remain unverified, and the branch has not been pushed.
 
-## Defects and changes in this candidate
+## Implemented corrections
 
 ### Directional principal locations
 
-The service assessment previously combined principal-location lists from the route's full set of records. Those lists could describe calls upstream of the assessed stop or calls from a broader/opposite pattern. A displayed direction now selects the source pattern with scheduled evidence at its representative frequency stop, verifies the ordered stop identities, and derives locations only from downstream calls. Closed loops rotate from the assessed stop before deriving locations. Repeated or unresolvable positions withhold the list and create a material Sources & Checks item. Route-pattern stop names and localities are retained by the BODS index builder so prepared records can support this check.
+The summary uses the ordered, identity-aligned source pattern which has scheduled evidence at the representative assessed stop. It derives places only from downstream calls in the displayed direction; closed loops rotate from the assessed stop. When order or identity cannot be proven, it withholds the list and preserves a material review item. The BODS index builder now retains ordered route-pattern stop names and localities to support this check. Display cleanup removes only a trailing `arrival` suffix.
 
-This is an ATLAS interpretation correction. It does not certify the underlying BODS or TNDS pattern. When the source cannot prove order or stop identity, the summary is deliberately incomplete and reviewable.
+### BODS-primary / TNDS-supplementary hierarchy
 
-### TNDS review and effective dates
+The generic overlapping-effective-date warning and its planner-review taxonomy item have been removed. TNDS date, timetable, wording, operator-name, and operating-profile differences alone no longer cause a BODS/TNDS disagreement warning. A locally covered presentation is BODS-led, with combined provenance retained; the planner timetable-source label now gives BODS its correct priority when both sources are recorded. Existing strict local-pattern duplicate arbitration remains conservative so potentially genuine TNDS services are not silently discarded.
 
-The data adapter already had a conservative local-family check: route number, operator family, local scheduled StopPoint set, ordered physical pattern, circular status, and explicit direction all need to agree before a TNDS source record is discarded as a BODS copy. TNDS-only route 231 remains separate from Pipers route 230. At planner-copy reconciliation, however, evidence with complete, overlapping but different validity intervals could still be folded into a single BODS row without a material warning. The candidate retains the public row while adding one grouped Sources & Checks item for this effective-date conflict. Original source records remain attached to the row for inspection.
+Pipers controls retain BODS-led Route 230 and visible TNDS-only Route 231. No route number is hardcoded. There is not yet a generic grouped unresolved-supplementary-identity item: ambiguous TNDS extras remain visible, but the real 555 case has not been reduced to a proven duplicate or a single grouped identity review. This remains open for manual source adjudication.
 
-This is a fail-safe conflict marker. It does not decide which conflicting feed is current, resolve non-overlapping superseded records against an assessment date, detect every operating-day/timetable disagreement, or reconcile 555 and N555 as a cross-route identity. Frequency similarity is not used as a fuzzy service-identity bridge.
+### Map, export references, and responsive layout
 
-### Qualification scope
+Word and PDF report references are derived from the selected export stop set. Orphan `Served at` references are removed, evidence-only stops receive no export marker number, and marker keys share the same deterministic numbering. Standalone map PDFs frame the confirmed site, selected stops, and applicable radius independently of the interactive map's last view. The one Leaflet map is retained while moving between persistent and results hosts; resize invalidation waits for measurable geometry.
 
-The summary builder could map qualifications from records onto a combined row after observing only the merged departure week. It now confirms that each record with departures at the representative evidence stop supports the same school/non-school or term-time restriction, and withholds a whole-row restriction when a record contains multiple calendar profiles. Neutral calendar variation notes and per-profile planner lines remain available. VehicleJourney overrides continue to be handled by the TNDS adapter's existing precedence and profile splitting.
+Browser viewport checks exposed horizontal overflow at 390 px: the stop and service tables kept 1000/1050 px minimum widths despite the small-screen layout. The mobile CSS now removes those minimums. The test confirms map container and Leaflet geometry agree after resizing.
 
-### Stop references and map exports
+## Actual source-shaped findings
 
-Numeric references are now generated against the report's selected stop set for both Word and PDF export. Orphan references are removed from presentation text; evidence stops without an exported marker have no map reference. A pure extent helper frames the confirmed site, report stops, and requested radius. PDF export creates a temporary Leaflet map using that extent and disposes it after capture, so the user's last interactive pan/zoom does not choose the exported framing.
+These local diagnostic outputs were generated in candidate scratch storage from the available regional source archives using the production Python builder, then composed with the frozen Run #75 supplementary records. The frozen Run #75 artifact itself was only read through a local junction and was not rebuilt or edited. These are diagnostic compositions, not a replacement prepared national dataset.
 
-### Interactive map layout
+- **Waltham Cross / 310:** both BODS-led displayed directions now derive downstream places from the assessed representative stops. Toward Waltham Cross from `210021701630`: Theobalds Grove Railway Station, Spitalbrook, Broxbourne, Wormley, Turnford, Cheshunt, Theobalds Grove. Toward Hertford from `210021701740`: St Margarets, Great Amwell, Ware, Chadwell, Hertford. TNDS rows with different directions/patterns remain separately visible; no cross-source disagreement item is generated. The actual 310 assessment DOCX was not generated in the browser.
+- **Heathrow / 203:** at Long Lane, Hounslow-bound from `40004402007B`: East Bedfont, Hatton, Hatton Cross, Cranford, Hounslow West, Hounslow. Staines-bound from `40004402007A`: Ashford Hospital Entrance, Stanwell, Ashford, Staines. The directional lists do not cross-contaminate. No source-disagreement warning is generated. The actual 203 assessment DOCX was not generated in the browser.
+- **Heathrow / 555 and N555:** the available current BODS records include route 555 in both directions, with local downstream places toward Hatton Cross and The Bear. TNDS also supplies route 555 records with different local patterns and a White Bus operator label; they remain supplementary rows because strict local identity is not proven. TNDS N555 records are Hallmark-branded, have current local patterns, and have no corresponding BODS N555 record at the assessed stops; they remain visible as a distinct supplementary service. No generic date-disagreement warning is produced. The route-family source shape supports treating N555 as distinct; the same-number 555 variants are not yet conclusively classified as covered duplicates versus additional services. No single grouped identity item currently captures that remaining ambiguity.
+- **Wycliffe / Stroud, 62/64/65:** BODS downstream outputs are coherent in both directions. Route 62 from Wycliffe `1600GLS314` toward Horsemarling Lane: Post Office, The Nippy Chippy, Grosvenor Road; toward Transport Hub from Pearcroft `1600GLS313`: Bridgend, Stanley Downton, Leonard Stanley, Kings Stanley, Middleyard, Selsley, Dudbridge. Route 64 from Ryeford Road North `1600GLS309` toward Merrywalks: Ebley, Stroud; from `1600GLS310` toward Transport Hub: Stonehouse, Oldend, Nastend, Nupend, Whitminster, Moreton Valence, Hardwicke. Route 65 from Wycliffe `1600GLS314` toward Transport Hub: Stroud Green, Standish, Little Haresfield, Haresfield, Hardwicke, Quedgeley, Kingsway; from Pearcroft `1600GLS313` toward Long Street: Nastend, Eastington, Claypits, Cambridge, Slimbridge, Draycott, Lower Cam. The actual 62/64/65 assessment DOCX files were not generated in the browser.
+- **TNDS review noise:** no real-assessment before/after total review-item count was captured. Available source-shaped results show no generic effective-date disagreement item; the TNDS-heavy real-count acceptance gate remains open. A missing/malformed supplementary TNDS coverage manifest in the browser environment is surfaced as an unresolved source item while loaded BODS evidence is retained; it is a source-availability issue, not an ATLAS directional-data conclusion.
 
-Map invalidation is scheduled after two animation frames and only when the moved map has measurable visible geometry. Resize observation covers the map and its workflow frame, and the UI exposes layout measurements for browser acceptance checks. The map remains one Leaflet instance as it moves between persistent and results hosts.
+## Verification evidence
 
-### Planner-facing location wording
+### Passing focused and data-bound controls
 
-Principal-location display derivation removes only a case-insensitive trailing `arrival` suffix. Raw source records remain the provenance evidence; no place-name dictionary or route-specific rewrite is used.
+- `tools/atlas-bus-data/test_build_static_index.py`: **19 passed**. The builder retains ordered route-pattern stops.
+- Bus assessment and planner-summary tests: passed, including no warning for a differing TNDS validity interval and a single BODS-led presented row.
+- `bus-timetable-merge`: passed using a current v2 stop-prefix shard; it retains the genuine local Route 231 call.
+- `prepared-bus-data-integrity`: passed against the v2 dataset: 375,664 active NaPTAN stops, 1,367 referenced shards, and 9 BODS regions.
+- `bus-qa-03-integrity`: passed.
+- `tnds-runtime-shard-browser`: passed, fetching/serving/composing 53 shards.
+- Existing focused route, calendar, map-layout, map-reference, map-PDF, Word-export contract, and UI-contract tests passed in the earlier full-suite run. Golden-route controls observed passing include 25C, 66, 242, 310, 657, 230/231, route variants, and calendar profiles. Milton Keynes Route 5 duplicate and the remaining named golden controls pass where included in those runs.
 
-## Evidence and review contracts
+### Playwright/browser
 
-- Principal locations require a named, identity-aligned ordered pattern containing the representative assessed stop. The downstream segment starts at that stop. Ambiguous repeated calls are withheld for review.
-- A map reference is valid only for a stop included in the selected export set. Word, map key, and marker assignment use the same deterministic reference view.
-- Outside London, BODS remains primary and TNDS remains supplementary. Exact local duplicate arbitration retains BODS; unique TNDS services remain. A focused overlapping-effective-date conflict is now reviewable, but operating-day/timetable comparison, stale records, non-overlapping supersession, and 555/N555 cross-route identity still need source-shaped regression and manual acceptance. No national source should be treated as error-free.
-- Qualification metadata remains attached to source records. Mixed-profile restriction notes are withheld at the summary boundary; the existing TNDS VehicleJourney > JourneyPattern > Service precedence and 657 school-only regression remain in scope for complete-suite verification.
+All four local browser checks pass individually with the workspace-scoped temporary directory and localhost server:
 
-## Regression evidence available in this checkout
+- `review-environment-browser.mjs`: full Word download, normal and nearest map exports, same-selection byte-identical map after deliberate pan/zoom, and 22-stop geographically spread export; no page errors or failed local assets.
+- `atlas-browser-smoke.mjs`: workflow, confirmation, results, map/marker references, cache behavior, routes, and service summary.
+- `planner-ux-browser.mjs`: responsive desktop/laptop/mobile layouts, Leaflet geometry after resize, Sources & Checks, source failure fallback, non-London handling, and plain-language presentation.
+- `site-selector-browser.mjs`: search refinement, drag and map selection, coordinate validation, explicit confirmation, assessment-point edits, and stale-result clearing.
 
-Focused controls added or updated:
+The planner workflow browser records the missing `/atlas/data/bus-tnds/manifest.json` request as a visible supplementary-source failure. It does not record page exceptions. The full browser report is a mocked Crystal Palace assessment, not the supplied 310/203/62/64/65 assessment data.
 
-- downstream principal locations, closed-loop order, and missing pattern identity review;
-- generic directional clipping controls labelled 310, 203, 62, 64, and 65;
-- an unambiguous trailing-arrival display cleanup;
-- selected export stop references and orphan-reference removal;
-- deterministic map extent for small, medium, and geographically spread stop sets;
-- Browser smoke assertions for persistent/results host movement and Leaflet/container size agreement.
+### Generated artefacts
 
-Commands that passed locally:
+Stored under candidate scratch `tmp/beta2-verification/visual/`:
 
-- `node tests/atlas/bus-service-assessment.test.mjs` — 21 tests.
-- `node tests/atlas/bus-map-references.test.mjs` — pass.
-- `node tests/atlas/bus-map-extent.test.mjs` — pass.
-- `node tests/atlas/bus-map-layout.test.mjs` — pass.
-- `node tests/atlas/bus-map-pdf.test.mjs` — pass.
-- `node tests/atlas/bus-word-export.test.mjs` — pass.
-- `node tests/atlas/bus-ui-contract.test.mjs` — pass.
-- `node tests/atlas/bus-group-1b-semantic-family.test.mjs`, `node tests/atlas/bus-alpha13-planner-summary.test.mjs`, `node tests/atlas/alpha13-summary-closeout.test.mjs`, `node tests/atlas/alpha14-production-row-consolidation.test.mjs`, `node tests/atlas/alpha15-production-fidelity.test.mjs`, and `node tests/atlas/alpha15-planner-service-group.test.mjs` — pass; includes existing 310, 657, 230/231, route-variant, and calendar controls.
-- `node tests/atlas/tnds-transxchange.test.mjs`, `node tests/atlas/tnds-operating-profile-standard.test.mjs`, `node tests/atlas/tnds-semantic-fragmentation.test.mjs`, `node tests/atlas/alpha13-calendar-safety.test.mjs`, `node tests/atlas/alpha12-source-completeness.test.mjs`, `node tests/atlas/alpha12-source-presentation.test.mjs`, `node tests/atlas/bus-presentation.test.mjs`, `node tests/atlas/bus-planner-golden-rule.test.mjs`, `node tests/atlas/bus-dest-endpoint-intelligence.test.mjs`, `node tests/atlas/bus-endpoint-alias-closeout.test.mjs`, and `node tests/atlas/v2-review-cache.test.mjs` — pass.
-- `node tests/atlas/bus-robustness-1b-national-planner-trust.test.mjs` — 10 tests passed.
-- With `TEMP`, `TMP`, and `TMPDIR` pointed to a temporary folder within the checkout: `node tests/atlas/tnds-preparation-multiservice.test.mjs`, `node tests/atlas/tnds-preparation-coverage.test.mjs`, `node tests/atlas/tnds-preparation-scale.test.mjs`, and `node tests/atlas/alpha12-evidence-integrity-audit.test.mjs` — pass, including 1,800-record scale preparation.
-- `node tests/atlas/bus-assessment.test.mjs` — 11 tests, including one grouped effective-date conflict item and the fail-safe directional-principal-location review count.
-- `node --check atlas/assets/js/app.mjs` — pass.
+- `nearest-stop-group-map.pdf`
+- `nearest-stop-group-map-after-pan-zoom.pdf` — byte-identical to the first compact map
+- `normal-assessment-map.pdf`
+- `spread-stop-map.pdf`
+- `full-assessment.docx`
 
-Not completed in this environment:
+Each map is one A3 page. Visual review confirmed the site, radius, selected-stop markers, references, key, and scale. The spread map has 22 numbered stops and a 2 km radius without an irrelevant extent. Microsoft Word opened the DOCX; the embedded normal map and stop-summary references 1 and 2 were visually present. The DOCX renderer could not be used because LibreOffice is not installed. Only the generated fixture report was reviewed in Word; real case Word/browser parity, qualifications, acknowledgements, and orphan-reference checks remain open.
 
-- `node tests/atlas/run-all.mjs` stops at `tests/atlas/tnds-runtime-shard-browser.test.mjs` because the checkout has no installed `playwright` package. Thus the Browser smoke has not run.
-- Python and the Python launcher are unavailable, so `tools/atlas-bus-data/test_build_static_index.py` has not run.
-- Data-bound `bus-timetable-merge`, `prepared-bus-data-integrity`, and `bus-qa-03-integrity` tests cannot start because their prepared national files are not present in this sparse checkout. The 900 MB publication root and the excluded national datasets were left untouched.
-- The review server test can bind a loopback listener but its follow-up fetch is blocked by sandbox `EACCES`; browser server acceptance is therefore incomplete here.
-- No GitHub Actions run was triggered by this branch push. The repository workflows are manual/reusable or are restricted to specific historical branch names; the only pull-request/push CI workflow is scoped to the Drawing Generator and `main`. Do not treat the absence of a run as a passing CI result.
-- The complete suite, required 310/203/62/64/65 source-shaped regressions, TNDS review-noise and effective-date conflict controls, operating-profile controls, full Word/Browser parity, and CI remain unverified. A focused unit pass is not a substitute for those gates.
+## Full-suite blockers and CI
 
-## Manual acceptance guide
+`node tests/atlas/run-all.mjs` does not pass in this checkout. It stops at the existing `tests/atlas/bus-qa-02-frequency.test.mjs:143` expectation: expected “Timetable varies between school and non-school days.”, actual empty text. The focused reproduction fails independently; the changed hierarchy files do not implement that assessment-profile note. Continuing the remaining modules after that failure exposed a second existing data-bound blocker in `bus-robustness-1a4f-tfl-ibus-operator.test.mjs:247`: the checked-in manifest digest differs from the digest computed from the locally linked Run #75 bytes. Other modules continued after skipping each known blocker and passed through the reviewed modules; this is not a full-suite pass.
 
-Use the current candidate build served from this branch. Confirm the assessment site and review the output against source evidence rather than expecting a fixed national-data answer:
+The repository has no applicable branch push/pull-request workflow for this candidate. The only relevant push workflow inspected is restricted to historical branch names; other CI is manual/reusable or belongs to the Drawing Generator. No CI run is claimed. A safe, narrowly scoped future CI workflow should run the ATLAS Bus suite on this branch family without changing production behavior. Network/DNS to GitHub was unavailable during verification, so remote push agreement is unconfirmed.
 
-1. **Waltham Cross / 310:** use the existing production replay `npm run review:atlas:alpha15` and the Waltham Cross production fixture. Check two directional rows and confirm each principal-location list follows the direction beyond its own representative stop.
-2. **Heathrow / Long Lane:** use the supplied Route 203 and 555 assessments as the comparison evidence. Check Staines-bound and Hounslow-bound locations independently; investigate 555/N555 dates and source provenance before interpreting current availability.
-3. **Wycliffe / Stonehouse:** use the supplied Stroud assessment (`GL5 3DS`) and map. Check Routes 62, 64, and 65 in each displayed direction; no opposite-side calls should appear downstream.
-4. **TNDS-heavy assessment:** inspect Sources & Checks. A TNDS contribution alone should not be treated as a defect; verify a genuine supplementary service survives and material conflicts remain explicit.
-5. **Pipers:** existing control point is `51.852700, -0.454343`, radius 700 m. Route 230 should remain BODS-led; genuine TNDS route 231 should remain visible.
-6. **Milton Keynes Route 5:** inspect for one BODS-led duplicate family without an unnecessary TNDS warning; retain distinct route variants.
-7. **Chingford:** use `99 Normanshire Drive, Chingford Mount, Highams Park, E4 9HB`. Preserve accepted school-only Route 657 behaviour.
-8. **Map export:** select a small stop set and then a broader/spread set, export each from different manual map views, and compare framing, radius, marker numbering, and stop key.
-9. **Word export:** export the same selected stop set and check each Served at reference exists in the included stop summary. A non-exported evidence stop must not carry a bracketed map number.
+## Remaining limitations and manual acceptance
 
-Manual acceptance is for the Product Owner and Technical Director. This document does not record that it has occurred.
+The real BODS-primary/TNDS-supplementary source shapes support corrected downstream outputs, Pipers 231 survival, and removal of generic date-conflict noise. They do not complete the acceptance gates for a grouped ambiguous supplementary identity, a real TNDS-heavy count comparison, full passing regression, or actual-case Word parity.
+
+Technical Director and Product Owner review should use the frozen Run #75 comparison material and supplied assessments to:
+
+1. Compare both Route 310 directions and the Long Lane 203 directions against the source journeys.
+2. Review Stroud routes 62/64/65 against the supplied map and patterns.
+3. Decide whether the same-number TNDS 555 records are duplicates or additional local services; confirm N555 remains a separate TNDS-only service. If identity remains genuinely ambiguous, require one grouped identity review item.
+4. Run one TNDS-heavy assessment and record total review items and warning classes before/after, verifying that real services survive.
+5. Generate 310, 203, 555/N555, and 62/64/65 DOCX reports and compare Browser and Word principal locations, qualifications, selected-stop references, and review acknowledgement.
+6. Resolve QA-02 and the TFL iBus digest mismatch, then run the complete ATLAS Bus regression.
+7. Review the candidate branch and CI result before manual acceptance. Do not merge or release Beta.2 as part of this verification.
 
 ## GitHub tooling adoption review
 
 - **Dependabot:** already configured; retain it.
-- **Codecov:** no adoption in this corrective sprint; current deterministic tests and workflow evidence are the relevant gates.
-- **OpenSSF Scorecard:** no adoption in this corrective sprint; it does not address the detected Bus-output defects.
-- **Sentry:** no adoption in this corrective sprint; no runtime telemetry change is needed for the scoped corrections.
-- **Renovate:** deferred; avoid overlapping dependency automation with Dependabot.
+- **Codecov:** no adoption in this corrective sprint.
+- **OpenSSF Scorecard:** no adoption in this corrective sprint.
+- **Sentry:** no adoption in this corrective sprint.
+- **Renovate:** deferred to avoid overlapping dependency automation with Dependabot.
 
 No tooling was installed or newly configured for this sprint.

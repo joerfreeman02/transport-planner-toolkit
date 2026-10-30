@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startReviewServer } from '../../tools/atlas-review/review-server.mjs';
-import { mockAccessRouting, mockMapTiles } from './browser-test-helpers.mjs';
+import { mockAccessRouting, mockMapTiles, mockPreparedBusTimetables } from './browser-test-helpers.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -26,6 +26,7 @@ page.on('pageerror', error => pageErrors.push(error.message));
 page.on('requestfailed', request => failedRequests.push({ url: request.url(), error: request.failure()?.errorText || 'unknown' }));
 await mockMapTiles(page);
 await mockAccessRouting(page);
+await mockPreparedBusTimetables(page);
 await page.route('https://nominatim.openstreetmap.org/**', route => {
   const query = new URL(route.request().url()).searchParams.get('q');
   geocodeQueries.push(query);
@@ -35,6 +36,9 @@ await page.route('https://api.tfl.gov.uk/**', route => route.fulfill({ status: 2
 
 try {
   await page.goto(review.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.getByRole('button', { name: 'Modules' }).click();
+  await page.getByRole('link', { name: /Start Bus Assessment/ }).click();
+  await page.getByRole('heading', { name: 'Assess nearby bus access', exact: true }).waitFor({ state: 'visible' });
   assert.equal(await page.locator('#siteMap.leaflet-container').isVisible(), true);
   assert.equal(await page.locator('.leaflet-control-zoom').isVisible(), true);
   assert.equal(await page.locator('#address').inputValue(), '');
@@ -48,7 +52,7 @@ try {
   assert.match(await page.locator('#geocodeStatus').innerText(), /building or location details/i);
   await page.getByRole('button', { name: 'Use this result' }).click();
   await page.locator('.assessment-point-marker').waitFor({ timeout: 5000 });
-  assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).count(), 0);
   const selected = await page.evaluate(() => window.__ATLAS_SITE_SELECTOR__.getSnapshot().site);
   assert.equal(selected.suppliedAddress, productOwnerQuery);
   assert.deepEqual([selected.geocoding.latitude, selected.geocoding.longitude], [51.7901, 0.0123]);
@@ -69,10 +73,11 @@ try {
   assert.equal(moved.assessmentPoint.adjustedFromCandidate, true);
 
   await page.getByRole('button', { name: 'Confirm assessment point' }).click();
-  await page.getByText('Confirmed assessment point', { exact: true }).waitFor({ timeout: 5000 });
+  assert.match(await page.locator('#confirmationStatus').innerText(), /The assessment point is confirmed/);
   const confirmed = await page.evaluate(() => window.__ATLAS_SITE_SELECTOR__.getSnapshot().confirmedSite);
   assert.deepEqual([confirmed.latitude, confirmed.longitude], [moved.latitude, moved.longitude]);
   assert.ok(confirmed.assessmentPoint.confirmedAt);
+  await page.getByRole('button', { name: /Continue to Run assessment/ }).click();
   await page.getByRole('button', { name: 'Build full Bus assessment' }).click();
   await page.locator('#evidenceRows tr').first().waitFor({ timeout: 20000 });
   assert.ok(await page.locator('#evidenceRows tr').count() > 0);
@@ -81,9 +86,10 @@ try {
   const mapBox = await page.locator('#siteMap').boundingBox();
   await page.mouse.click(mapBox.x + mapBox.width * 0.72, mapBox.y + mapBox.height * 0.35);
   await page.waitForFunction(() => document.getElementById('selectedMethod').textContent === 'Adjusted on map' && document.getElementById('evidencePanel').hidden);
-  assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: 'Build full Bus assessment' }).count(), 0);
   assert.match(await page.locator('#stopStatus').innerText(), /earlier bus results were cleared/i);
 
+  await page.locator('[data-workflow-step="1"]').click();
   await page.getByLabel('Site address or name').fill('Unknown former depot site');
   await page.getByRole('button', { name: 'Find site' }).click();
   await page.waitForFunction(() => /We could not find a suitable match|Site search is temporarily unavailable/.test(document.getElementById('geocodeStatus')?.textContent || ''), null, { timeout: 30000 });

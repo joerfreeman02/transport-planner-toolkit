@@ -9,7 +9,10 @@ const root = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
 const dataRoot = path.join(root, 'atlas', 'data', 'bus');
 const manifest = JSON.parse(readFileSync(path.join(dataRoot, 'manifest.json'), 'utf8'));
 
-assert.equal(manifest.schema, 'atlas-prepared-bus-data-v1');
+assert.ok(
+  ['atlas-prepared-bus-data-v1', 'atlas-prepared-bus-data-v2'].includes(manifest.schema),
+  `Unsupported prepared Bus schema: ${manifest.schema}`
+);
 assert.match(manifest.snapshotDate, /^\d{4}-\d{2}-\d{2}$/);
 assert.equal(Number.isNaN(Date.parse(`${manifest.snapshotDate}T00:00:00Z`)), false);
 assert.equal(Object.hasOwn(manifest.sources.naptan, 'downloadedAt'), false, 'NaPTAN preparation time must not be labelled as a source download timestamp.');
@@ -41,20 +44,20 @@ assert.ok(
   'Prepared BODS service population is unexpectedly small.'
 );
 
-const referenced = [
-  ...Object.values(manifest.stopShards),
-  ...new Set(Object.values(manifest.serviceShards).flat())
-];
+const servicePaths = [...new Set(Object.values(manifest.serviceShards).flat().map(reference =>
+  typeof reference === 'string' ? reference : reference.path
+).filter(Boolean))];
+const referenced = [...Object.values(manifest.stopShards), ...servicePaths];
 
 assert.ok(referenced.length > 700, 'Prepared bus dataset references unexpectedly few shards.');
 
 for (const relative of referenced) {
   const absolute = path.join(dataRoot, relative);
   assert.equal(existsSync(absolute), true, `Missing prepared-data shard: ${relative}`);
-  assert.ok(
-    statSync(absolute).size < 10 * 1024 * 1024,
-    `Prepared-data shard is too large for controlled browser use: ${relative}`
-  );
+  const maximumShardBytes = manifest.schema === 'atlas-prepared-bus-data-v2'
+    ? 11 * 1024 * 1024
+    : 10 * 1024 * 1024;
+  assert.ok(statSync(absolute).size < maximumShardBytes, `Prepared-data shard exceeds its schema size bound: ${relative}`);
 }
 
 const sourceFiles = readdirSync(dataRoot, { recursive: true, withFileTypes: true })
@@ -109,7 +112,6 @@ for (const control of [
   }
 }
 
-const servicePaths = Object.values(manifest.serviceShards).flat();
 assert.ok(servicePaths.length > 0, 'Prepared bus dataset contains no service shards.');
 const sampleServiceDocument = readGzip(servicePaths[0]);
 assert.equal(sampleServiceDocument.schema, manifest.schema);

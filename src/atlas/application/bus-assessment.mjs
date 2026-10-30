@@ -203,10 +203,6 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
       message: 'Operator evidence is unresolved or conflicting; ATLAS has therefore not stated an operator.'
     });
   }
-  for (const row of plannerServiceSummaries ?? []) for (const warning of row.sourceWarnings ?? []) {
-    if (!/BODS and TNDS evidence for this local route has overlapping but different effective-date intervals/i.test(String(warning))) continue;
-    add({ code: 'cross-source-service-conflict', route: row.routeNumber, stop: row.frequencyBasisStopId, source: 'BODS/TNDS', groupKey: row.crossSourceConflictKey || row.routeNumber, message: String(warning) });
-  }
   for (const failure of provenance.failedShardDiagnostics ?? []) {
     const affected = (failure.stopIds ?? []).map(String);
     const targets = affected.length ? affected : [null];

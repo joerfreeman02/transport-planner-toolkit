@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
 import { mergeBusTimetableSources } from '../../src/atlas/domain/bus-timetable-merge.mjs';
 import { buildPlannerBusServiceSummaries } from '../../src/atlas/domain/bus-planner-summary.mjs';
@@ -118,7 +119,25 @@ const insufficientIdentity = mergeBusTimetableSources({
 });
 assert.equal(insufficientIdentity.length, 2, 'ambiguous evidence is retained instead of guessed equivalent');
 
-const prepared231 = JSON.parse(fs.readFileSync(new URL('../../atlas/data/bus-tnds/services/231-se.json', import.meta.url), 'utf8'));
+const legacyPrepared231Path = new URL('../../atlas/data/bus-tnds/services/231-se.json', import.meta.url);
+let prepared231;
+if (fs.existsSync(legacyPrepared231Path)) {
+  prepared231 = JSON.parse(fs.readFileSync(legacyPrepared231Path, 'utf8'));
+} else {
+  // Current prepared national data uses bounded StopPoint-prefix shards.
+  // Select the Pipers local call from the shard manifest without reading the
+  // full national TNDS population or requiring the retired legacy file name.
+  const tndsRoot = new URL('../../atlas/data/bus-tnds/', import.meta.url);
+  const manifest = JSON.parse(fs.readFileSync(new URL('manifest.json', tndsRoot), 'utf8'));
+  const stopId = '021013518';
+  const shardKey = stopId.slice(0, manifest.serviceShardKeyLength);
+  const shardRefs = (manifest.serviceShards?.[shardKey] ?? []).filter(shard => shard.stopIds?.includes(stopId));
+  const localRecords = shardRefs.flatMap(shard => JSON.parse(
+    gunzipSync(fs.readFileSync(new URL(shard.path, tndsRoot))).toString('utf8')
+  ).services ?? []);
+  prepared231 = localRecords.find(record => String(record.routeNumber) === '231' && record.stopSchedules?.[stopId]);
+  assert.ok(prepared231, 'the current prepared TNDS shards retain the genuine Pipers route 231 call');
+}
 const pipers231 = mergeBusTimetableSources({ bods: [], tnds: [prepared231] });
 assert.equal(pipers231.length, 1, 'prepared Pipers 231 has no equivalent BODS service and remains available');
 assert.equal(pipers231[0].routeNumber, '231');

@@ -1432,5 +1432,7 @@ window.__ATLAS_BUS_UI__ = Object.freeze({
     const rect = container?.getBoundingClientRect();
     const size = map?.getSize();
     return container && rect && size ? { hostId: $('siteMapFrame')?.parentElement?.id || null, width: rect.width, height: rect.height, leafletWidth: size.x, leafletHeight: size.y } : null;
-  }
+  },
+  getMapView: () => map ? { center: { latitude: map.getCenter().lat, longitude: map.getCenter().lng }, zoom: map.getZoom() } : null,
+  setMapViewForQa: (latitude, longitude, zoom) => map?.setView([Number(latitude), Number(longitude)], Number(zoom), { animate: false })
 });

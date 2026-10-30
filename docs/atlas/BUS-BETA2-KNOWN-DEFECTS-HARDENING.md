@@ -6,7 +6,7 @@
 - Continuation starting candidate: `291c526cf4d71c7650c8eb218df6a6f7bee65342`
 - Frozen Beta.1 `main`: `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`
 - Status: engineering candidate. No merge, Beta.2 release, or Beta.1 baseline change is authorized by this work.
-- Technical Director review: **not ready**; the full Bus suite has two unrelated failing controls, actual assessment Word parity and TNDS-heavy before/after counts remain unverified, and the branch has not been pushed.
+- Technical Director review: **not ready**; the full Bus suite has two failing controls, actual assessment Word parity and TNDS-heavy before/after counts remain unverified.
 
 ## Implemented corrections
 
@@ -75,7 +75,7 @@ Each map is one A3 page. Visual review confirmed the site, radius, selected-stop
 
 `node tests/atlas/run-all.mjs` does not pass in this checkout. It stops at the existing `tests/atlas/bus-qa-02-frequency.test.mjs:143` expectation: expected “Timetable varies between school and non-school days.”, actual empty text. The focused reproduction fails independently; the changed hierarchy files do not implement that assessment-profile note. Continuing the remaining modules after that failure exposed a second existing data-bound blocker in `bus-robustness-1a4f-tfl-ibus-operator.test.mjs:247`: the checked-in manifest digest differs from the digest computed from the locally linked Run #75 bytes. Other modules continued after skipping each known blocker and passed through the reviewed modules; this is not a full-suite pass.
 
-The repository has no applicable branch push/pull-request workflow for this candidate. The only relevant push workflow inspected is restricted to historical branch names; other CI is manual/reusable or belongs to the Drawing Generator. No CI run is claimed. A safe, narrowly scoped future CI workflow should run the ATLAS Bus suite on this branch family without changing production behavior. Network/DNS to GitHub was unavailable during verification, so remote push agreement is unconfirmed.
+The candidate branch was pushed to `origin`; the remote branch head matched the local commit at push verification. No GitHub Actions workflow ran for that commit (`actions/runs?head_sha=8ac8fd22260298550cf5f764deab1c308ddc02ad` returned zero runs). The repository has no applicable branch push/pull-request workflow for this candidate. The only relevant push workflow inspected is restricted to historical branch names; other CI is manual/reusable or belongs to the Drawing Generator. No CI run is claimed. A safe, narrowly scoped future CI workflow should run the ATLAS Bus suite on this branch family without changing production behavior.
 
 ## Remaining limitations and manual acceptance
 

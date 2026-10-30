@@ -67,6 +67,7 @@ Not completed in this environment:
 - Python and the Python launcher are unavailable, so `tools/atlas-bus-data/test_build_static_index.py` has not run.
 - Data-bound `bus-timetable-merge`, `prepared-bus-data-integrity`, and `bus-qa-03-integrity` tests cannot start because their prepared national files are not present in this sparse checkout. The 900 MB publication root and the excluded national datasets were left untouched.
 - The review server test can bind a loopback listener but its follow-up fetch is blocked by sandbox `EACCES`; browser server acceptance is therefore incomplete here.
+- No GitHub Actions run was triggered by this branch push. The repository workflows are manual/reusable or are restricted to specific historical branch names; the only pull-request/push CI workflow is scoped to the Drawing Generator and `main`. Do not treat the absence of a run as a passing CI result.
 - The complete suite, required 310/203/62/64/65 source-shaped regressions, TNDS review-noise and effective-date conflict controls, operating-profile controls, full Word/Browser parity, and CI remain unverified. A focused unit pass is not a substitute for those gates.
 
 ## Manual acceptance guide

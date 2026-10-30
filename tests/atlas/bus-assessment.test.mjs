@@ -209,6 +209,25 @@ test('repeated special-day profile warnings group to one material calendar issue
   assert.ok(calendarIssues.every(item => item.stop === '2100A, 2100B'), 'all affected stops remain attached to each grouped issue');
 });
 
+test('special-day profile warnings without a public route identity remain separately reviewable', async () => {
+  const records = ['JP_unknown-1', 'JP_unknown-2'].map(profile => ({
+    ...service,
+    id: profile,
+    routeNumber: null,
+    timetableSource: 'TNDS',
+    source: { provider: 'TNDS' },
+    sourceWarnings: [`TNDS ${profile} has an unsupported complex operating profile (SpecialDaysOperation); operating days remain unresolved and no timetable days were fabricated.`]
+  }));
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: records, warnings: [], provenance: { source: 'TNDS' } }) },
+    accessRouting: { matrix: async () => route }
+  });
+  const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  const calendarIssues = result.reviewItems.filter(item => item.code === 'service-source-evidence' && /SpecialDaysOperation/.test(item.message));
+  assert.equal(calendarIssues.length, 2, 'unknown-route pattern warnings are not collapsed into one route-level issue');
+});
+
 test('Chingford repeated origin endpoint evidence is grouped by public route issue while all raw stop records remain', async () => {
   const chingfordStops = Array.from({ length: 5 }, (_, index) => ({
     ...stop, id: `CHINGFORD-${index + 1}`, name: `Grove Road ${index + 1}`,

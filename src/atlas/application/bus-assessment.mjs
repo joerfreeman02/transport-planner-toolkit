@@ -228,6 +228,10 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     if (specialDayProfile) {
       const route = String(service.routeNumber ?? '').trim();
       const source = String(service.timetableSource || service.source?.provider || 'timetable source').trim();
+      if (!route) {
+        add({ code: 'service-source-evidence', route: null, stop: service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0], source, message: String(warning) });
+        continue;
+      }
       const key = [route, source].map(value => value.toLowerCase()).join('|');
       const issue = specialDayProfileIssues.get(key) ?? { route, source, stops: new Set(), profiles: new Set() };
       const stop = String(service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0] || '').trim();

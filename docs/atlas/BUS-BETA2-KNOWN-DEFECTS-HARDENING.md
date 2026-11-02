@@ -195,3 +195,33 @@ This final continuation started from candidate `9469d45683544497910e50df1669dafa
 - Renovate: deferred to avoid overlapping dependency automation with Dependabot.
 
 No tooling was installed or newly configured.
+
+## 212 / 16C final timetable verification (2026-11-02)
+
+This verification started from candidate `bfe18461cb712e87754021f2468ef4467c846bcb`; frozen `main` remains `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`. The checks below use the immutable Run #75 prepared Bus/TNDS manifests (SHA-256 `1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f` and `2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f`). No national data was refreshed.
+
+### Route 212 — frozen TNDS dates explain the current difference
+
+- Source record: `tnds:SE:essex_212_EFCT_PF_212_PF9000012-11_20200901_20261012_040141.xml:212_PF9000012-11`. The record is valid through 12 October 2026; the Run #75 prepared timetable snapshot is dated 4 September 2026.
+- The ordered pattern starts at Waltham Cross Bus Station Stop C (`210021703420`), follows the circular route, and returns to Waltham Cross Bus Station (`210021700040`). The assessed frequency basis is the first Stop C call, `210021703420`; the returned terminal call does not supply the useful departure time.
+- Frozen weekday and Saturday departure samples at that selected call are 09:50, 11:20, 12:52 and 15:00 (four journeys/day). No Sunday departures are represented. These are departures, not the later return arrivals. The prepared record does not retain a per-call pickup/setdown flag, so the distinction is grounded in the ordered pattern endpoints and the stop-scoped departure schedule.
+- The current row remains **Mon–Sat: 4 journeys/day; approximately 09:50–15:00; no Sunday service**. This matches the frozen timetable evidence. The independently observed current departures around 09:30, 11:00, 12:30 and 14:30 are not in this expired TNDS service record. Classification: **frozen-data staleness / source incompleteness**, not an ATLAS circular-period defect. No current times were fabricated.
+- Limitation: the frozen evidence cannot establish Route 212's timetable after 12 October 2026. The automatic updater/data refresh must acquire that later schedule before the row can be considered current.
+
+### Route 16C — exact-origin short-working departure was lost in grouping
+
+- Frozen BODS source: south-east route ID `6770341`, Central Connect Route 16C, in the Run #75 service shard. The circular pattern is ordered from Waltham Cross Stop C (`210021703430`) around the loop back to the same Stop C. Its validity is 19 October 2026–19 July 2027, covering the 2 November 2026 review date.
+- The frozen full-loop Stop C schedule includes terminal observations at 08:00, 09:00, 09:43, 10:00, 10:43, 11:00, 11:43, 12:00, 12:43, 13:00, 13:43, 14:00, 14:43, 15:00, 15:43, 16:00, 16:43, 17:00, 17:43, 18:00, 18:43 and 19:43. The repeated calls around :43 are terminal return observations between hourly boarding departures, not extra departures.
+- The same frozen BODS service has an explicit Stop C origin short working to Maple Gate at 18:45 (`south_east:6770341:0:b47bb4fbffda`) and another to Maynard Court at 19:45 (`south_east:6770341:0:b1360459a1f1`). The latter is the requested later Sunday departure. It is present in Run #75, is not excluded by its effective dates or calendar, and its exact origin is the assessed Stop C.
+- Root cause: the principal timetable population removed all records classified as short workings before circular terminal normalization. That hid the valid 19:45 boarding journey. Normalizing the full-loop record in isolation also left an unpaired terminal return at 18:43 as the displayed end. This was a generic **application grouping/processing defect**, not a missing source record.
+- Correction: for a proven circular terminal, exact-origin short-working departures at the selected StopPoint now join the passenger boarding stream before circular terminal-call normalization. Arrival-only events remain excluded. The frozen route still reads approximately every 60 minutes, with a Sunday useful period of **08:00–19:45**. The generic control asserts the source record ID and 19:45 end time; no route-specific time is hardcoded.
+- Limitation: the prepared Run #75 representation exposes terminal call times and exact short-working endpoints, but not a GTFS pickup_type/setdown_type flag for every call. Endpoint role, stop-scoped schedule and ordered pattern provide the available distinction.
+
+### Verification status for this correction
+
+- `node tests/atlas/run-all.mjs` — **passed** against the complete Run #75 snapshot in an isolated verification checkout. The prepared snapshot manifest digests remained the exact Run #75 identities. The candidate checkout's local prepared-data mount was missing referenced shards, so the suite used the complete frozen-data checkout instead.
+- Focused circular and Waltham regression tests passed, including route 16C's retained BODS `19:45` source record, route 16's unchanged `08:15–21:40` / `07:10–19:38` periods, route 212's frozen departure population, and circular terminal-call filtering.
+- The real Run #75 Waltham browser-to-Word/map replay had no assertion failures, page errors, failed requests/responses or unintended external requests. It showed all 19 requested routes. Route 16 retained its accepted output; 16C remains Sunday-only with `08:00–19:45`; 212 remains `09:50–15:00` from the expired frozen schedule; both 242 identities remain present; 279 remains one Manor House row; 217/317/327 and 310 remain one useful row each; 491 and N279 remain present.
+- Sources & Checks contains exactly **7** items: endpoint evidence for 16, 16C, 217, 317 and 327 plus two TfL timetable-availability items. No principal-location warning returned.
+- Word with map, Word without map, reference removal for map-off, standalone A3 landscape PDF map, and browser/Word row parity passed. The audit status is `READY_FOR_TECHNICAL_DIRECTOR_REVIEW_BEFORE_MANUAL_RE-ACCEPTANCE`; it is not Product Owner acceptance.
+- The frozen `main` SHA remains `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`. No previously accepted Bus behaviour was intentionally changed except retaining the evidence-backed late boarding departure on the proven circular route 16C. Route 212 remains tied to its frozen schedule until the updater supplies newer national evidence.

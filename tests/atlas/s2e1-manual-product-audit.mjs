@@ -824,7 +824,7 @@ try {
         assert.match(route16?.['Direction / main service pattern'] || '', /^Circular/i, 'Waltham route 16 must be presented as circular.');
         assert.match(`${route16?.['Typical frequency']} ${route16?.['Operating period at stop']}`, /every ~30.*08:15.*21:40/i, 'Waltham route 16 must use departure-only terminal frequency and period evidence.');
         assert.match(route16C?.['Direction / main service pattern'] || '', /^Circular/i, 'Waltham route 16C must be presented as circular.');
-        assert.match(`${route16C?.['Typical frequency']} ${route16C?.['Operating period at stop']}`, /every ~60.*08:00.*18:45/i, 'Waltham route 16C must use its selected-stop circular departure population.');
+        assert.match(`${route16C?.['Typical frequency']} ${route16C?.['Operating period at stop']}`, /every ~60.*08:00.*19:45/i, 'Waltham route 16C must include the frozen exact-terminal 19:45 boarding short working.');
         assert.match(route212?.['Direction / main service pattern'] || '', /^Circular/i, 'Waltham TNDS route 212 must be presented as circular.');
         assert.match(`${route212?.['Typical frequency']} ${route212?.['Operating period at stop']}`, /4 journeys\/day.*09:50.*15:00/i, 'Waltham route 212 must use the frozen departing journey population.');
         assert.doesNotMatch(`${checksText} ${exportedWordText}`, /principal locations could not be safely mapped/i, 'Waltham must not retain stale principal-location warnings after final rows resolve those patterns.');

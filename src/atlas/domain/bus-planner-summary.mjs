@@ -1219,10 +1219,20 @@ function deduplicateDepartureEntries(entries) {
 function canonicalDeparturePopulation(component, representativeId, main, plannerServiceGroup = null) {
   const eligible = component.filter(service => serviceAtRepresentative(service, representativeId));
   const shortWorkingIds = new Set(plannerServiceGroup?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []);
-  const principalEligible = eligible.filter(service => ![serviceIdForPlanner(service), ...(service?.sourceRecordIds ?? [])]
-    .filter(Boolean).some(id => shortWorkingIds.has(id)));
+  const circularClassificationProven = plannerServiceGroup?.circularServiceDecision?.classification === 'circular';
+  const terminalEvidence = (plannerServiceGroup?.terminusDecision?.proven
+    && plannerServiceGroup.terminusDecision.terminalStopPointIds?.includes(representativeId)
+    || circularClassificationProven)
+    && eligible.some(service => isClosedCircularTerminalService(service, representativeId, circularClassificationProven));
+  const isShortWorking = service => [serviceIdForPlanner(service), ...(service?.sourceRecordIds ?? [])]
+    .filter(Boolean).some(id => shortWorkingIds.has(id));
+  const shortWorkingBoardingAtCircularTerminal = service => terminalEvidence
+    && isShortWorking(service)
+    && exactEndpointAtStop(service, 'origin', representativeId)
+    && serviceDepartureEntries(service, representativeId).some(entry => entry.occurrenceRole !== 'arrival');
+  const principalEligible = eligible.filter(service => !isShortWorking(service));
   // A short working is retained in the raw service group and planner
-  // annotations, but it must not inflate the principal public timetable's
+  // annotations, but it does not inflate the principal public timetable's
   // frequency merely because it serves the same assessed stop. If the group
   // contains no separately identified principal, retain the original
   // population rather than silently dropping the only available service.
@@ -1235,19 +1245,42 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
     && !reverseEndpointRelationship(candidate, service)
     && endpointDirectionCompatible(candidate, service)));
   const records = authoritativeRecords.length ? authoritativeRecords : populationRecords;
-  const circularClassificationProven = plannerServiceGroup?.circularServiceDecision?.classification === 'circular';
-  const terminalEvidence = (plannerServiceGroup?.terminusDecision?.proven
-    && plannerServiceGroup.terminusDecision.terminalStopPointIds?.includes(representativeId)
-    || circularClassificationProven)
-    && eligible.some(service => isClosedCircularTerminalService(service, representativeId, circularClassificationProven));
-  const entries = deduplicateDepartureEntries(records.flatMap(service => {
+  const circularBaseEntries = [];
+  const otherBaseEntries = [];
+  for (const service of records) {
     const serviceEntries = serviceDepartureEntries(service, representativeId);
     const circularTerminal = terminalEvidence && isClosedCircularTerminalService(service, representativeId, circularClassificationProven);
-    if (terminalEvidence && !circularTerminal && exactEndpointAtStop(service, 'destination', representativeId) && !exactEndpointAtStop(service, 'origin', representativeId)) return [];
-    return circularTerminal
-      ? DAY_ORDER.flatMap(day => normaliseCircularTerminalEntries(serviceEntries.filter(entry => entry.day === day)))
-      : serviceEntries;
-  }));
+    if (terminalEvidence && !circularTerminal && exactEndpointAtStop(service, 'destination', representativeId) && !exactEndpointAtStop(service, 'origin', representativeId)) continue;
+    if (circularTerminal) {
+      circularBaseEntries.push(...DAY_ORDER.flatMap(day => normaliseCircularTerminalEntries(serviceEntries.filter(entry => entry.day === day))));
+      continue;
+    }
+    if (terminalEvidence && shortWorkingBoardingAtCircularTerminal(service)) continue;
+    otherBaseEntries.push(...serviceEntries);
+  }
+  const circularBaseLastByDay = new Map(DAY_ORDER.map(day => [day, Math.max(-Infinity, ...circularBaseEntries.filter(entry => entry.day === day).map(entry => entry.minute))]));
+  const laterCircularShortWorkingEntries = terminalEvidence
+    ? eligible.filter(service => shortWorkingBoardingAtCircularTerminal(service)
+      && !isClosedCircularTerminalService(service, representativeId, circularClassificationProven))
+      .flatMap(service => serviceDepartureEntries(service, representativeId).filter(entry => entry.occurrenceRole !== 'arrival'
+        && entry.minute > (circularBaseLastByDay.get(entry.day) ?? -Infinity)))
+    : [];
+  const collectedEntries = deduplicateDepartureEntries([...circularBaseEntries, ...otherBaseEntries, ...laterCircularShortWorkingEntries]);
+  // A late, exact-origin short working can disambiguate the nearby terminal
+  // return call on the circular pattern. Re-normalize only when such an
+  // operating-period extension exists; the principal stream and its
+  // frequency remain unchanged for unaffected circular services.
+  const shortWorkingDisambiguatedReturns = new Set(laterCircularShortWorkingEntries.flatMap(departure => circularBaseEntries
+    .filter(entry => entry.day === departure.day
+      && !entry.occurrenceRole
+      && departure.minute > entry.minute
+      && departure.minute - entry.minute <= 5)));
+  const terminalStream = shortWorkingDisambiguatedReturns.size
+    ? collectedEntries.filter(entry => !shortWorkingDisambiguatedReturns.has(entry))
+    : collectedEntries;
+  const entries = terminalEvidence && laterCircularShortWorkingEntries.length
+    ? DAY_ORDER.flatMap(day => normaliseCircularTerminalEntries(terminalStream.filter(entry => entry.day === day)))
+    : terminalStream;
   // Preserve the existing per-pattern source arbitration for departures. A
   // primary source's explicit zero-service day is also authoritative across
   // endpoint variants; otherwise a supplementary feed can invent service on

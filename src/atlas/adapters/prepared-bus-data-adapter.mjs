@@ -603,7 +603,8 @@ export function createPreparedBusDataAdapter({
       // when its exact endpoint identities agree with this service record.
       return candidate.length > 1 && candidate[0] === originId && candidate.at(-1) === destinationId ? candidate : [];
     };
-    const patternsNeedingCalls = mergedServices.filter(service => !service.routePatternStops?.length && orderedPatternIds(service).length > 1);
+    const patternsNeedingCalls = mergedServices.filter(service => orderedPatternIds(service).length > 1
+      && (!service.routePatternStops?.length || service.routePatternStops.some(stop => !String(stop?.locality || stop?.localityName || stop?.nptgLocalityName || '').trim())));
     const referenceIds = [...new Set(patternsNeedingCalls.flatMap(orderedPatternIds))];
     const referenceResult = referenceIds.length ? await referenceStopPointsByIds(referenceIds, { forceRefresh }) : null;
     if (referenceResult?.ok) {
@@ -613,17 +614,21 @@ export function createPreparedBusDataAdapter({
       for (const service of patternsNeedingCalls) {
         const ids = orderedPatternIds(service);
         service.routePatternStopIds = ids;
-        service.routePatternStops = ids.map(id => {
+        const existingCalls = new Map((service.routePatternStops ?? []).map(stop => [String(stop?.id || stop?.stopPointId || ''), stop]));
+        const hydratedCalls = ids.map(id => {
           const stop = byId.get(id);
           const locality = stop ? localityByCode.get(String(stop.nptgLocalityCode ?? '')) : null;
+          const existing = existingCalls.get(id) ?? {};
           return stop ? {
+            ...existing,
             id,
-            name: String(stop.commonName ?? stop.name ?? '').trim(),
-            locality: String(locality?.name ?? stop.nptgLocalityName ?? stop.locality ?? '').trim(),
-            localityQualifier: String(stop.localityQualifier ?? '').trim(),
-            parentLocality: String(locality?.parentLocalityName ?? stop.parentLocalityName ?? '').trim()
-          } : { id, name: '' };
+            name: String(existing.name ?? existing.commonName ?? stop.commonName ?? stop.name ?? '').trim(),
+            locality: String(locality?.name ?? stop.nptgLocalityName ?? stop.locality ?? existing.locality ?? existing.localityName ?? existing.nptgLocalityName ?? '').trim(),
+            localityQualifier: String(existing.localityQualifier ?? stop.localityQualifier ?? '').trim(),
+            parentLocality: String(existing.parentLocality ?? locality?.parentLocalityName ?? stop.parentLocalityName ?? '').trim()
+          } : { ...existing, id, name: String(existing.name ?? existing.commonName ?? '').trim() };
         });
+        service.plannerLocalityPatternStops = hydratedCalls;
       }
     }
     const checkedAt = clock().toISOString();

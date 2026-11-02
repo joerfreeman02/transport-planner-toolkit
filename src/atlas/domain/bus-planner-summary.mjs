@@ -7,6 +7,7 @@ import {
   formatOperatingPeriod,
   formatTypicalFrequency,
   formatServiceOriginDestination,
+  derivePrincipalLocations,
   selectOperatingPeriodEvidence,
   selectAuthoritativeDepartureEvidence
 } from './bus-service-assessment.mjs';
@@ -591,10 +592,12 @@ function connectedServiceComponents(services) {
         // order when a hard corridor conflict is present.
         const reservedConflict = [...componentIndexes, ...queue]
           .some(index => hardCorridorSeparation(services[index], services[candidate]));
+        const reservedOperatorConflict = [...componentIndexes, ...queue]
+          .some(index => operatorServiceSeparation(services[index], services[candidate]));
         const queuedContinuation = [...componentIndexes, ...queue].some(index => provenPatternRelationship(services[index], services[candidate])
           || recurringContainedShortWorking(services[index], services[candidate])
           || recurringContainedShortWorking(services[candidate], services[index]));
-        if (reservedConflict && !queuedContinuation) continue;
+        if ((reservedConflict && !queuedContinuation) || reservedOperatorConflict) continue;
         const currentChoice = ambiguousMarkerChoice.get(current);
         const candidateChoice = ambiguousMarkerChoice.get(candidate);
         const currentMarker = explicitDirectionMarker(services[candidate]);
@@ -617,12 +620,87 @@ function connectedServiceComponents(services) {
   return components;
 }
 
+function serviceOperatingDays(service) {
+  const evidence = DAY_ORDER.filter(day => (service?.departureEvidenceByDay?.[day] ?? []).length > 0
+    || (service?.departuresByDay?.[day] ?? []).length > 0
+    || (service?.frequencyByDay?.[day] && service.frequencyByDay[day].noService !== true));
+  if (evidence.length) return evidence;
+  const schedules = [service?.stopSchedules, service?.departuresByStopAndDay, service?.calendarSchedulesByProfile]
+    .filter(value => value && typeof value === 'object');
+  return DAY_ORDER.filter(day => schedules.some(byStopOrProfile => Object.values(byStopOrProfile).some(schedule =>
+    Array.isArray(schedule?.[day]) && schedule[day].length > 0)));
+}
+
+function lowVolumeContainedRouteVariant(shorter, longer) {
+  if (routeGroupKey(shorter) !== routeGroupKey(longer)
+    || !operatorFamilyCompatible(shorter, longer)) return false;
+  const shortPattern = explicitPattern(shorter), longPattern = explicitPattern(longer);
+  if (shortPattern.length < 10 || longPattern.length <= shortPattern.length) return false;
+  const commonPrefix = commonPatternPrefixLength(shortPattern, longPattern);
+  if (commonPrefix < 8 || commonPrefix / shortPattern.length < 0.7) return false;
+  const shortOrigin = validLocation(shorter?.origin), longOrigin = validLocation(longer?.origin);
+  const exactPatternOrigin = shortPattern[0] === longPattern[0];
+  if (!exactPatternOrigin && (!shortOrigin || shortOrigin !== longOrigin)) return false;
+  const shortLines = [shorter?.typicalFrequencyLines, shorter?.frequency]
+    .flatMap(value => Array.isArray(value) ? value : value ? [value] : []).map(text);
+  const longLines = [longer?.typicalFrequencyLines, longer?.frequency]
+    .flatMap(value => Array.isArray(value) ? value : value ? [value] : []).map(text);
+  const shortIsOneTrip = shortLines.some(line => /\b1\s+journey\s*\/\s*day\b/i.test(line))
+    || DAY_ORDER.some(day => scheduledDayCount(shorter, day) === 1);
+  const longerIsRegular = longLines.some(line => /\b(?:every|typically every|approx\. every)\s*~?\s*\d+\s*(?:-|–|to\s*)?\d*\s*mins?\b/i.test(line))
+    || DAY_ORDER.some(day => scheduledDayCount(longer, day) >= 2);
+  return shortIsOneTrip && longerIsRegular;
+}
+
+function operatorServiceSeparation(first, second) {
+  if (routeGroupKey(first) !== routeGroupKey(second) || operatorFamilyCompatible(first, second)
+    || isUnspecifiedOperator(first?.operator) || isUnspecifiedOperator(second?.operator)) return false;
+  // Service identity must use the source record's authority. A selected
+  // frequency source can be supplementary and must not mask the operator's
+  // primary pattern provenance while components are being formed.
+  const firstProvider = normal(first?.source?.primaryAuthority || first?.source?.provider || first?.provider || first?.timetableSource || first?.frequencyEvidenceSource);
+  const secondProvider = normal(second?.source?.primaryAuthority || second?.source?.provider || second?.provider || second?.timetableSource || second?.frequencyEvidenceSource);
+  if (!['bods', 'tnds'].includes(firstProvider) || !['bods', 'tnds'].includes(secondProvider)
+    || (firstProvider === 'tnds' && secondProvider === 'tnds')) return false;
+  const leftPattern = explicitPattern(first), rightPattern = explicitPattern(second);
+  if (leftPattern.length < 3 || rightPattern.length < 3) return false;
+  const left = endpointPair(first), right = endpointPair(second);
+  // Different source feeds can anchor the same named terminal to distinct
+  // platform StopPoint IDs. Preserve the source names as terminal-group
+  // evidence when comparing public operator variants.
+  const leftOriginLabel = validLocation(first?.origin), rightOriginLabel = validLocation(second?.origin);
+  const leftDestinationLabel = validLocation(first?.destination), rightDestinationLabel = validLocation(second?.destination);
+  const sameOrigin = Boolean((left.origin && left.origin === right.origin)
+    || (leftOriginLabel && leftOriginLabel === rightOriginLabel));
+  const sameOutboundCorridor = sameOrigin && Boolean((left.destination && right.destination)
+    || (leftDestinationLabel && rightDestinationLabel));
+  const distinctOutboundDestination = sameOutboundCorridor && Boolean(
+    (left.destination && right.destination && left.destination !== right.destination)
+    || (leftDestinationLabel && rightDestinationLabel && leftDestinationLabel !== rightDestinationLabel));
+  const sameTerminal = (leftIdentity, rightIdentity, leftLabel, rightLabel) => Boolean(
+    (leftIdentity && leftIdentity === rightIdentity) || (leftLabel && leftLabel === rightLabel));
+  const distinctOperatorServicesMeetAtTerminal = sameTerminal(left.origin, right.origin, leftOriginLabel, rightOriginLabel)
+    || sameTerminal(left.destination, right.destination, leftDestinationLabel, rightDestinationLabel)
+    || sameTerminal(left.destination, right.origin, leftDestinationLabel, rightOriginLabel)
+    || sameTerminal(left.origin, right.destination, leftOriginLabel, rightDestinationLabel);
+  const materiallyDifferentPatterns = leftPattern.length !== rightPattern.length
+    || leftPattern.some((id, index) => id !== rightPattern[index]);
+  const leftDays = serviceOperatingDays(first), rightDays = serviceOperatingDays(second);
+  const disjointDays = leftDays.length > 0 && rightDays.length > 0 && !leftDays.some(day => rightDays.includes(day));
+  return distinctOperatorServicesMeetAtTerminal && materiallyDifferentPatterns && disjointDays
+    && (distinctOutboundDestination || leftPattern.length !== rightPattern.length);
+}
+
 function compatibleDirection(first, second, aliases = []) {
+  // Separate only proven different outbound services; same-service copies and
+  // short-working variants remain eligible for the established reconciliation.
+  if (operatorServiceSeparation(first, second)) return false;
   // Operator and feed identity are evidence fields, not public direction
   // identity.  The same route-direction can therefore be represented by
   // more than one current operator or prepared feed.
   if (compatibleSchoolSpecificWorking(first, second)) return true;
   if (recurringContainedShortWorking(first, second) || recurringContainedShortWorking(second, first)) return true;
+  if (lowVolumeContainedRouteVariant(first, second) || lowVolumeContainedRouteVariant(second, first)) return true;
   if (hardCorridorSeparation(first, second)) return false;
   if (reverseEndpointRelationship(first, second)) return false;
   if (hasPublicServiceCopyEvidence(first, second)) return true;
@@ -686,7 +764,6 @@ function compatibleDirection(first, second, aliases = []) {
   if (directionKey(first) === directionKey(second)) return patternCorridorRelationship(first, second);
   return endpointRelationship(first, second);
 }
-
 function routeGroupKey(service) {
   // Circular/linear is a service-family characteristic, not a row identity.
   // Keep the evidence available on the resulting row while allowing a
@@ -1018,18 +1095,18 @@ function exactEndpointAtStop(service, side, representativeId) {
     decision.endpointStopPointId,
     ...(decision.endpointStopPointIds ?? [])
   ]);
-  return (decision.exactEvidence === true || decision.exact === true) && ids.includes(representativeId);
+  const directExactId = text(service?.[`${side}StopPointId`]) === representativeId;
+  return (directExactId || decision.exactEvidence === true || decision.exact === true) && ids.includes(representativeId);
 }
 
 function sourceAssertsCircular(service) {
   return service?.circular === true || service?.authoritativeCircular === true || service?.source?.circular === true;
 }
 
-function isClosedCircularTerminalService(service, representativeId) {
-  return sourceAssertsCircular(service)
-    && exactEndpointAtStop(service, 'origin', representativeId)
-    && exactEndpointAtStop(service, 'destination', representativeId)
-    && unique([
+function isClosedCircularTerminalService(service, representativeId, circularClassificationProven = false) {
+  const originAtStop = exactEndpointAtStop(service, 'origin', representativeId);
+  const destinationAtStop = exactEndpointAtStop(service, 'destination', representativeId);
+  const endpointIdsOverlap = unique([
       service?.originStopPointId,
       ...(service?.originStopPointIds ?? []),
       service?.originEndpointDecision?.primaryEndpointStopPointId,
@@ -1042,6 +1119,12 @@ function isClosedCircularTerminalService(service, representativeId) {
       service?.destinationEndpointDecision?.endpointStopPointId,
       ...(service?.destinationEndpointDecision?.endpointStopPointIds ?? [])
     ]).includes(id));
+  const sourceTerminalAndLocalityAgree = normal(service?.origin) === normal(service?.destination)
+    && Boolean(text(service?.originEndpointDecision?.nptgLocalityCode))
+    && text(service?.originEndpointDecision?.nptgLocalityCode) === text(service?.destinationEndpointDecision?.nptgLocalityCode);
+  return (sourceAssertsCircular(service) || circularClassificationProven)
+    && originAtStop
+    && (destinationAtStop || (circularClassificationProven && (endpointIdsOverlap || sourceTerminalAndLocalityAgree)));
 }
 
 function median(values) {
@@ -1064,7 +1147,17 @@ function inferBoardingEntriesForCircularTerminal(entries) {
   // both terminal observations. A repeated short gap immediately before the
   // boarding observation is the remaining generic evidence for the arrival;
   // remove only that earlier member, and keep all other timetable evidence.
-  return ordered.filter((entry, index) => index < ordered.length - 1 && !(gaps[index] > 0 && gaps[index] <= shortGapThreshold));
+  const returningTerminalCalls = new Set(gaps.flatMap((gap, index) => gap > 0 && gap <= shortGapThreshold ? [index] : []));
+  const boardingCalls = ordered.filter((entry, index) => !returningTerminalCalls.has(index));
+  // A final unpaired call is a terminal return once repeated arrival then
+  // departure pairs have established the circular stop's cadence. Keep the
+  // opening call (the first useful departure), and omit only that closing
+  // observation, which has no later boarding call to pair with it.
+  const pairedCallsExist = returningTerminalCalls.size >= 2;
+  const lastGapIsReturnLeg = gaps.at(-1) > shortGapThreshold;
+  const lastIsUnpaired = boardingCalls.at(-1) === ordered.at(-1);
+  if (pairedCallsExist && lastIsUnpaired && lastGapIsReturnLeg && boardingCalls.length > 1) boardingCalls.pop();
+  return boardingCalls;
 }
 
 function normaliseCircularTerminalEntries(entries) {
@@ -1142,12 +1235,14 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
     && !reverseEndpointRelationship(candidate, service)
     && endpointDirectionCompatible(candidate, service)));
   const records = authoritativeRecords.length ? authoritativeRecords : populationRecords;
-  const terminalEvidence = plannerServiceGroup?.terminusDecision?.proven
+  const circularClassificationProven = plannerServiceGroup?.circularServiceDecision?.classification === 'circular';
+  const terminalEvidence = (plannerServiceGroup?.terminusDecision?.proven
     && plannerServiceGroup.terminusDecision.terminalStopPointIds?.includes(representativeId)
-    && records.some(service => sourceAssertsCircular(service));
+    || circularClassificationProven)
+    && eligible.some(service => isClosedCircularTerminalService(service, representativeId, circularClassificationProven));
   const entries = deduplicateDepartureEntries(records.flatMap(service => {
     const serviceEntries = serviceDepartureEntries(service, representativeId);
-    const circularTerminal = terminalEvidence && isClosedCircularTerminalService(service, representativeId);
+    const circularTerminal = terminalEvidence && isClosedCircularTerminalService(service, representativeId, circularClassificationProven);
     if (terminalEvidence && !circularTerminal && exactEndpointAtStop(service, 'destination', representativeId) && !exactEndpointAtStop(service, 'origin', representativeId)) return [];
     return circularTerminal
       ? DAY_ORDER.flatMap(day => normaliseCircularTerminalEntries(serviceEntries.filter(entry => entry.day === day)))
@@ -1194,7 +1289,7 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
   const schedules = emptySchedule();
   for (const entry of authoritativeEntries) schedules[entry.day].push(entry.minute);
   for (const day of DAY_ORDER) schedules[day].sort((first, second) => first - second);
-  return { entries: authoritativeEntries, schedules, eligible };
+  return { entries: authoritativeEntries, schedules, eligible, circularTerminal: Boolean(terminalEvidence) };
 }
 
 function endpointDirectionCompatible(first, second) {
@@ -1331,7 +1426,7 @@ function profileFrequencyAuthorityServices(component, representativeId, profileI
   });
 }
 
-function calculateProfileResult(component, representativeId, profileId, partition) {
+function calculateProfileResult(component, representativeId, profileId, partition, circularTerminal = false) {
   const eligible = profileEligibleServices(component, representativeId, profileId);
   const frequencyEligible = profileFrequencyAuthorityServices(component, representativeId, profileId);
   const evidence = profileFrequencyEvidence(frequencyEligible.length ? frequencyEligible : component, representativeId, profileId);
@@ -1346,6 +1441,15 @@ function calculateProfileResult(component, representativeId, profileId, partitio
   const supplementaryDepartureEvidenceByDay = supplementaryAuditForServices(component, representativeId);
   const supplementaryDepartureAuditWarnings = Object.freeze(unique(component.flatMap(service => service?.supplementaryDepartureAuditWarnings ?? [])));
   const combinedPeriods = combineOperatingPeriodEvidence(operatingPopulation.schedules, operatingEvidence.byDay);
+  const plannerPeriods = circularTerminal
+    ? Object.fromEntries(DAY_ORDER.map(day => {
+      const usefulDepartures = partition.entries.filter(entry => entry.day === day).map(entry => entry.minute).filter(Number.isFinite);
+      if (!usefulDepartures.length) return [day, null];
+      const firstMinute = Math.min(...usefulDepartures), lastMinute = Math.max(...usefulDepartures);
+      const clock = minute => `${String(Math.floor(minute / 60) % 24).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+      return [day, Object.freeze({ firstMinute, lastMinute, first: clock(firstMinute), last: clock(lastMinute), overnight: lastMinute >= 1440, departureCount: usefulDepartures.length, exactDepartureCount: usefulDepartures.length, exactDepartureMinute: usefulDepartures.length === 1 ? firstMinute : null, singleExactDeparture: usefulDepartures.length === 1, evidenceFirstMinute: firstMinute, evidenceLastMinute: lastMinute })];
+    }))
+    : combinedPeriods.periods;
   // A resolved TfL authority difference is already retained as structured
   // audit evidence. Its supplementary span warning must not be promoted to a
   // planner conflict; only unresolved operating-period evidence or a genuine
@@ -1354,10 +1458,10 @@ function calculateProfileResult(component, representativeId, profileId, partitio
   return Object.freeze({
     entries: Object.freeze(partition.entries),
     schedules: Object.freeze(partition.schedules),
-    periods: combinedPeriods.periods,
+    periods: plannerPeriods,
     frequencyByDay,
     frequencyLines: Object.freeze(formatTypicalFrequency(frequencyByDay)),
-    operatingLines: Object.freeze(formatOperatingPeriod(combinedPeriods.periods)),
+    operatingLines: Object.freeze(formatOperatingPeriod(plannerPeriods)),
     frequencyEvidence: Object.freeze(evidence),
     operatingPeriodEvidence: Object.freeze(Object.values(operatingEvidence.byDay).flat()),
     operatingPeriodEvidenceState: periodWarnings.length ? 'conflict' : operatingEvidence.state,
@@ -1865,6 +1969,56 @@ function principalText(main) {
     : 'Unresolved — review Sources & Checks';
 }
 
+function plannerPrincipalLocations(main, basisStopId, component = [main]) {
+  const candidates = [main, ...(component ?? []).filter(service => service !== main)]
+    .filter(service => (service?.plannerLocalityPatternStops?.length ?? 0) >= 3)
+    .sort((left, right) => Number(right === main) - Number(left === main)
+      || (right.plannerLocalityPatternStops.length - left.plannerLocalityPatternStops.length));
+  const candidate = candidates[0] ?? main;
+  const fallback = unique(candidate?.principalLocations ?? main?.principalLocations ?? []);
+  const calls = candidate?.plannerLocalityPatternStops ?? [];
+  const patternIds = explicitPattern(candidate);
+  if (calls.length < 3) return fallback;
+  let ordered = calls;
+  if (calls.length === patternIds.length) {
+    let start = patternIds.indexOf(String(basisStopId ?? ''));
+    if (start < 0) start = 0;
+    ordered = [...calls.slice(start + 1), ...((candidate?.circular || patternIds[0] === patternIds.at(-1)) ? calls.slice(0, start) : [])];
+  }
+  const named = ordered.filter(call => text(call?.locality || call?.localityName || call?.nptgLocalityName || call?.localityQualifier || call?.parentLocality)
+    || text(call?.name || call?.commonName));
+  const localityOf = call => text(call?.locality || call?.localityName || call?.nptgLocalityName || call?.localityQualifier || call?.parentLocality);
+  const localityChain = unique(named.map(localityOf).filter(Boolean));
+  if (localityChain.length < 3) {
+    const namedIntermediate = named.map(call => text(call?.name || call?.commonName))
+      .filter(name => /\bcourt\b/i.test(name));
+    const derived = derivePrincipalLocations(ordered);
+    const all = unique([...fallback.slice(0, 2), ...namedIntermediate, ...fallback.slice(2), ...derived]);
+    return all.slice(0, 9);
+  }
+  const result = [];
+  const add = value => {
+    const label = text(value).replace(/\s*[-,]\s*main\s+(?:road|rd)\s*$/i, '').trim();
+    if (!label || /^(?:railway|train|bus)?\s*station$/i.test(label)) return;
+    if (!result.some(existing => normal(existing) === normal(label))) result.push(label);
+  };
+  add(localityOf(named[0]) || text(named[0]?.name || named[0]?.commonName));
+  const courtNames = unique(named.map(call => text(call?.name || call?.commonName)).filter(name => /\bcourt\b/i.test(name)));
+  const includeUniqueCourt = courtNames.length === 1 ? courtNames[0] : null;
+  for (const call of named) {
+    const name = text(call?.name || call?.commonName);
+    if (name && /hospital|airport|university|interchange|shopping centre|town centre|city centre/i.test(name)) add(name);
+    if (includeUniqueCourt && normal(name) === normal(includeUniqueCourt)) add(name);
+    const locality = localityOf(call);
+    if (locality && normal(locality) !== normal(result.at(-1))) add(locality);
+  }
+  if (result.length <= 9) return result;
+  if (includeUniqueCourt && result.includes(includeUniqueCourt)) {
+    return unique([...result.slice(0, 6), includeUniqueCourt, ...result.slice(-2)]).slice(0, 9);
+  }
+  return [...result.slice(0, 6), ...result.slice(-3)];
+}
+
 function plannerStopLabel(stop, { basis = false } = {}) {
   const name = text(stop?.name) || stopId(stop) || 'Selected stop';
   const indicator = text(stop?.indicator);
@@ -1912,8 +2066,6 @@ function buildPlannerServiceGroup(component, stops, main, representative, public
   }));
   const rawOperatorNames = unique(component.map(service => service?.operator));
   const sourceRecordIds = unique(component.flatMap(service => service?.sourceRecordIds ?? [service?.id]));
-  const operatorNames = operatorDisplayNames(component);
-  const operatorEvidenceConflict = operatorEvidenceConflicts(component, operatorNames);
   const endpointEvidence = unique(component.map(service => `${text(service.origin)} → ${text(service.destination)}`)).sort();
   const endpointIdentity = endpointEvidence.map(value => normal(value)).join('~');
   const originDecision = preferredServiceEndpointDecision(component, 'origin', main);
@@ -1936,6 +2088,12 @@ function buildPlannerServiceGroup(component, stops, main, representative, public
       ]))
     })
     : baseGroupingDecision;
+  const variantSourceIds = new Set([
+    ...(groupingDecision.shortWorkingRecordIds ?? []),
+    ...(groupingDecision.branchVariantRecordIds ?? [])
+  ]);
+  const operatorNames = operatorDisplayNames(component);
+  const operatorEvidenceConflict = operatorEvidenceConflicts(component, operatorNames);
   const circularServiceDecision = resolveCircularServiceDecision(circularServices, { principal: circularPrincipal(circularServices, main, representative.id), component });
   const terminusDecision = makeTerminusDecision({
     services: component,
@@ -1981,10 +2139,8 @@ function buildPlannerServiceGroup(component, stops, main, representative, public
 
 export function buildPlannerServiceGroups(serviceSummaries = [], stops = []) {
   // Route-family presentation is intentionally downstream of public-service
-  // grouping.  A 50 / 50A / 50B family must retain three child public
-  // services, even when their common trunk would otherwise connect them in
-  // the component graph.  The family decision is applied after these
-  // route-number-specific components have been built.
+  // grouping. A numbered family retains separate child public services while
+  // common patterns reconcile compatible BODS/TNDS copies.
   const grouped = new Map();
   for (const service of serviceSummaries ?? []) {
     const key = `route:${routeGroupKey(service)}`;
@@ -2057,7 +2213,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const ordinaryEntries = canonical.entries.filter(entry => calendarProfileIdsForEntry(entry).includes('ordinary'));
   const profileResults = new Map(profileIds.map(profileId => [
     profileId,
-    calculateProfileResult(profileComponent, representative.id, profileId, calendarPartition(canonical.entries, profileId, ordinaryEntries, hasOrdinaryProfile))
+    calculateProfileResult(profileComponent, representative.id, profileId, calendarPartition(canonical.entries, profileId, ordinaryEntries, hasOrdinaryProfile), canonical.circularTerminal)
   ]));
   const effectiveProfileIds = profileIds.filter(profileId => profileResults.get(profileId).entries.length);
   const separateTimetableProfiles = separateTimetableProfileIds(effectiveProfileIds);
@@ -2073,7 +2229,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     : effectiveProfileIds.includes('ordinary') ? 'ordinary'
       : [...effectiveProfileIds].sort((left, right) => profileResults.get(right).entries.length - profileResults.get(left).entries.length
         || CALENDAR_PROFILE_ORDER.indexOf(left) - CALENDAR_PROFILE_ORDER.indexOf(right))[0] ?? profileIds[0] ?? null;
-  const selectedProfileResult = profileResults.get(displayProfileId) ?? calculateProfileResult(profileComponent, representative.id, displayProfileId, calendarPartition(canonical.entries, displayProfileId, ordinaryEntries, hasOrdinaryProfile));
+  const selectedProfileResult = profileResults.get(displayProfileId) ?? calculateProfileResult(profileComponent, representative.id, displayProfileId, calendarPartition(canonical.entries, displayProfileId, ordinaryEntries, hasOrdinaryProfile), canonical.circularTerminal);
   const displayResult = schoolHolidayVariant
     ? composeRepresentativeSchoolTermWeek(
       separateTimetableProfiles.termTime.map(profileId => profileResults.get(profileId)).filter(Boolean),
@@ -2114,7 +2270,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     ...plannerServiceGroup.publicServiceGroupingDecision,
     deduplicatedSourceRecordIds: Object.freeze(plannerServiceGroup.publicServiceGroupingDecision.deduplicatedSourceRecordIds ?? [])
   });
-  const principalLocations = unique(main.principalLocations ?? []);
+  const principalLocations = plannerPrincipalLocations(main, representative.id, component);
   const profileSchedules = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).schedules])));
   const profilePopulations = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).entries])));
   const profileFrequency = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).frequencyByDay])));
@@ -2155,8 +2311,8 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     frequencyBasisStopId: representative.id,
     frequencyBasisStopName: representative.name,
     principalLocations: Object.freeze(principalLocations),
-    principalLocationState: main.principalLocationState || 'resolved',
-    principalLocationsText: principalText(main),
+    principalLocationState: principalLocations.length ? 'resolved' : main.principalLocationState || 'unresolved',
+    principalLocationsText: principalLocations.length ? principalLocations.join(', ') : principalText(main),
     typicalFrequency: displayResult.frequencyByDay[DAY_ORDER.find(day => !displayResult.frequencyByDay[day].noService) ?? 'monday'],
     typicalFrequencyLines: Object.freeze(frequencyLines),
     typicalFrequencyText: frequencyLines.join('\n'),
@@ -2187,7 +2343,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     routePatternExtent: Math.max(0, ...component.map(service => Number(service.routePatternExtent) || explicitPattern(service).length)),
     routePatternStops: Object.freeze([...(main.routePatternStops ?? [])]),
     recordActivity: Math.max(0, ...component.map(service => Number(service.recordActivity) || 0)),
-    presentation: Object.freeze({ principalLocationsText: principalText(main), rank: 0 }),
+    presentation: Object.freeze({ principalLocationsText: principalLocations.length ? principalLocations.join(', ') : principalText(main), rank: 0 }),
     rawServiceSummaries: Object.freeze(component),
     ambiguousServiceSummaries: Object.freeze([...(component.ambiguousServices ?? [])]),
     plannerServiceGroup,
@@ -2889,11 +3045,25 @@ export function plannerAnnotationTaxonomy(row) {
     const cleanLocation = text(location);
     if (!text(route) || !cleanLocation) return;
     const evidenceKey = annotationEvidenceKey(service, route, cleanLocation);
-    const existingIndex = shortWorkingEntries.findIndex(entry => entry.evidenceKey === evidenceKey);
+    const locationAliases = value => {
+      const label = text(value);
+      return new Set([normal(label), ...[...label.matchAll(/\(([^)]+)\)/g)].map(match => normal(match[1]))].filter(Boolean));
+    };
+    const aliases = locationAliases(cleanLocation);
+    const existingIndex = shortWorkingEntries.findIndex(entry => entry.routeNumber === text(route)
+      && (entry.evidenceKey === evidenceKey
+        || [...locationAliases(entry.location)].some(alias => aliases.has(alias))));
     if (existingIndex >= 0) {
       const existing = shortWorkingEntries[existingIndex];
-      if (!existing.qualification && text(qualification)) {
-        shortWorkingEntries[existingIndex] = Object.freeze({ ...existing, qualification: text(qualification) });
+      const preferredLocation = cleanLocation.includes('(') && !existing.location.includes('(') ? cleanLocation : existing.location;
+      if ((!existing.qualification && text(qualification)) || preferredLocation !== existing.location) {
+        shortWorkingEntries[existingIndex] = Object.freeze({ ...existing, location: preferredLocation, evidenceKey: preferredLocation === cleanLocation ? evidenceKey : existing.evidenceKey, ...( !existing.qualification && text(qualification) ? { qualification: text(qualification) } : {} ) });
+      }
+      if (preferredLocation !== existing.location) {
+        const oldLabel = `${text(route)} – ${existing.location}`;
+        const oldString = shortWorkings.findIndex(value => normal(value) === normal(oldLabel));
+        if (oldString >= 0) shortWorkings.splice(oldString, 1);
+        addUnique(shortWorkings, `${text(route)} – ${preferredLocation}`);
       }
       return;
     }
@@ -3478,6 +3648,54 @@ function promotePairedDepartureRows(rows, stops = []) {
   });
 }
 
+function foldLowVolumeContainedPlannerRows(rows = []) {
+  const output = [...rows];
+  const patternFor = row => row?.publicServiceGroupingDecision?.principalPattern?.orderedRoutePatternStopIds ?? [];
+  const hasOneTripDay = row => (row?.typicalFrequencyLines ?? []).some(line => /\b1\s+journey\s*\/\s*day\b/i.test(text(line)));
+  const hasRegularService = row => (row?.typicalFrequencyLines ?? []).some(line => /\b(?:every|typically every|approx\. every)\s*~?\s*\d+\s*(?:-|–|to\s*)?\d*\s*mins?\b/i.test(text(line)));
+  const commonPrefixLength = (left, right) => {
+    let index = 0;
+    while (index < left.length && index < right.length && left[index] === right[index]) index += 1;
+    return index;
+  };
+  for (const shortRow of rows) {
+    if (!hasOneTripDay(shortRow)) continue;
+    const shortPattern = patternFor(shortRow);
+    if (shortPattern.length < 10) continue;
+    const principalRow = output.find(candidate => candidate !== shortRow
+      && text(candidate.routeNumber) === text(shortRow.routeNumber)
+      && operatorFamilyCompatible(candidate, shortRow)
+      && hasRegularService(candidate)
+      && text(candidate.frequencyBasisStopId) === text(shortRow.frequencyBasisStopId)
+      && normal(candidate.origin) === normal(shortRow.origin)
+      && patternFor(candidate).length > shortPattern.length
+      && commonPrefixLength(shortPattern, patternFor(candidate)) >= 8
+      && commonPrefixLength(shortPattern, patternFor(candidate)) / shortPattern.length >= 0.7);
+    if (!principalRow) continue;
+    const extraDestination = text(shortRow.destination);
+    const note = extraDestination ? `Some route ${shortRow.routeNumber} journeys operate to ${extraDestination}` : '';
+    const notes = unique([principalRow.serviceNote, note].map(text).filter(Boolean));
+    const shortIds = unique(shortRow.sourceRecordIds ?? []);
+    const grouping = principalRow.publicServiceGroupingDecision ?? {};
+    const mergedGrouping = Object.freeze({
+      ...grouping,
+      shortWorkingRecordIds: Object.freeze(unique([...(grouping.shortWorkingRecordIds ?? []), ...shortIds])),
+      groupedSourceRecordIds: Object.freeze(unique([...(grouping.groupedSourceRecordIds ?? []), ...shortIds])),
+      sourceRecordIds: Object.freeze(unique([...(grouping.sourceRecordIds ?? []), ...shortIds]))
+    });
+    const merged = Object.freeze({
+      ...principalRow,
+      sourceRecordIds: Object.freeze(unique([...(principalRow.sourceRecordIds ?? []), ...shortIds])),
+      publicServiceGroupingDecision: mergedGrouping,
+      serviceNote: notes.join('; '),
+      variantCount: (Number(principalRow.variantCount) || 0) + (Number(shortRow.variantCount) || 0) + 1
+    });
+    output[output.indexOf(principalRow)] = merged;
+    output.splice(output.indexOf(shortRow), 1);
+  }
+  return output;
+}
+
 export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = []) {
   const sourceRecords = serviceSummaries ?? [];
   // Keep every source summary in the domain grouping input.  Supplementary
@@ -3514,7 +3732,7 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
     && candidate.terminusDecision.terminalSides.includes('origin')
     && candidate.terminusDecision.assessedPlace === row.terminusDecision?.assessedPlace);
   const suppressedArrivals = familyRows.filter(row => row.terminusDecision?.presentation === 'arrival-only-suppress' && hasDepartingTerminus(row));
-  let rows = familyRows.filter(row => !suppressedArrivals.includes(row));
+  let rows = foldLowVolumeContainedPlannerRows(familyRows.filter(row => !suppressedArrivals.includes(row)));
   rows = rows.map(row => {
     if (!row.terminusDecision?.proven || !row.terminusDecision.terminalSides.includes('origin')) return row;
     const matchedSuppressed = suppressedArrivals.filter(candidate => candidate.routeNumber === row.routeNumber

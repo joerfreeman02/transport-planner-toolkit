@@ -595,13 +595,18 @@ function directionalPrincipalLocations(record, evidenceStopId) {
   const chosen = [];
   const add = value => {
     const label = text(value);
-    if (label && !chosen.some(existing => normal(existing) === normal(label))) chosen.push(label);
+    const facilityKey = value => normal(text(value).replace(/\s*[-,]\s*(?:main\s+)?(?:road|rd|street|st)\b.*$/i, ''));
+    if (label && !chosen.some(existing => normal(existing) === normal(label) || facilityKey(existing) === facilityKey(label))) chosen.push(label);
   };
   const legacyPrincipalNames = new Set(derivePrincipalLocations(downstreamNamed).map(normal));
   const locality = call => typeof call === 'string' ? '' : text(call?.locality || call?.localityName || call?.nptgLocalityName || call?.localityQualifier || call?.parentLocalityName);
+  const localityProgression = unique(downstreamNamed.map(locality).filter(Boolean).map(normal));
+  const hasUsefulLocalityProgression = localityProgression.length >= 3;
   const usefulName = (call, index) => {
     const name = place(call);
     if (!name) return '';
+    if (/^(?:railway|rail|train|bus|coach) station$/i.test(name)) return '';
+    if (!hasUsefulLocalityProgression && legacyPrincipalNames.has(normal(name))) return name;
     if (!locality(call)) return legacyPrincipalNames.has(normal(name)) ? name : '';
     const facility = /hospital|airport|university|interchange|shopping centre|town centre|city centre|post office/i.test(name);
     const station = /(?:bus|coach|rail(?:way)?) station/i.test(name);
@@ -845,6 +850,7 @@ export function buildServiceSummaries(stops, serviceRecords) {
       principalLocations,
       principalLocationState: principalResult.state || 'resolved',
       routePatternStops: Object.freeze([...(principalRecord.routePatternStops ?? [])]),
+      plannerLocalityPatternStops: Object.freeze([...(principalRecord.plannerLocalityPatternStops ?? [])]),
       circularPatternStopIds: Object.freeze([...(circularPatternSource.circularPatternStopIds ?? [])].map(text).filter(Boolean)),
       calendarEvidence: Object.freeze(calendarEvidence),
       directionFamily: directionGroupKey(first),

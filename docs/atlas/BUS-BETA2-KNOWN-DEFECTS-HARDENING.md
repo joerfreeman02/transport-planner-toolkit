@@ -75,6 +75,70 @@ The accepted outside-London hierarchy remains BODS primary with TNDS supplementa
 
 No tooling was installed or newly configured.
 
+## Final product accuracy closeout (2026-11-02)
+
+This continuation began at `4394dc5f8be80661ed070f2e5b20461c9d1b1b95` on `codex/atlas-bus-beta2-known-defects-hardening`. The frozen `main` SHA remains `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`. All verification used immutable Run #75 Bus (`1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f`) and TNDS (`2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f`) manifests. No refresh, acquisition, publication, release, merge, or updater activity occurred.
+
+### Defects corrected
+
+- **Route 242 identity:** the service graph could join different operators through opposite-direction patterns at a shared terminal and through cross-feed bridge records. The guard now compares proven primary source authority, operator, ordered pattern and service days across shared named terminal identity, preventing that bridge while retaining same-operator/source reconciliation. A genuinely low-volume route branch that shares a substantial ordered trunk is folded into its same-operator principal row with the source journey and destination note retained. Frozen Waltham output now has exactly two rows: Uno towards Potters Bar, Mon–Fri typically every 60–85 minutes and Saturday every 60 minutes; Central Connect towards Welham Green, Sunday every 120 minutes. The single weekday Brookfield journey remains a note on Uno’s row.
+- **Circular terminal frequency/period:** circular services use eligible departures from the selected terminal. Returning arrivals no longer create short artificial headways or extend useful departure periods. Route 16 displays approximately 30-minute core service and 08:15–21:40 weekdays / 07:10–19:38 Saturday. Route 16C displays approximately 60-minute Sunday service and 08:00–18:45. The selected frozen departure population supports 18:45; no later departure was inferred.
+- **Route 212:** TNDS same-locality terminal evidence plus an ordered outward loop now produces circular wording. The row shows four Monday–Saturday journeys and 09:50–15:00.
+- **Principal-location review warnings:** final planner rows can use a safe ordered locality pattern from a reconciled component member when the primary presentation record lacks locality calls. Warning reconciliation now runs against final resolved route and source identities; warnings remain when any final row for that identity is unresolved. The six reviewed route warnings are removed only after their final rows resolve. This replay also resolved the ordered locality chains for 217, 317 and 327 from their component patterns.
+- **Route 279 wording:** destination labels are deduplicated in the generic short-working note. The exported wording is `Some route 279 journeys operate to Stamford Hill (Rookwood Road).`
+- **Route 13/15 locations:** locality transitions take precedence where the reference pattern proves them. Route 13 removes the bare Railway Station and duplicated hospital main-road label; Route 15 now shows the ordered Waltham Cross–Waltham Abbey–Nazeing/Bumbles Green/Broadley Common–Harlow progression.
+
+### Final Waltham route audit
+
+The real Browser path rendered 20 planner rows across the 19 requested route numbers because Route 242 correctly has two operator identities. Browser and Word agree. Frequencies and periods below are at the selected Waltham Cross stop; source is the planner row's displayed timetable authority.
+
+| Route | Operator | Direction / identity | Calendar, typical frequency and useful period | Principal locations | Source |
+|---|---|---|---|---|---|
+| 13 | Central Connect | Towards The Talbot | Mon–Fri ~30 min, Sat ~60 min; 06:30–18:10 weekdays, 08:40–15:40 Saturday | Waltham Cross, Waltham Abbey, Upshire, Epping, St Margaret's Hospital, Coopersale, North Weald | BODS |
+| 14 | Central Connect | Towards Waltham Abbey (Princesfield Rd) | Mon–Fri 2/day; 07:50–20:25; no weekend service | Waltham Abbey, Highbridge Rdbt, Sun Street, Newteswell | BODS |
+| 15 | Central Connect | Towards Harlow Town Centre Bus Station | Mon–Fri ~60–80 min, Sat ~60–120 min; 09:10–22:10 weekdays, 07:55–22:10 Saturday | Waltham Cross, Waltham Abbey, Nazeing, Bumbles Green, Broadley Common, Tylers Cross, Passmores, Harlow, Harlow Town Centre | BODS |
+| 16 | Central Connect | Circular | Mon–Fri ~30 min, Sat about 30 min (irregular); 08:15–21:40 weekdays, 07:10–19:38 Saturday | Maynard Court, Gant Court, Waltham Abbey, Waltham Cross | BODS |
+| 16C | Central Connect | Circular | Sunday ~60 min; 08:00–18:45; no weekday/Saturday service | Waltham Cross, Waltham Abbey, Loughton, Debden | BODS |
+| 25C | Central Connect | Towards Harlow Town Centre Bus Station | Mon–Fri 1/day at about 16:05; no weekend service | Waltham Cross, Theobalds Grove, Cheshunt, Flamstead End, Turnford, Wormley, Abbotts Court, Harlow, Harlow Town Centre | BODS |
+| 66 | Arriva Herts and Essex | Towards Loughton Station | Mon–Fri ~30–40 min, Sat ~30 min; 05:29–19:05 weekdays, 06:05–18:50 Saturday | Waltham Cross, Waltham Abbey, Loughton | BODS |
+| 211 | Epping Forest Community Transport | Towards Breach Barns | Mon–Sat 4/day; 10:00–15:00 | Waltham Cross Railway Station, Quaker Lane, Parklands, Amesbury, Breach Barns, Waltham Abbey | TNDS |
+| 212 | Epping Forest Community Transport | Circular via Waltham Cross Railway Station (outbound) | Mon–Sat 4/day; 09:50–15:00 | Waltham Cross Railway Station, Farm Hill Road, Gilsland, Foxes Parade, Waltham Abbey, Waltham Cross | TNDS |
+| 217 | Arriva London North | Towards Turnpike Lane Bus Station | Mon–Fri ~10–15 min, Sat ~15–20 min, Sun ~20 min; 04:00–00:59 daily (next day) | Freezy Water, Bulls Cross, Manor Court, Enfield Wash, Forty Hill, Enfield, Turnpike Lane, West Green | TfL |
+| 242 | Central Connect | Towards Welham Green Railway Station | Sunday ~120 min, 09:00–17:00; no Mon–Sat service | Waltham Cross, Theobalds Grove, Cheshunt, Flamstead End, Rosedale, Goffs Oak, Swanley Bar, Brookmans Park, Welham Green | BODS |
+| 242 | Uno | Towards Potters Bar Railway Station | Mon–Fri ~60–85 min, Sat ~60 min; 06:25–20:20 weekdays, 07:05–17:40 Saturday | Waltham Cross, Theobalds Grove, Cheshunt, Flamstead End, Rosedale, Goffs Oak, Cuffley, Northaw, Potters Bar | BODS |
+| 251 | Arriva Herts and Essex | Towards Waltham Abbey (Princesfield Rd) | Mon–Fri ~30–40 min, Sat ~30 min; 06:37–19:21 weekdays, 08:05–19:35 Saturday | Waltham Cross Railway Station, Quaker Lane, Amwell Court, Edward Court, Jubilee Court, Wormyngford Court, Broomfield Court, Tillingham Court, Geisthorp Court | BODS |
+| 279 | Arriva London North | Towards Manor House Station | Mon–Fri ~5 min, Sat ~5–10 min, Sun ~10 min; 05:00–23:54 daily | Freezy Water, Enfield Wash, Enfield Highway, Ponders End, Lower Edmonton, Edmonton, Harringay, Stamford Hill, Manor House | BODS |
+| 310 | Arriva Herts and Essex | Towards Hertford Bus Station | Mon–Fri ~15–20 min, Sat ~20 min, Sun ~30 min; 06:03–22:40 weekdays, 06:40–22:39 Saturday, 07:45–20:45 Sunday | Waltham Cross, Theobalds Grove, Cheshunt, Turnford, Wormley, Broxbourne, Ware, Chadwell, Hertford | BODS |
+| 317 | Metroline Travel | Towards Enfield Town (Little Park Gardens) | Mon–Fri ~20 min, Sat ~20–30 min, Sun ~30 min; 05:00–00:59 Mon–Sat, 06:00–00:59 Sunday (next day) | Freezy Water, Bulls Cross, Manor Court, Enfield Wash, Forty Hill, Enfield, Enfield Town | TfL |
+| 327 | Metroline Travel | Towards Elsinge Estate | Mon–Sat ~40 min; 07:00–19:59; no Sunday service | Bullsmoor Lane / Hertford Road, Langdale Gardens (EN8), Lea Valley High School | TfL |
+| 491 | Metroline Travel | Towards North Middlesex Hospital | Mon–Fri ~20 min, Sat–Sun ~20 min; 06:10–23:45 Mon–Sat, 07:10–23:45 Sunday | Freezy Water, Enfield Lock, Brimsdown, Ponders End, Lower Edmonton, Edmonton, North Middlesex Hospital | BODS |
+| A1 | Central Connect | Towards Waltham Abbey (Quaker Lane) | Mon–Fri ~60 min; 08:40–14:40; no weekend service | Waltham Cross Railway Station, Long Croft Drive, Lea Road, Highbridge Rdbt, Quaker Lane, Waltham Abbey | BODS |
+| N279 | Arriva London North | Towards Charing Cross (Trafalgar Square) | Mon–Thu ~5–20 min, Fri–Sat ~20 min, Sun ~5–20 min; 00:00–04:45 daily (next day) | Freezy Water, Enfield Wash, Enfield Highway, Ponders End, Lower Edmonton, Edmonton, Tottenham Court Road Station, Leicester Square, Charing Cross | BODS |
+
+Route 242's retained note is `Some route 242 journeys operate to Brookfield Centre`. Other evidenced branch and short-working notes remain attached to the generated report; the Route 279 wording above is singular and deduplicated. Pipers 230/231, Long Lane 203, 25/25C, 62/64/65, 657, MK5, PE1, TfL and acknowledgement controls passed the complete deterministic regression.
+
+### Final review items and exports
+
+The Waltham Browser/Word run has **7** remaining review items:
+
+1. Route 16 destination endpoint: generic source endpoint retained because no exact endpoint identity was available.
+2. Route 16C destination endpoint: generic source endpoint retained because no exact endpoint identity was available.
+3. Route 217 origin endpoint: generic source endpoint retained because no exact endpoint identity was available.
+4. Route 317 origin endpoint: generic source endpoint retained because no exact endpoint identity was available.
+5. Route 327 origin endpoint: generic source endpoint retained because no exact endpoint identity was available.
+6. TfL scheduled timetable information could not be checked for one or more services; available authoritative results and matching national evidence were retained.
+7. TfL scheduled timetable information could not be checked for one or more services and no defensible national fallback was available; ATLAS did not assume zero service.
+
+No principal-location warning remains. The real localhost browser audit had zero browser errors, failed requests, failed responses, or unintended external requests. It passed acknowledgement-gated export, Word with map, Word without map, standalone map, Browser/Word row parity, and the complete route assertions. The generated Word files and standalone map are preserved with the acceptance report outside the repository for review.
+
+### Verification and checkpoint status
+
+- `node tests/atlas/run-all.mjs` — **passed**, ending `ATLAS Alpha.15 deterministic suite passed.` The default sandbox initially blocked its ephemeral localhost harness (`ERR_NETWORK_ACCESS_DENIED`); the same suite then passed with the authorized loopback boundary enabled. Frozen Bus and TNDS manifest digests remained unchanged.
+- Focused Beta.2 accuracy, Alpha.15 production-fidelity, and BUS-ROBUSTNESS-1A4 closeout tests — **passed**. The manual real-browser Waltham acceptance — **passed** with no failure entries.
+- Route 242 and 212 remain source-grounded in frozen BODS/TNDS; Routes 491 and N279 are BODS-only in this snapshot. The remaining TfL evidence items above are disclosed; no unavailable live timetable was fabricated.
+- Dependabot remains the existing dependency update mechanism. Codecov, OpenSSF Scorecard, Sentry and Renovate were reviewed; none was added or installed in this controlled closeout.
+- The candidate remains Beta.2 engineering work and requires Product Owner retest. `main` remains frozen. No release, merge, tag or national data refresh is authorized by this record.
+
 ## Final Waltham consolidation and safe-checkpoint continuation (2026-10-30)
 
 This continuation began with the candidate at `ecd62a068031dccf729468d1c4fdc60a6f0d715a`. At that point, nine intended source/test/documentation files were modified and generated audit/Word artifacts were untracked. A broad restore in the preceding fixture-recovery work had discarded earlier uncommitted changes; key rules were reconstructed from the audit and available evidence. The nine-file state was reviewed and checkpointed, but it is not represented as byte-for-byte preservation of the earlier uncommitted diff. The Run #75 reference worktree and its prepared data remained separate and unchanged. Temporary audit JSON/log and generated Word files are verification artifacts, not source changes.

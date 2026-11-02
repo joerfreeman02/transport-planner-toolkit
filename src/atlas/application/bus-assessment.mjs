@@ -257,9 +257,26 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     });
   }
   const directionalLocationIssues = new Map();
+  const safelyResolvedPrincipalSources = new Set((plannerServiceSummaries ?? [])
+    .filter(row => row?.principalLocationState !== 'unresolved' && (row?.principalLocations?.length ?? 0) > 0)
+    .flatMap(row => (row?.rawServiceSummaries ?? []).flatMap(service => [
+      service?.id,
+      ...(service?.sourceRecordIds ?? [])
+    ]).map(value => String(value ?? '').trim()).filter(Boolean)));
+  const resolvedPrincipalRoutes = new Set((plannerServiceSummaries ?? [])
+    .filter(row => row?.principalLocationState !== 'unresolved' && (row?.principalLocations?.length ?? 0) > 0)
+    .flatMap(row => [row.routeNumber, ...(row.publicRouteNumbers ?? []), ...(row.routeNumbers ?? [])]
+      .map(value => String(value ?? '').trim()).filter(Boolean)));
+  const unresolvedPrincipalRoutes = new Set((plannerServiceSummaries ?? [])
+    .filter(row => row?.principalLocationState === 'unresolved' || !(row?.principalLocations?.length ?? 0))
+    .flatMap(row => [row.routeNumber, ...(row.publicRouteNumbers ?? []), ...(row.routeNumbers ?? [])]
+      .map(value => String(value ?? '').trim()).filter(Boolean)));
   for (const service of serviceSummaries) for (const warning of service.sourceWarnings ?? []) {
     if (!/principal locations could not be safely mapped/i.test(String(warning))) continue;
+    const sourceIds = [service?.id, ...(service?.sourceRecordIds ?? [])].map(value => String(value ?? '').trim()).filter(Boolean);
+    if (sourceIds.length && sourceIds.every(id => safelyResolvedPrincipalSources.has(id))) continue;
     const route = String(service.routeNumber ?? '').trim();
+    if (route && resolvedPrincipalRoutes.has(route) && !unresolvedPrincipalRoutes.has(route)) continue;
     const message = String(warning).trim();
     const key = route || message.toLowerCase();
     const issue = directionalLocationIssues.get(key) ?? { route, messages: new Set(), sources: new Set(), stops: new Set() };
@@ -490,17 +507,46 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     // service reconciliation.  This prevents an unresolved national copy
     // from warning against a row whose named authoritative operator already
     // won the public-service decision.
+    const resolvedPrincipalSourceIds = new Set(plannerServiceSummaries
+      .filter(row => row?.principalLocationState !== 'unresolved' && (row?.principalLocations?.length ?? 0) > 0)
+      .flatMap(row => (row?.rawServiceSummaries ?? []).flatMap(service => [service?.id, ...(service?.sourceRecordIds ?? [])]))
+      .map(value => String(value ?? '').trim()).filter(Boolean));
+    const resolvedPrincipalRoutes = new Set(plannerServiceSummaries
+      .filter(row => row?.principalLocationState !== 'unresolved' && (row?.principalLocations?.length ?? 0) > 0)
+      .flatMap(row => [row.routeNumber, ...(row.publicRouteNumbers ?? []), ...(row.routeNumbers ?? [])]
+        .map(value => String(value ?? '').trim()).filter(Boolean)));
+    const unresolvedPrincipalRoutes = new Set(plannerServiceSummaries
+      .filter(row => row?.principalLocationState === 'unresolved' || !(row?.principalLocations?.length ?? 0))
+      .flatMap(row => [row.routeNumber, ...(row.publicRouteNumbers ?? []), ...(row.routeNumbers ?? [])]
+        .map(value => String(value ?? '').trim()).filter(Boolean)));
     const plannerSourceWarnings = [...new Set([
-      ...resolvedServiceSummaries.flatMap(service => [...(service.sourceWarnings ?? []), ...(service.endpointResolutionWarnings ?? [])]),
+      ...resolvedServiceSummaries.flatMap(service => [
+        ...(service.sourceWarnings ?? []).filter(warning => !/principal locations could not be safely mapped/i.test(String(warning))
+          || ![service?.id, ...(service?.sourceRecordIds ?? [])].map(value => String(value ?? '').trim()).filter(Boolean).every(id => resolvedPrincipalSourceIds.has(id))),
+        ...(service.endpointResolutionWarnings ?? [])
+      ]),
       ...plannerServiceSummaries.flatMap(service => plannerSourceWarning(service))
     ])];
+    const sourceWarningIsSafelyResolved = service => {
+      const ids = [service?.id, ...(service?.sourceRecordIds ?? [])]
+        .map(value => String(value ?? '').trim()).filter(Boolean);
+      if (ids.length > 0 && ids.every(id => resolvedPrincipalSourceIds.has(id))) return true;
+      const route = String(service?.routeNumber ?? '').trim();
+      return Boolean(route && resolvedPrincipalRoutes.has(route) && !unresolvedPrincipalRoutes.has(route));
+    };
+    const unresolvedPrincipalLocationWarnings = new Set(services
+      .filter(service => !sourceWarningIsSafelyResolved(service))
+      .flatMap(service => service.sourceWarnings ?? [])
+      .map(String).filter(warning => /principal locations could not be safely mapped/i.test(warning)));
+    const reconcilePrincipalLocationWarning = warning => !/principal locations could not be safely mapped/i.test(String(warning))
+      || unresolvedPrincipalLocationWarnings.has(String(warning));
     const routesByStop = new Map(selectedStops.map(stop => [stopKey(stop), new Set()]));
     for (const service of services) for (const [id, schedule] of Object.entries(service.stopSchedules ?? {})) if (routesByStop.has(id) && service.routeNumber && hasScheduledEvidence(schedule)) routesByStop.get(id).add(String(service.routeNumber));
     selectedStops = selectedStops.map(stop => {
       const timetableEvidence = buildStopTimetableEvidence(stop, services, servicesResult);
       return Object.freeze({ ...stop, routes: [...new Set([...(stop.routes ?? []), ...(routesByStop.get(stopKey(stop)) ?? new Set())])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })), timetableMatch: (routesByStop.get(stopKey(stop))?.size ?? 0) > 0, timetableEvidence: timetableEvidence.label, timetableEvidenceStatus: timetableEvidence.status, timetableEvidenceSources: timetableEvidence.sources ?? [] });
     });
-    const warnings = [...new Set([...(assessmentWarnings ?? commonWarnings), ...(servicesResult?.warnings ?? []), ...collectServiceWarnings(services), ...plannerSourceWarnings, ...(!servicesResult?.ok ? ['Timetable information is unavailable. Stop and routed-access results are still shown.'] : []), ...(!prepared.walkingResult?.ok ? ['Walking routes could not be checked. Please try again.'] : []), ...(!prepared.cyclingResult?.ok ? ['Cycling routes could not be checked. Please try again.'] : [])])];
+    const warnings = [...new Set([...(assessmentWarnings ?? commonWarnings), ...(servicesResult?.warnings ?? []), ...collectServiceWarnings(services), ...plannerSourceWarnings, ...(!servicesResult?.ok ? ['Timetable information is unavailable. Stop and routed-access results are still shown.'] : []), ...(!prepared.walkingResult?.ok ? ['Walking routes could not be checked. Please try again.'] : []), ...(!prepared.cyclingResult?.ok ? ['Cycling routes could not be checked. Please try again.'] : [])].filter(reconcilePrincipalLocationWarning))];
     const routingComplete = selectedStops.every(stop => stop.walking.status === 'routed' && stop.cycling.status === 'routed');
     const stopCoverageComplete = prepared.stopsResult.provenance?.stopCoverageComplete !== false;
     const nationalEvidenceComplete = servicesResult?.provenance?.nationalSourceAvailable !== false && !(servicesResult?.provenance?.nationalUnresolvedRoutes?.length);

@@ -12,7 +12,7 @@ jobs:
     env:
       ATLAS_TNDS_BANKS_JSON: ${{ vars.ATLAS_TNDS_BANKS_JSON }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: 108d898221f84c78c061db4f81335dcd911d6a0e
           path: application
@@ -50,7 +50,7 @@ jobs:
             assert r['siteUrl'] == f"https://joerfreeman02.github.io/atlas-tnds-{n}/"
           print('Configured Bank A remains A1-A3; inactive Bank B is B1-B5 with real repository/site endpoints.')
           PY
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           artifact-ids: 12275615359
           run-id: 39430415441
@@ -82,31 +82,31 @@ jobs:
             assert marker == {'schema':'atlas-publication-site-v1'}, (root['id'],marker)
             print(f"{root['id']} Pages marker healthy: {url}")
           PY
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: joerfreeman02/atlas-tnds-b1
           ref: pages-publish
           path: bank/B1
           token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: joerfreeman02/atlas-tnds-b2
           ref: pages-publish
           path: bank/B2
           token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: joerfreeman02/atlas-tnds-b3
           ref: pages-publish
           path: bank/B3
           token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: joerfreeman02/atlas-tnds-b4
           ref: pages-publish
           path: bank/B4
           token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: joerfreeman02/atlas-tnds-b5
           ref: pages-publish

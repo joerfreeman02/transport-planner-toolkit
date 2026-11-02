@@ -16,11 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
       - name: Verify checkpoint producer run and both named artifacts before download
@@ -58,7 +58,7 @@ jobs:
           print('Checkpoint producer and exact artifacts verified before restore.')
           PY
       - name: Restore primary checkpoint from verified producer
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: atlas-primary-reconciliation-checkpoint-${{ inputs.checkpoint_run_id }}
           run-id: ${{ inputs.checkpoint_run_id }}
@@ -66,7 +66,7 @@ jobs:
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/primary-checkpoint
       - name: Restore TNDS checkpoint from verified producer
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: atlas-tnds-reconciliation-checkpoint-${{ inputs.checkpoint_run_id }}
           run-id: ${{ inputs.checkpoint_run_id }}
@@ -97,7 +97,7 @@ jobs:
             --commit "$CHECKPOINT_COMMIT" --repository "$CHECKPOINT_REPOSITORY"
       - name: Upload bounded C3 trust evidence and full compressed ledger
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-bus-reconciliation-evidence-${{ github.run_id }}
           path: ${{ runner.temp }}/c3-reconciliation-evidence

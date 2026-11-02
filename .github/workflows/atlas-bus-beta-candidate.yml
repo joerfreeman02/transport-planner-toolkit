@@ -65,14 +65,14 @@ jobs:
     timeout-minutes: 360
     steps:
       - name: Check out exact feature commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.x'
 
@@ -179,7 +179,7 @@ jobs:
           PY
       - name: Restore exact primary raw snapshot
         if: inputs.mode == 'compose' && inputs.primary_source_run_id != ''
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: atlas-reference-source-snapshot-${{ inputs.primary_source_run_id }}
           run-id: ${{ inputs.primary_source_run_id }}
@@ -213,7 +213,7 @@ jobs:
       - name: Preserve verified primary snapshot before preparation
         id: primary-artifact
         if: inputs.mode == 'compose' && inputs.primary_source_run_id == ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-reference-source-snapshot-${{ github.run_id }}
           path: source-snapshot
@@ -222,7 +222,7 @@ jobs:
           retention-days: 90
       - name: Restore exact raw TNDS artifact
         if: inputs.mode == 'compose' && inputs.tnds_source_run_id != ''
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: atlas-tnds-quarantined-${{ inputs.tnds_source_run_id }}
           run-id: ${{ inputs.tnds_source_run_id }}
@@ -259,7 +259,7 @@ jobs:
       - name: Preserve fresh raw TNDS snapshot before capacity, extraction, or preparation
         id: tnds-artifact
         if: inputs.mode == 'compose' && inputs.tnds_source_run_id == ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-tnds-quarantined-${{ github.run_id }}
           path: ${{ runner.temp }}/tnds-quarantined-snapshot
@@ -323,7 +323,7 @@ jobs:
       - name: Upload immutable full candidate checkpoint
         id: candidate-artifact
         if: inputs.mode == 'compose'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-bus-beta-review-candidate-${{ github.run_id }}
           path: |
@@ -335,7 +335,7 @@ jobs:
 
       - name: Set up pnpm for actual-candidate browser audit
         if: inputs.mode == 'compose'
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10
       - name: Install locked JavaScript audit dependencies
@@ -354,7 +354,7 @@ jobs:
         run: node tests/atlas/s2c3-real-candidate-runtime-audit.mjs candidate-site candidate-audit/runtime-audit.json
       - name: Upload actual-candidate readiness audit reports
         if: always() && inputs.mode == 'compose' && hashFiles('candidate-audit/*.json') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-bus-beta-s2c3-candidate-audit-${{ github.run_id }}
           path: candidate-audit
@@ -385,7 +385,7 @@ jobs:
       - name: Restore exact full candidate checkpoint
         id: candidate-restore
         if: inputs.mode == 'restore_candidate'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: atlas-bus-beta-review-candidate-${{ inputs.candidate_checkpoint_run_id }}
           run-id: ${{ inputs.candidate_checkpoint_run_id }}
@@ -417,7 +417,7 @@ jobs:
           PY
       - name: Upload downstream validation result
         if: always() && steps.downstream-validation.outcome == 'success'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-bus-beta-review-validation-${{ github.run_id }}
           path: review-validation

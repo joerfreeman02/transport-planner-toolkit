@@ -70,8 +70,8 @@ jobs:
       total_bytes: ${{ steps.verify.outputs.total_bytes }}
       producer_run_id: ${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
       - name: Verify exact frozen-source artifact ID and digest
@@ -106,7 +106,7 @@ jobs:
           python tools/atlas-bus-data/source_freshness.py --output source-probe/freshness.json
       - name: Restore exact prior snapshot for explicit frozen diagnostic reuse
         if: inputs.v2_source_snapshot_run_id != ''
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: atlas-reference-source-snapshot-${{ inputs.v2_source_snapshot_run_id }}
           run-id: ${{ inputs.v2_source_snapshot_run_id }}
@@ -202,7 +202,7 @@ jobs:
         run: echo "name=atlas-reference-source-snapshot-${GITHUB_RUN_ID}" >> "${GITHUB_OUTPUT}"
       - name: Upload immutable source snapshot for preparation reuse
         id: upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.snapshot-name.outputs.name }}
           path: |

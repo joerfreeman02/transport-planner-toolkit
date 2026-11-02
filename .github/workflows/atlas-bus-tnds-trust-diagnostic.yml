@@ -40,20 +40,20 @@ jobs:
     timeout-minutes: 180
     steps:
       - name: Check out the selected feature branch commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.x'
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22.x'
           cache: pnpm
@@ -101,7 +101,7 @@ jobs:
           PREFLIGHT_OUTCOME: ${{ job.status }}
       - name: Upload offline preflight evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-tnds-trust-offline-preflight-${{ github.run_id }}
           path: ${{ runner.temp }}/tnds-evidence
@@ -115,16 +115,16 @@ jobs:
     timeout-minutes: 360
     steps:
       - name: Check out the selected feature branch commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.x'
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22.x'
       - name: Require successful offline preflight for this exact branch commit
@@ -205,7 +205,7 @@ jobs:
       - name: Restore exact prior raw snapshot artifact from selected producer run
         id: restore
         if: inputs.prior_producer_run_id != ''
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: atlas-tnds-quarantined-${{ inputs.prior_producer_run_id }}
           run-id: ${{ inputs.prior_producer_run_id }}
@@ -232,7 +232,7 @@ jobs:
       - name: Upload immutable raw TNDS checkpoint before extraction
         id: raw-artifact
         if: always() && steps.acquire.outputs.snapshot_available == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-tnds-quarantined-${{ github.run_id }}
           path: ${{ runner.temp }}/tnds-quarantined-snapshot
@@ -256,7 +256,7 @@ jobs:
           --producer-run-id "$PRODUCER_RUN_ID"
       - name: Upload verified TNDS reconciliation-input checkpoint
         if: always() && steps.prepare.outcome == 'success'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-tnds-reconciliation-checkpoint-${{ github.run_id }}
           path: ${{ runner.temp }}/tnds-evidence/tnds-reconciliation-checkpoint
@@ -315,7 +315,7 @@ jobs:
           PY
       - name: Upload TRUST evidence and capability report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-tnds-trust-evidence-${{ github.run_id }}
           path: |

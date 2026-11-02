@@ -42,11 +42,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.x'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.x'
       - name: Require a pristine Git checkout for deterministic ATLAS checks
@@ -94,7 +94,7 @@ jobs:
           print('Exact producer artifact ID, name, run, and availability verified.')
           PY
       - name: Restore supplied source snapshot from exact producer run
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           artifact-ids: ${{ inputs.source_snapshot_artifact_id }}
           run-id: ${{ inputs.source_snapshot_run_id }}
@@ -195,7 +195,7 @@ jobs:
           PY
       - name: Upload verified primary reconciliation-input checkpoint
         if: always() && steps.primary-reconciliation-checkpoint.outcome == 'success'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-primary-reconciliation-checkpoint-${{ github.run_id }}
           path: diagnostic-output/primary-reconciliation-checkpoint
@@ -237,7 +237,7 @@ jobs:
           fi
       - name: Upload evidence-safe diagnostic artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: atlas-reference-diagnostic-${{ github.run_id }}
           path: |

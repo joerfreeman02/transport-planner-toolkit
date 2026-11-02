@@ -94,3 +94,40 @@ Waltham Sources & Checks retains eight evidence items: Route 242 operator uncert
 Focused `bus-group-terminus`, `bus-assessment`, `tfl-bus-timetable`, Alpha.13 planner-summary, service-assessment, and 1A4/313 endpoint tests pass. The exact-pin browser/Word control passes its scripted controls after correcting the PE1 and Word assertion scope. The required full `node tests/atlas/run-all.mjs` did **not** pass: the restricted run first stopped on an `EPERM` rename while materializing a temporary TNDS browser fixture; retrying outside that sandbox passed the browser TNDS shard check but then failed `bus-timetable-merge.test.mjs:139` because the prepared TNDS shard set used by that run did not contain the expected Pipers Route 231 call. This failure is not yet classified as product regression or fixture mismatch; the suite has not been rerun against the complete frozen Run #75 shard set. The broader established Bus regression therefore remains unverified in this candidate.
 
 This record does not claim Product Owner acceptance. Manual retest must inspect the Waltham inward rows, Route 279's final short-working presentation, and live TfL availability for Route 279. The full Bus suite must be rerun against the established Run #75 fixture set. Product Owner approval has not occurred.
+
+## Set-and-forget engineering closeout (2026-11-02)
+
+This final continuation started from candidate `9469d45683544497910e50df1669dafa39f3b136`; frozen `main` remains `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`. This record supersedes the earlier open-blocker status above.
+
+### Corrections and regression findings
+
+- Waltham's inbound BODS and departing TfL patterns use different physical StopPoints in the same active NaPTAN StopArea (`210G432`). The previous physical-stop-only pairing left the arrival visible, and generic display names (`Bus Station` versus `Waltham Cross Bus Station`) prevented the proven pair from joining. The planner now requires an exact ordered arrival endpoint, exact departing start, reciprocal endpoint identity, compatible operator/route and shared active NaPTAN group; it then aligns the arrival display place with its proven departure. Similar names alone do not qualify. The multi-StopPoint regression and same-name/no-group negative control pass. Route 310 remains one departing row.
+- Route 279's recurring Rookwood short working was correctly recognized but not consolidated because the 39-call shared corridor was followed by a long but genuine branch tail; the component walk stopped at its earlier queue. The planner now permits a proven recurring contained continuation across that separation. Browser and Word show one Manor House principal row with `Short workings: Some route 279 journeys operate to Stamford Hill (Rookwood Road).`; short-working source records remain in grouping evidence. The available Waltham fixture is BODS evidence; live TfL timetable evidence for 279 was not available, so TfL/BODS authority remains a Product Owner retest item.
+- The first Pipers Route 231 failure came from an incomplete Run #75 fixture mount. The earlier temporary TNDS rename denial was a restricted-runner filesystem issue. Reconstructing the complete frozen fixture set resolved both environmental conditions; the suite's source-arbitration controls confirm Route 230 remains BODS-primary and Route 231 remains a genuine TNDS-only supplementary service. The Pipers regression was not weakened.
+- The PE1 Route 202 audit had a stale three-row expectation: the Queensgate-arriving pattern is preserved in the departing rows' terminus evidence and the duplicate arrival row is suppressed by the approved terminal presentation rule. Two useful departing rows remain: Austerby and the distinct Bourne branch. The X4 control likewise expects its useful departing row at the Queensgate terminus plus the route-scoped, weekday-qualified Kings School short-working note; the reciprocal arriving direction is retained in terminus evidence.
+
+### Final verification
+
+- `node tests/atlas/run-all.mjs` — **passed**, ending `ATLAS Alpha.15 deterministic suite passed.` It ran in an isolated scratch checkout using the complete frozen Run #75 data. The Bus manifest SHA-256 was `1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f`; TNDS was `2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f`; TfL iBus was `fe13f40eff9c260c2a426017ff2166539641d261a3332f0e752132ec2f1f432f`. Source fixture files were not modified.
+- The complete suite passed the Pipers 230/231 hierarchy control and the golden controls for Route 25/25C, 62/64/65, 242 variants, loops, Route 657, MK5, timetable authority, principal locations, Word/map export and endpoint decisions.
+- Focused checks passed for `bus-group-terminus`, `bus-assessment`, `bus-alpha13-planner-summary`, `tfl-bus-timetable`, `bus-service-assessment`, and `bus-robustness-1a4-313-principal-endpoint`. Node syntax checks and `git diff --check` passed. Python/static-index tests were not required because no source-data builder or index generation logic changed.
+- The exact Waltham/PE1 Playwright audit passed with zero page errors, failed requests or unintended external requests. The planner showed all 19 requested routes: 13, 14, 15, 16, 16C, 25C, 66, 211, 212, 217, 242, 251, 279, 310, 317, 327, 491, A1 and N279. Routes 217, 279, 310, 317 and 327 each have one useful row. 16C remains Sunday-only. Routes 491 and N279 are BODS-only in this fixture and are not claimed as live-TfL verified.
+- Waltham Sources & Checks contains **8** review items: Route 242 operator uncertainty; endpoint uncertainty for 16, 16C, 217, 317 and 327; and two assessment-level TfL timetable-availability items. The assessment is complete. Planner acknowledgement enabled Word and map exports; Browser/Word parity passed, map-on and map-off Word checks passed, and standalone A3 landscape map export passed.
+- The PE1 audit passed with two Route 202 departures and one X4 departing row carrying its qualified school short-working note. The audit report status is `READY_FOR_TECHNICAL_DIRECTOR_REVIEW_BEFORE_MANUAL_RE-ACCEPTANCE`; this is engineering readiness, not Product Owner acceptance.
+
+### Checkpoint and handover
+
+- Final candidate SHA is recorded in the commit and final handover.
+- The branch is not merged, tagged or published. Beta.1 and `main` remain frozen. No updater work or data refresh occurred.
+- Product Owner acceptance has **not** occurred. Manual retest must confirm mixed TfL/BODS Route 279 presentation and review the eight disclosed Waltham evidence items. No live TfL timetable verification is claimed for Routes 279, 491 or N279.
+- The local Product Owner acceptance environment is launched after the clean pushed checkpoint; its URL is included in the final handover and it remains running for the Product Owner.
+
+### GitHub tooling adoption review
+
+- Dependabot: existing weekly npm and GitHub Actions updates; retain.
+- Codecov: no adoption in this correction.
+- OpenSSF Scorecard: no adoption in this correction.
+- Sentry: no adoption in this correction.
+- Renovate: deferred to avoid overlapping dependency automation with Dependabot.
+
+No tooling was installed or newly configured.

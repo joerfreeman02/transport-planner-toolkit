@@ -591,7 +591,7 @@ function connectedServiceComponents(services) {
         // order when a hard corridor conflict is present.
         const reservedConflict = [...componentIndexes, ...queue]
           .some(index => hardCorridorSeparation(services[index], services[candidate]));
-        const queuedContinuation = queue.some(index => provenPatternRelationship(services[index], services[candidate])
+        const queuedContinuation = [...componentIndexes, ...queue].some(index => provenPatternRelationship(services[index], services[candidate])
           || recurringContainedShortWorking(services[index], services[candidate])
           || recurringContainedShortWorking(services[candidate], services[index]));
         if (reservedConflict && !queuedContinuation) continue;
@@ -3320,12 +3320,39 @@ function exactDepartureAnchor(row, stopId) {
   });
 }
 
-function pairedReciprocalTerminusDeparture(departing, arriving) {
+function exactArrivalTerminalAnchor(row, stopId) {
+  if (!stopId) return false;
+  return rowSourceRecords(row).some(service => {
+    const ids = explicitPattern(service);
+    return ids.at(-1) === stopId
+      && (text(service.frequencyBasisStopId) === stopId
+        || (service.stopIds ?? service.assessedStops ?? []).map(text).includes(stopId));
+  });
+}
+
+function activeLogicalStopGroups(stops, stopId) {
+  const stop = (stops ?? []).find(candidate => text(candidate?.id || candidate?.sourceId) === stopId);
+  return unique((stop?.logicalGroupRefs ?? [])
+    .filter(ref => text(ref?.source).toLowerCase() === 'naptan'
+      && text(ref?.status).toLowerCase() === 'active'
+      && ref?.targetExists === true)
+    .map(ref => ref?.id));
+}
+
+function sameProvenTerminalGroup(firstStopId, secondStopId, stops) {
+  if (firstStopId && firstStopId === secondStopId) return { sameStopPoint: true, groupIds: [] };
+  const right = new Set(activeLogicalStopGroups(stops, secondStopId));
+  const groupIds = activeLogicalStopGroups(stops, firstStopId).filter(id => right.has(id));
+  return groupIds.length ? { sameStopPoint: false, groupIds } : null;
+}
+
+function pairedReciprocalTerminusDeparture(departing, arriving, stops = []) {
   if (!departing || !arriving || departing === arriving) return false;
   if (text(departing.routeNumber).toUpperCase() !== text(arriving.routeNumber).toUpperCase()) return false;
-  const stopId = text(arriving.frequencyBasisStopId || arriving.servedAtStopId);
-  if (!stopId || text(departing.frequencyBasisStopId || departing.servedAtStopId) !== stopId) return false;
-  if (!exactDepartureAnchor(departing, stopId)) return false;
+  const arrivalStopId = text(arriving.frequencyBasisStopId || arriving.servedAtStopId);
+  const departureStopId = text(departing.frequencyBasisStopId || departing.servedAtStopId);
+  const terminalGroup = sameProvenTerminalGroup(arrivalStopId, departureStopId, stops);
+  if (!terminalGroup || !exactDepartureAnchor(departing, departureStopId) || !exactArrivalTerminalAnchor(arriving, arrivalStopId)) return false;
   const arrivalServices = rowSourceRecords(arriving);
   const departureServices = rowSourceRecords(departing);
   const hasCompatibleOperator = departureServices.some(outbound => arrivalServices.some(inbound => operatorFamilyCompatible(outbound, inbound)));
@@ -3336,26 +3363,99 @@ function pairedReciprocalTerminusDeparture(departing, arriving) {
     return hasResolvedExactEndpointEvidence(outbound, 'destination')
       && endpointIdentity(outbound, 'destination') === endpointIdentity(inbound, 'origin');
   }));
-  return reciprocalDestination || exactEndpointIdentity;
+  return reciprocalDestination || exactEndpointIdentity
+    ? Object.freeze({ arrivalStopId, departureStopId, sameStopPoint: terminalGroup.sameStopPoint, groupIds: terminalGroup.groupIds, reciprocalEndpoint: true })
+    : false;
 }
 
-function promotePairedDepartureRows(rows) {
-  const provenArrivals = rows.filter(row => row.terminusDecision?.proven
-    && row.terminusDecision.presentation === 'arrival-only-suppress');
-  if (!provenArrivals.length) return rows;
+function promotePairedDepartureRows(rows, stops = []) {
+  const pairedArrivals = new Map();
+  const pairedDepartures = new Map();
+  for (let arrivalIndex = 0; arrivalIndex < rows.length; arrivalIndex += 1) {
+    const arriving = rows[arrivalIndex];
+    const arrivalAlreadyProven = arriving.terminusDecision?.proven
+      && arriving.terminusDecision.presentation === 'arrival-only-suppress';
+    // Pairing may extend an existing physical-stop proof across a logical
+    // StopArea. For an unproven arrival, only distinct StopPoints in a shared
+    // active group can add the missing terminal proof; reciprocal labels at
+    // the same StopPoint alone must not remove an ordinary opposite direction.
+    if (arriving.terminusDecision?.status === 'through-service') continue;
+    for (let departureIndex = 0; departureIndex < rows.length; departureIndex += 1) {
+      if (arrivalIndex === departureIndex) continue;
+      const departing = rows[departureIndex];
+      if (departing.terminusDecision?.status === 'through-service') continue;
+      const evidence = pairedReciprocalTerminusDeparture(departing, arriving, stops);
+      if (!evidence) continue;
+      if (!arrivalAlreadyProven && evidence.sameStopPoint) continue;
+      pairedArrivals.set(arrivalIndex, [...(pairedArrivals.get(arrivalIndex) ?? []), { row: departing, evidence }]);
+      pairedDepartures.set(departureIndex, [...(pairedDepartures.get(departureIndex) ?? []), { row: arriving, evidence }]);
+    }
+  }
+  if (!pairedArrivals.size) return rows;
   return rows.map(row => {
-    if (row.terminusDecision?.proven) return row;
-    const paired = provenArrivals.filter(arrival => pairedReciprocalTerminusDeparture(row, arrival));
-    if (!paired.length) return row;
+    const rowIndex = rows.indexOf(row);
+    const arrivingPairs = pairedArrivals.get(rowIndex) ?? [];
+    const departingPairs = pairedDepartures.get(rowIndex) ?? [];
+    if (!arrivingPairs.length && !departingPairs.length) return row;
+    if (row.terminusDecision?.proven) {
+      if (row.terminusDecision.presentation !== 'arrival-only-suppress' || !arrivingPairs.length) return row;
+      const groupPairs = arrivingPairs.filter(pair => pair.evidence.groupIds.length);
+      const canonicalPlace = groupPairs.map(pair => text(pair.row.terminusDecision?.assessedPlace))
+        .find(value => value && !/^bus station$/i.test(value));
+      if (!canonicalPlace || canonicalPlace === row.terminusDecision.assessedPlace) return row;
+      const terminusDecision = Object.freeze({
+        ...row.terminusDecision,
+        assessedPlace: canonicalPlace,
+        note: `${canonicalPlace} is the route terminus.`,
+        evidence: Object.freeze({
+          ...(row.terminusDecision.evidence ?? {}),
+          pairedDepartureSourceRecordIds: Object.freeze(groupPairs.flatMap(pair => pair.row.sourceRecordIds ?? [])),
+          activeNaPTANLogicalGroupIds: Object.freeze(unique(groupPairs.flatMap(pair => pair.evidence.groupIds)))
+        })
+      });
+      return Object.freeze({ ...row, terminusDecision });
+    }
+    if (!arrivingPairs.length && row.terminusDecision?.proven
+      && row.terminusDecision.presentation === 'departing-only') return row;
+    const proofPairs = [...arrivingPairs, ...departingPairs];
+    const primaryPair = proofPairs[0];
+    const stopIds = unique(proofPairs.flatMap(pair => [pair.evidence.arrivalStopId, pair.evidence.departureStopId]));
+    const groupIds = unique(proofPairs.flatMap(pair => pair.evidence.groupIds));
+    const groupStop = (stops ?? []).find(stop => stopIds.includes(text(stop?.id || stop?.sourceId)));
+    const fallbackPlace = [groupStop?.logicalGroupName, groupStop?.stopAreaName, groupStop?.stopArea?.name,
+      groupStop?.name && groupStop?.locality ? `${groupStop.locality} ${groupStop.name}` : groupStop?.name]
+      .map(text).find(Boolean);
+    const pairedTerminalPlace = proofPairs.map(pair => text(pair.row.terminusDecision?.assessedPlace))
+      .find(value => value && !/^bus station$/i.test(value));
+    const logicalGroupPlace = groupIds.length ? pairedTerminalPlace || fallbackPlace : '';
+    const place = text(logicalGroupPlace || row.terminusDecision?.assessedPlace
+      || primaryPair.row.terminusDecision?.assessedPlace || 'assessed bus station');
+    const existing = row.terminusDecision ?? {};
+    if (arrivingPairs.length) {
+      const arrivalEvidence = unique([
+        ...(existing.arrivalEvidence ?? []),
+        ...row.sourceRecordIds ?? [],
+        ...arrivingPairs.flatMap(pair => pair.row.sourceRecordIds ?? [])
+      ]);
+      const terminusDecision = Object.freeze({
+        ...existing, type: 'TerminusDecision', status: 'proven-terminus', presentation: 'arrival-only-suppress',
+        proven: true, assessedPlace: place, terminalSides: Object.freeze(['destination']),
+        terminalStopPointIds: Object.freeze(unique([...(existing.terminalStopPointIds ?? []), ...stopIds])),
+        arrivalEvidence: Object.freeze(arrivalEvidence), departureEvidence: Object.freeze([]),
+        reason: 'The exact ordered arrival ends at a StopPoint in an active NaPTAN logical StopArea shared with the reciprocal departing pattern; no onward call follows that terminal.',
+        note: `${place} is the route terminus.`,
+        evidence: Object.freeze({ ...(existing.evidence ?? {}), pairedDepartureSourceRecordIds: Object.freeze(arrivingPairs.flatMap(pair => pair.row.sourceRecordIds ?? [])), activeNaPTANLogicalGroupIds: Object.freeze(groupIds), exactArrivalStopPointAnchor: primaryPair.evidence.arrivalStopId })
+      });
+      return Object.freeze({ ...row, terminusDecision });
+    }
     const arrivalIds = unique([
-      ...(row.terminusDecision?.arrivalEvidence ?? []),
-      ...paired.flatMap(arrival => arrival.terminusDecision.arrivalEvidence ?? []),
-      ...paired.flatMap(arrival => arrival.sourceRecordIds ?? [])
+      ...(existing.arrivalEvidence ?? []),
+      ...departingPairs.flatMap(pair => pair.row.terminusDecision?.arrivalEvidence ?? []),
+      ...departingPairs.flatMap(pair => pair.row.sourceRecordIds ?? [])
     ]);
     const stopId = text(row.frequencyBasisStopId || row.servedAtStopId);
-    const place = text(paired[0].terminusDecision.assessedPlace);
     const terminusDecision = Object.freeze({
-      ...(row.terminusDecision ?? {}),
+      ...existing,
       type: 'TerminusDecision',
       status: 'proven-terminus',
       presentation: 'departing-only',
@@ -3364,12 +3464,13 @@ function promotePairedDepartureRows(rows) {
       terminalSides: Object.freeze(['origin']),
       terminalStopPointIds: Object.freeze(unique([...(row.terminusDecision?.terminalStopPointIds ?? []), stopId])),
       arrivalEvidence: Object.freeze(arrivalIds),
-      departureEvidence: Object.freeze(unique([...(row.sourceRecordIds ?? []), ...(row.terminusDecision?.departureEvidence ?? [])])),
-      reason: 'The departing ordered pattern starts at the exact assessed StopPoint and its reciprocal destination matches the proven arriving public-service pattern.',
+      departureEvidence: Object.freeze(unique([...(row.sourceRecordIds ?? []), ...(existing.departureEvidence ?? [])])),
+      reason: 'The departing ordered pattern starts at the exact assessed StopPoint in an active NaPTAN logical StopArea shared with the paired arrival, and its destination reciprocates the arrival origin.',
       note: `${place} is the route terminus.`,
       evidence: Object.freeze({
-        ...(row.terminusDecision?.evidence ?? {}),
-        pairedArrivalSourceRecordIds: Object.freeze(paired.flatMap(arrival => arrival.sourceRecordIds ?? [])),
+        ...(existing.evidence ?? {}),
+        pairedArrivalSourceRecordIds: Object.freeze(departingPairs.flatMap(pair => pair.row.sourceRecordIds ?? [])),
+        activeNaPTANLogicalGroupIds: Object.freeze(groupIds),
         exactDepartingStopPointAnchor: stopId
       })
     });
@@ -3402,7 +3503,7 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
       if (!representedByResolvedRow) provisionalRows.push(Object.freeze({ ...row, destination: 'Destination requires review', directionPatternText: 'Destination requires review', unresolvedPublicIdentity: true, serviceNote: unique([row.serviceNote, 'Destination requires review before formal use.']).join(' ') }));
     }
   }
-  let familyRows = promotePairedDepartureRows(collapseCrossProviderPlannerCopies(collapsePublicRouteFamilies(provisionalRows)));
+  let familyRows = promotePairedDepartureRows(collapseCrossProviderPlannerCopies(collapsePublicRouteFamilies(provisionalRows)), stops);
   const plannerRouteNumbers = row => new Set(row?.publicRouteNumbers ?? row?.routeNumbers ?? [row?.routeNumber]);
   const sharesPlannerRouteNumber = (first, second) => [...plannerRouteNumbers(first)].some(route => plannerRouteNumbers(second).has(route));
   const hasDepartingTerminus = row => familyRows.some(candidate => candidate !== row

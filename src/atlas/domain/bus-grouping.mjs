@@ -243,20 +243,28 @@ function completeRoutePattern(service) {
 const SERVICE_DAYS = Object.freeze(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 
 function recurringDepartureDays(service) {
-  const records = [service, ...(service?.rawServiceSummaries ?? []), ...(service?.sourceServices ?? [])].filter(Boolean);
+  const records = [service].filter(Boolean);
+  const basisStopId = text(service?.frequencyBasisStopId || service?.servedAtStopId);
+  const evidenceMatchesBasis = item => {
+    const stopId = text(item?.stopPointId || item?.stopId || item?.assessedStopPointId);
+    return !stopId || !basisStopId || stopId === basisStopId;
+  };
   const counts = new Map();
   for (const day of SERVICE_DAYS) {
     let count = 0;
     for (const record of records) {
-      count = Math.max(count, (record?.departuresByDay?.[day] ?? []).length, (record?.departureEvidenceByDay?.[day] ?? []).length);
-      for (const schedule of Object.values(record?.stopSchedules ?? {})) count = Math.max(count, (schedule?.[day] ?? []).length);
-      for (const schedule of Object.values(record?.departuresByStopAndDay ?? {})) count = Math.max(count, (schedule?.[day] ?? []).length);
+      count = Math.max(count, (record?.departuresByDay?.[day] ?? []).length,
+        (record?.departureEvidenceByDay?.[day] ?? []).filter(evidenceMatchesBasis).length);
+      if (basisStopId) {
+        count = Math.max(count, (record?.stopSchedules?.[basisStopId]?.[day] ?? []).length,
+          (record?.departuresByStopAndDay?.[basisStopId]?.[day] ?? []).length);
+      }
     }
     if (count >= 12) counts.set(day, count);
   }
   const lines = records.flatMap(record => [record?.typicalFrequencyLines, record?.frequency])
     .flatMap(value => Array.isArray(value) ? value : value ? [value] : []).map(text);
-  const frequencyEvidence = records.flatMap(record => record?.frequencyEvidence ?? record?.departureFrequencyEvidence ?? []);
+  const frequencyEvidence = records.flatMap(record => record?.frequencyEvidence ?? record?.departureFrequencyEvidence ?? []).filter(evidenceMatchesBasis);
   for (const item of frequencyEvidence) {
     const day = text(item?.day).toLowerCase();
     const headway = Number(item?.headwayMinutes ?? item?.typicalHeadwayMinutes ?? item?.intervalMinutes ?? item?.minutes);

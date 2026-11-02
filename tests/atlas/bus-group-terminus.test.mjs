@@ -141,22 +141,40 @@ assert.equal(pairedRows.length, 1, 'proven arrival is consolidated into its exac
 assert.equal(pairedRows[0].destination, 'Turnpike Lane Bus Station');
 assert.ok(pairedRows[0].terminusDecision.arrivalEvidence.includes('217-arrival'), 'paired arrival remains in terminus evidence');
 
+const stationGroup = { source: 'NaPTAN', id: 'naptan:WALTHAM-STATION', status: 'active', targetExists: true };
+const multiStopStation = [
+  { ...stops[0], logicalGroupRefs: [stationGroup], stopAreaName: 'Waltham Cross Bus Station' },
+  { ...stops[0], id: 'W-B', indicator: 'Stop B', logicalGroupRefs: [stationGroup], stopAreaName: 'Waltham Cross Bus Station' }
+];
+const multiStopArrival = record({ id: '217-arrival-stop-b', routeNumber: '217', origin: 'Turnpike Lane Bus Station', destination: 'Bus Station', originStopPointId: 'TPL', destinationStopPointId: 'W-B', pattern: ['TPL', 'MID', 'W-B'], direction: 'inbound', frequencyBasisStopId: 'W-B', stopIds: ['W-B'] });
+const multiStopDeparture = record({ id: '217-departure-stop-a', routeNumber: '217', origin: 'Bus Station', destination: 'Turnpike Lane Bus Station', originStopPointId: 'W-A', destinationStopPointId: 'TPL', pattern: ['W-A', 'MID', 'TPL'], direction: 'outbound', frequencyBasisStopId: 'W-A', stopIds: ['W-A'] });
+multiStopArrival.originEndpointDecision = endpoint('Turnpike Lane Bus Station', 'TPL', 'area:TURNPIKE');
+multiStopArrival.destinationEndpointDecision = { chosen: 'Bus Station', chosenDisplayName: 'Bus Station' };
+multiStopDeparture.originEndpointDecision = { chosen: 'Bus Station', chosenDisplayName: 'Bus Station' };
+multiStopDeparture.destinationEndpointDecision = endpoint('Turnpike Lane Bus Station', 'TPL', 'area:TURNPIKE');
+const multiStopRows = rows([multiStopArrival, multiStopDeparture], multiStopStation);
+assert.equal(multiStopRows.length, 1, 'exact reciprocal patterns terminating/departing at different StopPoints in one active NaPTAN logical StopArea consolidate');
+assert.ok(multiStopRows[0].terminusDecision.evidence.activeNaPTANLogicalGroupIds.includes('naptan:WALTHAM-STATION'));
+assert.equal(multiStopRows[0].terminusDecision.assessedPlace, 'Waltham Cross Bus Station', 'paired departing row inherits the canonical group place used to suppress its arrival');
+const sameNamesNoGroupRows = rows([multiStopArrival, multiStopDeparture], multiStopStation.map(stop => ({ ...stop, logicalGroupRefs: [] })));
+assert.equal(sameNamesNoGroupRows.length, 2, 'same terminal names across distinct StopPoints do not prove a shared terminus group');
+
 // A long recurring short pattern may end on a distinct call while sharing a
 // strong ordered prefix with the full route. One-off shared-trunk branches
 // remain independent public services.
 const route279Trunk = Array.from({ length: 39 }, (_, index) => `279-${index}`);
 const frequent279 = ['Mon-Fri: Typically every ~5 mins', 'Sat: Typically every ~5–10 mins', 'Sun: Typically every ~10 mins'];
-const full279 = record({ id: '279-manor', routeNumber: '279', operator: 'Arriva London North', origin: 'Waltham Cross Bus Station', destination: 'Manor House Station', originStopPointId: 'W-A', destinationStopPointId: 'MANOR', pattern: [...route279Trunk, 'STAMFORD', 'MANOR'], direction: 'outbound', departuresByDay: {}, typicalFrequencyLines: frequent279 });
-const short279 = record({ id: '279-rookwood', routeNumber: '279', operator: 'Arriva London North', origin: 'Waltham Cross Bus Station', destination: 'Stamford Hill (Rookwood Road)', originStopPointId: 'W-A', destinationStopPointId: 'ROOKWOOD', pattern: [...route279Trunk, 'ROOKWOOD'], direction: 'outbound', departuresByDay: {}, typicalFrequencyLines: frequent279 });
+const full279 = record({ id: '279-manor', routeNumber: '279', operator: 'Arriva London North', origin: 'Waltham Cross Bus Station', destination: 'Manor House Station', originStopPointId: 'W-A', destinationStopPointId: 'MANOR', pattern: [...route279Trunk, 'STAMFORD-1', 'STAMFORD-2', 'SEVEN-SISTERS', 'MANOR-1', 'MANOR-2', 'MANOR-3', 'MANOR-4', 'MANOR'], direction: 'outbound', departuresByDay: {}, typicalFrequencyLines: frequent279 });
+const short279 = record({ id: '279-rookwood', routeNumber: '279', operator: 'Arriva London North', origin: 'Waltham Cross Bus Station', destination: 'Stamford Hill (Rookwood Road)', originStopPointId: 'W-A', destinationStopPointId: 'ROOKWOOD', pattern: [...route279Trunk, 'ROOKWOOD-1', 'ROOKWOOD-2', 'ROOKWOOD-3', 'ROOKWOOD-4', 'ROOKWOOD'], direction: 'outbound', departuresByDay: {}, typicalFrequencyLines: frequent279 });
 assert.equal(recurringContainedShortWorking(short279, full279), true);
 const route279Rows = rows([short279, full279]);
-assert.equal(route279Rows.length, 1, 'recurring same-route contained tail is shown as one public-service row');
+assert.equal(route279Rows.length, 1, 'recurring same-route contained working remains consolidated despite endpoint-divergent tails');
 assert.equal(route279Rows[0].destination, 'Manor House Station');
 assert.ok(route279Rows[0].publicServiceGroupingDecision.shortWorkingRecordIds.includes('279-rookwood'));
 assert.match(`${route279Rows[0].serviceNote} ${route279Rows[0].routeGroupNote || ''}`, /Rookwood Road|Stamford Hill/i);
 
-const onceDaily202Short = record({ id: '202-bourne', routeNumber: '202', operator: 'Central Connect', origin: 'Queensgate', destination: 'Bourne Bus Station', originStopPointId: 'W-A', destinationStopPointId: 'BOURNE', pattern: [...route279Trunk, 'BOURNE-1', 'BOURNE'], direction: 'outbound', departuresByDay: { ...week, monday: [465], tuesday: [465], wednesday: [465], thursday: [465], friday: [465] } });
-const onceDaily202Full = record({ id: '202-austerby', routeNumber: '202', operator: 'Central Connect', origin: 'Queensgate', destination: 'Austerby', originStopPointId: 'W-A', destinationStopPointId: 'AUSTERBY', pattern: [...route279Trunk, 'AUSTERBY-1', 'AUSTERBY'], direction: 'outbound', departuresByDay: { ...week, monday: [430], tuesday: [430], wednesday: [430], thursday: [430], friday: [430] } });
+const onceDaily202Short = record({ id: '202-bourne', routeNumber: '202', operator: 'Central Connect', origin: 'Queensgate', destination: 'Bourne Bus Station', originStopPointId: 'W-A', destinationStopPointId: 'BOURNE', pattern: [...route279Trunk, 'BOURNE-1', 'BOURNE'], direction: 'outbound', departuresByDay: { ...week, monday: [465], tuesday: [465], wednesday: [465], thursday: [465], friday: [465] }, stopIds: ['QG-202'], frequencyBasisStopId: 'QG-202', stopSchedules: { 'QG-202': { monday: [465], tuesday: [465], wednesday: [465], thursday: [465], friday: [465] }, 'OTHER-202': { monday: frequent279, tuesday: frequent279, wednesday: frequent279, thursday: frequent279, friday: frequent279 } }, frequencyEvidence: [{ stopPointId: 'OTHER-202', day: 'monday', headwayMinutes: 5 }, { stopPointId: 'OTHER-202', day: 'tuesday', headwayMinutes: 5 }] });
+const onceDaily202Full = record({ id: '202-austerby', routeNumber: '202', operator: 'Central Connect', origin: 'Queensgate', destination: 'Austerby', originStopPointId: 'W-A', destinationStopPointId: 'AUSTERBY', pattern: [...route279Trunk, 'AUSTERBY-1', 'AUSTERBY'], direction: 'outbound', departuresByDay: { ...week, monday: [430], tuesday: [430], wednesday: [430], thursday: [430], friday: [430] }, stopIds: ['QG-202'], frequencyBasisStopId: 'QG-202', stopSchedules: { 'QG-202': { monday: [430], tuesday: [430], wednesday: [430], thursday: [430], friday: [430] }, 'OTHER-202': { monday: frequent279, tuesday: frequent279, wednesday: frequent279, thursday: frequent279, friday: frequent279 } }, frequencyEvidence: [{ stopPointId: 'OTHER-202', day: 'monday', headwayMinutes: 5 }, { stopPointId: 'OTHER-202', day: 'tuesday', headwayMinutes: 5 }] });
 assert.equal(recurringContainedShortWorking(onceDaily202Short, onceDaily202Full), false);
 assert.equal(rows([onceDaily202Short, onceDaily202Full]).length, 2, 'daily branch journeys with a shared trunk are not collapsed without recurring frequency evidence');
 

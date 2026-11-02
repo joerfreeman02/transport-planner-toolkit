@@ -49,7 +49,8 @@ assert.match(manualBrowserAudit, /accepted Enfield route-329 control must not fa
 assert.match(manualBrowserAudit, /accepted Enfield route-329 control must not fabricate a resolved Word summary row/);
 assert.match(manualBrowserAudit, /Browser Sources & checks must expose the accepted route-329 unresolved timetable evidence/);
 assert.match(manualBrowserAudit, /Internal route-329 evidence review stays in Sources & Checks, not the planning report/);
-assert.match(manualBrowserAudit, /PE1 route 202 must preserve its three evidence-backed patterns/);
+assert.match(manualBrowserAudit, /PE1 route 202 must preserve its two distinct useful departing patterns/);
+assert.match(manualBrowserAudit, /PE1 route 202 must retain its Queensgate-arriving journeys in the departing rows’ terminus evidence/);
 assert.match(manualBrowserAudit, /PE1 Browser must not repeat the Bourne destination as an additional-services note/);
 assert.match(manualBrowserAudit, /PE1 Word must not repeat the Bourne destination as an additional-services note/);
 assert.match(manualBrowserAudit, /A zero-review\/complete status must not coexist with a material review-before-use instruction/);

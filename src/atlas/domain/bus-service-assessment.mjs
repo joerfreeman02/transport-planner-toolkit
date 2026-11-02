@@ -465,7 +465,44 @@ function plannerQualificationNote(note) {
 
 function sourceDiagnostic(note) {
   const value = text(note);
-  return Boolean(value && /could not be safely mapped|without intervalid linkage|frequency ranges?|representative stop.*(?:evidence|frequency)|source (?:evidence|processing)|processing|provenance|schedule integrity note/i.test(value));
+  return Boolean(value && /could not be safely mapped|calendar (?:profile|evidence).*unresolved|frozen calendar profiles conflict|conflicting partially resolved operating-day profiles|without intervalid linkage|frequency ranges?|representative stop.*(?:evidence|frequency)|source (?:evidence|processing)|processing|provenance|schedule integrity note/i.test(value));
+}
+
+function reconcilePartialCalendarConflict(record) {
+  if (!/tnds|traveline national dataset/i.test(providerOfRecord(record))) return record;
+  const calendars = record?.calendarEvidence ?? record?.operatingCalendarEvidence ?? [];
+  const partial = calendars.filter(calendar => calendar?.resolutionStatus === 'partial' && (calendar.daysOfWeek ?? calendar.days ?? []).length);
+  const signatures = new Set(partial.map(calendar => DAY_ORDER.filter(day => (calendar.daysOfWeek ?? calendar.days ?? []).includes(day)).join(',')));
+  if (partial.length < 2 || signatures.size < 2) return record;
+  const supportedProfiles = partial.filter(calendar => !partial.some(other => {
+    const candidateDays = new Set(other.daysOfWeek ?? other.days ?? []);
+    const profileDays = calendar.daysOfWeek ?? calendar.days ?? [];
+    return candidateDays.size < profileDays.length && [...candidateDays].every(day => profileDays.includes(day));
+  }));
+  const supportedDays = new Set(supportedProfiles.flatMap(calendar => calendar.daysOfWeek ?? calendar.days ?? []));
+  const supported = DAY_ORDER.filter(day => supportedDays.has(day));
+  const filterSchedule = schedule => Object.fromEntries(DAY_ORDER.map(day => [day, supportedDays.has(day) ? (schedule?.[day] ?? []) : []]));
+  const warning = 'The frozen calendar profiles conflict; only days supported by the most specific profiles are shown. Confirm weekend service against the operator timetable.';
+  return {
+    ...record,
+    stopSchedules: Object.fromEntries(Object.entries(record.stopSchedules ?? {}).map(([stopId, schedule]) => [stopId, filterSchedule(schedule)])),
+    departureEvidenceByDay: record.departureEvidenceByDay
+      ? Object.fromEntries(DAY_ORDER.map(day => [day, supportedDays.has(day) ? (record.departureEvidenceByDay[day] ?? []) : []]))
+      : record.departureEvidenceByDay,
+    operatingPeriodEvidence: (record.operatingPeriodEvidence ?? []).filter(entry => supportedDays.has(text(entry?.day).toLowerCase())),
+    sourceWarnings: unique([...(record.sourceWarnings ?? []), warning]),
+    serviceNotes: unique([...(record.serviceNotes ?? []), warning]),
+    calendarReconciliation: Object.freeze({
+      status: 'conflict-conservatively-restricted',
+      supportedDays: Object.freeze(supported),
+      conflictingPartialProfileCount: partial.length,
+      originalProfiles: Object.freeze(partial.map(calendar => Object.freeze({
+        daysOfWeek: Object.freeze([...(calendar.daysOfWeek ?? calendar.days ?? [])]),
+        resolutionStatus: calendar.resolutionStatus,
+        qualificationMetadata: calendar.qualificationMetadata ?? null
+      })))
+    })
+  };
 }
 
 export function collectServiceWarnings(serviceRecords = []) {
@@ -544,10 +581,19 @@ function representativeRecord(records, stopIds) {
 }
 
 function directionalPrincipalLocations(record, evidenceStopId) {
+  const topologyOnly = record?.tflRouteSequenceEvidence?.status === 'resolved'
+    && record?.tflRouteSequenceEvidence?.matchType === 'route-topology-only-for-timetable-fallback'
+    && record?.tflRouteSequenceEvidence?.scheduledTimetableUsed === false
+    ? record.tflRouteSequenceEvidence.matchedSequence
+    : null;
   const patternIds = (record?.routePatternStopIds?.length
     ? record.routePatternStopIds
-    : record?.circularPatternStopIds ?? []).map(text);
-  const calls = Array.isArray(record?.routePatternStops) ? record.routePatternStops : [];
+    : topologyOnly?.orderedStopPointIds?.length
+      ? topologyOnly.orderedStopPointIds
+      : record?.circularPatternStopIds ?? []).map(text);
+  const calls = Array.isArray(record?.routePatternStops) && record.routePatternStops.length
+    ? record.routePatternStops
+    : Array.isArray(topologyOnly?.orderedStops) ? topologyOnly.orderedStops : [];
   const unresolved = reason => ({ locations: [], state: 'unresolved', warning: `Principal locations could not be safely mapped ${reason}; review the source journey pattern.` });
   if (patternIds.length < 2 || calls.length !== patternIds.length) return unresolved('because a complete ordered call pattern is unavailable');
   if (!text(evidenceStopId)) return unresolved('because the assessed stop identity is unavailable');
@@ -681,7 +727,7 @@ export function selectOperatingPeriodEvidence(records, stopId) {
 }
 
 export function buildServiceSummaries(stops, serviceRecords) {
-  const preparedRecords = deduplicateServiceRecords(serviceRecords);
+  const preparedRecords = deduplicateServiceRecords(serviceRecords).map(reconcilePartialCalendarConflict);
   const selectedIds = new Set((stops ?? []).map(stop => text(stop.id || stop.sourceId)).filter(Boolean));
   const selectedStopsById = new Map((stops ?? []).map(stop => [text(stop.id || stop.sourceId), stop]));
   const groups = new Map();
@@ -751,7 +797,8 @@ export function buildServiceSummaries(stops, serviceRecords) {
       ...calendarQualificationNotes(calendarEvidence),
       ...records.flatMap(record => [...(record.serviceNotes ?? []), ...(record.qualifications ?? [])].map(plannerQualificationNote))
     ])
-      .filter(note => qualificationAppliesToFinalRow(note, departuresByDay) && qualificationScopeProven(note, records, frequencyBasisStopId));
+      .filter(note => /frozen calendar profiles conflict/i.test(note)
+        || (qualificationAppliesToFinalRow(note, departuresByDay) && qualificationScopeProven(note, records, frequencyBasisStopId)));
     const operatingPeriodWarnings = unique([...operatingEvidence.warnings, ...combinedPeriods.warnings]);
     const endpointPatterns = unique(records.map(record => `${text(record.origin)} → ${text(record.destination)}`));
     if (endpointPatterns.length > 1) notes.push('Includes scheduled short workings or route variants in this direction; the main origin/destination shown is the most extensive pattern in the source timetable.');
@@ -774,7 +821,21 @@ export function buildServiceSummaries(stops, serviceRecords) {
       : null;
     const integrityWarnings = unique(records.flatMap(record => record.scheduleIntegrityWarnings ?? []));
     if (integrityWarnings.length) notes.push(`Schedule integrity note: ${integrityWarnings.join(' ')}`);
-    const endpointEvidence = records.reduce((merged, record) => mergeEndpointEvidence(merged, record.endpointEvidence), { origin: {}, destination: {} });
+    const authoritativeTfLRecords = records.filter(record => normal(providerOfRecord(record)) === 'tfl');
+    const authoritativeTfLEndpointsResolved = authoritativeTfLRecords.length > 0 && authoritativeTfLRecords.every(record => {
+      const originIds = unique([record.originStopPointId, ...(record.originStopPointIds ?? [])]);
+      const destinationIds = unique([record.destinationStopPointId, ...(record.destinationStopPointIds ?? [])]);
+      return Boolean(text(record.origin) && text(record.destination)
+        && (record.source?.routeMetadata === 'matched' || (originIds.length === 1 && destinationIds.length === 1)));
+    });
+    const endpointAuthorityRecords = operatingPopulation.authoritativeProvider === 'TfL' && authoritativeTfLEndpointsResolved
+      ? authoritativeTfLRecords
+      : records;
+    const endpointRepresentative = endpointAuthorityRecords[0] ?? first;
+    // A resolved authoritative population defines planner-facing endpoint
+    // identity. Conflicting supplementary records remain in rawServiceSummaries
+    // for audit, but cannot manufacture endpoint ambiguity in the final row.
+    const endpointEvidence = endpointAuthorityRecords.reduce((merged, record) => mergeEndpointEvidence(merged, record.endpointEvidence), { origin: {}, destination: {} });
     const principalPattern = orderedPatternEndpoints(principalRecord);
     const circularPatternSource = [...records].sort((left, right) => {
       const lengthDifference = (right.circularPatternStopIds?.length ?? 0) - (left.circularPatternStopIds?.length ?? 0);
@@ -825,10 +886,10 @@ export function buildServiceSummaries(stops, serviceRecords) {
       operator: text(first.operator) || 'Operator not supplied in the timetable',
       origin: text(first.origin) || 'Origin not supplied',
       destination: text(first.destination) || 'Destination not supplied',
-      originStopPointId: text(first.originStopPointId || first.originStopPointIds?.[0]) || null,
-      destinationStopPointId: text(first.destinationStopPointId || first.destinationStopPointIds?.[0]) || null,
-      originStopPointIds: Object.freeze(unique(records.flatMap(record => [record.originStopPointId, ...(record.originStopPointIds ?? [])]))),
-      destinationStopPointIds: Object.freeze(unique(records.flatMap(record => [record.destinationStopPointId, ...(record.destinationStopPointIds ?? [])]))),
+      originStopPointId: text(endpointRepresentative.originStopPointId || endpointRepresentative.originStopPointIds?.[0]) || null,
+      destinationStopPointId: text(endpointRepresentative.destinationStopPointId || endpointRepresentative.destinationStopPointIds?.[0]) || null,
+      originStopPointIds: Object.freeze(unique(endpointAuthorityRecords.flatMap(record => [record.originStopPointId, ...(record.originStopPointIds ?? [])]))),
+      destinationStopPointIds: Object.freeze(unique(endpointAuthorityRecords.flatMap(record => [record.destinationStopPointId, ...(record.destinationStopPointIds ?? [])]))),
       endpointEvidence: Object.freeze({
         origin: Object.freeze(endpointEvidence.origin),
         destination: Object.freeze(endpointEvidence.destination)

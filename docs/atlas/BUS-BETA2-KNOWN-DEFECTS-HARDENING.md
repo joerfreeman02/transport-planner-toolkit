@@ -303,3 +303,49 @@ No N555 filtering or effective-date logic change was made. Run #75 still contain
 ### Remaining Product Owner checks
 
 Product Owner manual acceptance has not occurred. Retest Route 203 against the live TfL-primary response and Route 555 against the live current timetable; confirm the actual Chingford TfL 357/444/W16 rows; reconcile the Product Owner's four Waltham review items with the seven-item frozen headless replay; and review the source-staleness disclosures including N555. No merge, tag, release, publication, updater work or data refresh occurred.
+
+## London resilience and Pipers 231 calendar closeout (2026-11-02)
+
+### Tufton Road: TfL timetable failure with retained route topology
+
+The read-only TfL check used Tufton Road control point 51.613869, -0.020303 and a 700 m stop radius. This is a reproducible street control point, not a supplied postcode. TfL returned 28 nearby StopPoints, including Chingford Mount Stop C (`490005180C`) and Stop E (`490005180E`) for Route 158. TfL Route metadata identifies Stratford Bus Station and Chingford Mount as the route ends. The outbound timetable request at Stop C succeeded; the inbound Stop E request returned HTTP 400: `No direction could be found for stop: 490005180E on line: 158. The line may not serve this stop.` Both inbound and outbound ordered route-sequence requests still succeeded. The inbound sequence contains 44 calls and ends at Stop E.
+
+Root cause: TfL ordered-sequence requests were issued only for directions with successful TfL timetable service records. A failed direction was presented from a stop-scoped BODS fallback with no ordered pattern, so its principal locations became unresolved even though the TfL sequence remained available. The generic adapter now derives fallback sequence requests only from one unique exact route-section endpoint match, validates direction, service type, sequence endpoints and the assessed StopPoint, then attaches a `route-topology-only-for-timetable-fallback` evidence sidecar. It sets `scheduledTimetableUsed: false`; the national fallback's departure times, frequency and operating period remain the timetable evidence. No timetable journeys are fabricated from route topology. Ambiguous or incompatible section/sequence matches remain unresolved.
+
+Focused integration coverage reproduces a failed timetable with a successful TfL sequence, verifies topology-based principal locations, confirms the BODS schedule remains unchanged, and rejects incompatible sequence endpoints. The separate local Run #75 Tufton-radius diagnostic used 29 prepared stops and covered routes 97, 158, 215, 357, 385, 397, 397A, 444, 657, N26 and W16. It is a national-data diagnostic, not a replay of the live TfL rows. Exact current TfL Browser output for every listed route/direction and the live Tufton Sources & Checks result remain Product Owner review items.
+
+### TfL-primary endpoint warning reconciliation
+
+TfL/BODS disagreement diagnostics already classified a supplementary conflict as audit-only when TfL route metadata established the final route identity. Service-summary aggregation nevertheless unioned endpoint StopPoint IDs from separate BODS rows into the final TfL planner decision, so a safely resolved TfL row could inherit planner-facing endpoint ambiguity.
+
+The summary builder now selects TfL endpoint evidence for planner decisions only when every authoritative TfL record has named termini and matched route metadata or exactly one StopPoint ID for each endpoint. Supplementary BODS records and diagnostics remain in `rawServiceSummaries`. If TfL identity is absent, incomplete or conflicting, all endpoint sources remain in the decision and the warning stays actionable. Focused tests verify both cases.
+
+### Pipers Lane Route 231 calendar
+
+Frozen Run #75 uses archive `bed_51-231-_-y08-1.xml`, service code `51-231-_-y08-1`, valid 12 October 2026–31 July 2027. Eight prepared pattern variants have `calendarProfileId: ordinary`; profile records containing `SpecialDaysOperation` are marked `partial`. The immutable prepared evidence contains conflicting all-seven-day and Monday–Friday profiles, with specific Saturday-only profiles on some variants. The original XML payload is not present in this checkout, so the precise special-day meaning cannot be recovered from the prepared shard. The official operator timetable separates weekday and Saturday tables and contains no Sunday timetable.
+
+Root cause: profile grouping used the broad `ordinary` category and unioned partially resolved day sets, promoting unsupported Sunday departures. The parser and runtime now handle such conflicts generically: they remove a partially resolved profile when a more-specific profile contradicts it, then retain the union of days supported by the most-specific partial profiles. The conflict remains qualified and original profile evidence stays available. A direct Monday–Friday plus Saturday fixture proves Sunday is never inferred. School/non-school separation and the 657, 16C and PE1 calendar controls remain covered.
+
+The frozen-data Browser and Word output now shows:
+
+- Route 231 towards Dunstable Asda: Mon–Fri 3 journeys/day; Saturday 2 journeys/day; no Sunday service. Approximate period: 08:04–11:34 weekdays and 09:04–11:34 Saturday.
+- Route 231 towards Pepperstock: Mon–Fri 4 journeys/day; Saturday 1 journey/day; no Sunday service. Approximate period: 11:18–18:02 weekdays and one departure at approximately 11:18 Saturday.
+- Route 230 remains one Centrebus circular row, approximately hourly Monday–Saturday, with no Sunday service.
+
+Pipers Sources & Checks retains the incomplete NaPTAN stop-coverage item for Stop `021013524`. One calendar qualification is shown: `The frozen calendar profiles conflict; only days supported by the most specific profiles are shown. Confirm weekend service against the operator timetable.` Browser and Word rows match.
+
+### Headless cross-site results and exact review items
+
+The Browser/Word audit used the immutable Run #75 Bus/TNDS manifest digests recorded above. With `ATLAS_C4_TRACE_OPERATOR_STAGES=1`, all controls completed with no browser errors, failed requests/responses or external requests. Status: `READY_FOR_TECHNICAL_DIRECTOR_REVIEW_BEFORE_MANUAL_RE-ACCEPTANCE`, not Product Owner acceptance.
+
+- Pipers: Routes 230 and 231 passed; one evidence item remains for incomplete NaPTAN stop coverage at `021013524`.
+- Grove Road Chingford golden: Route 657 has two TfL rows, one school-day journey each way, no weekend service, and departures around 07:56 and 16:22. This fixture emitted no evidence-item warning.
+- Waltham Cross: Route 16 and 16C periods, Sunday-only 16C 08:00–19:45, four frozen 212 departures, both 242 identities, and 217/279/310/317/327 rows remain. Seven evidence items remain: endpoint decisions for 16, 16C, 217, 317 and 327, plus two TfL timetable-availability items. One calendar qualification from partial TNDS profiles is also disclosed; the 212 four-departure frozen schedule is unchanged. This does not reconcile the Product Owner's separate four-item live result.
+- Long Lane: both 203 directions remain, 555 is presented towards Hatton Cross, and both N555 directions remain. Six evidence items remain: complex TNDS calendars for 555 and N555; principal-location evidence for 482, 490 and H30; incomplete NaPTAN stop coverage at `40004402007A`.
+- Waltham map-on/map-off Word, standalone A3 map, Browser/Word parity, acknowledgements and export contracts passed.
+
+### Verification and remaining acceptance
+
+- `node tests/atlas/run-all.mjs` passed against the complete immutable Run #75 checkout and frozen TfL iBus index, ending `ATLAS Alpha.15 deterministic suite passed.` Focused topology/fallback, endpoint authority, TNDS partial-calendar and no-Sunday tests passed. The full suite retained 657 school-day-only, 16C Sunday-only, PE1 415 Wednesday-only, Pipers 230, PE1 202, Waltham, Long Lane and Wycliffe controls.
+- Dependabot remains the existing dependency automation. Codecov, OpenSSF Scorecard, Sentry and Renovate were reviewed but not installed or configured. Renovate remains deferred to avoid overlapping dependency automation.
+- Product Owner manual acceptance has not occurred. Before release, replay every Tufton route/direction with captured TfL responses, confirm both exact Route 158 planner rows and live Sources & Checks reconciliation, then obtain Product Owner review. No main edit, merge, tag, publication, updater run or data refresh occurred.

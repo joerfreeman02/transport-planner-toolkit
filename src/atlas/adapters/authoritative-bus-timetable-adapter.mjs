@@ -81,6 +81,90 @@ function matchNationalRequest(lineId, stopPointId, nationalServices) {
   return candidates.length === 1 ? candidates[0] : null;
 }
 
+function routeMetadataLineSections(metadataResult, lineId) {
+  if (!metadataResult || metadataResult.ok === false) return [];
+  const metadata = metadataResult && typeof metadataResult === 'object' && 'data' in metadataResult
+    ? metadataResult.data
+    : metadataResult;
+  const lines = Array.isArray(metadata) ? metadata : [metadata];
+  return lines.filter(line => normal(line?.id ?? line?.name) === normal(lineId))
+    .flatMap(line => Array.isArray(line?.routeSections) ? line.routeSections : Array.isArray(line?.sections) ? line.sections : [])
+    .filter(section => text(section?.direction) && text(section?.originationName) && text(section?.destinationName));
+}
+
+function fallbackRouteSections(service, routeSections) {
+  const origin = normal(service?.origin);
+  const destination = normal(service?.destination);
+  const direction = normal(service?.direction);
+  const originIds = unique([service?.originStopPointId, ...(service?.originStopPointIds ?? [])]);
+  const destinationIds = unique([service?.destinationStopPointId, ...(service?.destinationStopPointIds ?? [])]);
+  return routeSections.filter(section => {
+    if (origin && normal(section.originationName) !== origin) return false;
+    if (destination && normal(section.destinationName) !== destination) return false;
+    if (direction && ['inbound', 'outbound'].includes(direction) && normal(section.direction) !== direction) return false;
+    if (originIds.length && !originIds.includes(text(section.originator))) return false;
+    if (destinationIds.length && !destinationIds.includes(text(section.destination))) return false;
+    return Boolean(origin || destination || originIds.length || destinationIds.length);
+  });
+}
+
+function sameStopId(left, right) { return normal(left) === normal(right); }
+
+function fallbackTflRouteSequenceEvidence(service, request, routeMetadata, routeSequenceResult) {
+  const lineId = text(request?.lineId);
+  const stopPointId = text(request?.stopPointId);
+  const sections = fallbackRouteSections(service, routeMetadataLineSections(routeMetadata, lineId));
+  if (sections.length !== 1) return null;
+  const section = sections[0];
+  const sequences = (routeSequenceResult?.data ?? [])
+    .filter(entry => normal(entry.lineId) === normal(lineId) && normal(entry.direction) === normal(section.direction))
+    .flatMap(entry => (entry.sequences ?? []).map(sequence => ({ entry, sequence })))
+    .filter(({ sequence }) => {
+      const ids = sequence.orderedStopPointIds ?? [];
+      if (!ids.some(id => sameStopId(id, stopPointId))) return false;
+      if (section.serviceType && sequence.serviceType && normal(section.serviceType) !== normal(sequence.serviceType)) return false;
+      if (section.originator && !sameStopId(section.originator, ids[0])) return false;
+      if (section.destination && !sameStopId(section.destination, ids.at(-1))) return false;
+      if (!section.originator && normal(sequence.orderedStops?.[0]?.name) !== normal(section.originationName)) return false;
+      if (!section.destination && normal(sequence.orderedStops?.at(-1)?.name) !== normal(section.destinationName)) return false;
+      return true;
+    });
+  const uniqueSequences = sequences.filter(({ sequence }, index) => !sequences.slice(0, index).some(({ sequence: prior }) =>
+    text(prior.branchId) === text(sequence.branchId)
+      && normal(prior.serviceType) === normal(sequence.serviceType)
+      && (prior.orderedStopPointIds ?? []).length === (sequence.orderedStopPointIds ?? []).length
+      && (prior.orderedStopPointIds ?? []).every((id, position) => sameStopId(id, sequence.orderedStopPointIds[position]))));
+  if (uniqueSequences.length !== 1) return null;
+  const { entry, sequence } = uniqueSequences[0];
+  return Object.freeze({
+    provider: 'Transport for London Unified API',
+    lineId,
+    direction: text(section.direction),
+    status: 'resolved',
+    matchType: 'route-topology-only-for-timetable-fallback',
+    candidateCount: 1,
+    routeTopologyEndpoints: Object.freeze({ origin: sequence.orderedStopPointIds[0], destination: sequence.orderedStopPointIds.at(-1) }),
+    matchedSequence: Object.freeze({
+      branchId: sequence.branchId ?? null,
+      serviceType: sequence.serviceType ?? section.serviceType ?? null,
+      orderedLineRoutes: Object.freeze([...(sequence.orderedLineRoutes ?? [])]),
+      orderedStops: Object.freeze((sequence.orderedStops ?? []).map(stop => Object.freeze({ ...stop }))),
+      orderedStopPointIds: Object.freeze([...(sequence.orderedStopPointIds ?? [])])
+    }),
+    matchedRouteSections: Object.freeze([Object.freeze({
+      id: text(section.id) || null,
+      direction: text(section.direction),
+      originStopPointId: text(section.originator) || null,
+      destinationStopPointId: text(section.destination) || null,
+      serviceType: text(section.serviceType) || null,
+      validFrom: text(section.validFrom) || null,
+      validTo: text(section.validTo) || null
+    })]),
+    provenance: entry.provenance ?? null,
+    scheduledTimetableUsed: false
+  });
+}
+
 function requestIdentity(request) { return request?.lineId && request?.stopPointId ? `${request.lineId}|${request.stopPointId}` : null; }
 
 function matchBods(tfl, bods) {
@@ -573,20 +657,34 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     if (materialFallbackServices.length) warnings.push(fallbackWarning);
     if (unprocessed.length) warnings.push(`Unprocessed timetable scope: ${unprocessed.map(request => `${request.lineId}/${request.stopPointId}`).join(', ')}.`);
     let routeSequenceResult = null;
-    if (typeof tflAdapter.routeSequencesForLineDirections === 'function' && services.length) {
-      const sequenceRequests = [...new Map(services.map(service => {
+    if (typeof tflAdapter.routeSequencesForLineDirections === 'function' && (services.length || fallbackServices.length)) {
+      const directSequenceRequests = services.map(service => {
         const lineId = text(service.source?.lineId);
         const direction = text(service.direction);
-        return [`${normal(lineId)}|${normal(direction)}`, { lineId, direction }];
-      }).filter(([, request]) => request.lineId && request.direction)).values()];
+        return { lineId, direction };
+      }).filter(request => request.lineId && request.direction);
+      const fallbackSequenceRequests = fallbackServices.flatMap(service => {
+        const request = { lineId: text(service.source?.requestedLineId), stopPointId: text(service.source?.requestedStopPointId) };
+        return fallbackRouteSections(service, routeMetadataLineSections(routeMetadata, request.lineId))
+          .map(section => ({ lineId: request.lineId, direction: text(section.direction) }));
+      });
+      const sequenceRequests = [...new Map([...directSequenceRequests, ...fallbackSequenceRequests]
+        .filter(request => request.lineId && request.direction)
+        .map(request => [`${normal(request.lineId)}|${normal(request.direction)}`, request])).values()];
       routeSequenceResult = await tflAdapter.routeSequencesForLineDirections(sequenceRequests, {
         forceRefresh: options.forceRefresh,
         progress: { phase: 'checking-timetables', completed: processedRequests.length, total: processedRequests.length }
       });
       for (let index = 0; index < composed.length; index += 1) {
         const service = composed[index];
-        if (normal(service.provider ?? service.timetableSource ?? service.source?.provider) !== 'tfl') continue;
-        composed[index] = { ...service, tflRouteSequenceEvidence: tflRouteSequenceEvidenceForService(service, { ...routeSequenceResult, routeMetadata }) };
+        if (normal(service.provider ?? service.timetableSource ?? service.source?.provider) === 'tfl') {
+          composed[index] = { ...service, tflRouteSequenceEvidence: tflRouteSequenceEvidenceForService(service, { ...routeSequenceResult, routeMetadata }) };
+          continue;
+        }
+        const request = { lineId: text(service.source?.requestedLineId), stopPointId: text(service.source?.requestedStopPointId) };
+        if (!request.lineId || !request.stopPointId) continue;
+        const evidence = fallbackTflRouteSequenceEvidence(service, request, routeMetadata, routeSequenceResult);
+        if (evidence) composed[index] = { ...service, tflRouteSequenceEvidence: evidence };
       }
       warnings.push(...(routeSequenceResult.warnings ?? []));
     }

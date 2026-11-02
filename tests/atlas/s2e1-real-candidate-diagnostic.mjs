@@ -23,6 +23,7 @@ const controls = [
   { id: 'waltham', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700, focusRoutes: ['13', '13A', '13B', '13C', '66', '217', '279', '317', '327', '491', 'N279'] },
   { id: 'pipers', label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700, focusRoutes: ['46', '230', '231', 'C'] },
   { id: 'chingford', label: 'Normanshire Drive, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250, focusRoutes: ['357', '444', '657', 'W16'] },
+  { id: 'tufton', label: 'Tufton Road, Chingford Mount control point', latitude: 51.613869, longitude: -0.020303, radius: 700, focusRoutes: ['97', '158', '215', '357', '385', '397', '397A', '444', '657', 'N26', 'W16'] },
   { id: 'longlane', label: 'Long Lane, Hounslow', latitude: 51.456210, longitude: -0.462970, radius: 400, focusRoutes: ['203', '555', 'N555'] },
   { id: 'hoddesdon', label: 'The Drive, Hoddesdon', latitude: 51.7630, longitude: -0.0105, radius: 700, focusRoutes: ['33', '310', '907', '907A'] },
   { id: 'pe1', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '5A', '37', '101', '102'] },

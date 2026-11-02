@@ -217,14 +217,27 @@ function parseService({ source, serviceBlock, serviceBlocks, patternById, journe
       if (journeyPatternRef) return journeyPatternRef === variant.patternId;
       return recordVariants.length === 1;
     });
-    for (const journey of patternJourneys) {
+    const journeyProfiles = patternJourneys.map(journey => profileForJourney(journey, variant));
+    const partialProfiles = journeyProfiles.filter(calendar => calendar.resolutionStatus === 'partial' && calendar.daysOfWeek?.length);
+    const partialDaySignatures = new Set(partialProfiles.map(calendar => DAYS.filter(day => calendar.daysOfWeek.includes(day)).join(',')));
+    const conflictingPartialProfiles = partialProfiles.length > 1 && partialDaySignatures.size > 1;
+    const supportedPartialProfiles = conflictingPartialProfiles
+      ? partialProfiles.filter(calendar => !partialProfiles.some(other => {
+        const candidateDays = new Set(other.daysOfWeek);
+        return candidateDays.size < calendar.daysOfWeek.length && [...candidateDays].every(day => calendar.daysOfWeek.includes(day));
+      }))
+      : [];
+    const supportedDays = new Set(supportedPartialProfiles.flatMap(calendar => calendar.daysOfWeek));
+    if (conflictingPartialProfiles) calendarWarnings.push('TNDS journey variants contain conflicting partially resolved operating-day profiles; only days supported by the most specific partial profiles are shown pending calendar review.');
+    for (const [journeyIndex, journey] of patternJourneys.entries()) {
       const departure = minutes(first(journey, 'DepartureTime'));
       if (departure == null || variant.status === 'quarantine') continue;
-      const calendar = profileForJourney(journey, variant);
+      const calendar = journeyProfiles[journeyIndex];
       calendarEvidence.push(calendar);
       calendarWarnings.push(...calendar.warnings);
       const journeyIdentity = first(journey, 'VehicleJourneyCode') || first(journey, 'VehicleJourneyId') || first(journey, 'VehicleJourneyRef') || null;
-      for (const day of calendar.daysOfWeek) {
+      const operatingDays = conflictingPartialProfiles ? calendar.daysOfWeek.filter(day => supportedDays.has(day)) : calendar.daysOfWeek;
+      for (const day of operatingDays) {
         for (const stopId of patternStopIds) if (stopSchedules[stopId]) {
           const minute = departure + Math.round((profile.offsets?.get(stopId) ?? 0) / 60);
           stopSchedules[stopId][day].push(minute);

@@ -388,6 +388,16 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
         : 'TfL route metadata could not be checked. ATLAS retained the scheduled pattern without inventing full origin or destination.');
       const hasPeriods = timing.hasPeriods;
       const profileTimings = timing.profiles ?? [{ calendarProfileId: null, schedule: timing.schedule, departureEvidence: timing.departureEvidence, frequencyEvidence: timing.frequencyEvidence, operatingPeriodEvidence: timing.operatingPeriodEvidence, calendarEvidence: timing.calendarEvidence, evidence: timing.evidence }];
+      const requestedStopDetails = [...(Array.isArray(response?.stations) ? response.stations : []), ...(Array.isArray(response?.stops) ? response.stops : [])]
+        .find(station => text(station?.id ?? station?.stopPointId ?? station?.naptanId) === stopPointId);
+      const routePatternStops = [
+        ...(departureStopConfirmed && !hasRequestedStop ? [{
+          id: stopPointId,
+          name: text(requestedStopDetails?.name ?? requestedStopDetails?.commonName) || null,
+          locality: text(requestedStopDetails?.locality ?? requestedStopDetails?.parentLocality) || null
+        }] : []),
+        ...pattern.stations.map(station => ({ ...station }))
+      ];
       for (const profileTiming of profileTimings) services.push({
         id: `tfl:${lineId}:${normal(direction)}:${normal(pattern.id || `pattern-${index + 1}`)}${timing.splitByCalendarProfile ? `:calendar:${normal(profileTiming.calendarProfileId)}` : ''}`,
         routeNumber: lineName || lineId,
@@ -402,6 +412,11 @@ function routeRecords(response, stopPointId, responseDepartureStopId, metadataRe
           ...(departureStopConfirmed && !hasRequestedStop ? [stopPointId] : []),
           ...pattern.stations.map(station => station.id)
         ],
+        // Keep TfL's ordered StationInterval call labels alongside its exact
+        // StopPoint sequence. Principal-location derivation can then use the
+        // authoritative TfL pattern without requiring BODS/TNDS component
+        // calls to be present as a label supplement.
+        routePatternStops,
         operatingPeriodEvidence: profileTiming.operatingPeriodEvidence ?? [],
         stopSchedules: { [stopPointId]: profileTiming.schedule },
         departureEvidenceByDay: profileTiming.departureEvidence,

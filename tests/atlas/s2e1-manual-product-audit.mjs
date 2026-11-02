@@ -118,6 +118,7 @@ const controls = [
   { id: 'waltham-cross-nearest', label: '47 Berkley Avenue, Waltham Cross nearest logical stop group', latitude: 51.686144, longitude: -0.035707, radius: 700, assessmentMode: 'nearest' },
   { id: 'long-lane-route203', label: 'Long Lane, Hounslow', latitude: 51.456210, longitude: -0.462970, radius: 400 },
   { id: 'chingford', label: 'Normanshire Drive, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250 },
+  { id: 'hoddesdon-the-drive', label: 'The Drive, Hoddesdon', latitude: 51.7630, longitude: -0.0105, radius: 700 },
   { id: 'pe1', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500 }
 ];
 if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') controls.splice(0, controls.length, ...enfieldControls);
@@ -616,6 +617,12 @@ try {
         assert.match(hounslow['Principal locations'], /East Bedfont.*Hatton.*Hatton Cross.*Cranford.*Hounslow West.*Hounslow/i);
         assert.doesNotMatch(`${staines['Principal locations']} ${hounslow['Principal locations']}`, /See route origin \/ destination|Unresolved/i);
         outcome.route203BrowserRows = route203Rows;
+        const route555Central = rendered.find(row => row.Route === '555' && /Heathrow Central/i.test(row['Direction / main service pattern'] || ''));
+        const routeN555Rows = rendered.filter(row => row.Route === 'N555');
+        assert.ok(route555Central, 'Long Lane must retain Route 555 towards Heathrow Central.');
+        assert.match(route555Central['Typical frequency'], /30[–-]40 mins/i, 'Route 555 frequency at the assessed stop must include the proven Hatton Cross short-working departures.');
+        assert.ok(routeN555Rows.length >= 2, 'The frozen open-ended TNDS N555 record remains visible in both passenger directions.');
+        outcome.longLane555 = { route555Central, n555Rows: routeN555Rows };
       }
       const renderedServiceNotes = await serviceTable.locator('tbody tr.service-note').allInnerTexts();
       const byRoute = new Map();
@@ -818,6 +825,11 @@ try {
         assert.ok(route242.some(row => /Uno/i.test(row.Operator || '') && /Potters Bar/i.test(row['Direction / main service pattern'] || '') && /Mon-Fri:.*60/i.test(row['Typical frequency'] || '')), 'Waltham Browser route 242 must retain Uno’s weekday Potters Bar service.');
         assert.ok(route242.some(row => /Central Connect/i.test(row.Operator || '') && /Welham Green/i.test(row['Direction / main service pattern'] || '') && /Sun:.*120/i.test(row['Typical frequency'] || '')), 'Waltham Browser route 242 must retain Central Connect’s Sunday Welham Green service.');
         assert.ok(renderedServiceNotes.some(note => /Some route 242 journeys operate to Brookfield Centre/i.test(note)), 'Waltham Browser must retain the single Brookfield journey as an Uno short-working note.');
+        assert.ok(renderedServiceNotes.some(note => /Some route 242 journeys operate to Dame Alice Owen'?s School \(weekdays only\)/i.test(note)), 'Waltham Browser must retain the distinct weekday Dame Alice Owen’s School variant.');
+        assert.doesNotMatch(renderedServiceNotes.join(' '), /Some route 242 journeys operate to Potters Bar/i, 'Waltham Browser must not repeat the Uno principal destination as a Route 242 short working.');
+        assert.match(exportedWordText, /Some route 242 journeys operate to Dame Alice Owen'?s School \(weekdays only\)/i, 'Waltham Word must retain the distinct weekday Dame Alice Owen’s School variant.');
+        assert.match(exportedWordText, /Some route 242 journeys operate to Brookfield Centre/i, 'Waltham Word must retain Brookfield Centre separately.');
+        assert.doesNotMatch(exportedWordText, /Some route 242 journeys operate to Potters Bar/i, 'Waltham Word must not repeat the Uno principal destination as a Route 242 short working.');
         const route16 = rendered.find(row => row.Route === '16');
         const route16C = rendered.find(row => row.Route === '16C');
         const route212 = rendered.find(row => row.Route === '212');
@@ -865,10 +877,14 @@ try {
         outcome.standaloneMap = { format: 'PDF', validSignature: true, assessmentRadiusImplied: false, neutralFilename: standaloneMap.suggestedFilename() };
       }
       if (control.id === 'chingford') {
-        const route657 = rendered.find(row => row.Route === '657');
-        assert.ok(route657, 'Chingford golden control lost route 657.');
-        assert.match(route657['Typical frequency'], /Mon-Fri(?: \(School days\))?: 1 journey\/day/i, 'Chingford route 657 fixture golden frequency changed.');
-        assert.match(route657['Operating period at stop'], /07:56|16:22/, 'Chingford route 657 fixture golden timetable time changed.');
+        const route657Rows = rendered.filter(row => row.Route === '657');
+        assert.equal(route657Rows.length, 2, 'Chingford golden control must retain both route 657 directions.');
+        assert.ok(route657Rows.every(row => /TfL/i.test(row.Source || '')), 'Chingford route 657 remains TfL-primary.');
+        assert.ok(route657Rows.every(row => /Mon-Fri(?: \(School days\))?: 1 journey\/day/i.test(row['Typical frequency'])), 'Chingford route 657 remains one weekday school-day journey per evidenced direction.');
+        assert.ok(route657Rows.every(row => /Sat-Sun(?: \(School days\))?: No scheduled service/i.test(row['Typical frequency'])), 'Chingford route 657 remains unscheduled at weekends.');
+        assert.ok(route657Rows.every(row => !/Unresolved/i.test(row['Principal locations'] || '')), 'Chingford route 657 fixture must retain safe TfL principal locations.');
+        assert.match(route657Rows.map(row => row['Operating period at stop']).join(' '), /07:56|16:22/, 'Chingford route 657 fixture golden timetable times changed.');
+        outcome.chingford657Rows = route657Rows;
       }
       if (control.id === 'pe1') {
         const rows202 = rendered.filter(row => row.Route === '202');

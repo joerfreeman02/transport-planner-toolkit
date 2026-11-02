@@ -155,6 +155,27 @@ for (const [lineId, stopPointId] of [
   assert.deepEqual(omittedDepartureResult.data[0].stopSchedules[stopPointId].monday, [485], `${lineId}: the journey time is attributed to the confirmed departure StopPoint`);
 }
 
+// Chingford's TfL-only golden routes must resolve principal locations from
+// TfL's ordered StationInterval/StopPoint sequence, without national-feed
+// components. Route 657 retains the school-day-only calendar evidence below.
+for (const lineId of ['357', '444', 'W16', '657']) {
+  const stopPointId = `${lineId}-CHINGFORD-STOP`;
+  const chingfordAdapter = createTflBusTimetableAdapter({
+    cache: cache(),
+    fetchImpl: async () => response(departureStopOmittedFixture({ lineId, stopPointId, destination: `${lineId} terminus` }))
+  });
+  const chingfordResult = await chingfordAdapter.servicesForStop({ lineId, stopPointId, routeMetadata: omittedDepartureMetadata(lineId) });
+  assert.equal(chingfordResult.data.length, 1, `${lineId}: TfL-only Chingford fixture remains available`);
+  assert.deepEqual(chingfordResult.data[0].routePatternStopIds, [stopPointId, `${lineId}-NEXT`, `${lineId}-END`]);
+  assert.deepEqual(chingfordResult.data[0].routePatternStops.map(stop => stop.id), chingfordResult.data[0].routePatternStopIds);
+  const stop = { id: stopPointId, name: 'Chingford stop', walking: { status: 'routed', distanceMetres: 50 } };
+  const summary = buildServiceSummaries([stop], chingfordResult.data);
+  const plannerRows = buildPlannerBusServiceSummaries(summary, [stop]);
+  assert.ok(plannerRows.length, `${lineId}: planner row remains present`);
+  assert.ok(plannerRows.every(row => row.principalLocationState === 'resolved'), `${lineId}: ordered TfL-only calls resolve principal locations`);
+  assert.ok(plannerRows.every(row => !row.warnings?.some(warning => /principal locations could not be safely mapped/i.test(warning))), `${lineId}: no false principal-location review item remains`);
+}
+
 const sparseDepartureFixture = departureStopOmittedFixture({ lineId: 'ALT-SPARSE', stopPointId: 'ALT-SPARSE-REQUEST' });
 sparseDepartureFixture.timetable.routes[0].stationIntervals[0].intervals = [{ stopId: 'ALT-SPARSE-NEXT', timeToArrival: 2 }];
 const sparseDepartureAdapter = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async () => response(sparseDepartureFixture) });
@@ -236,13 +257,20 @@ assert.deepEqual(groveP.data[0].stopSchedules['GROVE-P'].monday, [476], 'Grove R
 assert.notDeepEqual(groveP.data[0].stopSchedules['GROVE-P'].monday, [478], 'Mapleton Road 07:58 cannot leak into Grove Road Stop P');
 assert.equal(groveP.data[0].departureEvidenceByDay.monday[0].stopPointId, 'GROVE-P');
 assert.equal(groveP.data[0].departureEvidenceByDay.monday[0].journeyIdentity, '657-outbound-morning');
+assert.deepEqual(groveP.data[0].routePatternStops.map(stop => stop.id), groveP.data[0].routePatternStopIds, 'TfL StationInterval labels remain aligned with the exact ordered StopPoint pattern.');
 const grovePSummary = buildServiceSummaries([{ id: 'GROVE-P', name: 'Grove Road', indicator: 'P' }], groveP.data)[0];
 assert.match(grovePSummary.typicalFrequencyText, /Mon-Fri: 1 journey\/day/);
 assert.match(grovePSummary.operatingPeriodLines.join(' '), /Mon-Fri: Departs approx\. 07:56/);
 assert.match(grovePSummary.serviceNote, /School-day journeys only/);
+assert.equal(grovePSummary.principalLocationState, 'resolved', 'TfL-only ordered StationInterval calls resolve principal locations without national-feed component records.');
+assert.match(grovePSummary.principalLocations.join(', '), /Bancroft's School/);
+assert.doesNotMatch(grovePSummary.sourceWarnings.join(' '), /Principal locations could not be safely mapped/i);
 const groveN = await tfl657.servicesForStop({ lineId: '657', stopPointId: 'GROVE-N', routeMetadata: routeMetadata657 });
 assert.deepEqual(groveN.data[0].stopSchedules['GROVE-N'].monday, [982], 'Grove Road Stop N keeps its own 16:22 timetable time');
-assert.match(buildServiceSummaries([{ id: 'GROVE-N', name: 'Grove Road', indicator: 'N' }], groveN.data)[0].operatingPeriodLines.join(' '), /Mon-Fri: Departs approx\. 16:22/);
+const groveNSummary = buildServiceSummaries([{ id: 'GROVE-N', name: 'Grove Road', indicator: 'N' }], groveN.data)[0];
+assert.match(groveNSummary.operatingPeriodLines.join(' '), /Mon-Fri: Departs approx\. 16:22/);
+assert.equal(groveNSummary.principalLocationState, 'resolved', 'The opposite TfL-only 657 sequence also derives its principal endpoint.');
+assert.match(groveNSummary.principalLocations.join(', '), /Salisbury Hall Sainsbury's/);
 
 let timetableCalls = 0, routeCalls = 0;
 const tfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => {

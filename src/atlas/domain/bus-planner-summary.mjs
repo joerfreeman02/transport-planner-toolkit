@@ -1265,7 +1265,34 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
       .flatMap(service => serviceDepartureEntries(service, representativeId).filter(entry => entry.occurrenceRole !== 'arrival'
         && entry.minute > (circularBaseLastByDay.get(entry.day) ?? -Infinity)))
     : [];
-  const collectedEntries = deduplicateDepartureEntries([...circularBaseEntries, ...otherBaseEntries, ...laterCircularShortWorkingEntries]);
+  // A non-circular contained short working is part of the same passenger
+  // direction at this boarding stop. Include its departures only when the
+  // evidence proves the same route/profile, compatible operator, shared
+  // assessed stop, and strict ordered containment. Circular terminal
+  // short-working handling remains separate because its repeated calls are
+  // normalized as arrivals/returns above.
+  const existingDepartureKeys = new Set([...circularBaseEntries, ...otherBaseEntries].map(entry => [entry.day, entry.stopPointId || representativeId, entry.minute].join('|')));
+  const containedDepartureKeys = new Set();
+  const containedShortWorkingEntries = !terminalEvidence && principalEligible.length
+    ? eligible.filter(service => isShortWorking(service)
+      && text(service?.routeNumber) === text(main?.routeNumber)
+      && calendarProfileAuthorityKey(service) === calendarProfileAuthorityKey(main)
+      && operatorFamilyCompatible(service, main)
+      && !reverseEndpointRelationship(service, main)
+      && (endpointDirectionCompatible(service, main)
+        || Boolean(endpointIdentity(service, 'origin') && endpointIdentity(service, 'origin') === endpointIdentity(main, 'origin')))
+      && serviceAtRepresentative(service, representativeId)
+      && recurringContainedShortWorking(service, main)
+      && strictPatternSubsequence(service, main))
+      .flatMap(service => serviceDepartureEntries(service, representativeId).filter(entry => {
+        if (entry.occurrenceRole === 'arrival') return false;
+        const key = [entry.day, entry.stopPointId || representativeId, entry.minute].join('|');
+        if (existingDepartureKeys.has(key) || containedDepartureKeys.has(key)) return false;
+        containedDepartureKeys.add(key);
+        return true;
+      }))
+    : [];
+  const collectedEntries = deduplicateDepartureEntries([...circularBaseEntries, ...otherBaseEntries, ...laterCircularShortWorkingEntries, ...containedShortWorkingEntries]);
   // A late, exact-origin short working can disambiguate the nearby terminal
   // return call on the circular pattern. Re-normalize only when such an
   // operating-period extension exists; the principal stream and its
@@ -2204,10 +2231,13 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     || resolveCircularServiceDecision(component, { principal: main, component });
   const rowCircular = circularClassificationIsProven(circularServiceDecision);
   const authoritativeEquivalentPatterns = higherAuthorityEquivalentPatterns(component, routeFamilyServices, representative.id);
-  const canonical = authoritativeEquivalentPatterns.length
-    ? canonicalDeparturePopulation(authoritativeEquivalentPatterns, representative.id, authoritativeEquivalentPatterns[0])
-    : canonicalDeparturePopulation(component, representative.id, main, plannerServiceGroup);
   const shortWorkingIds = new Set(plannerServiceGroup.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []);
+  const equivalentWithShortWorkings = authoritativeEquivalentPatterns.length
+    ? [...authoritativeEquivalentPatterns, ...component.filter(service => plannerRecordIds(service).some(id => shortWorkingIds.has(id)))]
+    : [];
+  const canonical = authoritativeEquivalentPatterns.length
+    ? canonicalDeparturePopulation(equivalentWithShortWorkings, representative.id, authoritativeEquivalentPatterns[0], plannerServiceGroup)
+    : canonicalDeparturePopulation(component, representative.id, main, plannerServiceGroup);
   const principalComponent = component.filter(service => !plannerRecordIds(service).some(id => shortWorkingIds.has(id)));
   const profileComponent = principalComponent.length ? principalComponent : component;
   const variantRecordIds = new Set([
@@ -3377,10 +3407,13 @@ function attachRouteNotes(rows) {
         ...entry,
         locations: (entry.locations ?? []).filter(location => !principalDestinations.has(normal(location)))
       })).filter(entry => entry.locations.length);
+      const shortWorkingEntries = (notes.shortWorkingEntries ?? []).filter(entry => !principalDestinations.has(normal(entry.location)));
       return Object.freeze({
         ...notes,
         additionalServiceEntries: Object.freeze(entries.map(entry => Object.freeze(entry))),
-        additionalServices: entries.length ? plannerAdditionalSentence(entries) : null
+        additionalServices: entries.length ? plannerAdditionalSentence(entries) : null,
+        shortWorkingEntries: Object.freeze(shortWorkingEntries),
+        shortWorkings: shortWorkingEntries.length ? plannerShortWorkingSentence(shortWorkingEntries) : null
       });
     };
     const rowNotes = group.map(({ row }) => notesFor(row));
@@ -3439,7 +3472,7 @@ function attachRouteNotes(rows) {
     };
     group.forEach(({ row }) => {
       (notesForRow(row).additionalServiceEntries ?? []).forEach(entry => mergeEntry(mergedAdditionalServiceEntries, entry));
-      (row.plannerNotes?.shortWorkingEntries ?? []).forEach(entry => mergeEntry(mergedShortWorkingEntries, entry));
+      (notesForRow(row).shortWorkingEntries ?? []).forEach(entry => mergeEntry(mergedShortWorkingEntries, entry));
       text(row.plannerNotes?.serviceQualification).split(';').map(text).filter(Boolean).forEach(qualification => {
         if (!mergedQualifications.some(existing => normal(existing) === normal(qualification))) mergedQualifications.push(qualification);
       });

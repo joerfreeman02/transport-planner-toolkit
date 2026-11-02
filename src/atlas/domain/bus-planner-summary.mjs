@@ -1672,6 +1672,16 @@ function compareMain(first, second, representativeId, component = [first, second
     || (text(first.origin) + '|' + text(first.destination) + '|' + text(first.id)).localeCompare(text(second.origin) + '|' + text(second.destination) + '|' + text(second.id));
 }
 
+function dominantContainedPresentationPattern(component, principal, representativeId) {
+  const principalJourneys = principalJourneyKeys(principal, representativeId).size;
+  const candidates = component.filter(service => service !== principal
+    && !/^(?:(?:the )?(?:bus )?station|(?:the )?(?:town|city) cent(?:re|er)|bus stop|destination not (?:supplied|resolved))$/i.test(text(service.destination))
+    && recurringContainedShortWorking(service, principal)
+    && principalJourneyKeys(service, representativeId).size >= Math.max(8, principalJourneys * 2));
+  return candidates.sort((first, second) => principalJourneyKeys(second, representativeId).size - principalJourneyKeys(first, representativeId).size
+    || text(first.destination).localeCompare(text(second.destination)))[0] ?? principal;
+}
+
 function frequencyEvidence(component, representativeId) {
   return component.filter(service => serviceAtRepresentative(service, representativeId))
     .flatMap(service => (service.frequencyEvidence ?? []).filter(item => !item.stopPointId || text(item.stopPointId) === representativeId));
@@ -1942,7 +1952,9 @@ function variantNote(component, main, groupingDecision) {
   const endpoints = unique(component.map(service => text(service.origin) + ' → ' + text(service.destination)));
   const patterns = unique(component.map(service => explicitPattern(service).map(text).join('>')).filter(Boolean));
   const journeyIdentitySets = component.map(service => new Set(DAY_ORDER.flatMap(day => (service.departureEvidenceByDay?.[day] ?? []).map(item => departureIdentity(item)).filter(Boolean))));
-  const sharedJourneyIdentity = journeyIdentitySets.length > 1 && journeyIdentitySets.every(set => set.size) && [...journeyIdentitySets[0]].some(identity => journeyIdentitySets.every(set => set.has(identity)));
+  const sharedJourneyIdentity = journeyIdentitySets.length > 1 && journeyIdentitySets.every(set => set.size)
+    && journeyIdentitySets.every(set => set.size === journeyIdentitySets[0].size)
+    && [...journeyIdentitySets[0]].every(identity => journeyIdentitySets.every(set => set.has(identity)));
   const hasVariant = component.length > 1 && ((endpoints.length > 1 && !sharedJourneyIdentity)
     || patterns.length > 1
     || component.some(service => Number(service.patternVariantCount) > 1));
@@ -2224,8 +2236,12 @@ function profileLines(lines, profileLabel) {
 function buildPlannerRow(component, stops, componentIndex, routeFamilyServices = component, publicRouteFamilyKey = null, serviceGroupOverride = null) {
   const representative = selectRepresentativeStop(component, stops);
   const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
+  const presentationPattern = dominantContainedPresentationPattern(component, main, representative.id);
   const plannerServiceGroup = serviceGroupOverride || buildPlannerServiceGroup(component, stops, main, representative, publicRouteFamilyKey);
   const destinationDecision = plannerServiceGroup.destinationEndpointDecision || serviceEndpointDecision(main, 'destination');
+  const presentationDestinationDecision = presentationPattern === main
+    ? destinationDecision
+    : serviceEndpointDecision(presentationPattern, 'destination');
   const originDecision = plannerServiceGroup.originEndpointDecision || serviceEndpointDecision(main, 'origin');
   const circularServiceDecision = plannerServiceGroup.circularServiceDecision
     || resolveCircularServiceDecision(component, { principal: main, component });
@@ -2327,13 +2343,18 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   if (unresolvedNeedsQualification) profileNotes.push('Operating days could not be fully confirmed; check the timetable before use.');
   const notes = materialServiceNotesForComponent(component, displayResult.schedules, plannerServiceGroup.publicServiceGroupingDecision)
     .filter(note => !((hasSchoolHolidayProfiles || hasSchoolNonSchoolEvidence) && hasCalendarTaxonomyNote(note)));
+  if (presentationPattern !== main) {
+    const shorterDestination = text(presentationPattern.destination);
+    const longerDestination = text(main.destination);
+    if (shorterDestination && longerDestination) notes.push(`Less frequent journeys continue beyond ${shorterDestination} to ${longerDestination}.`);
+  }
   notes.push(...profileNotes);
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
   const groupingDecision = Object.freeze({
     ...plannerServiceGroup.publicServiceGroupingDecision,
     deduplicatedSourceRecordIds: Object.freeze(plannerServiceGroup.publicServiceGroupingDecision.deduplicatedSourceRecordIds ?? [])
   });
-  const principalLocations = plannerPrincipalLocations(main, representative.id, component);
+  const principalLocations = plannerPrincipalLocations(presentationPattern, representative.id, component);
   const profileSchedules = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).schedules])));
   const profilePopulations = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).entries])));
   const profileFrequency = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).frequencyByDay])));
@@ -2352,6 +2373,8 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     operatorEvidenceConflict: plannerServiceGroup.operatorEvidenceConflict,
     origin: text(main.origin) || 'Origin not supplied',
     destination: destinationDecision.chosen || text(main.destination) || 'Destination not resolved',
+    presentationDestination: presentationDestinationDecision.chosen || text(presentationPattern.destination) || null,
+    presentationExtensionDestination: presentationPattern === main ? null : text(main.destination) || null,
     rawDestination: destinationDecision.raw || text(main.destination) || null,
     rawOrigin: originDecision.raw || text(main.origin) || null,
     originEndpointDecision: originDecision,
@@ -2365,7 +2388,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     calendarProfileLabels: Object.freeze(profileIds.map(calendarProfileDisplayLabel)),
     hasSeparateTimetablePair: hasSchoolHolidayProfiles || hasSchoolNonSchoolEvidence,
     directionFamily: directionKey(main),
-    directionPatternText: directionPatternText({ ...main, destination: destinationDecision.chosen, destinationLocality: null, circular: rowCircular, circularServiceDecision }),
+    directionPatternText: directionPatternText({ ...presentationPattern, destination: presentationDestinationDecision.chosen || text(presentationPattern.destination) || destinationDecision.chosen, destinationLocality: null, circular: rowCircular, circularServiceDecision }),
     servedAtStopId: representative.id,
     servedAtText: servedAtLines.join('\n') || servedAtText(representative),
     servedAtStops: Object.freeze(servedAtLines),
@@ -2414,7 +2437,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     operatorRawNames: plannerServiceGroup.rawOperatorNames,
     operatorIdentities: plannerServiceGroup.operatorIdentities,
     sourceSelection: canonical.eligible.length ? 'representative-stop scheduled evidence' : 'representative-stop summary fallback',
-    routeVariantNote: variantNote(component, main, groupingDecision),
+    routeVariantNote: variantNote(component, presentationPattern, groupingDecision),
     alternateDestinationNames: Object.freeze(alternateDestinations(component, main)),
     materialAlternateDestinations: groupingDecision.materialDestinationEvidence,
     publicServiceGroupingDecision: groupingDecision,
@@ -3064,7 +3087,8 @@ export function plannerAnnotationTaxonomy(row) {
   const qualifications = [];
   const additionalServiceEntries = [];
   const shortWorkingEntries = [];
-  const mainDestination = normal(plannerDestination(row));
+  const mainDestination = normal(row?.presentationDestination || plannerDestination(row));
+  const presentationExtensionDestination = normal(row?.presentationExtensionDestination);
   const mainOrigin = normal(plannerOrigin(row) || row?.origin);
   const assessedTerminus = normal(row?.terminusDecision?.assessedPlace);
   const annotationPattern = service => unique([
@@ -3186,6 +3210,7 @@ export function plannerAnnotationTaxonomy(row) {
   const decisionVariants = samePhysicalJourney ? [] : (row?.publicServiceGroupingDecision?.variantDestinationEvidence ?? []);
   const mainDestinationKeys = plannerServiceDestinationKeys(row?.destinationDecision ?? row?.destinationEndpointDecision);
   for (const variant of decisionVariants) {
+    if (presentationExtensionDestination && normal(variant.destination) === presentationExtensionDestination) continue;
     const idSet = new Set(variant.sourceRecordIds ?? []);
     if ([...idSet].some(id => principalSourceIds.has(id))) continue;
     if (variant.sourceRecordIds?.length && [...idSet].every(id => duplicateIds.has(id))) continue;
@@ -3228,6 +3253,7 @@ export function plannerAnnotationTaxonomy(row) {
       if (!id || duplicateIds.has(id)) continue;
       if ((service.sourceRecordIds ?? []).some(sourceId => principalSourceIds.has(sourceId)) && service !== services[0]) continue;
       const destination = plannerDestination(service);
+      if (presentationExtensionDestination && normal(destination) === presentationExtensionDestination) continue;
       const origin = plannerOrigin(service);
       if (!destination && !origin) continue;
       const originDiffers = origin && normal(origin) !== mainOrigin;
@@ -3243,7 +3269,7 @@ export function plannerAnnotationTaxonomy(row) {
       if (knownShortWorking && originDiffers && destination && (normal(destination) === mainDestination || sameMainPlace)) {
          addShortWorkingEntry(route, origin, service, null, scopedQualification);
       }
-      else if (knownShortWorking && destination && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
+      else if (knownShortWorking && destination && normal(destination) !== mainDestination && !sameMainPlace && normal(destination) !== assessedTerminus) {
          addShortWorkingEntry(route, destination, service, 'short-working', scopedQualification);
       }
       else if (originDiffers && destination && (normal(destination) === mainDestination || sameMainPlace)) {
@@ -3265,6 +3291,7 @@ export function plannerAnnotationTaxonomy(row) {
       ...(row.alternateDestinationNames ?? []),
       ...services.map(service => plannerDestination(service))
     ])) {
+      if (presentationExtensionDestination && normal(destination) === presentationExtensionDestination) continue;
       const matchingVariant = decisionVariants.find(variant => normal(variant.destination) === normal(destination));
       const matchingService = services.find(service => normal(plannerDestination(service)) === normal(destination));
       const candidateKeys = matchingVariant
@@ -3274,7 +3301,7 @@ export function plannerAnnotationTaxonomy(row) {
         || sameStructuredPlannerPlace(mainDestinationKeys, candidateKeys);
       const isShortVariant = matchingVariant?.kind === 'short-working'
         || (matchingService?.sourceRecordIds ?? []).some(sourceId => (row?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []).includes(sourceId));
-      if (isShortVariant && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
+      if (isShortVariant && normal(destination) !== mainDestination && !sameMainPlace && normal(destination) !== assessedTerminus) {
          addShortWorkingEntry(row.routeNumber, destination, matchingService, 'short-working');
       }
       else if (!sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
@@ -3291,7 +3318,11 @@ export function plannerAnnotationTaxonomy(row) {
     && !/circular service/i.test(rowQualification)
     && !qualifications.some(existing => normal(existing).includes(normal(rowQualification)))) addUnique(qualifications, rowQualification);
   const shortLocation = value => text(value).replace(/^[^–-]+[–-]\s*/u, '');
-  const compactShortWorkings = shortWorkings.filter(candidate => !shortWorkings.some(other => other !== candidate
+  const retainedShortWorkingEntries = presentationExtensionDestination
+    ? shortWorkingEntries.filter(entry => normal(entry.location) !== presentationExtensionDestination)
+    : shortWorkingEntries;
+  const compactShortWorkings = shortWorkings.filter(candidate => (!presentationExtensionDestination || normal(shortLocation(candidate)) !== presentationExtensionDestination)
+    && !shortWorkings.some(other => other !== candidate
     && normal(shortLocation(other)).includes(normal(shortLocation(candidate)))));
   // One ordered-pattern evidence item can have only one semantic display.
   // Distinct patterns retain separate keys, so a real branch and a real short
@@ -3299,7 +3330,7 @@ export function plannerAnnotationTaxonomy(row) {
   const annotationLabel = (route, location) => `${normal(route)}|${normal(location)}`;
   const additionalEvidenceKeys = new Set(additionalServiceEntries.map(entry => entry.evidenceKey).filter(Boolean));
   const additionalLabels = new Set(additionalServiceEntries.flatMap(entry => entry.locations.map(location => annotationLabel(entry.routeNumber, location))));
-  const shortWorkingWins = new Set(shortWorkingEntries.filter(entry => {
+  const shortWorkingWins = new Set(retainedShortWorkingEntries.filter(entry => {
     const sameLabel = additionalLabels.has(annotationLabel(entry.routeNumber, entry.location));
     if (!sameLabel) return false;
     const additional = additionalServiceEntries.find(candidate => candidate.routeNumber === entry.routeNumber
@@ -3317,7 +3348,7 @@ export function plannerAnnotationTaxonomy(row) {
       locations: Object.freeze(entry.locations.filter(location => !shortWorkingWins.has(annotationLabel(entry.routeNumber, location))))
     }))
     .filter(entry => entry.locations.length);
-  const exclusiveShortWorkingEntries = shortWorkingEntries.filter(entry => {
+  const exclusiveShortWorkingEntries = retainedShortWorkingEntries.filter(entry => {
     if (shortWorkingWins.has(annotationLabel(entry.routeNumber, entry.location))) return true;
     if (additionalEvidenceKeys.has(entry.evidenceKey)) return false;
     return !additionalLabels.has(annotationLabel(entry.routeNumber, entry.location));
@@ -3399,7 +3430,8 @@ function attachRouteNotes(rows) {
   const updates = new Map();
   for (const group of groups.values()) {
     const principalDestinations = new Set(group.flatMap(({ row }) => [
-      plannerDestination(row), row?.destinationDecision?.chosenDisplayName, row?.destinationEndpointDecision?.chosenDisplayName
+      plannerDestination(row), row?.destinationDecision?.chosenDisplayName, row?.destinationEndpointDecision?.chosenDisplayName,
+      row?.presentationExtensionDestination
     ]).map(normal).filter(Boolean));
     const notesForRow = row => {
       const notes = row.plannerNotes ?? {};
@@ -3507,9 +3539,9 @@ function attachRouteNotes(rows) {
       });
       return Object.freeze({
         ...notesForRow(row),
-        additionalServices: additionalEntries.length ? plannerAdditionalSentence(additionalEntries) : row.plannerNotes?.additionalServices || null,
+        additionalServices: additionalEntries.length ? plannerAdditionalSentence(additionalEntries) : notesForRow(row).additionalServices || null,
         additionalServiceEntries: Object.freeze(additionalEntries),
-        shortWorkings: exclusiveShortEntries.length ? plannerShortWorkingSentence(exclusiveShortEntries) : (additionalEntries.length ? null : row.plannerNotes?.shortWorkings || null),
+        shortWorkings: exclusiveShortEntries.length ? plannerShortWorkingSentence(exclusiveShortEntries) : (additionalEntries.length ? null : notesForRow(row).shortWorkings || null),
         shortWorkingEntries: Object.freeze(exclusiveShortEntries),
         serviceQualification: mergedQualifications.length ? mergedQualifications.join('; ') : row.plannerNotes?.serviceQualification || null
       });

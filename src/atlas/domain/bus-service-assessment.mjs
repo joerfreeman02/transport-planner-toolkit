@@ -1121,7 +1121,10 @@ export function operatorProvenanceLabel(service) {
 
 /** Shared planner-facing frequency rule; no synthetic departures are created. */
 export function calculateTypicalServiceFrequency(departures, { day, label = '', frequencyEvidence = [] } = {}) {
-  const scheduled = ordered(departures);
+  // A repeated minute at one selected stop is one usable departure for
+  // headway purposes, even when duplicate source/variant evidence survives
+  // into this boundary.
+  const scheduled = [...new Set(ordered(departures))];
   const band = deterministicFrequencyBand(frequencyEvidence, day);
   const dayText = dayLabel(day);
   if (band?.exact && scheduled.length) {
@@ -1146,9 +1149,24 @@ export function calculateTypicalServiceFrequency(departures, { day, label = '', 
     ? (orderedGaps.length % 2 ? orderedGaps[Math.floor(orderedGaps.length / 2)] : (orderedGaps[orderedGaps.length / 2 - 1] + orderedGaps[orderedGaps.length / 2]) / 2)
     : null;
   const inactiveGapThreshold = median == null ? Number.POSITIVE_INFINITY : Math.max(180, median * 3);
-  const filteredGaps = median != null && gaps.length >= 3
+  const activeGaps = median != null && gaps.length >= 3
     ? gaps.filter(gap => gap <= inactiveGapThreshold)
     : gaps;
+  // Interleaved patterns can create isolated very short gaps (for example,
+  // two departures a few minutes apart followed by the normal repeating
+  // interval). Those gaps should remain in the timetable, but should not set
+  // the lower edge of the typical-frequency range. Keep the threshold tied to
+  // this day's assessed-stop headway so genuine short service intervals stay
+  // visible when they recur as the normal cadence.
+  const activeOrdered = activeGaps.slice().sort((a, b) => a - b);
+  const activeMedian = activeOrdered.length
+    ? (activeOrdered.length % 2
+      ? activeOrdered[Math.floor(activeOrdered.length / 2)]
+      : (activeOrdered[activeOrdered.length / 2 - 1] + activeOrdered[activeOrdered.length / 2]) / 2)
+    : median;
+  const filteredGaps = activeMedian != null && activeGaps.length >= 3
+    ? activeGaps.filter(gap => gap >= activeMedian * 0.5)
+    : activeGaps;
   const robustGaps = filteredGaps.length ? filteredGaps : gaps;
   const robustOrdered = robustGaps.slice().sort((a, b) => a - b);
   const robustMedian = robustOrdered.length

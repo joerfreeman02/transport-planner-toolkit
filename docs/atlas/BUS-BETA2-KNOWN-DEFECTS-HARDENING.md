@@ -262,3 +262,44 @@ The Product Owner's latest manual run reports 4 review items: Routes 16 and 16C 
 - Focused TfL timetable, TfL-only principal-location, contained-short-working frequency, planner source-arbitration, Alpha.13 frequency, and Browser/Word wording tests passed. `git diff --check` passed.
 - Dependabot: retain current weekly updates. Codecov, OpenSSF Scorecard and Sentry were not adopted. Renovate remains deferred to avoid overlapping dependency automation. No tooling was installed.
 - This is an engineering candidate, not Product Owner acceptance. Manual retest must verify all four actual Chingford TfL routes and reconcile the reported 4 Waltham review items with the frozen headless 7-item result. No merge, tag, publication, updater run or data refresh occurred.
+
+## Final frequency and pattern presentation closeout (2026-11-02)
+
+This continuation began at `951b7a225d686ffcd609b26673cb90aa032c7539` on `codex/atlas-bus-beta2-known-defects-hardening`. Frozen `main` remains `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`. Verification used the immutable Run #75 Bus and TNDS manifests (SHA-256 `1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f` and `2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f`). No national data was refreshed.
+
+### Route 203 weekend frequency
+
+The Long Lane Run #75 replay uses BODS because the frozen candidate has no captured TfL Route 203 timetable response. At the two distinct assessed stops (`40004402007A` and `40004402007B`), each direction remains a separate row. The schedules contain repeated close gaps of roughly 3–5 minutes followed by the ordinary roughly 25–30 minute cadence. They are distinct scheduled times in overlapping same-direction patterns, not same-minute duplicates, cross-direction mixing, or a single route-specific short-working rule. The previous lower-quartile range calculation let this interleaved short-gap population set the displayed minimum.
+
+The generic frequency calculation now removes equivalent duplicate minutes and excludes only an anomalously short lower tail when estimating typical headway; it retains the scheduled departures and uses a day-specific median threshold, so an ordinarily recurring short interval remains part of the typical service. The stop and direction populations stay separate. Focused tests cover duplicate minutes, interleaved short gaps, and weekday-like 20–25 minute variation.
+
+Final headless Browser/Word frequencies are:
+
+- Towards Elmsleigh Bus Station: Mon–Sat `Typically every ~20–25 mins`; Sun `Every ~27 mins`.
+- Towards Hounslow Bus Station: Mon–Fri `Typically every ~20–25 mins`; Sat `Typically every ~20–30 mins`; Sun `Every ~29 mins`.
+
+The frozen replay therefore preserves weekday outputs and produces the anticipated near-30-minute Sunday service. It does not establish the Product Owner's live TfL authority because that timetable was not captured in Run #75; live authority remains a manual check.
+
+### Route 555 principal pattern and extension
+
+At the outbound Long Lane frequency-basis stop `40004402007B`, the frozen BODS records include a 30-journey-per-day Hatton Cross pattern (`london:104490:0:b17457fd8454`) and a contained 7-journey-per-day Heathrow Central continuation (`london:104490:0:1f8a2dd1d99b`). They are valid during the representative week, serve the same stop in the same direction, and have a proven ordered-pattern containment relationship. The shorter pattern is the materially dominant recurring service; Heathrow Central is the less-frequent extension.
+
+The generic planner presentation chooses a shorter contained pattern as the passenger-facing main pattern only when its selected-stop scheduled activity is at least twice the longer pattern and its destination is specifically named. The principal row now reads **Towards Hatton Cross Station**, retains the combined stop frequency (**Mon–Fri ~30–40 minutes; Sat–Sun ~30–35 minutes**), and carries one clear note: `Less frequent journeys continue beyond Hatton Cross Station to Heathrow Central Bus Station.` The Browser and Word controls confirm there is no duplicate peer row and no short-working annotation that mislabels either the dominant Hatton Cross pattern or Heathrow Central extension.
+
+### N555 source limitation
+
+No N555 filtering or effective-date logic change was made. Run #75 still contains six Hallmark Connections TNDS records beginning `2024-08-24` with no expiry date. They remain active according to the supplied metadata; this is a stale-source/data-refresh limitation, not an ATLAS date-filtering defect.
+
+### Final golden controls and verification
+
+- Pipers Browser/Word control: Route 230 remains a single BODS-primary circular row; Route 231 remains present as the genuine TNDS-only service. The focused source-arbitration regression passed.
+- Wycliffe College: Route 62, 64 and 65 ordered principal-location direction controls passed in the full suite; the direct Wycliffe assessment test also passed.
+- Milton Keynes Route 5: the complete frozen-data regression passed its BODS/TNDS source-authority and duplicate-peer controls.
+- PE1 Route 202: the isolated stage-traced Browser/Word golden passed with distinct Austerby and Bourne branches, the Queensgate arrival evidence retained, and the stale duplicate arrival row suppressed.
+- The complete headless Browser/Word audit passed Pipers, Waltham, Long Lane, Chingford 657, Hoddesdon/The Drive and PE1 controls with no browser errors, failed requests, or external requests. Its status is `READY_FOR_TECHNICAL_DIRECTOR_REVIEW_BEFORE_MANUAL_RE-ACCEPTANCE`; this is not Product Owner acceptance.
+- `node tests/atlas/run-all.mjs` passed against the full immutable Run #75 Bus/TNDS data and the frozen TfL iBus reference index, ending `ATLAS Alpha.15 deterministic suite passed.` Focused frequency, planner correction, cross-site, Wycliffe, endpoint and presentation tests passed. Browser/Word parity, acknowledgement, map-on/map-off Word, standalone A3 map export, syntax and `git diff --check` passed.
+- Dependabot remains the existing dependency automation. Codecov, OpenSSF Scorecard, Sentry and Renovate were not installed or newly configured; Renovate remains deferred to avoid overlapping Dependabot.
+
+### Remaining Product Owner checks
+
+Product Owner manual acceptance has not occurred. Retest Route 203 against the live TfL-primary response and Route 555 against the live current timetable; confirm the actual Chingford TfL 357/444/W16 rows; reconcile the Product Owner's four Waltham review items with the seven-item frozen headless replay; and review the source-staleness disclosures including N555. No merge, tag, release, publication, updater work or data refresh occurred.

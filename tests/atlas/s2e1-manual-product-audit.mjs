@@ -615,16 +615,27 @@ try {
         assert.ok(staines && hounslow, 'Route 203 planner rows must expose their direction-specific destinations.');
         assert.match(staines['Principal locations'], /Ashford Hospital Entrance.*Stanwell.*Ashford.*Staines|Stanwell.*Ashford Hospital Entrance.*Ashford.*Staines/i);
         assert.match(hounslow['Principal locations'], /East Bedfont.*Hatton.*Hatton Cross.*Cranford.*Hounslow West.*Hounslow/i);
+        for (const row of [staines, hounslow]) {
+          assert.doesNotMatch(row['Typical frequency'], /Sat:\s*Typically every ~5\s*mins|Sun:\s*Typically every ~5\s*mins/i, 'Route 203 weekend frequencies must not be driven by isolated short gaps.');
+          assert.match(row['Typical frequency'], /Sat:\s*(?:Typically )?every ~2[0-9](?:\s*[–-]\s*(?:2[0-9]|30))?\s*mins/i, 'Route 203 Saturday must show the representative 20–30 minute cadence.');
+          assert.match(row['Typical frequency'], /Sun:\s*(?:Typically )?every ~(?:2[5-9]|30)(?:\s*[–-]\s*30)?\s*mins/i, 'Route 203 Sunday must show the representative near-30-minute cadence.');
+        }
         assert.doesNotMatch(`${staines['Principal locations']} ${hounslow['Principal locations']}`, /See route origin \/ destination|Unresolved/i);
         outcome.route203BrowserRows = route203Rows;
-        const route555Central = rendered.find(row => row.Route === '555' && /Heathrow Central/i.test(row['Direction / main service pattern'] || ''));
+        const route555Hatton = rendered.find(row => row.Route === '555' && /Hatton Cross/i.test(row['Direction / main service pattern'] || ''));
         const routeN555Rows = rendered.filter(row => row.Route === 'N555');
-        assert.ok(route555Central, 'Long Lane must retain Route 555 towards Heathrow Central.');
-        assert.match(route555Central['Typical frequency'], /30[–-]40 mins/i, 'Route 555 frequency at the assessed stop must include the proven Hatton Cross short-working departures.');
+        assert.ok(route555Hatton, 'Long Lane must present the dominant Route 555 pattern towards Hatton Cross.');
+        assert.match(route555Hatton['Typical frequency'], /30[–-]40 mins/i, 'Route 555 frequency at the assessed stop must include the proven Hatton Cross short-working departures.');
+        assert.doesNotMatch(route555Hatton['Direction / main service pattern'], /Heathrow Central/i, 'the combined stop frequency must not imply that every journey continues to Heathrow Central.');
         assert.ok(routeN555Rows.length >= 2, 'The frozen open-ended TNDS N555 record remains visible in both passenger directions.');
-        outcome.longLane555 = { route555Central, n555Rows: routeN555Rows };
+        outcome.longLane555 = { route555Hatton, n555Rows: routeN555Rows };
       }
       const renderedServiceNotes = await serviceTable.locator('tbody tr.service-note').allInnerTexts();
+      if (control.id === 'long-lane-route203') {
+        assert.match(renderedServiceNotes.join(' '), /Less frequent journeys continue beyond Hatton Cross[^.]*Heathrow Central/i, 'the less-frequent Heathrow Central extension must remain disclosed in the route note.');
+        assert.doesNotMatch(renderedServiceNotes.join(' '), /Short workings:\s*Some route 555 journeys operate to Hatton Cross/i, 'the dominant Hatton Cross pattern must not be redundantly described as a short-working note.');
+        assert.doesNotMatch(renderedServiceNotes.join(' '), /Short workings:\s*Some route 555 journeys operate to Heathrow Central/i, 'the Heathrow Central extension must not be mislabeled as a short working.');
+      }
       const byRoute = new Map();
       for (const row of rendered) {
         const route = row.Route || '';
@@ -684,6 +695,12 @@ try {
           assert.equal(wordRow['Principal locations'], browserRow['Principal locations'], 'Word and Browser Route 203 principal locations must materially match.');
         }
         outcome.route203WordRows = word203Rows;
+        const word555Hatton = wordRows.find(row => row.Route === '555' && /Hatton Cross/i.test(row['Direction / main service pattern'] || ''));
+        assert.ok(word555Hatton, 'Word must present the dominant Route 555 Hatton Cross pattern.');
+        assert.match(word555Hatton['Typical frequency'], /30[–-]40 mins/i, 'Word must preserve the combined Route 555 stop frequency.');
+        assert.match(exportedWordText, /Less frequent journeys continue beyond Hatton Cross[^.]*Heathrow Central/i, 'Word must disclose the lower-frequency Heathrow Central extension.');
+        assert.doesNotMatch(exportedWordText, /Short workings:\s*Some route 555 journeys operate to Hatton Cross/i, 'Word must not redundantly describe the dominant Hatton Cross pattern as a short working.');
+        assert.doesNotMatch(exportedWordText, /Short workings:\s*Some route 555 journeys operate to Heathrow Central/i, 'Word must not label the Heathrow Central extension as a short working.');
       }
       outcome.renderedRows = rendered;
       outcome.renderedServiceNotes = renderedServiceNotes;

@@ -185,6 +185,36 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
   };
   const provenance = servicesResult?.provenance ?? {};
   const tflRequestIdentities = new Set((provenance.tflTimetableRequestIdentities ?? []).map(String));
+  const safelyPresentedBodsRouteStops = new Map();
+  for (const service of serviceSummaries ?? []) {
+    const authority = [...(service.sourceAuthorities ?? []), ...(service.sourceProviders ?? []), service.timetableSource, service.provider]
+      .map(value => String(value ?? '')).join(' ');
+    if (!/\bBODS\b/i.test(authority) || !service.frequencyByDay || (service.calendarReconciliation ?? []).length
+      || (service.plannerReviewWarnings ?? []).length || service.operatingPeriodEvidenceState === 'conflict'
+      || (service.operatingPeriodReviewWarnings ?? []).length
+      || (service.sourceWarnings ?? []).some(warning => /calendar/i.test(String(warning)))) continue;
+    const route = String(service.routeNumber ?? '').trim();
+    if (!route) continue;
+    const stops = safelyPresentedBodsRouteStops.get(route) ?? new Set();
+    for (const stop of service.stopIds ?? []) stops.add(String(stop));
+    safelyPresentedBodsRouteStops.set(route, stops);
+  }
+  for (const service of serviceSummaries ?? []) for (const message of service.plannerReviewWarnings ?? []) {
+    const route = String(service.routeNumber ?? '').trim();
+    const providers = [...(service.sourceAuthorities ?? []), ...(service.sourceProviders ?? []), service.timetableSource, service.provider]
+      .map(value => String(value ?? '')).join(' ').trim().split(/\s*\+\s*|\s*,\s*/).filter(Boolean);
+    const tndsOnly = providers.length > 0 && providers.every(value => /TNDS|Traveline National Dataset/i.test(value));
+    const tndsHasSafeBodsCounterpart = tndsOnly && (service.stopIds ?? []).some(stop => safelyPresentedBodsRouteStops.get(route)?.has(String(stop)));
+    if (tndsHasSafeBodsCounterpart) continue;
+    add({
+      code: 'service-source-evidence',
+      route,
+      stop: service.frequencyBasisStopId,
+      source: service.frequencyEvidenceSource || service.provider || 'TNDS',
+      groupKey: `calendar-reconciliation:${route}`,
+      message
+    });
+  }
   const resolvedTfLRoutes = new Set((serviceSummaries ?? []).filter(service => /\btfl\b/i.test(String(service.timetableSource || service.frequencyEvidenceSource || service.provider || service.sourceProviders?.join(' ') || service.sourceAuthorities?.join(' ') || service.source?.provider || ''))
     && String(service.routeNumber ?? '').trim())
     .map(service => String(service.routeNumber).trim()));

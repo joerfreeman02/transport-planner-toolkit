@@ -482,7 +482,6 @@ function reconcilePartialCalendarConflict(record) {
   const supportedDays = new Set(supportedProfiles.flatMap(calendar => calendar.daysOfWeek ?? calendar.days ?? []));
   const supported = DAY_ORDER.filter(day => supportedDays.has(day));
   const filterSchedule = schedule => Object.fromEntries(DAY_ORDER.map(day => [day, supportedDays.has(day) ? (schedule?.[day] ?? []) : []]));
-  const warning = 'The frozen calendar profiles conflict; only days supported by the most specific profiles are shown. Confirm weekend service against the operator timetable.';
   return {
     ...record,
     stopSchedules: Object.fromEntries(Object.entries(record.stopSchedules ?? {}).map(([stopId, schedule]) => [stopId, filterSchedule(schedule)])),
@@ -490,8 +489,6 @@ function reconcilePartialCalendarConflict(record) {
       ? Object.fromEntries(DAY_ORDER.map(day => [day, supportedDays.has(day) ? (record.departureEvidenceByDay[day] ?? []) : []]))
       : record.departureEvidenceByDay,
     operatingPeriodEvidence: (record.operatingPeriodEvidence ?? []).filter(entry => supportedDays.has(text(entry?.day).toLowerCase())),
-    sourceWarnings: unique([...(record.sourceWarnings ?? []), warning]),
-    serviceNotes: unique([...(record.serviceNotes ?? []), warning]),
     calendarReconciliation: Object.freeze({
       status: 'conflict-conservatively-restricted',
       supportedDays: Object.freeze(supported),
@@ -629,6 +626,28 @@ function directionalPrincipalLocations(record, evidenceStopId) {
   // An assessed terminal is a proven direct/minimal service; on a loop the
   // rotation above always has downstream calls and never repeats the anchor.
   if (!downstreamNamed.length) {
+    const topologyEndpoints = record?.tflRouteSequenceEvidence?.routeTopologyEndpoints ?? {};
+    const sourceEndpoints = (record?.source?.orderedPatternEndpoints ?? record?.orderedPatternEndpoints ?? []).map(text).filter(Boolean);
+    const verifiedFallbackPattern = Boolean(
+      topologyOnly
+      && patternIds.length >= 2
+      && patternIds[0] === text(topologyEndpoints.origin)
+      && patternIds.at(-1) === text(topologyEndpoints.destination)
+      && sourceEndpoints.length >= 2
+      && sourceEndpoints[0] === patternIds[0]
+      && sourceEndpoints.at(-1) === patternIds.at(-1)
+    );
+    const supportedFallbackLocations = verifiedFallbackPattern
+      ? unique((record?.principalLocations ?? []).map(text).filter(Boolean))
+      : [];
+    if (supportedFallbackLocations.length) {
+      const destination = text(record?.destination);
+      return {
+        locations: unique([...supportedFallbackLocations, ...(destination ? [destination] : [])]),
+        state: 'resolved',
+        warning: null
+      };
+    }
     const terminal = calls[start];
     const terminalName = text(record?.destinationStopPointId || record?.destinationStopPointIds?.[0]) === patternIds[start]
       && !/^(?:destination not supplied|destination not resolved)$/i.test(text(record?.destination))
@@ -793,12 +812,18 @@ export function buildServiceSummaries(stops, serviceRecords) {
       if (operatingPopulation.authoritativeProvider && normal(providerOfRecord(record)) !== normal(operatingPopulation.authoritativeProvider)) return [];
       return record.calendarEvidence ?? record.operatingCalendarEvidence ?? [];
     });
+    const calendarReconciliation = records.map(record => record.calendarReconciliation).filter(item => item?.status === 'conflict-conservatively-restricted');
+    const tndsOnlyCalendarConflict = calendarReconciliation.length > 0
+      && records.every(record => /tnds|traveline national dataset/i.test(providerOfRecord(record)));
+    const plannerReviewWarnings = tndsOnlyCalendarConflict
+      ? Object.freeze([`Route ${text(first.routeNumber) || 'service'} operating-day records conflicted. ATLAS retained the supported days; verify the operator timetable before formal use.`])
+      : Object.freeze([]);
     const notes = unique([
       ...calendarQualificationNotes(calendarEvidence),
       ...records.flatMap(record => [...(record.serviceNotes ?? []), ...(record.qualifications ?? [])].map(plannerQualificationNote))
     ])
-      .filter(note => /frozen calendar profiles conflict/i.test(note)
-        || (qualificationAppliesToFinalRow(note, departuresByDay) && qualificationScopeProven(note, records, frequencyBasisStopId)));
+      .filter(note => !/frozen calendar profiles conflict|most specific profiles|calendar profile reconciliation|conflicting partially resolved operating-day profiles/i.test(note)
+        && qualificationAppliesToFinalRow(note, departuresByDay) && qualificationScopeProven(note, records, frequencyBasisStopId));
     const operatingPeriodWarnings = unique([...operatingEvidence.warnings, ...combinedPeriods.warnings]);
     const endpointPatterns = unique(records.map(record => `${text(record.origin)} → ${text(record.destination)}`));
     if (endpointPatterns.length > 1) notes.push('Includes scheduled short workings or route variants in this direction; the main origin/destination shown is the most extensive pattern in the source timetable.');
@@ -914,6 +939,8 @@ export function buildServiceSummaries(stops, serviceRecords) {
       plannerLocalityPatternStops: Object.freeze([...(principalRecord.plannerLocalityPatternStops ?? [])]),
       circularPatternStopIds: Object.freeze([...(circularPatternSource.circularPatternStopIds ?? [])].map(text).filter(Boolean)),
       calendarEvidence: Object.freeze(calendarEvidence),
+      calendarReconciliation: Object.freeze(calendarReconciliation),
+      plannerReviewWarnings,
       directionFamily: directionGroupKey(first),
       routePatternStopIds: Object.freeze([...(principalRecord.routePatternStopIds ?? [])]),
       routePatternExtent: Math.max(0, ...records.map(record => orderedPatternEndpoints(record).length)),

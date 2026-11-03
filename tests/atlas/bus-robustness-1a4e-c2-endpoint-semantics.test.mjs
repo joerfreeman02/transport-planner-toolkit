@@ -102,6 +102,46 @@ assert.deepEqual(fallbackRow.stopSchedules.TUFTON, schedule, 'national fallback 
 const fallbackPrincipal = buildServiceSummaries([{ id: 'TUFTON', name: 'Tufton control' }], [fallbackRow])[0];
 assert.deepEqual(fallbackPrincipal.principalLocations, ['Chingford Mount']);
 assert.equal(fallbackPrincipal.principalLocationState, 'resolved');
+
+const fullPatternStop = {
+  id: 'CHINGFORD-E', name: 'Chingford Mount', latitude: 51.6138, longitude: -0.0203,
+  routes: ['158'], timetableAuthority: 'TfL'
+};
+const fullPatternFallback = createAuthoritativeBusTimetableAdapter({
+  tflAdapter: {
+    routeMetadataForLines: async () => ({ ok: true, data: [{ id: '158', routeSections: [fallbackSection] }], warnings: [], provenance: {} }),
+    servicesForStop: async () => ({ ok: false, code: 'http_failure', warnings: ['captured TfL Stop E timetable failure'], provenance: {} }),
+    routeSequencesForLineDirections: async requests => ({
+      ok: true, data: requests.map(request => ({ ...request, sequences: [fallbackSequence] })), warnings: [], provenance: {}
+    })
+  },
+  nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [{
+    id: 'bods-158-terminal-fallback', routeNumber: '158', operator: 'Arriva London North',
+    origin: 'Stratford Bus Station', destination: 'Chingford Mount', direction: 'towards Chingford Mount',
+    timetableSource: 'BODS', principalLocations: ['Leyton', 'Walthamstow', 'Highams Park'],
+    routePatternStopIds: fallbackSequence.orderedStopPointIds,
+    routePatternStops: fallbackSequence.orderedStops,
+    source: { provider: 'BODS', orderedPatternEndpoints: ['STRATFORD', 'CHINGFORD-E'] },
+    stopSchedules: { 'CHINGFORD-E': schedule }
+  }], warnings: [], provenance: {} }) }
+});
+const fullPatternAssessment = createBusAssessment({
+  stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [fullPatternStop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+  accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 80 }], warnings: [], provenance: {} }) },
+  timetableData: fullPatternFallback
+});
+const fullPatternResult = await fullPatternAssessment.assess({ latitude: 51.6138, longitude: -0.0203 }, { radius: 700 });
+const fullPatternSummary = fullPatternResult.serviceSummaries.find(row => row.routeNumber === '158');
+const fullPatternPlanner = fullPatternResult.plannerServiceSummaries.find(row => row.routeNumber === '158');
+assert.deepEqual(fullPatternSummary.principalLocations, ['Leyton', 'Walthamstow', 'Highams Park', 'Chingford Mount'],
+  'a terminal BODS fallback retains supported route localities when the exact ordered pattern agrees with resolved TfL topology');
+assert.equal(fullPatternSummary.principalLocationState, 'resolved');
+assert.equal(fullPatternSummary.provider, 'BODS fallback after TfL failure', 'topology does not change the timetable authority');
+assert.deepEqual(fullPatternPlanner.principalLocations, fullPatternSummary.principalLocations,
+  'the full application planner row keeps the supported terminal-fallback locality sequence');
+assert.equal(fullPatternResult.reviewItems.some(item => item.route === '158' && item.code === 'directional-principal-location'), false,
+  'a safely matched terminal fallback does not create a principal-location review item');
+assert.equal(fullPatternResult.services.find(row => row.source?.fallbackFor)?.source?.provider, 'BODS', 'the fallback remains visibly national evidence');
 const chingfordOutboundSection = {
   ...fallbackSection, id: 'section-158-outbound', direction: 'outbound', originationName: 'Chingford Mount',
   destinationName: 'Stratford Bus Station', originator: 'CHINGFORD-C', destination: 'STRATFORD'

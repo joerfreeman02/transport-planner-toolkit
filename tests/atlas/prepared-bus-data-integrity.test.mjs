@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,8 +7,16 @@ import { gunzipSync } from 'node:zlib';
 import { gridCellKey } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 
 const root = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
-const dataRoot = path.join(root, 'atlas', 'data', 'bus');
-const manifest = JSON.parse(readFileSync(path.join(dataRoot, 'manifest.json'), 'utf8'));
+const dataRoot = process.env.ATLAS_TEST_BUS_DATA_ROOT
+  ? path.resolve(process.env.ATLAS_TEST_BUS_DATA_ROOT)
+  : path.join(root, 'atlas', 'data', 'bus');
+const manifestBytes = readFileSync(path.join(dataRoot, 'manifest.json'));
+const manifest = JSON.parse(manifestBytes.toString('utf8'));
+if (process.env.ATLAS_TEST_BUS_DATA_ROOT) assert.equal(
+  createHash('sha256').update(manifestBytes).digest('hex'),
+  '1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f',
+  'External prepared-data fixture is not the immutable Run #75 Bus manifest.'
+);
 
 assert.ok(
   ['atlas-prepared-bus-data-v1', 'atlas-prepared-bus-data-v2'].includes(manifest.schema),

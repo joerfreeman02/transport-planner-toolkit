@@ -89,7 +89,7 @@ const cvRenderer=L.canvas({padding:.2,pane:'networks'});
 const svgRenderer=L.svg({padding:.2,pane:'residential'});
 const notice=(s,warning=false)=>{$('notice').textContent=s;$('notice').className=warning?'warning':'';};
 const download=(blob,name)=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};
-const keyGeometry=g=>JSON.stringify(g.coordinates[0])+'~'+JSON.stringify(g.coordinates[g.coordinates.length-1])+'~'+g.coordinates.length;
+const keyGeometry=g=>{const a=JSON.stringify(g.coordinates),b=JSON.stringify([...g.coordinates].reverse());return a<b?a:b};
 function getBand(sec,mode){const top=mode==='bicycle'?900:1800;if(!Number.isFinite(sec)||sec>top||sec<0)return -1;return definitions.findIndex(d=>sec<=d.to);}
 function parseFile(file,data){
  if(data.type!=='FeatureCollection'||!Array.isArray(data.features))throw Error('Not a GeoJSON FeatureCollection');

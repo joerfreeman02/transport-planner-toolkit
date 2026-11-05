@@ -1,38 +1,31 @@
-# ATLAS Isochrone Drawing Studio — isolated Leaflet beta
+# ATLAS Isochrone Drawing Studio — isolated beta
 
-**Status:** Working candidate; browser/map-tile/export QA still required. The existing ATLAS modules and main branch are unchanged.
+**Status:** Local review candidate. Synthetic import and geometry tests pass. Real Rowley Lane data, live OSM/browser rendering, print output, and visual comparison with the supplied PowerPoint still need review before issue.
 
-## Start (Windows)
-1. Check out branch `feature/atlas-isochrone-leaflet-mvp` in a separate Git worktree if your main checkout has work in progress.
-2. Run the existing root **OPEN ATLAS REVIEW.bat**. It starts the ATLAS HTTP server and opens the dashboard.
-3. On the same local server origin/port, browse to `/modules/isochrones/index.html`.
-   Example: if your dashboard opens at `http://127.0.0.1:PORT/`, open `http://127.0.0.1:PORT/modules/isochrones/index.html`.
-4. Choose the four *Rowley Lane ... Ped/Cyc.json* files supplied by Iso4App. No network data is uploaded when importing these files; browser FileReader reads them locally.
-5. Switch the scenario in the selector. The actual GeoJSON geometry is rendered on Leaflet and **fitBounds** fills the 8.96 × 5.77-inch map area used by the Cowley Hill PowerPoint.
-6. Click **Load verified OSM land use + POIs** to request `landuse=residential` polygons and named amenities from Overpass, confined to the visible map extent. This is optional if Overpass is unavailable, but **required before issuing a drawing with residential hatching**.
-7. Add/check any additional project-specific annotations, including Tesco, High Street, Existing Studios, schools, college and employment area. Click **Add annotation**, then the correct map location.
-8. Use **Export map PNG** for a 2x map-panel raster (it draws only tiles already visible in the map and adds georeferenced network/hatching/labels), or **Print / save EAS sheet PDF** for the full drawing frame.
+## Open locally
 
-## Existing ATLAS code reused
-- `../../assets/vendor/leaflet/`: same Leaflet vendor files as Bus, Accessibility and Drawing Generator.
-- `../drawing-generator/assets/js/basemap-compositor.js` → `basemapProvider()`: existing OSM provider contract.
-- `../drawing-generator/assets/images/eas-primary.png`: existing EAS corporate artwork.
+1. Open this branch in its separate worktree; do not change branches in the existing ATLAS checkout.
+2. Run the existing root **OPEN ATLAS REVIEW.bat** from this worktree.
+3. In the browser window opened by that review server, visit `/modules/isochrones/index.html` on the same local server origin. Keep the port printed/opened by the launcher; do not guess a port.
+4. Select the four `Rowley Lane ... Ped/Cyc.json` files through the browser file picker. Files are read in the browser and are not uploaded.
+5. Select each access scenario. Walking uses six five-minute bands through 30 minutes; cycling uses three through 15 minutes. A line's `to` value in seconds is the upper bound for its band. Only geometrically identical segments in the same band are deduplicated; distinct routes with common endpoints remain.
+6. Use **Load OSM land use + named features** only when needed. It makes one explicit, bounded Overpass request for the visible map extent, caches repeated extents in memory, and enforces a 30-second request interval. OSM names and land-use tags are source data, not proof of completeness or ground truth. Open boundaries appear dashed red, missing geometry is counted, and coverage remains marked unknown.
+7. Add annotations at evidence-based positions. Labels can be edited, dragged, and removed individually; manual placements still need checking.
+8. **Export map PNG** captures the currently visible OSM tiles only, at 3× map-panel resolution, with the isochrone, hatching, labels, scale, and attribution. If visible tiles are incomplete or the browser blocks canvas access, export stops with an error. **Print / save EAS sheet PDF** uses the live browser print view.
 
-## Important restrictions and QA
-- This is an **interactive browser application**, not a background tile scraper. Use the normal ATLAS HTTP review server. `file://` opening produced OSM 403s previously due to the missing referring origin.
-- Only standard map tiles for the actively displayed viewport are requested. Do not add automated multizoom prefetching or headless panning/scraping. Respect [OSMF's tile policy](https://operations.osmfoundation.org/policies/tiles/).
-- `© OpenStreetMap contributors` is displayed on the live map and inside exports. Iso4App also requires source attribution as appropriate.
-- OSM residential tags are **mapped land use, not a guarantee every dwelling/estate is present or correctly classified**. Verify against up-to-date photography and project survey evidence.
-- Way and closed relation-outer polygons are drawn; complex unclosed multipolygon relation members require a more complete polygon assembler before release.
-- Export PNG depends on cross-origin-enabled OSM tiles. If OSM tiles fail to load or the canvas is blocked by the browser, the UI reports the problem. Print-to-PDF remains the fall-back.
-- This MVP intentionally does not modify Bus, Accessibility, HRA, NEXUS, shared basemap contract or the Drawing Generator.
-- Review on latest Chrome or Edge. Check scales, road weights, legend, EAS logo and annotation location before use in a planning submission.
-- Direct automated PPTX injection using the EAS template is the next acceptance step; the current prototype creates panel PNGs and a printable complete sheet.
+## Layout and source
 
-## Suggested acceptance test
-1. Roundabout pedestrian, Pub pedestrian, Roundabout bicycle, Pub bicycle all load.
-2. Correct GeoJSON start markers, road lines, and travel-time legend for each.
-3. OSM basemap visibly loads (not the 403 checkerboards seen from `file://`).
-4. Map panel width:height equals `8.96/5.77`; no stretching, geographic displacement or missing attribution.
-5. OSM residential polygons load for one viewport and are verified against aerial images; add omitted landmarks manually.
-6. Export PNG is not blank and overlays line up; full-sheet print preserves the right-hand key and branding.
+- The preview's map panel is sized to the handover's 8.96 × 5.77 inch target ratio. The supplied project PowerPoint files are not in this worktree, so exact template dimensions and visual correspondence have not yet been verified.
+- The sheet uses the existing `assets/images/eas-primary.png` from Drawing Generator. It was visually inspected and shows the current **EAS Consulting Engineers** logo.
+- Existing shared Leaflet and basemap-provider code is imported read-only. No shared asset, module, contract, dashboard, or build file is changed.
+- The basemap is OSM Standard with visible attribution. There is no tile prefetch, zoom sweep, archive, or background query. Residential and POI retrieval runs only on the explicit button click for the visible bounds.
+- OSM residential ways and relation members are assembled into rings; inner rings are kept as holes. Unclosed members are shown as incomplete boundaries, not filled as residential areas. OSM geographic coverage remains unknown.
+- PPTX injection is not implemented. The present outputs are a map PNG and browser print-to-PDF.
+
+## Synthetic test
+
+```powershell
+node modules/isochrones/tests/core.test.mjs
+```
+
+The synthetic test covers walking/cycling limits, upper-bound banding, repeated start points, forward/reversed exact duplicates, distinct geometry, property preservation, relation ring assembly, holes, and incomplete boundaries. It does not substitute for the four Rowley Lane GeoJSONs or the live OSM/browser/print checks.

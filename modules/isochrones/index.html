@@ -17,7 +17,7 @@ select{min-width:270px}#notice{padding:8px 22px;background:#eef5ff;color:#28476a
 .divider{position:absolute;left:955px;top:19px;height:684px;border-left:2px solid #171717}
 .north{position:absolute;left:95px;top:26px;z-index:950;background:white;border:3px solid #d62a79;color:#132642;border-radius:50%;font-size:24px;font-weight:800;width:66px;height:66px;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .north span{font-size:19px;line-height:1}
-#map{position:absolute;left:94px;top:118px;width:860px;height:554px;background:#e9f0e4;overflow:hidden}
+#map{position:absolute;left:94px;top:118px;width:860px;height:553.84px;background:#e9f0e4;overflow:hidden}
 .sidebar{position:absolute;left:958px;top:20px;width:230px;height:682px;font-size:14px}
 .side-title{height:59px;display:flex;align-items:center;justify-content:center;border-bottom:1px solid #191919;text-align:center;padding:7px 8px;font-size:18px;font-weight:700}
 .side-subtitle{height:77px;border-bottom:1px solid #191919;text-align:center;display:flex;align-items:center;justify-content:center;padding:8px;font-size:13px}
@@ -28,19 +28,24 @@ select{min-width:270px}#notice{padding:8px 22px;background:#eef5ff;color:#28476a
 .hatch{width:29px;height:21px;border:1px solid #92969b;background:repeating-linear-gradient(135deg,transparent 0 6px,#69758177 6px 8px,transparent 8px 14px);flex-shrink:0}
 .brand{height:124px;border-bottom:1px solid #191919;display:flex;align-items:center;justify-content:center;gap:7px;padding:12px}
 .brand img{object-fit:contain;width:91px;max-height:60px}.brand .address{font-size:11px;line-height:1.5;text-align:right}
-.sources{position:absolute;bottom:8px;left:10px;right:9px;font-size:11px;line-height:1.45}
+.sources{position:absolute;bottom:8px;left:10px;right:9px;font-size:10px;line-height:1.35}
 .footer-warning{position:absolute;left:94px;top:677px;max-width:850px;font-size:10px;color:#8b3000}
 .badge{padding:2px 7px;border-radius:4px;background:#fff2c5;color:#623b00;font-size:11px}
 .leaflet-container{font-family:Arial,Helvetica,sans-serif}.leaflet-control-attribution{font-size:10px!important}
 .landmark-label{background:#faf8eccf;color:#182438;font-size:12px;font-weight:700;border:1px solid #32405d8c;border-radius:4px;padding:3px 5px;text-align:center;box-shadow:0 1px 2px #0002;white-space:normal;min-width:70px;max-width:165px}
 .leaflet-tooltip.landmark-label::before{display:none}
 .residential-hatch{fill:url(#atlas-residential-hatch)!important;fill-opacity:.95!important;stroke:#687e7f!important;stroke-width:1.0px!important}
+.incomplete-boundary{color:#bb3e27!important;weight:2.5px!important;dasharray:5 5}
+.annotation-list{display:flex;flex-wrap:wrap;gap:8px;padding:9px 22px;background:#f4f7fb;border-bottom:1px solid #ccd3dd;font-size:12px}
+.annotation-list:empty{display:none}.annotation-item{display:flex;align-items:center;gap:5px;border:1px solid #cbd5e1;border-radius:5px;padding:4px 6px;background:white}
+.annotation-item input{font:inherit;width:160px;padding:4px;border:1px solid #d2d9e2;border-radius:3px}.annotation-item button{padding:4px 6px;font-size:11px}
+.leaflet-control-scale{margin-bottom:8px!important}.leaflet-control-scale-line{background:#ffffffdf!important;color:#17253c!important;border-color:#17253c!important}
 @media print{
   @page{size:13.333in 7.5in;margin:0}
   html,body{background:white;margin:0;padding:0;print-color-adjust:exact;-webkit-print-color-adjust:exact}
-  .workspace,.tools,#notice,.hint{display:none!important}.stage{padding:0!important;overflow:visible!important}
+  .workspace,.tools,.annotation-list,#notice,.hint{display:none!important}.stage{padding:0!important;overflow:visible!important}
   .sheet{margin:0!important;box-shadow:none!important}
-  .leaflet-control-zoom{display:none!important}.footer-warning{display:none!important}
+  .leaflet-control-zoom{display:none!important}.footer-warning{display:block!important;color:#8b3000!important}
 }
 </style>
 </head>
@@ -49,12 +54,13 @@ select{min-width:270px}#notice{padding:8px 22px;background:#eef5ff;color:#28476a
 <section class="tools">
  <label class="pick">Import Iso4App GeoJSONs<input id="upload" type="file" accept=".json,.geojson,application/json" multiple></label>
  <select id="scenario"><option value="">Upload GeoJSONs to begin</option></select>
- <button id="landuse">Load verified OSM land use + POIs</button>
+ <button id="landuse">Load OSM land use + named features</button>
  <button id="addLabel">Add annotation</button>
  <button id="clearLabels">Clear manual annotations</button>
  <button id="exportPng" class="primary">Export map PNG</button>
  <button id="print">Print / save EAS sheet PDF</button>
 </section>
+<div id="annotationList" class="annotation-list" aria-live="polite"></div>
 <div id="notice">Ready. Select up to four Rowley Lane GeoJSON exports. The map will automatically fit the PowerPoint's 8.96 × 5.77-inch map panel.</div>
 <p class="hint">Maps display live OSM tiles exactly as ATLAS does. Open through an HTTP server (your ATLAS review launcher), not a file:// URL. OSM data is crowdsourced; check land use and annotations against current site evidence before issuing. No QGIS required.</p>
 <main class="stage">
@@ -66,7 +72,7 @@ select{min-width:270px}#notice{padding:8px 22px;background:#eef5ff;color:#28476a
   <div class="side-subtitle" id="sheetSubtitle">Rowley Lane, Borehamwood, Hertfordshire</div>
   <div class="legend" id="legend"><h3>KEY</h3><div class="entry"><div class="dot"></div>Site Access</div></div>
   <div class="brand"><img src="../drawing-generator/assets/images/eas-primary.png" alt="EAS logo"><div class="address">EAS Transport Planning<br>Millers House<br>Roydon Road<br>Stanstead Abbotts<br>SG12 8HN</div></div>
-  <div class="sources">Map data: © OpenStreetMap contributors (ODbL).<br>Isochrones: Iso4App. Residential: OSM landuse=residential where loaded.</div>
+  <div class="sources">Map: © OpenStreetMap contributors, ODbL 1.0<br>Street network: Iso4App Street Network GeoJSON<br>Residential outlines: OSM landuse=residential, coverage unknown<br>Named features: OpenStreetMap; review location and completeness</div>
  </aside>
  <div class="footer-warning" id="footerWarning">DRAFT • Confirm access, OSM residential coverage, school locations and annotation positions before issue.</div>
 </article>
@@ -74,149 +80,182 @@ select{min-width:270px}#notice{padding:8px 22px;background:#eef5ff;color:#28476a
 <script src="../../assets/vendor/leaflet/leaflet.js"></script>
 <script type="module">
 import {basemapProvider} from '../drawing-generator/assets/js/basemap-compositor.js';
+import {assembleResidential, ISOCHRONE_BANDS, parseIso4App, parseNamedPois} from './core.js';
 const $=id=>document.getElementById(id);
-const palette=['#2198c8','#f49a32','#d8ca10','#0d958c','#56dce2','#b446db'];
-const definitions=[{name:'5-minute',to:300},{name:'10-minute',to:600},{name:'15-minute',to:900},{name:'20-minute',to:1200},{name:'25-minute',to:1500},{name:'30-minute',to:1800}];
-const scenarios=[];let selected=null,network=null,marker=null,landuseLayer=null,poiLayer=null;
-const manualAnnotations=[], allLayerGroups=[];
+const definitions=ISOCHRONE_BANDS;
+const scenarios=[];let selected=null,network=null,landuseLayer=null,incompleteLayer=null,poiLayer=null,loadingOverpass=false;
+const overpassCache=new Map();let lastOverpassRequestAt=0,overpassCooldownUntil=0;
+const originMarkers=[], manualAnnotations=[];
 const provider=basemapProvider();
 const map=L.map('map',{zoomControl:true,preferCanvas:true,zoomSnap:0.25}).setView([51.665,-0.255],13);
-L.tileLayer(provider.urlTemplate,{maxZoom:provider.maxZoom,minZoom:provider.minZoom,attribution:'© OpenStreetMap contributors',crossOrigin:'anonymous',updateWhenIdle:true,keepBuffer:1}).addTo(map);
+const tileLayer=L.tileLayer(provider.urlTemplate,{maxZoom:provider.maxZoom,minZoom:provider.minZoom,attribution:'© OpenStreetMap contributors, ODbL 1.0',crossOrigin:'anonymous',updateWhenIdle:true,keepBuffer:1}).addTo(map);
 map.createPane('residential');map.getPane('residential').style.zIndex=335;
 map.createPane('networks');map.getPane('networks').style.zIndex=425;
 map.createPane('markers');map.getPane('markers').style.zIndex=630;
 const cvRenderer=L.canvas({padding:.2,pane:'networks'});
 const svgRenderer=L.svg({padding:.2,pane:'residential'});
 const notice=(s,warning=false)=>{$('notice').textContent=s;$('notice').className=warning?'warning':'';};
+L.control.scale({imperial:false,metric:true,maxWidth:140,position:'bottomleft'}).addTo(map);
+tileLayer.on('tileerror',()=>notice('Some OpenStreetMap tiles failed to load. Check the local HTTP origin and network before exporting.',true));
 const download=(blob,name)=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)};
-const keyGeometry=g=>{const a=JSON.stringify(g.coordinates),b=JSON.stringify([...g.coordinates].reverse());return a<b?a:b};
-function getBand(sec,mode){const top=mode==='bicycle'?900:1800;if(!Number.isFinite(sec)||sec>top||sec<0)return -1;return definitions.findIndex(d=>sec<=d.to);}
-function parseFile(file,data){
- if(data.type!=='FeatureCollection'||!Array.isArray(data.features))throw Error('Not a GeoJSON FeatureCollection');
- const origin=data.features.find(f=>f.geometry?.type==='Point'&&f.properties?.name==='start point');
- if(!origin)throw Error('Iso4App start point missing');
- const mode=origin.properties?.mobility==='bicycle'?'bicycle':'pedestrian';
- const seen=new Set(),features=[];
- for(const feature of data.features){
-  const g=feature.geometry,p=feature.properties||{};if(!g||g.type!=='LineString'||p.name!=='segment')continue;
-  const band=getBand(Number(p.to),mode);if(band<0||g.coordinates.length<2)continue;
-  const k=band+'_'+keyGeometry(g);if(seen.has(k))continue;seen.add(k);
-  features.push({type:'Feature',geometry:g,properties:{band}});
- }
- if(!features.length)throw Error('No usable street-network segments');
- return {filename:file.name,mode,origin:origin.geometry.coordinates,features,bounds:null};
-}
 function populateSelect(){
  $('scenario').replaceChildren();scenarios.forEach((s,i)=>{const opt=document.createElement('option');opt.value=i;opt.textContent=s.filename;$('scenario').appendChild(opt)});
 }
 function renderScenario(index){
  selected=scenarios[index];if(!selected)return;
- if(network)network.remove();if(marker)marker.remove();
- network=L.geoJSON({type:'FeatureCollection',features:selected.features},{pane:'networks',renderer:cvRenderer,style:f=>({color:palette[f.properties.band],weight:3.5,opacity:.96,interactive:false})}).addTo(map);
- const origin=selected.origin;marker=L.circleMarker([origin[1],origin[0]],{pane:'markers',radius:8,fillColor:'#fb1717',color:'#0e162d',weight:2,fillOpacity:1}).addTo(map);
- const bounds=network.getBounds().extend([origin[1],origin[0]]);
- map.invalidateSize();map.fitBounds(bounds,{padding:[12,12],maxZoom:15,animate:false});
+ if(network)network.remove();for(const marker of originMarkers)marker.remove();originMarkers.length=0;
+ network=L.geoJSON({type:'FeatureCollection',features:selected.features},{pane:'networks',renderer:cvRenderer,style:f=>({color:definitions[f.properties.easBand].colour,weight:3.5,opacity:.96,interactive:false})}).addTo(map);
+ for(const origin of selected.origins){const [longitude,latitude]=origin.geometry.coordinates;const label=selected.access?`${selected.access[0].toUpperCase()+selected.access.slice(1)} Access — ${selected.mode==='bicycle'?'Cycling':'Walking'}`:'Start Point — access scenario not identified';originMarkers.push(L.circleMarker([latitude,longitude],{pane:'markers',radius:8,fillColor:'#fb1717',color:'#0e162d',weight:2,fillOpacity:1}).addTo(map).bindTooltip(label,{permanent:true,direction:'right',className:'landmark-label'}))}
+ const bounds=network.getBounds();for(const origin of selected.origins)bounds.extend([origin.geometry.coordinates[1],origin.geometry.coordinates[0]]);
+ map.whenReady(()=>requestAnimationFrame(()=>{map.invalidateSize();map.fitBounds(bounds,{padding:[12,12],maxZoom:15,animate:false})}));
  const mode=selected.mode==='bicycle'?'Cycling':'Walking';
  $('sheetTitle').textContent=mode+' Isochrone';
- $('sheetSubtitle').textContent='Rowley Lane — '+(selected.filename.toLowerCase().includes('roundabout')?'Roundabout Access':'Pub Access')+' | Borehamwood';
- $('legend').innerHTML='<h3>KEY</h3><div class="entry"><div class="dot"></div>Site Access</div>'+definitions.slice(0,selected.mode==='bicycle'?3:6).map((b,i)=>'<div class="entry"><span class="swatch" style="--swatch:'+palette[i]+'"></span>'+b.name+' '+(selected.mode==='bicycle'?'Cycle':'Walk')+'</div>').join('')+'<div class="entry"><span class="hatch"></span>Residential Land Use</div>';
- notice('Loaded '+selected.filename+' with '+selected.features.length+' street segments. Use OSM land use + POIs to add verified geographic context.');
+ $('sheetSubtitle').textContent='Rowley Lane — '+(selected.access?selected.access[0].toUpperCase()+selected.access.slice(1)+' Access':'Access Scenario Not Identified')+' | Borehamwood';
+ $('legend').innerHTML='<h3>KEY</h3><div class="entry"><div class="dot"></div>Site Access</div>'+definitions.slice(0,selected.mode==='bicycle'?3:6).map((band,i)=>'<div class="entry"><span class="swatch" style="--swatch:'+band.colour+'"></span>'+band.label+' '+(selected.mode==='bicycle'?'Cycle':'Walk')+'</div>').join('')+'<div class="entry"><span class="hatch"></span>OSM Mapped Residential</div>';
+ const ignored=selected.ignoredSegments?` ${selected.ignoredSegments} out-of-range or invalid segments skipped.`:'';
+ notice(`Loaded ${selected.filename}: ${selected.features.length.toLocaleString()} unique street segments, ${selected.origins.length} distinct start point(s). Band limits use the upper “to” value in seconds.${ignored}`);
 }
 $('upload').onchange=async e=>{
  for(const file of e.target.files){
-  try{let data=JSON.parse(await file.text());const s=parseFile(file,data);scenarios.push(s)}
+  try{let data=JSON.parse(await file.text());const s=parseIso4App(data,file.name);scenarios.push(s)}
   catch(err){notice('Could not read '+file.name+': '+err.message,true)}
  }
- if(scenarios.length){populateSelect();renderScenario(0)}
+ if(scenarios.length){populateSelect();renderScenario(scenarios.length-1);$('scenario').value=String(scenarios.length-1)}
 };
 $('scenario').onchange=e=>renderScenario(Number(e.target.value));
 function ensureHatch(){
- const svg=document.querySelector('#map .leaflet-overlay-pane svg');
+ const svg=svgRenderer._container;
  if(!svg||svg.querySelector('#atlas-residential-hatch'))return;
  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
  defs.innerHTML='<pattern id="atlas-residential-hatch" patternUnits="userSpaceOnUse" width="9" height="9" patternTransform="rotate(45)"><rect width="9" height="9" fill="#e4e4e9" fill-opacity=".29"/><path d="M0 0V9" stroke="#4b6575" stroke-opacity=".62" stroke-width="2"/></pattern>';
  svg.insertBefore(defs,svg.firstChild);
 }
-function relationRing(member){const pts=(member.geometry||[]).map(p=>[p.lon,p.lat]);if(pts.length<4)return null;const a=pts[0],b=pts[pts.length-1];if(Math.abs(a[0]-b[0])+Math.abs(a[1]-b[1])>1e-7)return null;return pts}
-function osmPolygons(elements){
- const features=[];
- for(const item of elements){
-  if(item.tags?.landuse!=='residential')continue;
-  if(item.type==='way'&&item.geometry){const ring=relationRing(item);if(ring)features.push({type:'Feature',properties:{source:'OSM way '+item.id},geometry:{type:'Polygon',coordinates:[ring]}})}
-  if(item.type==='relation')for(const mem of item.members||[]){if(mem.role==='outer'){const ring=relationRing(mem);if(ring)features.push({type:'Feature',properties:{source:'OSM relation '+item.id},geometry:{type:'Polygon',coordinates:[ring]}})}}
- }
- return features;
+const requiredLandmarks=[
+ ['schools, nursery or college',pois=>pois.some(p=>['School','College','Nursery'].includes(p.category))],
+ ['Tesco',pois=>pois.some(p=>/tesco/i.test(p.name))],
+ ['Borehamwood High Street',pois=>pois.some(p=>/borehamwood.*high street|high street.*borehamwood/i.test(p.name))],
+ ['Existing Studios',pois=>pois.some(p=>/studio/i.test(p.name))],
+ ['employment area',pois=>pois.some(p=>/employment|industrial estate|business park/i.test(p.name))],
+ ['Borehamwood Shopping Park',pois=>pois.some(p=>/shopping park/i.test(p.name))]
+];
+function landmarkStatus(pois){
+ const missing=requiredLandmarks.filter(([,matches])=>!matches(pois)).map(([label])=>label);
+ return missing.length?`OSM-mapped labels still outstanding: ${missing.join('; ')}. No missing landmark has been inferred.`:'Named OSM candidates were returned for all checklist entries; school levels, feature names and positions still require review.';
 }
-function osmPois(elements){
- const seen=new Set(),found=[];
- for(const el of elements){
-  const t=el.tags||{},name=t.name||'',lat=el.lat??el.center?.lat,lon=el.lon??el.center?.lon;
-  if(!Number.isFinite(lat)||!Number.isFinite(lon)||!name)continue;
-  if(!(t.amenity==='school'||t.amenity==='college'||t.amenity==='kindergarten'||t.shop==='supermarket'||/tesco|studio|shopping park/i.test(name)))continue;
-  const k=name+'-'+lat.toFixed(5)+'-'+lon.toFixed(5);if(seen.has(k))continue;seen.add(k);found.push({name,lat,lon});
- }return found;
-}
-async function runOverpass(q){
- const hosts=['https://overpass.kumi.systems/api/interpreter','https://overpass-api.de/api/interpreter'];
- let last;for(const host of hosts){try{const r=await fetch(host,{method:'POST',body:new URLSearchParams({data:q}),headers:{'Content-Type':'application/x-www-form-urlencoded'}});if(!r.ok)throw Error('HTTP '+r.status);return await r.json()}catch(e){last=e}}
- throw Error('Overpass unavailable ('+(last?.message||'network error')+'). Retry later or import a verified residential GeoJSON in the next revision.');
+async function runOverpass(query){
+ if(overpassCache.has(query))return{payload:overpassCache.get(query),cached:true};
+ const waitMs=Math.max(overpassCooldownUntil-Date.now(),lastOverpassRequestAt+30000-Date.now());
+ if(waitMs>0)throw Error(`OSM Overpass is rate-limited locally. Wait ${Math.ceil(waitMs/1000)} seconds before requesting another extent.`);
+ const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),45000);
+ try{
+  lastOverpassRequestAt=Date.now();
+  const response=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:new URLSearchParams({data:query}),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:controller.signal});
+  if(!response.ok){if(response.status===429||response.status===406)overpassCooldownUntil=Date.now()+30000;throw Error(`Overpass returned HTTP ${response.status}${overpassCooldownUntil?' (wait 30 seconds before retrying)':''}`)}
+  const payload=await response.json();if(!Array.isArray(payload.elements))throw Error('Overpass response did not contain elements');
+  overpassCache.set(query,payload);return{payload,cached:false};
+ }catch(error){
+  if(error.name==='AbortError')throw Error('The bounded OSM land-use request timed out. Nothing was loaded; retry later.');
+  throw Error(`OSM land-use request failed (${error.message}). Nothing was labelled verified.`);
+ }finally{clearTimeout(timer)}
 }
 function installPois(pois){
- if(poiLayer)poiLayer.remove();poiLayer=L.layerGroup([],{}).addTo(map);
- for(const p of pois){L.circleMarker([p.lat,p.lon],{radius:3,color:'#334',fillColor:'#fff',fillOpacity:.9,weight:1}).addTo(poiLayer).bindTooltip(p.name,{permanent:true,direction:'top',className:'landmark-label',opacity:.94})}
- return pois.length;
+ if(poiLayer)poiLayer.remove();poiLayer=L.layerGroup().addTo(map);
+ for(const poi of pois){
+  L.circleMarker([poi.latitude,poi.longitude],{radius:3,color:'#334',fillColor:'#fff',fillOpacity:.9,weight:1})
+   .addTo(poiLayer).bindTooltip(`${poi.name} · ${poi.category}`,{permanent:true,direction:'top',className:'landmark-label',opacity:.94});
+ }
 }
 $('landuse').onclick=async ()=>{
- if(!selected){notice('Import GeoJSONs first.',true);return}
+ if(!selected||loadingOverpass){notice('Import a GeoJSON first, or wait for the current OSM request to finish.',true);return}
+ loadingOverpass=true;$('landuse').disabled=true;
  const b=map.getBounds();const bbox=[b.getSouth(),b.getWest(),b.getNorth(),b.getEast()].map(v=>v.toFixed(6)).join(',');
- // Only query the currently visible drawing footprint, once per explicit click.
- const query='[out:json][timeout:35];(way["landuse"="residential"]('+bbox+');relation["landuse"="residential"]('+bbox+');nwr["amenity"~"^(school|college|kindergarten)$"]('+bbox+');nwr["shop"="supermarket"]('+bbox+');nwr["name"~"Tesco|Studio|Shopping Park",i]('+bbox+'););out center geom;';
- notice('Loading OSM residential polygons and named amenities for the visible extent…');
+ // One bounded query only after an explicit user click; no background or zoom prefetch.
+ const query='[out:json][timeout:40];(way["landuse"="residential"]('+bbox+');relation["landuse"="residential"]('+bbox+');nwr["amenity"~"^(school|college|kindergarten)$"]('+bbox+');nwr["shop"="supermarket"]('+bbox+');nwr["name"~"Tesco|Studio|Shopping Park|High Street|Employment|Industrial Estate|Business Park",i]('+bbox+'););out center geom;';
+ notice('Loading OSM-mapped residential geometry and named features for the visible map extent. Review is required.');
  try{
-  const results=await runOverpass(query),polys=osmPolygons(results.elements||[]),pois=osmPois(results.elements||[]);
+  const response=await runOverpass(query),results=response.payload,assembled=assembleResidential(results.elements),pois=parseNamedPois(results.elements);
   if(landuseLayer)landuseLayer.remove();
-  landuseLayer=L.geoJSON({type:'FeatureCollection',features:polys},{pane:'residential',renderer:svgRenderer,style:()=>({className:'residential-hatch',color:'#657782',weight:1,fillOpacity:.8}),interactive:false}).addTo(map);
-  ensureHatch();map.on('layeradd',ensureHatch);installPois(pois);
-  notice('Loaded '+polys.length+' OSM residential polygons and '+pois.length+' named POIs. Review boundaries and missing labels before issue.');
- }catch(err){notice(err.message,true)}
+  if(incompleteLayer)incompleteLayer.remove();
+  landuseLayer=L.geoJSON({type:'FeatureCollection',features:assembled.features},{pane:'residential',renderer:svgRenderer,style:()=>({className:'residential-hatch',color:'#657782',weight:1,fillOpacity:.8}),interactive:false}).addTo(map);
+  const partialFeatures=assembled.incomplete.filter(item=>item.coordinates.length>=2).map((item,index)=>({type:'Feature',properties:{source:item.source,index},geometry:{type:'LineString',coordinates:item.coordinates}}));
+  incompleteLayer=L.geoJSON({type:'FeatureCollection',features:partialFeatures},{pane:'residential',renderer:svgRenderer,style:()=>({className:'incomplete-boundary',color:'#bb3e27',weight:2.5,dashArray:'5 5',fill:false}),interactive:false}).addTo(map);
+  ensureHatch();installPois(pois);
+  const unknown=assembled.coverage==='unknown'?' OSM completeness is unknown; this is mapped coverage only.':'';
+  const incomplete=assembled.incomplete.length?` ${assembled.incomplete.length} residential boundary item(s) are incomplete; available open fragments are dashed red.`:'';
+  notice(`Loaded ${assembled.features.length} OSM residential polygon(s) and ${pois.length} named OSM feature(s)${response.cached?' from the in-memory extent cache':''}.${incomplete}${unknown} ${landmarkStatus(pois)}`,assembled.incomplete.length>0||!assembled.features.length);
+ }catch(error){notice(error.message,true)}finally{loadingOverpass=false;$('landuse').disabled=false}
 };
+function renderAnnotationList(){
+ const list=$('annotationList');list.replaceChildren();
+ for(const annotation of manualAnnotations){
+  const row=document.createElement('div');row.className='annotation-item';
+  const input=document.createElement('input');input.value=annotation.name;input.setAttribute('aria-label','Annotation label');
+  input.onchange=()=>{annotation.name=input.value.trim()||annotation.name;input.value=annotation.name;annotation.layer.setTooltipContent(annotation.name);notice(`Updated manual annotation “${annotation.name}”. Check its location before issue.`)};
+  const position=document.createElement('span');position.textContent='drag marker to reposition';
+  const remove=document.createElement('button');remove.type='button';remove.textContent='Remove';remove.onclick=()=>{annotation.layer.remove();manualAnnotations.splice(manualAnnotations.indexOf(annotation),1);renderAnnotationList()};
+  row.append(input,position,remove);list.append(row);
+ }
+}
 function addManual(name,latlng){
- const c=L.circleMarker(latlng,{pane:'markers',radius:3,color:'#273655',fillColor:'#fff',fillOpacity:1}).addTo(map);
- const t=c.bindTooltip(name,{permanent:true,direction:'top',className:'landmark-label',opacity:.95});
- manualAnnotations.push(t);allLayerGroups.push(c);
+ const marker=L.marker(latlng,{pane:'markers',draggable:true,title:'Manual annotation; position requires review'}).addTo(map);
+ marker.bindTooltip(name,{permanent:true,direction:'top',className:'landmark-label',opacity:.95});
+ const annotation={name,layer:marker};manualAnnotations.push(annotation);
+ marker.on('dragend',()=>notice(`Repositioned manual annotation “${annotation.name}”. Check its location before issue.`));
+ renderAnnotationList();
 }
 let annotationMode=false;
-$('addLabel').onclick=()=>{annotationMode=true;notice('Click the map at the correct position for a label (school, Tesco, High Street, studios etc.).')};
-map.on('click',e=>{if(!annotationMode)return;annotationMode=false;const name=prompt('Annotation label');if(name?.trim()){addManual(name.trim(),e.latlng);notice('Added '+name.trim()+' at its geographic position.')}});
-$('clearLabels').onclick=()=>{for(const x of allLayerGroups)x.remove();allLayerGroups.length=0;manualAnnotations.length=0;notice('Manual annotations cleared. OSM POIs are retained.')};
+$('addLabel').onclick=()=>{annotationMode=true;notice('Click the map at the evidence-based location for the annotation. Edit the label or drag it after adding; verify before issue.')};
+map.on('click',e=>{if(!annotationMode)return;annotationMode=false;const name=prompt('Annotation label');if(name?.trim()){addManual(name.trim(),e.latlng);notice('Added a manual label at your selected position. It is not independently verified.')}});
+$('clearLabels').onclick=()=>{for(const annotation of manualAnnotations)annotation.layer.remove();manualAnnotations.length=0;renderAnnotationList();notice('Manual annotations cleared. OSM-sourced labels are retained.')};
+async function waitForVisibleTiles(timeout=15000){
+ const element=$('map'),rect=element.getBoundingClientRect();
+ const visibleTiles=()=>[...element.querySelectorAll('img.leaflet-tile')].filter(tile=>{const box=tile.getBoundingClientRect();return box.right>rect.left&&box.left<rect.right&&box.bottom>rect.top&&box.top<rect.bottom});
+ await new Promise((resolve,reject)=>{
+  const check=()=>{const tiles=visibleTiles();if(tiles.length&&tiles.every(tile=>tile.complete&&tile.naturalWidth)){tileLayer.off('load',check);clearTimeout(timer);resolve()}};
+  const timer=setTimeout(()=>{tileLayer.off('load',check);reject(Error('Visible OSM tiles did not finish loading.'))},timeout);
+  tileLayer.on('load',check);check();
+ });
+ const tiles=visibleTiles();if(!tiles.length)throw Error('No visible OpenStreetMap tiles are available.');
+ return tiles;
+}
 async function exportMapPng(){
  if(!selected){notice('Import a GeoJSON first.',true);return}
- const el=$('map'),rect=el.getBoundingClientRect(),scale=2;
- const c=document.createElement('canvas');c.width=el.clientWidth*scale;c.height=el.clientHeight*scale;
- const ctx=c.getContext('2d');ctx.scale(scale,scale);ctx.fillStyle='#ecf2e4';ctx.fillRect(0,0,el.clientWidth,el.clientHeight);
+ const el=$('map'),rect=el.getBoundingClientRect(),scale=3;
+ if(Math.abs(rect.width/rect.height-(8.96/5.77))>.002){notice('The map panel does not match the 8.96 × 5.77-inch target ratio; export stopped to avoid distortion.',true);return}
+ const c=document.createElement('canvas');c.width=Math.round(rect.width*scale);c.height=Math.round(rect.height*scale);
+ const ctx=c.getContext('2d');ctx.scale(scale,scale);ctx.fillStyle='#ecf2e4';ctx.fillRect(0,0,rect.width,rect.height);
  try{
-  let tileCount=0;for(const tile of el.querySelectorAll('img.leaflet-tile')){
-    if(!tile.complete||!tile.naturalWidth)continue;
-    const r=tile.getBoundingClientRect();if(r.right<rect.left||r.left>rect.right||r.bottom<rect.top||r.top>rect.bottom)continue;
-    ctx.drawImage(tile,r.left-rect.left,r.top-rect.top,r.width,r.height);tileCount++;
-  }
-  if(!tileCount)throw Error('Background tiles have not loaded. Check network access; do not export an empty map.');
-  function polyline(coords,color,weight){ctx.beginPath();coords.forEach(([lon,lat],i)=>{const p=map.latLngToContainerPoint([lat,lon]);i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)});ctx.strokeStyle=color;ctx.lineWidth=weight;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke()}
-  if(landuseLayer){ctx.save();landuseLayer.eachLayer(l=>{const g=l.feature?.geometry;if(!g)return;
-    for(const ring of g.coordinates||[]){ctx.save();ctx.beginPath();ring.forEach(([lon,lat],i)=>{let p=map.latLngToContainerPoint([lat,lon]);i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)});ctx.closePath();ctx.clip();ctx.fillStyle='#c0c7ca33';ctx.fillRect(0,0,el.clientWidth,el.clientHeight);ctx.strokeStyle='#68798555';ctx.lineWidth=1;for(let x=-el.clientHeight;x<el.clientWidth+el.clientHeight;x+=11){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+el.clientHeight,el.clientHeight);ctx.stroke()}ctx.restore()}
-   });ctx.restore()}
-  for(const f of selected.features)polyline(f.geometry.coordinates,palette[f.properties.band],3.5);
-  function renderLabel(name,latlng){const p=map.latLngToContainerPoint(latlng);const w=Math.min(155,Math.max(65,ctx.measureText(name).width+12));ctx.fillStyle='#fffceddf';ctx.strokeStyle='#43505d';ctx.lineWidth=.8;ctx.fillRect(p.x-w/2,p.y-30,w,24);ctx.strokeRect(p.x-w/2,p.y-30,w,24);ctx.fillStyle='#17253c';ctx.font='bold 12px Arial';ctx.textAlign='center';ctx.fillText(name,p.x,p.y-13,w-6)}
-  if(poiLayer)poiLayer.eachLayer(l=>{if(l.getTooltip())renderLabel(l.getTooltip().getContent(),l.getLatLng())});
-  for(const a of manualAnnotations)renderLabel(a.getTooltip().getContent(),a.getLatLng());
-  const p=map.latLngToContainerPoint([selected.origin[1],selected.origin[0]]);ctx.beginPath();ctx.arc(p.x,p.y,8,0,Math.PI*2);ctx.fillStyle='#f11515';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#101a2c';ctx.stroke();
-  ctx.fillStyle='#ffffffcf';ctx.fillRect(0,el.clientHeight-21,235,21);ctx.font='11px Arial';ctx.fillStyle='#132642';ctx.textAlign='left';ctx.fillText('© OpenStreetMap contributors (ODbL)',6,el.clientHeight-6);
-  c.toBlob(blob=>{if(blob)download(blob,'EAS_'+selected.filename.replace(/\.(json|geojson)$/i,'').replace(/\s/g,'_')+'.png')},'image/png');
-  notice('PNG exported using '+tileCount+' visible background tiles, geometrically aligned isochrone segments and current labels.');
- }catch(err){notice('PNG export failed: '+err.message+'. Use Print / Save PDF as a fallback.',true)}
+  const visibleTiles=await waitForVisibleTiles();
+  for(const tile of visibleTiles){const box=tile.getBoundingClientRect();ctx.drawImage(tile,box.left-rect.left,box.top-rect.top,box.width,box.height)}
+  const drawLine=(coordinates,color,width,dash=[])=>{
+   if(!coordinates?.length)return;ctx.beginPath();coordinates.forEach(([lon,lat],index)=>{const point=map.latLngToContainerPoint([lat,lon]);index?ctx.lineTo(point.x,point.y):ctx.moveTo(point.x,point.y)});
+   ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineJoin='round';ctx.lineCap='round';ctx.setLineDash(dash);ctx.stroke();ctx.setLineDash([]);
+  };
+ const drawRing=ring=>{ring.forEach(([lon,lat],index)=>{const point=map.latLngToContainerPoint([lat,lon]);index?ctx.lineTo(point.x,point.y):ctx.moveTo(point.x,point.y)});ctx.closePath()};
+  if(landuseLayer){landuseLayer.eachLayer(layer=>{
+   const geometry=layer.feature?.geometry;if(!geometry)return;
+   const polygons=geometry.type==='Polygon'?[geometry.coordinates]:geometry.type==='MultiPolygon'?geometry.coordinates:[];
+   for(const polygon of polygons){ctx.save();ctx.beginPath();polygon.forEach(drawRing);ctx.clip('evenodd');ctx.fillStyle='#dfe4e955';ctx.fillRect(0,0,rect.width,rect.height);ctx.strokeStyle='#68798577';ctx.lineWidth=.8;
+    for(let x=-rect.height;x<rect.width+rect.height;x+=11){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+rect.height,rect.height);ctx.stroke()}ctx.restore();
+   }
+  })}
+  if(incompleteLayer)incompleteLayer.eachLayer(layer=>drawLine(layer.feature?.geometry?.coordinates,'#bb3e27',2.5,[5,5]));
+  for(const feature of selected.features)drawLine(feature.geometry.coordinates,definitions[feature.properties.easBand].colour,3.5);
+  const renderLabel=(name,latlng)=>{const point=map.latLngToContainerPoint(latlng);ctx.font='bold 12px Arial';const width=Math.min(155,Math.max(65,ctx.measureText(name).width+12));ctx.fillStyle='#fffceddf';ctx.strokeStyle='#43505d';ctx.lineWidth=.8;ctx.fillRect(point.x-width/2,point.y-30,width,24);ctx.strokeRect(point.x-width/2,point.y-30,width,24);ctx.fillStyle='#17253c';ctx.textAlign='center';ctx.fillText(name,point.x,point.y-13,width-6)};
+  if(poiLayer)poiLayer.eachLayer(layer=>{if(layer.getTooltip())renderLabel(layer.getTooltip().getContent(),layer.getLatLng())});
+  for(const annotation of manualAnnotations)renderLabel(annotation.name,annotation.layer.getLatLng());
+  for(const marker of originMarkers){const point=marker.getLatLng();ctx.beginPath();const container=map.latLngToContainerPoint(point);ctx.arc(container.x,container.y,8,0,Math.PI*2);ctx.fillStyle='#f11515';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#101a2c';ctx.stroke();if(marker.getTooltip())renderLabel(marker.getTooltip().getContent(),point)}
+  const drawControl=(element,attribution=false)=>{const box=element.getBoundingClientRect(),style=getComputedStyle(element),x=box.left-rect.left,y=box.top-rect.top;ctx.font=style.font||'10px Arial';ctx.textAlign='left';ctx.textBaseline='alphabetic';ctx.fillStyle=style.backgroundColor==='rgba(0, 0, 0, 0)'?'#ffffffdf':style.backgroundColor;ctx.fillRect(x,y,box.width,box.height);ctx.strokeStyle=style.color||'#17253c';ctx.lineWidth=1;ctx.strokeRect(x,y,box.width,box.height);ctx.fillStyle=style.color||'#17253c';ctx.fillText(attribution?'© OpenStreetMap contributors, ODbL 1.0':element.textContent.trim(),x+4,y+box.height-4)};
+  for(const element of el.querySelectorAll('.leaflet-control-scale-line'))drawControl(element);
+  ctx.font='10px Arial';const credit='© OpenStreetMap contributors, ODbL 1.0';const creditWidth=ctx.measureText(credit).width+10;ctx.fillStyle='#ffffffdf';ctx.fillRect(rect.width-creditWidth-3,rect.height-19,creditWidth,16);ctx.fillStyle='#17253c';ctx.textAlign='left';ctx.fillText(credit,rect.width-creditWidth+2,rect.height-7);
+  const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));
+  if(!blob)throw Error('The browser could not create a PNG from this map.');
+  download(blob,'EAS_'+selected.filename.replace(/\.(json|geojson)$/i,'').replace(/\s/g,'_')+'.png');
+  notice(`Exported a ${c.width} × ${c.height} PNG from ${visibleTiles.length} visible OSM tile(s), with linework, hatching, scale and attribution.`);
+ }catch(error){notice(`PNG export failed: ${error.message}. Use browser Print / Save PDF if its live map is complete.`,true)}
 }
 $('exportPng').onclick=exportMapPng;
-$('print').onclick=()=>window.print();
+$('print').onclick=async ()=>{try{await waitForVisibleTiles();map.invalidateSize();map.whenReady(()=>window.print())}catch(error){notice(`Print stopped: ${error.message} Please wait for the visible map to load before printing.`,true)}};
 </script>
 </body>
 </html>

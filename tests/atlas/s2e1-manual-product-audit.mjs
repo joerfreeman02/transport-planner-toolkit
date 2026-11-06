@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFile, mkdir } from 'node:fs/promises';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -15,6 +15,7 @@ const [candidateArg, reportArg] = process.argv.slice(2);
 if (!candidateArg) throw new Error('Usage: node tests/atlas/s2e1-manual-product-audit.mjs <Run-75-candidate-root> [report.json]');
 const candidateRoot = path.resolve(candidateArg);
 const repositoryRoot = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
+const applicationRoot = process.env.ATLAS_AUDIT_APP_ROOT ? path.resolve(process.env.ATLAS_AUDIT_APP_ROOT) : repositoryRoot;
 assert.notEqual(candidateRoot, repositoryRoot, 'The frozen candidate data root must be separate from the production code checkout.');
 const candidateManifestPaths = {
   bus: path.join(candidateRoot, 'atlas', 'data', 'bus', 'manifest.json'),
@@ -30,7 +31,10 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const tflWalthamOperatingFixture = JSON.parse(await readFile(path.join(repositoryRoot, 'tests/atlas/fixtures/tfl-waltham-stop-a-operating-period-1a.json'), 'utf8'));
 const tflWalthamByLine = new Map(tflWalthamOperatingFixture.requests.map(request => [String(request.lineId), request.response]));
-const enfieldIbusIndex = JSON.parse(await readFile(path.join(repositoryRoot, 'atlas/data/tfl-ibus/20261009/operator-index.json'), 'utf8'));
+const tflIbusRoot = process.env.ATLAS_TEST_TFL_IBUS_ROOT
+  ? path.resolve(process.env.ATLAS_TEST_TFL_IBUS_ROOT)
+  : path.join(repositoryRoot, 'atlas/data/tfl-ibus');
+const enfieldIbusIndex = JSON.parse(await readFile(path.join(tflIbusRoot, '20261009/operator-index.json'), 'utf8'));
 const enfieldTflCapture = JSON.parse(await readFile(path.join(repositoryRoot, 'tests/atlas/fixtures/enfield-route313-tfl-capture-2026-10-23.json'), 'utf8'));
 const enfieldTflResponses = new Map(enfieldTflCapture.responses.map(response => [response.path, response]));
 const capturedEnfieldStop = enfieldTflCapture.stopPoint;
@@ -116,9 +120,14 @@ const controls = [
   { id: 'pipers-route46', label: 'Pipers Lane route 46 frequency control', latitude: 51.852700, longitude: -0.454343, radius: 1200 },
   { id: 'waltham-cross', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.686144, longitude: -0.035707, radius: 700 },
   { id: 'waltham-cross-nearest', label: '47 Berkley Avenue, Waltham Cross nearest logical stop group', latitude: 51.686144, longitude: -0.035707, radius: 700, assessmentMode: 'nearest' },
+  { id: 'abbotts-rise-nearest', label: 'Abbotts Rise public stop pair, Stanstead Abbotts', latitude: 51.78711445, longitude: 0.01104605, radius: 700, assessmentMode: 'nearest', focusRoutes: ['25', '25B', '25C', '33', '35', '35B', '35C'] },
+  { id: 'tufton', label: 'Tufton Road, Chingford Mount control point', latitude: 51.613869, longitude: -0.020303, radius: 700 },
+  { id: 'grove-road', label: 'Grove Road, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250 },
   { id: 'long-lane-route203', label: 'Long Lane, Hounslow', latitude: 51.456210, longitude: -0.462970, radius: 400 },
   { id: 'chingford', label: 'Normanshire Drive, Chingford', latitude: 51.616596, longitude: -0.0117893, radius: 250 },
   { id: 'hoddesdon-the-drive', label: 'The Drive, Hoddesdon', latitude: 51.7630, longitude: -0.0105, radius: 700 },
+  { id: 'wycliffe-stonehouse', label: 'Stroud, GL5 3DS', latitude: 51.745347, longitude: -2.218151, radius: 1400 },
+  { id: 'mk5-route5', label: 'Milton Keynes Route 5 control', latitude: 52.040000, longitude: -0.760000, radius: 700 },
   { id: 'pe1', label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500 }
 ];
 if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') controls.splice(0, controls.length, ...enfieldControls);
@@ -176,6 +185,18 @@ const failedResponses = [];
 const externalRequests = [];
 const statusManifestFallbacks = [];
 const tflReplayRequests = [];
+const liveTflCaptures = [];
+const recordedTflReplayMisses = [];
+const recordedTflReplayCounts = new Map();
+const recordedTflResponseQueues = new Map();
+if (process.env.ATLAS_TFL_REPLAY_CAPTURE) {
+  const recordedCapture = JSON.parse(await readFile(path.resolve(process.env.ATLAS_TFL_REPLAY_CAPTURE), 'utf8'));
+  if (recordedCapture.schema !== 'atlas-tfl-live-response-capture-v1') throw new Error('Recorded TfL replay capture has an unexpected schema.');
+  for (const response of recordedCapture.responses ?? []) {
+    const key = `${response.method} ${response.url}`;
+    recordedTflResponseQueues.set(key, [...(recordedTflResponseQueues.get(key) ?? []), response]);
+  }
+}
 const walthamNearestStopDistances = new Map([
   ['-0.03109,51.68560', 510],
   ['-0.03135,51.68573', 522],
@@ -246,8 +267,12 @@ try {
         response.end();
         return;
       }
-      const marker = pathname.startsWith('/atlas/data/bus-tnds/') ? '/atlas/data/bus-tnds/' : pathname.startsWith('/atlas/data/bus/') ? '/atlas/data/bus/' : null;
-      const root = marker ? path.join(candidateRoot, pathname.startsWith('/atlas/data/bus-tnds/') ? 'atlas/data/bus-tnds' : 'atlas/data/bus') : repositoryRoot;
+      const candidateDataMarker = pathname.startsWith('/atlas/data/bus-tnds/') ? '/atlas/data/bus-tnds/' : pathname.startsWith('/atlas/data/bus/') ? '/atlas/data/bus/' : null;
+      const tflIbusMarker = pathname.startsWith('/atlas/data/tfl-ibus/') ? '/atlas/data/tfl-ibus/' : null;
+      const root = candidateDataMarker
+        ? path.join(candidateRoot, pathname.startsWith('/atlas/data/bus-tnds/') ? 'atlas/data/bus-tnds' : 'atlas/data/bus')
+        : tflIbusMarker ? tflIbusRoot : applicationRoot;
+      const marker = candidateDataMarker || tflIbusMarker;
       const relative = marker ? pathname.slice(marker.length) : pathname.replace(/^\/+/, '');
       const target = relative.endsWith('/') ? `${relative}index.html` : relative || 'index.html';
       const file = path.resolve(root, target);
@@ -256,11 +281,13 @@ try {
       if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && pathname === '/atlas/assets/js/app.mjs') {
         let appSource = bytes.toString('utf8');
         const assignment = '  currentBusResult = result;';
-        appSource = appSource.replace('buildPlannerBusServiceSummaries, plannerRouteDisplayNumber', 'buildPlannerBusServiceSummaries, buildPlannerServiceGroups, plannerRouteDisplayNumber');
+        const plannerImport = 'import { buildBusTimetablePresentationNote,';
+        if (!appSource.includes(plannerImport)) throw new Error('Expected the production planner-summary import for the C4 trace hook.');
+        appSource = appSource.replace(plannerImport, 'import { buildPlannerServiceGroups, buildBusTimetablePresentationNote,');
         const assignmentIndex = appSource.indexOf(assignment);
         if (assignmentIndex < 0) throw new Error('Expected a production assessment result assignment for the C4 trace hook.');
-        const observer = `${assignment}\n  window.__ATLAS_C4_OPERATOR_TRACE__ = (routeNumber, selectedStopId = null) => {\n    const routeRecords = (records, selectedStopId) => (records ?? []).filter(record => String(record.routeNumber) === String(routeNumber)).map(record => { const schedule = record.stopSchedules?.[selectedStopId] ?? record.departuresByStopAndDay?.[selectedStopId] ?? {}; const population = record.canonicalDeparturePopulationAll ?? record.canonicalDeparturePopulation ?? {}; const counts = value => Array.isArray(value) ? value.length : null; return { id: record.id ?? null, routeNumber: record.routeNumber ?? null, operator: record.operator ?? null, provider: record.provider ?? null, timetableSource: record.timetableSource ?? null, origin: record.origin ?? null, destination: record.destination ?? null, direction: record.direction ?? null, directionFamily: record.directionFamily ?? null, directionPatternText: record.directionPatternText ?? null, calendarProfileId: record.calendarProfileId ?? null, routePatternStopIds: record.routePatternStopIds ?? [], routePatternStopNames: record.routePatternStopNames ?? [], plannerLocalityPatternStops: (record.plannerLocalityPatternStops ?? []).map(stop => ({ id: stop.id ?? null, name: stop.name ?? stop.commonName ?? null, locality: stop.locality ?? stop.localityName ?? stop.nptgLocalityName ?? null })), principalLocations: record.principalLocations ?? [], principalLocationState: record.principalLocationState ?? null, serviceNote: record.serviceNote ?? null, sourceRecordIds: record.sourceRecordIds ?? [], stopIds: record.stopIds ?? [], servedAtStopId: record.servedAtStopId ?? null, frequencyBasisStopId: record.frequencyBasisStopId ?? null, calendarProfileIds: record.calendarProfileIds ?? [], calendarProfileLabel: record.calendarProfileLabel ?? null, plannerNotes: record.plannerNotes ?? null, principalLocationsText: record.principalLocationsText ?? null, canonicalCounts: Object.fromEntries(Object.entries(population).map(([day,value]) => [day, counts(value)])), selectedStopCounts: Object.fromEntries(Object.entries(schedule).map(([day,value]) => [day, counts(value)])), typicalFrequencyLines: record.typicalFrequencyLines ?? null, operatingPeriodLines: record.operatingPeriodLines ?? null, shortWorkingClassification: record.shortWorkingClassification ?? null, grouping: record.publicServiceGroupingDecision ? { principalPattern: record.publicServiceGroupingDecision.principalPattern ?? null, shortWorkingRecordIds: record.publicServiceGroupingDecision.shortWorkingRecordIds ?? [], branchVariantRecordIds: record.publicServiceGroupingDecision.branchVariantRecordIds ?? [], deduplicatedSourceRecordIds: record.publicServiceGroupingDecision.deduplicatedSourceRecordIds ?? [] } : null, canonicalSamples: Object.fromEntries(Object.entries(record.canonicalDeparturePopulationAll ?? {}).map(([day, entries]) => [day, (entries ?? []).slice(0, 8).map(entry => ({ minute: entry.minute, sourceRecordId: entry.sourceRecordId, authorityProvider: entry.authorityProvider, provider: entry.provider, primaryAuthority: entry.primaryAuthority, journeyIdentity: entry.journeyIdentity }))])) }; });\n    const summarizeStop = stop => ({ id: stop.id ?? stop.sourceId ?? null, name: stop.name ?? null, latitude: stop.latitude ?? null, longitude: stop.longitude ?? null, distanceMetres: stop.distanceMetres ?? null, routes: stop.routes ?? [], timetableAuthority: stop.timetableAuthority ?? null, timetableAuthorities: stop.timetableAuthorities ?? [], routeAuthorities: stop.routeAuthorities ?? null, timetableCallEligible: stop.timetableCallEligible ?? null, logicalGroupRefs: stop.logicalGroupRefs ?? [], logicalGroupIds: stop.logicalGroupIds ?? [], stopAreaName: stop.stopAreaName ?? null, stopAreaId: stop.stopAreaId ?? null });
-    return { routeNumber, allDiscoveredStops: (result.stops ?? []).map(summarizeStop), stops: (result.stops ?? []).filter(stop => (stop.routes ?? []).some(route => String(route) === String(routeNumber))).map(summarizeStop), stopProvenance: result.provenance?.stops ?? null, composedServices: routeRecords(result.services, selectedStopId), normalizedServiceSummaries: routeRecords(result.serviceSummaries, selectedStopId), plannerRows: routeRecords(result.plannerServiceSummaries, selectedStopId), serviceGroups: ['242','202'].includes(String(routeNumber)) ? buildPlannerServiceGroups(result.serviceSummaries ?? [], result.stops ?? []).filter(group => String(group.routeNumber) === String(routeNumber)).map(group => ({ id: group.serviceIdentity, operator: group.operatorNames, principal: group.principal?.id, services: (group.services ?? []).map(service => ({ id: service.id, keys: Object.keys(service), recordIds: service.sourceRecordIds ?? [], source: service.source ?? null, timetableSource: service.timetableSource ?? null, provider: service.provider ?? null, frequencyEvidenceSource: service.frequencyEvidenceSource ?? null, sourceProvider: service.source?.provider ?? null, sourcePrimaryAuthority: service.source?.primaryAuthority ?? null, operator: service.operator, origin: service.origin, destination: service.destination, provider: service.timetableSource, patternLength: service.routePatternStopIds?.length ?? 0, days: Object.fromEntries(Object.entries(service.stopSchedules ?? {}).map(([stopId,schedule]) => [stopId, Object.entries(schedule).filter(([,values]) => values?.length).map(([day]) => day)])), variants: service.publicServiceGroupingDecision ?? null })) })) : [], terminalRows: (result.plannerServiceSummaries ?? []).filter(row => String(row.routeNumber) === String(routeNumber)).map(row => ({ id: row.id, destination: row.destination, frequencyBasisStopId: row.frequencyBasisStopId, terminusDecision: row.terminusDecision ?? null, sourceIds: row.sourceRecordIds ?? [] })), timetableProvenance: result.provenance?.timetables ?? null };\n  };`;
+        const observer = `${assignment}\n  window.__ATLAS_C4_OPERATOR_TRACE__ = (routeNumber, selectedStopId = null) => {\n    const routeRecords = (records, selectedStopId) => (records ?? []).filter(record => String(record.routeNumber) === String(routeNumber)).map(record => { const schedule = record.stopSchedules?.[selectedStopId] ?? record.departuresByStopAndDay?.[selectedStopId] ?? {}; const population = record.canonicalDeparturePopulationAll ?? record.canonicalDeparturePopulation ?? {}; const counts = value => Array.isArray(value) ? value.length : null; return { id: record.id ?? null, routeNumber: record.routeNumber ?? null, operator: record.operator ?? null, provider: record.provider ?? null, timetableSource: record.timetableSource ?? null, origin: record.origin ?? null, destination: record.destination ?? null, direction: record.direction ?? null, stopDirection: record.stopDirection ?? null, presentationDestination: record.presentationDestination ?? null, destinationDecision: record.destinationDecision ?? null, destinationEndpointDecision: record.destinationEndpointDecision ?? null, directionFamily: record.directionFamily ?? null, directionPatternText: record.directionPatternText ?? null, calendarProfileId: record.calendarProfileId ?? null, routePatternStopIds: record.routePatternStopIds ?? [], routePatternStopNames: record.routePatternStopNames ?? [], plannerLocalityPatternStops: (record.plannerLocalityPatternStops ?? []).map(stop => ({ id: stop.id ?? null, name: stop.name ?? stop.commonName ?? null, locality: stop.locality ?? stop.localityName ?? stop.nptgLocalityName ?? null })), principalLocations: record.principalLocations ?? [], principalLocationState: record.principalLocationState ?? null, serviceNote: record.serviceNote ?? null, sourceRecordIds: record.sourceRecordIds ?? [], stopIds: record.stopIds ?? [], servedAtStopId: record.servedAtStopId ?? null, frequencyBasisStopId: record.frequencyBasisStopId ?? null, calendarProfileIds: record.calendarProfileIds ?? [], calendarProfileLabel: record.calendarProfileLabel ?? null, plannerNotes: record.plannerNotes ?? null, principalLocationsText: record.principalLocationsText ?? null, canonicalCounts: Object.fromEntries(Object.entries(population).map(([day,value]) => [day, counts(value)])), selectedStopCounts: Object.fromEntries(Object.entries(schedule).map(([day,value]) => [day, counts(value)])), typicalFrequencyLines: record.typicalFrequencyLines ?? null, operatingPeriodLines: record.operatingPeriodLines ?? null, shortWorkingClassification: record.shortWorkingClassification ?? null, grouping: record.publicServiceGroupingDecision ? { principalPattern: record.publicServiceGroupingDecision.principalPattern ?? null, shortWorkingRecordIds: record.publicServiceGroupingDecision.shortWorkingRecordIds ?? [], branchVariantRecordIds: record.publicServiceGroupingDecision.branchVariantRecordIds ?? [], deduplicatedSourceRecordIds: record.publicServiceGroupingDecision.deduplicatedSourceRecordIds ?? [] } : null, canonicalSamples: Object.fromEntries(Object.entries(record.canonicalDeparturePopulationAll ?? {}).map(([day, entries]) => [day, (entries ?? []).slice(0, 100).map(entry => ({ minute: entry.minute, sourceRecordId: entry.sourceRecordId, authorityProvider: entry.authorityProvider, provider: entry.provider, primaryAuthority: entry.primaryAuthority, journeyIdentity: entry.journeyIdentity }))])) }; });\n    const summarizeStop = stop => ({ id: stop.id ?? stop.sourceId ?? null, name: stop.name ?? null, latitude: stop.latitude ?? null, longitude: stop.longitude ?? null, distanceMetres: stop.distanceMetres ?? null, routes: stop.routes ?? [], timetableAuthority: stop.timetableAuthority ?? null, timetableAuthorities: stop.timetableAuthorities ?? [], routeAuthorities: stop.routeAuthorities ?? null, timetableCallEligible: stop.timetableCallEligible ?? null, logicalGroupRefs: stop.logicalGroupRefs ?? [], logicalGroupIds: stop.logicalGroupIds ?? [], stopAreaName: stop.stopAreaName ?? null, stopAreaId: stop.stopAreaId ?? null });
+    return { routeNumber, allDiscoveredStops: (result.stops ?? []).map(summarizeStop), stops: (result.stops ?? []).filter(stop => (stop.routes ?? []).some(route => String(route) === String(routeNumber))).map(summarizeStop), stopProvenance: result.provenance?.stops ?? null, composedServices: routeRecords(result.services, selectedStopId), normalizedServiceSummaries: routeRecords(result.serviceSummaries, selectedStopId), plannerRows: routeRecords(result.plannerServiceSummaries, selectedStopId), serviceGroups: ['242','202'].includes(String(routeNumber)) ? buildPlannerServiceGroups(result.serviceSummaries ?? [], result.stops ?? []).filter(group => String(group.routeNumber) === String(routeNumber)).map(group => ({ id: group.serviceIdentity, operator: group.operatorNames, principal: group.principal?.id, services: (group.services ?? []).map(service => ({ id: service.id, keys: Object.keys(service), recordIds: service.sourceRecordIds ?? [], source: service.source ?? null, timetableSource: service.timetableSource ?? null, provider: service.provider ?? null, frequencyEvidenceSource: service.frequencyEvidenceSource ?? null, sourceProvider: service.source?.provider ?? null, sourcePrimaryAuthority: service.source?.primaryAuthority ?? null, operator: service.operator, origin: service.origin, destination: service.destination, provider: service.timetableSource, patternLength: service.routePatternStopIds?.length ?? 0, days: Object.fromEntries(Object.entries(service.stopSchedules ?? {}).map(([stopId,schedule]) => [stopId, Object.entries(schedule).filter(([,values]) => values?.length).map(([day]) => day)])), variants: service.publicServiceGroupingDecision ?? null })) })) : [], terminalRows: (result.plannerServiceSummaries ?? []).filter(row => String(row.routeNumber) === String(routeNumber)).map(row => ({ id: row.id, destination: row.destination, frequencyBasisStopId: row.frequencyBasisStopId, terminusDecision: row.terminusDecision ?? null, sourceIds: row.sourceRecordIds ?? [], routeFamilyMembers: (row.routeFamilyMembers ?? []).map(member => ({ routeNumber: member.routeNumber, operator: member.operator, origin: member.origin, destination: member.destination, directionPatternText: member.directionPatternText, principalLocations: member.principalLocations, frequencyLines: member.frequencyLines, operatingPeriodLines: member.operatingPeriodLines, calendarProfileIds: member.calendarProfileIds, calendarProfileLabels: member.calendarProfileLabels, departureCountsByDay: member.departureCountsByDay, serviceVariants: member.serviceVariants, frequencyBasisStopId: member.frequencyBasisStopId, terminusDecision: member.terminusDecision, sourceRecordIds: member.sourceRecordIds, serviceNote: member.serviceNote })), publicRouteFamilyDecision: row.publicRouteFamilyDecision ?? null })), timetableProvenance: result.provenance?.timetables ?? null };\n  };`;
         bytes = Buffer.from(`${appSource.slice(0, assignmentIndex)}${observer}${appSource.slice(assignmentIndex + assignment.length)}`, 'utf8');
       }
       const extension = path.extname(file).toLowerCase();
@@ -301,12 +328,22 @@ try {
     const url = route.request().url();
     if (url.includes('/table/')) {
       const points = decodeURIComponent(url.split('/').at(-1).split('?')[0]).split(';');
-      const nearestControl = activeControl?.id === 'waltham-cross-nearest';
+      const nearestControl = activeControl?.assessmentMode === 'nearest';
       const distances = points.map((point, index) => {
         if (!nearestControl) return index ? 100 : 0;
         const [longitude, latitude] = point.split(',').map(Number);
         const key = `${longitude.toFixed(5)},${latitude.toFixed(5)}`;
-        return index === 0 ? 0 : walthamNearestStopDistances.get(key) ?? 900;
+        if (activeControl?.id === 'waltham-cross-nearest') return index === 0 ? 0 : walthamNearestStopDistances.get(key) ?? 900;
+        if (activeControl?.id === 'abbotts-rise-nearest') {
+          const [longitude, latitude] = point.split(',').map(Number);
+          const [siteLongitude, siteLatitude] = [activeControl.longitude, activeControl.latitude];
+          const radians = value => value * Math.PI / 180;
+          const dLat = radians(latitude - siteLatitude);
+          const dLon = radians(longitude - siteLongitude);
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(radians(siteLatitude)) * Math.cos(radians(latitude)) * Math.sin(dLon / 2) ** 2;
+          return Math.round(6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1.25);
+        }
+        return index === 0 ? 0 : 900;
       });
       const durations = distances.map(distance => Math.round(distance / 1.2));
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'Ok', distances: [distances], durations: [durations] }) });
@@ -316,6 +353,37 @@ try {
   await page.route('https://api.tfl.gov.uk/**', route => {
     const replayUrl = new URL(route.request().url());
     if (activeControl?.id?.startsWith('enfield-')) tflReplayRequests.push({ control: activeControl.id, path: replayUrl.pathname, query: replayUrl.search.slice(1) });
+    if (process.env.ATLAS_TFL_REPLAY_CAPTURE && ['tufton', 'grove-road'].includes(activeControl?.id)) {
+      const request = route.request();
+      const key = `${request.method()} ${request.url()}`;
+      const queue = recordedTflResponseQueues.get(key) ?? [];
+      const captured = queue.shift();
+      if (captured) {
+        recordedTflResponseQueues.set(key, queue);
+        recordedTflReplayCounts.set(key, (recordedTflReplayCounts.get(key) ?? 0) + 1);
+        tflReplayRequests.push({ control: activeControl.id, path: replayUrl.pathname, query: replayUrl.search.slice(1), source: 'recorded live TfL response' });
+        const headers = { ...(captured.headers ?? {}), 'access-control-allow-origin': '*' };
+        return route.fulfill({ status: captured.status, headers, body: Buffer.from(captured.bodyBase64, 'base64') });
+      }
+      recordedTflReplayMisses.push({ control: activeControl.id, method: request.method(), url: request.url() });
+      return route.abort('failed');
+    }
+    if (process.env.ATLAS_AUDIT_LIVE_TFL === '1' && ['tufton', 'grove-road'].includes(activeControl?.id)) {
+      tflReplayRequests.push({ control: activeControl.id, path: replayUrl.pathname, query: replayUrl.search.slice(1), source: 'live TfL' });
+      return (async () => {
+        const response = await route.fetch({ timeout: 30000 });
+        const body = await response.body();
+        liveTflCaptures.push({
+          control: activeControl.id,
+          method: route.request().method(),
+          url: route.request().url(),
+          status: response.status(),
+          headers: Object.fromEntries(['content-type', 'date', 'last-modified', 'etag'].flatMap(name => response.headers()[name] ? [[name, response.headers()[name]]] : [])),
+          bodyBase64: body.toString('base64')
+        });
+        await route.fulfill({ response, body });
+      })();
+    }
     if (activeControl?.id === 'waltham-cross') {
       const url = new URL(route.request().url());
       let body = [];
@@ -352,7 +420,7 @@ try {
       else if (url.pathname.startsWith(`/Line/${fixture.routeNumber ?? '313'}/Route/Sequence/`)) body = fixture.sequences?.[url.pathname.split('/').at(-1)] ?? [];
       return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
     }
-    if (activeControl?.id !== 'chingford') return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
+    if (!['chingford', 'grove-road'].includes(activeControl?.id)) return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
     const url = new URL(route.request().url());
     let body = [];
     if (url.pathname === '/StopPoint') body = { stopPoints: ['GROVE-P', 'GROVE-N'].map((id, index) => ({ id, naptanId: id, commonName: 'Grove Road', indicator: index ? 'N' : 'P', towards: index ? "Salisbury Hall Sainsbury's" : "Bancroft's School", lat: 51.616596, lon: -0.0117893, stopType: 'NaptanPublicBusCoachTram', lines: [{ id: '657', name: '657' }] })) };
@@ -458,12 +526,13 @@ try {
       }
       if (control.id === 'waltham-cross') {
         assert.equal(await page.locator('#taskStatus').isVisible(), true, 'The completed progress card must remain visible with Results.');
-        assert.equal(await page.locator('#taskStatusMessage').innerText(), 'Assessment complete', 'A successful Waltham assessment must have a concise completion label.');
+        const expectedWalthamStatus = 'Assessment execution complete · source or routing checks incomplete';
+        assert.equal(await page.locator('#taskStatusMessage').innerText(), expectedWalthamStatus, 'Waltham retains the incomplete state while exact route/stop source checks require review.');
         assert.equal(await page.locator('#stopStatus').isHidden(), true, 'The completed assessment must not repeat review wording in the adjacent callout.');
         const reviewBadge = (await page.locator('#taskStatusReviewBadge').innerText()).trim();
         const cardReviewCount = Number(reviewBadge.match(/^([0-9]+) items? require review$/)?.[1] || 0);
         assert.ok(cardReviewCount > 0, 'The frozen Waltham review case must show its review count in the completion card.');
-        assert.equal(await page.locator('#resultFreshness').innerText(), 'Assessment complete', 'Results freshness must not repeat the card review count.');
+        assert.equal(await page.locator('#resultFreshness').innerText(), expectedWalthamStatus, 'Results freshness must agree with unresolved Waltham source checks without repeating the review count.');
         const sourceReviewBadge = await page.locator('#sourceReviewBadge').evaluate(element => element.textContent.trim());
         const sourceReviewCount = Number(sourceReviewBadge.match(/^([0-9]+) items? require review$/)?.[1] || 0);
         assert.equal(cardReviewCount, sourceReviewCount, 'The progress card must agree with the Sources & Checks review count.');
@@ -488,22 +557,24 @@ try {
         assert.ok(narrowLayout.stages.every(stage => stage.whiteSpace === 'nowrap' && stage.scrollWidth <= stage.width + 1), `Narrow stage labels wrap or overlap: ${JSON.stringify(narrowLayout.stages)}`);
         if (screenshotDirectory) await page.locator('#taskStatus').screenshot({ path: path.join(screenshotDirectory, 'assessment-progress-narrow.png') });
         await page.setViewportSize({ width: 1440, height: 1000 });
-        outcome.progressCardVisualChecks = { completedLabel: 'Assessment complete', reviewBadge, duplicateCallout: false, desktopStages: desktopLayout.stages, narrowStages: narrowLayout.stages, screenshotsCaptured: Boolean(screenshotDirectory) };
+        outcome.progressCardVisualChecks = { completedLabel: expectedWalthamStatus, reviewBadge, duplicateCallout: false, desktopStages: desktopLayout.stages, narrowStages: narrowLayout.stages, screenshotsCaptured: Boolean(screenshotDirectory) };
         if (acceptanceVisualDirectory) await page.screenshot({ path: path.join(acceptanceVisualDirectory, '09-step5-complete-desktop.png'), fullPage: true });
       }
-      if (control.id === 'waltham-cross-nearest') {
+      if (control.assessmentMode === 'nearest') {
         const modeLabel = (await page.locator('#assessmentModeSummary').innerText()).trim();
-        assert.match(modeLabel, /^Nearest stop group · /, 'Nearest Waltham results must identify the selected logical stop-group mode.');
-        assert.doesNotMatch(modeLabel, /radius|\b700\s*m\b/i, 'Nearest Waltham results must not imply that a configured radius selected the stop group.');
+        assert.match(modeLabel, /^Nearest stop group · /, 'Nearest results must identify the selected logical stop-group mode.');
+        assert.doesNotMatch(modeLabel, /radius|\b700\s*m\b/i, 'Nearest results must not imply that a configured radius selected the stop group.');
         const evidenceSummary = (await page.locator('#evidenceSummary').innerText()).trim();
         const assessedStopCount = Number(evidenceSummary.match(/([0-9]+) assessed\b/)?.[1] || evidenceSummary.match(/([0-9]+) stops? assessed\b/)?.[1] || 0);
-        assert.ok(assessedStopCount > 0, `Nearest Waltham assessment must report an assessed stop population: ${evidenceSummary}`);
+        assert.ok(assessedStopCount > 0, `Nearest assessment must report an assessed stop population: ${evidenceSummary}`);
         outcome.nearestModeLabel = modeLabel;
         outcome.evidenceSummary = evidenceSummary;
         outcome.assessedStopCount = assessedStopCount;
         outcome.assessedStopRows = await page.locator('#evidenceRows tr[data-stop-id]').evaluateAll(rows => rows.map(row => ({ id: row.dataset.stopId, name: row.querySelector('[data-label="Stop name"]')?.innerText.trim() || '', walking: row.querySelector('[data-label="Walking distance / time"]')?.innerText.trim() || '' })));
+        if (control.id === 'waltham-cross-nearest') {
         assert.deepEqual(outcome.assessedStopRows.map(stop => stop.id).sort(), ['210021703420', '210021703425', '210021703430', '210021703435', '210021703440'].sort(), 'Waltham nearest assessment must retain the Product Owner-confirmed five-stop Bus Station logical group.');
         assert.ok(outcome.assessedStopRows.every(stop => Number(stop.walking.match(/[0-9]+/g)?.[0]) >= 510 && Number(stop.walking.match(/[0-9]+/g)?.[0]) <= 561), 'Waltham nearest stop walking distances must match the Product Owner-reported 510–561 m range.');
+        }
         if (acceptanceVisualDirectory) await page.screenshot({ path: path.join(acceptanceVisualDirectory, 'nearest-step5-results.png'), fullPage: true });
       }
       if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id.startsWith('enfield-')) {
@@ -528,9 +599,32 @@ try {
         }
         outcome.route242Trace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('242') ?? null);
       }
+      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id === 'abbotts-rise-nearest') {
+        outcome.routeTraces = {};
+        for (const route of control.focusRoutes) {
+          outcome.routeTraces[route] = {};
+          for (const stopId of ['210021303500', '210021309320']) {
+            outcome.routeTraces[route][stopId] = await page.evaluate(({ route, stopId }) => window.__ATLAS_C4_OPERATOR_TRACE__?.(route, stopId) ?? null, { route, stopId });
+          }
+        }
+      }
       if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id === 'pipers-lane') {
         outcome.pipers230StageTrace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('230') ?? null);
         assert.ok(outcome.pipers230StageTrace, 'Production assessment result was not exposed to the test-only Pipers route-230 trace observer.');
+      }
+      if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id === 'wycliffe-stonehouse') {
+        outcome.route64Trace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('64') ?? null);
+        outcome.route65Trace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('65', '1600GLA90863') ?? null);
+        assert.ok(outcome.route64Trace && outcome.route65Trace, 'Wycliffe route 64/65 production evidence trace is unavailable.');
+        const route65PlannerRow = outcome.route65Trace.plannerRows.find(row => row.routeNumber === '65' && row.directionFamily === 'gtfs:0');
+        assert.equal(route65PlannerRow?.frequencyBasisStopId, '1600GLA90863', 'Route 65 frequency must remain based on the selected Merrywalks stop.');
+        assert.deepEqual([route65PlannerRow?.canonicalCounts?.monday, route65PlannerRow?.canonicalCounts?.saturday, route65PlannerRow?.canonicalCounts?.sunday], [12, 12, 5], 'Route 65 unified public row must retain the full observed Run #75 daily population without dropping a path group.');
+        const route65Monday = route65PlannerRow?.canonicalSamples?.monday ?? [];
+        assert.equal(route65Monday.length, 12, 'Route 65 Monday source evidence count must equal the displayed canonical population.');
+        assert.equal(new Set(route65Monday.map(item => item.minute)).size, route65Monday.length, 'Route 65 must not double-count same-minute departures across source paths.');
+        const route65SourceCounts = Object.values(Object.groupBy(route65Monday, item => item.sourceRecordId)).map(entries => entries.length).sort((left, right) => left - right);
+        assert.deepEqual(route65SourceCounts, [3, 4, 5], 'Route 65 must retain each of its three distinct same-operator path populations.');
+        assert.match(route65PlannerRow?.serviceNote ?? '', /journeys vary in the intermediate stops served/i, 'Route 65 unified presentation must disclose source-supported intermediate pattern variations.');
       }
       if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1' && control.id === 'pe1') {
         outcome.pe1202StageTrace = await page.evaluate(() => window.__ATLAS_C4_OPERATOR_TRACE__?.('202') ?? null);
@@ -596,6 +690,7 @@ try {
       assert.equal(await technical.getAttribute('hidden') !== null, true, 'Developer diagnostics must be absent from ordinary planner mode.');
       await page.locator('details > summary').filter({ hasText: /Sources\s*&\s*Checks/i }).click();
       const checksText = await page.locator('#plannerChecks').innerText();
+      if (control.id === 'waltham-cross') assert.match(checksText, /Result:\s*Assessment execution complete · source or routing checks incomplete/, 'Sources & Checks must retain the same partial state as the Waltham result badge and progress card.');
       if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.locator('#sourceChecksDetails').screenshot({ path: path.join(acceptanceVisualDirectory, '12-sources-checks.png') });
       outcome.sourcesAndChecks = checksText;
       const resultFreshnessText = await page.locator('#resultFreshness').innerText();
@@ -607,6 +702,7 @@ try {
 
       assert.doesNotMatch(checksText, /SpecialDaysOperation|TNDS .*special dates require review/i, 'Sources and checks exposes raw per-service special-day warnings.');
       const rendered = await serviceTable.locator('tbody tr:not(.service-note)').evaluateAll(rows => rows.map(row => Object.fromEntries([...row.querySelectorAll('td[data-label]')].map(cell => [cell.dataset.label, cell.innerText.replace(/\s+/g, ' ').trim()]))));
+      outcome.renderedRows = rendered;
       if (control.id === 'long-lane-route203') {
         const route203Rows = rendered.filter(row => row.Route === '203');
         assert.equal(route203Rows.length, 2, 'Long Lane must show both Route 203 directions.');
@@ -631,6 +727,65 @@ try {
         outcome.longLane555 = { route555Hatton, n555Rows: routeN555Rows };
       }
       const renderedServiceNotes = await serviceTable.locator('tbody tr.service-note').allInnerTexts();
+      outcome.renderedServiceNotes = renderedServiceNotes;
+      if (control.id === 'abbotts-rise-nearest') {
+        const route25Trace = outcome.routeTraces?.['25'] ?? {};
+        const families25 = Object.values(route25Trace).flatMap(trace => trace?.terminalRows ?? [])
+          .filter(row => row.publicRouteFamilyDecision?.memberRouteNumbers?.includes('25B'));
+        const family25B = families25.flatMap(row => row.routeFamilyMembers ?? []).find(member => member.routeNumber === '25B');
+        assert.ok(family25B, 'Route 25B must remain a structured member of the proven Route 25 family.');
+        assert.equal(family25B.departureCountsByDay?.monday, 5, 'The Route 25B family member must retain the five distinct weekday endpoint trips.');
+        assert.equal(family25B.departureCountsByDay?.saturday, 3, 'The Route 25B family member must retain three Saturday endpoint trips.');
+        assert.equal(family25B.departureCountsByDay?.sunday, 0, 'Route 25B must not imply Sunday availability.');
+        assert.equal(family25B.sourceRecordIds?.length, 2, 'Both Route 25B destination patterns must remain in the family member provenance.');
+        const family25BVariants = new Map((family25B.serviceVariants ?? []).map(variant => [variant.destination, variant.departureCountsByDay]));
+        assert.deepEqual(family25BVariants.get('Station Road'), { monday: 2, tuesday: 2, wednesday: 2, thursday: 2, friday: 2, saturday: 2, sunday: 0 },
+          'The Station Road child pattern must retain its own 2 weekday / 2 Saturday departures.');
+        assert.deepEqual(family25BVariants.get("Sainsbury's"), { monday: 3, tuesday: 3, wednesday: 3, thursday: 3, friday: 3, saturday: 1, sunday: 0 },
+          'The Sainsbury’s child pattern must retain its own 3 weekday / 1 Saturday departures.');
+        const family25Cs = [...new Map(Object.values(route25Trace).flatMap(trace => trace?.terminalRows ?? [])
+          .flatMap(row => row.routeFamilyMembers ?? []).filter(member => member.routeNumber === '25C')
+          .map(member => [`${member.origin}|${member.destination}|${(member.sourceRecordIds ?? []).join('|')}`, member])).values()];
+        assert.equal(family25Cs.length, 2, 'Both Route 25C directions must remain separate structured family members.');
+        assert.ok(family25Cs.every(member => member.departureCountsByDay?.monday === 1
+          && member.departureCountsByDay?.saturday === 0 && member.departureCountsByDay?.sunday === 0),
+        'Each Route 25C direction must retain its single weekday journey and no weekend service.');
+        assert.ok(family25Cs.every(member => member.serviceVariants?.length === 1
+          && Object.values(member.serviceVariants[0].departureCountsByDay).filter(count => count > 0).length === 5),
+        'Each Route 25C direction must retain its own destination and weekday-only population.');
+        assert.match(renderedServiceNotes.join(' '), /Route 25B also serves .*Station Road: Mon-Fri: 2 journeys\/day; Sat: 2 journeys\/day;.*Sainsbury's: Mon-Fri: 3 journeys\/day; Sat: 1 journey\/day; no Sunday service/i,
+          'The family note must preserve each Route 25B destination-specific population separately from the principal Route 25 service.');
+        assert.match(renderedServiceNotes.join(' '), /route 25C .*Mon-Fri: 1 journey\/day; no weekend service/i,
+          'The family note must disclose the materially limited Route 25C weekday-only service.');
+        assert.match(renderedServiceNotes.join(' '), /route 25C (?:also serves|operates to) Harlow Town Centre Temp Bus Station \(Mon-Fri: 1 journey\/day; no weekend service\)/i,
+          'The family note must retain Route 25C’s distinct one-per-weekday Harlow journey even though its destination overlaps the Route 25 principal corridor.');
+        const route35Rows = rendered.filter(row => row.Route === '35');
+        assert.equal(route35Rows.length, 2, 'Run #75 must retain both Route 35 public directions.');
+        const route35Stortford = route35Rows.find(row => /Bishops Stortford Interchange/i.test(row['Direction / main service pattern']));
+        const route35Hertford = route35Rows.find(row => /Hertford Bus Station/i.test(row['Direction / main service pattern']));
+        assert.ok(route35Stortford && route35Hertford, 'Route 35 directions must remain distinct and correctly headed.');
+        assert.match(route35Stortford['Operating period at stop'], /06:21/);
+        assert.match(route35Hertford['Operating period at stop'], /06:30.*20:03/);
+        assert.ok(renderedServiceNotes.some(note => /Route 35 journeys operate from St Margaret's Railway Station/i.test(note)), 'The short-origin note must identify St Margaret\'s as an origin, not as a destination.');
+        const route35cRows = rendered.filter(row => row.Route === '35C');
+        assert.equal(route35cRows.length, 2, 'Abbotts Rise must retain both public Route 35C directions.');
+        const toBirchwood = route35cRows.find(row => /Birchwood High School/i.test(row['Direction / main service pattern']));
+        assert.ok(toBirchwood, 'Abbotts Rise must retain the Route 35C direction towards Birchwood High School.');
+        assert.match(toBirchwood['Typical frequency'], /Mon-Fri: 3 journeys\/day/, 'Run #75 must retain all three published weekday journeys for this direction.');
+        assert.doesNotMatch(`${toBirchwood['Typical frequency']} ${toBirchwood['Operating period at stop']} ${renderedServiceNotes.join(' ')}`, /School-day journeys only/i, 'A school-named destination alone must not qualify all three journeys as school-day-only.');
+        assert.match(checksText, /Route 35C.*no journey-level calendar evidence/i, 'Sources & Checks must retain the unresolved school/term calendar source label.');
+        const route35b = control.focusRoutes.includes('35B') ? rendered.filter(row => row.Route === '35B') : [];
+        assert.equal(route35b.length, 0, 'Route 35B terminating at Abbotts Rise must not be advertised as a departing service.');
+        assert.match(renderedServiceNotes.join(' '), /Route 35B also serves Abbotts Rise \(terminating arrivals only; no departures from this stop\)/i,
+          'The subordinate family note must disclose that Route 35B calls are terminating arrivals, not useful departing service from Abbotts Rise.');
+        const route35bTrace = outcome.routeTraces?.['35B']?.['210021303500'];
+        if (route35bTrace) {
+          assert.equal(route35bTrace.plannerRows.length, 0, 'Arrival-only Route 35B must have no planner departure row.');
+          assert.ok(route35bTrace.composedServices.every(service => service.destination === 'Abbotts Rise'
+            && ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].every(day => service.selectedStopCounts?.[day] === 1)),
+          'Run #75 retains the six scheduled Route 35B terminal arrival calls in source evidence while excluding them from boardable planner departures.');
+        }
+      }
       if (control.id === 'long-lane-route203') {
         assert.match(renderedServiceNotes.join(' '), /Less frequent journeys continue beyond Hatton Cross[^.]*Heathrow Central/i, 'the less-frequent Heathrow Central extension must remain disclosed in the route note.');
         assert.doesNotMatch(renderedServiceNotes.join(' '), /Short workings:\s*Some route 555 journeys operate to Hatton Cross/i, 'the dominant Hatton Cross pattern must not be redundantly described as a short-working note.');
@@ -652,12 +807,14 @@ try {
       await page.locator('#includeMapInWord').waitFor({ state: 'visible' });
       if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.screenshot({ path: path.join(acceptanceVisualDirectory, '13-step6-export.png'), fullPage: true });
       const reviewGate = page.locator('#plannerReviewGate');
-      if (!(await reviewGate.isHidden())) {
+      const acknowledgementRequired = !(await reviewGate.isHidden());
+      if (acknowledgementRequired) {
         assert.equal(await page.locator('#plannerReviewAcknowledgement').isChecked(), false, 'Review acknowledgement must reset for each newly composed assessment.');
         assert.equal(await page.locator('#exportBusWord').isDisabled(), true, 'Formal Word export must wait for review acknowledgement.');
         await page.locator('#plannerReviewAcknowledgement').check();
         assert.match(await page.locator('#plannerReviewGateStatus').innerText(), /remain recorded/i);
       }
+      outcome.acknowledgement = { required: acknowledgementRequired, checked: acknowledgementRequired ? await page.locator('#plannerReviewAcknowledgement').isChecked() : false, exportEnabled: !(await page.locator('#exportBusWord').isDisabled()) };
       assert.equal(await page.locator('#includeMapInWord').isChecked(), true, 'Word map inclusion defaults ON.');
       const downloadPromise = page.waitForEvent('download', { timeout: 30000 }).catch(error => ({ downloadError: error }));
       await page.locator('#exportBusWord').click();
@@ -674,6 +831,14 @@ try {
       assert.match(documentXml, /<w:trPr><w:cantSplit\/><\/w:trPr>/, 'Word service table rows must stay together across page breaks.');
       const exportedWordText = wordText(documentXml);
       outcome.wordText = exportedWordText;
+      if (control.id === 'abbotts-rise-nearest') {
+        assert.match(exportedWordText, /Route 25B also serves .*Station Road: Mon-Fri: 2 journeys\/day; Sat: 2 journeys\/day; no Sunday service; Sainsbury's: Mon-Fri: 3 journeys\/day; Sat: 1 journey\/day; no Sunday service/i,
+          'The Word assessment must preserve the destination-specific Route 25B family departure populations.');
+        assert.match(exportedWordText, /route 25C .*Mon-Fri: 1 journey\/day; no weekend service/i,
+          'The Word assessment must preserve the same Route 25C family frequency note.');
+        assert.match(exportedWordText, /route 25C also serves Harlow Town Centre Temp Bus Station \(Mon-Fri: 1 journey\/day; no weekend service\)/i,
+          'The Word assessment must disclose Route 25C’s limited Harlow journey separately from the principal Route 25 frequency.');
+      }
       if (control.id === 'waltham-cross-nearest') {
         assert.match(exportedWordText, /in the nearest logical stop group at /i, 'Nearest Waltham Word wording must state that the assessed stops are from the nearest logical stop group.');
         assert.doesNotMatch(exportedWordText, /within the assessed area/i, 'Nearest Waltham Word wording must not describe the assessment as a full-radius area.');
@@ -855,7 +1020,14 @@ try {
         assert.match(route16C?.['Direction / main service pattern'] || '', /^Circular/i, 'Waltham route 16C must be presented as circular.');
         assert.match(`${route16C?.['Typical frequency']} ${route16C?.['Operating period at stop']}`, /every ~60.*08:00.*19:45/i, 'Waltham route 16C must include the frozen exact-terminal 19:45 boarding short working.');
         assert.match(route212?.['Direction / main service pattern'] || '', /^Circular/i, 'Waltham TNDS route 212 must be presented as circular.');
-        assert.match(`${route212?.['Typical frequency']} ${route212?.['Operating period at stop']}`, /4 journeys\/day.*09:50.*15:00/i, 'Waltham route 212 must use the frozen departing journey population.');
+        assert.match(`${route212?.['Typical frequency']} ${route212?.['Operating period at stop']}`, /4 journeys\/day.*09:50.*15:00/i, 'Waltham route 212 must reflect all four frozen TNDS departures at the selected Bus Station stop.');
+        const route212Trace = outcome.route212Trace?.plannerRows?.find(row => row.routeNumber === '212');
+        assert.equal(route212Trace?.frequencyBasisStopId, '210021703420', 'Waltham route 212 must use the established Stop C frequency-basis identity.');
+        assert.equal(route212Trace?.canonicalCounts?.monday, 4, 'Waltham route 212 Monday count must match the immutable Run #75 schedule evidence.');
+        assert.deepEqual(route212Trace?.canonicalSamples?.monday?.map(item => [item.journeyIdentity, item.minute]), [['1', 590], ['2', 680], ['3', 772], ['4', 900]], 'Waltham route 212 must retain the four source journeys, without arrivals or fabricated departures.');
+        const route212ComposedSourceIds = outcome.route212Trace?.composedServices?.find(service => service.routeNumber === '212')?.sourceRecordIds ?? [];
+        assert.ok(route212ComposedSourceIds.some(id => /PF9000012-11.*pattern:JP_212_PF9000012-11-2/.test(id))
+          && route212ComposedSourceIds.some(id => /PF9000012-11.*pattern:JP_212_PF9000012-11-3/.test(id)), 'Waltham route 212 composed-source evidence must retain the later two TNDS pattern record IDs.');
         assert.doesNotMatch(`${checksText} ${exportedWordText}`, /principal locations could not be safely mapped/i, 'Waltham must not retain stale principal-location warnings after final rows resolve those patterns.');
         assert.doesNotMatch(`${checksText} ${exportedWordText}`, /Stamford Hill \(Rookwood Road\) and Rookwood Road/i, 'Route 279 must not name the same short-working destination twice.');
         await page.locator('#includeMapInWord').uncheck();
@@ -893,14 +1065,17 @@ try {
         assert.match(standaloneMap.suggestedFilename(), /^Bus Assessment Map/i, 'Nearest-group map must use a neutral planning-facing filename.');
         outcome.standaloneMap = { format: 'PDF', validSignature: true, assessmentRadiusImplied: false, neutralFilename: standaloneMap.suggestedFilename() };
       }
-      if (control.id === 'chingford') {
+      if (['chingford', 'grove-road'].includes(control.id)) {
         const route657Rows = rendered.filter(row => row.Route === '657');
         assert.equal(route657Rows.length, 2, 'Chingford golden control must retain both route 657 directions.');
         assert.ok(route657Rows.every(row => /TfL/i.test(row.Source || '')), 'Chingford route 657 remains TfL-primary.');
         assert.ok(route657Rows.every(row => /Mon-Fri(?: \(School days\))?: 1 journey\/day/i.test(row['Typical frequency'])), 'Chingford route 657 remains one weekday school-day journey per evidenced direction.');
         assert.ok(route657Rows.every(row => /Sat-Sun(?: \(School days\))?: No scheduled service/i.test(row['Typical frequency'])), 'Chingford route 657 remains unscheduled at weekends.');
         assert.ok(route657Rows.every(row => !/Unresolved/i.test(row['Principal locations'] || '')), 'Chingford route 657 fixture must retain safe TfL principal locations.');
-        assert.match(route657Rows.map(row => row['Operating period at stop']).join(' '), /07:56|16:22/, 'Chingford route 657 fixture golden timetable times changed.');
+        if (control.id === 'grove-road' && (process.env.ATLAS_AUDIT_LIVE_TFL === '1' || process.env.ATLAS_TFL_REPLAY_CAPTURE)) {
+          assert.match(route657Rows.map(row => row['Operating period at stop']).join(' '), /07:55/i, 'Live Grove Road Route 657 morning departure must remain visible.');
+          assert.match(route657Rows.map(row => row['Operating period at stop']).join(' '), /16:26/i, 'Live Grove Road Route 657 afternoon departure must remain visible.');
+        } else assert.match(route657Rows.map(row => row['Operating period at stop']).join(' '), /07:56|16:22/, 'Chingford Route 657 fixture golden timetable times changed.');
         outcome.chingford657Rows = route657Rows;
       }
       if (control.id === 'pe1') {
@@ -999,17 +1174,52 @@ try {
             'Enfield 629 must remain qualified as a school-day service where present.');
         }
       }
+      if (!outcome.standaloneMap) {
+        const standaloneMapPromise = page.waitForEvent('download', { timeout: 30000 });
+        await page.locator('#exportAssessmentMap').click();
+        const standaloneMap = await standaloneMapPromise;
+        const standaloneMapPath = path.join(wordDirectory, `atlas-s2e1-${control.id}-standalone-map.pdf`);
+        await standaloneMap.saveAs(standaloneMapPath);
+        const standaloneMapBytes = await readFile(standaloneMapPath);
+        assert.equal(standaloneMapBytes.subarray(0, 8).toString('ascii'), '%PDF-1.4', 'Standalone assessment map must be a generated PDF.');
+        assert.ok(standaloneMapBytes.includes(Buffer.from('/MediaBox [0 0 1190.55 841.89]')), 'Standalone map PDF must use a landscape A3 page.');
+        assert.match(standaloneMap.suggestedFilename(), /^Bus Assessment Map/i, 'Standalone map must use a neutral planning-facing filename.');
+        assert.doesNotMatch(standaloneMap.suggestedFilename(), /ATLAS/i, 'Standalone map filename must not expose the internal product name.');
+        outcome.standaloneMap = { format: 'PDF', page: 'A3 landscape', validSignature: true, neutralFilename: standaloneMap.suggestedFilename() };
+      }
       report.controls[control.id] = outcome;
     } catch (error) {
       outcome.outcome = 'FAIL';
       outcome.error = error.message;
+      try { outcome.exportStatus = await page.locator('#exportStatus').innerText(); } catch {}
+      try { outcome.visibleStatus = (await page.locator('#taskStatusMessage').innerText()).trim(); } catch {}
+      try { outcome.visibleRows = await page.locator('#serviceTable tbody tr:not(.service-note)').evaluateAll(rows => rows.map(row => [...row.querySelectorAll('td[data-label]')].map(cell => [cell.dataset.label, cell.innerText.replace(/\s+/g, ' ').trim()]))); } catch {}
+      try { outcome.visibleStopIds = await page.locator('#evidenceRows tr[data-stop-id]').evaluateAll(rows => rows.map(row => row.dataset.stopId)); } catch {}
       report.controls[control.id] = outcome;
       fail(control.id, error.message);
     }
   }
-  assert.equal(errors.length, 0, `Browser console errors: ${errors.join('; ')}`);
+  const expectedTfl400s = process.env.ATLAS_AUDIT_LIVE_TFL === '1' || process.env.ATLAS_TFL_REPLAY_CAPTURE
+    ? failedResponses.filter(response => response.url.startsWith('https://api.tfl.gov.uk/') && response.status === 400).length
+    : 0;
+  const handledTfl400ConsoleErrors = errors.filter(message => /Failed to load resource: the server responded with a status of 400 \(Bad Request\)/i.test(message)).length;
+  const unhandledErrors = errors.filter(message => !/Failed to load resource: the server responded with a status of 400 \(Bad Request\)/i.test(message));
+  assert.equal(handledTfl400ConsoleErrors, expectedTfl400s, 'Live or recorded TfL HTTP 400 responses and browser console reports must reconcile exactly.');
+  assert.equal(unhandledErrors.length, 0, `Browser console errors: ${unhandledErrors.join('; ')}`);
   assert.equal(failedRequests.length, 0, `Failed browser requests: ${JSON.stringify(failedRequests)}`);
-  assert.equal(failedResponses.length, 0, `HTTP failures: ${JSON.stringify(failedResponses)}`);
+  const expectedRecordedTfl400s = process.env.ATLAS_AUDIT_LIVE_TFL === '1' || process.env.ATLAS_TFL_REPLAY_CAPTURE
+    ? failedResponses.filter(response => response.url.startsWith('https://api.tfl.gov.uk/') && response.status === 400)
+    : [];
+  const unexpectedHttpFailures = failedResponses.filter(response => !expectedRecordedTfl400s.includes(response));
+  assert.equal(unexpectedHttpFailures.length, 0, `Unexpected HTTP failures: ${JSON.stringify(unexpectedHttpFailures)}`);
+  for (const response of expectedRecordedTfl400s) {
+    const match = response.url.match(/\/Line\/([^/]+)\/Timetable\/([^/?]+)/i);
+    assert.ok(match, `Captured TfL HTTP 400 did not identify its route and StopPoint: ${response.url}`);
+    const route = decodeURIComponent(match[1]);
+    const stopId = decodeURIComponent(match[2]);
+    const routeEvidence = Object.values(report.controls).map(control => control.sourcesAndChecks).join('\n');
+    assert.match(routeEvidence, new RegExp(`Route ${route}[^\\n]*Stop ${stopId}`, 'i'), `The captured TfL HTTP 400 for ${route} / ${stopId} is not scoped to a Sources & Checks item.`);
+  }
   assert.equal(externalRequests.length, 0, `Unexpected external requests: ${externalRequests.join(', ')}`);
 } catch (error) {
   fail('audit-harness', error.message);
@@ -1026,6 +1236,19 @@ if (fullWalthamCount && nearestWalthamCount) {
   catch (error) { report.failures.push({ id: 'waltham-cross-nearest', reason: error.message }); }
 }
 report.tflReplayRequests = tflReplayRequests;
+if (process.env.ATLAS_TFL_REPLAY_CAPTURE) {
+  const unusedResponses = [...recordedTflResponseQueues.entries()].flatMap(([key, queue]) => queue.map(response => ({ key, status: response.status })));
+  report.recordedTflReplay = { capturePath: path.resolve(process.env.ATLAS_TFL_REPLAY_CAPTURE), matchedResponses: [...recordedTflReplayCounts.values()].reduce((sum, count) => sum + count, 0), misses: recordedTflReplayMisses, unusedResponses };
+  if (recordedTflReplayMisses.length || unusedResponses.length) fail('recorded-TfL-replay', `Exact recorded TfL replay mismatch: ${JSON.stringify(report.recordedTflReplay)}`);
+}
+if (liveTflCaptures.length) {
+  const capturePath = path.resolve(process.env.ATLAS_TFL_CAPTURE_PATH || 'tmp/atlas-live-tfl-replay-capture.json');
+  const captureDocument = { schema: 'atlas-tfl-live-response-capture-v1', capturedAt: new Date().toISOString(), sourceEnvironment: 'live TfL API responses captured during isolated headless review-v2 replay', candidateRoot, candidateManifestDigests, responses: liveTflCaptures };
+  const captureBytes = Buffer.from(JSON.stringify(captureDocument, null, 2));
+  await mkdir(path.dirname(capturePath), { recursive: true });
+  await writeFile(capturePath, captureBytes);
+  report.liveTflCapture = { path: capturePath, responseCount: liveTflCaptures.length, sha256: createHash('sha256').update(captureBytes).digest('hex') };
+}
 report.failedRequests = failedRequests;
 report.failedResponses = failedResponses;
 report.externalRequests = externalRequests;

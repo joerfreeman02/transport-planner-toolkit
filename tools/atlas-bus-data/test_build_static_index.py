@@ -74,6 +74,27 @@ def build_pipers_prepared_record() -> dict:
 
 
 class CircularIdentityTests(unittest.TestCase):
+    def test_school_named_endpoint_does_not_infer_school_day_qualification(self):
+        stops = {
+            "ORIGIN": {"id": "ORIGIN", "name": "Bus Station", "locality": "Town", "routes": set(), "timetableCallEligible": True},
+            "SCHOOL": {"id": "SCHOOL", "name": "Birchwood High School", "locality": "Town", "routes": set(), "timetableCallEligible": True},
+        }
+        services = {}
+        rows = [
+            {"stop_sequence": "1", "stop_id": "origin", "departure_time": "07:30:00"},
+            {"stop_sequence": "2", "stop_id": "school", "departure_time": "08:00:00"},
+        ]
+        BUILDER.process_trip(
+            "fixture", rows,
+            {"route_id": "r", "trip_id": "trip", "service_id": "weekday", "direction_id": "0", "trip_headsign": "Birchwood High School", "active_days": ["monday"]},
+            {"a": {"agency_name": "Fixture operator"}},
+            {"r": {"route_short_name": "99", "route_type": "3", "agency_id": "a"}},
+            {"origin": {"stop_name": "Bus Station"}, "school": {"stop_name": "Birchwood High School"}}, {}, {}, stops,
+            {"atco": {"origin": "ORIGIN", "school": "SCHOOL"}, "naptan": {}}, services
+        )
+        record = next(iter(services.values()))
+        self.assertNotIn("School-day or term-time service identified in the source timetable; check the assessment date before formal use.", record["qualifications"])
+
     def test_pipers_bods_prepared_pattern_fixture_is_emitted_by_production_gtfs_builder(self):
         fixture_path = Path(__file__).parents[2] / "tests" / "atlas" / "fixtures" / "pipers-bods-prepared-service.json"
         prepared = json.loads(fixture_path.read_text(encoding="utf-8"))

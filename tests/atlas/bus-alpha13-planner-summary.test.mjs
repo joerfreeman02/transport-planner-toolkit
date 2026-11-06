@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildPlannerBusServiceSummaries, plannerServiceSummariesForResult, plannerSourceWarning } from '../../src/atlas/domain/bus-planner-summary.mjs';
+import { buildPlannerBusServiceSummaries, directionPatternText, plannerServiceSummariesForResult, plannerSourceWarning } from '../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildServiceSummaries, calculateTypicalServiceFrequency } from '../../src/atlas/domain/bus-service-assessment.mjs';
 import { createAtlasTaskStatus, formatAtlasTaskStatus } from '../../src/atlas/presentation/atlas-task-status.mjs';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
@@ -13,6 +13,11 @@ const week = {
   saturday: [480, 540],
   sunday: [600]
 };
+
+assert.equal(directionPatternText({ destination: 'Transport Hub arrival', direction: 'Gloucester Transport Hub arrival' }), 'Towards Gloucester Transport Hub', 'A richer matched direction may clarify a generic endpoint name, while terminal-arrival wording stays out of the public label.');
+assert.equal(directionPatternText({ destination: 'Transport Hub', direction: 'northbound' }), 'Towards Transport Hub', 'A compass direction cannot replace a more specific destination name.');
+assert.equal(directionPatternText({ destination: 'The Talbot', direction: 'North Weald, The Talbot' }), 'Towards The Talbot', 'A comma-separated locality sequence is not an endpoint alias.');
+assert.equal(directionPatternText({ destination: 'St Cross', direction: 'St Cross' }), 'Towards St Cross', 'Legitimate place names ending in a double-s sequence remain unchanged.');
 const stop = { id: 'A', name: 'Waltham Cross Bus Station', indicator: 'G', distanceMetres: 110, walking: { status: 'routed', distanceMetres: 82 } };
 const secondStop = { id: 'B', name: 'Waltham Cross Bus Station', indicator: 'H', distanceMetres: 95, walking: { status: 'routed', distanceMetres: 120 } };
 const base = { routeNumber: '657', operator: 'Example Buses', direction: 'outbound', directionFamily: 'gtfs:0', origin: 'Waltham Cross', destination: 'Chingford', principalLocations: ['Enfield', 'Chingford Mount'], routePatternStopIds: ['A', 'B', 'C'], frequencyBasisStopId: 'A', stopIds: ['A'], departuresByDay: week, frequencyEvidence: [], sourceRecordIds: ['main'], serviceNote: 'School-day-only service.' };
@@ -46,6 +51,26 @@ assert.doesNotMatch(main.serviceNote, /Includes scheduled short workings/);
 assert.match(main.plannerNotes?.shortWorkings ?? '', /Enfield/i, 'the excluded same-stop short-working remains a planner-visible variant');
 assert.equal(main.directionPatternText, 'Towards Chingford');
 assert.equal(planner.filter(row => row.routeNumber === '657').length, 3);
+
+const boardableSameDestinationOriginVariant = buildPlannerBusServiceSummaries([
+  {
+    id: 'r35-principal', routeNumber: 'R35', operator: 'Fixture operator', timetableSource: 'BODS',
+    origin: 'Bus Station', destination: 'Interchange', direction: 'Interchange', directionFamily: 'gtfs:1',
+    routePatternStopIds: ['ORIGIN', 'ASSESS', 'NEXT', 'DEST'], stopIds: ['ASSESS'], frequencyBasisStopId: 'ASSESS',
+    departuresByDay: { monday: [571, 631, 691, 751, 811, 871, 978, 1056, 1116], tuesday: [571, 631, 691, 751, 811, 871, 978, 1056, 1116], wednesday: [571, 631, 691, 751, 811, 871, 978, 1056, 1116], thursday: [571, 631, 691, 751, 811, 871, 978, 1056, 1116], friday: [571, 631, 691, 751, 811, 871, 978, 1056, 1116], saturday: [], sunday: [] },
+    sourceRecordIds: ['r35-principal']
+  }, {
+    id: 'r35-midway-origin', routeNumber: 'R35', operator: 'Fixture operator', timetableSource: 'BODS',
+    origin: "St Margaret's Railway Station", destination: 'Interchange', direction: 'Interchange', directionFamily: 'gtfs:1',
+    routePatternStopIds: ['MIDWAY', 'ASSESS', 'NEXT', 'DEST'], stopIds: ['ASSESS'], frequencyBasisStopId: 'ASSESS',
+    departuresByDay: { monday: [381], tuesday: [381], wednesday: [381], thursday: [381], friday: [381], saturday: [], sunday: [] },
+    sourceRecordIds: ['r35-midway-origin']
+  }
+], [{ id: 'ASSESS', name: 'Abbotts Rise', indicator: 'adj' }]);
+assert.equal(boardableSameDestinationOriginVariant.length, 1, 'A same-direction departure with a shorter origin and the same downstream destination belongs to the assessed public direction.');
+assert.equal(boardableSameDestinationOriginVariant[0].canonicalDeparturePopulationAll.monday.length, 10, 'The unique 06:21 midpoint-origin departure must remain in the 9-journey principal timetable.');
+assert.match(boardableSameDestinationOriginVariant[0].operatingPeriodLines.join(' '), /Mon-Fri: .*06:21/);
+assert.match(boardableSameDestinationOriginVariant[0].plannerNotes?.shortWorkings ?? '', /from St Margaret/i, 'The later origin is presented as an origin variant, never as a destination.');
 
 const differentlyDatedCrossSourceRows = buildPlannerBusServiceSummaries([
   { ...base, id: 'bods-current-overlap', routeNumber: 'X5', timetableSource: 'BODS', validFrom: '2026-01-01', validTo: '2026-12-31', destination: 'Town Centre', principalLocations: ['Northgate'], sourceRecordIds: ['bods-current-overlap'] },

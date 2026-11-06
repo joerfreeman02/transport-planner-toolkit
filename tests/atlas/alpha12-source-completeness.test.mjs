@@ -275,6 +275,6 @@ const redundantTflFailureAssessment = createBusAssessment({
 const redundantTflResult = await redundantTflFailureAssessment.assess({ latitude: 51.7, longitude: -0.1 });
 assert.ok(redundantTflResult.provenance.timetables.unresolvedRequestIdentities.includes('279|REDUNDANT-STOP'), 'the failed request stays in technical provenance');
 assert.doesNotMatch(stopRoutesPresentation(redundantTflResult.stops.find(stop => stop.id === 'REDUNDANT-STOP')), /unavailable\/incomplete/i, 'a redundant TfL call does not contaminate the normal Routes serving stop text after the same route resolved from TfL');
-assert.equal(redundantTflResult.reviewItems.some(item => item.code === 'unresolved-timetable-request' && item.route === '279'), false, 'redundant TfL request failure is not promoted to planner review');
+assert.ok(redundantTflResult.reviewItems.some(item => item.code === 'unresolved-timetable-request' && item.route === '279' && item.stop === 'REDUNDANT-STOP'), 'a successful same-route call at another stop cannot resolve this exact route/stop request');
 
 console.log('PASS Alpha.12 source completeness, selected-stop duplicate coverage, evidence, nearest, and ambiguous-TfL regressions.');

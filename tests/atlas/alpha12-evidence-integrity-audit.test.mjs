@@ -7,6 +7,7 @@ import { createPreparedBusDataAdapter } from '../../src/atlas/adapters/prepared-
 import { createBusAssessment } from '../../src/atlas/application/bus-assessment.mjs';
 import { buildServiceSummaries } from '../../src/atlas/domain/bus-service-assessment.mjs';
 import { hasScheduledEvidence, hasScheduledEvidenceAt } from '../../src/atlas/domain/scheduled-evidence.mjs';
+import { stopRoutesPresentation } from '../../src/atlas/domain/bus-source-presentation.mjs';
 import { parseTndsTransXchangeServices } from '../../src/atlas/adapters/tnds-transxchange-adapter.mjs';
 import { prepareTnds } from '../../tools/atlas-bus-data/prepare_tnds.mjs';
 
@@ -15,6 +16,7 @@ const schedule = departures => Object.fromEntries(days.map(day => [day, day === 
 const emptySchedule = () => schedule([]);
 const sourceSuccess = (source, data = [], provenance = {}) => ({ ok: true, data, evidence: [], warnings: [], provenance: { source, ...provenance } });
 const sourceFailure = (source = 'TfL') => ({ ok: false, code: 'offline', data: null, evidence: [], warnings: [`${source} unavailable`], provenance: { source, unavailable: true } });
+const timetableResult = result => ({ servicesForStops: async () => result });
 const stop = (id, route, authority = 'TfL', extra = {}) => ({ id, name: id, routes: [route], timetableAuthority: authority, routeAuthorities: { [route]: [authority] }, ...extra });
 const national = ({ id = 'bods-Q', routeNumber = 'Q', timetableSource = 'BODS', stops = { A: [450] }, operator = 'Shared operator' } = {}) => ({ id, routeNumber, operator, origin: 'Origin', destination: 'Terminus', direction: 'Terminus', timetableSource, stopSchedules: Object.fromEntries(Object.entries(stops).map(([id, departures]) => [id, schedule(departures)])) });
 const tfl = ({ id = 'tfl-Q', routeNumber = 'Q', stopId = 'A', departures = [420], operator = 'Shared operator' } = {}) => ({ id, routeNumber, operator, origin: 'Origin', destination: 'Terminus', direction: 'Terminus', timetableSource: 'TfL', stopSchedules: { [stopId]: schedule(departures) } });
@@ -305,5 +307,53 @@ const emptySuccessfulResult = await assessWith([stop('A', 'Q')], {
 });
 assert.equal(emptySuccessfulResult.status, 'partial');
 assert.equal(emptySuccessfulResult.stops[0].timetableEvidenceStatus, 'SOURCE_UNAVAILABLE', 'source success without scheduled evidence is unresolved, not no-current');
+
+const sixExactRoutes = ['97', '158', '215', '397', '397A', 'N26'].map(route => tfl({ id: `tfl-${route}`, routeNumber: route, stopId: 'TUFTON-E' }));
+const sevenRouteStop = {
+  id: 'TUFTON-E', name: 'Chingford Mount Stop E', routes: ['97', '158', '215', '397', '397A', 'N26', 'W16'],
+  routeAuthorities: Object.fromEntries(['97', '158', '215', '397', '397A', 'N26', 'W16'].map(route => [route, ['TfL']]))
+};
+const oneUnresolved = await assessWith([sevenRouteStop], timetableResult(sourceSuccess('TfL', sixExactRoutes, {
+  tflTimetableAttempted: true, tflTimetableRequestIdentities: ['97|TUFTON-E', '158|TUFTON-E', '215|TUFTON-E', '397|TUFTON-E', '397A|TUFTON-E', 'N26|TUFTON-E', 'W16|TUFTON-E'],
+  unresolvedRequestIdentities: ['W16|TUFTON-E']
+})));
+const sevenRouteResult = oneUnresolved.stops[0];
+assert.deepEqual(sevenRouteResult.routes, ['97', '158', '215', '397', '397A', 'N26', 'W16']);
+assert.equal(stopRoutesPresentation(sevenRouteResult), '97, 158, 215, 397, 397A, N26, W16');
+assert.equal(sevenRouteResult.routeEvidence.filter(evidence => evidence.status === 'SOURCE_UNAVAILABLE').length, 1);
+assert.equal(sevenRouteResult.routeEvidence.find(evidence => evidence.route === 'W16').status, 'SOURCE_UNAVAILABLE');
+assert.equal(sevenRouteResult.routeEvidence.find(evidence => evidence.route === '97').status, 'MATCHED');
+assert.ok(oneUnresolved.reviewItems.some(item => item.code === 'unresolved-timetable-request' && item.route === 'W16' && item.stop === 'TUFTON-E' && item.source === 'TfL' && /Chingford Mount Stop E/.test(item.message)));
+
+const explicitNoCurrent = await assessWith([stop('EXPLICIT-NONE', '217', 'TfL', { name: 'Example Stop' })], timetableResult(sourceSuccess('TfL', [], {
+  tflTimetableRequestIdentities: ['217|EXPLICIT-NONE'], noCurrentRequestIdentities: ['217|EXPLICIT-NONE'], timetableConclusion: 'NO_CURRENT_MATCH'
+})));
+assert.equal(explicitNoCurrent.services.length, 0, 'an exact no-current response cannot fabricate a call');
+assert.ok(explicitNoCurrent.reviewItems.some(item => item.code === 'no-current-timetable-match' && item.route === '217' && item.source === 'TfL' && /does not establish that the public route is absent elsewhere/.test(item.message)));
+
+const exactBodsFallback = national({ id: 'bods-fallback-R', routeNumber: 'R', timetableSource: 'BODS fallback', stops: { 'FALLBACK-STOP': [450] } });
+const withFallback = await assessWith([stop('FALLBACK-STOP', 'R', 'TfL')], timetableResult(sourceSuccess('TfL', [exactBodsFallback], {
+  tflTimetableRequestIdentities: ['R|FALLBACK-STOP'], unresolvedRequestIdentities: ['R|FALLBACK-STOP']
+})));
+assert.ok(withFallback.services.some(service => service.routeNumber === 'R' && service.timetableSource === 'BODS fallback'));
+assert.equal(withFallback.stops[0].routeEvidence[0].status, 'PARTIAL');
+assert.ok(withFallback.reviewItems.some(item => item.code === 'unresolved-timetable-request' && /exact-stop BODS evidence is retained/.test(item.message)));
+
+const recordedWithoutSchedule = await assessWith([stop('RECORDED-ONLY', 'X5', 'TfL', { name: 'Recorded Only Stop' })], timetableResult(sourceSuccess('TfL', [], {
+  tflTimetableRequestIdentities: ['X5|RECORDED-ONLY'], noCurrentRequestIdentities: ['X5|RECORDED-ONLY'], timetableConclusion: 'NO_CURRENT_MATCH'
+})));
+assert.equal(recordedWithoutSchedule.stops[0].routeEvidence[0].status, 'NO_CURRENT_MATCH');
+assert.equal(recordedWithoutSchedule.services.length, 0);
+assert.deepEqual(recordedWithoutSchedule.stops[0].routes, ['X5']);
+assert.ok(recordedWithoutSchedule.reviewItems.some(item => item.code === 'no-current-timetable-match' && item.route === 'X5'));
+
+const allExactRoutes = await assessWith([{
+  id: 'ALL-EXACT', name: 'Fully Checked Stop', routes: ['A', 'B'], routeAuthorities: { A: ['TfL'], B: ['TfL'] }
+}], timetableResult(sourceSuccess('TfL', [tfl({ id: 'all-A', routeNumber: 'A', stopId: 'ALL-EXACT' }), tfl({ id: 'all-B', routeNumber: 'B', stopId: 'ALL-EXACT' })], {
+  tflTimetableRequestIdentities: ['A|ALL-EXACT', 'B|ALL-EXACT'], timetableConclusion: 'MATCHED'
+})));
+assert.equal(stopRoutesPresentation(allExactRoutes.stops[0]), 'A, B');
+assert.equal(allExactRoutes.stops[0].routeEvidence.every(evidence => evidence.status === 'MATCHED'), true);
+assert.equal(allExactRoutes.reviewItems.some(item => ['unresolved-timetable-request', 'no-current-timetable-match'].includes(item.code)), false);
 
 console.log('PASS Alpha.12 consolidated scheduled-evidence invariant, empty-service, quarantine, fallback-scope, and cross-stop matrix.');

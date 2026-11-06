@@ -739,7 +739,7 @@ function renderAssessment(result) {
     appendCell(row, 'Direction / indicator', stop.displayDirection);
     const walking = appendCell(row, 'Walking distance / time', formatAccess(stop.walking));
     if (stop.walking.status !== 'routed') walking.classList.add('route-unavailable');
-    appendCell(row, 'Routes serving stop', stopRoutesPresentation(stop, { selectedForReport }));
+    appendCell(row, 'Routes recorded or matched at stop', stopRoutesPresentation(stop, { selectedForReport }));
     row.addEventListener('click', event => {
       if (event.target.closest('input, a, button')) return;
       const marker = busStopMarkers.find(candidate => candidate.__atlasStopId === stopKey(stop));
@@ -938,7 +938,10 @@ function renderAssessment(result) {
   $('plannerReviewAcknowledgement').checked = false;
   $('plannerReviewGateStatus').textContent = reviewItems.length ? `${reviewItems.length} flagged item${reviewItems.length === 1 ? '' : 's'} remain visible in Sources & Checks.` : 'No flagged evidence requires acknowledgement.';
   updateFormalExportAvailability();
-  $('resultFreshness').textContent = 'Assessment complete';
+  const assessmentResultLabel = result.status === 'partial'
+    ? 'Assessment execution complete · source or routing checks incomplete'
+    : 'Assessment complete';
+  $('resultFreshness').textContent = assessmentResultLabel;
   $('resultFreshness').className = 'completion-badge';
   $('sourceReviewBadge').textContent = reviewItems.length ? `${reviewItems.length} item${reviewItems.length === 1 ? '' : 's'} require review` : 'No review items';
   $('sourceReviewBadge').hidden = reviewItems.length === 0;
@@ -947,7 +950,7 @@ function renderAssessment(result) {
   $('busDataCurrent').className = `current-badge${$('dataStatusMessage').classList.contains('warning') ? ' warning' : ''}`;
   const plannerChecks = $('plannerChecks');
   plannerChecks.replaceChildren();
-  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', 'Assessment complete']]) {
+  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', assessmentResultLabel]]) {
     const line = document.createElement('p'); const label = document.createElement('strong'); label.textContent = `${labelText}: `; line.append(label, value); plannerChecks.append(line);
   }
   const plannerWarnings = [...new Set(result.warnings.map(warning => plannerStopWarning(warning, result)).filter(Boolean))];

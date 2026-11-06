@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 import { approvedBusUpdaterPath, startReviewServer, stopReviewServer } from '../../tools/atlas-review/review-server.mjs';
 
 const rootDir = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
+const pinnedBusDataRoot = process.env.ATLAS_TEST_BUS_DATA_ROOT ? path.resolve(process.env.ATLAS_TEST_BUS_DATA_ROOT) : null;
+const reviewV2DataRoot = pinnedBusDataRoot ? path.resolve(pinnedBusDataRoot, '..') : null;
 let passed = 0;
 const pass = name => { passed += 1; console.log(`PASS Review environment — ${name}`); };
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'atlas-review-test-'));
@@ -16,9 +18,11 @@ let review;
 let updaterOpened = null;
 
 try {
-  review = await startReviewServer({ rootDir, preferredPort: 0, maximumPort: 0, stateFile, openBrowser: false, updaterLauncher: root => { updaterOpened = root; } });
+  review = await startReviewServer({ rootDir, preferredPort: 0, maximumPort: 0, stateFile, v2DataRoot: reviewV2DataRoot, openBrowser: false, updaterLauncher: root => { updaterOpened = root; } });
   assert.equal(review.reused, false);
-  assert.match(review.url, /^http:\/\/127\.0\.0\.1:\d+\/atlas\/#modules$/);
+  assert.match(review.url, reviewV2DataRoot
+    ? /^http:\/\/127\.0\.0\.1:\d+\/atlas\/\?review=v2#modules$/
+    : /^http:\/\/127\.0\.0\.1:\d+\/atlas\/#modules$/);
   assert.equal(existsSync(stateFile), true);
   assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).version, '2.0.0-beta.1');
   pass('starts on an available loopback address');
@@ -47,7 +51,7 @@ try {
   const assets = [
     ['/atlas/assets/css/atlas-shell.css', /^text\/css/],
     ['/atlas/assets/js/app.mjs', /^application\/javascript/],
-    ['/atlas/data/bus/manifest.json', /^application\/json/],
+    [reviewV2DataRoot ? '/__atlas-review/v2-data/bus/manifest.json' : '/atlas/data/bus/manifest.json', /^application\/json/],
     ['/src/atlas/domain/site.mjs', /^application\/javascript/],
     ['/src/atlas/application/site-selector.mjs', /^application\/javascript/],
     ['/assets/vendor/leaflet/leaflet.css', /^text\/css/],
@@ -59,6 +63,10 @@ try {
     const response = await fetch(new URL(assetPath, review.url));
     assert.equal(response.status, 200, assetPath);
     assert.match(response.headers.get('content-type'), type, assetPath);
+  }
+  if (reviewV2DataRoot) {
+    const pinnedManifestResponse = await fetch(new URL('/__atlas-review/v2-data/bus/manifest.json', review.url));
+    assert.deepEqual(await pinnedManifestResponse.json(), JSON.parse(await readFile(path.join(pinnedBusDataRoot, 'manifest.json'), 'utf8')));
   }
   pass('serves required CSS, JavaScript modules and branding assets with correct types');
 

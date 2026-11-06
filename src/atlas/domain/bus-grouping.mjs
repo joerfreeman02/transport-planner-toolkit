@@ -315,6 +315,13 @@ function containedEndpointShortWorking(shorterService, longerService) {
   if (text(shorterService?.routeNumber).toUpperCase() !== text(longerService?.routeNumber).toUpperCase()) return false;
   if (!sharedDirectionMarker(shorterService, longerService)) return false;
   if (!lineageIds(shorterService).some(value => lineageIds(longerService).map(normal).includes(normal(value)))) return false;
+  const shorterPattern = completeRoutePattern(shorterService);
+  const longerPattern = completeRoutePattern(longerService);
+  // Endpoint identity can distinguish a genuine branch when the feed uses
+  // different physical StopPoints, but it must not turn a longer through
+  // service into a short working merely because that service starts outside
+  // the assessed area and passes the shorter pattern's origin.
+  if (shorterPattern.length && longerPattern.length && shorterPattern.length > longerPattern.length) return false;
   for (const side of ['origin', 'destination']) {
     const other = side === 'origin' ? 'destination' : 'origin';
     if (endpointIdentity(shorterService, side) !== endpointIdentity(longerService, side)) continue;

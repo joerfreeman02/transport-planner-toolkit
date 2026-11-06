@@ -604,7 +604,9 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
         trip.get("service_id"), trip.get("trip_headsign"), trip.get("trip_short_name"),
         route.get("route_long_name"), route.get("route_desc")
     )).lower()
-    if re.search(r"\b(?:school|schools|schoolday|school day|college day|term time|pupil)\b", service_description):
+    # A school-named endpoint is not evidence that the trip calendar is
+    # restricted to school days. Require explicit calendar wording.
+    if re.search(r"\b(?:school[- ]?days?|schoolday|college[- ]?days?|term[- ]time|pupil)\b", service_description):
         record["qualifications"].add("School-day or term-time service identified in the source timetable; check the assessment date before formal use.")
     for stop, departure in matched:
         stop["routes"].add(route_number)

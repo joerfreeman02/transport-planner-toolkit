@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import zlib from 'node:zlib';
+import { fileURLToPath } from 'node:url';
 import { createAuthoritativeBusTimetableAdapter } from '../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
 import { createTflBusStopAdapter } from '../../src/atlas/adapters/tfl-bus-stop-adapter.mjs';
 import { createTflBusTimetableAdapter } from '../../src/atlas/adapters/tfl-bus-timetable-adapter.mjs';
@@ -308,7 +310,10 @@ assert.ok(sharedSleeps[0] >= 60000);
 assert.equal(sharedScheduler.snapshot().requestsInWindow, 1);
 assert.equal(TFL_SAFE_DETAILED_PAIR_LIMIT, 43, 'dense-scope threshold reserves StopPoint discovery and route metadata budget');
 
-const preparedPath = new URL('../../atlas/data/bus/services/49000-london.json.gz', import.meta.url);
+const busDataRoot = process.env.ATLAS_TEST_BUS_DATA_ROOT
+  ? path.resolve(process.env.ATLAS_TEST_BUS_DATA_ROOT)
+  : fileURLToPath(new URL('../../atlas/data/bus/', import.meta.url));
+const preparedPath = path.join(busDataRoot, 'services', '49000-london.json.gz');
 const prepared = JSON.parse(zlib.gunzipSync(fs.readFileSync(preparedPath)));
 const actualStopId = '490003378G';
 const londonRows = prepared.services.filter(service => ['279', '217', 'N279'].includes(String(service.routeNumber)) && service.stopSchedules?.[actualStopId]);

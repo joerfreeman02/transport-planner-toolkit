@@ -146,7 +146,7 @@ export function buildBusWordTables(result, { includeMap = true } = {}) {
   return [
     {
       caption: 'Table 3.2 - Bus Stop Summary',
-      headers: [...(includeMap ? ['Map reference'] : []), 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop'],
+      headers: [...(includeMap ? ['Map reference'] : []), 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes recorded or matched at stop'],
       rows: stopRows,
       widths: includeMap ? [8, 22, 15, 20, 20, 15] : [25, 17, 22, 22, 14]
     },

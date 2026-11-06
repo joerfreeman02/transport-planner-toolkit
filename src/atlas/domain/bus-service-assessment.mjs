@@ -695,7 +695,6 @@ function directionalPrincipalLocations(record, evidenceStopId) {
   const exactDestinationCall = patternIds.at(-1)
     && (destinationStopIds.includes(patternIds.at(-1)) || sourceEndpointIds.at(-1) === patternIds.at(-1));
   const destinationLabel = text(record?.destination);
-  if (exactDestinationCall && destinationLabel && !/^(?:destination not supplied|destination not resolved)$/i.test(destinationLabel)) add(destinationLabel);
   let previousLocality = normal(locality(downstreamNamed[0]));
   for (const [index, call] of downstreamNamed.entries()) {
     const namedPlace = usefulName(call, index);
@@ -705,6 +704,10 @@ function directionalPrincipalLocations(record, evidenceStopId) {
     if (callLocality) previousLocality = normal(callLocality);
   }
   add(locality(downstreamNamed.at(-1)) || place(downstreamNamed.at(-1)));
+  // Add an endpoint label only after the ordered downstream calls.  Inserting
+  // it before this loop made a valid terminus appear ahead of intermediate
+  // locations in Browser and Word summaries.
+  if (exactDestinationCall && destinationLabel && !/^(?:destination not supplied|destination not resolved)$/i.test(destinationLabel)) add(destinationLabel);
   const useful = chosen;
   return useful.length
     ? { locations: useful, state: 'resolved', warning: null }
@@ -831,9 +834,15 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const calendarReconciliation = records.map(record => record.calendarReconciliation).filter(item => item?.status === 'conflict-conservatively-restricted');
     const tndsOnlyCalendarConflict = calendarReconciliation.length > 0
       && records.every(record => /tnds|traveline national dataset/i.test(providerOfRecord(record)));
-    const plannerReviewWarnings = tndsOnlyCalendarConflict
-      ? Object.freeze([`Route ${text(first.routeNumber) || 'service'} operating-day records conflicted. ATLAS retained the supported days; verify the operator timetable before formal use.`])
-      : Object.freeze([]);
+    const inferredSchoolEndpointLabel = records.some(record =>
+      (record.qualifications ?? []).some(value => /School-day or term-time service identified in the source timetable; check the assessment date before formal use\./i.test(text(value)))
+      && /\bschool\b/i.test([record.origin, record.destination, record.direction, record.tripHeadsign, record.source?.tripHeadsign].map(text).join(' '))
+      && !['school-day', 'term-time'].includes(text(record.calendarProfileId || record.source?.calendarProfileId).toLowerCase())
+      && !(record.calendarEvidence ?? record.operatingCalendarEvidence ?? []).some(item => item?.schoolDayOnly || ['school-day', 'term-time'].includes(text(item?.calendarProfileId).toLowerCase())));
+    const plannerReviewWarnings = Object.freeze([
+      ...(tndsOnlyCalendarConflict ? [`Route ${text(first.routeNumber) || 'service'} operating-day records conflicted. ATLAS retained the supported days; verify the operator timetable before formal use.`] : []),
+      ...(inferredSchoolEndpointLabel ? [`Route ${text(first.routeNumber) || 'service'} source metadata mentions a school or term-time service, but no journey-level calendar evidence was supplied; verify the operator timetable before formal use.`] : [])
+    ]);
     const notes = unique([
       ...calendarQualificationNotes(calendarEvidence),
       ...records.flatMap(record => [...(record.serviceNotes ?? []), ...(record.qualifications ?? [])].map(plannerQualificationNote))
@@ -843,6 +852,21 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const operatingPeriodWarnings = unique([...operatingEvidence.warnings, ...combinedPeriods.warnings]);
     const endpointPatterns = unique(records.map(record => `${text(record.origin)} → ${text(record.destination)}`));
     if (endpointPatterns.length > 1) notes.push('Includes scheduled short workings or route variants in this direction; the main origin/destination shown is the most extensive pattern in the source timetable.');
+    const orderedPatternNamesByRecord = records.map(record => {
+      const patternStops = Array.isArray(record.plannerLocalityPatternStops) && record.plannerLocalityPatternStops.length
+        ? record.plannerLocalityPatternStops
+        : record.routePatternStops ?? [];
+      return unique(patternStops.map(stop => text(stop?.name || stop?.commonName || stop?.locality || stop?.localityName))
+        .filter(name => name && !/^\d{5,}$/.test(name)));
+    }).filter(names => names.length);
+    if (orderedPatternNamesByRecord.length > 1) {
+      const patternNameCounts = new Map();
+      orderedPatternNamesByRecord.forEach(names => names.forEach(name => patternNameCounts.set(name, (patternNameCounts.get(name) ?? 0) + 1)));
+      const variantCallNames = [...patternNameCounts.entries()]
+        .filter(([, count]) => count > 0 && count < orderedPatternNamesByRecord.length)
+        .map(([name]) => name);
+      if (variantCallNames.length) notes.push('Journeys vary in the intermediate stops served.');
+    }
     if (records.some(record => record.circular)) notes.push('Circular service.');
     if (!DAY_ORDER.some(day => periods[day])) notes.push('No scheduled departures are available for the prepared representative week.');
     const principalRecord = records.find(record => hasScheduledEvidence(record.stopSchedules?.[frequencyBasisStopId])) || first;
@@ -1338,6 +1362,12 @@ function qualificationAppliesToFinalRow(note, departuresByDay = {}) {
 function qualificationScopeProven(note, records, evidenceStopId) {
   if (!/non[- ]school|school[- ]day|term[- ]time/i.test(note)) return true;
   const represented = records.filter(record => hasScheduledEvidence(record.stopSchedules?.[evidenceStopId]));
+  const inferredSchoolEndpointLabel = represented.some(record =>
+    (record.qualifications ?? []).some(value => /School-day or term-time service identified in the source timetable; check the assessment date before formal use\./i.test(text(value)))
+    && /\bschool\b/i.test([record.origin, record.destination, record.direction, record.tripHeadsign, record.source?.tripHeadsign].map(text).join(' '))
+    && !['school-day', 'term-time'].includes(text(record.calendarProfileId || record.source?.calendarProfileId).toLowerCase())
+    && !(record.calendarEvidence ?? record.operatingCalendarEvidence ?? []).some(item => item?.schoolDayOnly || ['school-day', 'term-time'].includes(text(item?.calendarProfileId).toLowerCase())));
+  if (/^School-day journeys only\.$/i.test(note) && inferredSchoolEndpointLabel) return false;
   // A neutral mixed-calendar note describes the combined row. Its supporting
   // evidence is necessarily split across individual school and non-school
   // records, so requiring every record to carry the combined note drops it.

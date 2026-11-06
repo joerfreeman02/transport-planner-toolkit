@@ -23,10 +23,10 @@ assert.match(narrative,/A total of 2 bus stops are located within the assessed a
 assert.match(narrative,/Waltham Cross Railway Station/);
 assert.doesNotMatch(narrative,/Waltham Cross Railway Station, Railway Station/);
 assert.doesNotMatch(narrative,/checked evidence|planner-facing|ATLAS/i);
-assert.deepEqual(mapOn[0].headers,['Map reference','Stop name','Direction','Walking distance / time','Cycling distance / time','Routes serving stop']);
+assert.deepEqual(mapOn[0].headers,['Map reference','Stop name','Direction','Walking distance / time','Cycling distance / time','Routes recorded or matched at stop']);
 assert.equal(mapOn[0].rows[0][0],'1');
 assert.ok(mapOn[1].rows.some(row=>Array.isArray(row)&&row[0]==='66'&&row[3].includes('[1]')));
-assert.deepEqual(mapOff[0].headers,['Stop name','Direction','Walking distance / time','Cycling distance / time','Routes serving stop']);
+assert.deepEqual(mapOff[0].headers,['Stop name','Direction','Walking distance / time','Cycling distance / time','Routes recorded or matched at stop']);
 assert.equal(mapOff[0].rows[0].length,5);
 assert.ok(mapOff[1].rows.some(row=>Array.isArray(row)&&row[0]==='66'&&!row[3].includes('[1]')));
 assert.doesNotMatch(JSON.stringify([...mapOn,narrative]),/ATLAS|Private raw source failure|Private internal warning|Planner review required/i);

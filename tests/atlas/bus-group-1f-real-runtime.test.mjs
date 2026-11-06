@@ -65,7 +65,7 @@ for (const route of ['66', '251']) {
   assert.equal(row.terminusDecision.presentation, 'departing-only');
   assert.equal(row.terminusDecision.proven, true);
   assert.ok(row.terminusDecision.arrivalEvidence.length > 0);
-  assert.match(row.plannerNotes.shortWorkings, /Some route .* journeys operate to Hammond Street \(Smiths Lane\)/);
+  assert.match(row.plannerNotes.shortWorkings, /Some route .* journeys operate from Hammond Street \(Smiths Lane\)/, 'the evidenced later origin is described as an origin, not a destination');
   assert.doesNotMatch(`${row.destination} ${row.plannerNotes.additionalServices ?? ''}`, /Waltham Cross Bus Station/);
 }
 
@@ -92,7 +92,12 @@ assert.doesNotMatch(row279.plannerNotes.additionalServices, /Stamford Hill \(Roo
 assert.equal(row279.publicServiceGroupingDecision.variantDestinationEvidence.find(variant => /Manor House/.test(variant.destination))?.kind, 'branch-variant');
 assert.equal(rowFor('N279').plannerNotes.additionalServices, null);
 assert.equal(rowFor('317').plannerNotes.additionalServices, null);
-assert.match(rowFor('13').plannerNotes.additionalServices, /Route 13A also serves St Margaret's Hospital and Waltham Abbey \(Princesfield Rd\); route 13B also serves Railway Station and Waltham Abbey \(Princesfield Rd\); route 13C operates to Two Brewers/);
+assert.match(rowFor('13').plannerNotes.additionalServices, /Route 13A also serves St Margaret's Hospital and Waltham Abbey \(Princesfield Rd\) \(Mon-Fri: 3 journeys\/day; no weekend service\); route 13B also serves Railway Station and Waltham Abbey \(Princesfield Rd\) \(Railway Station: Sat: 2 journeys\/day; no weekday service; no Sunday service; Waltham Abbey \(Princesfield Rd\): Mon-Fri: 3 journeys\/day; no weekend service\); route 13C operates to Two Brewers \(Mon-Fri: 5 journeys\/day; Sat: 3 journeys\/day; no Sunday service\)/);
+assert.deepEqual(rowFor('13').typicalFrequencyLines, [
+  'Mon-Fri: Typically every ~30 mins',
+  'Sat: Every ~60 mins',
+  'Sun: No scheduled service'
+], 'Family member frequencies remain separately qualified in the note; they must not be folded into Route 13 principal frequency.');
 assert.equal(rowFor('13').principalLocations.join('|'), rowFor('13').routeFamilyMembers.find(member => member.routeNumber === '13').principalLocations.join('|'));
 assert.ok(rowFor('242') && rowFor('310'));
 assert.equal(rowsFor('217').length, 1);
@@ -112,7 +117,7 @@ const wordNotes = wordServiceRows.filter(row => !Array.isArray(row)).map(row => 
 assert.ok(wordNotes[0].startsWith('Presentation note: Where an assessed stop is the route terminus'));
 assert.equal(wordNotes.filter(note => note.startsWith('Presentation note:')).length, 1);
 assert.equal(wordNotes.at(-1).startsWith('Presentation note:'), false);
-assert.match(wordText, /Short workings: Some route 66 journeys operate to Hammond Street \(Smiths Lane\)\./);
+assert.match(wordText, /Short workings: Some route 66 journeys operate from Hammond Street \(Smiths Lane\)\./);
 assert.match(wordText, /Additional services: Route 13A also serves St Margaret's Hospital and Waltham Abbey \(Princesfield Rd\)/);
 assert.match(wordText, /Route terminus: Waltham Cross Bus Station\./);
 assert.doesNotMatch(wordText, /66 – Hammond Street/);

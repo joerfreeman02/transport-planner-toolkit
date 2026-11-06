@@ -3855,6 +3855,16 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
   return attachRouteNotes(sorted);
 }
 
+// The assessment pipeline resolves endpoints and source evidence before it
+// returns plannerServiceSummaries. Rebuilding those rows from raw service
+// summaries in the UI discards those decisions and can silently shorten a
+// principal-location chain. Use the resolved rows when present; retain the
+// builder as a compatibility path for older callers.
+export function plannerServiceSummariesForResult(result) {
+  if (Array.isArray(result?.plannerServiceSummaries)) return result.plannerServiceSummaries;
+  return buildPlannerBusServiceSummaries(result?.serviceSummaries ?? [], result?.stops ?? []);
+}
+
 export const buildPlannerBusServiceSummary = buildPlannerBusServiceSummaries;
 
 export function buildPlannerSummaryAudit(rows = [], expectedRowCounts = {}) {

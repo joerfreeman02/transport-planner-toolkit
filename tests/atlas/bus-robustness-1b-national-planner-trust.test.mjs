@@ -57,15 +57,16 @@ test('all selected national service shards succeed and remain complete', async (
   assert.equal(result.provenance.failedShardCount, 0);
 });
 
-test('one missing shard retains successful evidence and records unresolved scope', async () => {
+test('an absent manifest prefix is a no-published-shard result while configured shards remain complete', async () => {
   const adapter = adapterFor({ manifest: { ...baseManifest, serviceShards: { AAAAA: ['services/AAAAA.json.gz'] } }, shardPayloads: { 'services/AAAAA.json.gz': { schema: 'atlas-prepared-bus-data-v2', services: [serviceFor('a', '10', 'AAAAA')] } } });
   const result = await adapter.servicesForStops([stopA, stopB]);
   assert.equal(result.ok, true);
-  assert.equal(result.provenance.sourceCompleteness, 'PARTIAL');
+  assert.equal(result.provenance.sourceCompleteness, 'COMPLETE');
   assert.equal(result.provenance.timetableConclusion, 'MATCHED');
-  assert.deepEqual(result.provenance.unresolvedStopIds, ['BBBBB']);
+  assert.deepEqual(result.provenance.unresolvedStopIds, []);
   assert.equal(result.data[0].routeNumber, '10');
-  assert.equal(result.provenance.failedShardDiagnostics[0].status, 'missing');
+  assert.deepEqual(result.provenance.unconfiguredShardKeys, ['BBBBB']);
+  assert.equal(result.provenance.failedShardCount, 0);
 });
 
 test('malformed and validation-failed shards are isolated independently', async () => {

@@ -21,7 +21,7 @@ import { buildAssessmentMapExtent } from '../../../src/atlas/presentation/bus-ma
 import { layoutNumberedMapMarkers } from '../../../src/atlas/presentation/bus-map-layout.mjs';
 import { buildAssessmentMapPdf } from '../../../src/atlas/presentation/bus-map-pdf.mjs';
 import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-task-status.mjs';
-import { buildBusTimetablePresentationNote, buildPlannerBusServiceSummaries, plannerRouteDisplayNumber, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
+import { buildBusTimetablePresentationNote, plannerRouteDisplayNumber, plannerServiceSummariesForResult, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, isOtherNearbyStopRecord, partialTimetableQualification, plannerFacingServiceNote, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { plannerStopWarning, recommendedBusStop } from '../../../src/atlas/domain/bus-planner-trust.mjs';
@@ -96,7 +96,7 @@ function selectedResult() {
   if (!currentBusResult) return null;
   const stops = currentBusResult.stops.filter(stop => selectedStopIds.has(stopKey(stop)));
   const stopIds = new Set(stops.map(stopKey));
-  const sourceServices = buildPlannerBusServiceSummaries(currentBusResult.serviceSummaries, currentBusResult.stops);
+  const sourceServices = plannerServiceSummariesForResult(currentBusResult);
   const plannerServiceSummaries = sourceServices.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => stopIds.has(String(id))));
   const serviceSummaries = currentBusResult.serviceSummaries.filter(service => service.stopIds?.some(id => stopIds.has(String(id))));
   const report = { ...currentBusResult, stops, serviceSummaries, plannerServiceSummaries };
@@ -692,7 +692,7 @@ function reviewItemText(item) {
 function renderAssessment(result) {
   currentBusResult = result;
   result = withNumericMapReferences(result);
-  const presentedServices = buildPlannerBusServiceSummaries(result.serviceSummaries, result.stops);
+  const presentedServices = plannerServiceSummariesForResult(result);
   if (!selectionInitialised) {
     selectedStopIds = new Set(result.stops.filter(recommendedBusStop).map(stopKey));
     selectedServiceIds = new Set(presentedServices.map(serviceKey));

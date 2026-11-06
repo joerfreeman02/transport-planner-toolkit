@@ -17,7 +17,11 @@ export async function requestJson({ url, fetchImpl = globalThis.fetch, timeoutMs
   try {
     const response = await fetchImpl(url, { signal: controller.signal, headers: { Accept: 'application/json', ...headers } });
     if (!response || typeof response.ok !== 'boolean') return { ok: false, code: HTTP_FAILURE.INVALID_RESPONSE, message: 'Source returned an invalid HTTP response object.', url };
-    if (!response.ok) return { ok: false, code: HTTP_FAILURE.HTTP, message: `Source returned HTTP ${response.status}.`, status: response.status, url, headers: headerObject(response.headers) };
+    if (!response.ok) {
+      let responseData = null;
+      try { responseData = await response.json(); } catch { /* Error payloads are optional diagnostics. */ }
+      return { ok: false, code: HTTP_FAILURE.HTTP, message: `Source returned HTTP ${response.status}.`, status: response.status, url, headers: headerObject(response.headers), responseData };
+    }
     let data;
     try {
       data = await response.json();

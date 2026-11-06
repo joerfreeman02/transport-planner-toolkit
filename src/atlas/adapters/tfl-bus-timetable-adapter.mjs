@@ -702,6 +702,18 @@ export function createTflBusTimetableAdapter({ fetchImpl = globalThis.fetch, cac
     return runCachedSourceQuery({ cache, cacheKey: `tfl-timetable:${line}:${stop}`, freshForMs: 5 * 60 * 1000, forceRefresh, load: async () => {
       const response = await requestScheduler.schedule('timetable', () => requestJson({ url: endpoint, fetchImpl, timeoutMs }), { progress: progress ?? {} });
       const source = { ...provenance, endpoint, retrievedAt: clock().toISOString(), httpStatus: response.status ?? null };
+      const apiError = response.responseData;
+      const reportedNotServed = response.status === 400
+        && Number(apiError?.httpStatusCode) === 400
+        && text(apiError?.relativeUri) === `/Line/${line}/Timetable/${stop}`
+        && new RegExp(`^No direction could be found for stop: ${stop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} on line: ${line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\. The line may not serve this stop\\.?$`, 'i').test(text(apiError?.message));
+      if (reportedNotServed) return sourceSuccess({ data: [], warnings: [], provenance: {
+        ...source,
+        requestedStopPointId: stop,
+        timetableConclusion: 'NO_CURRENT_MATCH',
+        stopServiceConclusion: 'TfL reported no direction for this exact line/StopPoint pair.',
+        providerDiagnostic: { httpStatus: 400, exceptionType: text(apiError?.exceptionType) || null, relativeUri: text(apiError?.relativeUri), message: text(apiError?.message) }
+      } });
       if (!response.ok) return sourceFailure({ code: response.code, message: `TfL scheduled timetable could not be checked: ${response.message}`, status: response.status, provenance: source });
       if (!validResponse(response.data)) return sourceFailure({ code: 'invalid_response', message: 'TfL returned a scheduled timetable response that ATLAS could not safely interpret.', provenance: source });
       const responseDepartureStopId = text(response.data?.timetable?.departureStopId) || null;

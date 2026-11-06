@@ -425,3 +425,291 @@ The Milton Keynes Route 5 replay used `52.040000, -0.760000`, 700 m, on the same
 The broad deterministic Browser/Word audit completed all eight controls (Pipers 700 m, Pipers Route 46 1,200 m, Waltham cross and nearest-stop, Long Lane Route 203, Chingford, Hoddesdon, and PE1) with zero audit failures, browser errors or failed requests. Wycliffe and Route 5 Browser/Word replays also completed with zero audit failures, browser errors or failed requests. The immutable Run #75 `node tests/atlas/run-all.mjs` suite passed and ended `ATLAS Alpha.15 deterministic suite passed.` The dedicated review-environment browser test passed formal acknowledgement gating and produced four map exports (normal, nearest-stop group, nearest-stop group after pan/zoom, and spread-stop). Syntax and `git diff --check` checks passed.
 
 The preserved Pipers changes, Tufton correction, regression coverage and this hardening record have passed their automated checkpoint gates. Starting candidate HEAD remains `23e8d9ba5c5c334e52c53b7e806fd548f7c3a058`; frozen `main` and `origin/main` remain `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`. Product Owner acceptance has not occurred. This checkpoint is an engineering candidate only; no merge, tag, public release, publication, updater, or data refresh is authorized here. GitHub tooling review: Dependabot remains the existing weekly updater; Codecov, OpenSSF Scorecard and Sentry were not adopted; Renovate remains deferred to avoid overlapping Dependabot. No tooling was installed or configured.
+
+## Full product recovery continuation (2026-11-03)
+
+### Starting state and candidate handling
+
+- Starting local HEAD: `d556898bd4550653a26be1a3ec4d079b839f9085`, branch `codex/atlas-bus-beta2-known-defects-hardening`; the remote hardening branch was at the same SHA at the start of this continuation.
+- Frozen local `main` and `origin/main`: `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`.
+- Starting worktree was clean. Current changes remain uncommitted and unpushed because the actual Tufton review-v2 replay still has a material Route W16 principal-location review and live TfL timetable failures. No merge, tag, release, updater, publication or data refresh occurred.
+- Prepared Run #75 Bus and TNDS hashes remain `1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f` and `2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f`.
+
+### Tufton stop identity and route evidence
+
+The current full review-v2 replay used `51.613869, -0.020303`, 700 m. The live TfL response contained 28 StopPoints, 26 within the requested radius; exact prepared StopArea completion yielded 28 discovered/grouped/selected physical records. No same-name merge removed Stop E. The prior Product Owner report's approximately 11 reportable stops / 10 routes is not reproduced by this current live response; no old raw response was available to compare record-for-record.
+
+| Physical StopPoint | Indicator | Distance | Current exact route evidence |
+|---|---:|---:|---|
+| `490005180E` | Stop E | 426 m | TfL routes 97, 158, 215, 397, N26, W16; exact NaPTAN adds BODS-only 397A |
+| `490005180C` | Stop C | 397 m | TfL routes 158, W16 |
+| `490005178K` | Brook Crescent K | 409 m | TfL routes 357, 444, W16 |
+| `490005178H` | Brook Crescent H | 487 m | TfL routes 357, 444, 657, W16 |
+| `490005180S` | `->S`, Chingford Mount | 415 m | live TfL and exact physical record show no routes; retained as a distinct no-route stop and excluded from service rows |
+
+Stop `490005180S` is not Stop E. The source IDs and coordinates differ (`490005180S`: 51.61732, -0.01800; `490005180E`: 51.61732, -0.01761). TfL returned an empty `lines` list for S. ATLAS retains that stop without inventing a line, while E remains independently discovered and service-eligible. The old approximately 462 m wording is not an exact identity; the current live record is 415 m from the supplied point.
+
+At exact Stop E, immutable Run #75 NaPTAN lists route 397A. Run #75 BODS GTFS and TNDS both have matching Central Connect weekday timetable evidence there (one departure at 21:21; no Saturday/Sunday service). TfL's current StopPoint response does not list 397A. Generic exact-ID reconciliation now unions route associations while preserving TfL for TfL-listed routes and assigning BODS to NaPTAN-only routes. London orchestration excludes explicit non-TfL-only routes from TfL's batched metadata/timetable calls and retains their scheduled national evidence at the exact stop. In the first live rerun, sending the newly discovered 397A to the batched TfL route metadata endpoint caused a 404 that also prevented Route 158 topology resolution. That was corrected by authority-scoping TfL requests; no route or operator is hardcoded.
+
+### Route 158 and presentation root cause
+
+The first product-path divergence remains the UI recalculation: `currentBusResult.plannerServiceSummaries` already contains endpoint-resolved rows, but `selectedResult()` and `renderAssessment()` rebuilt planner summaries from raw `serviceSummaries`. That dropped the resolved full chain before Browser and Word presentation. A shared result helper now preserves the resolved rows and provides compatibility for results that do not include them.
+
+The current actual review-v2 Browser and Word export both show the Chingford-bound Route 158 locations in order: **Stratford New Town, Leyton, Walthamstow Central, Walthamstow, Blackhorse Road, Higham Hill, Highams Park, Chingford Mount**. Both directions remain distinct. The displayed operator is Arriva London North. Stop E's live TfL timetable request returned HTTP 400, so the timetable fallback is transparently national evidence; ordered TfL route topology resolved the location chain, without treating topology as a TfL timetable.
+
+The same full review also exposed Route W16's unresolved fallback principal pattern. Sources & Checks contains two items: the Route W16 principal-location evidence item at Stop E and one assessment-level TfL timetable warning. The current run completed assessment and enabled acknowledgement/export, but this unresolved Route W16 result is a material acceptance failure, not a clean Tufton pass. Live TfL returned HTTP 400 for `158/Timetable/490005180E` and `W16/Timetable/490005180E`; these outcomes are retained and not converted to zero service. Current Route 158 Browser and Word operators are Arriva London North. Current route 397A appears in both planner directions as Central Connect, source BODS.
+
+### Review-v2 root and Pipers actual application replay
+
+The prior Pipers `inspectScope` failure was reproduced against the actual review-v2 application before timetable assessment. The temporary review wrapper mounted the candidate checkout itself where the server expected the directory containing immediate `bus/` and `bus-tnds/` roots. That produced HTTP 404 for the required manifest path. Mounting the alternate Run #75 checkout initially failed the server's realpath containment check because its TNDS directory was a junction outside the root. Mounting the complete physical Run #75 directory fixed both routes; Bus and TNDS manifest requests now return HTTP 200 with the expected hashes. This review-server adjustment lives under ignored `tmp/`; it is not part of the application commit.
+
+The full actual review-v2 Pipers replay used `51.852700, -0.454343`, 700 m, a fresh headless Edge context, live timetable/routing sources and only a pinned geocoder response. `inspectScope` succeeded (11 stops, 1 discovered route, 2 route-stop pairs); the full assessment completed with 11 selected stops. Browser and Word both contain exactly one Route 230 circular Centrebus/BODS row (Monday–Saturday about hourly, no Sunday) and two distinct Route 231 TNDS/South Beds Dial-a-Ride directions: Dunstable Asda (Mon–Fri 3/day, Saturday 2/day, no Sunday) and Pepperstock (Mon–Fri 4/day, Saturday 1/day, no Sunday). Exactly one planner-actionable Route 231 calendar item remains. No internal parser or calendar-reconciliation wording appears in those rendered rows. Acknowledgement succeeded, Word export succeeded, map export succeeded (729,067 bytes), and the run had no page exceptions or failed requests.
+
+### Automated path, baseline and current-control matrix
+
+The previous fixture-based manual audit did not represent the exact Product Owner execution environment. In this continuation, Tufton and Pipers were run in the actual `/atlas/?review=v2#bus` application with the corrected physical Run #75 mount, production app bundle/adapters, live TfL and OSRM, real prepared manifests/shards/reference assets, workflow continuation, Browser summary and downloaded Word/map artifacts. The one intentional test substitution was the geocoder response to pin each supplied control coordinate. These diagnostic scripts are temporary and are not an integrated nine-control acceptance harness; therefore path equivalence for final release is **NO**.
+
+| Control | Current continuation status | Evidence / limitation |
+|---|---|---|
+| Tufton | **FAIL** | Actual review-v2 assessment completes; Route 158 Browser/Word chain and 397A are restored; Route W16 remains unresolved and live TfL returned two 400 responses; Sources & Checks has 2 items. |
+| Pipers | **PASS** | Actual review-v2 full assessment; 11 stops; 230 and both 231 directions match across Browser/Word; one calendar item; acknowledgement and map export passed. |
+| Waltham Cross | **NOT EXERCISED** | Earlier closeout evidence exists, but this candidate's full actual review-v2 path was not replayed in this continuation. |
+| Grove Road / Chingford | **NOT EXERCISED** | Not fully replayed through the actual review-v2 assessment and export flow in this continuation. |
+| Long Lane | **NOT EXERCISED** | Earlier offline/Browser controls exist; not replayed through this candidate's current live review-v2 flow here. |
+| Hoddesdon | **NOT EXERCISED** | Earlier deterministic Browser/Word evidence exists; no current actual review-v2 replay here. |
+| Wycliffe | **NOT EXERCISED** | Earlier Browser/Word evidence exists; no current actual review-v2 replay here. |
+| Milton Keynes Route 5 | **NOT EXERCISED** | Earlier Browser/Word evidence exists; no current actual review-v2 replay here. |
+| PE1 | **NOT EXERCISED** | Earlier Browser/Word evidence exists; no current actual review-v2 replay here. |
+
+Frozen Beta.1 core behavior and the complete Beta.2 retention matrix have not been re-exercised across all nine actual application controls in this continuation. Existing deterministic regression coverage remains in the suite, but it cannot replace those product-path replays. Prior documented cross-site results remain historical evidence, not a current release gate.
+
+### Verification, files and release status
+
+`node tests/atlas/run-all.mjs` passed against the immutable Run #75 Bus root and ended `ATLAS Alpha.15 deterministic suite passed.` This run included the UI contract correction for `plannerServiceSummariesForResult`. Focused stop identity/route-association, authoritative timetable orchestration, and planner-summary tests passed. Actual Tufton and Pipers Browser/Word parity, acknowledgements and map exports were checked as described above. `git diff --check` and syntax checks must be repeated after final edits.
+
+Tracked files currently changed: `atlas/assets/js/app.mjs`; `src/atlas/adapters/authoritative-bus-timetable-adapter.mjs`; `src/atlas/application/bus-stop-discovery.mjs`; `src/atlas/domain/bus-planner-summary.mjs`; and tests `bus-alpha13-planner-summary.test.mjs`, `bus-stop-structure.test.mjs`, `bus-ui-contract.test.mjs`, `review-environment.test.mjs`, `tfl-bus-timetable.test.mjs`. No code or documentation checkpoint was committed or pushed. Manual Product Owner re-acceptance remains outstanding and has not been performed.
+
+GitHub tooling adoption review remains: Dependabot is configured for weekly npm and GitHub Actions updates; Codecov, OpenSSF Scorecard and Sentry were not adopted; Renovate remains deferred to avoid overlapping dependency automation. No tooling was installed.
+
+**PRODUCT OWNER PATH AND AUTOMATED ACCEPTANCE PATH ARE MATERIALLY EQUIVALENT — NO**
+
+**READY FOR FINAL BETA.2 PRODUCT OWNER RE-ACCEPTANCE — NO**
+
+## Final evidence triage and controlled closeout (2026-11-06)
+
+This section supersedes earlier same-day statements above where the full ten-control replay or the new exact-response classification produced a later result. This is a source/evidence closeout; it does not authorize release.
+
+### Repository and preserved candidate
+
+- Starting and current committed HEAD: `d556898bd4550653a26be1a3ec4d079b839f9085`, on `codex/atlas-bus-beta2-known-defects-hardening`; the candidate parent is `23e8d9ba5c5c334e52c53b7e806fd548f7c3a058`. The previous report's `23e8d9b` remote value was a stale remote-tracking observation of the parent, not GitHub's branch tip. Read-only GitHub `ls-remote` now reports the branch at `d556898`. This worktree has no configured upstream. Local `main` and `origin/main` remain `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`.
+- No commit or push was made. The candidate worktree remains dirty with the previously reviewed corrections, their regression coverage, and this documentation. The existing recovery artifact was reverified at `tmp/atlas-beta2-final-recovery-final-2026-11-06.patch` (SHA-256 `2D386494D20B693F7E96E3FD49FCE227587B5864EDECEB2BED41AE4E2C64D519`). A separate fresh patch is generated after this documentation edit and recorded in the handover; the prior artifact is preserved.
+- Immutable Run #75 Bus/TNDS manifest hashes remain `1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f` and `2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f`. No national refresh or `main` update occurred.
+
+### Waltham Cross: exact TfL 400 responses and present result
+
+The six observed HTTP 400s were TfL's explicit not-served/no-direction response, not provider outages. They concern the same assessed point, StopPoint `210021703440` (Bus Station adj.), for routes 217, 279, 317, 327, 491 and N279. For each URI below, the response body was: `No direction could be found for stop: 210021703440 on line: {route}. The line may not serve this stop.`
+
+- `/Line/217/Timetable/210021703440`
+- `/Line/279/Timetable/210021703440`
+- `/Line/317/Timetable/210021703440`
+- `/Line/327/Timetable/210021703440`
+- `/Line/491/Timetable/210021703440`
+- `/Line/N279/Timetable/210021703440`
+
+The narrow TfL adapter correction recognizes only that exact API error form as `NO_CURRENT_MATCH`, and keeps the status and body in provider diagnostics. Other 400s and all 500s remain failures. TfL has authority for these routes at other returned London StopPoints, and the adapter continues the route-level cross-boundary checks there. BODS/TNDS stop records and timetables remain their own primary evidence for routes with national route authority; no zero-service conclusion was invented. The current full review-v2 replay has no HTTP failure classification for those six calls, no generic TfL outage warnings, and a **complete** assessment with only these two current review items:
+
+1. `Route 16 · Stop 210021703430 · BODS: Destination endpoint decision requires review: Generic source endpoint was retained because no exact endpoint identity was available; no place was inferred.`
+2. `Route 16C · Stop 210021703430 · BODS: Destination endpoint decision requires review: Generic source endpoint was retained because no exact endpoint identity was available; no place was inferred.`
+
+For reconciliation, the prior four-item presentation was those two endpoint items plus the two generic messages below, which the new exact response classification retired because they falsely described the six 400s as failed timetable checks:
+
+- `TfL scheduled timetable information could not be checked for one or more services. ATLAS retained available authoritative results and used matching national timetable evidence where available. Review the affected service evidence before formal use.`
+- `TfL scheduled timetable information could not be checked for one or more services, and no defensible national fallback was available. ATLAS did not assume zero service; review the incomplete evidence before formal use.`
+
+Current Browser rows retain routes 16, 16C, 212, 217, both distinct 242 operators, 279, 310, 317, 327, 491 and N279. 16C remains Sunday-only; 212 retains four source departures on Mon–Sat and no Sunday on the frozen record; both 242 operators remain distinct. Browser/Word parity passed. The two generic endpoint items are still reviewable material source limitations; the complete label does not waive them.
+
+### Long Lane: transient 500s, current six-to-two reconciliation
+
+The earlier replay's three TfL HTTP 500s were transient requests for routes 482/490 at Cargo Centre N/S StopPoints `490004355N` and `490004355S`. No such failures recurred in the current full replay and available fallbacks remained source-labelled. The previous six-item Sources & Checks state was made up of the two items still present (Route 555 and N555 complex TNDS `SpecialDaysOperation` calendars at stops `40004402007A, 40004402007B`), the former Route 490 (`490011966W`) and H30 (`490004355N`) principal-call mapping warnings, and the two generic timetable-failure messages that had described the three 500s. In the current result only the exact two calendar items remain:
+
+- `Route 555 · Stop 40004402007A, 40004402007B · TNDS: TNDS supplied 6 timetable patterns with unsupported complex special-day operating profiles; operating days remain unresolved and no timetable days were fabricated.`
+- `Route N555 · Stop 40004402007A, 40004402007B · TNDS: TNDS supplied 6 timetable patterns with unsupported complex special-day operating profiles; operating days remain unresolved and no timetable days were fabricated.`
+
+Current status is **complete**, with 14 planner rows, no HTTP failures, and the two source-calendar review items. Route 203 has two TfL-primary rows. Its final Browser frequencies are toward Elmsleigh: Mon–Sat ~20–25 min, Sun ~27 min; toward Hounslow: Mon–Fri ~20–25 min, Sat ~20–30 min, Sun ~29 min. Route 555 retains the White Bus Services Hatton Cross dominant main pattern at Long Lane (about 30–40 minutes Mon–Fri and 30–35 minutes Sat–Sun) and the Heathrow Central continuation note: `Less frequent journeys continue beyond Hatton Cross Station to Heathrow Central Bus Station.` The Heathrow continuation is evidence-backed at 7 frozen journeys against 30 Hatton Cross journeys. N555 remains Hallmark Connections Ltd, TNDS-sourced, with calendar qualification: days are not fully confirmed. Do not claim the old six warnings remain current, or treat the two unresolved complex calendars as harmless.
+
+### Wycliffe Route 64 and Hoddesdon Route 33
+
+- Route 64 toward Merrywalks presents `Stroud Merrywalks A` because the exact selected BODS pattern ends at the assessed terminal StopPoint; its full ordered sequence has no calls after the selected terminal and therefore no downstream locality chain to summarize. The complete ordered sidecar evidence and exact terminal identity agree. The opposite direction retains `Stroud → Cainscross → Ebley → Ryeford → Stonehouse → Oldend → Gloucester → Tredworth → St Pauls`. This is a legitimate terminal-only directional result, not a reason to hardcode Route 64. Wycliffe remains **partial** for unrelated Route 72SN/72SS calendar conflicts and a missing `1600F` timetable shard at `1600FLX49`; those are unresolved source limitations, not proof that Route 64 is defective.
+- Hoddesdon Route 33 toward Sainsbury's was a software defect: the assessment selected an ordered call pattern but planner summarization discarded its complete exact-ID locality sidecar. The generic fallback now consumes it only when every ordered StopPoint ID exactly matches. The regression includes a blank unmapped upstream label and rejects any sequence mismatch. Current Run #75 replay resolves both Route 33 directions, including the downstream Sainsbury's endpoint, without inferred places; the assessment is complete with no Route 33 review item.
+
+### PE1 and Tufton/Pipers warning integrity
+
+- PE1's exact remaining items are `Route 4P · Stop 0590PQG20 · BODS: Principal locations could not be safely mapped because a complete ordered call pattern is unavailable; review the source journey pattern.` and `Route 102 · Stop 2700LMDT2386 · TNDS: Destination endpoint decision requires review: Exact endpoint evidence contains materially conflicting place identities; the strongest safe source presentation was retained for technical review.` These are unresolved source evidence, not defects proven by this replay. The two Delaine Route 202 branches (Austerby and Bourne) and genuine service identities remain; Route 415 remains Wednesday-only in the underlying reviewed golden, with its one Wednesday journey and no inferred other-day service. Browser/Word parity passed; the current live-snapshot replay has two review items and is complete, which does not clear them.
+- Tufton 158 still has both Arriva London North directions; W16 has both Stagecoach London directions; 397A remains two Central Connect BODS/TNDS directions. Exact TfL 400s for 158 and W16 at Stop E `490005180E` say `No direction could be found for stop: 490005180E on line: {route}. The line may not serve this stop.` The recovered topology is used for locations only, while TfL/BODS timetable source labels stay truthful. One further full Tufton replay traced the generic Sources & Checks warning to W11 outbound, assessed at StopPoint `490009752E`, across ordinary, school-day and non-school-day service profiles. The service carries `material-identity-ambiguity` for `direction`, `principalLocations` and `routePatternStopIds`; TfL route metadata is incomplete, so BODS cannot safely resolve the TfL identity. Operator presentation is Stagecoach London by unanimous BODS supplementary evidence, but timetable authority remains `TfL + BODS supplementary`; principal places are `Walthamstow Stadium, Cecil Road, North Countess Road`. The exact visible warning is `TfL and supplementary national evidence disagree on an unresolved route identity for one or more London services. ATLAS retained the authoritative TfL schedule; inspect the affected service evidence before formal use.` It is a material unresolved source conflict. Although the screen says complete and shows zero review items, the warning prevents acceptance; do not omit or waive it. 158/W16 diagnostic differences are audit-only and are not the source of this warning.
+- Pipers 700 m and Route 46 1,200 m controls complete with one Route 231 calendar review each. Route 230 stays one Centrebus circular service, Mon–Sat about hourly, no Sunday. Route 231 remains South Beds Dial-a-Ride with 3 weekday / 2 Saturday Dunstable journeys and 4 weekday / 1 Saturday Pepperstock journeys, no Sunday; internal calendar diagnostics are absent from Browser/Word row text. Sources & Checks fell from two items to one because the earlier NaPTAN incomplete-coverage warning is now supported by complete source evidence: `preparedNaPTANStructural.available` and prepared StopPoints are available, all requested IDs match, and `exactUnmatchedIds`, `unresolvedIds`, `missingIds` and `malformedIds` are empty. The warning was resolved through improved evidence completeness, not suppressed. The remaining Route 231 operating-day conflict is preserved.
+
+### Direct Beta.1 baseline, ten actual review-v2 controls, and retention
+
+The accepted Beta.1 baseline at `108d898221f84c78c061db4f81335dcd911d6a0e` was served from its isolated detached worktree without modifying its files. A fresh headless Pipers review-v2 workflow executed site selection, point confirmation, assessment setup, stop discovery, `inspectScope`, full assessment, result and Sources & Checks, then Word and map exports. It produced 11 stops, 1 route, 2 assessed pairs, 19 services and 3 Browser/Word rows; all 3 rows matched, map PDF downloaded (536,153 bytes), no HTTP or application errors occurred, and there was no acknowledgement gate because the result had no review items. This establishes representative core workflow parity, not a full cross-site Beta.1 replay or proof that live source values must match across versions. The script's only diagnostic note was that the Beta.1 assessment module predates the Beta.2 locality-sidecar hardening hook.
+
+| Control | Final status | Current review items | Replay checks |
+|---|---|---|---|
+| Tufton 700 m | COMPLETE, **blocked by W11 material conflict** | Sources & Checks warning traces W11 outbound at `490009752E`; no review drawer item | 24 Browser/Word rows matched; map passed; no page errors; two exact TfL no-direction 400s |
+| Pipers 700 m | COMPLETE with review | Route 231 TNDS calendar | 3/3 parity; acknowledgement and map passed |
+| Pipers Route 46 1,200 m | COMPLETE with review | Route 231 TNDS calendar | 8/8 parity; acknowledgement and map passed |
+| Waltham 700 m | COMPLETE with review | Route 16 and 16C generic destination endpoint identity | 20/20 parity; acknowledgement where gate shown; map passed; six TfL 400s are explicit no-current-match |
+| Grove Road 250 m | COMPLETE | None | 8/8 parity; map passed; no acknowledgement gate applicable |
+| Long Lane 400 m | COMPLETE with review | Route 555/N555 complex special-day calendars | 14/14 parity; acknowledgement and map passed; current replay has no HTTP failures |
+| Hoddesdon 700 m | COMPLETE | No Route 33 review | 21/21 parity; acknowledgement and map passed |
+| Wycliffe 1,400 m | PARTIAL | Route 72SN/72SS calendar conflicts and `1600F` shard unavailability | 54/54 parity; acknowledgement and map passed; partial is not a pass |
+| MK5 700 m | COMPLETE with review | 11 route/calendar/operator/endpoint items outside Route 5 | 89/89 parity; acknowledgement and map passed |
+| PE1 500 m | COMPLETE with review | Route 4P ordered pattern and Route 102 endpoint identity | 54/54 parity; acknowledgement and map passed |
+
+All ten full app contexts executed the UI-driven discovery and assessment orchestration, common Browser/Word field comparison, map export, and acknowledgement where the review gate appeared. There were no application page errors or missing local data-root assets. HTTP 400s on Tufton and Waltham were source responses and are documented above. The Product Owner and headless workflow are materially equivalent for the tested workflow (**YES**); this does not mean Product Owner manual acceptance occurred.
+
+| Retained golden | Result |
+|---|---|
+| Waltham 16/16C/212/217/242/279/310/317/327/491/N279 | **FAIL acceptance gate** — rows retained and six no-direction calls classified; generic 16/16C endpoints remain under review. |
+| Grove Road 357/444/W16/657 | **PASS** — includes school-day-only 657, one journey each direction, no weekend. |
+| Long Lane 203/555/N555 | **FAIL acceptance gate** — rows/weekend frequencies/555 extension retained; 555/N555 special-day calendars remain unresolved. |
+| Pipers 230/231/46 | **FAIL acceptance gate** — rows/operators/directions retained; Route 231 calendar conflict remains disclosed. |
+| Tufton 158/W16/397A | **FAIL acceptance gate** — routes/operators/directions/authority retained; W11 material identity conflict blocks acceptance. |
+| Hoddesdon 33/310/907/907A | **PASS** — rows retained; Route 33 ordered-location defect corrected generically. |
+| Wycliffe 62/64/65 | **FAIL acceptance gate** — rows retained and Route 64 terminal output is valid; unrelated source conflicts/shard make assessment partial. |
+| MK5 Route 5 BODS/TNDS | **PASS for Route 5 golden** — two Arriva Beds and Bucks directions, no duplicate peer; unrelated 11 review items remain. |
+| PE1 Route 202 branching and Route 415 | **FAIL acceptance gate** — branches/identity retained and Wednesday-only 415 source behavior preserved; 4P/102 reviews remain. |
+| Source hierarchy, no fabricated service/calendar, operator and Browser/Word integrity | **PASS automated** — full deterministic suite and all ten parity checks passed; source-review blockers remain. |
+
+### Tests, tooling and final disposition
+
+- Focused source-adapter, TfL timetable, TfL operating-period, and bus-assessment regression tests passed. Full `node tests/atlas/run-all.mjs` passed against immutable Run #75 with `ATLAS_TEST_BUS_DATA_ROOT=../atlas-beta2-final-verification/atlas/data/bus`, ending `ATLAS Alpha.15 deterministic suite passed.` The first unpinned/default-root attempt failed on an old incomplete manifest; the Run #75-pinned execution is the passing result. Localhost test harness required the authorized loopback boundary.
+- Browser/Word service-field parity passed in all ten current review-v2 controls. All ten map exports passed. Acknowledgement was checked where the review gate existed. Beta.1 representative replay also passed Word/map parity, with no acknowledgement needed.
+- Dependabot is configured for weekly npm and GitHub Actions updates. Codecov, OpenSSF Scorecard, Sentry and Renovate remain uninstalled/unconfigured; no adoption milestone was reached and none was installed in this sprint. Recommendation: keep Dependabot; configure one required CI coverage check (Codecov) only after repository CI ownership/secret policy is confirmed; enable OpenSSF Scorecard as a read-only scheduled workflow; defer Sentry until a deployed environment and approved telemetry/privacy policy exist; keep Renovate deferred while Dependabot owns dependency updates.
+- After this documentation update, `git diff --check` and `node --check` for each modified `.mjs` file both passed. The worktree remains dirty and uncommitted. Material blockers include W11 route identity ambiguity, Waltham generic endpoints, Pipers/Long Lane complex calendars, Wycliffe source conflicts/shard, and PE1 pattern/endpoint source evidence. Do not commit, push, merge, tag, release, publish, refresh national data, or start updater work under this closeout.
+
+**PRODUCT OWNER PATH AND AUTOMATED ACCEPTANCE PATH ARE MATERIALLY EQUIVALENT — YES**
+
+**READY FOR FINAL BETA.2 PRODUCT OWNER RE-ACCEPTANCE — NO**
+
+## WIP safeguard and material-defect closeout (2026-11-06)
+
+This section supersedes the earlier no-commit/no-push disposition for this closeout only. Product Owner authorization now permits one WIP engineering checkpoint commit and a normal push to the existing hardening branch, after the stated verification gates. The checkpoint is an unaccepted candidate; it is not a release, merge, tag, publication, national data refresh, or updater change. Independent Technical Director code review remains pending.
+
+### Material corrections and actual browser evidence
+
+- **Tufton / W11:** assessment now creates an actionable `supplementary-identity-conflict` review item at `490009752E`, names the affected route and providers, preserves the TfL timetable authority, and describes BODS only as supplementary evidence. The separate endpoint review at `490005173N` is retained. Actual replay completed with 145 services and 24 planner rows; two TfL timetable 400s and one W11 route-sequence 503 were recorded without a page error. Both review items appeared, acknowledgement passed, 24 Browser/Word rows matched, and map export succeeded (1,558,722 bytes). The route identity ambiguity is disclosed for professional evidence review, not asserted as resolved.
+- **Long Lane / Route 555 calendars:** a TNDS `SpecialDaysOperation` warning is suppressed only where exact route/stop evidence is already safely presented from BODS; unsupported N555 calendar evidence remains actionable. Actual replay completed with 55 services and 14 planner rows, one N555 review item, no failed HTTP requests, successful acknowledgement, matching Browser/Word rows, and a successful map export (893,496 bytes).
+- **Wycliffe / manifest completeness:** absence of a prefix key from the complete prepared BODS manifest is treated as no published shard for that prefix, with `unconfiguredShardKeys` provenance. A key that is present but whose shard fails to load remains a source failure. In Run #75, `1600F` is absent from the manifest and has no BODS shard file, while the selected TNDS shard is present. This is not reported as incomplete BODS shard coverage. Actual replay completed with 516 services and 54 planner rows; only the two 72SN/72SS calendar evidence items remain. No page or HTTP failures occurred; acknowledgement, Browser/Word parity, and map export (2,020,517 bytes) passed.
+- **Task wording:** a completed assessment with review items now says `Assessment execution complete · professional evidence review required`. A partial assessment says source/routing checks are incomplete. “Assessment complete” is reserved for a complete result without review items.
+- **Waltham:** six genuine TfL no-direction HTTP 400s at `210021703440` remain in network evidence. The two review items are the actionable Route 16 and 16C endpoint findings at `210021703430`; the previous duplicate generic failures are no longer emitted. Actual replay completed with 498 services and 20 planner rows; acknowledgement, 20-row Browser/Word parity, and map export (1,410,741 bytes) passed. The six upstream 400s are disclosed.
+- **Other controls:** Pipers 700 m completed with 19 services / 3 rows and one Route 231 TNDS evidence item; Pipers 46 at 1,200 m completed with 62 / 8 and the corresponding Route 231 item. Grove Road completed with 8 / 8 and no review items (so no acknowledgement gate applied). Hoddesdon completed with 317 / 21 and no review items. Milton Keynes completed with 762 / 89 and eight review items. PE1 completed with 539 / 54 and two review items (`4P` principal location and Route `102` endpoint). All ten contexts had zero page errors; Browser/Word rows matched in every context; all map exports passed; acknowledgement passed wherever a gate was shown.
+
+| Actual review-v2 context | Services / rows | Result / actionable items | Browser/Word | Ack / map |
+|---|---:|---|---|---|
+| Tufton | 145 / 24 | complete / 2: W11 identity conflict and endpoint | pass | pass / pass |
+| Pipers 700 m | 19 / 3 | complete / 1: Route 231 TNDS evidence | pass | pass / pass |
+| Pipers 46 1,200 m | 62 / 8 | complete / 1: Route 231 TNDS evidence | pass | pass / pass |
+| Waltham Cross | 498 / 20 | complete / 2: Routes 16 and 16C endpoints | pass | pass / pass |
+| Grove Road | 8 / 8 | complete / 0 | pass | n/a / pass |
+| Long Lane | 55 / 14 | complete / 1: N555 special-day calendar | pass | pass / pass |
+| Hoddesdon | 317 / 21 | complete / 0 | pass | n/a / pass |
+| Wycliffe / Stroud | 516 / 54 | complete / 2: Routes 72SN and 72SS calendar evidence | pass | pass / pass |
+| Milton Keynes | 762 / 89 | complete / 8: unrelated route/source evidence | pass | pass / pass |
+| PE1 | 539 / 54 | complete / 2: Route 4P principal location and Route 102 endpoint | pass | pass / pass |
+
+“Complete” above describes execution status only. The review-item counts remain part of the result and require the Product Owner’s judgment; they are not converted into acceptance by successful exports or acknowledgement.
+
+### Beta.1 regression scope, test result, and push safety
+
+- The accepted Beta.1 baseline remains at `108d898221f84c78c061db4f81335dcd911d6a0e`; the candidate branch contains the prior Beta.2 hardening history through `d556898bd4550653a26be1a3ec4d079b839f9085`. The two commits have no Git merge base, so this audit compares endpoint trees and does not claim ancestry. The endpoint-tree comparison spans 49 paths: intended ATLAS bus source arbitration, prepared-data, planner/endpoint/calendar/frequency, review presentation, map and Word behavior, supporting tests and closeout documentation, plus two explicitly manual/workflow-only files (`atlas-bus-frozen-beta-publish.yml` and `atlas-bus-tnds-capacity-diagnostic.yml`). No unrelated deployed application path was changed in this WIP delta. The baseline Pipers browser workflow replay passed; full deterministic regression and all ten candidate Browser/Word comparisons passed. This is targeted evidence, not an exhaustive replay of every Beta.1 site.
+- Full `node tests/atlas/run-all.mjs` against immutable Run #75 (`ATLAS_TEST_BUS_DATA_ROOT=../atlas-beta2-final-verification/atlas/data/bus`) passed, ending `ATLAS Alpha.15 deterministic suite passed.` Focused bus-assessment, prepared-data adapter, national-planner-trust, planner-summary, and TfL timetable regression tests passed. An initial run without the snapshot variable failed the integrity check against the checkout’s stale default manifest and is not counted as a Run #75 result.
+- Current worktree delta is limited to the reviewed ATLAS bus remediation, its regression tests, task wording, and this closeout record. Preserved recovery/evidence patches remain outside the commit. The WIP commit must contain no `tmp/` artifacts.
+- Workflow inspection confirms the frozen publisher is `workflow_dispatch` only and requires `main` plus an explicit publication authorization. The data-refresh workflow is manual-dispatch gated. The push-triggered workflows are restricted to other exact feature branches or `main` with drawing-generator path filters. A normal push to `codex/atlas-bus-beta2-known-defects-hardening` therefore does not deploy, publish, merge, tag, or refresh data.
+- `main` and `origin/main` remain frozen at `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`. GitHub’s hardening branch was last verified at `d556898bd4550653a26be1a3ec4d079b839f9085`; local `origin/` tracking metadata is stale and is not remote authority. The authorized WIP commit may be pushed only as a normal fast-forward to that existing branch, after confirming the remote still has the expected tip. No force push or workaround is authorized.
+- The review environment is the existing local candidate at `http://127.0.0.1:8771/atlas/?review=v2#bus` and identifies its base checkpoint as `d556898`. It must remain available after the WIP checkpoint; the next review should identify the new WIP revision clearly.
+
+Disposition: engineering verification supports presenting this WIP candidate for Product Owner re-acceptance. Product acceptance has not occurred, independent Technical Director code review is pending, and no release/publication is authorized.
+
+**INDEPENDENT TECHNICAL DIRECTOR CODE REVIEW PENDING — YES**
+
+**READY FOR FINAL BETA.2 PRODUCT OWNER RE-ACCEPTANCE — YES**
+
+## Final engineering recovery continuation (2026-11-06)
+
+### Repository, preservation and immutable data
+
+- Starting and current local HEAD: `d556898bd4550653a26be1a3ec4d079b839f9085`, branch `codex/atlas-bus-beta2-known-defects-hardening`.
+- The original ten-file worktree was present and preserved. This continuation adds the generic exact-pattern TfL topology handoff and its regression coverage, bringing the tracked diff to 11 files. No commit or push was made because the actual-app gate has material failures.
+- Local `main` and `origin/main` remain `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`. The remote hardening branch remains at its previously verified `23e8d9ba5c5c334e52c53b7e806fd548f7c3a058`; local worktree is dirty by design.
+- The original recovery patch remains `tmp/atlas-beta2-final-recovery-2026-11-06.patch`, SHA-256 `0FF1F5E6B9873F19C6B1FBD30403358E1441522FF3E58772E195880D36F1E7E0`. The post-W16 code patch is preserved at `tmp/atlas-beta2-final-recovery-post-w16-2026-11-06.patch`. The final recovery patch was refreshed after this continuation record was added at `tmp/atlas-beta2-final-recovery-final-2026-11-06.patch`.
+- Product review URL: `http://127.0.0.1:8771/atlas/?review=v2#bus`. The existing localhost environment stayed running; its served footer identifies `Beta.2 candidate review · d556898`. Immutable Run #75 Bus/TNDS manifests were mounted with the expected hashes (`1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f` / `2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f`). The prepared snapshot date is 19 October 2026 and is disclosed as stale for formal use; no data refresh occurred.
+
+### Demonstrated W16 defect and correction
+
+The 6 November Tufton full review-v2 replay used `51.613869, -0.020303`, 700 m. TfL returned HTTP 400 for the scheduled timetable lookups at `158/490005180E` and `W16/490005180E`, while both W16 direction route-sequence endpoints returned HTTP 200. The BODS fallback at Stop E retains a complete ordered 37-StopPoint pattern from Leytonstone to Chingford Mount. That exact ordered pattern matches the resolved live TfL inbound topology sequence. The fallback's `routePatternStops` labels are absent, which is why the prior composition did not carry topology into principal-location calculation.
+
+This is an ATLAS fallback-processing defect, not a lack of source topology and not permission to invent a timetable. The generic correction only reuses already-resolved TfL route-sequence evidence when route identity, direction, every ordered StopPoint ID and compatible operator family agree exactly with the national fallback pattern. It marks the match as topology-only, states that no TfL scheduled timetable was used, preserves the BODS timetable authority and does not add a W16-specific code path. A focused adapter/planner regression verifies both resolved locations and truthful BODS source labelling.
+
+The corrected actual Browser and Word result resolves both W16 directions. The Chingford Mount direction now ends with the topology-backed `Chingford Mount`; the reverse direction remains the existing resolved chain. Route 158 retains both directions, including the full Chingford-bound chain **Stratford New Town, Leyton, Walthamstow Central, Walthamstow, Blackhorse Road, Higham Hill, Highams Park, Chingford Mount**. Route 397A remains two weekday BODS/Central Connect directions. Operators remain Arriva London North for 158, Central Connect for 397A and Stagecoach London for W16.
+
+Tufton completed in 162.2 s: inspectScope succeeded (28 stops, 12 routes, 106 route-stop pairs), all 28 stops were selected, assessment status was complete (147 services, 24 planner rows), acknowledgement succeeded, and Word/map exports succeeded (map 1,558,800 bytes). Sources & Checks now has exactly one item: `TfL scheduled timetable information could not be checked for one or more services. ATLAS retained available authoritative results and used matching national timetable evidence where available. Review the affected service evidence before formal use.` This is actionable and accurately covers the two timetable failures. No TfL failure was treated as zero service.
+
+### Full actual review-v2 control results
+
+All nine named controls used the same candidate worktree, review-v2 UI and app bundle, immutable Run #75 data roots/manifests, inspectScope, continuation control, discovery, timetable adapters, planner summary, Sources & Checks, acknowledgement, Browser result, Word export and map export. Each used a fresh headless Edge context and a pinned geocoder response solely to use the recorded coordinate. The Pipers Route 46 1,200 m replay was added as an extra tenth control. Browser/Word service rows were compared on common rendered fields; all ten comparisons passed. All ten map downloads completed. The acknowledgement gate was checked and passed where visible; Grove Road had no review items and therefore no gate.
+
+| Control | Radius | Runtime | Scope (stops/routes/pairs) | Services / planner rows | Result / review items | Requests and exports |
+|---|---:|---:|---:|---:|---|---|
+| Tufton | 700 m | 162.2 s | 28 / 12 / 106 | 147 / 24 | complete / 1 | Browser/Word parity, acknowledgement and map passed; two TfL timetable HTTP 400s retained |
+| Pipers | 700 m | 16.5 s | 11 / 1 / 2 | 19 / 3 | complete / 1 | parity, acknowledgement, map passed; no failed requests |
+| Pipers Route 46 | 1,200 m | 20.6 s | 26 / 2 / 10 | 62 / 8 | complete / 1 | parity, acknowledgement, map passed; no failed requests |
+| Waltham Cross | 700 m | 84.0 s | 16 / 21 / 86 | 498 / 20 | **partial / 4** | exports and parity passed; six TfL timetable HTTP 400s |
+| Grove Road | 250 m | 20.8 s | 2 / 4 / 8 | 8 / 8 | complete / 0 | parity and map passed; acknowledgement was not applicable; no failed requests |
+| Long Lane | 400 m | 21.9 s | 5 / 6 / 12 | 53 / 14 | **partial / 6** | exports and parity passed; three TfL timetable HTTP 500s |
+| Hoddesdon | 700 m | 17.8 s | 15 / 11 / 84 | 317 / 21 | complete / 2 | parity, acknowledgement and map passed; no failed requests |
+| Wycliffe / Stroud | 1,400 m | 83.4 s | 146 / 33 / 416 | 516 / 56 | **partial / 5** | exports and parity passed; no failed requests |
+| Milton Keynes | 700 m | 21.2 s | 31 / 36 / 227 | 762 / 89 | complete / 22 | parity, acknowledgement and map passed; no failed requests |
+| PE1 | 500 m | 40.2 s | 57 / 32 / 97 | 539 / 54 | complete / 3 | parity, acknowledgement and map passed; no failed requests |
+
+The Product Owner's 15-item Tufton failure did not recur; the corrected result's single item is the real timetable-availability warning. Pipers did not show `The required stop evidence could not be checked`. Pipers Route 230 remains one Centrebus circular, approximately hourly Monday–Saturday and no Sunday; Route 231 remains South Beds Dial-a-Ride with Dunstable 3/day weekdays and 2/day Saturday, Pepperstock 4/day weekdays and 1/day Saturday, and no Sunday. No internal calendar diagnostics appear in the rows. At 1,200 m the three Route 46 operator/direction rows and Route 230/231 rows remain present; the only control review item is the relevant Route 231 calendar conflict.
+
+Other observed route outputs:
+
+- Waltham: Route 16 circular; 16C Sunday-only through 19:45; 212 circular; both 242 operators remain distinct; 279 Manor House chain includes Stamford Hill; 217, 317, 327, 310, 491 and N279 remain. The actual scope has six HTTP 400 timetable requests (217, 279, 317, 327, 491 and N279) and result status is partial. Four review items remain. The assessment is therefore not accepted as complete even though route rows, exports and parity exist.
+- Grove Road: both 357 and 444 directions, W16 and both 657 directions remain; 657 is labelled school-day only, one journey per direction, with no weekend service. Sources & Checks is empty and no requests failed.
+- Long Lane: both 203 directions show TfL primary and the corrected weekend frequencies; 555 dominant Hatton Cross and The Bear directions and both N555 rows remain. Three timetable HTTP 500s affect other TfL calls and the assessment is partial with six review items; final source limitations and continuation note require manual inspection.
+- Hoddesdon: 33, 310, 907 and 907A remain, including both 310 directions. Route 33 towards Sainsbury's has unresolved principal locations, as does 25B; assessment status is complete, but this source uncertainty is visible and remains a product review item.
+- Wycliffe: routes 62/64/65 remain. Route 64 towards Merrywalks only shows `Stroud Merrywalks A`; incomplete ordered-call evidence remains among five review items. The assessment is partial and fails the release gate.
+- MK5: Route 5 remains two Arriva Beds and Bucks directions with correct principal chains; Browser/Word parity passed and its 22 review items did not identify Route 5. Assessment status is complete.
+- PE1: both Route 202 branches (Austerby and Bourne) and Route 415 remain. Three review items include incomplete principal-location evidence, including a Route 415 destination endpoint review; further operator timetable/manual verification remains necessary.
+
+### Beta.2 retention matrix and accepted Beta.1 baseline
+
+| Area / retained correction | Result | Evidence / remaining issue |
+|---|---|---|
+| Tufton Stop E identity, distinct no-route stop, 158 both directions, 397A, operators, truthful BODS fallback, W16 | **PASS** | Current actual replay; W16 exact topology fallback regression passes; one honest timetable warning remains. |
+| Pipers 230 circular, 231 TNDS days, no Sunday, no internal diagnostics, Route 46 clean presentation | **PASS with review** | Actual 700 m and 1,200 m controls; relevant Route 231 calendar conflict remains disclosed. |
+| Waltham 16 circular, 16C Sunday-only, 212 circular, dual 242, 279 chain, 217/317/327/310/491/N279 | **PARTIAL / FAIL gate** | Rows remain, but assessment status partial after six live TfL 400s and four review items; 13/15 principal locations and short-working/warning reconciliation need targeted manual check. |
+| Grove 357/444/W16, 657 school-day-only one journey each direction, no weekend, TfL priority | **PASS** | Actual 250 m replay; complete, empty review drawer, parity and map pass. |
+| Long Lane 203 TfL-primary and weekend frequencies, 555/N555 patterns | **PARTIAL / NOT ACCEPTED** | Rows remain, but full assessment partial after three TfL 500s; extension-note and transparent N555 limitation require manual source inspection. |
+| Hoddesdon 33/310/907/907A | **FAIL** | All routes and both 310 directions remain, but Route 33 toward Sainsbury's principal pattern is unresolved. |
+| Wycliffe 62/64/65 | **FAIL** | Route 64 toward Merrywalks degrades to one location; incomplete evidence and partial assessment. |
+| MK5 Route 5 BODS-primary with Arriva Beds and Bucks, two directions, no duplicate peers | **PASS** | Current route appears correctly in both Browser and Word; unrelated review items remain in other routes. |
+| PE1 Route 202 branching and Route 415 | **PARTIAL / FAIL gate** | Both 202 branches and 415 row remain; endpoint/principal evidence reviews still require resolution and Wednesday-only detail needs manual confirmation. |
+| General source hierarchy, no false zero, calendar safety, operators, frequency and warning contracts | **PASS automated / partial product gate** | Full suite passed on immutable Run #75; three actual controls are partial and must not be called complete. |
+| Browser/Word parity and acknowledgement/export behavior | **PASS** | Ten actual review-v2 contexts: all common service fields matched, all maps downloaded, acknowledgement passed where the review gate was required. |
+| Frozen accepted Beta.1 manual workflow comparison | **NOT EXERCISED** | This continuation did not run a representative accepted Beta.1 product workflow; automated regression coverage is not a direct baseline replay. |
+
+The actual headless runner exercised the same review-v2 UI pathway and workflow controls as the Product Owner pathway: geocode selection, confirmed point, inspectScope, full-assessment continuation, result, Sources & Checks, acknowledgement, Word and map. The geocoder coordinate was pinned to the recorded golden point. Therefore the harness is materially representative of the Product Owner pathway (**YES**), but this is not a substitute for manual Product Owner acceptance, which remains pending.
+
+### Tests, tooling and release decision
+
+- Focused `node tests/atlas/tfl-bus-timetable.test.mjs`: **passed**, including the exact prepared-pattern fallback topology regression.
+- Full `node tests/atlas/run-all.mjs` with `ATLAS_TEST_BUS_DATA_ROOT=../atlas-beta2-final-verification/atlas/data/bus`: **passed**, ending `ATLAS Alpha.15 deterministic suite passed.` The first default-root attempt used the older checkout `atlas/data` and failed integrity because its old manifest references a missing shard; it was not treated as a Run #75 result. The pinned Run #75 manifest hash was verified before the passing run.
+- Review-v2 full application controls: all ten executed; Browser/Word service parity, acknowledgement where applicable and map exports passed. Actual Waltham, Long Lane and Wycliffe assessment status was partial and is not counted as pass.
+- GitHub tooling adoption review: Dependabot is configured for weekly npm and Actions updates; Codecov, OpenSSF Scorecard, Sentry and Renovate remain uninstalled/unconfigured. No adoption milestone was reached and no tooling/configuration changed.
+- Syntax checks and `git diff --check` must be repeated after this final documentation edit. Worktree stays dirty and uncommitted. Because partial assessments and unresolved principal-location/evidence issues remain, there is no checkpoint commit or push. No merge, tag, release, updater, publication or national-data refresh occurred.
+
+**PRODUCT OWNER PATH AND AUTOMATED ACCEPTANCE PATH ARE MATERIALLY EQUIVALENT — YES**
+
+**READY FOR FINAL BETA.2 PRODUCT OWNER RE-ACCEPTANCE — NO**

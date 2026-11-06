@@ -579,7 +579,7 @@ function representativeRecord(records, stopIds) {
 
 function directionalPrincipalLocations(record, evidenceStopId) {
   const topologyOnly = record?.tflRouteSequenceEvidence?.status === 'resolved'
-    && record?.tflRouteSequenceEvidence?.matchType === 'route-topology-only-for-timetable-fallback'
+    && ['route-topology-only-for-timetable-fallback', 'exact-prepared-pattern-match-for-timetable-fallback'].includes(record?.tflRouteSequenceEvidence?.matchType)
     && record?.tflRouteSequenceEvidence?.scheduledTimetableUsed === false
     ? record.tflRouteSequenceEvidence.matchedSequence
     : null;
@@ -588,9 +588,19 @@ function directionalPrincipalLocations(record, evidenceStopId) {
     : topologyOnly?.orderedStopPointIds?.length
       ? topologyOnly.orderedStopPointIds
       : record?.circularPatternStopIds ?? []).map(text);
+  const preparedLocalityCalls = Array.isArray(record?.plannerLocalityPatternStops) ? record.plannerLocalityPatternStops : [];
+  const alignedPreparedLocalityCalls = patternIds.length >= 2
+    && preparedLocalityCalls.length === patternIds.length
+    && preparedLocalityCalls.every((call, index) => {
+      const id = text(typeof call === 'string' ? '' : call?.id || call?.stopPointId || call?.sourceId);
+      return id === patternIds[index];
+    })
+    ? preparedLocalityCalls
+    : null;
   const calls = Array.isArray(record?.routePatternStops) && record.routePatternStops.length
     ? record.routePatternStops
-    : Array.isArray(topologyOnly?.orderedStops) ? topologyOnly.orderedStops : [];
+    : Array.isArray(topologyOnly?.orderedStops) ? topologyOnly.orderedStops
+      : alignedPreparedLocalityCalls ?? [];
   const unresolved = reason => ({ locations: [], state: 'unresolved', warning: `Principal locations could not be safely mapped ${reason}; review the source journey pattern.` });
   if (patternIds.length < 2 || calls.length !== patternIds.length) return unresolved('because a complete ordered call pattern is unavailable');
   if (!text(evidenceStopId)) return unresolved('because the assessed stop identity is unavailable');
@@ -680,6 +690,12 @@ function directionalPrincipalLocations(record, evidenceStopId) {
     return facility || (station && index < downstreamNamed.length - 1 && !sameStationLocality) ? name : '';
   };
   add(locality(downstreamNamed[0]) || place(downstreamNamed[0]));
+  const destinationStopIds = unique([record?.destinationStopPointId, ...(record?.destinationStopPointIds ?? [])]);
+  const sourceEndpointIds = (record?.source?.orderedPatternEndpoints ?? record?.orderedPatternEndpoints ?? []).map(text).filter(Boolean);
+  const exactDestinationCall = patternIds.at(-1)
+    && (destinationStopIds.includes(patternIds.at(-1)) || sourceEndpointIds.at(-1) === patternIds.at(-1));
+  const destinationLabel = text(record?.destination);
+  if (exactDestinationCall && destinationLabel && !/^(?:destination not supplied|destination not resolved)$/i.test(destinationLabel)) add(destinationLabel);
   let previousLocality = normal(locality(downstreamNamed[0]));
   for (const [index, call] of downstreamNamed.entries()) {
     const namedPlace = usefulName(call, index);

@@ -83,6 +83,17 @@ test('prepared BODS lookup joins schedules by authoritative stop ID', async () =
   assert.equal(result.provenance.apiKeyEmbedded, false);
 });
 
+test('a prefix absent from the complete prepared manifest is no published BODS shard, not a missing referenced shard', async () => {
+  const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchFixture, baseUrl: 'https://atlas.example/data/' });
+  const result = await adapter.servicesForStops([{ ...stop, id: '1600FLX49', routes: ['64'] }]);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.data, []);
+  assert.equal(result.provenance.sourceCompleteness, 'COMPLETE');
+  assert.equal(result.provenance.timetableConclusion, 'NO_CURRENT_MATCH');
+  assert.deepEqual(result.provenance.unconfiguredShardKeys, ['1600F']);
+  assert.deepEqual(result.warnings, []);
+});
+
 test('prepared v2 decodes physical stops and exposes sidecars without changing v1 service access', async () => {
   const v2Manifest = {
     ...manifest,
@@ -178,7 +189,9 @@ test('TNDS quarantine warns only when an affected selected stop is assessed', as
   assert.equal(affected.provenance.tndsServing, 'bounded-legacy-manifest');
   assert.doesNotMatch(affected.warnings.join(' '), /JP-Q|quarantined\.json/);
   const unrelated = await adapter.servicesForStops([{ ...stop, id: '9990A' }]);
-  assert.equal(unrelated.ok, false);
+  assert.equal(unrelated.ok, true, 'an absent prefix in the complete BODS manifest means no published shard, not a failed lookup');
+  assert.deepEqual(unrelated.data, []);
+  assert.deepEqual(unrelated.provenance.unconfiguredShardKeys, ['9990A']);
 });
 
 test('TNDS stop-prefix shards bound requests and preserve quarantine impact', async () => {
@@ -276,24 +289,26 @@ test('non-call bus-domain infrastructure does not request a missing timetable sh
   assert.equal(result.provenance.sourceCompleteness, 'COMPLETE');
 });
 
-test('missing prepared timetable area remains an unavailable source, not zero', async () => {
+test('a BODS prefix absent from the complete manifest has no published BODS service shard', async () => {
   const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchFixture, baseUrl: 'https://atlas.example/data/' });
   const result = await adapter.servicesForStops([{ id: '9990A', areaCode: '999' }]);
-  assert.equal(result.ok, false);
-  assert.equal(result.code, 'unavailable_source');
+  assert.equal(result.ok, true);
+  assert.equal(result.provenance.timetableConclusion, 'NO_CURRENT_MATCH');
+  assert.deepEqual(result.provenance.unconfiguredShardKeys, ['9990A']);
+  assert.deepEqual(result.warnings, []);
 });
 
-test('partial timetable coverage keeps successful shard evidence and marks the uncovered scope', async () => {
+test('configured BODS shards load while an absent manifest prefix remains a no-match', async () => {
   const adapter = createPreparedBusDataAdapter({ fetchImpl: fetchFixture, baseUrl: 'https://atlas.example/data/' });
   const result = await adapter.servicesForStops([stop, { id: '9990A', areaCode: '999' }]);
   assert.equal(result.ok, true);
   assert.equal(result.data.length, 1);
-  assert.equal(result.provenance.sourceCompleteness, 'PARTIAL');
-  assert.equal(result.provenance.failedShardCount, 1);
+  assert.equal(result.provenance.sourceCompleteness, 'COMPLETE');
+  assert.equal(result.provenance.failedShardCount, 0);
   assert.equal(result.provenance.successfulShardCount, 1);
-  assert.deepEqual(result.provenance.unresolvedStopIds, ['9990A']);
-  assert.match(result.warnings.join(' '), /not treated as absent/);
-  assert.match(result.warnings.join(' '), /Successful timetable shards were retained/);
+  assert.deepEqual(result.provenance.unresolvedStopIds, []);
+  assert.deepEqual(result.provenance.unconfiguredShardKeys, ['9990A']);
+  assert.doesNotMatch(result.warnings.join(' '), /Prepared timetable evidence was incomplete/);
 });
 
 test('malformed prepared stop data is distinguished from a genuine zero', async () => {

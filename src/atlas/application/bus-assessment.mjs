@@ -199,6 +199,33 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     for (const stop of service.stopIds ?? []) stops.add(String(stop));
     safelyPresentedBodsRouteStops.set(route, stops);
   }
+  const materialIdentityIssues = new Map();
+  for (const service of services ?? []) {
+    const diagnostics = (service.sourceAuthorityDiagnostics ?? []).filter(diagnostic => diagnostic?.classification === 'material-identity-ambiguity' && (diagnostic.materialFields ?? []).length);
+    if (!diagnostics.length) continue;
+    const route = String(service.routeNumber ?? '').trim();
+    const stop = String(service.source?.assessedStopPointId || service.source?.requestedStopPointId || service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0] || '').trim();
+    if (!route) continue;
+    const key = `${route.toLowerCase()}|${stop}`;
+    const issue = materialIdentityIssues.get(key) ?? { route, stop, fields: new Set(), providers: new Set(), authorities: new Set() };
+    for (const diagnostic of diagnostics) {
+      for (const field of diagnostic.materialFields) issue.fields.add(String(field));
+      if (diagnostic.provider) issue.providers.add(String(diagnostic.provider));
+      if (diagnostic.authoritativeProvider) issue.authorities.add(String(diagnostic.authoritativeProvider));
+    }
+    materialIdentityIssues.set(key, issue);
+  }
+  for (const issue of materialIdentityIssues.values()) {
+    const fields = [...issue.fields].sort();
+    const supplementary = [...issue.providers].sort().join(' + ') || 'supplementary national';
+    const authority = [...issue.authorities].sort().join(' + ') || 'TfL';
+    add({
+      code: 'supplementary-identity-conflict', route: issue.route, stop: issue.stop,
+      source: `${authority} / ${supplementary}`,
+      factKey: fields.join('|'),
+      message: `Material ${supplementary} disagreement with ${authority} evidence affects ${fields.join(', ')}; the authoritative schedule was retained, but route identity requires professional review before formal use.`
+    });
+  }
   for (const service of serviceSummaries ?? []) for (const message of service.plannerReviewWarnings ?? []) {
     const route = String(service.routeNumber ?? '').trim();
     const providers = [...(service.sourceAuthorities ?? []), ...(service.sourceProviders ?? []), service.timetableSource, service.provider]
@@ -258,13 +285,15 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     if (specialDayProfile) {
       const route = String(service.routeNumber ?? '').trim();
       const source = String(service.timetableSource || service.source?.provider || 'timetable source').trim();
+      const stop = String(service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0] || '').trim();
+      const tndsOnlyEvidence = /TNDS|Traveline National Dataset/i.test(source);
+      if (tndsOnlyEvidence && route && stop && safelyPresentedBodsRouteStops.get(route)?.has(stop)) continue;
       if (!route) {
-        add({ code: 'service-source-evidence', route: null, stop: service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0], source, message: String(warning) });
+        add({ code: 'service-source-evidence', route: null, stop, source, message: String(warning) });
         continue;
       }
       const key = [route, source].map(value => value.toLowerCase()).join('|');
       const issue = specialDayProfileIssues.get(key) ?? { route, source, stops: new Set(), profiles: new Set() };
-      const stop = String(service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0] || '').trim();
       if (stop) issue.stops.add(stop);
       const profile = String(warning).match(/\b(?:TNDS\s+)?([^\s]+)\s+has an unsupported complex operating profile/i)?.[1];
       const identity = profile || (service.sourceRecordIds ?? []).map(String).sort().join(',') || String(service.id ?? warning);

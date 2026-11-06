@@ -103,7 +103,7 @@ assert.doesNotMatch(app, /No additional principal locations identified/);
 assert.match(app, /Try a different search, or choose the assessment point on the map instead/);
 assert.doesNotMatch(app, /Your description is still recorded/);
 assert.match(app, /buildServicePresentation/);
-assert.match(app, /buildPlannerBusServiceSummaries/);
+assert.match(app, /plannerServiceSummariesForResult/);
 assert.match(app, /plannerStopLabel/);
 assert.match(app, /bus-stop-marker/);
 assert.match(app, /__ATLAS_BUS_UI__/);

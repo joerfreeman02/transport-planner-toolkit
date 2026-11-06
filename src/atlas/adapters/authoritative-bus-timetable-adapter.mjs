@@ -50,6 +50,7 @@ function stagedRequests(stops, { insideLondon = false, crossBoundaryTfLRoutes = 
   const entries = stops.flatMap(stop => (stop.routes ?? []).map(line => {
     const lineId = text(line), stopPointId = stopKey(stop);
     const routeHasTfLCoverage = crossBoundaryTfLRoutes.has(normal(lineId));
+    if (insideLondon && stop?.routeAuthorities && !routeAuthorities(stop, lineId).includes('tfl')) return [];
     if (!insideLondon && !routeAuthorities(stop, lineId).includes('tfl') && !routeHasTfLCoverage) return [];
     return lineId && stopPointId ? [`${lineId}|${stopPointId}`, { lineId, stopPointId, stop }] : [];
   })).filter(entry => Array.isArray(entry) && entry.length === 2);
@@ -162,6 +163,38 @@ function fallbackTflRouteSequenceEvidence(service, request, routeMetadata, route
     })]),
     provenance: entry.provenance ?? null,
     scheduledTimetableUsed: false
+  });
+}
+
+function exactPreparedPatternTflEvidence(service, request, composedServices) {
+  const pattern = (service?.routePatternStopIds ?? []).map(text).filter(Boolean);
+  if (pattern.length < 2 || !pattern.some(id => sameStopId(id, request.stopPointId))) return null;
+  const candidates = (composedServices ?? []).flatMap(candidate => {
+    const evidence = candidate?.tflRouteSequenceEvidence;
+    const sequence = evidence?.matchedSequence?.orderedStopPointIds ?? [];
+    if (normal(candidate?.provider ?? candidate?.timetableSource ?? candidate?.source?.provider) !== 'tfl'
+      || evidence?.status !== 'resolved'
+      || normal(evidence.lineId) !== normal(request.lineId)
+      || sequence.length !== pattern.length
+      || !sameSequence(sequence, pattern)
+      || !operatorFamilyCompatible(candidate, service)) return [];
+    return [evidence];
+  });
+  const signatures = new Map(candidates.map(evidence => [JSON.stringify([
+    normal(evidence.lineId), normal(evidence.direction), evidence.matchedSequence?.branchId,
+    evidence.matchedSequence?.serviceType, evidence.matchedSequence?.orderedStopPointIds
+  ]), evidence]));
+  if (signatures.size !== 1) return null;
+  const evidence = [...signatures.values()][0];
+  return Object.freeze({
+    ...evidence,
+    matchType: 'exact-prepared-pattern-match-for-timetable-fallback',
+    scheduledTimetableUsed: false,
+    provenance: Object.freeze({
+      ...(evidence.provenance ?? {}),
+      topologyAppliedTo: 'exact BODS/TNDS fallback ordered StopPoint pattern',
+      timetableAuthorityRetained: text(service?.timetableSource ?? service?.source?.provider) || 'national fallback'
+    })
   });
 }
 
@@ -649,6 +682,22 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
         const retained = nationalCoverageAfterAuthority(service, services, fallbackServices, nationalOnlyStopIds);
         if (retained) composed.push(retained);
       }
+    } else {
+      // In London, retain national evidence for routes explicitly associated
+      // with an assessed StopPoint by NaPTAN but absent from TfL's route list.
+      // TfL remains primary wherever it claims that route at that StopPoint.
+      const nationalOnlyStopIdsByRoute = new Map();
+      for (const stop of stops.filter(candidate => candidate?.routeAuthorities && typeof candidate.routeAuthorities === 'object')) for (const route of nationalRoutesForStop(stop)) {
+        const key = normal(route);
+        const ids = nationalOnlyStopIdsByRoute.get(key) ?? new Set();
+        ids.add(stopKey(stop));
+        nationalOnlyStopIdsByRoute.set(key, ids);
+      }
+      for (const service of nationalServices) {
+        const routeStopIds = nationalOnlyStopIdsByRoute.get(normal(service.routeNumber)) ?? new Set();
+        const matchingStopIds = scheduledStopIds(service).filter(stopId => routeStopIds.has(stopId));
+        if (matchingStopIds.length) composed.push(scopedScheduledService(service, matchingStopIds));
+      }
     }
     if (conflicts) warnings.push(conflictWarning);
     if (materialUnresolvedObserved.length && (materialFallbackServices.length || unresolvedEntries.length)) warnings.push(partialWarning);
@@ -683,7 +732,8 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
         }
         const request = { lineId: text(service.source?.requestedLineId), stopPointId: text(service.source?.requestedStopPointId) };
         if (!request.lineId || !request.stopPointId) continue;
-        const evidence = fallbackTflRouteSequenceEvidence(service, request, routeMetadata, routeSequenceResult);
+        const evidence = fallbackTflRouteSequenceEvidence(service, request, routeMetadata, routeSequenceResult)
+          ?? exactPreparedPatternTflEvidence(service, request, composed);
         if (evidence) composed[index] = { ...service, tflRouteSequenceEvidence: evidence };
       }
       warnings.push(...(routeSequenceResult.warnings ?? []));

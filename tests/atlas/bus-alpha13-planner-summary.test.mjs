@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildPlannerBusServiceSummaries, plannerSourceWarning } from '../../src/atlas/domain/bus-planner-summary.mjs';
+import { buildPlannerBusServiceSummaries, plannerServiceSummariesForResult, plannerSourceWarning } from '../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildServiceSummaries, calculateTypicalServiceFrequency } from '../../src/atlas/domain/bus-service-assessment.mjs';
 import { createAtlasTaskStatus, formatAtlasTaskStatus } from '../../src/atlas/presentation/atlas-task-status.mjs';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
@@ -16,6 +16,15 @@ const week = {
 const stop = { id: 'A', name: 'Waltham Cross Bus Station', indicator: 'G', distanceMetres: 110, walking: { status: 'routed', distanceMetres: 82 } };
 const secondStop = { id: 'B', name: 'Waltham Cross Bus Station', indicator: 'H', distanceMetres: 95, walking: { status: 'routed', distanceMetres: 120 } };
 const base = { routeNumber: '657', operator: 'Example Buses', direction: 'outbound', directionFamily: 'gtfs:0', origin: 'Waltham Cross', destination: 'Chingford', principalLocations: ['Enfield', 'Chingford Mount'], routePatternStopIds: ['A', 'B', 'C'], frequencyBasisStopId: 'A', stopIds: ['A'], departuresByDay: week, frequencyEvidence: [], sourceRecordIds: ['main'], serviceNote: 'School-day-only service.' };
+
+const recovered158 = Object.freeze({ id: 'planner:158|towards-chingford', routeNumber: '158', operator: 'Arriva London North', direction: 'towards Chingford Mount', origin: 'Stratford Bus Station', destination: 'Chingford Mount', principalLocations: ['Stratford New Town', 'Leyton', 'Walthamstow Central', 'Walthamstow', 'Blackhorse Road', 'Higham Hill', 'Highams Park', 'Chingford Mount'], principalLocationsText: 'Stratford New Town, Leyton, Walthamstow Central, Walthamstow, Blackhorse Road, Higham Hill, Highams Park, Chingford Mount', stopIds: ['A'], sourceRecordIds: ['tfl:158:inbound', 'bods:158:fallback'], timetableSource: 'TfL', principalLocationState: 'resolved' });
+const degraded158 = { ...base, routeNumber: '158', direction: 'inbound', origin: 'Stratford Bus Station', destination: 'Chingford Mount', principalLocations: ['Hall Lane'], stopIds: ['A'], id: 'raw:158' };
+const resolved158Rows = plannerServiceSummariesForResult({ plannerServiceSummaries: [recovered158], serviceSummaries: [degraded158], stops: [stop] });
+assert.deepEqual(resolved158Rows, [recovered158], 'Browser/Word selection must retain endpoint-resolved planner locations instead of rebuilding from a weaker raw summary.');
+const resolved158WordRows = buildBusWordTables({ ok: true, stops: [stop], plannerServiceSummaries: resolved158Rows, serviceSummaries: [degraded158] })[1].rows;
+assert.match(resolved158WordRows.map(row => Object.values(row).join(' ')).join(' '), /Stratford New Town.*Highams Park.*Chingford Mount/, 'Word presentation retains the complete resolved 158 principal-location chain.');
+const legacyPlannerRows = plannerServiceSummariesForResult({ serviceSummaries: [base], stops: [stop] });
+assert.deepEqual(legacyPlannerRows, buildPlannerBusServiceSummaries([base], [stop]), 'Legacy callers without resolved planner rows retain the existing builder behavior.');
 
 const planner = buildPlannerBusServiceSummaries([
   base,
@@ -56,9 +65,10 @@ assert.equal(formatAtlasTaskStatus({ phase: 'routing-stops', completed: 2, total
 assert.equal(formatAtlasTaskStatus({ phase: 'checking-timetables', completed: 12, total: 31 }), 'Step 3 of 5 · Checking timetables — 12 of 31');
 assert.match(formatAtlasTaskStatus({ phase: 'checking-timetables', waiting: true }), /Waiting briefly/);
 assert.equal(formatAtlasTaskStatus({ phase: 'complete' }), 'Assessment complete');
-assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: 'one source was unavailable' }), 'Assessment complete');
-assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '1 evidence item needs review' }), 'Assessment complete');
-assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '2 evidence items need review' }), 'Assessment complete');
+assert.equal(formatAtlasTaskStatus({ phase: 'complete', reviewCount: 1 }), 'Assessment execution complete · professional evidence review required');
+assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: 'one source was unavailable' }), 'Assessment execution complete · source or routing checks incomplete');
+assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '1 evidence item needs review' }), 'Assessment execution complete · source or routing checks incomplete');
+assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '2 evidence items need review' }), 'Assessment execution complete · source or routing checks incomplete');
 assert.equal(formatAtlasTaskStatus({ phase: 'unavailable' }), 'Assessment unavailable');
 
 const statusMessage = { textContent: '' };
@@ -78,7 +88,7 @@ assert.equal(statusCount.textContent, '12 of 31');
 assert.equal(statusRegion.attributes['aria-busy'], 'true');
 assert.deepEqual(statusStages.map(stage => stage.dataset.state), ['complete', 'complete', 'active', 'upcoming', 'upcoming']);
 taskStatus.update({ phase: 'partial', detail: 'one timetable request failed', reviewCount: 3 });
-assert.equal(statusMessage.textContent, 'Assessment complete');
+assert.equal(statusMessage.textContent, 'Assessment execution complete · source or routing checks incomplete');
 assert.equal(statusReviewBadge.hidden, false);
 assert.equal(statusReviewBadge.textContent, '3 items require review');
 assert.equal(statusProgress.hidden, true);

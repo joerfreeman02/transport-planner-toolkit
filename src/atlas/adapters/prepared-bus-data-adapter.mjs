@@ -423,10 +423,19 @@ export function createPreparedBusDataAdapter({
     const stopIdsByShardKey = new Map(shardKeys.map(key => [key, [...stopIds].filter(stopId => stopId.slice(0, prefixLength) === key)]));
     const shardDiagnostics = [];
     const shardPayloads = [];
+    const unconfiguredShardKeys = [];
     for (const key of shardKeys) {
       const configured = index.serviceShards?.[key];
       const shardStopIds = stopIdsByShardKey.get(key) ?? [];
-      if (!configured || (Array.isArray(configured) && configured.length === 0)) {
+      if (!configured) {
+        // The prepared manifest is the complete index of published BODS
+        // shards. An absent key means no shard was published for this prefix,
+        // not a missing referenced file. Only an explicit manifest path that
+        // fails to load is an incomplete-source condition.
+        unconfiguredShardKeys.push(key);
+        continue;
+      }
+      if (Array.isArray(configured) && configured.length === 0) {
         shardDiagnostics.push(serviceShardFailure({ key, status: 'missing', code: 'missing_shard', message: `No prepared timetable shard is configured for stop prefix ${key}.`, stopIds: shardStopIds }));
         continue;
       }
@@ -455,11 +464,19 @@ export function createPreparedBusDataAdapter({
     const failedShardDiagnostics = shardDiagnostics.filter(item => item.status !== 'loaded');
     const successfulShardDiagnostics = shardDiagnostics.filter(item => item.status === 'loaded');
     if (!shardPayloads.length) {
+      if (failedShardDiagnostics.length === 0 && unconfiguredShardKeys.length === shardKeys.length) {
+        return sourceSuccess({ data: [], evidence: [], warnings: [], provenance: {
+          source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url, sourceCompleteness: 'COMPLETE',
+          timetableConclusion: 'NO_CURRENT_MATCH', requestedShardKeys: shardKeys,
+          unconfiguredShardKeys, checkedStopIds: [], failedShardCount: 0, successfulShardCount: 0,
+          failedShardDiagnostics: [], successfulShardDiagnostics: [], failedRequests: 0, unresolvedRequests: 0
+        } });
+      }
       const failedStopIds = [...new Set(failedShardDiagnostics.flatMap(item => item.stopIds))].sort();
       return sourceFailure({
         code: failedShardDiagnostics.some(item => item.status === 'malformed' || item.status === 'validation-failed') ? 'invalid_response' : 'unavailable_source',
         message: 'Bus timetable information could not be checked. Please try again.',
-        provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url, sourceCompleteness: 'SOURCE_UNAVAILABLE', timetableConclusion: 'UNRESOLVED', requestedShardKeys: shardKeys, unresolvedStopIds: failedStopIds, failedShardCount: failedShardDiagnostics.length, successfulShardCount: 0, failedShardDiagnostics, successfulShardDiagnostics, failedRequests: failedShardDiagnostics.length, unresolvedRequests: failedShardDiagnostics.length },
+        provenance: { source: TIMETABLE_SOURCE, endpoint: index.sources.bods.url, sourceCompleteness: 'SOURCE_UNAVAILABLE', timetableConclusion: 'UNRESOLVED', requestedShardKeys: shardKeys, unconfiguredShardKeys, unresolvedStopIds: failedStopIds, failedShardCount: failedShardDiagnostics.length, successfulShardCount: 0, failedShardDiagnostics, successfulShardDiagnostics, failedRequests: failedShardDiagnostics.length, unresolvedRequests: failedShardDiagnostics.length },
         warnings: [`Prepared timetable evidence was unavailable for ${failedStopIds.length || failedShardDiagnostics.length} selected stop area${(failedStopIds.length || failedShardDiagnostics.length) === 1 ? '' : 's'}. No zero-service conclusion has been assumed.`]
       });
     }
@@ -649,7 +666,7 @@ export function createPreparedBusDataAdapter({
     if (supplementaryFailure) warningsWithSupplementary.push(`Supplementary TNDS evidence remains unresolved: ${supplementaryFailure.warning} Successfully loaded BODS-primary services were retained.`);
     return sourceSuccess({
       data: mergedServices, evidence: [], warnings: warningsWithSupplementary,
-      provenance: { source: tndsProvenance ? `${TIMETABLE_SOURCE}; ${tndsProvenance.source}` : TIMETABLE_SOURCE, endpoint: index.sources.bods.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, tndsPreparedAt: tndsProvenance?.dataPreparedAt || null, tndsServing: tndsProvenance?.serving || null, tndsShardRequests: tndsProvenance?.shardRequests ?? null, supplementarySourceCondition: supplementaryFailure ? 'UNRESOLVED' : tndsBaseUrl ? 'CHECKED' : 'NOT_CONFIGURED', supplementarySourceFailure: supplementaryFailure ? { code: supplementaryFailure.code, endpoint: supplementaryFailure.endpoint, failedShard: supplementaryFailure.failedShard || null } : null, datasetVersion: index.sources.bods.sha256, regions: index.sources.bods.regions, representativeDates: index.representativeDates, anonymousRequest: true, apiKeyEmbedded: false, attribution: TIMETABLE_ATTRIBUTION, unresolvedRequestIdentities: stableUnresolvedRequestIdentities, nationalUnresolvedRequestIdentities: stableUnresolvedRequestIdentities, nationalUnresolvedRoutes: [...new Set([...(tndsProvenance?.unresolvedRequestIdentities ?? []).map(identity => String(identity).split('|')[0]), ...(supplementaryFailure ? supplementaryUnresolvedIdentities.map(identity => identity.split('|')[0]) : []), ...unresolvedRoutes])].filter(Boolean).sort((left, right) => left.localeCompare(right, undefined, { numeric: true })), checkedStopIds: [...new Set(successfulShardDiagnostics.flatMap(item => item.stopIds))].sort(), unresolvedStopIds: [...new Set([...failedStopIds, ...(supplementaryFailure ? callStops.filter(stop => nationalRoutesAtStop(stop).length).map(stop => String(stop.id || stop.sourceId || '')) : [])])].sort(), requestedShardKeys: shardKeys, failedShardCount: failedShardDiagnostics.length + (supplementaryFailure ? 1 : 0), successfulShardCount: successfulShardDiagnostics.length, failedShardDiagnostics, successfulShardDiagnostics, failedRequests: failedShardDiagnostics.length + (supplementaryFailure ? 1 : 0), unresolvedRequests: failedShardDiagnostics.length + (supplementaryFailure ? 1 : 0), sourceCompleteness: partial || supplementaryFailure ? 'PARTIAL' : 'COMPLETE', timetableConclusion }
+      provenance: { source: tndsProvenance ? `${TIMETABLE_SOURCE}; ${tndsProvenance.source}` : TIMETABLE_SOURCE, endpoint: index.sources.bods.url, retrievedAt: checkedAt, dataPreparedAt: index.generatedAt, tndsPreparedAt: tndsProvenance?.dataPreparedAt || null, tndsServing: tndsProvenance?.serving || null, tndsShardRequests: tndsProvenance?.shardRequests ?? null, supplementarySourceCondition: supplementaryFailure ? 'UNRESOLVED' : tndsBaseUrl ? 'CHECKED' : 'NOT_CONFIGURED', supplementarySourceFailure: supplementaryFailure ? { code: supplementaryFailure.code, endpoint: supplementaryFailure.endpoint, failedShard: supplementaryFailure.failedShard || null } : null, datasetVersion: index.sources.bods.sha256, regions: index.sources.bods.regions, representativeDates: index.representativeDates, anonymousRequest: true, apiKeyEmbedded: false, attribution: TIMETABLE_ATTRIBUTION, unresolvedRequestIdentities: stableUnresolvedRequestIdentities, nationalUnresolvedRequestIdentities: stableUnresolvedRequestIdentities, nationalUnresolvedRoutes: [...new Set([...(tndsProvenance?.unresolvedRequestIdentities ?? []).map(identity => String(identity).split('|')[0]), ...(supplementaryFailure ? supplementaryUnresolvedIdentities.map(identity => identity.split('|')[0]) : []), ...unresolvedRoutes])].filter(Boolean).sort((left, right) => left.localeCompare(right, undefined, { numeric: true })), checkedStopIds: [...new Set(successfulShardDiagnostics.flatMap(item => item.stopIds))].sort(), unresolvedStopIds: [...new Set([...failedStopIds, ...(supplementaryFailure ? callStops.filter(stop => nationalRoutesAtStop(stop).length).map(stop => String(stop.id || stop.sourceId || '')) : [])])].sort(), requestedShardKeys: shardKeys, unconfiguredShardKeys, failedShardCount: failedShardDiagnostics.length + (supplementaryFailure ? 1 : 0), successfulShardCount: successfulShardDiagnostics.length, failedShardDiagnostics, successfulShardDiagnostics, failedRequests: failedShardDiagnostics.length + (supplementaryFailure ? 1 : 0), unresolvedRequests: failedShardDiagnostics.length + (supplementaryFailure ? 1 : 0), sourceCompleteness: partial || supplementaryFailure ? 'PARTIAL' : 'COMPLETE', timetableConclusion }
     });
   }
 

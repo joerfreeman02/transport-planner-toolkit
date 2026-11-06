@@ -17,6 +17,13 @@ const response = body => ({ ok: true, status: 200, headers: new Headers({ 'acces
 const httpFailure = status => ({ ok: false, status, headers: new Headers(), json: async () => ({}) });
 const cache = () => createJsonCache({ storage: createMemoryStorage(), namespace: 'tfl-test' });
 const withOperator = { ...fixture, timetable: { ...fixture.timetable, routes: fixture.timetable.routes.map(route => ({ ...route, operator: 'London General' })) } };
+const notServedError = { exceptionType: 'ApiArgumentException', httpStatusCode: 400, httpStatus: 'BadRequest', relativeUri: '/Line/217/Timetable/210021703440', message: 'No direction could be found for stop: 210021703440 on line: 217. The line may not serve this stop.' };
+const exactNotServedAdapter = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => String(url).includes('/Route') ? response(routeFixture) : ({ ok: false, status: 400, headers: new Headers(), json: async () => notServedError }) });
+const exactNotServed = await exactNotServedAdapter.servicesForStop({ lineId: '217', stopPointId: '210021703440' });
+assert.equal(exactNotServed.ok, true, 'TfL’s exact no-direction API response is an explicit non-served line/StopPoint conclusion, not a failed lookup');
+assert.equal(exactNotServed.provenance.timetableConclusion, 'NO_CURRENT_MATCH');
+assert.equal(exactNotServed.provenance.httpStatus, 400, 'the original provider status remains auditable');
+assert.equal(exactNotServed.provenance.providerDiagnostic.message, notServedError.message);
 const inboundFixture = { ...withOperator, direction: 'inbound', timetable: { ...withOperator.timetable, departureStopId: '490TEST004', routes: [{ ...withOperator.timetable.routes[0], stationIntervals: [{ intervals: [{ stopId: '490TEST004', timeToArrival: 0 }, { stopId: '490TEST006', timeToArrival: 8 }, { stopId: '490TEST003', timeToArrival: 12 }, { stopId: '490TEST001', timeToArrival: 20 }] }] }] } };
 
 assert.deepEqual(parseTflPeriodCalendar('Schooldays').days, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
@@ -458,6 +465,22 @@ assert.equal(unresolvedConflict.provenance.supplementaryMaterialConflictCount, 1
 assert.equal(unresolvedConflict.data[0].sourceAuthorityDiagnostics[0].classification, 'material-identity-ambiguity');
 assert.match(unresolvedConflict.warnings.join(' '), /unresolved route identity/i, 'an unresolved TfL identity disagreement remains reviewable');
 
+const londonOnlyRouteStops = [];
+const londonOnlyStop = { id: '490005180E', routes: ['158', '397A'], timetableAuthorities: ['TfL', 'BODS'], routeAuthorities: { '158': ['TfL'], '397A': ['BODS'] } };
+const londonOnlyRoute = createAuthoritativeBusTimetableAdapter({
+  tflAdapter: {
+    servicesForStop: async request => { londonOnlyRouteStops.push(request); return { ok: true, data: [], warnings: [], provenance: { timetableConclusion: 'NO_CURRENT_MATCH' } }; },
+    routeMetadataForLines: async lines => { londonOnlyRouteStops.push({ metadataLines: lines }); return { ok: true, data: [], warnings: [], provenance: {} }; }
+  },
+  nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS' } }) },
+  londonSupplementAdapter: { servicesForStops: async () => ({ ok: true, data: [{ id: 'bods-397a', routeNumber: '397A', operator: 'National Operator', origin: 'Origin', destination: 'Destination', direction: 'outbound', stopSchedules: { '490005180E': { monday: [1281] } } }], warnings: [], provenance: { source: 'BODS' } }) }
+});
+const londonOnlyRouteResult = await londonOnlyRoute.servicesForStops([londonOnlyStop], { site: { latitude: 51.613869, longitude: -0.020303 } });
+assert.deepEqual(londonOnlyRouteStops.find(entry => entry.metadataLines)?.metadataLines, ['158'], 'a NaPTAN-only London route does not poison batched TfL route metadata requests');
+assert.deepEqual(londonOnlyRouteStops.filter(entry => entry.lineId).map(entry => entry.lineId), ['158'], 'TfL timetable requests remain limited to TfL-authoritative routes');
+assert.equal(londonOnlyRouteResult.data.find(service => service.routeNumber === '397A')?.timetableSource, 'BODS', 'a proven NaPTAN-only route remains available as national timetable evidence');
+assert.deepEqual(londonOnlyRouteResult.data.find(service => service.routeNumber === '397A')?.stopSchedules?.['490005180E']?.monday, [1281]);
+
 const missingMetadataTfl = createTflBusTimetableAdapter({ cache: cache(), fetchImpl: async url => String(url).includes('/Route') ? httpFailure(503) : response(withOperator) });
 const supplemented = await createAuthoritativeBusTimetableAdapter({ tflAdapter: missingMetadataTfl, nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [matchingBods], warnings: [], provenance: { source: 'BODS' } }) } }).servicesForStops([stop], { site: { latitude: 51.418, longitude: -0.082 } });
 assert.equal(supplemented.data[0].origin, 'Full Route Origin');
@@ -470,6 +493,52 @@ const fallbackResult = await fallback.servicesForStops([stop], { site: { latitud
 assert.equal(fallbackResult.ok, true);
 assert.equal(fallbackResult.data[0].timetableSource, 'BODS fallback after TfL failure');
 assert.match(fallbackResult.warnings.join(' '), /explicit supplementary fallback/);
+const exactFallbackPattern = ['PATTERN-A', 'PATTERN-B', 'PATTERN-C'];
+const exactFallbackStops = [
+  { id: 'PATTERN-A', name: 'Pattern origin', routes: ['X'], timetableAuthority: 'TfL' },
+  { id: 'PATTERN-B', name: 'Pattern assessed stop', routes: ['X'], timetableAuthority: 'TfL' }
+];
+const exactFallbackSequence = {
+  lineId: 'X', direction: 'outbound', branchId: 1, serviceType: 'Regular',
+  orderedStopPointIds: exactFallbackPattern,
+  orderedStops: exactFallbackPattern.map((id, index) => ({ id, name: ['Pattern origin', 'Pattern middle', 'Pattern terminus'][index] })),
+  orderedLineRoutes: []
+};
+const exactFallbackTfl = {
+  servicesForStop: async ({ stopPointId }) => stopPointId === 'PATTERN-A'
+    ? { ok: true, data: [{
+      id: 'tfl-X-pattern', routeNumber: 'X', operator: 'Stagecoach London', provider: 'TfL', direction: 'outbound',
+      origin: 'Pattern origin', destination: 'Pattern terminus', originStopPointId: 'PATTERN-A', destinationStopPointId: 'PATTERN-C',
+      routePatternStopIds: exactFallbackPattern, routePatternStops: exactFallbackSequence.orderedStops,
+      stopSchedules: { 'PATTERN-A': { monday: [480] } }, source: { provider: 'TfL', lineId: 'X' }
+    }], warnings: [], provenance: { timetableConclusion: 'MATCHED' } }
+    : { ok: false, code: 'http_error', status: 400, warnings: ['TfL timetable request failed'], provenance: { timetableConclusion: 'UNRESOLVED' } },
+  routeMetadataForLines: async () => ({ ok: true, data: [], warnings: [], provenance: {} }),
+  routeSequencesForLineDirections: async () => ({
+    ok: true, data: [{ lineId: 'X', direction: 'outbound', sequences: [exactFallbackSequence] }],
+    warnings: [], provenance: {}
+  })
+};
+const exactFallbackBods = {
+  id: 'bods-X-exact-pattern', routeNumber: 'X', operator: 'Stagecoach London', provider: 'BODS',
+  origin: 'Pattern origin', destination: 'Pattern terminus', direction: 'outbound',
+  routePatternStopIds: exactFallbackPattern, principalLocations: [],
+  stopSchedules: { 'PATTERN-B': { monday: [490] } },
+  source: { provider: 'BODS' }
+};
+const exactFallbackResult = await createAuthoritativeBusTimetableAdapter({
+  tflAdapter: exactFallbackTfl,
+  nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [exactFallbackBods], warnings: [], provenance: { source: 'BODS' } }) }
+}).servicesForStops(exactFallbackStops, { site: { latitude: 51.418, longitude: -0.082 } });
+const exactFallbackService = exactFallbackResult.data.find(service => service.source?.requestedStopPointId === 'PATTERN-B');
+assert.equal(exactFallbackService.timetableSource, 'BODS fallback after TfL failure', 'TfL topology reuse never relabels fallback timetable authority');
+assert.equal(exactFallbackService.tflRouteSequenceEvidence?.status, 'resolved', 'an exact prepared fallback pattern can reuse already resolved same-route TfL topology');
+assert.equal(exactFallbackService.tflRouteSequenceEvidence?.matchType, 'exact-prepared-pattern-match-for-timetable-fallback');
+assert.equal(exactFallbackService.tflRouteSequenceEvidence?.scheduledTimetableUsed, false, 'topology evidence does not imply a TfL scheduled timetable');
+const exactFallbackSummaries = buildServiceSummaries([exactFallbackStops[1]], [exactFallbackService]);
+const exactFallbackPlanner = buildPlannerBusServiceSummaries(exactFallbackSummaries, [exactFallbackStops[1]]);
+assert.equal(exactFallbackPlanner[0].principalLocationState, 'resolved', 'the exact national fallback pattern retains defensible principal locations');
+assert.doesNotMatch((exactFallbackPlanner[0].warnings ?? []).join(' '), /principal locations could not be safely mapped/i);
 const allFailed = await createAuthoritativeBusTimetableAdapter({ tflAdapter: failureTfl, nationalAdapter: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS' } }) } }).servicesForStops([stop], { site: { latitude: 51.418, longitude: -0.082 } });
 assert.equal(allFailed.ok, false);
 assert.match(allFailed.message, /No London zero-service conclusion/);

@@ -12,7 +12,12 @@ await test('timeout', async () => {
   const fetchImpl = (_url, options) => new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))));
   assert.equal((await requestJson({ url: 'https://fixture.test', fetchImpl, timeoutMs: 5 })).code, 'timeout');
 });
-await test('HTTP failure', async () => assert.equal((await requestJson({ url: 'https://fixture.test', fetchImpl: async () => response({}, 503) })).code, 'http_failure'));
+await test('HTTP failure retains a structured provider error body for endpoint-specific classification', async () => {
+  const failure = await requestJson({ url: 'https://fixture.test', fetchImpl: async () => response({ exceptionType: 'ApiArgumentException', message: 'No direction could be found.' }, 400) });
+  assert.equal(failure.code, 'http_failure');
+  assert.equal(failure.status, 400);
+  assert.deepEqual(failure.responseData, { exceptionType: 'ApiArgumentException', message: 'No direction could be found.' });
+});
 await test('invalid payload', async () => {
   const invalid = { ok: true, status: 200, headers: new Headers(), json: async () => { throw new Error('bad JSON'); } };
   assert.equal((await requestJson({ url: 'https://fixture.test', fetchImpl: async () => invalid })).code, 'invalid_response');

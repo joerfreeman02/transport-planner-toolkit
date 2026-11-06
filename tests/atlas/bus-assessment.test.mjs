@@ -55,6 +55,32 @@ test('ordered pattern independently derives downstream principal locations witho
   assert.doesNotMatch(presented.principalLocationsDisplay, /See route origin \/ destination/);
 });
 
+test('exact ordered NaPTAN locality sidecar recovers downstream locations and mismatches fail closed', async () => {
+  const assessRecord = async record => {
+    const assessment = createBusAssessment({
+      stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+      timetableData: { servicesForStops: async () => ({ ok: true, data: [record], warnings: [], provenance: { source: 'BODS' } }) },
+      accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 60 }], warnings: [], provenance: {} }) }
+    });
+    return assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  };
+  const patternIds = ['ORIGIN', 'UNMAPPED-UPSTREAM', '2100A', 'TERMINUS'];
+  const localityCalls = [
+    { id: 'ORIGIN', name: 'Origin locality' },
+    { id: 'UNMAPPED-UPSTREAM', name: '' },
+    { id: '2100A', name: 'High Street', locality: 'Assessed locality' },
+    { id: 'TERMINUS', name: 'Sainsbury’s' }
+  ];
+  const recovered = await assessRecord({ ...service, id: 'naptan-sidecar', principalLocations: undefined, routePatternStopIds: patternIds, routePatternStops: [], plannerLocalityPatternStops: localityCalls, stopSchedules: { '2100A': service.stopSchedules['2100A'] } });
+  assert.deepEqual(recovered.serviceSummaries[0].principalLocations, ['Sainsbury’s']);
+  assert.equal(recovered.serviceSummaries[0].principalLocationState, 'resolved');
+  assert.equal(recovered.reviewItems.some(item => item.code === 'directional-principal-location'), false);
+
+  const mismatched = await assessRecord({ ...service, id: 'mismatched-naptan-sidecar', principalLocations: undefined, routePatternStopIds: patternIds, routePatternStops: [], plannerLocalityPatternStops: [localityCalls[0], { ...localityCalls[1], id: 'OTHER-STOP' }, ...localityCalls.slice(2)], stopSchedules: { '2100A': service.stopSchedules['2100A'] } });
+  assert.equal(mismatched.serviceSummaries[0].principalLocationState, 'unresolved');
+  assert.ok(mismatched.reviewItems.some(item => item.code === 'directional-principal-location'));
+});
+
 test('missing pattern identity is explicit and cannot be hidden by a planner placeholder', async () => {
   const unresolvedService = { ...service, id: 'no-pattern', principalLocations: undefined, routePatternStopIds: [], routePatternStops: [], stopSchedules: { '2100A': service.stopSchedules['2100A'] } };
   const assessment = createBusAssessment({
@@ -262,7 +288,7 @@ test('repeated special-day profile warnings group to one material calendar issue
       stopSchedules: { [assessedStop.id]: service.stopSchedules['2100A'] },
       sourceWarnings: [`TNDS ${profile} has an unsupported complex operating profile (SpecialDaysOperation); operating days remain unresolved and no timetable days were fabricated.`]
     };
-  }));
+  })).concat({ ...service, id: '555-bods-primary', routeNumber: '555', provider: 'BODS', primaryAuthority: 'BODS', timetableSource: 'BODS', source: { provider: 'BODS', primaryAuthority: 'BODS' }, stopSchedules: { '2100A': service.stopSchedules['2100A'], '2100B': service.stopSchedules['2100A'] } });
   const assessment = createBusAssessment({
     stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop, secondStop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
     timetableData: { servicesForStops: async () => ({ ok: true, data: records, warnings: [], provenance: { source: 'TNDS' } }) },
@@ -270,10 +296,43 @@ test('repeated special-day profile warnings group to one material calendar issue
   });
   const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
   const calendarIssues = result.reviewItems.filter(item => item.code === 'service-source-evidence' && /special-day operating profiles/i.test(item.message));
-  assert.equal(calendarIssues.length, 2, 'the material calendar uncertainty remains once for each public route');
-  assert.deepEqual(calendarIssues.map(item => item.route).sort(), ['555', 'N555']);
-  assert.ok(calendarIssues.every(item => /6 timetable patterns/.test(item.message)));
-  assert.ok(calendarIssues.every(item => item.stop === '2100A, 2100B'), 'all affected stops remain attached to each grouped issue');
+  assert.equal(calendarIssues.length, 1, 'BODS calendar evidence fully covering Route 555 makes its conflicting supplementary TNDS calendars immaterial');
+  assert.deepEqual(calendarIssues.map(item => item.route), ['N555']);
+  assert.match(calendarIssues[0].message, /6 timetable patterns/);
+  assert.equal(calendarIssues[0].stop, '2100A, 2100B', 'the TNDS-only N555 limitation retains every affected stop');
+  assert.ok(result.serviceSummaries.some(row => row.routeNumber === '555' && /BODS/i.test([row.timetableSource, row.frequencyEvidenceSource, row.provider, row.sourceProviders, row.sourceAuthorities].flat().join(' '))), 'Route 555 remains BODS-primary: ' + JSON.stringify(result.serviceSummaries.filter(row => row.routeNumber === '555').map(row => ({ timetableSource: row.timetableSource, frequencyEvidenceSource: row.frequencyEvidenceSource, provider: row.provider, sourceProviders: row.sourceProviders, sourceAuthorities: row.sourceAuthorities }))));
+  assert.match(calendarIssues[0].source, /TNDS/);
+});
+
+test('material TfL and BODS identity conflict becomes a route- and stop-specific Sources & Checks review item', async () => {
+  const assessedStop = { ...stop, id: '490009752E', routes: ['W11'], timetableAuthority: 'TfL', timetableAuthorities: ['TfL', 'NaPTAN'], routeAuthorities: { W11: ['TfL'] } };
+  const w11 = {
+    ...service,
+    id: 'tfl:w11:outbound:0:calendar:ordinary',
+    routeNumber: 'W11',
+    operator: 'Stagecoach London',
+    origin: 'Chingford Hall Estate',
+    destination: 'Walthamstow Central Station',
+    direction: 'outbound',
+    provider: 'TfL',
+    timetableSource: 'TfL + BODS supplementary',
+    source: { provider: 'TfL', primaryAuthority: 'TfL', routeMetadata: 'incomplete', assessedStopPointId: '490009752E' },
+    sourceAuthorityDiagnostics: [{ provider: 'BODS', type: 'supplementary-field-disagreement', fields: ['direction', 'principalLocations', 'routePatternStopIds'], materialFields: ['direction', 'principalLocations', 'routePatternStopIds'], classification: 'material-identity-ambiguity', authoritativeProvider: 'TfL' }],
+    stopSchedules: { '490009752E': service.stopSchedules['2100A'] }
+  };
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [assessedStop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [w11], warnings: ['TfL and supplementary national evidence disagree on an unresolved route identity for one or more London services.'], provenance: { sourceCompleteness: 'COMPLETE', supplementaryMaterialConflictCount: 1 } }) },
+    accessRouting: { matrix: async () => ({ ...route, routes: [{ ...route.routes[0] }] }) }
+  });
+  const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  const issue = result.reviewItems.find(item => item.code === 'supplementary-identity-conflict');
+  assert.equal(result.status, 'complete', 'assessment execution remains complete while professional evidence review is required');
+  assert.ok(issue);
+  assert.equal(issue.route, 'W11');
+  assert.equal(issue.stop, '490009752E');
+  assert.match(issue.message, /direction, principalLocations, routePatternStopIds/);
+  assert.equal(result.plannerServiceSummaries[0].timetableSource, 'TfL', 'the authoritative TfL schedule stays primary when the fixture provides no supplementary departures');
 });
 
 test('special-day profile warnings without a public route identity remain separately reviewable', async () => {

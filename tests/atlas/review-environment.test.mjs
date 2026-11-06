@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer as createNetServer } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -61,6 +61,24 @@ try {
     assert.match(response.headers.get('content-type'), type, assetPath);
   }
   pass('serves required CSS, JavaScript modules and branding assets with correct types');
+
+  const v2DataRoot = path.join(temporary, 'run75-data-root');
+  await mkdir(path.join(v2DataRoot, 'bus'), { recursive: true });
+  await mkdir(path.join(v2DataRoot, 'bus-tnds'), { recursive: true });
+  await writeFile(path.join(v2DataRoot, 'bus', 'manifest.json'), '{"dataset":"Run75-Bus"}');
+  await writeFile(path.join(v2DataRoot, 'bus-tnds', 'manifest.json'), '{"dataset":"Run75-TNDS"}');
+  const v2State = path.join(temporary, 'v2-review-state.json');
+  const v2Review = await startReviewServer({ rootDir, preferredPort: 0, maximumPort: 0, stateFile: v2State, v2DataRoot, openBrowser: false });
+  const v2BusManifest = await fetch(new URL('/__atlas-review/v2-data/bus/manifest.json', v2Review.url));
+  const v2TndsManifest = await fetch(new URL('/__atlas-review/v2-data/bus-tnds/manifest.json', v2Review.url));
+  assert.equal(v2BusManifest.status, 200);
+  assert.deepEqual(await v2BusManifest.json(), { dataset: 'Run75-Bus' });
+  assert.equal(v2TndsManifest.status, 200);
+  assert.deepEqual(await v2TndsManifest.json(), { dataset: 'Run75-TNDS' });
+  assert.equal((await fetch(new URL('/__atlas-review/v2-data/atlas/data/bus/manifest.json', v2Review.url))).status, 404, 'Review-v2 mounts the data directory itself; it does not infer a checkout-relative atlas/data prefix.');
+  await v2Review.close();
+  await v2Review.closed;
+  pass('mounts the v2 data directory at /bus and /bus-tnds exactly');
 
   assert.equal((await fetch(new URL('/unknown-review-page', review.url))).status, 404);
   assert.equal((await fetch(new URL('/.git/config', review.url))).status, 404);

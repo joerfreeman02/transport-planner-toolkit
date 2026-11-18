@@ -18,7 +18,9 @@ function stopRouteNumbers(stop) {
 export function buildBusTransportStatement(result, { services = result?.plannerServiceSummaries ?? result?.serviceSummaries ?? [], nearestGroupName = result?.nearestGroup?.name ?? null } = {}) {
   const count = assessedStopRecords(result?.stops).length;
   const routeNumbers = [...new Set((services ?? []).flatMap(service => service.publicRouteNumbers ?? service.routeNumbers ?? [service.routeNumber]).map(text).filter(Boolean))];
-  const destinationValues = (services ?? []).flatMap(service => [service.destination, ...(service.principalLocations ?? [])]).map(text).filter(Boolean);
+  const destinationValues = (services ?? []).flatMap(service => [service.destination, ...(service.principalLocations ?? [])])
+    .map(value => text(value).replace(/\s+arrival\s*$/i, '').trim())
+    .filter(Boolean);
   const destinationKey = value => value.toLocaleLowerCase('en-GB').replace(/[^a-z0-9]+/gu, ' ').trim().replace(/\s+/gu, ' ');
   const destinations = [];
   for (const destination of destinationValues) {
@@ -146,7 +148,7 @@ export function buildBusWordTables(result, { includeMap = true } = {}) {
   return [
     {
       caption: 'Table 3.2 - Bus Stop Summary',
-      headers: [...(includeMap ? ['Map reference'] : []), 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop'],
+      headers: [...(includeMap ? ['Map reference'] : []), 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes recorded or matched at stop'],
       rows: stopRows,
       widths: includeMap ? [8, 22, 15, 20, 20, 15] : [25, 17, 22, 22, 14]
     },

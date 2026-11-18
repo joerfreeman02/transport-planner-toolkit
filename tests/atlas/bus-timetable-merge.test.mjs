@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { gunzipSync } from 'node:zlib';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
 import { mergeBusTimetableSources } from '../../src/atlas/domain/bus-timetable-merge.mjs';
@@ -119,7 +121,10 @@ const insufficientIdentity = mergeBusTimetableSources({
 });
 assert.equal(insufficientIdentity.length, 2, 'ambiguous evidence is retained instead of guessed equivalent');
 
-const legacyPrepared231Path = new URL('../../atlas/data/bus-tnds/services/231-se.json', import.meta.url);
+const tndsDataRoot = process.env.ATLAS_TEST_BUS_TNDS_DATA_ROOT
+  ? path.resolve(process.env.ATLAS_TEST_BUS_TNDS_DATA_ROOT)
+  : fileURLToPath(new URL('../../atlas/data/bus-tnds/', import.meta.url));
+const legacyPrepared231Path = path.join(tndsDataRoot, 'services', '231-se.json');
 let prepared231;
 if (fs.existsSync(legacyPrepared231Path)) {
   prepared231 = JSON.parse(fs.readFileSync(legacyPrepared231Path, 'utf8'));
@@ -127,13 +132,12 @@ if (fs.existsSync(legacyPrepared231Path)) {
   // Current prepared national data uses bounded StopPoint-prefix shards.
   // Select the Pipers local call from the shard manifest without reading the
   // full national TNDS population or requiring the retired legacy file name.
-  const tndsRoot = new URL('../../atlas/data/bus-tnds/', import.meta.url);
-  const manifest = JSON.parse(fs.readFileSync(new URL('manifest.json', tndsRoot), 'utf8'));
+  const manifest = JSON.parse(fs.readFileSync(path.join(tndsDataRoot, 'manifest.json'), 'utf8'));
   const stopId = '021013518';
   const shardKey = stopId.slice(0, manifest.serviceShardKeyLength);
   const shardRefs = (manifest.serviceShards?.[shardKey] ?? []).filter(shard => shard.stopIds?.includes(stopId));
   const localRecords = shardRefs.flatMap(shard => JSON.parse(
-    gunzipSync(fs.readFileSync(new URL(shard.path, tndsRoot))).toString('utf8')
+    gunzipSync(fs.readFileSync(path.join(tndsDataRoot, shard.path))).toString('utf8')
   ).services ?? []);
   prepared231 = localRecords.find(record => String(record.routeNumber) === '231' && record.stopSchedules?.[stopId]);
   assert.ok(prepared231, 'the current prepared TNDS shards retain the genuine Pipers route 231 call');
@@ -143,6 +147,26 @@ assert.equal(pipers231.length, 1, 'prepared Pipers 231 has no equivalent BODS se
 assert.equal(pipers231[0].routeNumber, '231');
 assert.equal(pipers231[0].operator, 'South Beds Dial-a-Ride');
 assert.equal(pipers231[0].timetableSource, 'TNDS', 'TNDS-only 231 provenance is retained');
+
+const waltham212StopId = '210021703420';
+const tnds212Manifest = JSON.parse(fs.readFileSync(path.join(tndsDataRoot, 'manifest.json'), 'utf8'));
+const tnds212ShardKey = waltham212StopId.slice(0, tnds212Manifest.serviceShardKeyLength);
+const tnds212Shards = (tnds212Manifest.serviceShards?.[tnds212ShardKey] ?? [])
+  .filter(shard => shard.stopIds?.includes(waltham212StopId));
+const tnds212Patterns = tnds212Shards.flatMap(shard => JSON.parse(
+  gunzipSync(fs.readFileSync(path.join(tndsDataRoot, shard.path))).toString('utf8')
+).services ?? []).filter(record => String(record.routeNumber) === '212'
+  && String(record.source?.serviceCode) === '212_PF9000012-11');
+assert.equal(tnds212Patterns.length, 3, 'Run #75 keeps all three published TNDS pattern records for the Route 212 source service');
+const scoped212Patterns = tnds212Patterns.map(record => scopedScheduledService(normalisePreparedService(record), [waltham212StopId]));
+const merged212 = mergeBusTimetableSources({ bods: [], tnds: scoped212Patterns });
+assert.equal(merged212.length, 1, 'compatible patterns from one TNDS source service form one planner input');
+assert.deepEqual(merged212[0].stopSchedules[waltham212StopId].monday, [590, 680, 772, 900], 'all four source departures at the exact Waltham Bus Station call are retained');
+assert.deepEqual(merged212[0].departureEvidenceByDay.monday
+  .filter(item => item.stopPointId === waltham212StopId)
+  .map(item => [item.journeyIdentity, item.minute]), [['1', 590], ['2', 680], ['3', 772], ['4', 900]], 'the exact-stop departure evidence retains the four distinct journey identities');
+assert.deepEqual(merged212[0].sourceRecordIds, tnds212Patterns.map(record => record.id), 'the merged public row retains all three source pattern identities');
+assert.match(merged212[0].source.archive, /20200901_20261012/, 'the source validity end date remains in the archived TNDS provenance');
 
 const plannerRows = buildPlannerBusServiceSummaries([
   { id: 'tfl:7', routeNumber: '7', operator: 'TfL', origin: 'Start', destination: 'End', direction: 'End', directionFamily: 'gtfs:0', source: { provider: 'TfL' }, timetableSource: 'TfL', stopIds: ['LOCAL'], frequencyBasisStopId: 'LOCAL', departuresByDay: Object.fromEntries(Object.keys(schedule([])).map(day => [day, [420]])), departureEvidenceByDay: Object.fromEntries(Object.keys(schedule([])).map(day => [day, [{ minute: 420, stopPointId: 'LOCAL', provider: 'TfL' }]])), calendarProfileId: 'ordinary', circular: false, principalLocations: ['Test'], sourceRecordIds: ['tfl:7'] }

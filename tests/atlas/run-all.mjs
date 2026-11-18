@@ -10,6 +10,7 @@ await import('./bus-stop-discovery.test.mjs');
 await import('./prepared-bus-data-adapter.test.mjs');
 await import('./tnds-runtime-shard-browser.test.mjs');
 await import('./bus-timetable-merge.test.mjs');
+await import('./bus-timetable-merge-semantic.test.mjs');
 await import('./bus-robustness-1b-national-planner-trust.test.mjs');
 await import('./nptg-review-runtime.test.mjs');
 await import('./bus-stop-structure.test.mjs');

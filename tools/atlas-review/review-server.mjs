@@ -1,7 +1,7 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import { createReadStream, existsSync } from 'node:fs';
-import { appendFile, mkdir, readFile, realpath, stat, unlink, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, readdir, realpath, stat, unlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,6 +11,7 @@ const APP_ID = 'eas-atlas-review-v1';
 const APP_VERSION = '2.0.0-beta.1';
 const UPDATE_BUS_DATA_PATH = path.join('tools', 'atlas-bus-data', 'UPDATE ATLAS BUS DATA.bat');
 const STATUS_PATH = '/__atlas-review/status';
+const IDENTITY_PATH = '/__atlas-review/identity';
 const STOP_PATH = '/__atlas-review/stop';
 const V2_DATA_PATH = '/__atlas-review/v2-data/';
 const DEFAULT_ROOT = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
@@ -39,15 +40,111 @@ function rootIdentifier(rootDir) {
   return createHash('sha256').update(path.resolve(rootDir).toLowerCase()).digest('hex').slice(0, 16);
 }
 
-function cleanGitRevision(rootDir) {
+function gitRevisionState(rootDir) {
   try {
     const status = execFileSync('git', ['-C', rootDir, 'status', '--porcelain'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-    if (status.trim()) return null;
     const revision = execFileSync('git', ['-C', rootDir, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    return /^[0-9a-f]{40}$/i.test(revision) ? revision : null;
+    return { revision: /^[0-9a-f]{40}$/i.test(revision) ? revision : null, dirty: Boolean(status.trim()) };
   } catch {
-    return null;
+    return { revision: null, dirty: null };
   }
+}
+
+async function applicationCodeDigest(rootDir) {
+  const roots = ['atlas', 'src', 'assets', 'modules', 'config'];
+  const extensions = new Set(['.html', '.mjs', '.js', '.css']);
+  const files = [];
+  const visit = async (directory, relative) => {
+    let entries;
+    try { entries = await readdir(directory, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue;
+      const childRelative = path.join(relative, entry.name);
+      if (entry.isDirectory()) {
+        if (childRelative.split(path.sep).some(part => part.toLowerCase() === 'data')) continue;
+        await visit(path.join(directory, entry.name), childRelative);
+      } else if (entry.isFile() && extensions.has(path.extname(entry.name).toLowerCase())) {
+        files.push(childRelative);
+      }
+    }
+  };
+  for (const relative of roots) await visit(path.join(rootDir, relative), relative);
+  files.sort((left, right) => left.localeCompare(right));
+  const digest = createHash('sha256');
+  for (const relative of files) {
+    digest.update(relative.split(path.sep).join('/')).update('\0');
+    digest.update(await readFile(path.join(rootDir, relative))).update('\0');
+  }
+  return { sha256: digest.digest('hex'), fileCount: files.length };
+}
+
+async function fileSha256(file) {
+  try { return createHash('sha256').update(await readFile(file)).digest('hex'); }
+  catch { return null; }
+}
+
+async function preparedSourceIdentity(rootDir, v2DataRoot, tflIbusDataRoot) {
+  const dataRoot = v2DataRoot || path.join(rootDir, 'atlas', 'data');
+  const bus = path.join(dataRoot, 'bus');
+  const tnds = path.join(dataRoot, 'bus-tnds');
+  const ibus = tflIbusDataRoot ? path.resolve(tflIbusDataRoot) : path.join(dataRoot, 'tfl-ibus');
+  const indexFiles = [];
+  const findIndexes = async (directory, relative = '') => {
+    let entries;
+    try { entries = await readdir(directory, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      if (entry.isDirectory()) await findIndexes(path.join(directory, entry.name), path.join(relative, entry.name));
+      else if (entry.isFile() && /^operator-index\.json$/i.test(entry.name)) {
+        indexFiles.push({ path: path.join(relative, entry.name).split(path.sep).join('/'), sha256: await fileSha256(path.join(directory, entry.name)) });
+      }
+    }
+  };
+  await findIndexes(ibus);
+  indexFiles.sort((left, right) => left.path.localeCompare(right.path));
+  let ibusManifest = null;
+  try { ibusManifest = JSON.parse(await readFile(path.join(ibus, 'manifest.json'), 'utf8')); } catch {}
+  const declaredIndex = ibusManifest?.indexPath && indexFiles.find(index => index.path === String(ibusManifest.indexPath).split(path.sep).join('/'));
+  return {
+    bus: { manifestSha256: await fileSha256(path.join(bus, 'manifest.json')) },
+    tnds: { manifestSha256: await fileSha256(path.join(tnds, 'manifest.json')) },
+    tflIbus: {
+      manifestSha256: await fileSha256(path.join(ibus, 'manifest.json')),
+      declaredIndexPath: ibusManifest?.indexPath ?? null,
+      declaredIndexSha256: ibusManifest?.indexSha256 ?? null,
+      declaredIndexMatchesManifest: ibusManifest?.indexPath && ibusManifest?.indexSha256 && declaredIndex
+        ? declaredIndex.sha256 === ibusManifest.indexSha256
+        : null,
+      operatorIndexes: indexFiles
+    }
+  };
+}
+
+export async function createRuntimeIdentity(rootDir, v2DataRoot = null, tflIbusDataRoot = null) {
+  const resolvedRoot = path.resolve(rootDir);
+  const resolvedV2DataRoot = v2DataRoot ? path.resolve(v2DataRoot) : null;
+  const resolvedTflIbusDataRoot = tflIbusDataRoot ? path.resolve(tflIbusDataRoot) : null;
+  const rootId = rootIdentifier(resolvedRoot);
+  const v2RootId = resolvedV2DataRoot ? rootIdentifier(resolvedV2DataRoot) : null;
+  const tflIbusRootId = resolvedTflIbusDataRoot ? rootIdentifier(resolvedTflIbusDataRoot) : null;
+  const git = gitRevisionState(resolvedRoot);
+  const code = await applicationCodeDigest(resolvedRoot);
+  const marker = `ATLAS review ${APP_VERSION} · ${git.revision ? `git ${git.revision.slice(0, 7)}` : 'git unknown'} · code ${code.sha256.slice(0, 12)} · worktree ${git.dirty === null ? 'unknown' : git.dirty ? 'dirty' : 'clean'}`;
+  return {
+    appId: APP_ID,
+    version: APP_VERSION,
+    buildMarker: marker,
+    worktreeRoot: resolvedRoot,
+    rootId,
+    gitRevision: git.revision,
+    worktreeDirty: git.dirty,
+    applicationCodeSha256: code.sha256,
+    applicationCodeFileCount: code.fileCount,
+    v2DataRoot: resolvedV2DataRoot,
+    v2RootId,
+    tflIbusDataRoot: resolvedTflIbusDataRoot,
+    tflIbusRootId,
+    preparedSources: await preparedSourceIdentity(resolvedRoot, resolvedV2DataRoot, resolvedTflIbusDataRoot)
+  };
 }
 
 export function reviewStateDirectory() {
@@ -92,13 +189,15 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 1200) {
   }
 }
 
-async function probeReview(state, expectedRootId) {
+async function probeReview(state, expectedRootId, expectedCodeSha256 = null) {
   if (!state?.port) return false;
   try {
     const response = await fetchWithTimeout(`http://127.0.0.1:${state.port}${STATUS_PATH}`);
     if (!response.ok) return false;
     const payload = await response.json();
-    return payload.appId === APP_ID && payload.rootId === expectedRootId;
+    return payload.appId === APP_ID
+      && payload.rootId === expectedRootId
+      && (!expectedCodeSha256 || payload.applicationCodeSha256 === expectedCodeSha256);
   } catch {
     return false;
   }
@@ -158,7 +257,7 @@ async function resolveExternalDataFile(dataRoot, pathname) {
   return details.isFile() ? { file: candidateReal, size: details.size } : null;
 }
 
-function createRequestHandler({ rootDir, rootId, v2DataRoot = null, v2RootId = null, stopToken, closeServer, updaterLauncher = launchBusUpdater }) {
+function createRequestHandler({ rootDir, rootId, v2DataRoot = null, v2RootId = null, identity, stopToken, closeServer, updaterLauncher = launchBusUpdater }) {
   return async (request, response) => {
     const method = request.method || 'GET';
     let pathname;
@@ -167,7 +266,11 @@ function createRequestHandler({ rootDir, rootId, v2DataRoot = null, v2RootId = n
 
     if (pathname === STATUS_PATH && method === 'GET') {
       response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-      return response.end(JSON.stringify({ appId: APP_ID, version: APP_VERSION, rootId, v2RootId }));
+      return response.end(JSON.stringify({ appId: APP_ID, version: APP_VERSION, rootId, v2RootId, applicationCodeSha256: identity.applicationCodeSha256, buildMarker: identity.buildMarker }));
+    }
+    if (pathname === IDENTITY_PATH && method === 'GET') {
+      response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      return response.end(JSON.stringify(identity));
     }
     if (pathname === STOP_PATH && method === 'POST') {
       if (!safeTokenMatch(stopToken, request.headers['x-atlas-review-token'])) return plainResponse(response, 403, 'ATLAS review stop request was not recognised.');
@@ -197,11 +300,11 @@ function createRequestHandler({ rootDir, rootId, v2DataRoot = null, v2RootId = n
     }
 
     const contentType = MIME_TYPES[path.extname(resolved.file).toLowerCase()] || 'application/octet-stream';
-    const testBuildSha = pathname === '/atlas/' || pathname === '/atlas/index.html' ? cleanGitRevision(rootDir) : null;
-    const injectedHtml = testBuildSha
+    const testBuildMarker = pathname === '/atlas/' || pathname === '/atlas/index.html' ? identity.buildMarker : null;
+    const injectedHtml = testBuildMarker
       ? (await readFile(resolved.file, 'utf8')).replace(
           /<body\b[^>]*>/i,
-          tag => `${tag.slice(0, -1)} data-atlas-test-build="BUS-TFL-COMPLETE · ${testBuildSha.slice(0, 7)}">`,
+          tag => `${tag.slice(0, -1)} data-atlas-test-build="${testBuildMarker}">`,
         )
       : null;
     const contentLength = injectedHtml === null ? resolved.size : Buffer.byteLength(injectedHtml);
@@ -241,6 +344,7 @@ export async function startReviewServer({
   maximumPort = 8789,
   stateFile = reviewStateFile(rootDir),
   v2DataRoot = null,
+  tflIbusDataRoot = null,
   openBrowser = true,
   updaterLauncher = launchBusUpdater
 } = {}) {
@@ -248,8 +352,14 @@ export async function startReviewServer({
   const resolvedV2DataRoot = v2DataRoot ? path.resolve(v2DataRoot) : null;
   if (!existsSync(path.join(resolvedRoot, 'atlas', 'index.html'))) throw new Error('ATLAS application files were not found.');
   const rootId = rootIdentifier(resolvedRoot);
+  const v2RootId = resolvedV2DataRoot ? rootIdentifier(resolvedV2DataRoot) : null;
+  const resolvedTflIbusDataRoot = tflIbusDataRoot ? path.resolve(tflIbusDataRoot) : null;
+  const tflIbusRootId = resolvedTflIbusDataRoot ? rootIdentifier(resolvedTflIbusDataRoot) : null;
+  const identity = await createRuntimeIdentity(resolvedRoot, resolvedV2DataRoot, resolvedTflIbusDataRoot);
   const existing = await readState(stateFile);
-  if (await probeReview(existing, rootId) && (!resolvedV2DataRoot || existing.v2RootId === rootIdentifier(resolvedV2DataRoot))) {
+  if (await probeReview(existing, rootId, identity.applicationCodeSha256)
+    && (!resolvedV2DataRoot || existing.v2RootId === v2RootId)
+    && (!resolvedTflIbusDataRoot || existing.tflIbusRootId === tflIbusRootId)) {
     const url = `http://127.0.0.1:${existing.port}/atlas/${resolvedV2DataRoot ? '?review=v2' : ''}#modules`;
     if (openBrowser) openDefaultBrowser(url);
     return { reused: true, port: existing.port, url, stateFile, closed: Promise.resolve() };
@@ -261,11 +371,10 @@ export async function startReviewServer({
   let resolveClosed;
   const closed = new Promise(resolve => { resolveClosed = resolve; });
   const closeServer = () => { if (server?.listening) server.close(); else resolveClosed(); };
-  const v2RootId = resolvedV2DataRoot ? rootIdentifier(resolvedV2DataRoot) : null;
-  server = createServer(createRequestHandler({ rootDir: resolvedRoot, rootId, v2DataRoot: resolvedV2DataRoot, v2RootId, stopToken, closeServer, updaterLauncher }));
+  server = createServer(createRequestHandler({ rootDir: resolvedRoot, rootId, v2DataRoot: resolvedV2DataRoot, v2RootId, identity, stopToken, closeServer, updaterLauncher }));
   const port = await listen(server, preferredPort, maximumPort);
   const url = `http://127.0.0.1:${port}/atlas/${resolvedV2DataRoot ? '?review=v2' : ''}#modules`;
-  await writeState(stateFile, { appId: APP_ID, version: APP_VERSION, rootId, v2RootId, port, processId: process.pid, stopToken, startedAt: new Date().toISOString() });
+  await writeState(stateFile, { appId: APP_ID, version: APP_VERSION, rootId, v2RootId, tflIbusRootId, applicationCodeSha256: identity.applicationCodeSha256, port, processId: process.pid, stopToken, startedAt: new Date().toISOString() });
 
   server.on('close', async () => {
     const current = await readState(stateFile);

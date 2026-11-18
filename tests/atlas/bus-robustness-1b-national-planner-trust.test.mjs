@@ -107,10 +107,10 @@ test('route metadata survives partial timetable evidence and is presented as qua
   assert.deepEqual(assessment.stops.map(stop => stop.routes), [['10'], ['20']]);
   assert.equal(assessment.stops[0].timetableEvidenceStatus, 'MATCHED');
   assert.equal(assessment.stops[1].timetableEvidenceStatus, 'SOURCE_UNAVAILABLE');
-  assert.match(assessment.wording, /not been treated as absent/);
+  assert.doesNotMatch(assessment.wording, /routes? .* not been treated as absent/);
   assert.ok(assessment.reviewItems.some(item => item.code === 'timetable-shard-failure'));
-  assert.match(stopRoutesPresentation(assessment.stops[1]), /not treated as absent/);
-  assert.match(partialTimetableQualification(assessment.stops), /routes 20/);
+  assert.equal(stopRoutesPresentation(assessment.stops[1]), '20');
+  assert.match(partialTimetableQualification(assessment.stops), /route\/stop/);
 });
 
 test('genuine no-route and no-current-match conclusions remain distinct', async () => {
@@ -122,7 +122,7 @@ test('genuine no-route and no-current-match conclusions remain distinct', async 
   const noMatchStop = { id: 'NOMATCH', name: 'No Match Stop', routes: ['30'], routeAuthorities: { '30': ['BODS'] } };
   const noMatch = await assessmentFor([noMatchStop], { ok: true, data: [], warnings: [], provenance: { source: 'Department for Transport Bus Open Data Service', sourceCompleteness: 'COMPLETE', timetableConclusion: 'NO_CURRENT_MATCH' } }).assess({});
   assert.equal(noMatch.stops[0].timetableEvidenceStatus, 'NO_CURRENT_MATCH');
-  assert.match(stopRoutesPresentation(noMatch.stops[0]), /no current timetable match/);
+  assert.equal(stopRoutesPresentation(noMatch.stops[0]), '30');
 });
 
 test('stop-scoped outcomes survive unrelated national failures and repeated route numbers', async () => {

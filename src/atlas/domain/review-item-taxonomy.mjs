@@ -1,5 +1,6 @@
 export const REVIEW_ITEM_CATEGORIES = Object.freeze({
   'unresolved-timetable-request': Object.freeze({ category: 'timetable', routeBearing: true }),
+  'no-current-timetable-match': Object.freeze({ category: 'timetable', routeBearing: true }),
   'unprocessed-timetable-request': Object.freeze({ category: 'timetable', routeBearing: true }),
   'unprocessed-timetable-scope': Object.freeze({ category: 'timetable', routeBearing: false }),
   'quarantined-timetable-request': Object.freeze({ category: 'timetable', routeBearing: true }),

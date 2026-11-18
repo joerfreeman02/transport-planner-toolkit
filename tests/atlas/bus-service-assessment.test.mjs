@@ -15,6 +15,51 @@ test('identical weekdays use the EAS Mon-Fri form', () => {
   assert.equal(formatOperatingPeriod(calculateOperatingPeriods(days))[0], 'Mon-Fri: Approx. 05:16–01:27 (next day)');
 });
 
+test('operating periods disclose materially separated windows from exact selected-stop departures', () => {
+  const monday = [493, 1153, 1213, 1273, 1333, 1393];
+  const periods = calculateOperatingPeriods({ monday });
+  assert.equal(formatOperatingPeriod(periods)[0], 'Mon: Approx. 08:13; Approx. 19:13–23:13');
+  assert.deepEqual(periods.monday.windows.map(window => [window.firstMinute, window.lastMinute, window.departureCount]), [[493, 493, 1], [1153, 1393, 5]]);
+});
+
+test('ordinary low-frequency and overnight schedules are not needlessly split', () => {
+  const lowFrequency = calculateOperatingPeriods({ monday: [480, 780, 1080] });
+  assert.deepEqual(lowFrequency.monday.windows, []);
+  assert.equal(formatOperatingPeriod(lowFrequency)[0], 'Mon: Approx. 08:00–18:00');
+  const overnight = calculateOperatingPeriods({ monday: [1380, 1450, 1510, 1570] });
+  assert.deepEqual(overnight.monday.windows, []);
+  assert.equal(formatOperatingPeriod(overnight)[0], 'Mon: Approx. 23:00–02:10 (next day)');
+});
+
+test('BODS terminal boarding uncertainty is disclosed without role-specific evidence', () => {
+  const schedule = { monday: [480, 540], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] };
+  const terminal = { id: 'loop', routeNumber: 'R', operator: 'Fixture operator', origin: 'A', destination: 'A', direction: 'Clockwise', circular: true, timetableSource: 'BODS', circularPatternStopIds: ['A', 'B', 'A'], stopSchedules: { A: schedule } };
+  const [summary] = buildServiceSummaries([{ id: 'A' }], [terminal]);
+  assert.match(summary.plannerReviewWarnings.join(' '), /boarding eligibility cannot be independently confirmed from this snapshot/i);
+  const nonterminal = { ...terminal, id: 'linear', circular: false, destination: 'B', circularPatternStopIds: undefined, routePatternStopIds: ['A', 'B'] };
+  const [linearSummary] = buildServiceSummaries([{ id: 'A' }], [nonterminal]);
+  assert.doesNotMatch(linearSummary.plannerReviewWarnings.join(' '), /boarding eligibility cannot be independently confirmed/i);
+});
+test('explicit set-down-only calls stay in source evidence but not departure periods or frequency', () => {
+  const days = { monday: [480, 540, 600], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] };
+  const departureEvidenceByDay = {
+    monday: [
+      { minute: 480, stopPointId: 'A', journeyIdentity: 'boardable', provider: 'BODS', occurrenceRole: 'departure', pickupType: '0', dropOffType: '0' },
+      { minute: 540, stopPointId: 'A', journeyIdentity: 'arranged', provider: 'BODS', occurrenceRole: 'conditional-pickup', pickupType: '2', dropOffType: '0' },
+      { minute: 600, stopPointId: 'A', journeyIdentity: 'set-down', provider: 'BODS', occurrenceRole: 'arrival', pickupType: '1', dropOffType: '0' }
+    ],
+    tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: []
+  };
+  const [summary] = buildServiceSummaries([{ id: 'A' }], [{
+    id: 'role-aware', routeNumber: 'R', operator: 'Fixture operator', origin: 'Origin', destination: 'A', direction: 'A',
+    timetableSource: 'BODS', stopSchedules: { A: days }, departureEvidenceByDay
+  }]);
+  assert.deepEqual(summary.departuresByDay.monday, [480]);
+  assert.equal(summary.operatingPeriods.monday.lastMinute, 480);
+  assert.match(summary.sourceWarnings.join(' '), /1 source calls marked set-down-only/);
+  assert.match(summary.sourceWarnings.join(' '), /1 source calls requiring pickup arrangements/);
+});
+
 test('frequency capability requires an explicit approved period', () => {
   assert.throws(() => calculateScheduledFrequency([600], {}), /representative assessment period/);
   const frequency = calculateScheduledFrequency([600, 610, 620, 630, 640, 650], { startMinute: 600, endMinute: 660, label: 'approved fixture period' });
@@ -65,6 +110,30 @@ test('route variants remain traceable and trigger a material note', () => {
   assert.equal(summary.serviceNote, '');
 });
 
+test('same-endpoint journeys retain named intermediate corridor variants in the public summary', () => {
+  const schedule = { monday: [480], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] };
+  const pattern = (via, time) => ({
+    id: via, routeNumber: '20', operator: 'Example', origin: 'Town Centre', destination: 'Dursley', direction: 'Dursley', qualifications: [],
+    routePatternStops: [{ id: 'A', name: 'Town Centre' }, { id: via, name: via }, { id: 'D', name: 'Dursley' }],
+    stopSchedules: { A: { ...schedule, monday: [time] } }
+  });
+  const [summary] = buildServiceSummaries([{ id: 'A', name: 'Town Centre' }], [pattern('Tinkley Corner', 480), pattern('The Cross', 510)]);
+  assert.match(summary.serviceNote, /Intermediate stop patterns vary, including Tinkley Corner, The Cross\./i);
+  assert.doesNotMatch(summary.serviceNote, /journeys vary in the intermediate stops served/i, 'the variation note names the actual calls that differ');
+  assert.deepEqual(summary.departuresByDay.monday, [480, 510]);
+});
+
+test('identical ordered calls do not receive a corridor-variation note', () => {
+  const schedule = { monday: [480], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] };
+  const pattern = id => ({
+    id, routeNumber: '20', operator: 'Example', origin: 'Town Centre', destination: 'Dursley', direction: 'Dursley', qualifications: [],
+    routePatternStops: [{ id: 'A', name: 'Town Centre' }, { id: 'B', name: 'West Street' }, { id: 'D', name: 'Dursley' }],
+    stopSchedules: { A: schedule }
+  });
+  const [summary] = buildServiceSummaries([{ id: 'A', name: 'Town Centre' }], [pattern('one'), pattern('two')]);
+  assert.doesNotMatch(summary.serviceNote, /different intermediate stops/i);
+});
+
 test('circular services with the same endpoints retain opposite directions', () => {
   const schedule = { monday: [480], tuesday: [480], wednesday: [480], thursday: [480], friday: [480], saturday: [], sunday: [] };
   const summaries = buildServiceSummaries([{ id: 'A' }], [
@@ -79,6 +148,18 @@ test('circular, school-day and limited qualifications remain visible', () => {
   const [summary] = buildServiceSummaries([{ id: 'A' }], [{ id: 'school-loop', routeNumber: 'S1', operator: 'School Bus', origin: 'School', destination: 'School', direction: 'Clockwise', circular: true, principalLocations: [], qualifications: ['School-day-only service.'], stopSchedules: { A: { monday: [480], tuesday: [480], wednesday: [480], thursday: [480], friday: [480], saturday: [], sunday: [] } } }]);
   assert.match(summary.serviceNote, /School-day journeys only\./);
   assert.match(summary.serviceNote, /Circular service\./);
+});
+
+test('a school-named endpoint alone cannot prove a school-day calendar', () => {
+  const weekdays = { monday: [456, 1176, 1236], tuesday: [456, 1176, 1236], wednesday: [456, 1176, 1236], thursday: [456, 1176, 1236], friday: [456, 1176, 1236], saturday: [], sunday: [] };
+  const inferred = 'School-day or term-time service identified in the source timetable; check the assessment date before formal use.';
+  const [summary] = buildServiceSummaries([{ id: 'A', name: 'Abbotts Rise' }], [{
+    id: 'school-endpoint', routeNumber: '99', operator: 'Fixture operator', origin: 'Bus Station', destination: 'Birchwood High School',
+    direction: 'Birchwood High School', source: { provider: 'BODS', tripHeadsign: 'Birchwood High School' }, qualifications: [inferred],
+    stopSchedules: { A: weekdays }
+  }]);
+  assert.doesNotMatch(summary.serviceNote, /School-day journeys only/i, 'The GTFS preparation heuristic must not become a route-wide calendar claim.');
+  assert.match(summary.plannerReviewWarnings.join(' '), /Route 99.*no journey-level calendar evidence/i, 'The unresolved source label remains visible as a review warning.');
 });
 
 test('calendar restrictions are withheld from a mixed-profile source row', () => {
@@ -217,6 +298,56 @@ test('missing selected stop direction does not create guessed bracket text', () 
   const [summary] = buildServiceSummaries([{ id: 'A', name: 'Undirected', walking: { status: 'routed', distanceMetres: 100 } }], [{ id: 'undirected', routeNumber: '5', operator: 'Example', origin: 'A', destination: 'B', direction: 'B', principalLocations: [], stopSchedules: { A: { monday: [420], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] } } }]);
   assert.equal(summary.stopDirection, null);
   assert.equal(formatServiceOriginDestination(summary), 'A - B');
+});
+
+test('ordered principal locations keep destination after downstream calls for linear, terminal, circular, branch and short-working patterns', () => {
+  const days = Object.fromEntries(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => [day, day === 'monday' ? [480] : []]));
+  const calls = [
+    { id: 'A', name: 'Origin', locality: 'Alpha' },
+    { id: 'B', name: 'Assessed Road', locality: 'Beta' },
+    { id: 'C', name: 'Central Hospital', locality: 'Gamma' },
+    { id: 'D', name: 'Town Centre', locality: 'Delta' },
+    { id: 'E', name: 'Destination', locality: 'Omega' }
+  ];
+  const record = (id, pattern, basis, destinationId, direction = id) => ({
+    id, routeNumber: `R-${id}`, operator: 'Example Buses', origin: 'Alpha', destination: 'Omega', destinationStopPointId: destinationId,
+    direction: `Towards ${direction}`, directionFamily: direction, routePatternStopIds: pattern.map(call => call.id), routePatternStops: pattern,
+    stopSchedules: { [basis]: days }, timetableSource: 'BODS'
+  });
+  const linear = buildServiceSummaries([{ id: 'B', name: 'Assessed Road', walking: { status: 'routed', distanceMetres: 80 } }], [record('linear', calls, 'B', 'E')])[0];
+  const names = linear.principalLocations;
+  assert.ok(names.includes('Central Hospital') && names.includes('Town Centre') && names.includes('Omega'));
+  assert.ok(names.indexOf('Omega') > names.indexOf('Central Hospital'));
+  assert.ok(names.indexOf('Omega') > names.indexOf('Town Centre'), 'terminus follows every supported downstream intermediate');
+
+  const nearTerminal = buildServiceSummaries([{ id: 'D', walking: { status: 'routed', distanceMetres: 80 } }], [record('near', calls.slice(3), 'D', 'E')])[0];
+  assert.ok(nearTerminal.principalLocations.includes('Omega'));
+  assert.equal(nearTerminal.principalLocations.some(value => /Alpha|Beta|Gamma/.test(value)), false, 'upstream locations are excluded at near-terminal stops');
+
+  const terminal = buildServiceSummaries([{ id: 'E', walking: { status: 'routed', distanceMetres: 80 } }], [record('terminal', calls, 'E', 'E')])[0];
+  assert.equal(terminal.principalLocations.some(value => /Alpha|Beta|Gamma|Delta/.test(value)), false, 'a genuine terminal has no upstream locations');
+
+  const loopCalls = [calls[0], calls[1], calls[2], calls[3], calls[0]];
+  const loop = buildServiceSummaries([{ id: 'B', walking: { status: 'routed', distanceMetres: 80 } }], [{
+    ...record('loop', loopCalls, 'B', null), routeNumber: 'L', circular: true, circularPatternStopIds: loopCalls.map(call => call.id)
+  }])[0];
+  assert.ok(loop.principalLocations.indexOf('Gamma') < loop.principalLocations.indexOf('Delta'), 'circular traversal keeps its rotated downstream order');
+
+  const branchA = record('branch-a', [calls[0], calls[1], calls[2], calls[4]], 'B', 'E', 'Branch A');
+  const branchB = record('branch-b', [calls[0], calls[1], calls[3], calls[4]], 'B', 'E', 'Branch B');
+  const branches = buildServiceSummaries([{ id: 'B', walking: { status: 'routed', distanceMetres: 80 } }], [branchA, branchB]);
+  assert.equal(branches.length, 2, 'separate directions retain their branch patterns');
+  assert.ok(branches.some(row => row.principalLocations.includes('Central Hospital')));
+  assert.ok(branches.some(row => row.principalLocations.includes('Town Centre')));
+
+  const shortWorking = buildServiceSummaries([{ id: 'B', walking: { status: 'routed', distanceMetres: 80 } }], [record('short', calls.slice(0, 3), 'B', 'C', 'Short')])[0];
+  assert.ok(shortWorking.principalLocations.includes('Gamma'));
+  assert.equal(shortWorking.principalLocations.includes('Delta'), false, 'short workings do not inherit the main route beyond their supported endpoint');
+
+  const partial = buildServiceSummaries([{ id: 'B', walking: { status: 'routed', distanceMetres: 80 } }], [{
+    ...record('partial', calls, 'B', 'E'), routePatternStops: calls.slice(0, 3)
+  }])[0];
+  assert.equal(partial.principalLocationState, 'unresolved', 'incomplete ordered calls remain unresolved rather than being reordered by endpoint text');
 });
 
 for (const [name, fn] of tests) {

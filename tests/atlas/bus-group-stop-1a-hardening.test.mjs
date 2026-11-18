@@ -122,6 +122,35 @@ assert.ok(decision.branchVariantRecordIds.includes('q1-branch'));
 assert.ok(decision.calendarVariantRecordIds.includes('q1-school'));
 assert.ok(decision.variantDestinationEvidence.some(item => item.routeNumber === 'Q1' && item.destination === 'Midpoint'));
 
+const throughAtAssessedStop = fictionalRecord({
+  id: 'q1-through-at-assessed-stop',
+  origin: 'Remote Origin',
+  originStopPointId: 'R1',
+  originArea: 'area:REMOTE',
+  destination: 'Beta Terminal',
+  destinationStopPointId: 'B1',
+  destinationArea: 'area:BETA',
+  pattern: ['R1', 'A1', 'X1', 'B1'],
+  sourceRouteIds: ['shared-lineage']
+});
+const terminalShortWorking = fictionalRecord({
+  id: 'q1-terminal-short-working',
+  origin: 'Alpha Interchange',
+  originStopPointId: 'A1',
+  originArea: 'area:ALPHA',
+  destination: 'Beta Terminal',
+  destinationStopPointId: 'B1',
+  destinationArea: 'area:BETA',
+  pattern: ['A1', 'X1', 'B1'],
+  sourceRouteIds: ['shared-lineage']
+});
+const terminalBiasedDecision = makePublicServiceGroupingDecision({
+  services: [throughAtAssessedStop, terminalShortWorking],
+  principal: terminalShortWorking
+});
+assert.ok(!terminalBiasedDecision.shortWorkingRecordIds.includes(throughAtAssessedStop.id),
+  'a longer through pattern cannot be classified as a short working solely because its origin is outside the assessed area');
+
 const unresolvedDuplicate = fictionalRecord({ id: 'q1-unresolved' });
 unresolvedDuplicate.destinationEndpointDecision = { chosen: 'Beta Terminal', decisionType: 'unresolved-review', exact: false };
 assert.equal(makePublicServiceGroupingDecision({ services: [main, unresolvedDuplicate], principal: main }).deduplicatedSourceRecordIds.length, 0);

@@ -33,7 +33,10 @@ assert.match(app, /requested StopPoints \$\{requested\.join\(', '\) \|\| 'none'\
 assert.doesNotMatch(html.match(/<header[\s\S]*?<\/header>/)?.[0] ?? '', /data-atlas-test-build|Development\/Test build/);
 assert.match(app, /reviewBadge\.hidden = reviewItems\.length === 0/);
 assert.match(app, /groupReviewItems\(reviewItems\)/, 'normal Sources & Checks groups records by shared issue while retaining the original result items');
-assert.match(app, /Underlying evidence \(\$\{topic\.items\.length\}\)/, 'every compact review topic can expand to its exact route/StopPoint evidence records');
+assert.match(app, /Technical evidence and source references \(\$\{topic\.items\.length\}\)/, 'every review topic keeps exact technical identities and original records in an explicit disclosure');
+assert.match(app, /reviewStopLabel\(\{ stops: result\.stops \}, id\)/, 'normal review scopes use the same assessed physical stop and its human-readable name');
+assert.match(app, /Recorded source: \$\{topic\.source \|\| 'not supplied'\}; exact bus stop identifier:/, 'exact source identity remains inspectable in technical evidence');
+assert.match(app, /Walking routes', 'Estimated using street mapping'/, 'normal Sources & Checks avoids exposing the routing software name');
 assert.match(app, /What happened\?/);
 assert.match(app, /Effect on this assessment/);
 assert.match(app, /What to do/);

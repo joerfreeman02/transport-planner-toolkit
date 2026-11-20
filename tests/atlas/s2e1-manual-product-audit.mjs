@@ -748,9 +748,11 @@ try {
       if (control.id === 'waltham-cross') assert.match(normalChecksText, /Result:\s*Assessment execution complete · source or routing checks incomplete/, 'Sources & Checks must retain the same partial state as the Waltham result badge and progress card.');
       if (control.id === 'waltham-cross') {
         assert.match(normalChecksText, /The national bus timetable snapshot is \d+ days old/);
-        assert.match(normalChecksText, /Transport for London stop records were returned for this location/);
+        assert.match(normalChecksText, /Transport for London bus stop records were returned for this location/);
         assert.match(normalChecksText, /Other routes and stops continue to use their national timetable source/);
         assert.match(normalChecksText, /How timetable periods and frequency ranges are used/);
+        assert.match(normalChecksText, /Bus Station — Stop [A-Z]/, 'collapsed review topics use the assessed physical bus stop name and indicator');
+        assert.doesNotMatch(normalChecksText, /\bBODS\b|\bTNDS\b|\bTfL\b|\bOSRM\b|\bNPTG\b|StopPoint\s+\d|210021703\d{3}/i, 'normal Sources & Checks hides system acronyms and numeric stop identities');
         assert.doesNotMatch(normalChecksText, /national-primary|operating-period\/frequency evidence|exact scheduled journeys/i);
       }
       if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.locator('#sourceChecksDetails').screenshot({ path: path.join(acceptanceVisualDirectory, '12-sources-checks.png') });
@@ -765,8 +767,10 @@ try {
         assert.match(checksText, /What happened\?/);
         assert.match(checksText, /Effect on this assessment/);
         assert.match(checksText, /What to do/);
-        assert.match(checksText, /The displayed frequency for Routes 217, 317, 327 is based on timetable evidence at Bus Station \(StopPoint 210021703420\)/);
-        assert.match(checksText, /These supplementary Transport for London exact-stop checks did not return matches/);
+        assert.match(checksText, /The displayed frequency for Routes 217, 317, 327 is based on timetable evidence at Bus Station — Stop [A-Z]/);
+        assert.match(checksText, /These additional Transport for London timetable checks found no matching information for some bus stops/);
+        assert.match(checksText, /Technical evidence and source references/);
+        assert.match(checksText, /exact bus stop identifier: 210021703440/);
       }
       await page.locator('#plannerChecks details').evaluateAll(elements => elements.forEach(element => { element.open = false; }));
       outcome.sourcesAndChecks = normalChecksText;

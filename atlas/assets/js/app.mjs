@@ -25,7 +25,7 @@ import { buildBusTimetablePresentationNote, plannerRouteDisplayNumber, plannerSe
 import { buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, isOtherNearbyStopRecord, partialTimetableQualification, plannerFacingServiceNote, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { plannerStopWarning, recommendedBusStop } from '../../../src/atlas/domain/bus-planner-trust.mjs';
-import { describeReviewDiagnostics, describeReviewTopic, groupReviewItems } from '../../../src/atlas/domain/review-topics.mjs';
+import { describeReviewDiagnostics, describeReviewTopic, groupReviewItems, plannerSourceLabel, reviewStopLabel } from '../../../src/atlas/domain/review-topics.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
@@ -976,14 +976,14 @@ function renderAssessment(result) {
   $('busDataCurrent').className = `current-badge${$('dataStatusMessage').classList.contains('warning') ? ' warning' : ''}`;
   const plannerChecks = $('plannerChecks');
   plannerChecks.replaceChildren();
-  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', assessmentResultLabel]]) {
+  for (const [labelText, value] of [['Stops', plannerSourceLabel(stopSource)], ['Timetables', plannerSourceLabel(timetableLabel)], ['Walking routes', 'Estimated using street mapping'], ['Checked', checked], ['Result', assessmentResultLabel]]) {
     const line = document.createElement('p'); const label = document.createElement('strong'); label.textContent = `${labelText}: `; line.append(label, value); plannerChecks.append(line);
   }
   const plannerWarnings = [...new Set(result.warnings.map(warning => plannerStopWarning(warning, result)).filter(Boolean))];
   if (plannerWarnings.length) {
     const heading = document.createElement('strong'); heading.textContent = 'Points to note';
     const list = document.createElement('ul');
-    plannerWarnings.forEach(warning => { const item = document.createElement('li'); item.textContent = warning; list.append(item); });
+    plannerWarnings.forEach(warning => { const item = document.createElement('li'); item.textContent = plannerSourceLabel(warning).replace(/\bStopPoints?\b/gi, match => /^StopPoint$/i.test(match) ? 'bus stop' : 'bus stops'); list.append(item); });
     plannerChecks.append(heading, list);
   }
   if ((result.warnings ?? []).some(warning => /(?:\bTfL\b|Transport for London) supplied operating-period\/frequency evidence/i.test(String(warning)))) {
@@ -1004,10 +1004,10 @@ function renderAssessment(result) {
       const summary = document.createElement('summary');
       const routeText = topic.routes.length ? `Routes ${topic.routes.join(', ')}` : 'Assessment-wide';
       const stopIds = [...new Set(topic.items.map(item => String(item?.stop ?? '').trim()).filter(Boolean))];
-      const stopText = stopIds.length ? stopIds.map(id => `StopPoint ${id}`).join(', ') : 'all assessed stops';
+      const stopText = stopIds.length ? stopIds.map(id => reviewStopLabel({ stops: result.stops }, id)).join(', ') : 'all assessed stops';
       const explanation = describeReviewTopic(topic, { plannerServiceSummaries: presentedServices, stops: result.stops });
       const title = document.createElement('strong'); title.className = 'review-topic-title'; title.textContent = explanation.heading;
-      const scope = document.createElement('span'); scope.className = 'review-topic-scope'; scope.textContent = `${routeText} · ${stopText} · ${topic.source}`;
+      const scope = document.createElement('span'); scope.className = 'review-topic-scope'; scope.textContent = `${routeText} · ${stopText} · ${plannerSourceLabel(topic.source)}`;
       const count = document.createElement('small'); count.className = 'review-topic-count'; count.textContent = `${topic.items.length} record${topic.items.length === 1 ? '' : 's'}`;
       summary.className = 'review-topic-summary';
       summary.append(title, scope, count);
@@ -1015,10 +1015,13 @@ function renderAssessment(result) {
       const impact = labelledReviewNote('Effect on this assessment', explanation.impact, 'review-topic-impact');
       const action = labelledReviewNote('What to do', explanation.action, 'review-topic-action');
       const raw = document.createElement('details');
-      const rawSummary = document.createElement('summary'); rawSummary.textContent = `Underlying evidence (${topic.items.length})`;
+      raw.className = 'review-topic-evidence';
+      const rawSummary = document.createElement('summary'); rawSummary.textContent = `Technical evidence and source references (${topic.items.length})`;
+      const sourceReference = document.createElement('p');
+      sourceReference.textContent = `Recorded source: ${topic.source || 'not supplied'}; exact bus stop identifier: ${topic.stop || 'not supplied'}.`;
       const evidenceList = document.createElement('ul');
       topic.items.forEach(item => { const evidence = document.createElement('li'); evidence.textContent = reviewItemText(item); evidenceList.append(evidence); });
-      raw.append(rawSummary, evidenceList);
+      raw.append(rawSummary, sourceReference, evidenceList);
       detail.append(summary, what, impact, action, raw); line.append(detail); list.append(line);
     });
     plannerChecks.append(heading, list);
@@ -1028,7 +1031,7 @@ function renderAssessment(result) {
     const summary = document.createElement('summary'); summary.textContent = `Supplementary source checks · ${reviewDiagnostics.length} records`;
     const note = document.createElement('p'); note.textContent = describeReviewDiagnostics(reviewDiagnostics);
     const raw = document.createElement('details');
-    const rawSummary = document.createElement('summary'); rawSummary.textContent = 'View the retained source records';
+    const rawSummary = document.createElement('summary'); rawSummary.textContent = 'Technical evidence and source references';
     const list = document.createElement('ul');
     reviewDiagnostics.forEach(item => { const line = document.createElement('li'); line.textContent = reviewItemText(item); list.append(line); });
     raw.append(rawSummary, list);

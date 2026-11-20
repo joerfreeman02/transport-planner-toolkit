@@ -162,7 +162,11 @@ test('source-unavailable route-bearing stops remain recommended while Other near
   assert.equal(plannerStopWarning('The prepared dataset reported no bus stops within the selected distance.', { stops: [{ id: 'waltham-1' }] }), '');
   assert.equal(plannerStopWarning('The prepared dataset reported no bus stops within the selected distance.', { stops: [] }), 'No bus stops were found within the selected distance.');
   assert.equal(plannerStopWarning('TNDS JP_52-230 includes special-day operating metadata (SpecialDaysOperation); regular-day evidence was retained, but special dates require review.'), '');
-  assert.equal(plannerStopWarning('Some timetables contain date-specific changes. Check the assessment date before formal use.'), 'Some timetables contain date-specific changes. Check the assessment date before formal use.');
+  assert.equal(plannerStopWarning('Some timetables contain date-specific changes. Check the assessment date before formal use.'), 'Some timetable records include date-specific changes. Check the operator timetable for the assessment date before relying on those days.');
+  assert.equal(plannerStopWarning('The prepared bus dataset is 32 days old and should be refreshed before formal use.'), 'The national bus timetable snapshot is 32 days old. Check the operator’s current timetable before relying on it.');
+  assert.equal(plannerStopWarning('The prepared bus dataset does not contain a valid update time.'), 'The national bus timetable snapshot has no recorded preparation date; check a current operator timetable before relying on it.');
+  assert.equal(plannerStopWarning('TfL StopPoint records were checked at this confirmed point outside the Greater London boundary; TfL timetable authority is limited to returned records.'), 'Transport for London stop records were returned for this location. Transport for London timetable information applies only to the exact stops it returned.');
+  assert.equal(plannerStopWarning('TfL supplied operating-period/frequency evidence; ATLAS retained period boundaries separately from exact scheduled journeys.'), '');
 });
 
 test('station access infrastructure is not reported as a missing timetable call point', async () => {

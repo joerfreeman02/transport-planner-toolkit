@@ -569,9 +569,13 @@ try {
         const cardReviewCount = Number(reviewBadge.match(/^([0-9]+) items? require review$/)?.[1] || 0);
         assert.ok(cardReviewCount > 0, 'The frozen Waltham review case must show its review count in the completion card.');
         assert.equal(await page.locator('#resultFreshness').innerText(), expectedWalthamStatus, 'Results freshness must agree with unresolved Waltham source checks without repeating the review count.');
-        const sourceReviewBadge = await page.locator('#sourceReviewBadge').evaluate(element => element.textContent.trim());
-        const sourceReviewCount = Number(sourceReviewBadge.match(/^[0-9]+ topics · ([0-9]+) records$/)?.[1] || 0);
-        const sourceReviewTopicCount = Number(sourceReviewBadge.match(/^([0-9]+) topics · [0-9]+ records$/)?.[1] || 0);
+        const sourceReviewBadge = await page.locator('#sourceReviewBadge').evaluate(element => ({
+          text: element.innerText.trim(),
+          topics: Number(element.dataset.topicCount || 0),
+          records: Number(element.dataset.recordCount || 0)
+        }));
+        const sourceReviewCount = sourceReviewBadge.records;
+        const sourceReviewTopicCount = sourceReviewBadge.topics;
         assert.equal(cardReviewCount, sourceReviewCount, 'The progress card must agree with the Sources & Checks review count.');
         assert.ok(sourceReviewTopicCount > 0 || sourceReviewCount === 0, 'Sources & Checks must report distinct topics separately from underlying evidence records.');
         const desktopLayout = await page.locator('#taskStatus').evaluate(element => ({
@@ -732,21 +736,44 @@ try {
       assert.equal(await technical.getAttribute('hidden') !== null, true, 'Developer diagnostics must be absent from ordinary planner mode.');
       await page.locator('details > summary').filter({ hasText: /Sources\s*&\s*Checks/i }).click();
       const normalChecksText = await page.locator('#plannerChecks').innerText();
-      const sourceReviewBadgeText = (await page.locator('#sourceReviewBadge').innerText()).trim();
-      const sourceReviewCounts = sourceReviewBadgeText.match(/^([0-9]+) topics · ([0-9]+) records$/);
-      assert.ok(sourceReviewCounts || /No review items/.test(sourceReviewBadgeText), `Sources & Checks did not expose distinct topic and evidence counts: ${sourceReviewBadgeText}`);
-      if (sourceReviewCounts) {
-        assert.ok(Number(sourceReviewCounts[1]) > 0 && Number(sourceReviewCounts[2]) > 0, 'material review topics and evidence records must both be counted');
-        assert.ok(Number(sourceReviewCounts[1]) <= Number(sourceReviewCounts[2]), 'topic count cannot exceed its evidence-record count');
+      const sourceReviewBadge = await page.locator('#sourceReviewBadge').evaluate(element => ({
+        text: element.innerText.trim(),
+        topics: Number(element.dataset.topicCount || 0),
+        records: Number(element.dataset.recordCount || 0)
+      }));
+      assert.ok((sourceReviewBadge.topics > 0 && sourceReviewBadge.records > 0) || /No review items/.test(sourceReviewBadge.text), `Sources & Checks did not expose distinct topic and evidence counts: ${sourceReviewBadge.text}`);
+      if (sourceReviewBadge.topics > 0) {
+        assert.ok(sourceReviewBadge.topics <= sourceReviewBadge.records, 'topic count cannot exceed its evidence-record count');
       }
       if (control.id === 'waltham-cross') assert.match(normalChecksText, /Result:\s*Assessment execution complete · source or routing checks incomplete/, 'Sources & Checks must retain the same partial state as the Waltham result badge and progress card.');
+      if (control.id === 'waltham-cross') {
+        assert.match(normalChecksText, /The national bus timetable snapshot is \d+ days old/);
+        assert.match(normalChecksText, /Transport for London stop records were returned for this location/);
+        assert.match(normalChecksText, /Other routes and stops continue to use their national timetable source/);
+        assert.match(normalChecksText, /How timetable periods and frequency ranges are used/);
+        assert.doesNotMatch(normalChecksText, /national-primary|operating-period\/frequency evidence|exact scheduled journeys/i);
+      }
       if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.locator('#sourceChecksDetails').screenshot({ path: path.join(acceptanceVisualDirectory, '12-sources-checks.png') });
+      if (acceptanceVisualDirectory && control.id === 'waltham-cross') {
+        await page.locator('#plannerChecks > ul li > details').evaluateAll(elements => elements.forEach(element => { element.open = true; }));
+        await page.locator('#sourceChecksDetails').screenshot({ path: path.join(acceptanceVisualDirectory, '12-sources-checks-explained.png') });
+        await page.locator('#plannerChecks > ul li > details').evaluateAll(elements => elements.forEach(element => { element.open = false; }));
+      }
       await page.locator('#plannerChecks details').evaluateAll(elements => elements.forEach(element => { element.open = true; }));
       const checksText = await page.locator('#plannerChecks').innerText();
+      if (control.id === 'waltham-cross') {
+        assert.match(checksText, /What happened\?/);
+        assert.match(checksText, /Effect on this assessment/);
+        assert.match(checksText, /What to do/);
+        assert.match(checksText, /The displayed frequency for Routes 217, 317, 327 is based on timetable evidence at Bus Station \(StopPoint 210021703420\)/);
+        assert.match(checksText, /These supplementary Transport for London exact-stop checks did not return matches/);
+      }
       await page.locator('#plannerChecks details').evaluateAll(elements => elements.forEach(element => { element.open = false; }));
       outcome.sourcesAndChecks = normalChecksText;
       outcome.expandedSourcesAndChecks = checksText;
-      outcome.sourceReviewBadge = sourceReviewBadgeText;
+      outcome.sourceReviewBadge = sourceReviewBadge.text;
+      outcome.sourceReviewTopicCount = sourceReviewBadge.topics;
+      outcome.sourceReviewRecordCount = sourceReviewBadge.records;
       const resultFreshnessText = await page.locator('#resultFreshness').innerText();
       if (/0 evidence items? need review/i.test(resultFreshnessText)) {
         assert.doesNotMatch(checksText, /review (?:the affected )?service evidence before formal use|review the incomplete evidence before formal use/i,

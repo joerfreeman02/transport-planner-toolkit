@@ -1297,4 +1297,31 @@ Known Route 16/16C endpoint/boarding evidence, Route 24 terminal-role limitation
 
 GitHub tooling review: Dependabot remains configured; Codecov and OpenSSF Scorecard remain deferred pending stable CI/ownership; Sentry remains deferred pending telemetry/privacy ownership; Renovate remains deferred in favour of Dependabot. Nothing was installed or reconfigured.
 
+## Sprint 6 — plain-English Sources & Checks — 20 November 2026
+
+**Base:** `b092e2a48a419fae57a825aab19b8dd337b76688` on `codex/atlas-bus-beta2-blockers-20261118`; frozen `main` remains `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`. This correction changes planner explanations only. Timetable calculations, source hierarchy, source records, review classification and prepared Run #75 data are unchanged.
+
+Each actionable topic now explains what the source evidence did, what that means for this assessment and what the planner should check. Topics retain their routes, exact StopPoint, source labels, underlying record counts and expandable original evidence. Acknowledgements remain unchecked initially; export remains gated. Supplemental diagnostics retain their records in a separate expandable area and do not satisfy the acknowledgement gate.
+
+- An exact-stop TfL gap is explained as “no timetable was returned for this StopPoint,” not proof that a route does not run. The displayed-frequency basis is named only when every affected route row establishes the same different StopPoint. In the Waltham replay, displayed Routes 217, 317 and 327 frequency is based on `210021703420`; the unmatched exact-stop lookup is `210021703440`.
+- BODS terminal warnings say that the snapshot does not establish whether boarding is permitted. They do not claim the service is unboardable or remove it.
+- TNDS operating-day conflicts remain actionable and direct planners to check the operator timetable for the assessment date. Endpoint uncertainty says that an exact destination identity was unavailable and ATLAS did not infer a place. Cross-provider conflicts name the sources and state which schedule remains primary.
+- Assessment-wide notes use plain provider names and explain practical scope. National snapshot freshness is expressed as an age (31 days in this replay). Frequency-range methodology remains available in a separate disclosure.
+
+The UI prioritizes actionable-topic count, with underlying records shown as secondary information. Topics expose “What happened?”, “Effect on this assessment”, and “What to do”; raw evidence remains expandable. Word and A3 continue to omit internal review detail and retain the existing acknowledgement safety gate.
+
+### Acceptance-count discrepancy — remains open
+
+The requested Waltham presentation described **6 topics / 30 records**. The reproducible 700 m Run #75 application replay selected and assessed 15 StopPoints and displayed **13 actionable topics / 42 records**, plus **9 supplemental diagnostic records**. The raw 51 records reconcile to 20 BODS boarding-role, 19 unresolved TfL request identities, 2 TNDS calendar, 5 endpoint, 3 route-identity and 2 assessment-wide records. No topics or records were suppressed to force the requested count; all nine diagnostics remain inspectable. Product Owner retest against the requested count remains blocked until the parties confirm the site, radius, snapshot and assessment scope used for that expected total.
+
+### Verification
+
+- Focused review-topic, planner-source-note and UI-contract tests passed. Syntax checks for the changed app, domain helpers and audit passed; `git diff --check` passed.
+- Full deterministic `node tests/atlas/run-all.mjs` passed with explicit frozen Run #75 Bus, TNDS and TfL iBus roots, ending `ATLAS Alpha.15 deterministic suite passed`. Initial attempts without the frozen roots/local browser allowance failed on fixture setup; the final configured run passed.
+- Static-index preparation suite passed **21/21**.
+- Actual uninstrumented Waltham 700 m and Chingford browser controls reported zero failures, browser errors and external requests. Waltham still displays 42 actionable records and 9 supplemental diagnostics. Browser/Word and A3 assertions passed; the expanded screenshot is under ignored `tmp/atlas-plain-language-waltham-shots/`.
+- The full traced Browser/Word/A3 replay passed **16/16 controls** against immutable Run #75. Recorded TfL responses matched **135/135**, with zero misses, unused responses, failed requests, or unexpected external requests. The only two HTTP 400 responses were the expected Tufton requests for Routes 158 and W16 at StopPoint `490005180E`; the two matching browser console messages correspond to those source responses. The report is `tmp/atlas-acceptance-plain-language-16-control.json`; captured responses came from the existing `abbotts-golden-tfl-capture.json` fixture.
+
+No production version/build, source data or updater changed. No national refresh occurred. No source warning was hidden. GitHub tooling review remains unchanged: Dependabot configured; Codecov and OpenSSF Scorecard deferred pending stable CI/ownership; Sentry deferred pending telemetry/privacy ownership; Renovate deferred in favour of Dependabot. Nothing was installed or reconfigured.
+
 \n

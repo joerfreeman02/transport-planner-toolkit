@@ -148,4 +148,12 @@ Known Route 16/16C endpoint/boarding evidence, Route 24 terminal-role limitation
 
 GitHub tooling review: Dependabot remains configured; Codecov and OpenSSF Scorecard remain deferred pending stable CI/ownership; Sentry remains deferred pending telemetry/privacy ownership; Renovate remains deferred in favour of Dependabot. Nothing was installed or reconfigured.
 
+## Sprint 6 — plain-English Sources & Checks — 20 November 2026
+
+See `BUS-BETA2-KNOWN-DEFECTS-HARDENING.md` for the detailed behavior, evidence and acceptance discrepancy. The UI now explains each review topic as what happened, its effect on this assessment, and what the planner should do. It retains provider labels, exact StopPoints, source records, expandable raw evidence, initial unchecked acknowledgement, and the existing export gate. No timetable calculation, source data, hierarchy or review classification changed.
+
+The actual 700 m Run #75 Waltham Browser/Word/A3 replay shows **13 actionable topics / 42 records plus 9 supplemental diagnostics**, versus the assignment’s stated **6 / 30**. Nothing was suppressed to force that count. This discrepancy remains open and prevents Product Owner re-acceptance until the scope behind the expected count is reconciled.
+
+The full deterministic Node suite passed using the frozen Run #75 Bus, TNDS and TfL iBus roots; Python static-index tests passed **21/21**. Uninstrumented Waltham and Chingford controls completed with no report failures, browser errors or external requests. The full traced Browser/Word/A3 replay passed **16/16** controls; the captured TfL replay matched **135/135** responses with zero misses, unused responses, failed requests or unexpected external requests. Two expected TfL HTTP 400 responses for Routes 158 and W16 at Tufton StopPoint `490005180E` were the only browser console errors. The detailed report is `tmp/atlas-acceptance-plain-language-16-control.json`. The application remains version `2.0.0-beta.1`; no refresh, build change, release or deployment occurred. GitHub tooling review is unchanged; no tooling was installed.
+
 \n

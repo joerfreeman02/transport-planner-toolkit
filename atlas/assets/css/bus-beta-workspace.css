@@ -161,7 +161,8 @@ button.secondary:hover:not(:disabled), .secondary:hover:not(:disabled) { border-
 .result-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 8px 0 16px; padding: 10px 12px; border: 1px solid var(--atlas-border); border-radius: 7px; background: #f7f9fc; color: #42566b; font-size: .8rem; }
 .current-badge { padding: 5px 9px; border-radius: 999px; background: #eaf6eb; color: #245f2b; font-size: .76rem; }
 .current-badge.warning { background: #fff3d9; color: #6d4b00; }
-.review-badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: var(--atlas-pale-orange); color: #823904; font-size: .74rem; font-weight: 800; }
+.review-badge { display: inline-flex; align-items: baseline; gap: 7px; padding: 4px 8px; border-radius: 999px; background: var(--atlas-pale-orange); color: #823904; font-size: .78rem; font-weight: 800; }
+.review-badge small { color: #68432f; font-size: .67rem; font-weight: 600; }
 .review-badge:empty { display: none; }
 .assessment-output { margin-top: 20px; }
 .output-heading h4, .assessment-wording h4 { color: var(--atlas-navy); }
@@ -201,6 +202,15 @@ tbody tr:nth-child(even) { background: #f5f8fb; }
 .source-checks > summary { display: flex; align-items: center; gap: 9px; padding: 13px 15px; color: var(--atlas-navy); }
 .source-checks-hint { margin-left: auto; color: #586c81; font-size: .74rem; font-weight: 500; }
 .source-checks #plannerChecks { padding: 3px 15px 14px; border-top: 1px solid #e0e7ee; color: #24384d; }
+.review-topic-summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.review-topic-title { flex: 1 1 100%; color: var(--atlas-navy); }
+.review-topic-scope { color: #53667a; font-size: .78rem; font-weight: 500; }
+.review-topic-count { color: #65788b; font-size: .7rem; font-weight: 500; }
+.review-topic-what, .review-topic-impact, .review-topic-action { max-width: 100ch; }
+.review-topic-what strong, .review-topic-impact strong, .review-topic-action strong { color: var(--atlas-navy); }
+.source-methodology { margin: 9px 0; padding: 7px 10px; border: 1px solid #d7e1ea; border-radius: 5px; background: #f8fafc; }
+.source-methodology > summary { color: #354e67; font-size: .8rem; font-weight: 650; }
+.source-methodology p { margin: 7px 0 2px; color: #53667a; font-size: .8rem; }
 .data-status { margin-top: 10px; padding: 12px; border: 1px solid var(--atlas-border); border-radius: 7px; background: #f7f9fc; }
 .data-status h3 { color: var(--atlas-navy); }
 .data-status dd { color: #465b70; }

@@ -25,7 +25,7 @@ import { buildBusTimetablePresentationNote, plannerRouteDisplayNumber, plannerSe
 import { buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, isOtherNearbyStopRecord, partialTimetableQualification, plannerFacingServiceNote, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { plannerStopWarning, recommendedBusStop } from '../../../src/atlas/domain/bus-planner-trust.mjs';
-import { groupReviewItems } from '../../../src/atlas/domain/review-topics.mjs';
+import { describeReviewDiagnostics, describeReviewTopic, groupReviewItems } from '../../../src/atlas/domain/review-topics.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
@@ -689,18 +689,11 @@ function reviewItemText(item) {
   return scope ? scope + ': ' + item.message : item.message;
 }
 
-function reviewTopicHeadline(topic) {
-  const examples = {
-    'unresolved-timetable-request': 'An exact-stop timetable response is unresolved.',
-    'no-current-timetable-match': 'No current timetable match was returned for this stop.',
-    'service-source-evidence': 'The operating-day evidence needs checking.',
-    'supplementary-identity-conflict': 'Timetable sources disagree about route identity.',
-    'planner-endpoint-resolution': 'The route endpoint could not be confirmed.',
-    'directional-principal-location': 'The direction-specific route pattern needs checking.',
-    'unresolved-operator-evidence': 'The operator identity remains unresolved.'
-  };
-  if (topic.items.some(item => /boarding eligibility cannot be independently confirmed/i.test(item.message))) return 'Boarding permissions are not recorded at this stop.';
-  return examples[topic.code] || 'Source evidence needs review.';
+function labelledReviewNote(labelText, value, className) {
+  const paragraph = document.createElement('p'); paragraph.className = className;
+  const label = document.createElement('strong'); label.textContent = labelText;
+  paragraph.append(label, document.createTextNode(' '), document.createTextNode(value));
+  return paragraph;
 }
 
 
@@ -953,15 +946,31 @@ function renderAssessment(result) {
   }
   $('plannerReviewGate').hidden = reviewItems.length === 0;
   $('plannerReviewAcknowledgement').checked = false;
-  $('plannerReviewGateStatus').textContent = reviewItems.length ? `${reviewTopics.length} review topic${reviewTopics.length === 1 ? '' : 's'} cover ${reviewItems.length} evidence record${reviewItems.length === 1 ? '' : 's'} in Sources & Checks.` : 'No flagged evidence requires acknowledgement.';
+  $('plannerReviewGateStatus').textContent = reviewItems.length ? `${reviewTopics.length} source review topic${reviewTopics.length === 1 ? '' : 's'} need${reviewTopics.length === 1 ? 's' : ''} your attention. Open each topic, then acknowledge before export.` : 'No flagged evidence requires acknowledgement.';
   updateFormalExportAvailability();
   const assessmentResultLabel = result.status === 'partial'
     ? 'Assessment execution complete · source or routing checks incomplete'
     : 'Assessment complete';
   $('resultFreshness').textContent = assessmentResultLabel;
   $('resultFreshness').className = 'completion-badge';
-  $('sourceReviewBadge').textContent = reviewItems.length ? `${reviewTopics.length} topics · ${reviewItems.length} records` : 'No review items';
-  $('sourceReviewBadge').hidden = reviewItems.length === 0;
+  const reviewBadge = $('sourceReviewBadge');
+  reviewBadge.replaceChildren();
+  if (reviewItems.length) {
+    const topicCount = document.createElement('strong');
+    topicCount.textContent = `${reviewTopics.length} review topic${reviewTopics.length === 1 ? '' : 's'}`;
+    const recordCount = document.createElement('small');
+    recordCount.textContent = `${reviewItems.length} underlying records`;
+    reviewBadge.append(topicCount, recordCount);
+    reviewBadge.dataset.topicCount = String(reviewTopics.length);
+    reviewBadge.dataset.recordCount = String(reviewItems.length);
+    reviewBadge.setAttribute('aria-label', `${reviewTopics.length} review topics, ${reviewItems.length} underlying evidence records`);
+  } else {
+    reviewBadge.textContent = 'No review items';
+    delete reviewBadge.dataset.topicCount;
+    delete reviewBadge.dataset.recordCount;
+    reviewBadge.removeAttribute('aria-label');
+  }
+  reviewBadge.hidden = reviewItems.length === 0;
   $('sourceChecksDetails').open = false;
   $('busDataCurrent').textContent = $('dataStatusMessage').textContent;
   $('busDataCurrent').className = `current-badge${$('dataStatusMessage').classList.contains('warning') ? ' warning' : ''}`;
@@ -977,6 +986,15 @@ function renderAssessment(result) {
     plannerWarnings.forEach(warning => { const item = document.createElement('li'); item.textContent = warning; list.append(item); });
     plannerChecks.append(heading, list);
   }
+  if ((result.warnings ?? []).some(warning => /(?:\bTfL\b|Transport for London) supplied operating-period\/frequency evidence/i.test(String(warning)))) {
+    const methodology = document.createElement('details');
+    methodology.className = 'source-methodology';
+    const summary = document.createElement('summary'); summary.textContent = 'How timetable periods and frequency ranges are used';
+    const note = document.createElement('p');
+    note.textContent = 'When a source provides an operating period or frequency range rather than exact departure times, ATLAS keeps it as a period or range. It does not turn that range into invented scheduled departures.';
+    methodology.append(summary, note);
+    plannerChecks.append(methodology);
+  }
   if (reviewItems.length) {
     const heading = document.createElement('strong'); heading.textContent = 'Review topics';
     const list = document.createElement('ul');
@@ -985,24 +1003,36 @@ function renderAssessment(result) {
       const detail = document.createElement('details');
       const summary = document.createElement('summary');
       const routeText = topic.routes.length ? `Routes ${topic.routes.join(', ')}` : 'Assessment-wide';
-      const stopText = topic.stop ? `StopPoint ${topic.stop}` : 'all assessed stops';
-      summary.textContent = `${reviewTopicHeadline(topic)} · ${routeText} · ${stopText} · ${topic.source} · ${topic.items.length} record${topic.items.length === 1 ? '' : 's'}`;
-      const action = document.createElement('p'); action.textContent = topic.items[0]?.message || '';
+      const stopIds = [...new Set(topic.items.map(item => String(item?.stop ?? '').trim()).filter(Boolean))];
+      const stopText = stopIds.length ? stopIds.map(id => `StopPoint ${id}`).join(', ') : 'all assessed stops';
+      const explanation = describeReviewTopic(topic, { plannerServiceSummaries: presentedServices, stops: result.stops });
+      const title = document.createElement('strong'); title.className = 'review-topic-title'; title.textContent = explanation.heading;
+      const scope = document.createElement('span'); scope.className = 'review-topic-scope'; scope.textContent = `${routeText} · ${stopText} · ${topic.source}`;
+      const count = document.createElement('small'); count.className = 'review-topic-count'; count.textContent = `${topic.items.length} record${topic.items.length === 1 ? '' : 's'}`;
+      summary.className = 'review-topic-summary';
+      summary.append(title, scope, count);
+      const what = labelledReviewNote('What happened?', explanation.what, 'review-topic-what');
+      const impact = labelledReviewNote('Effect on this assessment', explanation.impact, 'review-topic-impact');
+      const action = labelledReviewNote('What to do', explanation.action, 'review-topic-action');
       const raw = document.createElement('details');
       const rawSummary = document.createElement('summary'); rawSummary.textContent = `Underlying evidence (${topic.items.length})`;
       const evidenceList = document.createElement('ul');
       topic.items.forEach(item => { const evidence = document.createElement('li'); evidence.textContent = reviewItemText(item); evidenceList.append(evidence); });
       raw.append(rawSummary, evidenceList);
-      detail.append(summary, action, raw); line.append(detail); list.append(line);
+      detail.append(summary, what, impact, action, raw); line.append(detail); list.append(line);
     });
     plannerChecks.append(heading, list);
   }
   if (reviewDiagnostics.length) {
     const details = document.createElement('details');
-    const summary = document.createElement('summary'); summary.textContent = `Source diagnostics retained · no separate planner action (${reviewDiagnostics.length} records)`;
+    const summary = document.createElement('summary'); summary.textContent = `Supplementary source checks · ${reviewDiagnostics.length} records`;
+    const note = document.createElement('p'); note.textContent = describeReviewDiagnostics(reviewDiagnostics);
+    const raw = document.createElement('details');
+    const rawSummary = document.createElement('summary'); rawSummary.textContent = 'View the retained source records';
     const list = document.createElement('ul');
     reviewDiagnostics.forEach(item => { const line = document.createElement('li'); line.textContent = reviewItemText(item); list.append(line); });
-    details.append(summary, list); plannerChecks.append(details);
+    raw.append(rawSummary, list);
+    details.append(summary, note, raw); plannerChecks.append(details);
   }
   if (diagnosticMode) {
   const diagnostics = $('diagnostics');

@@ -120,6 +120,9 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') {
 const controls = [
   { id: 'pipers-lane', label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700 },
   { id: 'pipers-route46', label: 'Pipers Lane route 46 frequency control', latitude: 51.852700, longitude: -0.454343, radius: 1200 },
+  { id: 'redricks-route24-terminal', label: 'River Way Rdbt StopPoint 1500TMPLFLD2 Route 24 terminal-role control', latitude: 51.7925678, longitude: 0.1267994, radius: 100, focusRoutes: ['24'] },
+  { id: 'redricks-route417-opposite', label: 'River Way opposite StopPoint 1500IM2689B Route 417 window control', latitude: 51.7854402, longitude: 0.1181416, radius: 100, focusRoutes: ['417'] },
+  { id: 'waltham-route16-plain', label: 'Waltham Route 16/16C uninstrumented control', latitude: 51.686144, longitude: -0.035707, radius: 700, focusRoutes: ['16', '16C'] },
   { id: 'waltham-cross', label: '47 Berkley Avenue, Waltham Cross', latitude: 51.686144, longitude: -0.035707, radius: 700 },
   { id: 'waltham-cross-nearest', label: '47 Berkley Avenue, Waltham Cross nearest logical stop group', latitude: 51.686144, longitude: -0.035707, radius: 700, assessmentMode: 'nearest' },
   { id: 'abbotts-rise-nearest', label: 'Abbotts Rise public stop pair, Stanstead Abbotts', latitude: 51.78711445, longitude: 0.01104605, radius: 700, assessmentMode: 'nearest', focusRoutes: ['25', '25B', '25C', '33', '35', '35B', '35C'] },
@@ -1009,8 +1012,46 @@ try {
           displayedSaturdayPopulation: route231Rows.find(row => /Dunstable Asda/i.test(row['Direction / main service pattern']))?.['Typical frequency'] ?? null,
           sourceReviewStopId: '021028151',
           outboundHillcrestStopId: '021024640',
-          currentOperatorSaturdayParity: 'unresolved: Saturday timetable columns name Chapel calls and do not identify the Hillcrest Park NaPTAN point'
+          currentOperatorSaturdayParity: 'source-version difference: the June 2026 Parish Council timetable explicitly lists Woodside, Hillcrest Park 09:04 on Saturdays; the newer TNDS snapshot is valid from 2026-10-12 and supplies three unique outbound times. The operator website still links its 2025 timetable, so post-October operator confirmation is unavailable.'
         };
+      }
+      if (control.id === 'redricks-route24-terminal') {
+        const route24 = rendered.filter(row => row.Route === '24');
+        assert.ok(route24.length > 0, 'The exact River Way Rdbt StopPoint must retain its frozen Route 24 source row.');
+        assert.ok(route24.some(row => /1500TMPLFLD2|River Way Rdbt/i.test(row['Served at'] || '')), 'Route 24 must remain tied to the exact River Way Rdbt selected StopPoint.');
+        assert.match(checksText, /Route 24 · Stop 1500TMPLFLD2 · BODS: Frozen BODS data at this selected terminal does not retain stop-time boarding or alighting roles/i,
+          'The exact Route 24 terminal must retain its internal boarding-role uncertainty disclosure.');
+        assert.ok(route24.some(row => /18:51/.test(row['Operating period at stop'] || '')), 'The frozen 18:51 terminal time must remain available as source evidence.');
+        assert.doesNotMatch(exportedWordText, /Sources & Checks|Evidence items to review|boarding eligibility cannot be independently confirmed|Destination endpoint decision requires review/i,
+          'Word must keep internal Route 24 source review and endpoint diagnostics excluded.');
+        outcome.exactStopControl = { stopPointId: '1500TMPLFLD2', route: '24', rows: route24 };
+      }
+      if (control.id === 'redricks-route417-opposite') {
+        const route417 = rendered.filter(row => row.Route === '417');
+        assert.ok(route417.length > 0, 'The exact River Way opposite StopPoint must retain its frozen Route 417 source row.');
+        assert.ok(outcome.assessedStopRows.some(stop => stop.id === '1500IM2689B'), 'The opposite River Way StopPoint must be assessed as its own physical stop.');
+        assert.ok(outcome.assessedStopRows.some(stop => stop.id === '1500IM2689'), 'The nearby adjacent River Way/Tesco-side StopPoint must remain distinct from the opposite stop.');
+        const oppositeRows = route417.filter(row => /River Way\s*[—-]\s*opp/i.test(row['Served at'] || ''));
+        const adjacentRows = route417.filter(row => /River Way\s*[—-]\s*adj/i.test(row['Served at'] || ''));
+        assert.ok(oppositeRows.some(row => /08:14/i.test(row['Operating period at stop'] || '') && /19:14.*23:14/i.test(row['Operating period at stop'] || '')), 'Route 417 at River Way opposite must preserve its separate morning and evening windows.');
+        assert.ok(adjacentRows.length > 0, 'The adjacent Tesco-side River Way service must not be substituted for the opposite-stop 417 control.');
+        assert.match(exportedWordText, /417[\s\S]{0,600}08:14[\s\S]{0,100}19:14.*23:14/i, 'Word must preserve the same exact-stop Route 417 morning and evening service windows.');
+        assert.doesNotMatch(exportedWordText, /Sources & Checks|Evidence items to review|boarding eligibility cannot be independently confirmed|Destination endpoint decision requires review/i,
+          'Word must keep the internal Route 24 source review and endpoint diagnostics excluded.');
+        outcome.exactStopControl = { stopPointId: '1500IM2689B', route: '417', rows: route417 };
+      }
+      if (control.id === 'waltham-route16-plain') {
+        const route16 = rendered.find(row => row.Route === '16');
+        const route16c = rendered.find(row => row.Route === '16C');
+        assert.ok(route16 && route16c, 'The uninstrumented Waltham Browser control must retain Route 16 and the Route 16C golden control.');
+        assert.match(route16['Operating period at stop'] || '', /Sat: Approx\. 07:10–19:10/, 'Route 16 must retain the published Saturday last pick-up at 19:10.');
+        assert.doesNotMatch(route16['Operating period at stop'] || '', /19:38/, 'The later 19:38 set-down-only call must not be advertised as a boarding departure.');
+        assert.match(route16c['Operating period at stop'] || '', /Sun: Approx\. 08:00–19:45/, 'Route 16C Sunday 19:45 must remain unaffected.');
+        assert.match(checksText, /Route 16 · Stop 210021703430 · BODS: Frozen BODS data at this selected terminal does not retain stop-time boarding or alighting roles/i,
+          'Route 16 must retain its exact Stop C source-role uncertainty in Sources & Checks.');
+        assert.doesNotMatch(exportedWordText, /Sources & Checks|Evidence items to review|boarding eligibility cannot be independently confirmed/i,
+          'Word must keep the internal Route 16 source-role uncertainty excluded.');
+        outcome.route16Plain = { route16, route16c, stopPointId: '210021703430', selectedStopIds: outcome.assessedStopRows.map(stop => stop.id) };
       }
       if (control.id === 'pearcroft-route65') {
         const browser65 = rendered.filter(row => row.Route === '65');

@@ -1314,6 +1314,8 @@ The UI prioritizes actionable-topic count, with underlying records shown as seco
 
 The requested Waltham presentation described **6 topics / 30 records**. The reproducible 700 m Run #75 application replay selected and assessed 15 StopPoints and displayed **13 actionable topics / 42 records**, plus **9 supplemental diagnostic records**. The raw 51 records reconcile to 20 BODS boarding-role, 19 unresolved TfL request identities, 2 TNDS calendar, 5 endpoint, 3 route-identity and 2 assessment-wide records. No topics or records were suppressed to force the requested count; all nine diagnostics remain inspectable. Product Owner retest against the requested count remains blocked until the parties confirm the site, radius, snapshot and assessment scope used for that expected total.
 
+**Controlled manual retest:** Open the local review URL in the handover and confirm the build marker names the final checkpoint SHA. In Bus, recreate the same confirmed Waltham Cross site selection, choose full-radius mode at 700 m, and verify the selected StopPoints and Run #75 date before comparing Sources & Checks. Check the topic count, underlying-record count and expandable source records before acknowledging anything. If the control still expects 6/30, capture its site point, radius, selected StopPoints and candidate/data identity for reconciliation; do not dismiss records or export as accepted until the scope mismatch is resolved. Then spot-check the exact-stop TfL, boarding-role, calendar and endpoint explanations described above.
+
 ### Verification
 
 - Focused review-topic, planner-source-note and UI-contract tests passed. Syntax checks for the changed app, domain helpers and audit passed; `git diff --check` passed.

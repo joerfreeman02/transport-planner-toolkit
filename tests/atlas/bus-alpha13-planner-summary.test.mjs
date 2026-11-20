@@ -167,6 +167,13 @@ assert.equal(route279[0].frequencyBasisStopId, 'A');
 assert.equal(route279[0].canonicalDeparturePopulation.monday.every(item => item.stopPointId === 'A'), true);
 assert.equal(route279[0].routeGroupNote, 'Additional short workings and timetable variants operate.'); // legacy audit field; not planner-facing
 assert.equal(route279[0].directionPatternText, 'Towards Theobalds Grove');
+const route279RepeatedPatternNote = buildPlannerBusServiceSummaries([
+  plannerRecord({ routeNumber: '279', ids: '279-note', serviceNote: 'Intermediate stop patterns vary, including East Street. Intermediate stop patterns vary, including West Street.' })
+], coherentStops)[0];
+assert.equal(route279RepeatedPatternNote.serviceNote, 'Intermediate stop patterns vary, including East Street; West Street.', 'shared intermediate-pattern wording is stated once while both source-supported examples remain');
+const route279RepeatedPatternWord = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [route279RepeatedPatternNote], serviceSummaries: [] })[1].rows.find(row => !Array.isArray(row) && /Intermediate stop patterns vary/.test(row.text));
+assert.match(route279RepeatedPatternWord.text, /East Street; West Street/);
+assert.equal((route279RepeatedPatternWord.text.match(/Intermediate stop patterns vary/g) ?? []).length, 1, 'Word uses the same deduplicated route note as the Browser summary');
 
 const sameTime = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: 'Q', departures: [420], ids: 'same-physical' }),

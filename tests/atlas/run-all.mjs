@@ -17,6 +17,7 @@ await import('./bus-stop-structure.test.mjs');
 await import('./bus-data-updater.test.mjs');
 await import('./prepared-bus-data-integrity.test.mjs');
 await import('./bus-service-assessment.test.mjs');
+await import('./review-topics.test.mjs');
 await import('./bus-presentation.test.mjs');
 await import('./bus-alpha5.test.mjs');
 await import('./osrm-access-routing-adapter.test.mjs');

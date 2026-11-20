@@ -139,7 +139,7 @@ if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') controls.splice(0, contr
 if (process.env.ATLAS_AUDIT_CONTROL === 'pearcroft-route65') controls.splice(0, controls.length, { id: 'pearcroft-route65', label: 'Pearcroft Road public stop 1600GLS313', latitude: 51.74319, longitude: -2.27813, radius: 120 });
 else if (process.env.ATLAS_AUDIT_CONTROL) controls.splice(0, controls.length, ...controls.filter(control => control.id === process.env.ATLAS_AUDIT_CONTROL));
 const stageTraceRequiredControls = new Set(['waltham-cross', 'waltham-cross-nearest', 'abbotts-rise-nearest', 'pe1']);
-if (controls.some(control => stageTraceRequiredControls.has(control.id)) && process.env.ATLAS_C4_TRACE_OPERATOR_STAGES !== '1') {
+if (controls.some(control => stageTraceRequiredControls.has(control.id)) && process.env.ATLAS_C4_TRACE_OPERATOR_STAGES !== '1' && process.env.ATLAS_AUDIT_UNINSTRUMENTED !== '1') {
   throw new Error('The Waltham, Abbotts Rise and PE1 acceptance assertions require production-stage traces. Rerun with ATLAS_C4_TRACE_OPERATOR_STAGES=1; do not treat missing trace fields as product failures.');
 }
 const chingfordRouteMetadata657 = { id: '657', routeSections: [
@@ -570,8 +570,10 @@ try {
         assert.ok(cardReviewCount > 0, 'The frozen Waltham review case must show its review count in the completion card.');
         assert.equal(await page.locator('#resultFreshness').innerText(), expectedWalthamStatus, 'Results freshness must agree with unresolved Waltham source checks without repeating the review count.');
         const sourceReviewBadge = await page.locator('#sourceReviewBadge').evaluate(element => element.textContent.trim());
-        const sourceReviewCount = Number(sourceReviewBadge.match(/^([0-9]+) items? require review$/)?.[1] || 0);
+        const sourceReviewCount = Number(sourceReviewBadge.match(/^[0-9]+ topics · ([0-9]+) records$/)?.[1] || 0);
+        const sourceReviewTopicCount = Number(sourceReviewBadge.match(/^([0-9]+) topics · [0-9]+ records$/)?.[1] || 0);
         assert.equal(cardReviewCount, sourceReviewCount, 'The progress card must agree with the Sources & Checks review count.');
+        assert.ok(sourceReviewTopicCount > 0 || sourceReviewCount === 0, 'Sources & Checks must report distinct topics separately from underlying evidence records.');
         const desktopLayout = await page.locator('#taskStatus').evaluate(element => ({
           cardWidth: element.clientWidth, cardScrollWidth: element.scrollWidth,
           stages: [...element.querySelectorAll('.task-stages li')].map(stage => ({ label: stage.textContent.trim(), width: stage.clientWidth, scrollWidth: stage.scrollWidth, whiteSpace: getComputedStyle(stage).whiteSpace }))
@@ -729,10 +731,22 @@ try {
       const technical = page.locator('#developerDiagnostics');
       assert.equal(await technical.getAttribute('hidden') !== null, true, 'Developer diagnostics must be absent from ordinary planner mode.');
       await page.locator('details > summary').filter({ hasText: /Sources\s*&\s*Checks/i }).click();
-      const checksText = await page.locator('#plannerChecks').innerText();
-      if (control.id === 'waltham-cross') assert.match(checksText, /Result:\s*Assessment execution complete · source or routing checks incomplete/, 'Sources & Checks must retain the same partial state as the Waltham result badge and progress card.');
+      const normalChecksText = await page.locator('#plannerChecks').innerText();
+      const sourceReviewBadgeText = (await page.locator('#sourceReviewBadge').innerText()).trim();
+      const sourceReviewCounts = sourceReviewBadgeText.match(/^([0-9]+) topics · ([0-9]+) records$/);
+      assert.ok(sourceReviewCounts || /No review items/.test(sourceReviewBadgeText), `Sources & Checks did not expose distinct topic and evidence counts: ${sourceReviewBadgeText}`);
+      if (sourceReviewCounts) {
+        assert.ok(Number(sourceReviewCounts[1]) > 0 && Number(sourceReviewCounts[2]) > 0, 'material review topics and evidence records must both be counted');
+        assert.ok(Number(sourceReviewCounts[1]) <= Number(sourceReviewCounts[2]), 'topic count cannot exceed its evidence-record count');
+      }
+      if (control.id === 'waltham-cross') assert.match(normalChecksText, /Result:\s*Assessment execution complete · source or routing checks incomplete/, 'Sources & Checks must retain the same partial state as the Waltham result badge and progress card.');
       if (acceptanceVisualDirectory && control.id === 'waltham-cross') await page.locator('#sourceChecksDetails').screenshot({ path: path.join(acceptanceVisualDirectory, '12-sources-checks.png') });
-      outcome.sourcesAndChecks = checksText;
+      await page.locator('#plannerChecks details').evaluateAll(elements => elements.forEach(element => { element.open = true; }));
+      const checksText = await page.locator('#plannerChecks').innerText();
+      await page.locator('#plannerChecks details').evaluateAll(elements => elements.forEach(element => { element.open = false; }));
+      outcome.sourcesAndChecks = normalChecksText;
+      outcome.expandedSourcesAndChecks = checksText;
+      outcome.sourceReviewBadge = sourceReviewBadgeText;
       const resultFreshnessText = await page.locator('#resultFreshness').innerText();
       if (/0 evidence items? need review/i.test(resultFreshnessText)) {
         assert.doesNotMatch(checksText, /review (?:the affected )?service evidence before formal use|review the incomplete evidence before formal use/i,
@@ -769,6 +783,7 @@ try {
       const renderedServiceNotes = await serviceTable.locator('tbody tr.service-note').allInnerTexts();
       outcome.renderedServiceNotes = renderedServiceNotes;
       if (control.id === 'abbotts-rise-nearest') {
+        if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1') {
         const route25Trace = outcome.routeTraces?.['25'] ?? {};
         const families25 = Object.values(route25Trace).flatMap(trace => trace?.terminalRows ?? [])
           .filter(row => row.publicRouteFamilyDecision?.memberRouteNumbers?.includes('25B'));
@@ -793,6 +808,7 @@ try {
         assert.ok(family25Cs.every(member => member.serviceVariants?.length === 1
           && Object.values(member.serviceVariants[0].departureCountsByDay).filter(count => count > 0).length === 5),
         'Each Route 25C direction must retain its own destination and weekday-only population.');
+        }
         assert.match(renderedServiceNotes.join(' '), /Route 25B also serves .*Station Road: Mon-Fri: 2 journeys\/day; Sat: 2 journeys\/day;.*Sainsbury's: Mon-Fri: 3 journeys\/day; Sat: 1 journey\/day; no Sunday service/i,
           'The family note must preserve each Route 25B destination-specific population separately from the principal Route 25 service.');
         assert.match(renderedServiceNotes.join(' '), /route 25C .*Mon-Fri: 1 journey\/day; no weekend service/i,
@@ -984,7 +1000,7 @@ try {
       outcome.routesWithMoreThanTwoRows = [...byRoute].filter(([, rows]) => rows.length > 2).map(([route, rows]) => ({ route, rows }));
       outcome.sourceColumn = { visibleOnTopMiddleBottom: true, samples: sourceSamples, overflow: scroll };
       outcome.technicalDetailsHidden = true;
-      outcome.sourcesAndChecks = checksText;
+      outcome.expandedSourcesAndChecks = checksText;
 
       outcome.wordFilename = download.suggestedFilename();
       outcome.wordArtifact = wordPath;
@@ -1124,13 +1140,15 @@ try {
         assert.match(`${route16C?.['Typical frequency']} ${route16C?.['Operating period at stop']}`, /every ~60.*08:00.*19:45/i, 'Waltham route 16C must include the frozen exact-terminal 19:45 boarding short working.');
         assert.match(route212?.['Direction / main service pattern'] || '', /^Circular/i, 'Waltham TNDS route 212 must be presented as circular.');
         assert.match(`${route212?.['Typical frequency']} ${route212?.['Operating period at stop']}`, /4 journeys\/day.*09:50.*15:00/i, 'Waltham route 212 must reflect all four frozen TNDS departures at the selected Bus Station stop.');
-        const route212Trace = outcome.route212Trace?.plannerRows?.find(row => row.routeNumber === '212');
-        assert.equal(route212Trace?.frequencyBasisStopId, '210021703420', 'Waltham route 212 must use the established Stop C frequency-basis identity.');
-        assert.equal(route212Trace?.canonicalCounts?.monday, 4, 'Waltham route 212 Monday count must match the immutable Run #75 schedule evidence.');
-        assert.deepEqual(route212Trace?.canonicalSamples?.monday?.map(item => [item.journeyIdentity, item.minute]), [['1', 590], ['2', 680], ['3', 772], ['4', 900]], 'Waltham route 212 must retain the four source journeys, without arrivals or fabricated departures.');
-        const route212ComposedSourceIds = outcome.route212Trace?.composedServices?.find(service => service.routeNumber === '212')?.sourceRecordIds ?? [];
-        assert.ok(route212ComposedSourceIds.some(id => /PF9000012-11.*pattern:JP_212_PF9000012-11-2/.test(id))
-          && route212ComposedSourceIds.some(id => /PF9000012-11.*pattern:JP_212_PF9000012-11-3/.test(id)), 'Waltham route 212 composed-source evidence must retain the later two TNDS pattern record IDs.');
+        if (process.env.ATLAS_C4_TRACE_OPERATOR_STAGES === '1') {
+          const route212Trace = outcome.route212Trace?.plannerRows?.find(row => row.routeNumber === '212');
+          assert.equal(route212Trace?.frequencyBasisStopId, '210021703420', 'Waltham route 212 must use the established Stop C frequency-basis identity.');
+          assert.equal(route212Trace?.canonicalCounts?.monday, 4, 'Waltham route 212 Monday count must match the immutable Run #75 schedule evidence.');
+          assert.deepEqual(route212Trace?.canonicalSamples?.monday?.map(item => [item.journeyIdentity, item.minute]), [['1', 590], ['2', 680], ['3', 772], ['4', 900]], 'Waltham route 212 must retain the four source journeys, without arrivals or fabricated departures.');
+          const route212ComposedSourceIds = outcome.route212Trace?.composedServices?.find(service => service.routeNumber === '212')?.sourceRecordIds ?? [];
+          assert.ok(route212ComposedSourceIds.some(id => /PF9000012-11.*pattern:JP_212_PF9000012-11-2/.test(id))
+            && route212ComposedSourceIds.some(id => /PF9000012-11.*pattern:JP_212_PF9000012-11-3/.test(id)), 'Waltham route 212 composed-source evidence must retain the later two TNDS pattern record IDs.');
+        }
         assert.doesNotMatch(`${checksText} ${exportedWordText}`, /principal locations could not be safely mapped/i, 'Waltham must not retain stale principal-location warnings after final rows resolve those patterns.');
         assert.doesNotMatch(`${checksText} ${exportedWordText}`, /Stamford Hill \(Rookwood Road\) and Rookwood Road/i, 'Route 279 must not name the same short-working destination twice.');
         await page.locator('#includeMapInWord').uncheck();
@@ -1173,7 +1191,7 @@ try {
         assert.equal(route657Rows.length, 2, 'Chingford golden control must retain both route 657 directions.');
         assert.ok(route657Rows.every(row => /TfL/i.test(row.Source || '')), 'Chingford route 657 remains TfL-primary.');
         assert.ok(route657Rows.every(row => /Mon-Fri(?: \(School days\))?: 1 journey\/day/i.test(row['Typical frequency'])), 'Chingford route 657 remains one weekday school-day journey per evidenced direction.');
-        assert.ok(route657Rows.every(row => /Sat-Sun(?: \(School days\))?: No scheduled service/i.test(row['Typical frequency'])), 'Chingford route 657 remains unscheduled at weekends.');
+        assert.ok(route657Rows.every(row => /Sat-Sun: No scheduled service/i.test(row['Typical frequency']) && !/Sat-Sun \(School days\)/i.test(row['Typical frequency'])), 'Chingford route 657 remains unscheduled at weekends without implying a weekend schoolday calendar.');
         assert.ok(route657Rows.every(row => !/Unresolved/i.test(row['Principal locations'] || '')), 'Chingford route 657 fixture must retain safe TfL principal locations.');
         if (control.id === 'grove-road' && (process.env.ATLAS_AUDIT_LIVE_TFL === '1' || process.env.ATLAS_TFL_REPLAY_CAPTURE)) {
           assert.match(route657Rows.map(row => row['Operating period at stop']).join(' '), /07:55/i, 'Live Grove Road Route 657 morning departure must remain visible.');
@@ -1320,7 +1338,7 @@ try {
     assert.ok(match, `Captured TfL HTTP 400 did not identify its route and StopPoint: ${response.url}`);
     const route = decodeURIComponent(match[1]);
     const stopId = decodeURIComponent(match[2]);
-    const routeEvidence = Object.values(report.controls).map(control => control.sourcesAndChecks).join('\n');
+    const routeEvidence = Object.values(report.controls).map(control => control.expandedSourcesAndChecks || control.sourcesAndChecks).join('\n');
     assert.match(routeEvidence, new RegExp(`Route ${route}[^\\n]*Stop ${stopId}`, 'i'), `The captured TfL HTTP 400 for ${route} / ${stopId} is not scoped to a Sources & Checks item.`);
   }
   assert.equal(externalRequests.length, 0, `Unexpected external requests: ${externalRequests.join(', ')}`);

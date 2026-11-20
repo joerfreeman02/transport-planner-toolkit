@@ -257,6 +257,12 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     });
   }
   const stopById = new Map((selectedStops ?? []).map(stop => [stopKey(stop), stop]));
+  const hasSafeNationalPrimaryFallback = (route, stop, stopRecord) => {
+    const authorities = (stopRecord?.routeAuthorities?.[String(route ?? '')] ?? []).map(value => String(value).toLowerCase());
+    return authorities.some(value => /\bbods\b/.test(value))
+      && !authorities.some(value => /\btfl\b|transport for london/.test(value))
+      && safelyPresentedBodsRouteStops.get(String(route ?? ''))?.has(String(stop ?? '')) === true;
+  };
   const nationalUnresolved = new Set((provenance.nationalUnresolvedRequestIdentities ?? []).map(String));
   const noCurrentIdentities = new Set((provenance.noCurrentRequestIdentities ?? []).map(String));
   for (const identity of [...(provenance.unresolvedRequestIdentities ?? []), ...(provenance.nationalUnresolvedRequestIdentities ?? [])]) {
@@ -268,9 +274,12 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
       && (hasScheduledEvidence(service.stopSchedules?.[String(parts.stop ?? '')] || {})
         || (service.stopIds ?? []).map(String).includes(String(parts.stop ?? ''))
         || String(service.frequencyBasisStopId ?? '') === String(parts.stop ?? '')));
+    const resolvedByNationalAuthority = provider === 'TfL' && hasSafeNationalPrimaryFallback(parts.route, parts.stop, stopRecord);
     add({
       code: 'unresolved-timetable-request', route: parts.route, stop: parts.stop, source: provider,
-      message: `Route ${parts.route ?? 'unknown'} at ${stopRecord?.name || 'the recorded stop'} (stop ${parts.stop ?? 'unknown'}): ${provider} timetable evidence remained unresolved${fallback ? '; exact-stop BODS evidence is retained and any frequency shown is based on that schedule' : '; no exact-stop schedule from this request is available, so do not rely on a frequency for this route/stop'}. The stop-source route association is preserved.`
+      severity: resolvedByNationalAuthority ? 'information' : 'warning',
+      actionability: resolvedByNationalAuthority ? 'diagnostic' : 'review',
+      message: `Route ${parts.route ?? 'unknown'} at ${stopRecord?.name || 'the recorded stop'} (stop ${parts.stop ?? 'unknown'}): ${provider} timetable evidence remained unresolved${fallback ? '; exact-stop BODS evidence is retained and any frequency shown is based on that schedule' : '; no exact-stop schedule from this request is available, so do not rely on a frequency for this route/stop'}.${resolvedByNationalAuthority ? ' BODS is the recorded authority at this StopPoint and supplies the displayed schedule, so this supplementary TfL result requires no separate planner action.' : ' The stop-source route association is preserved.'}`
     });
   }
   for (const identity of noCurrentIdentities) {
@@ -280,9 +289,12 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     const provider = tflRequestIdentities.has(identity) ? 'TfL' : (provenance.nationalTimetableProviders?.join('/') || 'BODS/TNDS');
     const recorded = (stopRecord?.routes ?? []).map(String).includes(String(parts.route ?? ''));
     if (!recorded) continue;
+    const resolvedByNationalAuthority = provider === 'TfL' && hasSafeNationalPrimaryFallback(parts.route, parts.stop, stopRecord);
     add({
       code: 'no-current-timetable-match', route: parts.route, stop: parts.stop, source: provider,
-      message: `Route ${parts.route} is recorded at ${stopRecord?.name || 'this stop'} (stop ${parts.stop}); ${provider} returned no current timetable match for this exact stop. No departure was added, and this result does not establish that the public route is absent elsewhere.`
+      severity: resolvedByNationalAuthority ? 'information' : 'warning',
+      actionability: resolvedByNationalAuthority ? 'diagnostic' : 'review',
+      message: `Route ${parts.route} is recorded at ${stopRecord?.name || 'this stop'} (stop ${parts.stop}); ${provider} returned no current timetable match for this exact stop. No departure was added, and this result does not establish that the public route is absent elsewhere.${resolvedByNationalAuthority ? ' BODS is the recorded authority at this StopPoint and supplies the displayed schedule, so this supplementary TfL result requires no separate planner action.' : ''}`
     });
   }
   for (const row of plannerServiceSummaries ?? []) if (row.operatorEvidenceConflict) {
@@ -661,12 +673,14 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     ].map(String)).size;
     const timetablesComplete = Boolean(servicesResult?.ok) && servicesResult?.provenance?.sourceCompleteness !== 'PARTIAL' && !Number(servicesResult?.provenance?.failedShardCount || 0) && nationalEvidenceComplete && Number(servicesResult?.provenance?.unprocessedRequests || 0) === 0 && Math.max(Number(servicesResult?.provenance?.unresolvedRequests || 0), unresolvedIdentityCount) === 0;
     const status = stopCoverageComplete && timetablesComplete && serviceSummaries.length && routingComplete ? 'complete' : 'partial';
-    const reviewItems = buildReviewItems({ selectedStops, services, serviceSummaries: resolvedServiceSummaries, plannerServiceSummaries, servicesResult, warnings, prepared, stopCoverageComplete, routingComplete });
+    const reviewEvidence = buildReviewItems({ selectedStops, services, serviceSummaries: resolvedServiceSummaries, plannerServiceSummaries, servicesResult, warnings, prepared, stopCoverageComplete, routingComplete });
+    const reviewItems = reviewEvidence.filter(item => item.actionability !== 'diagnostic');
+    const reviewDiagnostics = reviewEvidence.filter(item => item.actionability === 'diagnostic');
     const selectedIds = new Set(selectedStops.map(stopKey));
     const routes = new Set(enrichedDiscoveredStops.flatMap(stop => stop.routes ?? []));
     onProgress({ phase: status === 'complete' ? 'complete' : 'partial', detail: status === 'complete' ? 'Complete' : partialDetail(reviewItems) });
     const wordingBase = buildControlledBusWording(plannerServiceSummaries, { nearestGroupName: nearestGroup?.name ?? null, nearestConclusion: nearestGroup?.conclusion ?? null });
-    return Object.freeze({ ok: true, status, assessmentMode, discoveredStopCount: enrichedDiscoveredStops.length, scope: { stopCount: enrichedDiscoveredStops.length, routeCount: routes.size, pairCount: routePairs(enrichedDiscoveredStops).size }, nearestGroup, stops: Object.freeze(selectedStops), services: Object.freeze(services), serviceSummaries: Object.freeze(resolvedServiceSummaries), plannerServiceSummaries: Object.freeze(plannerServiceSummaries), endpointResolution: Object.freeze(endpointResolution), wording: wordingBase, warnings: Object.freeze(warnings), reviewItems: Object.freeze(reviewItems), provenance: Object.freeze({ stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres }, timetables: servicesResult?.provenance ?? {}, endpoints: endpointResolution.provenance ?? {}, walking: prepared.walkingResult?.provenance ?? {}, cycling: prepared.cyclingResult?.provenance ?? {} }), evidence: Object.freeze((prepared.stopsResult.evidence ?? []).filter(item => assessmentMode === 'full' || selectedIds.has(item?.subject?.id))) });
+    return Object.freeze({ ok: true, status, assessmentMode, discoveredStopCount: enrichedDiscoveredStops.length, scope: { stopCount: enrichedDiscoveredStops.length, routeCount: routes.size, pairCount: routePairs(enrichedDiscoveredStops).size }, nearestGroup, stops: Object.freeze(selectedStops), services: Object.freeze(services), serviceSummaries: Object.freeze(resolvedServiceSummaries), plannerServiceSummaries: Object.freeze(plannerServiceSummaries), endpointResolution: Object.freeze(endpointResolution), wording: wordingBase, warnings: Object.freeze(warnings), reviewItems: Object.freeze(reviewItems), reviewDiagnostics: Object.freeze(reviewDiagnostics), provenance: Object.freeze({ stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres }, timetables: servicesResult?.provenance ?? {}, endpoints: endpointResolution.provenance ?? {}, walking: prepared.walkingResult?.provenance ?? {}, cycling: prepared.cyclingResult?.provenance ?? {} }), evidence: Object.freeze((prepared.stopsResult.evidence ?? []).filter(item => assessmentMode === 'full' || selectedIds.has(item?.subject?.id))) });
   }
 
   async function inspectScope(site, { radius = 700, forceRefresh = false } = {}) {

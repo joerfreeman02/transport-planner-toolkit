@@ -1610,7 +1610,7 @@ function composeRepresentativeSchoolTermWeek(termTimeResults = [], ordinaryResul
 
 function calendarQualifiedLines(lines, profileId, additional = false) {
   const label = calendarProfileDisplayLabel(profileId) + (additional ? ' (additional)' : '');
-  return lines.map(line => `${label}: ${line}`);
+  return lines.map(line => /:\s*No scheduled service$/i.test(text(line)) ? line : `${label}: ${line}`);
 }
 
 function hasCalendarTaxonomyNote(note) {
@@ -2265,7 +2265,7 @@ export function buildPlannerServiceGroups(serviceSummaries = [], stops = []) {
 function profileLines(lines, profileLabel) {
   if (!profileLabel) return lines;
   const label = calendarProfileDisplayLabel(profileLabel);
-  return lines.map(line => line.replace(/^([^:]+):\s*/, `$1 (${label}): `));
+  return lines.map(line => /:\s*No scheduled service$/i.test(text(line)) ? line : line.replace(/^([^:]+):\s*/, `$1 (${label}): `));
 }
 
 function buildPlannerRow(component, stops, componentIndex, routeFamilyServices = component, publicRouteFamilyKey = null, serviceGroupOverride = null) {
@@ -3572,12 +3572,28 @@ function legacyVariantCompatibilityNote(group) {
   return 'Additional short workings and timetable variants operate.';
 }
 
+function combineIntermediatePatternNotes(notes = []) {
+  const pattern = /^Intermediate stop patterns vary, including (.+)\.$/i;
+  const matches = notes.map(note => ({ note, match: text(note).match(pattern) })).filter(item => item.match);
+  if (matches.length < 2) return notes;
+  const combined = `Intermediate stop patterns vary, including ${unique(matches.map(item => item.match[1])).join('; ')}.`;
+  const first = notes.indexOf(matches[0].note);
+  const filtered = notes.filter(note => !matches.some(item => item.note === note));
+  filtered.splice(Math.min(first, filtered.length), 0, combined);
+  return filtered;
+}
+
 function attachRouteNotes(rows) {
   const prepared = rows.map(row => Object.freeze({ ...row, plannerNotes: plannerAnnotationTaxonomy(row) }));
   const groups = new Map();
   prepared.forEach((row, index) => { const key = row.publicRouteFamilyKey || row.routeGroupKey; if (!groups.has(key)) groups.set(key, []); groups.get(key).push({ row, index }); });
-  const notesFor = row => unique(text(row.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean))
-    .filter(note => !(row?.hasSeparateTimetablePair && /^(?:School-day journeys only\.|School days only\.|Non-school days only\.|Term-time service\.)$/i.test(note)));
+  const notesFor = row => {
+    const qualifications = new Set(text(row?.plannerNotes?.serviceQualification).split(';').map(value => normal(value)));
+    const notes = unique(text(row.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean))
+      .filter(note => !qualifications.has(normal(note)))
+      .filter(note => !(row?.hasSeparateTimetablePair && /^(?:School-day journeys only\.|School days only\.|Non-school days only\.|Term-time service\.)$/i.test(note)));
+    return combineIntermediatePatternNotes(notes);
+  };
   const structuredQualification = note => /school[- ]?days?|term[- ]time|non[- ]school|holiday|operating days could not be fully confirmed/i.test(text(note));
   const sharedTaxonomy = new Set(['School-day journeys only.', 'School days only.', 'Term-time service.', 'Non-school days only.', 'Circular service.']);
   const updates = new Map();

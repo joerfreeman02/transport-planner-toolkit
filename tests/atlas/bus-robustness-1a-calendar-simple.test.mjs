@@ -138,7 +138,7 @@ const schoolOnly = planner([record({
   departures: week({ weekday: [982] }),
   serviceNote: 'School-day-only service.'
 })])[0];
-assert.equal(schoolOnly.typicalFrequencyText, 'Mon-Fri (School days): 1 journey/day\nSat-Sun (School days): No scheduled service');
+assert.equal(schoolOnly.typicalFrequencyText, 'Mon-Fri (School days): 1 journey/day\nSat-Sun: No scheduled service');
 assert.equal(schoolOnly.serviceNote, 'School-day journeys only.');
 assert.equal(schoolOnly.hasSeparateTimetablePair, false);
 assert.equal(plannerRouteDisplayNumber(schoolOnly), '657');

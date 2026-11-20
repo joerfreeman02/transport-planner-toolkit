@@ -25,6 +25,7 @@ import { buildBusTimetablePresentationNote, plannerRouteDisplayNumber, plannerSe
 import { buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, isOtherNearbyStopRecord, partialTimetableQualification, plannerFacingServiceNote, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { plannerStopWarning, recommendedBusStop } from '../../../src/atlas/domain/bus-planner-trust.mjs';
+import { groupReviewItems } from '../../../src/atlas/domain/review-topics.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
@@ -688,6 +689,20 @@ function reviewItemText(item) {
   return scope ? scope + ': ' + item.message : item.message;
 }
 
+function reviewTopicHeadline(topic) {
+  const examples = {
+    'unresolved-timetable-request': 'An exact-stop timetable response is unresolved.',
+    'no-current-timetable-match': 'No current timetable match was returned for this stop.',
+    'service-source-evidence': 'The operating-day evidence needs checking.',
+    'supplementary-identity-conflict': 'Timetable sources disagree about route identity.',
+    'planner-endpoint-resolution': 'The route endpoint could not be confirmed.',
+    'directional-principal-location': 'The direction-specific route pattern needs checking.',
+    'unresolved-operator-evidence': 'The operator identity remains unresolved.'
+  };
+  if (topic.items.some(item => /boarding eligibility cannot be independently confirmed/i.test(item.message))) return 'Boarding permissions are not recorded at this stop.';
+  return examples[topic.code] || 'Source evidence needs review.';
+}
+
 
 function renderAssessment(result) {
   currentBusResult = result;
@@ -913,6 +928,8 @@ function renderAssessment(result) {
   $('resultSource').textContent = `${stopSource}; ${timetableLabel}; OpenStreetMap routing`;
   $('resultChecked').textContent = checked;
   const reviewItems = result.reviewItems ?? [];
+  const reviewDiagnostics = result.reviewDiagnostics ?? [];
+  const reviewTopics = groupReviewItems(reviewItems);
   const rawEndpointEvidence = $('rawEndpointEvidence');
   if (rawEndpointEvidence) {
     rawEndpointEvidence.replaceChildren();
@@ -936,14 +953,14 @@ function renderAssessment(result) {
   }
   $('plannerReviewGate').hidden = reviewItems.length === 0;
   $('plannerReviewAcknowledgement').checked = false;
-  $('plannerReviewGateStatus').textContent = reviewItems.length ? `${reviewItems.length} flagged item${reviewItems.length === 1 ? '' : 's'} remain visible in Sources & Checks.` : 'No flagged evidence requires acknowledgement.';
+  $('plannerReviewGateStatus').textContent = reviewItems.length ? `${reviewTopics.length} review topic${reviewTopics.length === 1 ? '' : 's'} cover ${reviewItems.length} evidence record${reviewItems.length === 1 ? '' : 's'} in Sources & Checks.` : 'No flagged evidence requires acknowledgement.';
   updateFormalExportAvailability();
   const assessmentResultLabel = result.status === 'partial'
     ? 'Assessment execution complete · source or routing checks incomplete'
     : 'Assessment complete';
   $('resultFreshness').textContent = assessmentResultLabel;
   $('resultFreshness').className = 'completion-badge';
-  $('sourceReviewBadge').textContent = reviewItems.length ? `${reviewItems.length} item${reviewItems.length === 1 ? '' : 's'} require review` : 'No review items';
+  $('sourceReviewBadge').textContent = reviewItems.length ? `${reviewTopics.length} topics · ${reviewItems.length} records` : 'No review items';
   $('sourceReviewBadge').hidden = reviewItems.length === 0;
   $('sourceChecksDetails').open = false;
   $('busDataCurrent').textContent = $('dataStatusMessage').textContent;
@@ -961,10 +978,31 @@ function renderAssessment(result) {
     plannerChecks.append(heading, list);
   }
   if (reviewItems.length) {
-    const heading = document.createElement('strong'); heading.textContent = 'Evidence items to review';
+    const heading = document.createElement('strong'); heading.textContent = 'Review topics';
     const list = document.createElement('ul');
-    reviewItems.forEach(item => { const line = document.createElement('li'); line.textContent = reviewItemText(item); list.append(line); });
+    reviewTopics.forEach(topic => {
+      const line = document.createElement('li');
+      const detail = document.createElement('details');
+      const summary = document.createElement('summary');
+      const routeText = topic.routes.length ? `Routes ${topic.routes.join(', ')}` : 'Assessment-wide';
+      const stopText = topic.stop ? `StopPoint ${topic.stop}` : 'all assessed stops';
+      summary.textContent = `${reviewTopicHeadline(topic)} · ${routeText} · ${stopText} · ${topic.source} · ${topic.items.length} record${topic.items.length === 1 ? '' : 's'}`;
+      const action = document.createElement('p'); action.textContent = topic.items[0]?.message || '';
+      const raw = document.createElement('details');
+      const rawSummary = document.createElement('summary'); rawSummary.textContent = `Underlying evidence (${topic.items.length})`;
+      const evidenceList = document.createElement('ul');
+      topic.items.forEach(item => { const evidence = document.createElement('li'); evidence.textContent = reviewItemText(item); evidenceList.append(evidence); });
+      raw.append(rawSummary, evidenceList);
+      detail.append(summary, action, raw); line.append(detail); list.append(line);
+    });
     plannerChecks.append(heading, list);
+  }
+  if (reviewDiagnostics.length) {
+    const details = document.createElement('details');
+    const summary = document.createElement('summary'); summary.textContent = `Source diagnostics retained · no separate planner action (${reviewDiagnostics.length} records)`;
+    const list = document.createElement('ul');
+    reviewDiagnostics.forEach(item => { const line = document.createElement('li'); line.textContent = reviewItemText(item); list.append(line); });
+    details.append(summary, list); plannerChecks.append(details);
   }
   if (diagnosticMode) {
   const diagnostics = $('diagnostics');

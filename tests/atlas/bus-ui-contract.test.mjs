@@ -32,6 +32,10 @@ assert.match(app, /Raw endpoint resolution evidence \(\$\{decisions\.length\} en
 assert.match(app, /requested StopPoints \$\{requested\.join\(', '\) \|\| 'none'\}; hydrated \$\{hydrated\.join\(', '\) \|\| 'none'\}; unresolved \$\{unresolved\.join\(', '\) \|\| 'none'\}/, 'raw technical StopPoint evidence remains inspectable when review items are grouped');
 assert.doesNotMatch(html.match(/<header[\s\S]*?<\/header>/)?.[0] ?? '', /data-atlas-test-build|Development\/Test build/);
 assert.match(app, /\$\('sourceReviewBadge'\)\.hidden = reviewItems\.length === 0/);
+assert.match(app, /groupReviewItems\(reviewItems\)/, 'normal Sources & Checks groups records by shared issue while retaining the original result items');
+assert.match(app, /Underlying evidence \(\$\{topic\.items\.length\}\)/, 'every compact review topic can expand to its exact route/StopPoint evidence records');
+assert.match(app, /Source diagnostics retained · no separate planner action/, 'safely resolved supplementary source observations remain inspectable without becoming planner review tasks');
+assert.match(app, /const reviewRequired = \(currentBusResult\?\.reviewItems\?\.length \?\? 0\) > 0/, 'diagnostic records cannot bypass or trigger the material acknowledgement gate');
 assert.match(html, /atlas-mark-node-one[\s\S]*atlas-mark-path-three[\s\S]*atlas-mark-complete/);
 assert.match(workspaceCss, /atlas-a-stage-one[\s\S]*atlas-a-stage-complete/);
 assert.match(workspaceCss, /#taskStatus\[aria-busy="true"\]/);

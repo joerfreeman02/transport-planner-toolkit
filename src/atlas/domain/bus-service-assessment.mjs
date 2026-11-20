@@ -907,7 +907,11 @@ export function buildServiceSummaries(stops, serviceRecords) {
     const terminalBoardingRoleUnknown = records.some(record => {
       if (!/bods|bus open data/i.test(providerOfRecord(record))) return false;
       const patternIds = (record.circularPatternStopIds?.length ? record.circularPatternStopIds : record.routePatternStopIds ?? []).map(text).filter(Boolean);
-      const isTerminal = patternIds.at(-1) === frequencyBasisStopId || (record.circular === true && patternIds.includes(frequencyBasisStopId));
+      // A circular route can serve intermediate stops too. Missing boarding
+      // roles are a terminal concern only when this StopPoint is at an ordered
+      // pattern boundary; mere presence somewhere in the loop is insufficient.
+      const isTerminal = patternIds.at(-1) === frequencyBasisStopId
+        || (record.circular === true && patternIds[0] === frequencyBasisStopId);
       if (!isTerminal) return false;
       const roleEvidence = [
         ...(record.nonBoardingCalls ?? []),
@@ -943,7 +947,8 @@ export function buildServiceSummaries(stops, serviceRecords) {
         .filter(([, count]) => count > 0 && count < orderedPatternNamesByRecord.length)
         .map(([name]) => name);
       if (variantCallNames.length) {
-        const examples = variantCallNames.slice(0, 4);
+        const formatCallName = name => /^school$/i.test(name) ? 'the stop labelled “School”' : name;
+        const examples = variantCallNames.slice(0, 4).map(formatCallName);
         const remainder = variantCallNames.length > examples.length ? '; other intermediate calls also vary' : '';
         notes.push(`Intermediate stop patterns vary, including ${examples.join(', ')}${remainder}.`);
       }

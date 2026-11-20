@@ -180,6 +180,26 @@ test('BODS survives unresolved supplementary TNDS without a complete assessment'
   assert.ok(result.reviewItems.length > 0, 'supplementary uncertainty remains visible for review');
 });
 
+test('unresolved supplementary TfL lookup is diagnostic only when exact-stop BODS is safely primary', async () => {
+  const bods = { ...service, routeNumber: '10', id: 'bods-primary-exact-stop', timetableSource: 'BODS', provider: 'BODS', source: { provider: 'BODS', primaryAuthority: 'BODS' } };
+  const assessAt = async routeAuthorities => {
+    const assessment = createBusAssessment({
+      stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [{ ...stop, routeAuthorities: { '10': routeAuthorities } }], evidence: [], warnings: [], provenance: { stopCoverageComplete: true } }) },
+      timetableData: { servicesForStops: async () => ({ ok: true, data: [bods], warnings: [], provenance: { sourceCompleteness: 'PARTIAL', unresolvedRequestIdentities: ['10|2100A'], tflTimetableRequestIdentities: ['10|2100A'] } }) },
+      accessRouting: { matrix: async (_site, stops) => ({ ok: true, routes: stops.map(() => ({ status: 'routed', distanceMetres: 100, durationSeconds: 60 })), warnings: [], provenance: {} }) }
+    });
+    return assessment.assess({});
+  };
+  const nationalPrimary = await assessAt(['BODS']);
+  assert.equal(nationalPrimary.reviewItems.some(item => item.code === 'unresolved-timetable-request'), false);
+  assert.ok(nationalPrimary.reviewDiagnostics.some(item => item.code === 'unresolved-timetable-request' && item.actionability === 'diagnostic' && /no separate planner action/i.test(item.message)));
+  assert.ok(nationalPrimary.plannerServiceSummaries.some(item => item.routeNumber === '10'), 'the displayed schedule remains available from the exact-stop BODS record');
+
+  const tflPrimary = await assessAt(['TfL', 'BODS']);
+  assert.ok(tflPrimary.reviewItems.some(item => item.code === 'unresolved-timetable-request'), 'BODS presence cannot clear a missing TfL-authoritative match');
+  assert.equal(tflPrimary.reviewDiagnostics.some(item => item.code === 'unresolved-timetable-request'), false);
+});
+
 test('conflicting route operator evidence preserves service rows and creates a visible review item', async () => {
   const route329Services = [
     { ...service, id: 'bods-329-north', routeNumber: '329', operator: 'Arriva London North', timetableSource: 'BODS', source: { provider: 'BODS' } },

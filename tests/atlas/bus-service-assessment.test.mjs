@@ -39,6 +39,14 @@ test('BODS terminal boarding uncertainty is disclosed without role-specific evid
   const nonterminal = { ...terminal, id: 'linear', circular: false, destination: 'B', circularPatternStopIds: undefined, routePatternStopIds: ['A', 'B'] };
   const [linearSummary] = buildServiceSummaries([{ id: 'A' }], [nonterminal]);
   assert.doesNotMatch(linearSummary.plannerReviewWarnings.join(' '), /boarding eligibility cannot be independently confirmed/i);
+  const circularIntermediate = { ...terminal, id: 'loop-middle', circularPatternStopIds: ['A', 'B', 'C', 'A'], stopSchedules: { B: schedule } };
+  const [intermediateSummary] = buildServiceSummaries([{ id: 'B' }], [circularIntermediate]);
+  assert.doesNotMatch(intermediateSummary.plannerReviewWarnings.join(' '), /boarding eligibility cannot be independently confirmed/i,
+    'a StopPoint inside a circular pattern is not a terminal merely because it is served by the loop');
+  const circularEndpoint = { ...terminal, id: 'loop-endpoint', circularPatternStopIds: ['A', 'B', 'A'], stopSchedules: { A: schedule } };
+  const [endpointSummary] = buildServiceSummaries([{ id: 'A' }], [circularEndpoint]);
+  assert.match(endpointSummary.plannerReviewWarnings.join(' '), /boarding eligibility cannot be independently confirmed/i,
+    'genuine circular pattern boundary uncertainty remains reviewable');
 });
 test('explicit set-down-only calls stay in source evidence but not departure periods or frequency', () => {
   const days = { monday: [480, 540, 600], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] };

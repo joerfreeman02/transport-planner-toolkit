@@ -26,7 +26,7 @@ assert.equal(presented.length, summaries.length, 'Presentation must retain every
 assert.equal(presented.find(service => service.id === 'same').presentation.principalLocationsText, 'As main 25C service');
 assert.equal(presented.find(service => service.id === 'extra').presentation.principalLocationsText, 'As main 25C service, plus Roydon');
 assert.equal(presented.find(service => service.id === 'short').presentation.principalLocationsText, 'Short working of main 25C service');
-assert.equal(presented.find(service => service.id === 'unproven').presentation.principalLocationsText, 'Unresolved — review Sources & Checks');
+assert.equal(presented.find(service => service.id === 'unproven').presentation.principalLocationsText, 'Specific principal locations not supplied');
 assert.notEqual(presented.find(service => service.id === 'inbound').directionFamily, presented.find(service => service.id === 'main').directionFamily);
 assert.ok(presented.every(service => !service.presentation.principalLocationsText.includes('No additional principal locations identified')));
 
@@ -36,8 +36,10 @@ const fallbackRows = buildServicePresentation([
   { ...base, id: 'unknown-extent', directionFamily: 'headsign:unknown', routePatternStopIds: [], routePatternExtent: 0, principalLocations: [] }
 ]);
 assert.equal(fallbackRows.find(service => service.id === 'two-stop').presentation.principalLocationsText, 'Known terminus');
-assert.equal(fallbackRows.find(service => service.id === 'multi-stop').presentation.principalLocationsText, 'Unresolved — review Sources & Checks');
-assert.equal(fallbackRows.find(service => service.id === 'unknown-extent').presentation.principalLocationsText, 'Unresolved — review Sources & Checks');
+assert.equal(fallbackRows.find(service => service.id === 'multi-stop').presentation.principalLocationsText, 'Specific principal locations not supplied');
+assert.equal(fallbackRows.find(service => service.id === 'unknown-extent').presentation.principalLocationsText, 'Specific principal locations not supplied');
+assert.equal(buildServicePresentation([{ ...base, id: 'demand-responsive', origin: 'Queensgate', destination: 'Demand Responsive Area', direction: 'Stamford CallConnect', principalLocations: [], principalLocationState: 'unresolved' }])[0].presentation.principalLocationsText,
+  'Demand-responsive service area; specific locations not supplied');
 
 const ruralCalls = ['Town A', 'Village B', 'Village C', 'Village D', 'Village E', 'Town F'].map(name => ({ name, locality: name }));
 const ruralLocations = derivePrincipalLocations(ruralCalls);
@@ -61,4 +63,5 @@ const result = { ok: true, stops: [], serviceSummaries: summaries };
 const wordRows = buildBusWordTables(result)[1].rows.filter(row => Array.isArray(row));
 assert.deepEqual(wordRows.map(row => row[2]), presented.map(service => `${service.origin} – ${service.destination}`));
 assert.deepEqual(wordRows.map(row => row[3]), presented.map(service => service.presentation.principalLocationsText));
+assert.ok(!wordRows.flat().some(value => /review Sources & Checks/i.test(String(value))), 'professional Word service cells must not contain internal review instructions');
 console.log('PASS shared Bus presentation decision drives deterministic browser/Word order and wording.');

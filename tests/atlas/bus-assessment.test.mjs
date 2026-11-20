@@ -91,7 +91,7 @@ test('missing pattern identity is explicit and cannot be hidden by a planner pla
   const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
   assert.equal(result.serviceSummaries[0].principalLocationState, 'unresolved');
   assert.ok(result.reviewItems.some(item => item.code === 'directional-principal-location' && item.route === '10'));
-  assert.equal(result.plannerServiceSummaries[0].principalLocationsText, 'Unresolved — review Sources & Checks');
+  assert.equal(result.plannerServiceSummaries[0].principalLocationsText, 'Specific principal locations not supplied');
   assert.doesNotMatch(result.plannerServiceSummaries[0].principalLocationsText, /See route origin \/ destination/);
 });
 

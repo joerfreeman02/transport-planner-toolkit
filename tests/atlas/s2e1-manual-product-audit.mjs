@@ -137,6 +137,7 @@ const controls = [
 ];
 if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') controls.splice(0, controls.length, ...enfieldControls);
 if (process.env.ATLAS_AUDIT_CONTROL === 'pearcroft-route65') controls.splice(0, controls.length, { id: 'pearcroft-route65', label: 'Pearcroft Road public stop 1600GLS313', latitude: 51.74319, longitude: -2.27813, radius: 120 });
+else if (process.env.ATLAS_AUDIT_CONTROL === 'abbotts-rise-full') controls.splice(0, controls.length, { id: 'abbotts-rise-full', label: 'Abbotts Rise public stop pair, Stanstead Abbotts full-radius control', latitude: 51.78711445, longitude: 0.01104605, radius: 700, focusRoutes: ['25', '25B', '25C', '33', '35', '35B', '35C'] });
 else if (process.env.ATLAS_AUDIT_CONTROL) controls.splice(0, controls.length, ...controls.filter(control => control.id === process.env.ATLAS_AUDIT_CONTROL));
 const stageTraceRequiredControls = new Set(['waltham-cross', 'waltham-cross-nearest', 'abbotts-rise-nearest', 'pe1']);
 if (controls.some(control => stageTraceRequiredControls.has(control.id)) && process.env.ATLAS_C4_TRACE_OPERATOR_STAGES !== '1' && process.env.ATLAS_AUDIT_UNINSTRUMENTED !== '1') {
@@ -918,6 +919,18 @@ try {
       assert.match(documentXml, /<w:trPr><w:cantSplit\/><\/w:trPr>/, 'Word service table rows must stay together across page breaks.');
       const exportedWordText = wordText(documentXml);
       outcome.wordText = exportedWordText;
+      assert.doesNotMatch(exportedWordText, /review Sources & Checks/i, `${control.id} Word export leaked an internal review instruction into professional output.`);
+      assert.doesNotMatch(exportedWordText, /&amp;/i, `${control.id} Word export contains an HTML entity instead of rendered text.`);
+      if (control.id === 'hoddesdon-the-drive') {
+        assert.match(renderedServiceNotes.join(' '), /from Lister Hospital to Brookfield Centre[^)]*Sun: 7 journeys\/day/i,
+          'Hoddesdon Browser must identify the 7-trip Sunday Route 907A population by its retained origin.');
+        assert.match(renderedServiceNotes.join(' '), /from Stevenage Bus Station to Brookfield Centre[^)]*Sun: 2 journeys\/day/i,
+          'Hoddesdon Browser must identify the separate 2-trip Sunday Route 907A population by its retained origin.');
+        assert.match(exportedWordText, /from Lister Hospital to Brookfield Centre[^)]*Sun: 7 journeys\/day/i,
+          'Hoddesdon Word must identify the 7-trip Sunday Route 907A population by its retained origin.');
+        assert.match(exportedWordText, /from Stevenage Bus Station to Brookfield Centre[^)]*Sun: 2 journeys\/day/i,
+          'Hoddesdon Word must identify the separate 2-trip Sunday Route 907A population by its retained origin.');
+      }
       if (control.id === 'abbotts-rise-nearest') {
         assert.match(exportedWordText, /Route 25B also serves .*Station Road: Mon-Fri: 2 journeys\/day; Sat: 2 journeys\/day; no Sunday service; Sainsbury's: Mon-Fri: 3 journeys\/day; Sat: 1 journey\/day; no Sunday service/i,
           'The Word assessment must preserve the destination-specific Route 25B family departure populations.');
@@ -1231,6 +1244,17 @@ try {
         outcome.chingford657Rows = route657Rows;
       }
       if (control.id === 'pe1') {
+        const route4pRows = rendered.filter(row => row.Route === '4P' && /TransportConnect/i.test(row.Operator || ''));
+        assert.ok(route4pRows.some(row => /Demand-responsive service area; specific locations not supplied/i.test(row['Principal locations'] || '')),
+          'PE1 Word/Browser must use a truthful professional fallback for the unresolved BODS 4P principal pattern.');
+        assert.match(renderedServiceNotes.join(' '), /CallConnect operates flexibly; published times are notional, and journeys must be booked in advance/i,
+          'PE1 Browser must disclose the bookable flexible service and notional published times for the evidenced CallConnect pattern.');
+        assert.match(exportedWordText, /CallConnect operates flexibly; published times are notional, and journeys must be booked in advance/i,
+          'PE1 Word must disclose the bookable flexible service and notional published times for the evidenced CallConnect pattern.');
+        assert.match(checksText, /4P|Queensgate|BODS/i,
+          'PE1 internal Sources & Checks must retain the unresolved source evidence for the 4P pattern.');
+        assert.doesNotMatch(exportedWordText, /Unresolved — review Sources & Checks/i,
+          'PE1 Word must not expose internal review instructions in the principal-locations cell.');
         const rows202 = rendered.filter(row => row.Route === '202');
         const word202 = wordRows.filter(row => row.Route === '202');
         assert.equal(rows202.length, 2, `PE1 route 202 must preserve its two distinct useful departing patterns; received ${rows202.length}.`);

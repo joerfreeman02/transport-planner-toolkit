@@ -29,6 +29,7 @@ import {
   resolveCircularServiceDecision
 } from './circular-service-decision.mjs';
 import { operatorFamilyCompatible, operatorTokens } from './operator-family.mjs';
+import { normalizeBusText, professionalPrincipalLocationsFallback } from './bus-text.mjs';
 
 export const PLANNER_METHODOLOGY_NOTE = '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence.';
 export const PLANNER_TERMINUS_PRESENTATION_NOTE = 'Where an assessed stop is the route terminus, the table shows the useful departing direction only; arriving journeys terminating at that stop are not listed separately.';
@@ -47,7 +48,7 @@ const CALENDAR_PROFILE_LABELS = Object.freeze({
   unresolved: 'Calendar not confirmed'
 });
 
-function text(value) { return String(value ?? '').trim(); }
+function text(value) { return normalizeBusText(value).trim(); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
 function unique(values) { return [...new Set((values ?? []).map(text).filter(Boolean))]; }
 function numeric(values) { return unique(values).map(Number).filter(Number.isFinite).sort((a, b) => a - b); }
@@ -2069,11 +2070,11 @@ export function plannerSourceWarning(service) {
 function principalText(main) {
   const locations = unique(main?.principalLocations ?? []);
   if (locations.length) return locations.join(', ');
-  if (main?.principalLocationState === 'unresolved') return 'Unresolved — review Sources & Checks';
+  if (main?.principalLocationState === 'unresolved') return professionalPrincipalLocationsFallback(main);
   const destination = text(main?.destinationEndpointDecision?.chosenDisplayName || main?.destinationEndpointDecision?.chosen || main?.destination);
   return destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination)
     ? destination
-    : 'Unresolved — review Sources & Checks';
+    : professionalPrincipalLocationsFallback(main);
 }
 
 function plannerPrincipalLocations(main, basisStopId, component = [main]) {
@@ -3140,7 +3141,10 @@ function familyMemberAvailabilityNote(member = {}) {
   const variants = member.serviceVariants ?? familyMemberServiceVariants(member);
   const variantCounts = variants.map(variant => DAY_ORDER.map(day => variant.departureCountsByDay[day]));
   if (variants.length > 1 && variantCounts.some(counts => JSON.stringify(counts) !== JSON.stringify(variantCounts[0]))) {
-    const detail = variants.map(variant => `${variant.destination}: ${availabilityDetailFromCounts(variant.departureCountsByDay)}`).join('; ');
+    const repeatedDestinations = new Set(variants.map(variant => normal(variant.destination))
+      .filter((destination, index, destinations) => destination && destinations.indexOf(destination) !== index));
+    const detail = variants.map(variant => `${repeatedDestinations.has(normal(variant.destination))
+      ? `from ${variant.origin || 'an unlabelled origin'} to ` : ''}${variant.destination}: ${availabilityDetailFromCounts(variant.departureCountsByDay)}`).join('; ');
     return detail;
   }
   const counts = member.departureCountsByDay ?? {};
@@ -3326,6 +3330,14 @@ export function plannerAnnotationTaxonomy(row) {
   const hasUnrestrictedPrincipal = services.some(service => !isVariantService(service)
     && !['school-day', 'non-school-day', 'holiday'].includes(calendarProfileFromService(service)));
   const mixedSchoolCalendar = hasSchoolAndNonSchoolProfiles(services);
+  const hasFlexibleCallConnectSource = services.some(service => {
+    const sourceText = [service?.operator, service?.direction, service?.origin, service?.destination,
+      ...(service?.routePatternStopNames ?? []), ...(service?.routePatternStops ?? []).map(stop => typeof stop === 'string' ? stop : stop?.name ?? stop?.commonName)]
+      .map(text).join(' ');
+    return /callconnect/i.test(sourceText) && /demand\s+responsive\s+area/i.test(sourceText);
+  });
+  if (hasFlexibleCallConnectSource) addUnique(qualifications,
+    'CallConnect operates flexibly; published times are notional, and journeys must be booked in advance. Check availability with the operator.');
   const shortWorkingRecordIds = new Set(row?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []);
   const variantQualificationNotes = new Set(services.filter(service => isVariantService(service))
     .flatMap(service => materialServiceNotesForService(service).map(note => materialServiceNote(note) || note)));

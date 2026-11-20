@@ -1189,7 +1189,10 @@ function independentPrincipalLocationsText(service) {
     const destination = text(service?.destination);
     if (destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination)) return destination;
   }
-  return 'Unresolved — review Sources & Checks';
+  const endpointText = `${text(service?.destination)} ${text(service?.direction)}`;
+  return /demand\s+responsive\s+area/i.test(endpointText)
+    ? 'Demand-responsive service area; specific locations not supplied'
+    : 'Specific principal locations not supplied';
 }
 
 function finalPrincipalLocationsText(service, main) {

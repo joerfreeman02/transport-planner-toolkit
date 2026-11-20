@@ -1,4 +1,5 @@
 import { hasScheduledEvidenceAt } from './scheduled-evidence.mjs';
+import { normalizeBusText } from './bus-text.mjs';
 
 export const TIMETABLE_PRESENTATION_LABELS = Object.freeze({
   tfl: 'Transport for London scheduled timetables',
@@ -20,7 +21,7 @@ export function isOtherNearbyStopRecord(stop = {}) {
 /** Strip only the non-actionable legacy variant banner; preserve all evidence-qualified notes. */
 export function plannerFacingServiceNote(value) {
   const generic = /^(?:Additional short workings and timetable variants operate\.|Additional variants and short workings operate\.)$/i;
-  return String(value ?? '').trim().split(/(?<=[.!?])\s+/u).filter(sentence => !generic.test(sentence.trim())).join(' ').trim();
+  return normalizeBusText(value).trim().split(/(?<=[.!?])\s+/u).filter(sentence => !generic.test(sentence.trim())).join(' ').trim();
 }
 
 /** Plain-English route evidence for an assessed stop or an unselected candidate. */

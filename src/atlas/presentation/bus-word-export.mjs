@@ -40,9 +40,14 @@ export function buildBusTransportStatement(result, { services = result?.plannerS
   const population = nearestGroupName
     ? `in the nearest logical stop group at ${text(nearestGroupName)}`
     : 'within the assessed area';
+  const nearestConclusion = result?.nearestGroup?.conclusion;
   const first = serviceCount
     ? `A total of ${count} bus stop${count === 1 ? ' is' : 's are'} located ${population}, providing access to ${routeNumbers.length} bus route${routeNumbers.length === 1 ? '' : 's'} across ${serviceCount} timetable service pattern${serviceCount === 1 ? '' : 's'}${connectionText}.`
-    : `${count} bus stop${count === 1 ? ' is' : 's are'} located ${population}. No usable timetable evidence was available for the selected stops.`;
+    : nearestConclusion === 'NO_CURRENT_MATCH'
+      ? `${count} bus stop${count === 1 ? ' is' : 's are'} located ${population}. No current timetable match was established for this group; this does not establish that no public bus service operates there where source coverage is incomplete.`
+      : nearestConclusion === 'UNRESOLVED'
+        ? `${count} bus stop${count === 1 ? ' is' : 's are'} located ${population}. Timetable evidence for this group remained unresolved, and a farther group was not substituted.`
+        : `${count} bus stop${count === 1 ? ' is' : 's are'} located ${population}. No usable timetable evidence was available for the selected stops.`;
   const second = serviceCount
     ? `Services operate at a range of frequencies${hasQualifications ? ', with material qualifications shown alongside the relevant rows' : ''}. Assessed stops are summarised in Table 3.2; principal destinations, typical frequencies and operating periods are provided in Table 3.3.`
     : 'The stops and their access information are summarised in Table 3.2.';

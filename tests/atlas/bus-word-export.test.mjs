@@ -28,6 +28,15 @@ const arrivalNarrative = buildBusTransportStatement({
 });
 assert.match(arrivalNarrative, /connections towards Gloucester Transport Hub/);
 assert.doesNotMatch(arrivalNarrative, /Transport Hub arrival/);
+const nearestNoMatchNarrative = buildBusTransportStatement({
+  ...result,
+  stops: [result.stops[0]],
+  nearestGroup: { name: 'Nearest Stop', conclusion: 'NO_CURRENT_MATCH' },
+  plannerServiceSummaries: []
+});
+assert.match(nearestNoMatchNarrative, /No current timetable match was established for this group/);
+assert.match(nearestNoMatchNarrative, /does not establish that no public bus service operates/);
+assert.doesNotMatch(nearestNoMatchNarrative, /No usable timetable evidence was available/);
 assert.doesNotMatch(narrative,/checked evidence|planner-facing|ATLAS/i);
 assert.deepEqual(mapOn[0].headers,['Map reference','Stop name','Direction','Walking distance / time','Cycling distance / time','Routes recorded or matched at stop']);
 assert.equal(mapOn[0].rows[0][0],'1');

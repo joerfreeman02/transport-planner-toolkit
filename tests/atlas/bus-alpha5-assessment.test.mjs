@@ -48,7 +48,7 @@ test('nearest mode sends the complete nearest logical stop group to timetable pr
   assert.equal(result.nearestGroup.name, 'Bus Station');
 });
 
-test('nearest mode checks walking-ranked groups in order and may select a farther group with confirmed service', async () => {
+test('nearest mode retains the nearest group after confirmed NO_CURRENT_MATCH', async () => {
   const serviceCalls = [];
   const stops = [
     { id: 'NEAR', name: 'Nearest Stop', locality: 'Example', latitude: 51.6850, longitude: -0.0330, routes: [] },
@@ -68,26 +68,91 @@ test('nearest mode checks walking-ranked groups in order and may select a farthe
   }) };
   const result = await createBusAssessment({ stopDiscovery, timetableData, accessRouting }).assess(site, { mode: 'nearest' });
   assert.equal(result.ok, true);
-  assert.deepEqual(serviceCalls, [['NEAR'], ['FAR']], 'The nearest routed-walking candidate is checked before the farther group.');
-  assert.equal(result.nearestGroup.anchorStopId, 'FAR', 'A confirmed no-match at the nearest physical group allows the current behavior to select a farther served group.');
-  assert.deepEqual(result.stops.map(item => item.id), ['FAR']);
+  assert.deepEqual(serviceCalls, [['NEAR']], 'The approved Product Owner rule retains the closest walking group after confirmed NO_CURRENT_MATCH.');
+  assert.equal(result.nearestGroup.anchorStopId, 'NEAR');
+  assert.equal(result.nearestGroup.conclusion, 'NO_CURRENT_MATCH');
+  assert.deepEqual(result.stops.map(item => item.id), ['NEAR']);
+  assert.equal(result.serviceSummaries.length, 0);
+  assert.match(result.wording, /No current timetable match was established/);
+  assert.match(result.wording, /does not establish that no public bus service operates/);
 });
 
-test('nearest mode returns a partial result when no service is found within 2km', async () => {
+test('nearest mode does not substitute a farther group when nearest timetable evidence is unresolved', async () => {
+  const serviceCalls = [];
+  const stops = [
+    { id: 'NEAR', name: 'Nearest Stop', locality: 'Example', latitude: 51.6850, longitude: -0.0330, routes: ['10'] },
+    { id: 'FAR', name: 'Farther Stop', locality: 'Example', latitude: 51.6860, longitude: -0.0330, routes: ['99'] }
+  ];
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: stops, warnings: [], evidence: [], provenance: { providerAdapter: 'prepared-national' } }) },
+    timetableData: { servicesForStops: async selected => {
+      serviceCalls.push(selected.map(item => item.id));
+      return { ok: true, data: [], warnings: [], provenance: { source: 'BODS', timetableConclusion: 'UNRESOLVED', failedRequests: 1 } };
+    } },
+    accessRouting: { matrix: async (_site, selected) => ({ ok: true, warnings: [], provenance: { source: 'OSRM' }, routes: selected.map(item => ({ status: 'routed', distanceMetres: item.id === 'NEAR' ? 50 : 190, durationSeconds: 60 })) }) }
+  });
+  const result = await assessment.assess(site, { mode: 'nearest' });
+  assert.deepEqual(serviceCalls, [['NEAR']]);
+  assert.equal(result.nearestGroup.anchorStopId, 'NEAR');
+  assert.equal(result.nearestGroup.conclusion, 'UNRESOLVED');
+  assert.deepEqual(result.stops.map(item => item.id), ['NEAR']);
+  assert.match(result.wording, /evidence .* remained unresolved/);
+});
+
+test('explicit no-match with incomplete source coverage is kept unresolved and never becomes a zero-service claim', async () => {
+  const stop = { id: 'NEAR', name: 'Nearest Stop', locality: 'Example', latitude: 51.6850, longitude: -0.0330, routes: ['10'] };
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { providerAdapter: 'prepared-national' } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS', timetableConclusion: 'NO_CURRENT_MATCH', nationalSourceAvailable: false } }) },
+    accessRouting: { matrix: async (_site, selected) => ({ ok: true, warnings: [], provenance: { source: 'OSRM' }, routes: selected.map(() => ({ status: 'routed', distanceMetres: 50, durationSeconds: 60 })) }) }
+  });
+  const result = await assessment.assess(site, { mode: 'nearest' });
+  assert.equal(result.nearestGroup.conclusion, 'UNRESOLVED');
+  assert.equal(result.status, 'partial');
+  assert.match(result.wording, /evidence .* remained unresolved/);
+  assert.doesNotMatch(result.wording, /No current timetable match was established/);
+});
+
+test('nearest mode retains a matched closest group and leaves farther groups to full mode', async () => {
+  const calls = [];
+  const stops = [
+    { id: 'NEAR', name: 'Nearest Stop', locality: 'Example', latitude: 51.6850, longitude: -0.0330, routes: ['10'] },
+    { id: 'FAR', name: 'Farther Stop', locality: 'Example', latitude: 51.6860, longitude: -0.0330, routes: ['99'] }
+  ];
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: stops, warnings: [], evidence: [], provenance: { providerAdapter: 'prepared-national' } }) },
+    timetableData: { servicesForStops: async selected => {
+      calls.push(selected.map(item => item.id));
+      return { ok: true, warnings: [], provenance: { source: 'BODS', timetableConclusion: 'MATCHED' }, data: [{ id: '10', routeNumber: '10', operator: 'Example', origin: 'A', destination: 'B', principalLocations: [], stopSchedules: { NEAR: weekdays }, qualifications: [] }] };
+    } },
+    accessRouting: { matrix: async (_site, selected) => ({ ok: true, warnings: [], provenance: { source: 'OSRM' }, routes: selected.map(item => ({ status: 'routed', distanceMetres: item.id === 'NEAR' ? 50 : 190, durationSeconds: 60 })) }) }
+  });
+  const nearest = await assessment.assess(site, { mode: 'nearest' });
+  assert.deepEqual(calls, [['NEAR']]);
+  assert.equal(nearest.nearestGroup.anchorStopId, 'NEAR');
+  assert.deepEqual(nearest.stops.map(item => item.id), ['NEAR']);
+  calls.length = 0;
+  const full = await assessment.assess(site, { mode: 'full' });
+  assert.deepEqual(calls, [['NEAR', 'FAR']]);
+  assert.equal(full.nearestGroup, null);
+  assert.deepEqual(full.stops.map(item => item.id), ['NEAR', 'FAR']);
+});
+
+test('nearest mode expands only when no valid routed nearest group was identified within the initial radius', async () => {
   const stop = { id: 'UNSERVED', name: 'Pipers Lane', locality: 'Example', latitude: site.latitude, longitude: site.longitude, routes: [] };
   const assessment = createBusAssessment({
-    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { source: 'prepared' } }) },
+    stopDiscovery: { nearbyStops: async (_site, { radius }) => ({ ok: true, data: radius === 500 ? [stop] : [{ ...stop, id: 'ROUTED', walking: undefined }], warnings: [], evidence: [], provenance: { source: 'prepared' } }) },
     timetableData: { servicesForStops: async () => ({ ok: true, data: [], warnings: [], provenance: { source: 'BODS', timetableConclusion: 'NO_CURRENT_MATCH' } }) },
-    accessRouting: { matrix: async () => ({ ok: true, warnings: [], provenance: { source: 'OSRM' }, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 80 }] }) }
+    accessRouting: { matrix: async (_site, selected) => ({ ok: true, warnings: [], provenance: { source: 'OSRM' }, routes: selected.map(item => ({ status: item.id === 'UNSERVED' ? 'unavailable' : 'routed', distanceMetres: item.id === 'UNSERVED' ? null : 100, durationSeconds: 80 })) }) }
   });
   const result = await assessment.assess(site, { mode: 'nearest', radius: 500 });
   assert.equal(result.ok, true);
   assert.equal(result.status, 'partial');
-  assert.match(result.warnings.join(' '), /Nearest search expanded from 500 m to 2,000 m because no matched scheduled service was established in the initial radius\./);
+  assert.match(result.warnings.join(' '), /Nearest search expanded from 500 m to 2,000 m because no stop group with a valid routed walking distance was identified in the initial radius\./);
   assert.equal(result.provenance.stops.selectedRadiusMetres, 500);
   assert.equal(result.provenance.stops.actualDiscoveryRadiusMetres, 2000);
   assert.equal(result.provenance.stops.radiusMetres, 2000);
-  assert.equal(result.nearestGroup, null);
+  assert.equal(result.nearestGroup.anchorStopId, 'ROUTED');
 });
 
 for (const [name, fn] of tests) {

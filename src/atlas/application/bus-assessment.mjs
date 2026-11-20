@@ -519,6 +519,15 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
           warnings: [...new Set([...(warnings ?? []), 'The nearest candidate group was retained because timetable evidence was unavailable or unresolved; ATLAS did not substitute a farther group.'])]
         };
       }
+      if (conclusion === 'NO_CURRENT_MATCH') {
+        return {
+          selectedStops: selection.stops,
+          services: result.data ?? [],
+          servicesResult: result,
+          nearestGroup: Object.freeze({ name: selection.groupName, anchorStopId: selection.anchor.id, anchorWalkingDistanceMetres: selection.anchor.walking.distanceMetres, conclusion, basis: `${selection.basis} The nearest candidate was retained after no current timetable match was established; a farther group was not substituted.` }),
+          warnings: [...new Set([...(warnings ?? []), 'The nearest candidate group was retained because no current timetable match was established. This does not establish that no public service operates where source coverage is incomplete.'])]
+        };
+      }
       const selectedIds = new Set(selection.stops.map(stopKey));
       remaining.splice(0, remaining.length, ...remaining.filter(stop => !selectedIds.has(stopKey(stop))));
     }
@@ -571,13 +580,13 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     let assessmentWarnings = commonWarnings;
     if (assessmentMode === 'nearest') {
       let nearest = await nearestTimetable(enrichedDiscoveredStops, { forceRefresh, site }, commonWarnings, onProgress);
-      if (!nearest.selectedStops.length && Number(radius) < 2000) {
+      if (!nearest.nearestGroup && Number(radius) < 2000) {
         const expanded = await prepareStops(site, 2000, forceRefresh, null, onProgress);
         if (expanded.stopsResult.ok) {
           prepared = expanded;
           actualDiscoveryRadiusMetres = 2000;
           enrichedDiscoveredStops = expanded.enriched;
-          nearest = await nearestTimetable(expanded.enriched, { forceRefresh, site }, [...commonWarnings, `Nearest search expanded from ${selectedRadiusMetres} m to 2,000 m because no matched scheduled service was established in the initial radius.`], onProgress);
+          nearest = await nearestTimetable(expanded.enriched, { forceRefresh, site }, [...commonWarnings, `Nearest search expanded from ${selectedRadiusMetres} m to 2,000 m because no stop group with a valid routed walking distance was identified in the initial radius.`], onProgress);
         }
       }
       assessmentWarnings = nearest.warnings;
@@ -656,7 +665,7 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     const selectedIds = new Set(selectedStops.map(stopKey));
     const routes = new Set(enrichedDiscoveredStops.flatMap(stop => stop.routes ?? []));
     onProgress({ phase: status === 'complete' ? 'complete' : 'partial', detail: status === 'complete' ? 'Complete' : partialDetail(reviewItems) });
-    const wordingBase = buildControlledBusWording(plannerServiceSummaries, { nearestGroupName: nearestGroup?.name ?? null });
+    const wordingBase = buildControlledBusWording(plannerServiceSummaries, { nearestGroupName: nearestGroup?.name ?? null, nearestConclusion: nearestGroup?.conclusion ?? null });
     return Object.freeze({ ok: true, status, assessmentMode, discoveredStopCount: enrichedDiscoveredStops.length, scope: { stopCount: enrichedDiscoveredStops.length, routeCount: routes.size, pairCount: routePairs(enrichedDiscoveredStops).size }, nearestGroup, stops: Object.freeze(selectedStops), services: Object.freeze(services), serviceSummaries: Object.freeze(resolvedServiceSummaries), plannerServiceSummaries: Object.freeze(plannerServiceSummaries), endpointResolution: Object.freeze(endpointResolution), wording: wordingBase, warnings: Object.freeze(warnings), reviewItems: Object.freeze(reviewItems), provenance: Object.freeze({ stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres }, timetables: servicesResult?.provenance ?? {}, endpoints: endpointResolution.provenance ?? {}, walking: prepared.walkingResult?.provenance ?? {}, cycling: prepared.cyclingResult?.provenance ?? {} }), evidence: Object.freeze((prepared.stopsResult.evidence ?? []).filter(item => assessmentMode === 'full' || selectedIds.has(item?.subject?.id))) });
   }
 

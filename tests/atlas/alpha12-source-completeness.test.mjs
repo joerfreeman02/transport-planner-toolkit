@@ -229,9 +229,11 @@ const nearestNoMatch = createBusAssessment({
   accessRouting: { matrix: routed }
 });
 const nearestNoMatchResult = await nearestNoMatch.assess({ latitude: 51.7, longitude: -0.1 }, { mode: 'nearest' });
-assert.equal(noMatchCalls, 2);
-assert.equal(nearestNoMatchResult.nearestGroup.anchorStopId, 'FARTHER-B');
-assert.equal(nearestNoMatchResult.status, 'complete');
+assert.equal(noMatchCalls, 1, 'The approved Product Owner nearest-group rule prevents a farther timetable group from replacing the closest routed group after NO_CURRENT_MATCH.');
+assert.equal(nearestNoMatchResult.nearestGroup.anchorStopId, 'NEAREST-A');
+assert.equal(nearestNoMatchResult.nearestGroup.conclusion, 'NO_CURRENT_MATCH');
+assert.equal(nearestNoMatchResult.status, 'partial');
+assert.match(nearestNoMatchResult.wording, /No current timetable match was established/);
 
 const ambiguousFallbackService = { id: 'bods-279', routeNumber: '279', operator: 'National operator', origin: 'Origin', destination: 'Terminus', direction: 'Terminus', timetableSource: 'BODS', stopSchedules: { 'TFL-STOP': schedule([450]) } };
 const ambiguousFallback = createAuthoritativeBusTimetableAdapter({

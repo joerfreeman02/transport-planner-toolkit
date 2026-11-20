@@ -135,13 +135,13 @@ const noMatchExpansion = createBusAssessment({
   accessRouting: { matrix: routed }
 });
 const noMatchResult = await noMatchExpansion.assess({ latitude: 51.685, longitude: -0.033 }, { mode: 'nearest', radius: 400, onProgress: progress => noMatchProgress.push(progress) });
-assert.deepEqual(noMatchExpansionCalls, [400, 2000], 'nearest mode expands only after an explicit no-current-match conclusion');
-assert.equal(noMatchResult.provenance.stops.actualDiscoveryRadiusMetres, 2000);
+assert.deepEqual(noMatchExpansionCalls, [400], 'The approved Product Owner nearest-group rule retains the closest routed group after NO_CURRENT_MATCH instead of expanding to seek a farther served group.');
+assert.equal(noMatchResult.provenance.stops.actualDiscoveryRadiusMetres, 400);
 assert.ok(noMatchProgress.some(progress => progress.phase === 'routing-stops' && progress.total === 1));
 assert.ok(noMatchProgress.some(progress => progress.phase === 'checking-timetables'));
-assert.equal(noMatchTimetableCalls, 2, 'nearest expansion makes exactly one additional timetable request');
-assert.ok(noMatchProgress.filter(progress => progress.phase === 'checking-timetables' && progress.completed === 0).length >= 2, 'expanded nearest forwards the initial checking-timetables progress event');
-assert.ok(noMatchProgress.filter(progress => progress.phase === 'checking-timetables' && progress.completed === 1 && progress.total === 1).length >= 2, 'expanded nearest forwards the completed checking-timetables progress event');
+assert.equal(noMatchTimetableCalls, 1, 'a confirmed no-match at the nearest group makes no farther-group or expanded-scope timetable request');
+assert.equal(noMatchResult.nearestGroup.anchorStopId, 'EXPANSION-NO-MATCH');
+assert.equal(noMatchResult.nearestGroup.conclusion, 'NO_CURRENT_MATCH');
 
 let clock = 0;
 const sleeps = [];

@@ -1631,8 +1631,10 @@ export function selectNearestStopGroup(stops, { maximumSeparationMetres = 350 } 
   });
 }
 
-export function buildControlledBusWording(serviceSummaries, { nearestGroupName = null } = {}) {
+export function buildControlledBusWording(serviceSummaries, { nearestGroupName = null, nearestConclusion = null } = {}) {
   const services = serviceSummaries ?? [];
+  if (!services.length && nearestGroupName && nearestConclusion === 'NO_CURRENT_MATCH') return `No current timetable match was established for the nearest assessed bus stop group at ${nearestGroupName}. This does not establish that no public bus service operates there where source coverage is incomplete.`;
+  if (!services.length && nearestGroupName && nearestConclusion === 'UNRESOLVED') return `Timetable evidence for the nearest assessed bus stop group at ${nearestGroupName} remained unresolved. ATLAS did not substitute a farther group.`;
   if (!services.length) return 'No bus-service summary wording is available for the confirmed assessment point.';
   const routes = unique(services.flatMap(service => service.publicRouteNumbers ?? service.routeNumbers ?? [service.routeNumber]));
   const locations = unique(services.flatMap(service => service.principalLocations)).slice(0, 8);

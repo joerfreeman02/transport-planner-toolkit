@@ -135,6 +135,10 @@ const controls = [
 if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') controls.splice(0, controls.length, ...enfieldControls);
 if (process.env.ATLAS_AUDIT_CONTROL === 'pearcroft-route65') controls.splice(0, controls.length, { id: 'pearcroft-route65', label: 'Pearcroft Road public stop 1600GLS313', latitude: 51.74319, longitude: -2.27813, radius: 120 });
 else if (process.env.ATLAS_AUDIT_CONTROL) controls.splice(0, controls.length, ...controls.filter(control => control.id === process.env.ATLAS_AUDIT_CONTROL));
+const stageTraceRequiredControls = new Set(['waltham-cross', 'waltham-cross-nearest', 'abbotts-rise-nearest', 'pe1']);
+if (controls.some(control => stageTraceRequiredControls.has(control.id)) && process.env.ATLAS_C4_TRACE_OPERATOR_STAGES !== '1') {
+  throw new Error('The Waltham, Abbotts Rise and PE1 acceptance assertions require production-stage traces. Rerun with ATLAS_C4_TRACE_OPERATOR_STAGES=1; do not treat missing trace fields as product failures.');
+}
 const chingfordRouteMetadata657 = { id: '657', routeSections: [
   { id: '657-out', direction: 'outbound', originationName: "Salisbury Hall Sainsbury's", destinationName: "Bancroft's School" },
   { id: '657-in', direction: 'inbound', originationName: "Bancroft's School", destinationName: "Salisbury Hall Sainsbury's" }

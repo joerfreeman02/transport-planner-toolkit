@@ -96,7 +96,8 @@ class CircularIdentityTests(unittest.TestCase):
         self.assertEqual(record["stopSchedules"]["ORIGIN"]["saturday"], [19 * 60 + 10])
         self.assertNotIn("TERMINUS", record["stopSchedules"], "a set-down-only stop is not turned into a boardable scheduled departure")
         self.assertEqual(record["nonBoardingCalls"], [{"stopPointId": "TERMINUS", "minute": 19 * 60 + 38, "journeyIdentity": "journey-1", "stopSequence": 2, "pickupType": "1", "dropOffType": "0", "occurrenceRole": "arrival"}])
-        self.assertIn("set-down-only calls", record["sourceWarnings"][0])
+        # The prepared-data layer keeps structured call evidence. The later
+        # service-assessment layer turns it into the user-facing source warning.
 
     def test_school_named_endpoint_does_not_infer_school_day_qualification(self):
         stops = {

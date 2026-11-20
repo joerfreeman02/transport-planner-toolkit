@@ -48,6 +48,31 @@ test('nearest mode sends the complete nearest logical stop group to timetable pr
   assert.equal(result.nearestGroup.name, 'Bus Station');
 });
 
+test('nearest mode checks walking-ranked groups in order and may select a farther group with confirmed service', async () => {
+  const serviceCalls = [];
+  const stops = [
+    { id: 'NEAR', name: 'Nearest Stop', locality: 'Example', latitude: 51.6850, longitude: -0.0330, routes: [] },
+    { id: 'FAR', name: 'Farther Stop', locality: 'Example', latitude: 51.6860, longitude: -0.0330, routes: ['99'] }
+  ];
+  const stopDiscovery = { nearbyStops: async () => ({ ok: true, data: stops, warnings: [], evidence: [], provenance: { providerAdapter: 'prepared-national' } }) };
+  const timetableData = { servicesForStops: async selected => {
+    serviceCalls.push(selected.map(item => item.id));
+    if (selected.some(item => item.id === 'NEAR')) return { ok: true, data: [], warnings: [], provenance: { source: 'BODS', timetableConclusion: 'NO_CURRENT_MATCH' } };
+    return { ok: true, data: [{ id: '99', routeNumber: '99', operator: 'Example', origin: 'A', destination: 'B', direction: 'B', principalLocations: [], stopSchedules: { FAR: weekdays }, qualifications: [] }], warnings: [], provenance: { source: 'BODS', timetableConclusion: 'MATCHED' } };
+  } };
+  const accessRouting = { matrix: async (_site, selected, mode) => ({
+    ok: true,
+    warnings: [],
+    provenance: { source: 'OSRM' },
+    routes: selected.map(item => ({ status: 'routed', distanceMetres: item.id === 'NEAR' ? (mode === 'walk' ? 50 : 70) : (mode === 'walk' ? 190 : 220), durationSeconds: 60 }))
+  }) };
+  const result = await createBusAssessment({ stopDiscovery, timetableData, accessRouting }).assess(site, { mode: 'nearest' });
+  assert.equal(result.ok, true);
+  assert.deepEqual(serviceCalls, [['NEAR'], ['FAR']], 'The nearest routed-walking candidate is checked before the farther group.');
+  assert.equal(result.nearestGroup.anchorStopId, 'FAR', 'A confirmed no-match at the nearest physical group allows the current behavior to select a farther served group.');
+  assert.deepEqual(result.stops.map(item => item.id), ['FAR']);
+});
+
 test('nearest mode returns a partial result when no service is found within 2km', async () => {
   const stop = { id: 'UNSERVED', name: 'Pipers Lane', locality: 'Example', latitude: site.latitude, longitude: site.longitude, routes: [] };
   const assessment = createBusAssessment({

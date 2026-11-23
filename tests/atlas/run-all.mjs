@@ -93,6 +93,8 @@ await import('./s2e1-enfield-313-multistop-composition.test.mjs');
 await import('./reference-data-workflow-contract.test.mjs');
 await import('./refresh-freshness.test.mjs');
 await import('./atlas-data-publication.test.mjs');
+await import('./app-data-release.test.mjs');
+await import('./app-data-release-workflow-contract.test.mjs');
 await import('./publication-wait.test.mjs');
 await import('./publication-preflight.test.mjs');
 await import('./atlas-candidate-checkpoint.test.mjs');

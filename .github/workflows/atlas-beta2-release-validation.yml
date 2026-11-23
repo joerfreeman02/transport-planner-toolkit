@@ -1,0 +1,132 @@
+name: ATLAS Beta.2 exact-SHA release validation
+
+on:
+  push:
+    branches: [codex/atlas-bus-beta2-release-re1-20261123]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tfl_capture_run_id:
+        description: Hosted run containing the exact recorded 135-response TfL replay JSON
+        required: false
+        type: string
+      tfl_capture_artifact_id:
+        description: Exact GitHub artifact ID for the recorded replay
+        required: false
+        type: string
+      tfl_capture_artifact_digest:
+        description: Exact artifact SHA-256 digest
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: atlas-beta2-release-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  exact-sha:
+    if: github.repository == 'joerfreeman02/transport-planner-toolkit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install frozen JavaScript dependencies and Chromium
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+      - name: Confirm the exact source commit and immutable Run #75 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          gh api repos/$GITHUB_REPOSITORY/actions/artifacts/12275615359 > "$RUNNER_TEMP/run75.json"
+          python - "$RUNNER_TEMP/run75.json" <<'PY'
+          import json,sys
+          a=json.load(open(sys.argv[1])); w=a.get('workflow_run') or {}
+          if a.get('name')!='atlas-bus-beta-review-candidate-39430415441' or a.get('digest')!='sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471' or a.get('expired') is not False: raise SystemExit('Immutable Run #75 artifact metadata mismatch.')
+          if w.get('id')!=39430415441 or w.get('head_sha')!='151199cc914c235870f444d26b03c2309edbd035': raise SystemExit('Immutable Run #75 artifact producer mismatch.')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 12275615359
+          run-id: 39430415441
+          repository: joerfreeman02/transport-planner-toolkit
+          github-token: ${{ github.token }}
+          path: restored
+      - name: Verify checkpoint provenance and frozen Bus/TNDS/iBus identities
+        run: |
+          ROOT="$GITHUB_WORKSPACE/restored/atlas-bus-beta-review-candidate-39430415441"
+          CANDIDATE="$ROOT/candidate-site"
+          node tools/atlas-data-publication/review-candidate-checkpoint.mjs verify --candidate-root "$CANDIDATE" --checkpoint-root "$ROOT/review-checkpoint" --expected-run-id 39430415441 --expected-commit-sha 151199cc914c235870f444d26b03c2309edbd035
+          test "$(sha256sum "$CANDIDATE/atlas/data/bus/manifest.json" | cut -d' ' -f1)" = '1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f'
+          test "$(sha256sum "$CANDIDATE/atlas/data/bus-tnds/manifest.json" | cut -d' ' -f1)" = '2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f'
+          test "$(sha256sum "$CANDIDATE/atlas/data/tfl-ibus/manifest.json" | cut -d' ' -f1)" = '3090e1da6da21878725d0b30343757bd32c65fcdd56d9fdecb6f6ae6c75b5d53'
+          test "$(sha256sum "$CANDIDATE/atlas/data/tfl-ibus/20261009/operator-index.json" | cut -d' ' -f1)" = '39b0eae384ec7a44115f898b940b3f35213577195706d38a82fa97707d2610de'
+          echo "ATLAS_TEST_BUS_DATA_ROOT=$CANDIDATE/atlas/data/bus" >> "$GITHUB_ENV"
+          echo "ATLAS_TEST_BUS_TNDS_DATA_ROOT=$CANDIDATE/atlas/data/bus-tnds" >> "$GITHUB_ENV"
+          echo "ATLAS_TEST_TFL_IBUS_ROOT=$CANDIDATE/atlas/data/tfl-ibus" >> "$GITHUB_ENV"
+          echo "ATLAS_CANDIDATE_ROOT=$CANDIDATE" >> "$GITHUB_ENV"
+      - name: Run full deterministic ATLAS Node suite
+        run: pnpm test:atlas
+      - name: Run required Python static-index suite
+        run: python -m unittest discover -s tools/atlas-bus-data -p 'test_build_static_index.py' -v
+      - name: Verify app/data artifact contracts and an isolated reconstruction dry run
+        run: node tests/atlas/app-data-release.test.mjs
+      - name: Run immutable Run #75 16-control Browser/Word/A3 acceptance audit
+        env:
+          ATLAS_AUDIT_APP_ROOT: ${{ github.workspace }}
+          ATLAS_AUDIT_APP_BUILD: ${{ github.sha }}
+          ATLAS_C4_TRACE_OPERATOR_STAGES: '1'
+        run: node tests/atlas/s2e1-manual-product-audit.mjs "$ATLAS_CANDIDATE_ROOT" release-audit.json
+      - name: Run the captured 135-response TfL replay when an exact artifact was supplied
+        if: github.event_name == 'workflow_dispatch' && inputs.tfl_capture_run_id != '' && inputs.tfl_capture_artifact_id != '' && inputs.tfl_capture_artifact_digest != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CAPTURE_RUN: ${{ inputs.tfl_capture_run_id }}
+          CAPTURE_ARTIFACT: ${{ inputs.tfl_capture_artifact_id }}
+          CAPTURE_DIGEST: ${{ inputs.tfl_capture_artifact_digest }}
+          ATLAS_C4_TRACE_OPERATOR_STAGES: '1'
+          ATLAS_AUDIT_APP_ROOT: ${{ github.workspace }}
+          ATLAS_AUDIT_APP_BUILD: ${{ github.sha }}
+        run: |
+          [[ "$CAPTURE_RUN" =~ ^[0-9]+$ && "$CAPTURE_ARTIFACT" =~ ^[0-9]+$ && "$CAPTURE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$CAPTURE_ARTIFACT" > "$RUNNER_TEMP/tfl-artifact.json"
+          python - "$RUNNER_TEMP/tfl-artifact.json" <<'PY'
+          import json,os,sys
+          a=json.load(open(sys.argv[1])); w=a.get('workflow_run') or {}
+          if a.get('id')!=int(os.environ['CAPTURE_ARTIFACT']) or a.get('digest')!=os.environ['CAPTURE_DIGEST'] or a.get('expired') is not False or w.get('id')!=int(os.environ['CAPTURE_RUN']): raise SystemExit('TfL capture artifact identity mismatch.')
+          PY
+          gh run download "$CAPTURE_RUN" -n atlas-tfl-replay-capture -D restored-tfl || true
+          mapfile -t FILES < <(find restored-tfl -type f -name '*.json' -print)
+          test "${#FILES[@]}" -eq 1
+          export ATLAS_TFL_REPLAY_CAPTURE="${FILES[0]}"
+          node tests/atlas/s2e1-manual-product-audit.mjs "$ATLAS_CANDIDATE_ROOT" release-audit-tfl.json
+      - name: State the TfL replay disposition explicitly when no capture artifact was supplied
+        if: github.event_name != 'workflow_dispatch' || inputs.tfl_capture_artifact_id == ''
+        run: echo '::warning::Recorded 135-response TfL replay was NOT EXECUTED; no exact hosted capture artifact identity was supplied.'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atlas-beta2-release-validation-${{ github.sha }}
+          path: |
+            release-audit.json
+            release-audit-tfl.json
+          if-no-files-found: ignore
+          retention-days: 90

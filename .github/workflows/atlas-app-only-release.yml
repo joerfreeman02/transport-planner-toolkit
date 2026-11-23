@@ -47,7 +47,7 @@ env:
 jobs:
   prepare:
     if: github.repository == 'joerfreeman02/transport-planner-toolkit' && github.ref == 'refs/heads/main' && inputs.authorize_publication == true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
     permissions:
       actions: read
@@ -236,7 +236,7 @@ jobs:
   deploy:
     needs: prepare
     if: needs.prepare.result == 'success' && inputs.authorize_publication == true && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pages: write
       id-token: write
@@ -248,7 +248,7 @@ jobs:
   verify-live:
     needs: [prepare, deploy]
     if: needs.prepare.result == 'success' && needs.deploy.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Verify the exact published application identity
         env:

@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
+import { canonicalTflReplayKey, readTflReplayCapture, safeTflUrlForReport } from '../../tools/atlas-release/tfl-replay-privacy.mjs';
 import { launchAtlasBrowser } from './playwright-launch.mjs';
 import { createPreparedBusDataAdapter } from '../../src/atlas/adapters/prepared-bus-data-adapter.mjs';
 import { createSite, confirmSite } from '../../src/atlas/domain/site.mjs';
@@ -138,7 +139,10 @@ const controls = [
 if (process.env.ATLAS_C4_ENFIELD_EVIDENCE_ONLY === '1') controls.splice(0, controls.length, ...enfieldControls);
 if (process.env.ATLAS_AUDIT_CONTROL === 'pearcroft-route65') controls.splice(0, controls.length, { id: 'pearcroft-route65', label: 'Pearcroft Road public stop 1600GLS313', latitude: 51.74319, longitude: -2.27813, radius: 120 });
 else if (process.env.ATLAS_AUDIT_CONTROL === 'abbotts-rise-full') controls.splice(0, controls.length, { id: 'abbotts-rise-full', label: 'Abbotts Rise public stop pair, Stanstead Abbotts full-radius control', latitude: 51.78711445, longitude: 0.01104605, radius: 700, focusRoutes: ['25', '25B', '25C', '33', '35', '35B', '35C'] });
-else if (process.env.ATLAS_AUDIT_CONTROL) controls.splice(0, controls.length, ...controls.filter(control => control.id === process.env.ATLAS_AUDIT_CONTROL));
+else if (process.env.ATLAS_AUDIT_CONTROL) {
+  const selectedControls = new Set(process.env.ATLAS_AUDIT_CONTROL.split(',').map(value => value.trim()).filter(Boolean));
+  controls.splice(0, controls.length, ...controls.filter(control => selectedControls.has(control.id)));
+}
 const stageTraceRequiredControls = new Set(['waltham-cross', 'waltham-cross-nearest', 'abbotts-rise-nearest', 'pe1']);
 if (controls.some(control => stageTraceRequiredControls.has(control.id)) && process.env.ATLAS_C4_TRACE_OPERATOR_STAGES !== '1' && process.env.ATLAS_AUDIT_UNINSTRUMENTED !== '1') {
   throw new Error('The Waltham, Abbotts Rise and PE1 acceptance assertions require production-stage traces. Rerun with ATLAS_C4_TRACE_OPERATOR_STAGES=1; do not treat missing trace fields as product failures.');
@@ -201,10 +205,10 @@ const recordedTflReplayMisses = [];
 const recordedTflReplayCounts = new Map();
 const recordedTflResponseQueues = new Map();
 if (process.env.ATLAS_TFL_REPLAY_CAPTURE) {
-  const recordedCapture = JSON.parse(await readFile(path.resolve(process.env.ATLAS_TFL_REPLAY_CAPTURE), 'utf8'));
+  const { capture: recordedCapture } = await readTflReplayCapture(path.resolve(process.env.ATLAS_TFL_REPLAY_CAPTURE));
   if (recordedCapture.schema !== 'atlas-tfl-live-response-capture-v1') throw new Error('Recorded TfL replay capture has an unexpected schema.');
   for (const response of recordedCapture.responses ?? []) {
-    const key = `${response.method} ${response.url}`;
+    const key = canonicalTflReplayKey(response.method, response.url);
     recordedTflResponseQueues.set(key, [...(recordedTflResponseQueues.get(key) ?? []), response]);
   }
 }
@@ -330,8 +334,8 @@ try {
   await cacheSession.send('Network.setCacheDisabled', { cacheDisabled: true });
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-  page.on('requestfailed', request => failedRequests.push({ url: request.url(), error: request.failure()?.errorText || 'unknown' }));
-  page.on('response', response => { if (response.status() >= 400) failedResponses.push({ url: response.url(), status: response.status() }); });
+  page.on('requestfailed', request => failedRequests.push({ url: safeTflUrlForReport(request.url()), error: request.failure()?.errorText || 'unknown' }));
+  page.on('response', response => { if (response.status() >= 400) failedResponses.push({ url: safeTflUrlForReport(response.url()), status: response.status() }); });
   page.on('request', request => {
     const url = new URL(request.url());
     if (!['127.0.0.1', 'localhost', 'tile.openstreetmap.org', 'routing.openstreetmap.de', 'api.tfl.gov.uk', 'nominatim.openstreetmap.org'].includes(url.hostname)) externalRequests.push(request.url());
@@ -372,24 +376,25 @@ try {
   });
   await page.route('https://api.tfl.gov.uk/**', route => {
     const replayUrl = new URL(route.request().url());
-    if (activeControl?.id?.startsWith('enfield-')) tflReplayRequests.push({ control: activeControl.id, path: replayUrl.pathname, query: replayUrl.search.slice(1) });
+    const reportUrl = new URL(safeTflUrlForReport(replayUrl.toString()));
+    if (activeControl?.id?.startsWith('enfield-')) tflReplayRequests.push({ control: activeControl.id, path: reportUrl.pathname, query: reportUrl.search.slice(1) });
     if (process.env.ATLAS_TFL_REPLAY_CAPTURE && ['tufton', 'grove-road'].includes(activeControl?.id)) {
       const request = route.request();
-      const key = `${request.method()} ${request.url()}`;
+      const key = canonicalTflReplayKey(request.method(), request.url());
       const queue = recordedTflResponseQueues.get(key) ?? [];
       const captured = queue.shift();
       if (captured) {
         recordedTflResponseQueues.set(key, queue);
         recordedTflReplayCounts.set(key, (recordedTflReplayCounts.get(key) ?? 0) + 1);
-        tflReplayRequests.push({ control: activeControl.id, path: replayUrl.pathname, query: replayUrl.search.slice(1), source: 'recorded live TfL response' });
+        tflReplayRequests.push({ control: activeControl.id, path: reportUrl.pathname, query: reportUrl.search.slice(1), source: 'recorded live TfL response' });
         const headers = { ...(captured.headers ?? {}), 'access-control-allow-origin': '*' };
         return route.fulfill({ status: captured.status, headers, body: Buffer.from(captured.bodyBase64, 'base64') });
       }
-      recordedTflReplayMisses.push({ control: activeControl.id, method: request.method(), url: request.url() });
+      recordedTflReplayMisses.push({ control: activeControl.id, method: request.method(), url: safeTflUrlForReport(request.url()) });
       return route.abort('failed');
     }
     if (process.env.ATLAS_AUDIT_LIVE_TFL === '1' && ['tufton', 'grove-road'].includes(activeControl?.id)) {
-      tflReplayRequests.push({ control: activeControl.id, path: replayUrl.pathname, query: replayUrl.search.slice(1), source: 'live TfL' });
+      tflReplayRequests.push({ control: activeControl.id, path: reportUrl.pathname, query: reportUrl.search.slice(1), source: 'live TfL' });
       return (async () => {
         const response = await route.fetch({ timeout: 30000 });
         const body = await response.body();
@@ -1425,17 +1430,17 @@ if (fullWalthamCount && nearestWalthamCount) {
 report.tflReplayRequests = tflReplayRequests;
 if (process.env.ATLAS_TFL_REPLAY_CAPTURE) {
   const unusedResponses = [...recordedTflResponseQueues.entries()].flatMap(([key, queue]) => queue.map(response => ({ key, status: response.status })));
-  report.recordedTflReplay = { capturePath: path.resolve(process.env.ATLAS_TFL_REPLAY_CAPTURE), matchedResponses: [...recordedTflReplayCounts.values()].reduce((sum, count) => sum + count, 0), misses: recordedTflReplayMisses, unusedResponses };
+  report.recordedTflReplay = { capturePath: 'privacy-safe TfL replay fixture', matchedResponses: [...recordedTflReplayCounts.values()].reduce((sum, count) => sum + count, 0), misses: recordedTflReplayMisses, unusedResponses };
   const captureBytes = await readFile(path.resolve(process.env.ATLAS_TFL_REPLAY_CAPTURE));
   report.runtimeIdentity.tflEvidence = {
     mode: 'captured TfL response replay',
-    capturePath: path.resolve(process.env.ATLAS_TFL_REPLAY_CAPTURE),
+    capturePath: 'privacy-safe TfL replay fixture',
     captureSha256: createHash('sha256').update(captureBytes).digest('hex'),
     matchedResponses: report.recordedTflReplay.matchedResponses,
     misses: report.recordedTflReplay.misses.length,
     unusedResponses: report.recordedTflReplay.unusedResponses.length,
     failedBrowserRequests: failedRequests.length,
-    expectedHttp400s: failedResponses.filter(response => response.url.startsWith('https://api.tfl.gov.uk/') && response.status === 400).map(response => ({ url: response.url, status: response.status }))
+    expectedHttp400s: failedResponses.filter(response => response.url.startsWith('https://api.tfl.gov.uk/') && response.status === 400).map(response => ({ url: safeTflUrlForReport(response.url), status: response.status }))
   };
   if (recordedTflReplayMisses.length || unusedResponses.length) fail('recorded-TfL-replay', `Exact recorded TfL replay mismatch: ${JSON.stringify(report.recordedTflReplay)}`);
 }
@@ -1453,6 +1458,26 @@ report.externalRequests = externalRequests;
 report.statusManifestFallbacks = statusManifestFallbacks;
 report.statusManifestNote = 'The Run #75 candidate and production checkout do not include the separately published status manifest; the localhost audit supplies 204 No Content, and the normal app reports status unavailable. This response is independent of Bus assessment data.';
 report.readiness = report.failures.length ? 'NOT_READY_FOR_MANUAL_RE-ACCEPTANCE' : 'READY_FOR_TECHNICAL_DIRECTOR_REVIEW_BEFORE_MANUAL_RE-ACCEPTANCE';
+report.candidateRoot = 'immutable Run #75 candidate data root';
+report.runtimeIdentity.worktreeRoot = 'application checkout';
+report.runtimeIdentity.v2DataRoot = 'immutable Run #75 candidate data root';
+report.runtimeIdentity.tflIbusDataRoot = 'coherent Run #75 iBus fixture';
+delete report.runtimeIdentity.rootId;
+delete report.runtimeIdentity.v2RootId;
+delete report.runtimeIdentity.tflIbusRootId;
+if (report.recordedTflReplay) report.recordedTflReplay.capturePath = 'privacy-reviewed TfL replay fixture';
+if (report.runtimeIdentity.tflEvidence) report.runtimeIdentity.tflEvidence.capturePath = 'privacy-reviewed TfL replay fixture';
+if (report.liveTflCapture) report.liveTflCapture.path = 'live TfL capture path withheld';
+report.controls = Object.fromEntries(Object.entries(report.controls).map(([controlId, result]) => [controlId, {
+  status: result.status ?? result.outcome ?? 'completed',
+  acknowledgementRecorded: Boolean(result.acknowledgement),
+  wordExportVerified: Boolean(result.wordArtifact),
+  mapExportVerified: Boolean(result.standaloneMap),
+  assessedStopCount: result.assessedStopRows?.length ?? 0,
+  sourceReviewItemCount: result.sourceReviewRecordCount ?? 0,
+  technicalDetailsHidden: result.technicalDetailsHidden ?? true
+}]));
+delete report.runtimeIdentity.assessmentRuns;
 if (reportArg) {
   const destination = path.resolve(reportArg);
   await mkdir(path.dirname(destination), { recursive: true });

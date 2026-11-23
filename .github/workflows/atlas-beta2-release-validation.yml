@@ -5,20 +5,6 @@ on:
     branches: [codex/atlas-bus-beta2-release-re1-20261123]
   pull_request:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      tfl_capture_run_id:
-        description: Hosted run containing the exact recorded 135-response TfL replay JSON
-        required: true
-        type: string
-      tfl_capture_artifact_id:
-        description: Exact GitHub artifact ID for the recorded replay
-        required: true
-        type: string
-      tfl_capture_artifact_digest:
-        description: Exact artifact SHA-256 digest
-        required: true
-        type: string
 
 permissions:
   actions: read
@@ -140,55 +126,17 @@ jobs:
         run: python -m unittest discover -s tools/atlas-bus-data -p 'test_build_static_index.py' -v
       - name: Verify app/data artifact contracts and an isolated reconstruction dry run
         run: node tests/atlas/app-data-release.test.mjs
-      - name: Verify exact hosted TfL replay artifact identity
-        if: github.event_name == 'workflow_dispatch' && inputs.tfl_capture_run_id != '' && inputs.tfl_capture_artifact_id != '' && inputs.tfl_capture_artifact_digest != ''
+      - name: Verify privacy-safe 135-response TfL capture and transformation manifest
+        run: node tools/atlas-release/tfl-replay-privacy.mjs verify tests/atlas/fixtures/tfl-replay/tfl-replay-c2.json.gz tests/atlas/fixtures/tfl-replay/privacy-manifest.json
+      - name: Run required exact-head 16-control Browser/Word/A3 audit with captured TfL replay
         env:
-          GH_TOKEN: ${{ github.token }}
-          CAPTURE_RUN: ${{ inputs.tfl_capture_run_id }}
-          CAPTURE_ARTIFACT: ${{ inputs.tfl_capture_artifact_id }}
-          CAPTURE_DIGEST: ${{ inputs.tfl_capture_artifact_digest }}
+          ATLAS_TFL_REPLAY_CAPTURE: ${{ github.workspace }}/tests/atlas/fixtures/tfl-replay/tfl-replay-c2.json.gz
           ATLAS_C4_TRACE_OPERATOR_STAGES: '1'
           ATLAS_AUDIT_APP_ROOT: ${{ github.workspace }}
           ATLAS_AUDIT_APP_BUILD: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          [[ "$CAPTURE_RUN" =~ ^[0-9]+$ && "$CAPTURE_ARTIFACT" =~ ^[0-9]+$ && "$CAPTURE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$CAPTURE_ARTIFACT" > "$RUNNER_TEMP/tfl-artifact.json"
-          python - "$RUNNER_TEMP/tfl-artifact.json" <<'PY'
-          import json,os,sys
-          a=json.load(open(sys.argv[1])); w=a.get('workflow_run') or {}
-          if a.get('id')!=int(os.environ['CAPTURE_ARTIFACT']) or a.get('digest')!=os.environ['CAPTURE_DIGEST'] or a.get('expired') is not False or w.get('id')!=int(os.environ['CAPTURE_RUN']): raise SystemExit('TfL capture artifact identity mismatch.')
-          PY
-      - uses: actions/download-artifact@v4
-        if: github.event_name == 'workflow_dispatch' && inputs.tfl_capture_run_id != '' && inputs.tfl_capture_artifact_id != '' && inputs.tfl_capture_artifact_digest != ''
-        with:
-          artifact-ids: ${{ inputs.tfl_capture_artifact_id }}
-          run-id: ${{ inputs.tfl_capture_run_id }}
-          repository: joerfreeman02/transport-planner-toolkit
-          github-token: ${{ github.token }}
-          path: restored-tfl
-      - name: Run the immutable 16-control Browser/Word/A3 audit with exact captured TfL replay
-        if: github.event_name == 'workflow_dispatch' && inputs.tfl_capture_run_id != '' && inputs.tfl_capture_artifact_id != '' && inputs.tfl_capture_artifact_digest != ''
-        env:
-          ATLAS_C4_TRACE_OPERATOR_STAGES: '1'
-          ATLAS_AUDIT_APP_ROOT: ${{ github.workspace }}
-          ATLAS_AUDIT_APP_BUILD: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: |
-          mapfile -t FILES < <(find restored-tfl -type f -name '*.json' -print)
-          test "${#FILES[@]}" -eq 1
-          python - "${FILES[0]}" <<'PY'
-          import json,sys
-          capture=json.load(open(sys.argv[1])); responses=capture.get('responses') or capture.get('requests') or []
-          if len(responses)!=135: raise SystemExit(f'Expected 135 exact captured TfL responses; received {len(responses)}.')
-          if any(not isinstance(row,dict) or 'url' not in row or 'status' not in row for row in responses): raise SystemExit('TfL replay has an invalid response entry.')
-          print('Verified exact captured TfL response count:',len(responses))
-          PY
-          export ATLAS_TFL_REPLAY_CAPTURE="${FILES[0]}"
-          node tests/atlas/s2e1-manual-product-audit.mjs "$ATLAS_CANDIDATE_ROOT" release-audit-tfl.json
-      - name: Fail closed when the hosted TfL replay is not supplied
-        if: github.event_name != 'workflow_dispatch' || inputs.tfl_capture_run_id == '' || inputs.tfl_capture_artifact_id == '' || inputs.tfl_capture_artifact_digest == ''
-        run: |
-          echo 'Hosted 135-response TfL replay is NOT EXECUTED on this push/PR event. Exact replay evidence is required for a complete release-validation result.'
-          exit 1
+        run: node tests/atlas/s2e1-manual-product-audit.mjs "$ATLAS_CANDIDATE_ROOT" release-audit-tfl.json
+      - name: Verify audit report completeness and privacy redaction
+        run: node tools/atlas-release/tfl-replay-privacy.mjs verify-audit release-audit-tfl.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

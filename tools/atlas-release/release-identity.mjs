@@ -27,14 +27,15 @@ export function createReleaseIdentity({ applicationSha, version, build, dataSour
     || (version === '2.0.0-beta.1' && build === 'ATLAS-2.0.0-beta.1-20261025');
   if (!supportedBuild) throw new Error('Version/build is outside the known Beta.1 rollback and proposed Beta.2 identities.');
   if (dataSources?.schema !== 'atlas-data-sources-v2') throw new Error('A published atlas-data-sources-v2 configuration is required.');
-  if (!dataSources.publicationVersion || !dataSources.datasets?.bus?.baseUrl || !(dataSources.datasets?.tnds?.activeRoots?.length || dataSources.datasets?.tnds?.roots?.length)) throw new Error('Published Bus and TNDS identities are incomplete.');
+  if (!dataSources.publicationVersion || !dataStatus || !dataSources.datasets?.bus?.baseUrl || !(dataSources.datasets?.tnds?.activeRoots?.length || dataSources.datasets?.tnds?.roots?.length)) throw new Error('Published Bus, TNDS and data-status identities are incomplete.');
   if (!busManifest || !tndsManifests?.length || !ibusManifest || !ibusIndex) throw new Error('Bus, TNDS, iBus manifest and iBus index evidence are all required.');
   return {
     schema: 'atlas-release-identity-v1',
     application: { version, build, commitSha: applicationSha.toLowerCase() },
     data: {
       publicationVersion: dataSources.publicationVersion,
-      currentness: dataStatus?.generatedAt ?? dataStatus?.snapshotDate ?? null,
+      currentness: dataStatus?.generatedAt ?? dataStatus?.snapshotDate ?? dataStatus?.candidateGeneratedAt ?? null,
+      dataStatusSha256: sha256(normaliseJson(dataStatus)),
       dataSourcesSha256: sha256(normaliseJson(dataSources)),
       busManifestSha256: sha256(normaliseJson(busManifest)),
       tndsManifestSha256: tndsManifests.map(manifest => sha256(normaliseJson(manifest))).sort(),
@@ -49,13 +50,13 @@ export function assertApplicationPinned(previous, next) {
   for (const key of ['version', 'build', 'commitSha']) {
     if (previous.application?.[key] !== next.application?.[key]) throw new Error(`Data-refresh would replace approved application ${key}.`);
   }
-  if (!next.data?.publicationVersion || !next.data?.dataSourcesSha256 || !next.data?.busManifestSha256 || !next.data?.tndsManifestSha256?.length || !next.data?.ibusManifestSha256 || !next.data?.ibusIndexSha256) throw new Error('Data-refresh publication identity is incomplete.');
+  if (!next.data?.publicationVersion || !next.data?.dataStatusSha256 || !next.data?.dataSourcesSha256 || !next.data?.busManifestSha256 || !next.data?.tndsManifestSha256?.length || !next.data?.ibusManifestSha256 || !next.data?.ibusIndexSha256) throw new Error('Data-refresh publication identity is incomplete.');
   return true;
 }
 
 export function assertAppOnlyPreservesData(previous, next) {
   if (previous?.schema !== 'atlas-release-identity-v1' || next?.schema !== 'atlas-release-identity-v1') throw new Error('Release identity schema mismatch.');
-  for (const key of ['publicationVersion', 'currentness', 'dataSourcesSha256', 'busManifestSha256', 'ibusManifestSha256', 'ibusIndexSha256']) {
+  for (const key of ['publicationVersion', 'currentness', 'dataStatusSha256', 'dataSourcesSha256', 'busManifestSha256', 'ibusManifestSha256', 'ibusIndexSha256']) {
     if (previous.data?.[key] !== next.data?.[key]) throw new Error(`Application-only release would change approved data ${key}.`);
   }
   if (JSON.stringify(previous.data?.tndsManifestSha256) !== JSON.stringify(next.data?.tndsManifestSha256)) throw new Error('Application-only release would change approved TNDS manifest identities.');

@@ -1103,7 +1103,8 @@ jobs:
           if data.get('publicationVersion')!=os.environ['EXPECTED_PUBLICATION']: raise SystemExit('Live data publication version differs from the assembled artifact.')
           def digest(value): return hashlib.sha256((json.dumps(value,indent=2)+'\n').encode()).hexdigest()
           if digest(config)!=data.get('dataSourcesSha256'): raise SystemExit('Live data-source config differs from the published identity.')
-          if status.get('generatedAt')!=data.get('currentness') and status.get('snapshotDate')!=data.get('currentness'): raise SystemExit('Live data currentness differs from the published identity.')
+          if digest(status)!=data.get('dataStatusSha256'): raise SystemExit('Live data-status manifest differs from the published identity.')
+          if (status.get('generatedAt') or status.get('snapshotDate') or status.get('candidateGeneratedAt'))!=data.get('currentness'): raise SystemExit('Live data currentness differs from the published identity.')
           base='https://joerfreeman02.github.io/transport-planner-toolkit/atlas/'; cfgbase=base+'config/'
           def get_json(url):
             with urllib.request.urlopen(url,timeout=45) as response: return json.loads(response.read())

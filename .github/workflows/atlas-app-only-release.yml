@@ -306,15 +306,18 @@ jobs:
           for n in $(seq 1 30); do curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/config/atlas-release-identity.json' -o "$RUNNER_TEMP/release-identity.json" && break; sleep 10; done
           curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/config/atlas-data-sources.json' -o "$RUNNER_TEMP/live-config.json"
           curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/config/atlas-release.json' -o "$RUNNER_TEMP/live-release.json"
+          curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/data/status/manifest.json' -o "$RUNNER_TEMP/live-status.json"
           curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/data/tfl-ibus/manifest.json' -o "$RUNNER_TEMP/live-ibus-manifest.json"
-          python - "$RUNNER_TEMP/release-identity.json" "$RUNNER_TEMP/live-config.json" "$RUNNER_TEMP/live-ibus-manifest.json" "$RUNNER_TEMP/live-release.json" <<'PY'
+          python - "$RUNNER_TEMP/release-identity.json" "$RUNNER_TEMP/live-config.json" "$RUNNER_TEMP/live-status.json" "$RUNNER_TEMP/live-ibus-manifest.json" "$RUNNER_TEMP/live-release.json" <<'PY'
           import hashlib,json,os,sys,urllib.parse,urllib.request
-          identity=json.load(open(sys.argv[1])); config=json.load(open(sys.argv[2])); ibus=json.load(open(sys.argv[3])); release=json.load(open(sys.argv[4]))
+          identity=json.load(open(sys.argv[1])); config=json.load(open(sys.argv[2])); status=json.load(open(sys.argv[3])); ibus=json.load(open(sys.argv[4])); release=json.load(open(sys.argv[5]))
           app=identity.get('application') or {}; data=identity.get('data') or {}
           if app.get('commitSha')!=os.environ['EXPECTED_SHA'] or app.get('build')!=os.environ['EXPECTED_BUILD'] or app.get('version')!='2.0.0-beta.2': raise SystemExit('Published application identity differs from the authorized candidate.')
           if release.get('version')!=app['version'] or release.get('build')!=app['build']: raise SystemExit('Published About/runtime version metadata differs from the release identity.')
           def digest(value): return hashlib.sha256((json.dumps(value,indent=2)+'\n').encode()).hexdigest()
           if digest(config)!=data.get('dataSourcesSha256'): raise SystemExit('Published data-source configuration changed during the app-only release.')
+          if digest(status)!=data.get('dataStatusSha256'): raise SystemExit('Published data-status manifest changed during the app-only release.')
+          if (status.get('generatedAt') or status.get('snapshotDate') or status.get('candidateGeneratedAt'))!=data.get('currentness'): raise SystemExit('Published data currentness changed during the app-only release.')
           base='https://joerfreeman02.github.io/transport-planner-toolkit/atlas/'
           def get_json(url):
             with urllib.request.urlopen(url,timeout=45) as r: return json.loads(r.read())

@@ -41,7 +41,8 @@ export function dataPublicationIdentity({ dataSources, dataStatus, busManifestSh
   if (!dataSources?.publicationVersion || !dataStatus || !busManifestSha256 || !tndsManifestSha256?.length || !ibusManifestSha256 || !ibusIndexSha256) throw new Error('Approved live-data identity is incomplete.');
   return {
     publicationVersion: dataSources.publicationVersion,
-    currentness: dataStatus.generatedAt ?? dataStatus.snapshotDate ?? null,
+    currentness: dataStatus.generatedAt ?? dataStatus.snapshotDate ?? dataStatus.candidateGeneratedAt ?? null,
+    dataStatusSha256: jsonHash(dataStatus),
     dataSourcesSha256: jsonHash(dataSources),
     busManifestSha256,
     tndsManifestSha256: [...tndsManifestSha256].sort(),

@@ -1,0 +1,75 @@
+{
+  "schema": "atlas-tfl-replay-privacy-manifest-v1",
+  "source": {
+    "description": "Retained Product Owner headless acceptance capture; original local source path intentionally withheld.",
+    "originalSha256": "9882a2057578b2d659a8522f90753ebedabcc012fd72c60e4547a82223ea4e7b",
+    "originalSchema": "atlas-tfl-live-response-capture-v1",
+    "responseCount": 135,
+    "candidateRun": "39430415441",
+    "candidateArtifactId": "12275615359",
+    "candidateArtifactSha256": "5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471",
+    "candidateProducerSha": "151199cc914c235870f444d26b03c2309edbd035",
+    "candidateManifestDigests": {
+      "bus": "sha256:1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f",
+      "tnds": "sha256:2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f"
+    }
+  },
+  "result": {
+    "file": "tfl-replay-c2.json.gz",
+    "gzipSha256": "a08322168fc8651c37ba3b412ef315513a707ba02c142c28f11f145df433c1f0",
+    "jsonSha256": "7c61eba7eabc12112138e3a76c5637e7bf9829315a4d18206f210a6b278a0a7d",
+    "responseCount": 135,
+    "responseStatusCounts": {
+      "200": 133,
+      "400": 2
+    },
+    "pseudonymizedCoordinateRequestCount": 2,
+    "orderedStatusAndBodyDigest": "95c4816384110f4ce6e0aea06ed4d1c7062592d2b6588fdbde5bcdac3920fcd3",
+    "orderedCanonicalRequestKeysDigest": "fea78682d682dd9bb86c70e9acfde8034f9fe62d0dc6d26be9eef05a8d102381",
+    "totalResponseBodyBytes": 21086055,
+    "bodyContentChanged": false
+  },
+  "transformations": [
+    {
+      "field": "candidateRoot",
+      "action": "removed; contained a workstation filesystem path"
+    },
+    {
+      "field": "sourceEnvironment",
+      "action": "replaced with a generic capture provenance description"
+    },
+    {
+      "field": "responses[].control",
+      "action": "removed; replay matching does not use control labels"
+    },
+    {
+      "field": "responses[].url query lat/lon",
+      "action": "replaced with 0 in 2 coordinate-bearing requests; replay matches by canonical method, path and non-coordinate query parameters"
+    },
+    {
+      "field": "responses[].headers.date",
+      "action": "removed; preserved content-type when present"
+    },
+    {
+      "field": "responses[].status",
+      "action": "preserved exactly and in original response order"
+    },
+    {
+      "field": "responses[].bodyBase64",
+      "action": "preserved byte-for-byte and in original response order"
+    }
+  ],
+  "privacyReview": {
+    "sourceCapturePathWithheld": true,
+    "requestCoordinateValuesPseudonymized": true,
+    "responseBodiesAreCapturedPublicTfLResponses": true,
+    "automatedScan": {
+      "emailMatches": 0,
+      "postcodeMatches": 0,
+      "credentialMatches": 0,
+      "workstationPathMatches": 0,
+      "potentiallyPersonalBodyFieldNames": 0
+    },
+    "falsePositiveReview": "Telephone-shaped regex matches were inspected by JSON field path and were NaPTAN/stop identifiers, not telephone fields."
+  }
+}

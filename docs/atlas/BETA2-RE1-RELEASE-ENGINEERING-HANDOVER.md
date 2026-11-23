@@ -89,6 +89,55 @@ Stylesheet order in `atlas/index.html` remains EAS theme, Leaflet, `atlas-shell.
 
 No tooling was installed or reconfigured.
 
+## RE-1-C1 correction — 23 November 2026
+
+This addendum records the final release-engineering correction on top of the draft PR. It does not accept Beta.2 or authorize a merge, tag, publication, updater run, or Pages deployment.
+
+### Frozen regression source reconciliation
+
+| Source | Identity/evidence | Disposition |
+|---|---|---|
+| Original Run #75 producer | Run `39430415441`, artifact `12275615359`, producer SHA `151199cc914c235870f444d26b03c2309edbd035`, ZIP digest `sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471` | Immutable parent preserved. Its original artifact identity is never relabelled. |
+| Run #75 Bus/TNDS | Raw manifests `1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f` and `2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f` | Both match the original archive and remain the regression parent roots. |
+| Run #75 mounted iBus | Manifest `14b416823cb648c869750db90939bac33a027f2f91485322f08c2d9c4394914f`; mounted index `5efcf64bfe1e158ecac52a8df8609984600b90ddd9b1b25b5112de7f6e24ebc1` | Mixed mount; rejected as a regression pair. CI checks these exact wrong bytes before using the separately identified fixture. |
+| Retained historical iBus pair | C1 branch `codex/atlas-bus-tfl-ibus-calendar-stability`; source commit `649de0dfa3aff7250a37231dedbf201904ace038` added the pair; clean branch closeout `737f26a108deba5f6fb22dac00bce02af4f87e6b`. Commit Git blobs: manifest `75de0b549b1c65ccd1a34b2bdad6b9bdb3c2be0b`, index `90e88205a5b37f20cc82eddcb98b49ebedb32929`. The retained Windows source checkout has `core.autocrlf=true`; its clean checkout materializes JSON as CRLF. Those exact raw working-tree bytes hash to manifest `3090e1da6da21878725d0b30343757bd32c65fcdd56d9fdecb6f6ae6c75b5d53` and index `39b0eae384ec7a44115f898b940b3f35213577195706d38a82fa97707d2610de`, which is the manifest-declared pair. | The exact clean Windows checkout bytes were reconstructed into `tests/atlas/fixtures/run75-ibus-20261009/`; `.gitattributes` uses `-text` so hosted Linux checkout preserves those bytes. The fixture does not claim LF-normalized Git blob bytes as dataset identity. Manifest declaration, index bytes, base version `20261009`, and validity interval 8 October–5 November 2026 agree. Six patterns cover service line 313. No data was downloaded or refreshed. |
+| Current public iBus capture (read-only, 23 Nov) | Manifest `fe13f40eff9c260c2a426017ff2166539641d261a3332f0e752132ec2f1f432f`; index `5efcf64bfe1e158ecac52a8df8609984600b90ddd9b1b25b5112de7f6e24ebc1` | A distinct live publication. Raw HTTP bytes were hashed during this correction: manifest declaration equals the index SHA; manifest/index base version and validity dates agree. The live pair is coherent and is not treated as corrupt merely because it differs from frozen Run #75. |
+
+`tests/atlas/fixtures/run75-ibus-20261009/provenance.json` binds the supplemental fixture to the original Run #75 artifact identity, the historical Git commit/blob IDs, the clean Windows checkout and its `core.autocrlf=true` materialization. The CI workflow is configured to upload this small iBus fixture as a new immutable GitHub Actions artifact and record its run, artifact ID, name, digest, and source SHA. That artifact is a supplemental overlay; it does not replace or alter the 2.5 GB Run #75 archive. The composite audit keeps the original Bus/TNDS parent and overlays only the byte-verified iBus pair after original checkpoint validation.
+
+### Corrected release boundary
+
+- `tools/atlas-release/reviewed-beta2-files.json` is an exact reviewed-path manifest anchored to accepted main `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`. It includes the approved workflow/release-engineering files and rejects any unlisted path; directory-prefix allowlisting is removed.
+- App-only release validation installs dependencies, runs deterministic and Browser/Word/A3 tests, and assembles the artifact from the same exact `application_commit_sha` checkout. The assembled release identity is checked against that SHA before Pages artifact upload.
+- Frozen Run #75 fixture identity is independent of live data approval. Current live configuration, status, Bus/TNDS/iBus manifests and index are internally verified, then represented by a separate normalized identity digest. Dispatch requires an explicit `approved_live_data_identity_sha256`; app-only assembly rechecks that digest against the exact files copied into the candidate. A later approved data snapshot is therefore supported without weakening integrity checks or forcing equality to the older test fixture.
+- Proposed [ADR-017](../adr/ADR-017-atlas-app-and-data-release-boundary.md) records this two-contract release boundary and awaits Technical Director approval. ADR-016 is unchanged.
+- The exact release-validation workflow checks out the PR head SHA, not GitHub's synthetic pull-request merge commit. The optional TfL replay path is no longer optional for a complete gate: exact artifact ID/run/digest and all 135 entries are required, otherwise the workflow ends failed with the replay marked not executed. The 16-control browser audit only runs when that capture is supplied, preventing a fallback to live TfL acquisition.
+
+### Local verification and remaining hosted gates
+
+| Check | RE-1-C1 result |
+|---|---|
+| Recovered iBus raw-byte/internal consistency | Passed: exact `3090e1da…` manifest and `39b0eae…` index; mixed `14b416…`/`5efcf6…` pair rejected by regression test. |
+| Focused release-boundary test | Passed: coherent/mixed iBus, exact allowlist acceptance/rejection, approved later live identity, unapproved identity rejection. |
+| App/data assembly and workflow contract tests | Passed after the C1 changes. |
+| Full deterministic Node suite | Passed locally against preserved Run #75 Bus/TNDS roots and the recovered coherent iBus pair (`ATLAS Alpha.15 deterministic suite passed`). Local temporary outputs were directed into this worktree. |
+| Python static-index suite | Not executed locally: only the Windows Store `python.exe` shim is available and fails to start. Hosted Ubuntu Python remains required. |
+| Full 16-control Browser/Word/A3 plus captured TfL replay | Not executed in this correction. The retained exact 135-response file matches content digest `9882a2057578b2d659a8522f90753ebedabcc012fd72c60e4547a82223ea4e7b`, but includes assessment-coordinate request URLs and a workstation-specific candidate path in capture metadata. It was not published to this public repository's workflow artifacts. A privacy-safe exact fixture or authorized private artifact channel is required; no replacement responses were generated. |
+| App-only artifact rehearsal | Workflow corrected and deterministic fixture dry run remains passed. The final current-live-data rehearsal is incomplete until a live identity digest is explicitly approved and the exact application SHA is selected. No Pages upload/deploy occurred. |
+| Data-refresh downgrade protection | Prior code/contract fixtures remain; no national updater or publication was run. End-to-end post-patch rehearsal remains incomplete. |
+| Beta.1 rollback | Not verified end to end. Accepted-main reconstruction digest `0bc19576f4d42adc162808deb205758f90bca68e4f694e25de34f7ede3cecc0a` is not a deployed package proof. Live Beta.1 app commit and complete historical package/payload restoration remain unproven. |
+| Branch/environment policy | Public repository rulesets query returned `[]`; the GitHub App cannot read main branch protection (403 `Resource not accessible by integration`) or Pages environment reviewer settings. Do not assume protection; a repository administrator must verify these manually before release. |
+
+### Hard-gate disposition
+
+This correction resolves the iBus fixture, bounded path allowlist, exact selected-checkout test/assembly, and frozen-vs-live identity design defects. It does **not** produce full hosted exact-SHA acceptance because the exact TfL capture cannot safely be placed in public artifacts. Hosted Python, the 16-control Browser/Word/A3 audit, and 135-response replay therefore remain incomplete.
+
+The legacy Beta.1 application SHA is now established from its authoritative publication record, rather than inferred from the public version string: successful Pages workflow run [40340530395](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/40340530395) ran from accepted main `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`; its frozen publisher checked out and verified `application/` at `108d898221f84c78c061db4f81335dcd911d6a0e`, then assembled `pages-site/` by copying that checkout with the separately verified Run #75 Bus/TNDS and status roots. The deploy job succeeded and named Pages artifact `12662622302`, Pages build version `8f1d8ae…`; `verify-live` confirmed Beta.1 version/build and the data publication version `40340530395-108d898…`. The publisher's later temporary edits were runner-only, after the Pages tree was assembled; they did not change the assembled app. This establishes the deployed application source from workflow/run evidence even though the public release JSON lacks a commit field.
+
+The Pages artifact was not retained in the Actions artifact collection (`40340530395` lists no downloadable Actions artifacts), so the exact deployed ZIP/package bytes cannot be restored. A reproducible recovery baseline is therefore: application source `108d898…`; the exact published data configuration/publication version `40340530395-108d898…`; and read-only fetched live Bus/TNDS/iBus/status roots with their individually verified identities. Rebuild and inspect this baseline in isolation, compare runtime assets and references, then obtain explicit Technical Director and Product Owner approval before any production restoration. Existing accepted-main reconstruction digest `0bc19576…` is not a substitute for that run-specific package rehearsal. End-to-end rollback remains incomplete and blocks release readiness.
+
+The branch must remain a draft; Technical Director review can assess the correction, but Product Owner release approval is **not ready** and production remains unchanged.
+
 ## Next work and acceptance
 
 Next independent work is the authorized automatic-updater/data-lineage workstream only after Beta.2 is accepted and deployed. It must preserve the app pin and rehearse Run #42 lineage on its intended producer branch. CSS modularisation is a separate future sprint after the Beta.2 application is released and frozen.

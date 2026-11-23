@@ -9,15 +9,15 @@ on:
     inputs:
       tfl_capture_run_id:
         description: Hosted run containing the exact recorded 135-response TfL replay JSON
-        required: false
+        required: true
         type: string
       tfl_capture_artifact_id:
         description: Exact GitHub artifact ID for the recorded replay
-        required: false
+        required: true
         type: string
       tfl_capture_artifact_digest:
         description: Exact artifact SHA-256 digest
-        required: false
+        required: true
         type: string
 
 permissions:
@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -54,8 +54,10 @@ jobs:
       - name: Confirm the exact source commit and immutable Run #75 artifact
         env:
           GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          echo "Validated application and test source SHA: $SOURCE_SHA"
           gh api repos/$GITHUB_REPOSITORY/actions/artifacts/12275615359 > "$RUNNER_TEMP/run75.json"
           python - "$RUNNER_TEMP/run75.json" <<'PY'
           import json,sys
@@ -86,25 +88,59 @@ jobs:
           }
           check_sha256 "$CANDIDATE/atlas/data/bus/manifest.json" '1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f'
           check_sha256 "$CANDIDATE/atlas/data/bus-tnds/manifest.json" '2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f'
-          check_sha256 "$CANDIDATE/atlas/data/tfl-ibus/manifest.json" '3090e1da6da21878725d0b30343757bd32c65fcdd56d9fdecb6f6ae6c75b5d53'
-          check_sha256 "$CANDIDATE/atlas/data/tfl-ibus/20261009/operator-index.json" '39b0eae384ec7a44115f898b940b3f35213577195706d38a82fa97707d2610de'
+          check_sha256 "$CANDIDATE/atlas/data/tfl-ibus/manifest.json" '14b416823cb648c869750db90939bac33a027f2f91485322f08c2d9c4394914f'
+          check_sha256 "$CANDIDATE/atlas/data/tfl-ibus/20261009/operator-index.json" '5efcf64bfe1e158ecac52a8df8609984600b90ddd9b1b25b5112de7f6e24ebc1'
+          echo 'Original Run #75 artifact identity retained; its internally mixed iBus mount is verified then excluded from regression execution.'
+          node --input-type=module - "$CANDIDATE/atlas/data/tfl-ibus" <<'JS'
+          import fs from 'node:fs/promises';
+          import path from 'node:path';
+          import { verifyIbusFixture } from './tools/atlas-release/release-boundary.mjs';
+          const source=path.resolve('tests/atlas/fixtures/run75-ibus-20261009');
+          const target=process.argv[2];
+          const result=await verifyIbusFixture(source,{manifestSha256:'3090e1da6da21878725d0b30343757bd32c65fcdd56d9fdecb6f6ae6c75b5d53',indexSha256:'39b0eae384ec7a44115f898b940b3f35213577195706d38a82fa97707d2610de'});
+          const provenance=JSON.parse(await fs.readFile(path.join(source,'provenance.json'),'utf8'));
+          if(provenance.identity.manifestSha256!==result.manifestSha256||provenance.identity.indexSha256!==result.indexSha256) throw new Error('Fixture provenance does not match exact source bytes.');
+          await fs.rm(target,{recursive:true,force:true});
+          await fs.mkdir(path.join(target,'20261009'),{recursive:true});
+          await fs.copyFile(path.join(source,'manifest.json'),path.join(target,'manifest.json'));
+          await fs.copyFile(path.join(source,'20261009/operator-index.json'),path.join(target,'20261009/operator-index.json'));
+          console.log(`Coherent iBus regression pair restored from ${provenance.overlaySource.commit}; ${result.manifestSha256} / ${result.indexSha256}`);
+          JS
+          node --input-type=module -e "import {verifyIbusFixture} from './tools/atlas-release/release-boundary.mjs'; const r=await verifyIbusFixture(process.argv[1],{manifestSha256:'3090e1da6da21878725d0b30343757bd32c65fcdd56d9fdecb6f6ae6c75b5d53',indexSha256:'39b0eae384ec7a44115f898b940b3f35213577195706d38a82fa97707d2610de'}); console.log('Overlay verified',r.manifestSha256,r.indexSha256)" "$CANDIDATE/atlas/data/tfl-ibus"
           echo "ATLAS_TEST_BUS_DATA_ROOT=$CANDIDATE/atlas/data/bus" >> "$GITHUB_ENV"
           echo "ATLAS_TEST_BUS_TNDS_DATA_ROOT=$CANDIDATE/atlas/data/bus-tnds" >> "$GITHUB_ENV"
           echo "ATLAS_TEST_TFL_IBUS_ROOT=$CANDIDATE/atlas/data/tfl-ibus" >> "$GITHUB_ENV"
           echo "ATLAS_CANDIDATE_ROOT=$CANDIDATE" >> "$GITHUB_ENV"
+      - name: Publish immutable coherent iBus regression fixture
+        id: fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-run75-ibus-fixture-${{ github.event.pull_request.head.sha || github.sha }}
+          path: tests/atlas/fixtures/run75-ibus-20261009/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Record hosted fixture identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FIXTURE_ARTIFACT_ID: ${{ steps.fixture.outputs.artifact-id }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test -n "$FIXTURE_ARTIFACT_ID"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$FIXTURE_ARTIFACT_ID" > "$RUNNER_TEMP/ibus-fixture-artifact.json"
+          python - "$RUNNER_TEMP/ibus-fixture-artifact.json" <<'PY'
+          import json,os,sys
+          a=json.load(open(sys.argv[1])); w=a.get('workflow_run') or {}
+          if a.get('name')!='atlas-run75-ibus-fixture-'+os.environ['SOURCE_SHA'] or a.get('expired') is not False: raise SystemExit('Hosted iBus fixture metadata mismatch.')
+          if w.get('head_sha')!=os.environ['SOURCE_SHA']: raise SystemExit('Hosted iBus fixture producer SHA mismatch.')
+          print('Hosted iBus fixture:',a.get('id'),a.get('name'),a.get('digest'),'producer run',w.get('id'),'source SHA',w.get('head_sha'))
+          PY
       - name: Run full deterministic ATLAS Node suite
         run: pnpm test:atlas
       - name: Run required Python static-index suite
         run: python -m unittest discover -s tools/atlas-bus-data -p 'test_build_static_index.py' -v
       - name: Verify app/data artifact contracts and an isolated reconstruction dry run
         run: node tests/atlas/app-data-release.test.mjs
-      - name: Run immutable Run #75 16-control Browser/Word/A3 acceptance audit
-        env:
-          ATLAS_AUDIT_APP_ROOT: ${{ github.workspace }}
-          ATLAS_AUDIT_APP_BUILD: ${{ github.sha }}
-          ATLAS_C4_TRACE_OPERATOR_STAGES: '1'
-        run: node tests/atlas/s2e1-manual-product-audit.mjs "$ATLAS_CANDIDATE_ROOT" release-audit.json
-      - name: Run the captured 135-response TfL replay when an exact artifact was supplied
+      - name: Verify exact hosted TfL replay artifact identity
         if: github.event_name == 'workflow_dispatch' && inputs.tfl_capture_run_id != '' && inputs.tfl_capture_artifact_id != '' && inputs.tfl_capture_artifact_digest != ''
         env:
           GH_TOKEN: ${{ github.token }}
@@ -113,7 +149,7 @@ jobs:
           CAPTURE_DIGEST: ${{ inputs.tfl_capture_artifact_digest }}
           ATLAS_C4_TRACE_OPERATOR_STAGES: '1'
           ATLAS_AUDIT_APP_ROOT: ${{ github.workspace }}
-          ATLAS_AUDIT_APP_BUILD: ${{ github.sha }}
+          ATLAS_AUDIT_APP_BUILD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           [[ "$CAPTURE_RUN" =~ ^[0-9]+$ && "$CAPTURE_ARTIFACT" =~ ^[0-9]+$ && "$CAPTURE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
           gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$CAPTURE_ARTIFACT" > "$RUNNER_TEMP/tfl-artifact.json"
@@ -122,14 +158,37 @@ jobs:
           a=json.load(open(sys.argv[1])); w=a.get('workflow_run') or {}
           if a.get('id')!=int(os.environ['CAPTURE_ARTIFACT']) or a.get('digest')!=os.environ['CAPTURE_DIGEST'] or a.get('expired') is not False or w.get('id')!=int(os.environ['CAPTURE_RUN']): raise SystemExit('TfL capture artifact identity mismatch.')
           PY
-          gh run download "$CAPTURE_RUN" -n atlas-tfl-replay-capture -D restored-tfl || true
+      - uses: actions/download-artifact@v4
+        if: github.event_name == 'workflow_dispatch' && inputs.tfl_capture_run_id != '' && inputs.tfl_capture_artifact_id != '' && inputs.tfl_capture_artifact_digest != ''
+        with:
+          artifact-ids: ${{ inputs.tfl_capture_artifact_id }}
+          run-id: ${{ inputs.tfl_capture_run_id }}
+          repository: joerfreeman02/transport-planner-toolkit
+          github-token: ${{ github.token }}
+          path: restored-tfl
+      - name: Run the immutable 16-control Browser/Word/A3 audit with exact captured TfL replay
+        if: github.event_name == 'workflow_dispatch' && inputs.tfl_capture_run_id != '' && inputs.tfl_capture_artifact_id != '' && inputs.tfl_capture_artifact_digest != ''
+        env:
+          ATLAS_C4_TRACE_OPERATOR_STAGES: '1'
+          ATLAS_AUDIT_APP_ROOT: ${{ github.workspace }}
+          ATLAS_AUDIT_APP_BUILD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
           mapfile -t FILES < <(find restored-tfl -type f -name '*.json' -print)
           test "${#FILES[@]}" -eq 1
+          python - "${FILES[0]}" <<'PY'
+          import json,sys
+          capture=json.load(open(sys.argv[1])); responses=capture.get('responses') or capture.get('requests') or []
+          if len(responses)!=135: raise SystemExit(f'Expected 135 exact captured TfL responses; received {len(responses)}.')
+          if any(not isinstance(row,dict) or 'url' not in row or 'status' not in row for row in responses): raise SystemExit('TfL replay has an invalid response entry.')
+          print('Verified exact captured TfL response count:',len(responses))
+          PY
           export ATLAS_TFL_REPLAY_CAPTURE="${FILES[0]}"
           node tests/atlas/s2e1-manual-product-audit.mjs "$ATLAS_CANDIDATE_ROOT" release-audit-tfl.json
-      - name: State the TfL replay disposition explicitly when no capture artifact was supplied
-        if: github.event_name != 'workflow_dispatch' || inputs.tfl_capture_artifact_id == ''
-        run: echo '::warning::Recorded 135-response TfL replay was NOT EXECUTED; no exact hosted capture artifact identity was supplied.'
+      - name: Fail closed when the hosted TfL replay is not supplied
+        if: github.event_name != 'workflow_dispatch' || inputs.tfl_capture_run_id == '' || inputs.tfl_capture_artifact_id == '' || inputs.tfl_capture_artifact_digest == ''
+        run: |
+          echo 'Hosted 135-response TfL replay is NOT EXECUTED on this push/PR event. Exact replay evidence is required for a complete release-validation result.'
+          exit 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1,10 +1,12 @@
 # ATLAS Bus Beta.2 RE-1 — release engineering handover
 
 **Date:** 23 November 2026
-**Status:** Engineering implementation in a draft review branch; not merged, accepted, published or deployed
+**Status:** Engineering implementation pushed for draft PR review; not merged, accepted, published or deployed
 **Application candidate:** `d1a478d584dc402df4d6d225a2fa797959f657d5`
 **Accepted pre-release `main`:** `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`
 **Proposed branch:** `codex/atlas-bus-beta2-release-re1-20261123`
+**Current RE-1 head:** `821b2ebbb36e139e4a9b49d9725bb3053244fbdb`
+**Draft PR:** [#56](https://github.com/joerfreeman02/transport-planner-toolkit/pull/56)
 
 ## Outcome and release gate
 
@@ -14,7 +16,7 @@ This is implementation, isolated artifact reconstruction and local acceptance ve
 
 ## Branch and change scope
 
-The starting candidate checkout was clean at `d1a478d584dc402df4d6d225a2fa797959f657d5`. Local `main` and `origin/main` both resolved to `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`. The RE-1 branch was created at the candidate commit. Existing candidate, Beta.1, recovery and regression worktrees were preserved. The branch has not been pushed or merged as of this handover.
+The starting candidate checkout was clean at `d1a478d584dc402df4d6d225a2fa797959f657d5`. Local `main` and `origin/main` both resolved to `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`. Existing candidate, Beta.1, recovery and regression worktrees were preserved. The RE-1 branch is pushed through `821b2ebbb36e139e4a9b49d9725bb3053244fbdb`; commits are `1855b089a19d3cf47cc0ea33622a3523e21c676d` (implementation), `ba5f22d146c95c950c869c7fd367ac0251ef65aa` (runner pin) and `821b2ebbb36e139e4a9b49d9725bb3053244fbdb` (hash-mismatch diagnostics). PR #56 remains draft. Neither main nor production was changed.
 
 Changes are limited to release identities, app/data assembly and workflow controls, tests and handover/ADR documentation. No Bus service matching, route grouping, operator choice, boarding, frequency, calendars, circular routes, stop selection, Sources & Checks, Word/A3 content, or Run #75 data files were changed. No CSS/HTML shell refactor was made. The app's committed `2.0.0-beta.1` release record remains intact; Beta.2 identity is generated only in an explicitly authorized deployment artifact.
 
@@ -47,7 +49,7 @@ On 23 November 2026, a read-only fetch of public Pages returned the current data
 | JavaScript syntax checks for release-identity and refresh identity scripts | Passed |
 | `git diff --check` | Passed |
 | Full deterministic Node suite | Passed (`pnpm test:atlas`) against the immutable Run #75 candidate roots from the preserved `atlas-beta2-final-verification` worktree, with test temp output confined to this RE-1 worktree. The headless browser harness required terminal-only localhost access. |
-| Python static-index suite | Not executed locally; only the Windows Store Python shim is present and cannot start. The first hosted run stopped before Python tests at the Chromium setup step. Hosted CI pins Python 3.11; rerun is pending after the runner image correction. |
+| Python static-index suite | Not executed locally; only the Windows Store Python shim is present and cannot start. Hosted validation has not reached the Python step. |
 | Local 16-control Browser/Word/A3 audit | Passed headlessly against immutable Run #75 roots: 16 controls, zero recorded audit failures. Report: `tmp/audit-re1/acceptance-report.json`. The missing separately published status manifest is explicitly noted; the audit supplied 204 No Content for that independent endpoint. |
 | Recorded 135-response TfL replay | Passed in the same local audit: 135 matched responses, zero misses, zero unused responses; capture SHA-256 `9882a2057578b2d659a8522f90753ebedabcc012fd72c60e4547a82223ea4e7b`. Expected captured TfL HTTP 400 evidence remained scoped in Sources & Checks. The hosted artifact ID/digest is still required for hosted release validation. |
 | Full Python preparation suite and Run #42 lineage | Not rerun. `39e142767946aa31ecf0f87544e6d7491ca90297` is not an ancestor of this candidate. The Technical Director's provisional exception is preserved; no assertion or history was changed. A checkpoint rehearsal remains required for future data-lineage work. |
@@ -55,7 +57,7 @@ On 23 November 2026, a read-only fetch of public Pages returned the current data
 | Data-refresh downgrade rehearsal | Fixture contract only; no live updater run |
 | Beta.1 rollback rehearsal | Accepted-baseline artifact reconstruction passed in isolated `tmp/beta1-rollback-live-config-dry-run/pages-artifact` from exact `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`, using the fetched live source configuration, public Bus/TNDS manifests, live iBus manifest/index and status manifest. Artifact-tree digest: `0bc19576f4d42adc162808deb205758f90bca68e4f694e25de34f7ede3cecc0a`. This proves non-production reconstruction, but rollback is **not fully verified** because the current published app has no commit identity and the rebuilt app was not deployed or exercised against all external payloads. |
 
-The exact-SHA GitHub Actions workflow ran on commit `1855b089a19d3cf47cc0ea33622a3523e21c676d` for both push and PR. Both stopped during `pnpm exec playwright install --with-deps chromium`: the moving `ubuntu-latest` image resolved to Ubuntu 26.04, which Playwright 1.58.2 does not support. The unrelated Drawing Generator PR check hit the same setup failure after all its deterministic tests passed. Browser workflows were pinned to `ubuntu-24.04`; this correction has not yet rerun on GitHub. Hosted check links: [ATLAS push run 45146376229](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45146376229), [ATLAS PR run 45146486298](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45146486298), and [Drawing Generator run 45146486278](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45146486278). Do not count steps skipped after runner setup failed as passing.
+The exact-SHA GitHub Actions workflow ran on `821b2ebbb36e139e4a9b49d9725bb3053244fbdb` in [PR run 45149612441](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45149612441). Runner setup, Chromium installation, exact source SHA, immutable Run #75 artifact metadata/digest/producer, artifact restoration and review-checkpoint provenance all passed. The strengthened hash diagnostics then failed closed: Bus and TNDS matched Run #75 (`1195f19…` and `2cc49b4…`), but the archived candidate iBus manifest was `14b416823cb648c869750db90939bac33a027f2f91485322f08c2d9c4394914f`, not the separately verified Run #75 manifest `3090e1da…`. This `14b416…` root is already documented in the hardening record as a mixed mount whose declared iBus index hash (`39b0ea…`) differs from its mounted Linux index (`5efcf6…`); this hosted attempt stopped at the manifest check, so it did not separately report the archived index's hash. The run therefore stopped before Node, Python, app/data fixture and 16-control tests; those hosted steps are skipped, not passed. The frozen expected hashes were deliberately not weakened. The current GitHub-hosted Run #75 candidate artifact cannot be accepted as a coherent iBus input. The two earlier runs [45146376229](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45146376229) and [45146486298](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45146486298) failed at Chromium setup on Ubuntu 26.04; workflows are now pinned to `ubuntu-24.04`. The existing [Drawing Generator run 45149612468](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45149612468) passed deterministic and Browser/PDF checks after that correction.
 
 ## Rollback and remaining blockers
 
@@ -63,7 +65,7 @@ The accepted pre-release source is `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`, w
 
 Additional release prerequisites:
 
-1. Run exact-SHA hosted validation on the pushed RE-1 head and review successful Node, Python static-index, Run #75 16-control Browser/Word/A3, service-parity and acknowledgement results.
+1. Produce or restore a coherent, immutable Run #75 GitHub artifact whose iBus manifest and index bytes match a verified pair, without refreshing or altering national data; then rerun exact-SHA hosted Node, Python static-index, Run #75 16-control Browser/Word/A3, service-parity and acknowledgement checks. The currently pinned Run #75 archive is internally mixed (`14b416…` manifest with `5efcf6…` index), so the hosted gate fails closed before those steps.
 2. Supply and validate a hosted immutable 135-response TfL capture artifact (producer run, artifact ID, digest, content count).
 3. Resolve the current public iBus-vs-Run #75 identity mismatch and bootstrap a verifiable live application commit identity before any updater run or Beta.2 publication.
 4. Verify the currently deployed application commit and rehearse restoration with complete external data payload availability; the accepted-baseline reconstruction alone is not end-to-end rollback proof.
@@ -91,4 +93,4 @@ No tooling was installed or reconfigured.
 
 Next independent work is the authorized automatic-updater/data-lineage workstream only after Beta.2 is accepted and deployed. It must preserve the app pin and rehearse Run #42 lineage on its intended producer branch. CSS modularisation is a separate future sprint after the Beta.2 application is released and frozen.
 
-The RE-1 branch requires Technical Director review. Product Owner release acceptance is **not ready** while hosted verification, live identity reconciliation and rollback proof are incomplete. Do not merge, tag, release, deploy, publish, refresh data or operate the updater from this handover.
+The RE-1 branch and draft PR #56 are ready for Technical Director review as an engineering proposal, with the hosted artifact inconsistency clearly recorded. Product Owner release acceptance is **not ready** while the immutable iBus artifact is unresolved, hosted validations are incomplete, live identity reconciliation is outstanding and rollback proof is incomplete. Do not merge, tag, release, deploy, publish, refresh data or operate the updater from this handover.

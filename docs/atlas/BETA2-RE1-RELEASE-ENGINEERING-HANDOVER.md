@@ -181,3 +181,45 @@ No application code in the Bus assessment path, national data, release version, 
 Next independent work is the authorized automatic-updater/data-lineage workstream only after Beta.2 is accepted and deployed. It must preserve the app pin and rehearse Run #42 lineage on its intended producer branch. CSS modularisation is a separate future sprint after the Beta.2 application is released and frozen.
 
 The RE-1 branch and draft PR #56 are ready for Technical Director review as an engineering proposal, with the hosted artifact inconsistency clearly recorded. Product Owner release acceptance is **not ready** while the immutable iBus artifact is unresolved, hosted validations are incomplete, live identity reconciliation is outstanding and rollback proof is incomplete. Do not merge, tag, release, deploy, publish, refresh data or operate the updater from this handover.
+
+## RE-1-C3 final recovery and authorization — 23 November 2026
+
+This section supersedes earlier Beta.1 rollback and payload-completeness conclusions where this newer evidence differs. It does not grant release approval.
+
+### Beta.1 own-baseline restoration rehearsal
+
+The original Pages ZIP was not retained. This is a functionally verified reconstruction, not exact historical recovery. Publisher app source: `108d898221f84c78c061db4f81335dcd911d6a0e`; reconstructed tree SHA-256: `0bc19576f4d42adc162808deb205758f90bca68e4f694e25de34f7ede3cecc0a`; historical version/build: `2.0.0-beta.1` / `ATLAS-2.0.0-beta.1-20261025`. The Beta.1 source's own `tests/atlas/run-all.mjs` passed (`ATLAS Alpha.15 deterministic suite passed`) against retained Run #75 Bus/TNDS data and the coherent frozen iBus fixture. Its headless review-browser flow passed navigation, site selection, assessment (two fixture evidence rows), and map rendering with no page errors or failed local requests. An isolated copy of the reconstructed package produced a non-empty DOCX and standalone PDF exports for normal assessment, nearest group, repeated pan/zoom, and spread-stop cases. Stop/timetable routes were deterministic fixtures; this was not a live timetable assessment. No production package was replaced.
+
+### Live-data eligibility and payload availability
+
+Candidate live-data identity: `2a0f18d4c3f2dd6aa339a2a40b6c373debf5d772f02719e0ba6d5a9639f3c17c`; not Product Owner-approved. Captured Bus and TNDS manifest bytes match the preserved Run #75 manifests. All 1,634 Bus referenced paths exist. TNDS declares 14,159 runtime shards; all 14,159 are present in the retained snapshot and match manifest-declared compressed sizes. This verifies complete path/size availability in the retained snapshot, not current public-object byte equivalence (those objects were not reacquired). The captured coherent iBus manifest/index pair has six patterns and references separately hosted schedule objects; those objects were not reacquired. Status is `diagnosticOnly:true`, `productionEligible:false`, with candidate timestamp 20 October (34 days before this review). iBus `validTo` is 5 November (18 days expired).
+
+| Decision | Conclusion |
+|---|---|
+| A. Controlled internal Beta with explicit qualifications | Defensible only for restricted internal evaluation if the Product Owner explicitly accepts the diagnostic-only snapshot, freshness limitations, and expired iBus validity. Keep warnings visible. Not professional reliance or a production-eligible release. |
+| B. Application/data incompatibility | No incompatibility was demonstrated. `productionEligible:false` remains a production gate and must not be bypassed. |
+| C. Updater/remediation first | Required before production eligibility unless a new approved publication supplies eligible status and current identities. Expired iBus validity requires replacement or an approved policy decision before its operator identification can be treated as current. |
+
+Hashes establish identity/integrity, not currentness or eligibility. National Bus/TNDS interpretation is anchored to the diagnostic 20 October snapshot. Expired iBus validity makes current TfL operator identification unconfirmed by this index; it does not prove all national timetables invalid. Existing report qualifications and acknowledgement/export safeguards remain. No status record changed and no refresh ran.
+
+### Exact-candidate app-only rehearsal and downgrade controls
+
+The app-only artifact used application SHA `ada473174738ae9cc05664dafc0e9fc643a4f328`, proposed version/build `2.0.0-beta.2` / `ATLAS-2.0.0-beta.2-20261123`, retained captured config/status/iBus identities and the digest above, and excluded separate Bus/TNDS payload trees. Tree SHA-256: `e96865a32ce8d51dab2d090000a513fca935c265fcd53a4f80f038ed0f7a0b70`. In an isolated test copy, the assembled app started through the supported V2 loopback review route with Run #75 data available through its read-only gateway. The fixture-backed representative assessment rendered two evidence rows, exposed Sources & Checks, generated a non-empty Word DOCX, and downloaded four standalone PDF maps. No page errors or failed local requests occurred. Stop/timetable/map requests were deterministic fixtures; this proves package startup and workflow/export compatibility, not an assessment of all live national payloads. The packaged source configuration was preserved unchanged.
+
+The release-contract suite passed exact app SHA/version/build pinning, later data identity update without app change, digest verification, preservation of source/status identity, whole-site artifact integrity, and rejection of wrong digest, wrong commit and downgrade. Workflow tests cover shared Pages concurrency, but concurrent real GitHub deployments were not exercised. No acquisition, bank rotation, reference-data update, publication, updater or deployment ran.
+
+### Governance and remaining decisions
+
+GitHub confirmed PR #56 remains open and draft, targets frozen `main` `8f1d8ae50405ec4acf38dd66d6c8f60896a5649e`, and heads at `ada473174738ae9cc05664dafc0e9fc643a4f328`. Exact-SHA push/PR validation runs `45198355804` and `45198367666`, and Drawing Generator run `45198367955`, were green on that SHA. The combined-status endpoint returned no entries; individual Actions records are the evidence. Earlier GitHub inspection found no main/release branch protection and `github-pages` limited to `main`, without a required reviewer and with administrator bypass enabled. No settings changed; an administrator must confirm current state.
+
+Administrator steps:
+
+1. In **Settings → Branches → Add branch protection rule** (or a repository ruleset), target `main`. Require pull requests, independent approval when another maintainer exists, review-conversation resolution, and successful **ATLAS Beta.2 exact-SHA release validation** and **Drawing Generator CI** checks. Select exact contexts from completed runs. Block force pushes and deletion.
+2. For a sole owner, do not require approval the owner cannot give to their own PR. Keep exact required CI and record manual owner review/acceptance in the PR; restrict any administrator bypass to documented emergency recovery. Prefer an independent maintainer for routine releases.
+3. In **Settings → Environments → github-pages**, retain the `main` restriction and require an independent reviewer where supported by the repository plan and reviewer availability. Disable bypass where supported and safe. If independent reviewers are unavailable, keep the branch restriction and require explicit recorded administrator approval before dispatch; document the residual dual-control limitation.
+4. Before release, verify exact `main` SHA, green required checks, approved data digest/status, version/build, and complete artifact manifest. Merge only after separate approval, then deploy only the validated main SHA through the existing Pages workflow.
+5. Verify deployed app identity/version/build, Bus entry, acknowledgement, Word, A3/map, and Sources & Checks. For rollback, stop deployment, restore the recorded prior accepted Pages artifact/commit through the same controlled workflow, verify app/data identities, rerun those smoke checks, and preserve incident evidence. No rollback or production action is authorized here.
+
+Product Owner/Technical Director decisions: approve ADR-017 and retain the 310/311 Python lineage exception; accept this data digest for internal evaluation only with qualifications or require updater remediation; accept the Beta.1 reconstruction limitation/fallback; accept exact Beta.2 app SHA; separately approve integration, release and deployment. The diagnostic-only flag does not support production eligibility. Dependabot remains configured; Codecov and OpenSSF Scorecard remain post-stable-CI candidates; Sentry is deferred pending privacy/operational ownership; Renovate remains deferred in favour of Dependabot. No tooling installed.
+
+**RE-1-C3:** bounded engineering evidence is complete; production-eligible release is not ready. No application logic, release identity, source data, main, production configuration, governance setting, tag, merge or deployment changed.

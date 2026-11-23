@@ -130,8 +130,23 @@ async function reconcilePreparedStopPoints(result, referenceData, naptanAdapter,
   const data = result.data.map(stop => {
     const prepared = preparedById.get(String(stop.id || stop.sourceId));
     if (!prepared) return stop;
+    // A TfL StopPoint can have additional NaPTAN route associations that are
+    // absent from the live TfL line list. Keep the exact physical StopPoint
+    // identity and TfL associations, while exposing NaPTAN-only routes to the
+    // national timetable fallback path.
+    const tflRoutes = (stop.routes ?? []).map(String);
+    const naptanRoutes = (prepared.routes ?? []).map(String);
+    const routes = [...new Set([...tflRoutes, ...naptanRoutes])];
+    const routeAuthorities = Object.fromEntries(routes.map(route => {
+      const explicit = stop.routeAuthorities?.[route] ?? stop.routeAuthorities?.[String(route)];
+      const authorities = Array.isArray(explicit) ? explicit : explicit ? [explicit] : tflRoutes.includes(route) ? ['TfL'] : [];
+      return [route, authorities.length ? authorities : ['BODS']];
+    }));
     return {
       ...stop,
+      routes,
+      routeAuthorities,
+      timetableAuthorities: [...new Set([...(stop.timetableAuthorities ?? [stop.timetableAuthority]).filter(Boolean), ...(naptanRoutes.length ? ['BODS'] : [])])],
       logicalGroupRefs: prepared.logicalGroupRefs ?? stop.logicalGroupRefs ?? [],
       nptgLocalityCode: prepared.nptgLocalityCode ?? stop.nptgLocalityCode ?? null,
       status: prepared.status ?? stop.status ?? null,

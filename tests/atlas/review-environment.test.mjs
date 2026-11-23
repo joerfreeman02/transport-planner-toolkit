@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer as createNetServer } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +8,9 @@ import { fileURLToPath } from 'node:url';
 import { approvedBusUpdaterPath, startReviewServer, stopReviewServer } from '../../tools/atlas-review/review-server.mjs';
 
 const rootDir = path.resolve(fileURLToPath(new URL('../../', import.meta.url)));
+const pinnedBusDataRoot = process.env.ATLAS_TEST_BUS_DATA_ROOT ? path.resolve(process.env.ATLAS_TEST_BUS_DATA_ROOT) : null;
+const reviewV2DataRoot = pinnedBusDataRoot ? path.resolve(pinnedBusDataRoot, '..') : null;
+const pinnedTflIbusDataRoot = process.env.ATLAS_TEST_TFL_IBUS_ROOT ? path.resolve(process.env.ATLAS_TEST_TFL_IBUS_ROOT) : null;
 let passed = 0;
 const pass = name => { passed += 1; console.log(`PASS Review environment — ${name}`); };
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'atlas-review-test-'));
@@ -16,9 +19,11 @@ let review;
 let updaterOpened = null;
 
 try {
-  review = await startReviewServer({ rootDir, preferredPort: 0, maximumPort: 0, stateFile, openBrowser: false, updaterLauncher: root => { updaterOpened = root; } });
+  review = await startReviewServer({ rootDir, preferredPort: 0, maximumPort: 0, stateFile, v2DataRoot: reviewV2DataRoot, tflIbusDataRoot: pinnedTflIbusDataRoot, openBrowser: false, updaterLauncher: root => { updaterOpened = root; } });
   assert.equal(review.reused, false);
-  assert.match(review.url, /^http:\/\/127\.0\.0\.1:\d+\/atlas\/#modules$/);
+  assert.match(review.url, reviewV2DataRoot
+    ? /^http:\/\/127\.0\.0\.1:\d+\/atlas\/\?review=v2#modules$/
+    : /^http:\/\/127\.0\.0\.1:\d+\/atlas\/#modules$/);
   assert.equal(existsSync(stateFile), true);
   assert.equal(JSON.parse(await readFile(stateFile, 'utf8')).version, '2.0.0-beta.1');
   pass('starts on an available loopback address');
@@ -27,6 +32,16 @@ try {
   assert.equal(atlas.status, 200);
   assert.match(atlas.headers.get('content-type'), /^text\/html/);
   const atlasHtml = await atlas.text();
+  const identityResponse = await fetch(new URL('/__atlas-review/identity', review.url));
+  assert.equal(identityResponse.status, 200);
+  const identity = await identityResponse.json();
+  assert.equal(identity.worktreeRoot, rootDir);
+  assert.match(identity.gitRevision, /^[0-9a-f]{40}$/i);
+  assert.equal(typeof identity.worktreeDirty, 'boolean');
+  assert.match(identity.applicationCodeSha256, /^[0-9a-f]{64}$/i);
+  assert.ok(identity.applicationCodeFileCount > 0);
+  assert.ok(atlasHtml.includes(`data-atlas-test-build="${identity.buildMarker}"`), 'The rendered review marker must identify the exact application-code fingerprint, including a dirty worktree.');
+  assert.equal((await (await fetch(new URL('/__atlas-review/status', review.url))).json()).applicationCodeSha256, identity.applicationCodeSha256);
   assert.match(atlasHtml, /ATLAS — Transport and Location Assessment/);
   assert.match(atlasHtml, /2\.0\.0-beta\.1/);
   assert.match(atlasHtml, /ATLAS-2\.0\.0-beta\.1-20261025/);
@@ -47,7 +62,7 @@ try {
   const assets = [
     ['/atlas/assets/css/atlas-shell.css', /^text\/css/],
     ['/atlas/assets/js/app.mjs', /^application\/javascript/],
-    ['/atlas/data/bus/manifest.json', /^application\/json/],
+    [reviewV2DataRoot ? '/__atlas-review/v2-data/bus/manifest.json' : '/atlas/data/bus/manifest.json', /^application\/json/],
     ['/src/atlas/domain/site.mjs', /^application\/javascript/],
     ['/src/atlas/application/site-selector.mjs', /^application\/javascript/],
     ['/assets/vendor/leaflet/leaflet.css', /^text\/css/],
@@ -60,7 +75,33 @@ try {
     assert.equal(response.status, 200, assetPath);
     assert.match(response.headers.get('content-type'), type, assetPath);
   }
+  if (reviewV2DataRoot) {
+    const pinnedManifestResponse = await fetch(new URL('/__atlas-review/v2-data/bus/manifest.json', review.url));
+    assert.deepEqual(await pinnedManifestResponse.json(), JSON.parse(await readFile(path.join(pinnedBusDataRoot, 'manifest.json'), 'utf8')));
+  }
   pass('serves required CSS, JavaScript modules and branding assets with correct types');
+
+  const v2DataRoot = path.join(temporary, 'run75-data-root');
+  await mkdir(path.join(v2DataRoot, 'bus'), { recursive: true });
+  await mkdir(path.join(v2DataRoot, 'bus-tnds'), { recursive: true });
+  await writeFile(path.join(v2DataRoot, 'bus', 'manifest.json'), '{"dataset":"Run75-Bus"}');
+  await writeFile(path.join(v2DataRoot, 'bus-tnds', 'manifest.json'), '{"dataset":"Run75-TNDS"}');
+  const v2State = path.join(temporary, 'v2-review-state.json');
+  const v2Review = await startReviewServer({ rootDir, preferredPort: 0, maximumPort: 0, stateFile: v2State, v2DataRoot, tflIbusDataRoot: pinnedTflIbusDataRoot, openBrowser: false });
+  const v2Identity = await (await fetch(new URL('/__atlas-review/identity', v2Review.url))).json();
+  assert.match(v2Identity.preparedSources.bus.manifestSha256, /^[0-9a-f]{64}$/i);
+  assert.match(v2Identity.preparedSources.tnds.manifestSha256, /^[0-9a-f]{64}$/i);
+  assert.ok(v2Identity.preparedSources.tflIbus.manifestSha256 === null || /^[0-9a-f]{64}$/i.test(v2Identity.preparedSources.tflIbus.manifestSha256), 'Optional iBus evidence must be hashed when supplied and reported absent otherwise.');
+  const v2BusManifest = await fetch(new URL('/__atlas-review/v2-data/bus/manifest.json', v2Review.url));
+  const v2TndsManifest = await fetch(new URL('/__atlas-review/v2-data/bus-tnds/manifest.json', v2Review.url));
+  assert.equal(v2BusManifest.status, 200);
+  assert.deepEqual(await v2BusManifest.json(), { dataset: 'Run75-Bus' });
+  assert.equal(v2TndsManifest.status, 200);
+  assert.deepEqual(await v2TndsManifest.json(), { dataset: 'Run75-TNDS' });
+  assert.equal((await fetch(new URL('/__atlas-review/v2-data/atlas/data/bus/manifest.json', v2Review.url))).status, 404, 'Review-v2 mounts the data directory itself; it does not infer a checkout-relative atlas/data prefix.');
+  await v2Review.close();
+  await v2Review.closed;
+  pass('mounts the v2 data directory at /bus and /bus-tnds exactly');
 
   assert.equal((await fetch(new URL('/unknown-review-page', review.url))).status, 404);
   assert.equal((await fetch(new URL('/.git/config', review.url))).status, 404);

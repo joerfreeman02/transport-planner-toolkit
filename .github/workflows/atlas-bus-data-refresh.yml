@@ -739,23 +739,85 @@ jobs:
       - name: Record freshness decision
         run: echo "${{ steps.decision.outputs.message }}"
 
+  application-pin:
+    name: Resolve approved application identity before data refresh
+    needs: [main-guard, freshness]
+    if: github.ref == 'refs/heads/main' && inputs.prepared_schema != 'v2' && needs.main-guard.outputs.trust_mode == '' && needs.freshness.outputs.refresh_required == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      app_sha: ${{ steps.pin.outputs.app_sha }}
+      version: ${{ steps.pin.outputs.version }}
+      build: ${{ steps.pin.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Fetch current release identity and fail closed on legacy or invalid publication
+        id: pin
+        run: |
+          node tools/atlas-data-publication/fetch-last-known-good.mjs 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/' last-known-good
+          python - <<'PY'
+          import json,re,subprocess
+          from pathlib import Path
+          identity=json.loads(Path('last-known-good/atlas/config/atlas-release-identity.json').read_text())
+          app=identity.get('application') or {}
+          if identity.get('schema')!='atlas-release-identity-v1': raise SystemExit('Published release identity schema is missing or unsupported; stopping before refresh/acquisition.')
+          if not re.fullmatch(r'[0-9a-f]{40}',str(app.get('commitSha',''))): raise SystemExit('Published application commit identity is invalid.')
+          if app.get('version') not in ('2.0.0-beta.1','2.0.0-beta.2') or not app.get('build'): raise SystemExit('Published application version/build is unsupported.')
+          subprocess.run(['git','cat-file','-e',app['commitSha']+'^{commit}'],check=True)
+          subprocess.run(['git','merge-base','--is-ancestor',app['commitSha'],'origin/main'],check=True)
+          data=identity.get('data') or {}
+          for key in ('publicationVersion','dataSourcesSha256','busManifestSha256','tndsManifestSha256','ibusManifestSha256','ibusIndexSha256'):
+              if not data.get(key): raise SystemExit('Published application/data identity is incomplete: '+key)
+          import hashlib
+          def digest(value): return hashlib.sha256((json.dumps(value,indent=2)+'\n').encode()).hexdigest()
+          base=Path('last-known-good/atlas/data')
+          sources=json.loads(Path('last-known-good/atlas/config/atlas-data-sources.json').read_text())
+          if digest(sources)!=data['dataSourcesSha256']: raise SystemExit('Live data-source configuration differs from the published release identity.')
+          if digest(json.loads((base/'bus/manifest.json').read_text()))!=data['busManifestSha256']: raise SystemExit('Live Bus manifest differs from the published release identity.')
+          tnds=[]
+          for p in (base/'bus-tnds').rglob('manifest.json'): tnds.append(json.loads(p.read_text()))
+          if sorted(map(digest,tnds))!=sorted(data['tndsManifestSha256']): raise SystemExit('Live TNDS manifest identities differ from the published release identity.')
+          ibus=json.loads((base/'tfl-ibus/manifest.json').read_text())
+          index=json.loads((base/'tfl-ibus'/ibus['indexPath']).read_text())
+          if digest(ibus)!=data['ibusManifestSha256'] or digest(index)!=data['ibusIndexSha256']: raise SystemExit('Live iBus identity differs from the published release identity.')
+          import os
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
+              output.write('app_sha='+app['commitSha']+'\nversion='+app['version']+'\nbuild='+app['build']+'\n')
+          PY
+
   build-validate:
     name: Build and validate Bus/TNDS candidate
-    needs: [main-guard, freshness]
-    if: inputs.prepared_schema != 'v2' && needs.main-guard.outputs.trust_mode == '' && needs.freshness.result == 'success' && needs.freshness.outputs.refresh_required == 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    needs: [main-guard, freshness, application-pin]
+    if: inputs.prepared_schema != 'v2' && needs.main-guard.outputs.trust_mode == '' && needs.freshness.result == 'success' && needs.freshness.outputs.refresh_required == 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && (github.ref != 'refs/heads/main' || needs.application-pin.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    outputs:
+      application_sha: ${{ steps.release-identity.outputs.application_sha }}
+      application_version: ${{ steps.release-identity.outputs.application_version }}
+      application_build: ${{ steps.release-identity.outputs.application_build }}
+      publication_version: ${{ steps.release-identity.outputs.publication_version }}
     permissions:
       contents: read
       pages: write
       id-token: write
     env:
       ATLAS_DIAGNOSTIC_ONLY: ${{ inputs.measure_only || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main') }}
+      ATLAS_PINNED_APPLICATION_SHA: ${{ needs.application-pin.outputs.app_sha }}
       ATLAS_CHECKPOINT_PRODUCER_RUN_ID: ${{ inputs.resume_checkpoint_run_id || github.run_id }}
       ATLAS_CURRENT_CANDIDATE_CACHE_KEY: atlas-verified-candidate-checkpoint-v2-${{ github.run_id }}
       ATLAS_CANDIDATE_CACHE_KEY: atlas-verified-candidate-checkpoint-v2-${{ inputs.resume_checkpoint_run_id || github.run_id }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
@@ -764,9 +826,23 @@ jobs:
           node-version: '22.x'
       - name: Prepare isolated Pages site
         run: |
+          APP_SHA="$ATLAS_PINNED_APPLICATION_SHA"
+          if [ -z "$APP_SHA" ]; then APP_SHA="$GITHUB_SHA"; fi
+          git fetch origin "$APP_SHA"
+          mkdir -p application-source
+          git archive "$APP_SHA" | tar -x -C application-source
           rm -rf pages-site
           mkdir pages-site
-          rsync -a --exclude='.git' --exclude='pages-site' --exclude='atlas/data/bus' --exclude='atlas/data/bus-tnds' ./ pages-site/
+          for root in index.html assets atlas modules src config data; do
+            if [ -e "application-source/$root" ]; then
+              if [ -d "application-source/$root" ]; then
+                mkdir -p "pages-site/$root"
+                if [ "$root" = atlas ]; then rsync -a --exclude='data/bus' --exclude='data/bus-tnds' "application-source/$root/" "pages-site/$root/";
+                else rsync -a "application-source/$root/" "pages-site/$root/"; fi
+              else cp "application-source/$root" "pages-site/$root"; fi
+            fi
+          done
+          for file in .nojekyll CNAME robots.txt 404.html; do if [ -f "application-source/$file" ]; then cp "application-source/$file" "pages-site/$file"; fi; done
       - name: Require publication targets only for production
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
         run: |
@@ -776,6 +852,18 @@ jobs:
           test -n "${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}"
       - name: Obtain last-known-good deployed metadata
         run: node tools/atlas-data-publication/fetch-last-known-good.mjs 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/' last-known-good
+      - name: Restore the approved app identity, current configuration and iBus snapshot into the full-site base
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true
+        run: |
+          cp last-known-good/atlas/config/atlas-data-sources.json pages-site/atlas/config/atlas-data-sources.json
+          cp last-known-good/atlas/config/atlas-release-identity.json pages-site/atlas/config/atlas-release-identity.json
+          cp last-known-good/atlas/config/atlas-release.json pages-site/atlas/config/atlas-release.json
+          mkdir -p pages-site/atlas/data/status
+          cp last-known-good/atlas/data/status/manifest.json pages-site/atlas/data/status/manifest.json
+          rm -rf pages-site/atlas/data/tfl-ibus
+          cp -a last-known-good/atlas/data/tfl-ibus pages-site/atlas/data/tfl-ibus
+          node --input-type=module -e "import fs from 'node:fs'; import {renderAtlasDataSourcesModule} from './tools/atlas-data-publication/publication.mjs'; const c=JSON.parse(fs.readFileSync('last-known-good/atlas/config/atlas-data-sources.json')); fs.writeFileSync('pages-site/atlas/config/atlas-data-sources.mjs',renderAtlasDataSourcesModule(c));"
+          node --input-type=module -e "import fs from 'node:fs'; const a=JSON.parse(fs.readFileSync('pages-site/atlas/config/atlas-release-identity.json')); const p='pages-site/atlas/index.html'; let h=fs.readFileSync(p,'utf8'); h=h.replaceAll('ATLAS-2.0.0-beta.1-20261025',a.application.build).replaceAll('2.0.0-beta.1',a.application.version); fs.writeFileSync(p,h);"
       - name: Restore exact verified candidate checkpoint
         id: candidate-cache
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
@@ -945,7 +1033,23 @@ jobs:
         run: |
           cp publication-config/atlas-data-sources.mjs pages-site/atlas/config/atlas-data-sources.mjs
           cp publication-config/atlas-data-sources.json pages-site/atlas/config/atlas-data-sources.json
+          mkdir -p "$RUNNER_TEMP/atlas-data-identity/atlas/data"
+          cp -a pages-site/atlas/data/bus "$RUNNER_TEMP/atlas-data-identity/atlas/data/bus"
+          cp -a pages-site/atlas/data/bus-tnds "$RUNNER_TEMP/atlas-data-identity/atlas/data/bus-tnds"
           rm -rf pages-site/atlas/data/bus pages-site/atlas/data/bus-tnds
+          node tools/atlas-release/refresh-identity-cli.mjs pages-site last-known-good/atlas/config/atlas-release-identity.json "$RUNNER_TEMP/atlas-data-identity"
+      - name: Export the exact assembled release identity
+        id: release-identity
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true
+        run: |
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          identity=json.loads(Path('pages-site/atlas/config/atlas-release-identity.json').read_text())
+          app=identity['application']; data=identity['data']
+          if not identity.get('artifactTreeSha256'): raise SystemExit('Complete Pages artifact has no deterministic file-tree digest.')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
+              output.write('application_sha='+app['commitSha']+'\napplication_version='+app['version']+'\napplication_build='+app['build']+'\npublication_version='+data['publicationVersion']+'\n')
       - name: Validate complete application artifact
         run: |
           test -f pages-site/index.html
@@ -973,6 +1077,47 @@ jobs:
       name: github-pages
     steps:
       - uses: actions/deploy-pages@v4
+
+  verify-live:
+    name: Verify published app pin and data identities
+    needs: [application-pin, build-validate, deploy]
+    if: needs.deploy.result == 'success' && github.ref == 'refs/heads/main' && inputs.measure_only != true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm the live app is unchanged and the data publication is exact
+        env:
+          EXPECTED_SHA: ${{ needs.application-pin.outputs.app_sha }}
+          EXPECTED_VERSION: ${{ needs.application-pin.outputs.version }}
+          EXPECTED_BUILD: ${{ needs.application-pin.outputs.build }}
+          EXPECTED_PUBLICATION: ${{ needs.build-validate.outputs.publication_version }}
+        run: |
+          for n in $(seq 1 30); do curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/config/atlas-release-identity.json' -o "$RUNNER_TEMP/identity.json" && break; sleep 10; done
+          curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/config/atlas-data-sources.json' -o "$RUNNER_TEMP/config.json"
+          curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/data/status/manifest.json' -o "$RUNNER_TEMP/status.json"
+          curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/data/tfl-ibus/manifest.json' -o "$RUNNER_TEMP/ibus.json"
+          python - "$RUNNER_TEMP/identity.json" "$RUNNER_TEMP/config.json" "$RUNNER_TEMP/status.json" "$RUNNER_TEMP/ibus.json" <<'PY'
+          import hashlib,json,os,sys,urllib.parse,urllib.request
+          identity=json.load(open(sys.argv[1])); config=json.load(open(sys.argv[2])); status=json.load(open(sys.argv[3])); ibus=json.load(open(sys.argv[4]))
+          app=identity.get('application') or {}; data=identity.get('data') or {}
+          if (app.get('commitSha'),app.get('version'),app.get('build'))!=(os.environ['EXPECTED_SHA'],os.environ['EXPECTED_VERSION'],os.environ['EXPECTED_BUILD']): raise SystemExit('Live application identity changed during data refresh.')
+          if data.get('publicationVersion')!=os.environ['EXPECTED_PUBLICATION']: raise SystemExit('Live data publication version differs from the assembled artifact.')
+          def digest(value): return hashlib.sha256((json.dumps(value,indent=2)+'\n').encode()).hexdigest()
+          if digest(config)!=data.get('dataSourcesSha256'): raise SystemExit('Live data-source config differs from the published identity.')
+          if digest(status)!=data.get('dataStatusSha256'): raise SystemExit('Live data-status manifest differs from the published identity.')
+          if (status.get('generatedAt') or status.get('snapshotDate') or status.get('candidateGeneratedAt'))!=data.get('currentness'): raise SystemExit('Live data currentness differs from the published identity.')
+          base='https://joerfreeman02.github.io/transport-planner-toolkit/atlas/'; cfgbase=base+'config/'
+          def get_json(url):
+            with urllib.request.urlopen(url,timeout=45) as response: return json.loads(response.read())
+          bus=config['datasets']['bus']; busbase=urllib.parse.urljoin(cfgbase,bus['baseUrl'])
+          if digest(get_json(urllib.parse.urljoin(busbase,bus.get('manifest','manifest.json'))))!=data.get('busManifestSha256'): raise SystemExit('Live Bus manifest mismatch.')
+          tnds=config['datasets']['tnds']; roots=tnds.get('activeRoots') or tnds.get('roots') or []
+          manifests=sorted(digest(get_json(urllib.parse.urljoin(urllib.parse.urljoin(cfgbase,x['baseUrl']),tnds.get('manifest','manifest.json')))) for x in roots)
+          if manifests!=sorted(data.get('tndsManifestSha256') or []): raise SystemExit('Live TNDS root manifests mismatch.')
+          if digest(ibus)!=data.get('ibusManifestSha256'): raise SystemExit('Live iBus manifest mismatch.')
+          if digest(get_json(urllib.parse.urljoin(base+'data/tfl-ibus/',ibus['indexPath'])))!=data.get('ibusIndexSha256'): raise SystemExit('Live iBus index mismatch.')
+          if not identity.get('artifactTreeSha256'): raise SystemExit('Live release identity has no artifact tree digest.')
+          print('Live application and refreshed data identities match the validated Pages artifact.')
+          PY
 
   freshness-no-op:
     name: Confirm already-fresh Bus data

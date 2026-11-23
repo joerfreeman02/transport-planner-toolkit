@@ -150,6 +150,28 @@ const route46Principal = route46Composition.find(row => row.routeNumber === '46'
 assert.ok(route46Principal, 'the route-46 public service remains available');
 assert.deepEqual(route46Principal.canonicalDeparturePopulation.monday.map(entry => entry.minute), hourlyMinutes, 'an exact same-direction, operator-compatible, shared-stop BODS principal supplies the route-46 frequency population instead of TNDS duplicate/variant headways');
 assert.match(route46Principal.typicalFrequencyText, /Every ~60 mins/i);
+const allWeekEvidence = (minutes, provider, identity) => Object.fromEntries(Object.keys(weekdays).map(day => [day,
+  minutes.map((minute, index) => ({ minute, stopPointId: 'PIPERS-A', journeyIdentity: `${identity}-${day}-${index}`, provider }))
+]));
+const dominantShortWorking = buildPlannerBusServiceSummaries([
+  {
+    ...plannerBase, id: '555-hatton-main', routeNumber: '555', operator: 'White Bus Services', direction: 'outbound',
+    origin: 'Hepworth Way', destination: 'Hatton Cross', routePatternStopIds: ['START', ...Array.from({ length: 46 }, (_, index) => `S${index}`), 'HATTON'],
+    provider: 'BODS', timetableSource: 'BODS', source: { provider: 'BODS' },
+    departureEvidenceByDay: allWeekEvidence(Array.from({ length: 30 }, (_, index) => 360 + index * 30), 'BODS', '555-hatton')
+  },
+  {
+    ...plannerBase, id: '555-heathrow-extension', routeNumber: '555', operator: 'White Bus Services', direction: 'outbound',
+    origin: 'Hepworth Way', destination: 'Heathrow Central Bus Station', routePatternStopIds: ['START', ...Array.from({ length: 46 }, (_, index) => `S${index}`), 'HATTON', 'HEATHROW'],
+    provider: 'BODS', timetableSource: 'BODS', source: { provider: 'BODS' },
+    departureEvidenceByDay: allWeekEvidence(Array.from({ length: 7 }, (_, index) => 375 + index * 120), 'BODS', '555-heathrow')
+  }
+], [stop]);
+assert.equal(dominantShortWorking.length, 1, 'a contained longer extension remains grouped with the dominant principal pattern');
+assert.match(dominantShortWorking[0].directionPatternText, /Hatton Cross/i, 'the materially more frequent shorter pattern supplies the passenger-facing destination');
+assert.equal(dominantShortWorking[0].canonicalDeparturePopulation.monday.length, 37, 'principal-pattern wording does not discard either the frequent short pattern or the less-frequent continuation departures');
+assert.notEqual(dominantShortWorking[0].typicalFrequencyText, 'Mon-Sun: Every ~120 mins', 'combined frequency at the assessed stop remains visible after principal-pattern selection');
+assert.match(`${dominantShortWorking[0].serviceNote ?? ""} ${dominantShortWorking[0].routeVariantNote ?? ""}`, /Heathrow Central/i, 'the less-frequent longer extension remains explicitly disclosed');
 const sparsePrimaryInbound = {
   ...plannerBase, id: 'bods-route46-inbound-sparse-endpoints', routeNumber: '46', operator: 'Centrebus',
   direction: 'Park Square (Stop P1)', directionFamily: 'gtfs:1', origin: 'Bridge Street', destination: 'Park Square',

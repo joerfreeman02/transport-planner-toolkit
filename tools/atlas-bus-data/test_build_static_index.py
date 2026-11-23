@@ -74,6 +74,52 @@ def build_pipers_prepared_record() -> dict:
 
 
 class CircularIdentityTests(unittest.TestCase):
+    def test_explicit_no_pickup_calls_are_retained_but_excluded_from_departures(self):
+        stops = {
+            "ORIGIN": {"id": "ORIGIN", "name": "Origin", "locality": "Town", "routes": set(), "timetableCallEligible": True},
+            "TERMINUS": {"id": "TERMINUS", "name": "Terminus", "locality": "Town", "routes": set(), "timetableCallEligible": True},
+        }
+        services = {}
+        rows = [
+            {"stop_sequence": "1", "stop_id": "origin", "departure_time": "19:10:00"},
+            {"stop_sequence": "2", "stop_id": "terminus", "arrival_time": "19:38:00", "departure_time": "19:38:00", "pickup_type": "1", "drop_off_type": "0"},
+        ]
+        BUILDER.process_trip(
+            "fixture", rows,
+            {"route_id": "r", "trip_id": "journey-1", "service_id": "daily", "direction_id": "0", "trip_headsign": "Terminus", "active_days": ["saturday"]},
+            {"a": {"agency_name": "Fixture operator"}},
+            {"r": {"route_short_name": "99", "route_type": "3", "agency_id": "a"}},
+            {"origin": {"stop_name": "Origin"}, "terminus": {"stop_name": "Terminus"}}, {}, {}, stops,
+            {"atco": {"origin": "ORIGIN", "terminus": "TERMINUS"}, "naptan": {}}, services
+        )
+        record = next(iter(services.values()))
+        self.assertEqual(record["stopSchedules"]["ORIGIN"]["saturday"], [19 * 60 + 10])
+        self.assertNotIn("TERMINUS", record["stopSchedules"], "a set-down-only stop is not turned into a boardable scheduled departure")
+        self.assertEqual(record["nonBoardingCalls"], [{"stopPointId": "TERMINUS", "minute": 19 * 60 + 38, "journeyIdentity": "journey-1", "stopSequence": 2, "pickupType": "1", "dropOffType": "0", "occurrenceRole": "arrival"}])
+        # The prepared-data layer keeps structured call evidence. The later
+        # service-assessment layer turns it into the user-facing source warning.
+
+    def test_school_named_endpoint_does_not_infer_school_day_qualification(self):
+        stops = {
+            "ORIGIN": {"id": "ORIGIN", "name": "Bus Station", "locality": "Town", "routes": set(), "timetableCallEligible": True},
+            "SCHOOL": {"id": "SCHOOL", "name": "Birchwood High School", "locality": "Town", "routes": set(), "timetableCallEligible": True},
+        }
+        services = {}
+        rows = [
+            {"stop_sequence": "1", "stop_id": "origin", "departure_time": "07:30:00"},
+            {"stop_sequence": "2", "stop_id": "school", "departure_time": "08:00:00"},
+        ]
+        BUILDER.process_trip(
+            "fixture", rows,
+            {"route_id": "r", "trip_id": "trip", "service_id": "weekday", "direction_id": "0", "trip_headsign": "Birchwood High School", "active_days": ["monday"]},
+            {"a": {"agency_name": "Fixture operator"}},
+            {"r": {"route_short_name": "99", "route_type": "3", "agency_id": "a"}},
+            {"origin": {"stop_name": "Bus Station"}, "school": {"stop_name": "Birchwood High School"}}, {}, {}, stops,
+            {"atco": {"origin": "ORIGIN", "school": "SCHOOL"}, "naptan": {}}, services
+        )
+        record = next(iter(services.values()))
+        self.assertNotIn("School-day or term-time service identified in the source timetable; check the assessment date before formal use.", record["qualifications"])
+
     def test_pipers_bods_prepared_pattern_fixture_is_emitted_by_production_gtfs_builder(self):
         fixture_path = Path(__file__).parents[2] / "tests" / "atlas" / "fixtures" / "pipers-bods-prepared-service.json"
         prepared = json.loads(fixture_path.read_text(encoding="utf-8"))
@@ -286,6 +332,8 @@ class CircularIdentityTests(unittest.TestCase):
         record = next(iter(services.values()))
         self.assertNotIn("routePatternStopIds", record)
         self.assertEqual(record["circularPatternStopIds"], ["490000001A", "gtfs:frozen_region:missing-gtfs", "490000001A"])
+        self.assertEqual([call["id"] for call in record["routePatternStops"]], record["circularPatternStopIds"])
+        self.assertEqual([call["name"] for call in record["routePatternStops"]], ["Loop origin", "Unmatched call", "Loop origin"])
         self.assertEqual(record["source"]["orderedPatternEndpoints"], ["490000001A", "490000001A"])
         self.assertEqual(record["circularPatternStopIds"][0], record["circularPatternStopIds"][-1])
 

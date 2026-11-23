@@ -1,0 +1,154 @@
+name: ATLAS Beta.2 exact-SHA release validation
+
+on:
+  push:
+    branches: [codex/atlas-bus-beta2-release-re1-20261123]
+  pull_request:
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: atlas-beta2-release-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  exact-sha:
+    if: github.repository == 'joerfreeman02/transport-planner-toolkit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install frozen JavaScript dependencies and Chromium
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+      - name: Confirm the exact source commit and immutable Run #75 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          echo "Validated application and test source SHA: $SOURCE_SHA"
+          gh api repos/$GITHUB_REPOSITORY/actions/artifacts/12275615359 > "$RUNNER_TEMP/run75.json"
+          python - "$RUNNER_TEMP/run75.json" <<'PY'
+          import json,sys
+          a=json.load(open(sys.argv[1])); w=a.get('workflow_run') or {}
+          if a.get('name')!='atlas-bus-beta-review-candidate-39430415441' or a.get('digest')!='sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471' or a.get('expired') is not False: raise SystemExit('Immutable Run #75 artifact metadata mismatch.')
+          if w.get('id')!=39430415441 or w.get('head_sha')!='151199cc914c235870f444d26b03c2309edbd035': raise SystemExit('Immutable Run #75 artifact producer mismatch.')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 12275615359
+          run-id: 39430415441
+          repository: joerfreeman02/transport-planner-toolkit
+          github-token: ${{ github.token }}
+          path: restored
+      - name: Verify checkpoint provenance and frozen Bus/TNDS/iBus identities
+        run: |
+          ROOT="$GITHUB_WORKSPACE/restored/atlas-bus-beta-review-candidate-39430415441"
+          CANDIDATE="$ROOT/candidate-site"
+          node tools/atlas-data-publication/review-candidate-checkpoint.mjs verify --candidate-root "$CANDIDATE" --checkpoint-root "$ROOT/review-checkpoint" --expected-run-id 39430415441 --expected-commit-sha 151199cc914c235870f444d26b03c2309edbd035
+          check_sha256() {
+            local path="$1" expected="$2" actual
+            actual="$(sha256sum "$path" | cut -d' ' -f1)"
+            echo "SHA256 $path = $actual (expected $expected)"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "Run #75 frozen-file identity mismatch: $path" >&2
+              return 1
+            fi
+          }
+          check_sha256 "$CANDIDATE/atlas/data/bus/manifest.json" '1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f'
+          check_sha256 "$CANDIDATE/atlas/data/bus-tnds/manifest.json" '2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f'
+          check_sha256 "$CANDIDATE/atlas/data/tfl-ibus/manifest.json" '14b416823cb648c869750db90939bac33a027f2f91485322f08c2d9c4394914f'
+          check_sha256 "$CANDIDATE/atlas/data/tfl-ibus/20261009/operator-index.json" '5efcf64bfe1e158ecac52a8df8609984600b90ddd9b1b25b5112de7f6e24ebc1'
+          echo 'Original Run #75 artifact identity retained; its internally mixed iBus mount is verified then excluded from regression execution.'
+          node --input-type=module - "$CANDIDATE/atlas/data/tfl-ibus" <<'JS'
+          import fs from 'node:fs/promises';
+          import path from 'node:path';
+          import { verifyIbusFixture } from './tools/atlas-release/release-boundary.mjs';
+          const source=path.resolve('tests/atlas/fixtures/run75-ibus-20261009');
+          const target=process.argv[2];
+          const result=await verifyIbusFixture(source,{manifestSha256:'3090e1da6da21878725d0b30343757bd32c65fcdd56d9fdecb6f6ae6c75b5d53',indexSha256:'39b0eae384ec7a44115f898b940b3f35213577195706d38a82fa97707d2610de'});
+          const provenance=JSON.parse(await fs.readFile(path.join(source,'provenance.json'),'utf8'));
+          if(provenance.identity.manifestSha256!==result.manifestSha256||provenance.identity.indexSha256!==result.indexSha256) throw new Error('Fixture provenance does not match exact source bytes.');
+          await fs.rm(target,{recursive:true,force:true});
+          await fs.mkdir(path.join(target,'20261009'),{recursive:true});
+          await fs.copyFile(path.join(source,'manifest.json'),path.join(target,'manifest.json'));
+          await fs.copyFile(path.join(source,'20261009/operator-index.json'),path.join(target,'20261009/operator-index.json'));
+          console.log(`Coherent iBus regression pair restored from ${provenance.overlaySource.commit}; ${result.manifestSha256} / ${result.indexSha256}`);
+          JS
+          node --input-type=module -e "import {verifyIbusFixture} from './tools/atlas-release/release-boundary.mjs'; const r=await verifyIbusFixture(process.argv[1],{manifestSha256:'3090e1da6da21878725d0b30343757bd32c65fcdd56d9fdecb6f6ae6c75b5d53',indexSha256:'39b0eae384ec7a44115f898b940b3f35213577195706d38a82fa97707d2610de'}); console.log('Overlay verified',r.manifestSha256,r.indexSha256)" "$CANDIDATE/atlas/data/tfl-ibus"
+          echo "ATLAS_TEST_BUS_DATA_ROOT=$CANDIDATE/atlas/data/bus" >> "$GITHUB_ENV"
+          echo "ATLAS_TEST_BUS_TNDS_DATA_ROOT=$CANDIDATE/atlas/data/bus-tnds" >> "$GITHUB_ENV"
+          echo "ATLAS_TEST_TFL_IBUS_ROOT=$CANDIDATE/atlas/data/tfl-ibus" >> "$GITHUB_ENV"
+          echo "ATLAS_CANDIDATE_ROOT=$CANDIDATE" >> "$GITHUB_ENV"
+      - name: Publish immutable coherent iBus regression fixture
+        id: fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-run75-ibus-fixture-${{ github.event.pull_request.head.sha || github.sha }}
+          path: tests/atlas/fixtures/run75-ibus-20261009/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Record hosted fixture identity
+        env:
+          FIXTURE_ARTIFACT_ID: ${{ steps.fixture.outputs.artifact-id }}
+          FIXTURE_ARTIFACT_DIGEST: ${{ steps.fixture.outputs.artifact-digest }}
+          FIXTURE_ARTIFACT_URL: ${{ steps.fixture.outputs.artifact-url }}
+          FIXTURE_ARTIFACT_NAME: atlas-run75-ibus-fixture-${{ github.event.pull_request.head.sha || github.sha }}
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PRODUCER_RUN_ID: ${{ github.run_id }}
+        run: |
+          test -n "$FIXTURE_ARTIFACT_ID"
+          [[ "$FIXTURE_ARTIFACT_ID" =~ ^[0-9]+$ ]]
+          [[ "$FIXTURE_ARTIFACT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$PRODUCER_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$FIXTURE_ARTIFACT_NAME" == "atlas-run75-ibus-fixture-$SOURCE_SHA" ]]
+          [[ -n "$FIXTURE_ARTIFACT_URL" ]]
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          python - <<'PY'
+          import os
+          print('Hosted iBus fixture:',os.environ['FIXTURE_ARTIFACT_ID'],os.environ['FIXTURE_ARTIFACT_NAME'],os.environ['FIXTURE_ARTIFACT_DIGEST'],'producer run',os.environ['PRODUCER_RUN_ID'],'source SHA',os.environ['SOURCE_SHA'],os.environ['FIXTURE_ARTIFACT_URL'])
+          PY
+      - name: Run full deterministic ATLAS Node suite
+        run: pnpm test:atlas
+      - name: Run required Python static-index suite
+        run: python -m unittest discover -s tools/atlas-bus-data -p 'test_build_static_index.py' -v
+      - name: Verify app/data artifact contracts and an isolated reconstruction dry run
+        run: node tests/atlas/app-data-release.test.mjs
+      - name: Verify privacy-safe 135-response TfL capture and transformation manifest
+        run: node tools/atlas-release/tfl-replay-privacy.mjs verify tests/atlas/fixtures/tfl-replay/tfl-replay-c2.json.gz tests/atlas/fixtures/tfl-replay/privacy-manifest.json
+      - name: Run required exact-head 16-control Browser/Word/A3 audit with captured TfL replay
+        env:
+          ATLAS_TFL_REPLAY_CAPTURE: ${{ github.workspace }}/tests/atlas/fixtures/tfl-replay/tfl-replay-c2.json.gz
+          ATLAS_C4_TRACE_OPERATOR_STAGES: '1'
+          ATLAS_AUDIT_APP_ROOT: ${{ github.workspace }}
+          ATLAS_AUDIT_APP_BUILD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node tests/atlas/s2e1-manual-product-audit.mjs "$ATLAS_CANDIDATE_ROOT" release-audit-tfl.json
+      - name: Verify audit report completeness and privacy redaction
+        run: node tools/atlas-release/tfl-replay-privacy.mjs verify-audit release-audit-tfl.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atlas-beta2-release-validation-${{ github.sha }}
+          path: |
+            release-audit.json
+            release-audit-tfl.json
+          if-no-files-found: ignore
+          retention-days: 90

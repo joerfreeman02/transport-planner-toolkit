@@ -148,16 +148,18 @@ assert.equal(normalRoute.plannerNotes.shortWorkings, null);
 const wordText = buildBusWordTables({
   ok: true,
   stops,
-  provenance: { stops: { retrievedAt: '2026-10-07T12:34:56Z' } },
+  assessmentDate: '2026-10-07',
+  generatedAt: '2026-10-08T09:00:00Z',
+  provenance: { stops: { retrievedAt: '2026-10-08T08:55:00Z', dataPreparedAt: '2026-10-20T13:28:46Z' }, timetables: { retrievedAt: '2026-10-08T08:57:00Z', dataPreparedAt: '2026-10-20T13:28:46Z', tndsPreparedAt: '2026-10-19T07:45:16Z' } },
   plannerServiceSummaries: [pureCalendarRows[0], genuineShort, genuineBranch, school657, normalRoute],
   serviceSummaries: []
 })
   .flatMap(table => table.rows ?? [])
   .map(row => Array.isArray(row) ? row.join(' ') : String(row?.text ?? ''))
   .join(' ');
-assert.match(wordText, /Timetable note: Where separate term-time and school-holiday timetables are published, the term-time timetable is shown\./);
+assert.match(wordText, /Timetable note: Assessment generated on 2026-10-08; calendar assessment date 2026-10-07.*Where separate term-time and school-holiday timetables are published, the term-time timetable is shown\./);
 assert.doesNotMatch(wordText, /Timetable note: Timetable note:/);
-assert.match(wordText, /Timetable information reflects the data available on 2026-10-07/);
+assert.match(wordText, /calendar assessment date 2026-10-07/);
 assert.doesNotMatch(wordText, /ATLAS/);
 assert.doesNotMatch(wordText, /Service note: Timetable may vary during school holidays/);
 assert.match(wordText, /Resolved Midpoint/);

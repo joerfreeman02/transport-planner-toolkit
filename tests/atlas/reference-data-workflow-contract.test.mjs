@@ -180,7 +180,11 @@ assert.doesNotMatch(diagnostic.slice(diagnostic.indexOf('Upload evidence-safe di
 assert.match(integrity, /referenced\.length > 700/);
 assert.match(integrity, /shard/);
 assert.match(top, /uses: actions\/upload-pages-artifact@v3[\s\S]*?path: pages-site/);
-assert.match(top, /rsync -a --exclude='.git' --exclude='pages-site' --exclude='atlas\/data\/bus' --exclude='atlas\/data\/bus-tnds' \.\/ pages-site\//);
+assert.match(top, /git archive "\$APP_SHA" \| tar -x -C application-source/);
+assert.match(top, /application-source\/\$root\//);
+assert.match(top, /rsync -a --exclude='data\/bus' --exclude='data\/bus-tnds' "application-source\/\$root\/" "pages-site\/\$root\/"/);
+assert.match(top, /cp last-known-good\/atlas\/config\/atlas-release-identity\.json pages-site\/atlas\/config\/atlas-release-identity\.json/);
+assert.match(top, /refresh-identity-cli\.mjs pages-site last-known-good\/atlas\/config\/atlas-release-identity\.json/);
 assert.match(refresh, /--acquisition-disabled requires --source-snapshot/);
 assert.match(refresh, /materialise_for_preparation\(snapshot_root, staging\)/);
 assert.match(refresh, /snapshot_date = frozen_snapshot_date\(snapshot_manifest\) if snapshot_root else datetime\.now\(timezone\.utc\)\.date\(\)\.isoformat\(\)/);

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createBusAssessment, createReviewItem } from '../../src/atlas/application/bus-assessment.mjs';
+import { buildServicePresentation } from '../../src/atlas/domain/bus-service-assessment.mjs';
 
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
@@ -18,6 +19,98 @@ test('complete assessment joins stops, timetable services and separate routed mo
   assert.equal(result.stops[0].walking.distanceMetres, 250);
   assert.equal(result.stops[0].cycling.distanceMetres, 300);
   assert.equal(result.serviceSummaries[0].routeNumber, '10');
+});
+
+test('ordered pattern independently derives downstream principal locations without prepared principalLocations', async () => {
+  const patternService = {
+    ...service,
+    id: 'pattern-derived',
+    principalLocations: undefined,
+    origin: 'Upstream origin',
+    destination: 'Downstream terminus',
+    direction: 'Downstream terminus',
+    routePatternStopIds: ['UPSTREAM', '2100A', 'FIRST-DOWNSTREAM', 'HOSPITAL', 'TERMINUS'],
+    routePatternStops: [
+      { id: 'UPSTREAM', name: 'Upstream place', locality: 'Upstream' },
+      { id: '2100A', name: 'High Street', locality: 'Assessed locality' },
+      { id: 'FIRST-DOWNSTREAM', name: 'East Bedfont', locality: 'East Bedfont' },
+      { id: 'HOSPITAL', name: 'Central Hospital', locality: 'Cranford' },
+      { id: 'TERMINUS', name: 'Hounslow arrival', locality: 'Hounslow' }
+    ],
+    stopSchedules: { '2100A': service.stopSchedules['2100A'] }
+  };
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [patternService], warnings: [], provenance: { source: 'BODS' } }) },
+    accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 60 }], warnings: [], provenance: {} }) }
+  });
+  const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  const summary = result.serviceSummaries[0];
+  assert.deepEqual(summary.principalLocations, ['East Bedfont', 'Central Hospital', 'Cranford', 'Hounslow']);
+  assert.equal(summary.principalLocationState, 'resolved');
+  assert.ok(!summary.principalLocations.includes('High Street'), 'the assessed evidence stop is excluded');
+  assert.ok(!summary.principalLocations.includes('Upstream place'), 'upstream locations never enter the planner row');
+  const presented = buildServicePresentation([summary])[0];
+  assert.equal(presented.principalLocationsDisplay, 'East Bedfont, Central Hospital, Cranford, Hounslow');
+  assert.doesNotMatch(presented.principalLocationsDisplay, /See route origin \/ destination/);
+});
+
+test('exact ordered NaPTAN locality sidecar recovers downstream locations and mismatches fail closed', async () => {
+  const assessRecord = async record => {
+    const assessment = createBusAssessment({
+      stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+      timetableData: { servicesForStops: async () => ({ ok: true, data: [record], warnings: [], provenance: { source: 'BODS' } }) },
+      accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 60 }], warnings: [], provenance: {} }) }
+    });
+    return assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  };
+  const patternIds = ['ORIGIN', 'UNMAPPED-UPSTREAM', '2100A', 'TERMINUS'];
+  const localityCalls = [
+    { id: 'ORIGIN', name: 'Origin locality' },
+    { id: 'UNMAPPED-UPSTREAM', name: '' },
+    { id: '2100A', name: 'High Street', locality: 'Assessed locality' },
+    { id: 'TERMINUS', name: 'Sainsbury’s' }
+  ];
+  const recovered = await assessRecord({ ...service, id: 'naptan-sidecar', principalLocations: undefined, routePatternStopIds: patternIds, routePatternStops: [], plannerLocalityPatternStops: localityCalls, stopSchedules: { '2100A': service.stopSchedules['2100A'] } });
+  assert.deepEqual(recovered.serviceSummaries[0].principalLocations, ['Sainsbury’s']);
+  assert.equal(recovered.serviceSummaries[0].principalLocationState, 'resolved');
+  assert.equal(recovered.reviewItems.some(item => item.code === 'directional-principal-location'), false);
+
+  const mismatched = await assessRecord({ ...service, id: 'mismatched-naptan-sidecar', principalLocations: undefined, routePatternStopIds: patternIds, routePatternStops: [], plannerLocalityPatternStops: [localityCalls[0], { ...localityCalls[1], id: 'OTHER-STOP' }, ...localityCalls.slice(2)], stopSchedules: { '2100A': service.stopSchedules['2100A'] } });
+  assert.equal(mismatched.serviceSummaries[0].principalLocationState, 'unresolved');
+  assert.ok(mismatched.reviewItems.some(item => item.code === 'directional-principal-location'));
+});
+
+test('missing pattern identity is explicit and cannot be hidden by a planner placeholder', async () => {
+  const unresolvedService = { ...service, id: 'no-pattern', principalLocations: undefined, routePatternStopIds: [], routePatternStops: [], stopSchedules: { '2100A': service.stopSchedules['2100A'] } };
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [unresolvedService], warnings: [], provenance: { source: 'BODS' } }) },
+    accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 60 }], warnings: [], provenance: {} }) }
+  });
+  const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  assert.equal(result.serviceSummaries[0].principalLocationState, 'unresolved');
+  assert.ok(result.reviewItems.some(item => item.code === 'directional-principal-location' && item.route === '10'));
+  assert.equal(result.plannerServiceSummaries[0].principalLocationsText, 'Specific principal locations not supplied');
+  assert.doesNotMatch(result.plannerServiceSummaries[0].principalLocationsText, /See route origin \/ destination/);
+});
+
+test('proven terminal destination is the minimum useful location and repeated circular anchors fail closed', async () => {
+  const assessRecord = async record => {
+    const assessment = createBusAssessment({
+      stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+      timetableData: { servicesForStops: async () => ({ ok: true, data: [record], warnings: [], provenance: { source: 'BODS' } }) },
+      accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 60 }], warnings: [], provenance: {} }) }
+    });
+    return assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  };
+  const terminalResult = await assessRecord({ ...service, id: 'terminal-pattern', routePatternStopIds: ['UPSTREAM', '2100A'], routePatternStops: [{ id: 'UPSTREAM', name: 'Upstream' }, { id: '2100A', name: 'High Street' }], destinationStopPointId: '2100A', destination: 'Terminus', stopSchedules: { '2100A': service.stopSchedules['2100A'] } });
+  assert.deepEqual(terminalResult.serviceSummaries[0].principalLocations, ['Terminus']);
+  assert.equal(terminalResult.serviceSummaries[0].principalLocationState, 'resolved');
+  const repeatedResult = await assessRecord({ ...service, id: 'repeated-loop-anchor', circular: true, routePatternStopIds: ['UPSTREAM', '2100A', 'MID', '2100A', 'TERMINUS'], routePatternStops: ['UPSTREAM', '2100A', 'MID', '2100A', 'TERMINUS'].map(id => ({ id, name: id })), stopSchedules: { '2100A': service.stopSchedules['2100A'] } });
+  assert.deepEqual(repeatedResult.serviceSummaries[0].principalLocations, []);
+  assert.equal(repeatedResult.serviceSummaries[0].principalLocationState, 'unresolved');
+  assert.ok(repeatedResult.reviewItems.some(item => item.code === 'directional-principal-location'));
 });
 
 test('timetable and routing failures produce an honest partial assessment', async () => {
@@ -87,6 +180,26 @@ test('BODS survives unresolved supplementary TNDS without a complete assessment'
   assert.ok(result.reviewItems.length > 0, 'supplementary uncertainty remains visible for review');
 });
 
+test('unresolved supplementary TfL lookup is diagnostic only when exact-stop BODS is safely primary', async () => {
+  const bods = { ...service, routeNumber: '10', id: 'bods-primary-exact-stop', timetableSource: 'BODS', provider: 'BODS', source: { provider: 'BODS', primaryAuthority: 'BODS' } };
+  const assessAt = async routeAuthorities => {
+    const assessment = createBusAssessment({
+      stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [{ ...stop, routeAuthorities: { '10': routeAuthorities } }], evidence: [], warnings: [], provenance: { stopCoverageComplete: true } }) },
+      timetableData: { servicesForStops: async () => ({ ok: true, data: [bods], warnings: [], provenance: { sourceCompleteness: 'PARTIAL', unresolvedRequestIdentities: ['10|2100A'], tflTimetableRequestIdentities: ['10|2100A'] } }) },
+      accessRouting: { matrix: async (_site, stops) => ({ ok: true, routes: stops.map(() => ({ status: 'routed', distanceMetres: 100, durationSeconds: 60 })), warnings: [], provenance: {} }) }
+    });
+    return assessment.assess({});
+  };
+  const nationalPrimary = await assessAt(['BODS']);
+  assert.equal(nationalPrimary.reviewItems.some(item => item.code === 'unresolved-timetable-request'), false);
+  assert.ok(nationalPrimary.reviewDiagnostics.some(item => item.code === 'unresolved-timetable-request' && item.actionability === 'diagnostic' && /no separate planner action/i.test(item.message)));
+  assert.ok(nationalPrimary.plannerServiceSummaries.some(item => item.routeNumber === '10'), 'the displayed schedule remains available from the exact-stop BODS record');
+
+  const tflPrimary = await assessAt(['TfL', 'BODS']);
+  assert.ok(tflPrimary.reviewItems.some(item => item.code === 'unresolved-timetable-request'), 'BODS presence cannot clear a missing TfL-authoritative match');
+  assert.equal(tflPrimary.reviewDiagnostics.some(item => item.code === 'unresolved-timetable-request'), false);
+});
+
 test('conflicting route operator evidence preserves service rows and creates a visible review item', async () => {
   const route329Services = [
     { ...service, id: 'bods-329-north', routeNumber: '329', operator: 'Arriva London North', timetableSource: 'BODS', source: { provider: 'BODS' } },
@@ -137,6 +250,130 @@ test('all assessment review paths carry deterministic taxonomy categories', asyn
   assert.equal(future.category, 'other-material');
 });
 
+test('usable BODS evidence is not challenged by differing TNDS effective dates', async () => {
+  const records = [
+    { ...service, id: 'bods-effective', timetableSource: 'BODS', validFrom: '2026-01-01', validTo: '2026-12-31' },
+    { ...service, id: 'tnds-effective', timetableSource: 'TNDS', source: { provider: 'TNDS' }, validFrom: '2026-06-01', validTo: '2027-05-31' }
+  ];
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: records, warnings: [], provenance: { source: 'BODS/TNDS' } }) },
+    accessRouting: { matrix: async () => ({ ok: true, routes: [{ status: 'routed', distanceMetres: 100, durationSeconds: 90 }], warnings: [], provenance: {} }) }
+  });
+  const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  assert.equal(result.reviewItems.some(item => /cross-source-service-conflict|BODS and TNDS evidence/i.test(`${item.code} ${item.message}`)), false);
+  assert.equal(result.plannerServiceSummaries.length, 1, 'the locally equivalent services remain one BODS-led planner row');
+  assert.equal(result.plannerServiceSummaries[0].timetableSource, 'BODS');
+});
+
+test('same-route principal-location uncertainty is grouped across sources, stops and directions', async () => {
+  const warning = 'Principal locations could not be safely mapped to ordered calls at the assessed stop; review the source journey pattern.';
+  const secondStop = { ...stop, id: '2100B', name: 'Another Stop' };
+  const records = [stop, secondStop].flatMap((assessedStop, index) => ['BODS', 'TfL'].map(provider => ({
+    ...service,
+    id: `${provider.toLowerCase()}-direction-${index}`,
+    timetableSource: provider,
+    source: { provider },
+    direction: index === 0 ? 'outbound' : 'inbound',
+    origin: index === 0 ? 'Alpha' : 'Gamma',
+    destination: index === 0 ? 'Beta' : 'Delta',
+    stopSchedules: { [assessedStop.id]: service.stopSchedules['2100A'] },
+    sourceWarnings: [warning]
+  })));
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop, secondStop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: records, warnings: [], provenance: { source: 'BODS/TfL' } }) },
+    accessRouting: { matrix: async (_site, stops) => ({ ...route, routes: stops.map(() => ({ ...route.routes[0] })) }) }
+  });
+  const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  const directionIssues = result.reviewItems.filter(item => item.code === 'directional-principal-location');
+  assert.equal(directionIssues.length, 1, 'the same public-route location issue is not repeated for each source, stop or direction');
+  assert.equal(directionIssues[0].route, '10');
+  assert.equal(directionIssues[0].stop, '2100A, 2100B', 'all affected assessed stops remain attached to the grouped issue');
+  assert.equal(directionIssues[0].source, 'BODS + TfL', 'the grouped item preserves every source that raised the issue');
+  assert.equal(directionIssues[0].message, 'Principal locations could not be safely mapped for one or more timetable patterns; review the source journey pattern.');
+});
+
+test('repeated special-day profile warnings group to one material calendar issue per route', async () => {
+  const secondStop = { ...stop, id: '2100B', name: 'Another Stop' };
+  const records = ['555', 'N555'].flatMap(routeNumber => Array.from({ length: 6 }, (_, index) => {
+    const assessedStop = index % 2 ? secondStop : stop;
+    const profile = `JP_${routeNumber}-${index + 1}`;
+    return {
+      ...service,
+      id: `${routeNumber}-${profile}-${assessedStop.id}`,
+      routeNumber,
+      timetableSource: 'TNDS',
+      source: { provider: 'TNDS' },
+      stopSchedules: { [assessedStop.id]: service.stopSchedules['2100A'] },
+      sourceWarnings: [`TNDS ${profile} has an unsupported complex operating profile (SpecialDaysOperation); operating days remain unresolved and no timetable days were fabricated.`]
+    };
+  })).concat({ ...service, id: '555-bods-primary', routeNumber: '555', provider: 'BODS', primaryAuthority: 'BODS', timetableSource: 'BODS', source: { provider: 'BODS', primaryAuthority: 'BODS' }, stopSchedules: { '2100A': service.stopSchedules['2100A'], '2100B': service.stopSchedules['2100A'] } });
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop, secondStop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: records, warnings: [], provenance: { source: 'TNDS' } }) },
+    accessRouting: { matrix: async (_site, stops) => ({ ...route, routes: stops.map(() => ({ ...route.routes[0] })) }) }
+  });
+  const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  const calendarIssues = result.reviewItems.filter(item => item.code === 'service-source-evidence' && /special-day operating profiles/i.test(item.message));
+  assert.equal(calendarIssues.length, 1, 'BODS calendar evidence fully covering Route 555 makes its conflicting supplementary TNDS calendars immaterial');
+  assert.deepEqual(calendarIssues.map(item => item.route), ['N555']);
+  assert.match(calendarIssues[0].message, /6 timetable patterns/);
+  assert.equal(calendarIssues[0].stop, '2100A, 2100B', 'the TNDS-only N555 limitation retains every affected stop');
+  assert.ok(result.serviceSummaries.some(row => row.routeNumber === '555' && /BODS/i.test([row.timetableSource, row.frequencyEvidenceSource, row.provider, row.sourceProviders, row.sourceAuthorities].flat().join(' '))), 'Route 555 remains BODS-primary: ' + JSON.stringify(result.serviceSummaries.filter(row => row.routeNumber === '555').map(row => ({ timetableSource: row.timetableSource, frequencyEvidenceSource: row.frequencyEvidenceSource, provider: row.provider, sourceProviders: row.sourceProviders, sourceAuthorities: row.sourceAuthorities }))));
+  assert.match(calendarIssues[0].source, /TNDS/);
+});
+
+test('material TfL and BODS identity conflict becomes a route- and stop-specific Sources & Checks review item', async () => {
+  const assessedStop = { ...stop, id: '490009752E', routes: ['W11'], timetableAuthority: 'TfL', timetableAuthorities: ['TfL', 'NaPTAN'], routeAuthorities: { W11: ['TfL'] } };
+  const w11 = {
+    ...service,
+    id: 'tfl:w11:outbound:0:calendar:ordinary',
+    routeNumber: 'W11',
+    operator: 'Stagecoach London',
+    origin: 'Chingford Hall Estate',
+    destination: 'Walthamstow Central Station',
+    direction: 'outbound',
+    provider: 'TfL',
+    timetableSource: 'TfL + BODS supplementary',
+    source: { provider: 'TfL', primaryAuthority: 'TfL', routeMetadata: 'incomplete', assessedStopPointId: '490009752E' },
+    sourceAuthorityDiagnostics: [{ provider: 'BODS', type: 'supplementary-field-disagreement', fields: ['direction', 'principalLocations', 'routePatternStopIds'], materialFields: ['direction', 'principalLocations', 'routePatternStopIds'], classification: 'material-identity-ambiguity', authoritativeProvider: 'TfL' }],
+    stopSchedules: { '490009752E': service.stopSchedules['2100A'] }
+  };
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [assessedStop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: [w11], warnings: ['TfL and supplementary national evidence disagree on an unresolved route identity for one or more London services.'], provenance: { sourceCompleteness: 'COMPLETE', supplementaryMaterialConflictCount: 1 } }) },
+    accessRouting: { matrix: async () => ({ ...route, routes: [{ ...route.routes[0] }] }) }
+  });
+  const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  const issue = result.reviewItems.find(item => item.code === 'supplementary-identity-conflict');
+  assert.equal(result.status, 'complete', 'assessment execution remains complete while professional evidence review is required');
+  assert.ok(issue);
+  assert.equal(issue.route, 'W11');
+  assert.equal(issue.stop, '490009752E');
+  assert.match(issue.message, /direction, principalLocations, routePatternStopIds/);
+  assert.equal(result.plannerServiceSummaries[0].timetableSource, 'TfL', 'the authoritative TfL schedule stays primary when the fixture provides no supplementary departures');
+});
+
+test('special-day profile warnings without a public route identity remain separately reviewable', async () => {
+  const records = ['JP_unknown-1', 'JP_unknown-2'].map(profile => ({
+    ...service,
+    id: profile,
+    routeNumber: null,
+    timetableSource: 'TNDS',
+    source: { provider: 'TNDS' },
+    sourceWarnings: [`TNDS ${profile} has an unsupported complex operating profile (SpecialDaysOperation); operating days remain unresolved and no timetable days were fabricated.`]
+  }));
+  const assessment = createBusAssessment({
+    stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [stop], warnings: [], evidence: [], provenance: { stopCoverageComplete: true } }) },
+    timetableData: { servicesForStops: async () => ({ ok: true, data: records, warnings: [], provenance: { source: 'TNDS' } }) },
+    accessRouting: { matrix: async () => route }
+  });
+  const result = await assessment.assess({ latitude: 51.7, longitude: -0.03 }, { radius: 250 });
+  const calendarIssues = result.reviewItems.filter(item => item.code === 'service-source-evidence' && /SpecialDaysOperation/.test(item.message));
+  assert.equal(calendarIssues.length, 2, 'unknown-route pattern warnings are not collapsed into one route-level issue');
+});
+
 test('Chingford repeated origin endpoint evidence is grouped by public route issue while all raw stop records remain', async () => {
   const chingfordStops = Array.from({ length: 5 }, (_, index) => ({
     ...stop, id: `CHINGFORD-${index + 1}`, name: `Grove Road ${index + 1}`,
@@ -157,9 +394,11 @@ test('Chingford repeated origin endpoint evidence is grouped by public route iss
   });
   const result = await assessment.assess({ latitude: 51.6, longitude: -0.01 }, { radius: 250 });
   const endpointIssues = result.reviewItems.filter(item => item.code === 'planner-endpoint-resolution');
+  const directionIssues = result.reviewItems.filter(item => item.code === 'directional-principal-location');
   assert.equal(result.services.length, 15, 'all per-StopPoint source records remain in the assessment evidence');
-  assert.equal(result.reviewItems.length, 3, 'the main review badge counts only the three actionable route-level endpoint issue groups');
+  assert.equal(result.reviewItems.length, 6, 'review counts include three route-level endpoint issues and three unproven directional summaries');
   assert.equal(endpointIssues.length, 3, 'the review count is one actionable origin-endpoint issue for each of Routes 215, 385 and 397, not one per StopPoint');
+  assert.equal(directionIssues.length, 3, 'unmapped principal locations remain actionable without being repeated for every StopPoint record');
   assert.deepEqual(endpointIssues.map(item => item.route).sort(), ['215', '385', '397']);
   assert.ok(endpointIssues.every(item => item.actionability === 'review'));
   assert.ok(result.services.every(record => record.originStopPointIds?.length === 1 && record.sourceRecordIds?.length === 1), 'grouping review items leaves every raw source record and unresolved origin StopPoint identity accessible');

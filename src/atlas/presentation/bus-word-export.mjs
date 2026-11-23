@@ -18,7 +18,9 @@ function stopRouteNumbers(stop) {
 export function buildBusTransportStatement(result, { services = result?.plannerServiceSummaries ?? result?.serviceSummaries ?? [], nearestGroupName = result?.nearestGroup?.name ?? null } = {}) {
   const count = assessedStopRecords(result?.stops).length;
   const routeNumbers = [...new Set((services ?? []).flatMap(service => service.publicRouteNumbers ?? service.routeNumbers ?? [service.routeNumber]).map(text).filter(Boolean))];
-  const destinationValues = (services ?? []).flatMap(service => [service.destination, ...(service.principalLocations ?? [])]).map(text).filter(Boolean);
+  const destinationValues = (services ?? []).flatMap(service => [service.destination, ...(service.principalLocations ?? [])])
+    .map(value => text(value).replace(/\s+arrival\s*$/i, '').trim())
+    .filter(Boolean);
   const destinationKey = value => value.toLocaleLowerCase('en-GB').replace(/[^a-z0-9]+/gu, ' ').trim().replace(/\s+/gu, ' ');
   const destinations = [];
   for (const destination of destinationValues) {
@@ -38,9 +40,14 @@ export function buildBusTransportStatement(result, { services = result?.plannerS
   const population = nearestGroupName
     ? `in the nearest logical stop group at ${text(nearestGroupName)}`
     : 'within the assessed area';
+  const nearestConclusion = result?.nearestGroup?.conclusion;
   const first = serviceCount
-    ? `A total of ${count} bus stop${count === 1 ? ' is' : 's are'} located ${population}, providing access to ${routeNumbers.length} bus route${routeNumbers.length === 1 ? '' : 's'}${connectionText}.`
-    : `${count} bus stop${count === 1 ? ' is' : 's are'} located ${population}. No usable timetable evidence was available for the selected stops.`;
+    ? `A total of ${count} bus stop${count === 1 ? ' is' : 's are'} located ${population}, providing access to ${routeNumbers.length} bus route${routeNumbers.length === 1 ? '' : 's'} across ${serviceCount} timetable service pattern${serviceCount === 1 ? '' : 's'}${connectionText}.`
+    : nearestConclusion === 'NO_CURRENT_MATCH'
+      ? `${count} bus stop${count === 1 ? ' is' : 's are'} located ${population}. No current timetable match was established for this group; this does not establish that no public bus service operates there where source coverage is incomplete.`
+      : nearestConclusion === 'UNRESOLVED'
+        ? `${count} bus stop${count === 1 ? ' is' : 's are'} located ${population}. Timetable evidence for this group remained unresolved, and a farther group was not substituted.`
+        : `${count} bus stop${count === 1 ? ' is' : 's are'} located ${population}. No usable timetable evidence was available for the selected stops.`;
   const second = serviceCount
     ? `Services operate at a range of frequencies${hasQualifications ? ', with material qualifications shown alongside the relevant rows' : ''}. Assessed stops are summarised in Table 3.2; principal destinations, typical frequencies and operating periods are provided in Table 3.3.`
     : 'The stops and their access information are summarised in Table 3.2.';
@@ -146,7 +153,7 @@ export function buildBusWordTables(result, { includeMap = true } = {}) {
   return [
     {
       caption: 'Table 3.2 - Bus Stop Summary',
-      headers: [...(includeMap ? ['Map reference'] : []), 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes serving stop'],
+      headers: [...(includeMap ? ['Map reference'] : []), 'Stop name', 'Direction', 'Walking distance / time', 'Cycling distance / time', 'Routes recorded or matched at stop'],
       rows: stopRows,
       widths: includeMap ? [8, 22, 15, 20, 20, 15] : [25, 17, 22, 22, 14]
     },

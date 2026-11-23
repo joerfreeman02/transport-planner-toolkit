@@ -22,11 +22,13 @@ const tndsRoot = path.join(candidateRoot, 'atlas', 'data', 'bus-tnds');
 const nationalRequests = [];
 const tflRequests = [];
 const controls = {
-  waltham: { label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6857829, longitude: -0.0330001, radius: 700, focusRoutes: ['13', '13A', '13B', '13C', '14', '15', '15A', '16', '16C', '25C', '66', '217', '242', '251', '279', '310', '317', '327', '491', 'A1', 'N279'] },
-  pipers: { label: 'Pipers Lane', latitude: 51.852700, longitude: -0.454343, radius: 700, focusRoutes: ['46', '230', '231', 'C'] },
-  pipers46: { label: 'Pipers Lane route 46 selected-stop frequency control', latitude: 51.852700, longitude: -0.454343, radius: 1200, focusRoutes: ['46'] },
+  tufton: { label: 'Tufton Road, Chingford Mount', latitude: 51.6145182, longitude: -0.0204976, radius: 400, focusRoutes: ['97', '158', '215', '397', '397A', '444', 'W11', 'W16'] },
+  waltham: { label: '47 Berkley Avenue, Waltham Cross', latitude: 51.6861442, longitude: -0.035707, radius: 700, focusRoutes: ['13', '13A', '13B', '13C', '14', '15', '15A', '16', '16C', '25C', '66', '217', '242', '251', '279', '310', '317', '327', '491', 'A1', 'N279'] },
+  pipers: { label: 'Pipers Lane', latitude: 51.8518496, longitude: -0.4557839, radius: 1200, focusRoutes: ['46', '230', '231', 'C'] },
+  pipers46: { label: 'Pipers Lane route 46 selected-stop frequency control', latitude: 51.8518496, longitude: -0.4557839, radius: 1200, focusRoutes: ['46'] },
   pe1: { label: 'PE1 2TL', latitude: 52.577554, longitude: -0.242489, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '6', '23', '24', '25', '27', '33', '37', '60', '61', '62', '63', '101', '102', '201', '202', '415', '904', '4P', 'A', 'B', 'C'] },
   enfield: { label: 'Enfield Town', latitude: 51.6522, longitude: -0.0809, radius: 500, focusRoutes: ['121', '191', '313', '329', '629', 'W8'] },
+  longlane: { label: 'Long Lane, Hounslow', latitude: 51.456210, longitude: -0.462970, radius: 400, focusRoutes: ['203'] },
   queensgate: { label: 'Queensgate Bus Station', latitude: 52.5701, longitude: -0.2498, radius: 500, focusRoutes: ['X4', '1', '2', '3', '4', '5', '6', '23', '24', '25', '27', '33', '60', '61', '62', '63', '202', '415', '904', '5A', 'A', 'B', 'C'] }
 };
 const control = controls[controlId];
@@ -135,6 +137,14 @@ const rawRows = assessment.services.filter(row => wanted.has(route(row.routeNumb
   id: row.id, routeNumber: row.routeNumber, operator: row.operator, timetableSource: row.timetableSource,
   provider: row.provider, source: row.source, origin: row.origin, destination: row.destination,
   direction: row.direction, stopScheduleIds: Object.keys(row.stopSchedules ?? {}),
+  directionFamily: row.directionFamily, patternVariants: row.patternVariants, circular: row.circular,
+  calendarProfileId: row.calendarProfileId, validFrom: row.validFrom, validTo: row.validTo,
+  routePatternStopIds: row.routePatternStopIds, circularPatternStopIds: row.circularPatternStopIds,
+  routePatternStops: row.routePatternStops,
+  selectedStopScheduleCounts: Object.fromEntries(assessment.stops.map(stop => [String(stop.id), row.stopSchedules?.[String(stop.id)] ?? null]).filter(([, value]) => value)),
+  selectedStopDepartureEvidence: Object.fromEntries(Object.entries(row.departureEvidenceByDay ?? {}).map(([day, entries]) => [day,
+    (entries ?? []).filter(entry => assessment.stops.some(stop => String(stop.id) === String(entry.stopPointId)))
+      .map(entry => ({ minute: entry.minute, stopPointId: entry.stopPointId, journeyIdentity: entry.journeyIdentity, sourceRecordId: entry.sourceRecordId, provider: entry.provider, calendarProfileId: entry.calendarProfileId }))]).filter(([, entries]) => entries.length)),
   scheduledStops: Object.fromEntries(Object.entries(row.stopSchedules ?? {}).map(([id, days]) => [id,
     Object.fromEntries(Object.entries(days ?? {}).map(([day, times]) => [day, Array.isArray(times) ? times.length : 0]))]))
 }));
@@ -163,23 +173,9 @@ const plannerRows = assessment.plannerServiceSummaries.filter(row => wanted.has(
     id: service.id, sourceRecordIds: service.sourceRecordIds, routeNumber: service.routeNumber, operator: service.operator,
     provider: service.provider, timetableSource: service.timetableSource, origin: service.origin, destination: service.destination,
     direction: service.direction, stopIds: service.stopIds, frequencyBasisStopId: service.frequencyBasisStopId,
-    calendarProfileId: service.calendarProfileId, departuresByDay: service.departuresByDay,
-    departureEvidenceByDay: service.departureEvidenceByDay
-  })),
-  selectedDeparturePopulationByDay: Object.fromEntries(Object.entries(row.canonicalDeparturePopulation ?? {}).map(([day, entries]) => [day, entries.map(entry => ({
-    minute: entry.minute, stopPointId: entry.stopPointId, routeNumber: entry.routeNumber, journeyIdentity: entry.journeyIdentity,
-    sourceRecordId: entry.sourceRecordId, provider: entry.provider, calendarProfileIds: entry.calendarProfileIds
-  }))])),
-  canonicalDeparturePopulationByDay: Object.fromEntries(Object.entries(row.canonicalDeparturePopulationAll ?? {}).map(([day, entries]) => [day, entries.map(entry => ({
-    minute: entry.minute, stopPointId: entry.stopPointId, routeNumber: entry.routeNumber, journeyIdentity: entry.journeyIdentity,
-    sourceRecordId: entry.sourceRecordId, provider: entry.provider, calendarProfileIds: entry.calendarProfileIds
-  }))])),
-  rawServiceEvidence: (row.rawServiceSummaries ?? []).map(service => ({
-    id: service.id, sourceRecordIds: service.sourceRecordIds, routeNumber: service.routeNumber, operator: service.operator,
-    provider: service.provider, timetableSource: service.timetableSource, origin: service.origin, destination: service.destination,
-    direction: service.direction, stopIds: service.stopIds, frequencyBasisStopId: service.frequencyBasisStopId,
-    calendarProfileId: service.calendarProfileId, departuresByDay: service.departuresByDay,
-    departureEvidenceByDay: service.departureEvidenceByDay
+    principalLocations: service.principalLocations, routePatternStopIds: service.routePatternStopIds,
+    routePatternStops: service.routePatternStops,
+    calendarProfileId: service.calendarProfileId
   })),
   serviceNote: row.serviceNote, routeVariantNote: row.routeVariantNote, routeGroupNote: row.routeGroupNote, plannerNotes: row.plannerNotes,
   groupingDecision: row.publicServiceGroupingDecision,
@@ -353,6 +349,7 @@ const compactPlannerRows = rows => rows.map(row => ({
   id: row.id, routeNumber: row.routeNumber, routeNumbers: row.routeNumbers, operator: row.operator,
   direction: row.direction, origin: row.origin, destination: row.destination,
   directionPatternText: row.directionPatternText, principalLocations: row.principalLocations,
+  principalLocationState: row.principalLocationState, principalLocationsText: row.principalLocationsText,
   serviceNote: row.serviceNote, routeVariantNote: row.routeVariantNote, routeGroupNote: row.routeGroupNote, plannerNotes: row.plannerNotes,
   servedAtStopId: row.servedAtStopId, timetableBasisStopLabel: row.timetableBasisStopLabel,
   frequencyBasisStopId: row.frequencyBasisStopId, calendarProfileIds: row.calendarProfileIds,
@@ -385,7 +382,28 @@ const compactSummaryRows = rows => rows.map(row => ({
 const compactRawRows = rows => rows.map(row => ({
   id: row.id, routeNumber: row.routeNumber, operator: row.operator, timetableSource: row.timetableSource,
   origin: row.origin, destination: row.destination, direction: row.direction,
-  stopScheduleIds: row.stopScheduleIds, scheduledStops: row.scheduledStops
+  source: {
+    provider: row.source?.provider ?? row.provider ?? null,
+    lineId: row.source?.lineId ?? null,
+    routeId: row.source?.routeId ?? null,
+    directionId: row.source?.directionId ?? null,
+    journeyPatternId: row.source?.journeyPatternId ?? row.source?.patternId ?? null,
+    vehicleJourneyIds: row.source?.vehicleJourneyIds ?? (row.source?.vehicleJourneyId ? [row.source.vehicleJourneyId] : [])
+  },
+  calendarProfileId: row.calendarProfileId ?? null,
+  validity: { from: row.validFrom ?? row.validity?.from ?? null, to: row.validTo ?? row.validity?.to ?? null },
+  routePatternStopIds: row.routePatternStopIds ?? row.circularPatternStopIds ?? [],
+  circularPatternStopIds: row.circularPatternStopIds ?? [], patternVariants: row.patternVariants ?? [],
+  directionFamily: row.directionFamily ?? null, circular: row.circular === true,
+  routePatternStops: (row.routePatternStops ?? []).map(call => typeof call === 'string' ? { id: null, name: call } : ({
+    id: call.id ?? call.stopPointId ?? call.sourceId ?? null, name: call.name ?? call.commonName ?? null,
+    locality: call.locality ?? call.localityName ?? call.nptgLocalityName ?? null
+  })),
+  stopScheduleIds: row.stopScheduleIds ?? Object.keys(row.stopSchedules ?? {}), scheduledStops: row.scheduledStops,
+  selectedStopScheduleCounts: Object.fromEntries(Object.entries(row.selectedStopScheduleCounts ?? {}).map(([id, days]) => [id,
+    Object.fromEntries(Object.entries(days ?? {}).map(([day, times]) => [day, Array.isArray(times) ? { count: times.length, first: times[0] ?? null, last: times.at(-1) ?? null } : null]))])),
+  selectedStopDepartureEvidence: row.selectedStopDepartureEvidence,
+  sourceRecordIds: row.sourceRecordIds ?? []
 }));
 const compactStops = stopRows.map(stop => ({
   id: stop.id, name: stop.name, distanceMetres: stop.distanceMetres,
@@ -482,6 +500,7 @@ const report = {
     route202ForensicTrace,
     sourceProvenance: { sourceAuthorities: unique(serviceSummaries.map(row => row.timetableSource).filter(Boolean)), tflLiveRequests: 0 },
     warnings: (assessment.warnings ?? []).slice(0, 40) },
+  reviewItems: assessment.reviewItems,
   sameCandidatePreparedOnlyComparison: {
     rawTargetCounts: Object.fromEntries([...wanted].map(r => [r, preparedOnly.services.filter(row => route(row.routeNumber) === r).length])),
     summaryTargetCounts: Object.fromEntries([...wanted].map(r => [r, preparedOnly.serviceSummaries.filter(row => route(row.routeNumber) === r).length])),
@@ -504,5 +523,8 @@ process.stdout.write(`${JSON.stringify({ schema: report.schema, reportPath, stat
   rawSourcesByRoute: Object.fromEntries([...wanted].map(r => [r, Object.fromEntries([...new Set(rawRows.filter(row => route(row.routeNumber) === r).map(row => row.timetableSource))].map(source => [source, rawRows.filter(row => route(row.routeNumber) === r && row.timetableSource === source).length]))])),
   targetPlannerRows: [...wanted].flatMap(r => plannerRowsFor(r).map(row => ({ route: row.routeNumber, members: row.routeNumbers,
     family: row.routeFamilyDecision?.state, principal: row.routeFamilyDecision?.principalRouteNumber,
-    frequency: row.typicalFrequencyLines, circular: row.circularClassification }))) })}\n`);
+    principalLocationState: row.principalLocationState, principalLocations: row.principalLocations,
+    frequency: row.typicalFrequencyLines, circular: row.circularClassification }))),
+  reviewItemCounts: { total: assessment.reviewItems.length, principalLocations: assessment.reviewItems.filter(item => item.code === 'directional-principal-location').length },
+  principalLocationReviewItems: assessment.reviewItems.filter(item => item.code === 'directional-principal-location').map(({ route, stop, source, message }) => ({ route, stop, source, message })) })}\n`);
 if (diagnosticGateError) throw diagnosticGateError;

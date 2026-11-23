@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildPlannerBusServiceSummaries, plannerSourceWarning } from '../../src/atlas/domain/bus-planner-summary.mjs';
+import { buildPlannerBusServiceSummaries, directionPatternText, foldLowVolumeContainedPlannerRows, plannerServiceSummariesForResult, plannerSourceWarning } from '../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildServiceSummaries, calculateTypicalServiceFrequency } from '../../src/atlas/domain/bus-service-assessment.mjs';
 import { createAtlasTaskStatus, formatAtlasTaskStatus } from '../../src/atlas/presentation/atlas-task-status.mjs';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
@@ -13,9 +13,23 @@ const week = {
   saturday: [480, 540],
   sunday: [600]
 };
+
+assert.equal(directionPatternText({ destination: 'Transport Hub arrival', direction: 'Gloucester Transport Hub arrival' }), 'Towards Gloucester Transport Hub', 'A richer matched direction may clarify a generic endpoint name, while terminal-arrival wording stays out of the public label.');
+assert.equal(directionPatternText({ destination: 'Transport Hub', direction: 'northbound' }), 'Towards Transport Hub', 'A compass direction cannot replace a more specific destination name.');
+assert.equal(directionPatternText({ destination: 'The Talbot', direction: 'North Weald, The Talbot' }), 'Towards The Talbot', 'A comma-separated locality sequence is not an endpoint alias.');
+assert.equal(directionPatternText({ destination: 'St Cross', direction: 'St Cross' }), 'Towards St Cross', 'Legitimate place names ending in a double-s sequence remain unchanged.');
 const stop = { id: 'A', name: 'Waltham Cross Bus Station', indicator: 'G', distanceMetres: 110, walking: { status: 'routed', distanceMetres: 82 } };
 const secondStop = { id: 'B', name: 'Waltham Cross Bus Station', indicator: 'H', distanceMetres: 95, walking: { status: 'routed', distanceMetres: 120 } };
 const base = { routeNumber: '657', operator: 'Example Buses', direction: 'outbound', directionFamily: 'gtfs:0', origin: 'Waltham Cross', destination: 'Chingford', principalLocations: ['Enfield', 'Chingford Mount'], routePatternStopIds: ['A', 'B', 'C'], frequencyBasisStopId: 'A', stopIds: ['A'], departuresByDay: week, frequencyEvidence: [], sourceRecordIds: ['main'], serviceNote: 'School-day-only service.' };
+
+const recovered158 = Object.freeze({ id: 'planner:158|towards-chingford', routeNumber: '158', operator: 'Arriva London North', direction: 'towards Chingford Mount', origin: 'Stratford Bus Station', destination: 'Chingford Mount', principalLocations: ['Stratford New Town', 'Leyton', 'Walthamstow Central', 'Walthamstow', 'Blackhorse Road', 'Higham Hill', 'Highams Park', 'Chingford Mount'], principalLocationsText: 'Stratford New Town, Leyton, Walthamstow Central, Walthamstow, Blackhorse Road, Higham Hill, Highams Park, Chingford Mount', stopIds: ['A'], sourceRecordIds: ['tfl:158:inbound', 'bods:158:fallback'], timetableSource: 'TfL', principalLocationState: 'resolved' });
+const degraded158 = { ...base, routeNumber: '158', direction: 'inbound', origin: 'Stratford Bus Station', destination: 'Chingford Mount', principalLocations: ['Hall Lane'], stopIds: ['A'], id: 'raw:158' };
+const resolved158Rows = plannerServiceSummariesForResult({ plannerServiceSummaries: [recovered158], serviceSummaries: [degraded158], stops: [stop] });
+assert.deepEqual(resolved158Rows, [recovered158], 'Browser/Word selection must retain endpoint-resolved planner locations instead of rebuilding from a weaker raw summary.');
+const resolved158WordRows = buildBusWordTables({ ok: true, stops: [stop], plannerServiceSummaries: resolved158Rows, serviceSummaries: [degraded158] })[1].rows;
+assert.match(resolved158WordRows.map(row => Object.values(row).join(' ')).join(' '), /Stratford New Town.*Highams Park.*Chingford Mount/, 'Word presentation retains the complete resolved 158 principal-location chain.');
+const legacyPlannerRows = plannerServiceSummariesForResult({ serviceSummaries: [base], stops: [stop] });
+assert.deepEqual(legacyPlannerRows, buildPlannerBusServiceSummaries([base], [stop]), 'Legacy callers without resolved planner rows retain the existing builder behavior.');
 
 const planner = buildPlannerBusServiceSummaries([
   base,
@@ -38,6 +52,34 @@ assert.match(main.plannerNotes?.shortWorkings ?? '', /Enfield/i, 'the excluded s
 assert.equal(main.directionPatternText, 'Towards Chingford');
 assert.equal(planner.filter(row => row.routeNumber === '657').length, 3);
 
+const boardableSameDestinationOriginVariant = buildPlannerBusServiceSummaries([
+  {
+    id: 'r35-principal', routeNumber: 'R35', operator: 'Fixture operator', timetableSource: 'BODS',
+    origin: 'Bus Station', destination: 'Interchange', direction: 'Interchange', directionFamily: 'gtfs:1',
+    routePatternStopIds: ['ORIGIN', 'ASSESS', 'NEXT', 'DEST'], stopIds: ['ASSESS'], frequencyBasisStopId: 'ASSESS',
+    departuresByDay: { monday: [571, 631, 691, 751, 811, 871, 978, 1056, 1116], tuesday: [571, 631, 691, 751, 811, 871, 978, 1056, 1116], wednesday: [571, 631, 691, 751, 811, 871, 978, 1056, 1116], thursday: [571, 631, 691, 751, 811, 871, 978, 1056, 1116], friday: [571, 631, 691, 751, 811, 871, 978, 1056, 1116], saturday: [], sunday: [] },
+    sourceRecordIds: ['r35-principal']
+  }, {
+    id: 'r35-midway-origin', routeNumber: 'R35', operator: 'Fixture operator', timetableSource: 'BODS',
+    origin: "St Margaret's Railway Station", destination: 'Interchange', direction: 'Interchange', directionFamily: 'gtfs:1',
+    routePatternStopIds: ['MIDWAY', 'ASSESS', 'NEXT', 'DEST'], stopIds: ['ASSESS'], frequencyBasisStopId: 'ASSESS',
+    departuresByDay: { monday: [381], tuesday: [381], wednesday: [381], thursday: [381], friday: [381], saturday: [], sunday: [] },
+    sourceRecordIds: ['r35-midway-origin']
+  }
+], [{ id: 'ASSESS', name: 'Abbotts Rise', indicator: 'adj' }]);
+assert.equal(boardableSameDestinationOriginVariant.length, 1, 'A same-direction departure with a shorter origin and the same downstream destination belongs to the assessed public direction.');
+assert.equal(boardableSameDestinationOriginVariant[0].canonicalDeparturePopulationAll.monday.length, 10, 'The unique 06:21 midpoint-origin departure must remain in the 9-journey principal timetable.');
+assert.match(boardableSameDestinationOriginVariant[0].operatingPeriodLines.join(' '), /Mon-Fri: .*06:21/);
+assert.match(boardableSameDestinationOriginVariant[0].plannerNotes?.shortWorkings ?? '', /from St Margaret/i, 'The later origin is presented as an origin variant, never as a destination.');
+
+const differentlyDatedCrossSourceRows = buildPlannerBusServiceSummaries([
+  { ...base, id: 'bods-current-overlap', routeNumber: 'X5', timetableSource: 'BODS', validFrom: '2026-01-01', validTo: '2026-12-31', destination: 'Town Centre', principalLocations: ['Northgate'], sourceRecordIds: ['bods-current-overlap'] },
+  { ...base, id: 'tnds-overlapping-revision', routeNumber: 'X5', timetableSource: 'TNDS', validFrom: '2026-06-01', validTo: '2027-05-31', destination: 'Town Centre', principalLocations: ['Northgate'], sourceRecordIds: ['tnds-overlapping-revision'] }
+], [stop]);
+assert.equal(differentlyDatedCrossSourceRows.length, 1, 'the established public family remains consolidated under BODS authority');
+assert.equal(differentlyDatedCrossSourceRows[0].timetableSource, 'BODS');
+assert.ok(differentlyDatedCrossSourceRows.every(row => !row.sourceWarnings.some(warning => /BODS and TNDS evidence/i.test(warning))));
+
 const word = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [main], serviceSummaries: [] });
 assert.deepEqual(word[1].headers, ['Route', 'Operator', 'Direction / main service pattern', 'Served at', 'Principal locations', 'Typical frequency', 'Operating period at stop']);
 assert.equal(word[1].rows[0][3], main.servedAtText);
@@ -48,9 +90,10 @@ assert.equal(formatAtlasTaskStatus({ phase: 'routing-stops', completed: 2, total
 assert.equal(formatAtlasTaskStatus({ phase: 'checking-timetables', completed: 12, total: 31 }), 'Step 3 of 5 · Checking timetables — 12 of 31');
 assert.match(formatAtlasTaskStatus({ phase: 'checking-timetables', waiting: true }), /Waiting briefly/);
 assert.equal(formatAtlasTaskStatus({ phase: 'complete' }), 'Assessment complete');
-assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: 'one source was unavailable' }), 'Assessment complete');
-assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '1 evidence item needs review' }), 'Assessment complete');
-assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '2 evidence items need review' }), 'Assessment complete');
+assert.equal(formatAtlasTaskStatus({ phase: 'complete', reviewCount: 1 }), 'Assessment execution complete · professional evidence review required');
+assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: 'one source was unavailable' }), 'Assessment execution complete · source or routing checks incomplete');
+assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '1 evidence item needs review' }), 'Assessment execution complete · source or routing checks incomplete');
+assert.equal(formatAtlasTaskStatus({ phase: 'partial', detail: '2 evidence items need review' }), 'Assessment execution complete · source or routing checks incomplete');
 assert.equal(formatAtlasTaskStatus({ phase: 'unavailable' }), 'Assessment unavailable');
 
 const statusMessage = { textContent: '' };
@@ -70,7 +113,7 @@ assert.equal(statusCount.textContent, '12 of 31');
 assert.equal(statusRegion.attributes['aria-busy'], 'true');
 assert.deepEqual(statusStages.map(stage => stage.dataset.state), ['complete', 'complete', 'active', 'upcoming', 'upcoming']);
 taskStatus.update({ phase: 'partial', detail: 'one timetable request failed', reviewCount: 3 });
-assert.equal(statusMessage.textContent, 'Assessment complete');
+assert.equal(statusMessage.textContent, 'Assessment execution complete · source or routing checks incomplete');
 assert.equal(statusReviewBadge.hidden, false);
 assert.equal(statusReviewBadge.textContent, '3 items require review');
 assert.equal(statusProgress.hidden, true);
@@ -112,12 +155,25 @@ const route279 = buildPlannerBusServiceSummaries([
 assert.equal(route279.length, 1, 'many same-direction patterns consolidate to one planner row');
 assert.equal(route279[0].departuresByDay.monday.length, route279Departures.length, 'duplicate timetable representations do not inflate the canonical departure population');
 assert.match(route279[0].typicalFrequencyLines[0], /Approx\. every \d+ mins \(irregular\)/, 'frequent irregular service uses a rounded average headway');
-assert.match(route279[0].operatingPeriodLines[0], /Approx\. 05:00–01:00 \(next day\)/, 'operating period uses the same canonical population and preserves overnight chronology');
+const route417Window = buildPlannerBusServiceSummaries([
+  plannerRecord({ routeNumber: '417', departures: [493, 1153, 1213, 1273, 1333, 1393], ids: '417-window-control' })
+], coherentStops)[0];
+assert.equal(route417Window.operatingPeriodLines[0], 'Mon-Fri: Approx. 08:13; Approx. 19:13–23:13', 'the route 417-shaped selected-stop timetable exposes its long gap');
+const route417Word = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [route417Window], serviceSummaries: [] })[1].rows.find(row => Array.isArray(row) && row[0] === '417');
+assert.equal(route417Word[6], route417Window.operatingPeriodLines.join('\n'), 'Word carries the same separated windows as the Browser summary');
+assert.equal(route279[0].operatingPeriodLines[0], 'Mon-Fri: Approx. 05:00–10:00; Approx. 01:00 (next day)', 'a long daytime-to-next-day gap is disclosed as separate exact-departure windows');
 assert.equal(route279[0].servedAtStopId, 'A');
 assert.equal(route279[0].frequencyBasisStopId, 'A');
 assert.equal(route279[0].canonicalDeparturePopulation.monday.every(item => item.stopPointId === 'A'), true);
 assert.equal(route279[0].routeGroupNote, 'Additional short workings and timetable variants operate.'); // legacy audit field; not planner-facing
 assert.equal(route279[0].directionPatternText, 'Towards Theobalds Grove');
+const route279RepeatedPatternNote = buildPlannerBusServiceSummaries([
+  plannerRecord({ routeNumber: '279', ids: '279-note', serviceNote: 'Intermediate stop patterns vary, including East Street. Intermediate stop patterns vary, including West Street.' })
+], coherentStops)[0];
+assert.equal(route279RepeatedPatternNote.serviceNote, 'Intermediate stop patterns vary, including East Street; West Street.', 'shared intermediate-pattern wording is stated once while both source-supported examples remain');
+const route279RepeatedPatternWord = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [route279RepeatedPatternNote], serviceSummaries: [] })[1].rows.find(row => !Array.isArray(row) && /Intermediate stop patterns vary/.test(row.text));
+assert.match(route279RepeatedPatternWord.text, /East Street; West Street/);
+assert.equal((route279RepeatedPatternWord.text.match(/Intermediate stop patterns vary/g) ?? []).length, 1, 'Word uses the same deduplicated route note as the Browser summary');
 
 const sameTime = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: 'Q', departures: [420], ids: 'same-physical' }),
@@ -166,6 +222,14 @@ assert.equal(route13.departuresByDay.monday.length, 18, 'principal-route frequen
 assert.doesNotMatch(route13.serviceNote, /Limited service|no more than three/i, 'limited-service notes are recalculated after consolidation');
 assert.equal(route13.routeGroupNote, 'Additional short workings and timetable variants operate.'); // legacy audit field; not planner-facing
 assert.equal(route13.directionPatternText, 'Towards North Weald');
+
+const punctuationSafeNotes = foldLowVolumeContainedPlannerRows([
+  { routeNumber: 'PUNCT', operator: 'Example Buses', origin: 'Waltham Cross', destination: 'Theobalds Grove', frequencyBasisStopId: 'A', typicalFrequencyLines: ['Mon-Fri: Every ~120 mins'], serviceNote: 'Journeys vary in the intermediate stops served.', publicServiceGroupingDecision: { principalPattern: { orderedRoutePatternStopIds: ['A','B','C','D','E','F','G','H','I','J','K','L'] } }, sourceRecordIds: ['punct-main'], variantCount: 1 },
+  { routeNumber: 'PUNCT', operator: 'Example Buses', origin: 'Waltham Cross', destination: 'Harlow', frequencyBasisStopId: 'A', typicalFrequencyLines: ['Mon-Fri: 1 journey/day'], publicServiceGroupingDecision: { principalPattern: { orderedRoutePatternStopIds: ['A','B','C','D','E','F','G','H','I','J'] } }, sourceRecordIds: ['punct-short'], variantCount: 1 }
+]);
+assert.equal(punctuationSafeNotes.length, 1, 'a low-volume contained short working remains in its principal route row');
+assert.doesNotMatch(punctuationSafeNotes[0].serviceNote, /served\.;/);
+assert.match(punctuationSafeNotes[0].serviceNote, /served\. Some route PUNCT journeys operate to Harlow/);
 
 const mixedPatternEvidence = buildPlannerBusServiceSummaries([
   plannerRecord({ routeNumber: 'E', departures: [420, 480, 540, 600, 660, 720], ids: 'e-main', frequencyEvidence: [{ periodType: 'FrequencyMinutes', day: 'monday', lowestFrequency: 10, highestFrequency: 10 }] }),
@@ -234,6 +298,7 @@ const wordTable = buildBusWordTables({ ok: true, stops: [], plannerServiceSummar
 const wordRows = wordTable.rows;
 assert.equal(wordRows[0][2], route279[0].directionPatternText, 'Word consumes the same direction model as Browser');
 assert.equal(wordRows[0][5], route279[0].typicalFrequencyText, 'Word consumes the same frequency model as Browser');
+assert.equal(wordRows[0][6], route279[0].operatingPeriodLines.join('\n'), 'Word consumes the same separated windows and overnight chronology as Browser');
 assert.equal(wordTable.prelude, '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence.', 'Word carries a concise external methodology note once before the table');
 const reviewWordRows = buildBusWordTables({ ok: true, stops: [], plannerServiceSummaries: [], serviceSummaries: [], reviewItems: [{ route: '279', stop: 'A', source: 'TfL', message: 'Review this timetable evidence.' }] })[1].rows;
 assert.equal(reviewWordRows.some(row => !Array.isArray(row) && /^Planner review required:/i.test(row.text)), false, 'planning-facing Word omits internal planner-review warning rows');

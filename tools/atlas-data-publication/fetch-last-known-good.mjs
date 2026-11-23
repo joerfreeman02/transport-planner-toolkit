@@ -40,19 +40,54 @@ await writeJson('active-slots.json', {
 
 const fallback = { bus: new URL('data/bus/', root), tnds: new URL('data/bus-tnds/', root) };
 const busBase = config?.datasets?.bus?.baseUrl ? new URL(config.datasets.bus.baseUrl, new URL('config/', root)) : fallback.bus;
-const firstTndsBase = activeRoots[0]?.baseUrl ? new URL(activeRoots[0].baseUrl, new URL('config/', root)) : (tnds.baseUrl ? new URL(tnds.baseUrl, new URL('config/', root)) : fallback.tnds);
-for (const [key, base] of [['bus', busBase], ['tnds', firstTndsBase]]) {
-  const manifest = config?.datasets?.[key]?.manifest || 'manifest.json';
-  const text = await fetchText(new URL(manifest, base));
-  if (text) {
-    const target = path.join(outputRoot, 'atlas', 'data', key === 'bus' ? 'bus' : 'bus-tnds', 'manifest.json');
-    await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.writeFile(target, text);
-  }
+const busManifest = config?.datasets?.bus?.manifest || 'manifest.json';
+const busText = await fetchText(new URL(busManifest, busBase));
+if (busText) {
+  const target = path.join(outputRoot, 'atlas', 'data', 'bus', 'manifest.json');
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await fs.writeFile(target, busText);
+}
+const tndsRoots = activeRoots.length ? activeRoots : [{ id: 'default', baseUrl: tnds.baseUrl || fallback.tnds.toString() }];
+for (const [index, item] of tndsRoots.entries()) {
+  if (!item?.baseUrl) continue;
+  const base = new URL(item.baseUrl, new URL('config/', root));
+  const text = await fetchText(new URL(tnds.manifest || 'manifest.json', base));
+  if (!text) continue;
+  const relative = index === 0 ? 'atlas/data/bus-tnds/manifest.json' : `atlas/data/bus-tnds/${item.id || `root-${index + 1}`}/manifest.json`;
+  const target = path.join(outputRoot, relative);
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await fs.writeFile(target, text);
 }
 const status = await fetchText(new URL('data/status/manifest.json', root));
 if (status) {
   const target = path.join(outputRoot, 'atlas', 'data', 'status', 'manifest.json');
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, status);
+}
+const releaseIdentity = await fetchText(new URL('config/atlas-release-identity.json', root));
+if (releaseIdentity) {
+  JSON.parse(releaseIdentity);
+  const target = path.join(outputRoot, 'atlas', 'config', 'atlas-release-identity.json');
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await fs.writeFile(target, releaseIdentity);
+}
+const releaseMetadata = await fetchText(new URL('config/atlas-release.json', root));
+if (releaseMetadata) {
+  JSON.parse(releaseMetadata);
+  const target = path.join(outputRoot, 'atlas', 'config', 'atlas-release.json');
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await fs.writeFile(target, releaseMetadata);
+}
+const ibusManifestText = await fetchText(new URL('data/tfl-ibus/manifest.json', root));
+if (ibusManifestText) {
+  const manifest = JSON.parse(ibusManifestText);
+  const indexText = manifest.indexPath ? await fetchText(new URL(`data/tfl-ibus/${manifest.indexPath}`, root)) : null;
+  const manifestTarget = path.join(outputRoot, 'atlas', 'data', 'tfl-ibus', 'manifest.json');
+  await fs.mkdir(path.dirname(manifestTarget), { recursive: true });
+  await fs.writeFile(manifestTarget, ibusManifestText);
+  if (indexText) {
+    const indexTarget = path.join(outputRoot, 'atlas', 'data', 'tfl-ibus', manifest.indexPath);
+    await fs.mkdir(path.dirname(indexTarget), { recursive: true });
+    await fs.writeFile(indexTarget, indexText);
+  }
 }

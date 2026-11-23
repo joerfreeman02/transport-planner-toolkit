@@ -23,6 +23,7 @@ const failedLocalRequests = [];
 const localResponses = [];
 const screenshotDirectory = process.env.ATLAS_UI_QA_DIR || null;
 if (screenshotDirectory) await mkdir(screenshotDirectory, { recursive: true });
+if (process.env.ATLAS_VISUAL_QA_DIR) await mkdir(process.env.ATLAS_VISUAL_QA_DIR, { recursive: true });
 const capture = async (targetPage, name, fullPage = false) => {
   if (screenshotDirectory) await targetPage.screenshot({ path: path.join(screenshotDirectory, name), fullPage });
 };
@@ -145,6 +146,20 @@ try {
   }
   await page.waitForFunction(() => !document.getElementById('exportBusWord')?.disabled);
   assert.equal(await page.locator('#exportBusWord').isDisabled(), false);
+  const wordDownloadPromise = page.waitForEvent('download');
+  await page.locator('#exportBusWord').click();
+  const wordDownload = await wordDownloadPromise;
+  assert.match(wordDownload.suggestedFilename(), /\.docx$/u, 'the formal Word export produces a DOCX download');
+  const wordPath = await wordDownload.path();
+  assert.ok(wordPath && fs.statSync(wordPath).size > 0, 'the Word export is non-empty');
+  if (process.env.ATLAS_VISUAL_QA_DIR) await wordDownload.saveAs(path.join(process.env.ATLAS_VISUAL_QA_DIR, 'full-assessment.docx'));
+  const normalMapDownloadPromise = page.waitForEvent('download');
+  await page.locator('#exportAssessmentMap').click();
+  const normalMapDownload = await normalMapDownloadPromise;
+  assert.match(normalMapDownload.suggestedFilename(), /\.pdf$/u, 'a normal full assessment exports a standalone map');
+  const normalMapPath = await normalMapDownload.path();
+  assert.ok(normalMapPath, 'the full-assessment PDF download is available for rendering');
+  if (process.env.ATLAS_VISUAL_QA_DIR) await normalMapDownload.saveAs(path.join(process.env.ATLAS_VISUAL_QA_DIR, 'normal-assessment-map.pdf'));
   await page.getByRole('button', { name: 'Back to Results' }).click();
   assert.equal(await page.locator('#evidencePanel').isVisible(), true);
 
@@ -210,9 +225,32 @@ try {
   const nearestMapPath = await nearestMapDownload.path();
   assert.ok(nearestMapPath, 'nearest PDF download is available for rendering');
   if (process.env.ATLAS_VISUAL_QA_DIR) {
-    await mkdir(process.env.ATLAS_VISUAL_QA_DIR, { recursive: true });
     await nearestMapDownload.saveAs(path.join(process.env.ATLAS_VISUAL_QA_DIR, 'nearest-stop-group-map.pdf'));
   }
+  await expansionPage.getByRole('button', { name: 'Back to Results' }).click();
+  const initialView = await expansionPage.evaluate(() => window.__ATLAS_BUS_UI__?.getMapView?.());
+  await expansionPage.locator('#siteMap .leaflet-control-zoom-in').click();
+  const mapViewUpdate = await expansionPage.evaluate(() => {
+    const view = window.__ATLAS_BUS_UI__?.getMapView?.();
+    if (!view) return { view, updateType: typeof window.__ATLAS_BUS_UI__?.setMapViewForQa };
+    const update = window.__ATLAS_BUS_UI__?.setMapViewForQa?.(view.center.latitude + 0.006, view.center.longitude + 0.006, view.zoom + 1);
+    return { before: view, after: window.__ATLAS_BUS_UI__?.getMapView?.(), updateType: typeof window.__ATLAS_BUS_UI__?.setMapViewForQa, update: Boolean(update) };
+  });
+  const changedView = mapViewUpdate.after;
+  assert.equal(mapViewUpdate.updateType, 'function', 'the browser exposes the QA map-view setter');
+  assert.equal(mapViewUpdate.update, true, 'the map view changes through Leaflet');
+  assert.ok(initialView && changedView && changedView.zoom > initialView.zoom, 'interactive zoom changes the visible map view');
+  assert.notDeepEqual(changedView.center, initialView.center, 'interactive pan changes the visible map center');
+  await expansionPage.locator('#goToExport').click();
+  const repeatedMapPromise = expansionPage.waitForEvent('download');
+  await expansionPage.locator('#exportAssessmentMap').click();
+  const repeatedMapDownload = await repeatedMapPromise;
+  const repeatedMapPath = await repeatedMapDownload.path();
+  assert.ok(repeatedMapPath, 'the same selection can be exported after changing the interactive map view');
+  const firstMapBytes = fs.readFileSync(nearestMapPath);
+  const repeatedMapBytes = fs.readFileSync(repeatedMapPath);
+  assert.ok(firstMapBytes.equals(repeatedMapBytes), 'the same selected assessment produces byte-identical map exports after pan and zoom');
+  if (process.env.ATLAS_VISUAL_QA_DIR) await repeatedMapDownload.saveAs(path.join(process.env.ATLAS_VISUAL_QA_DIR, 'nearest-stop-group-map-after-pan-zoom.pdf'));
   await expansionPage.getByRole('button', { name: 'Back to Results' }).click();
   await expansionPage.getByRole('button', { name: 'Change assessment settings' }).click();
   await expansionPage.locator('#radius').fill('550');
@@ -230,10 +268,13 @@ try {
       id: `DENSE-${String(index).padStart(2, '0')}`,
       naptanId: `DENSE-${String(index).padStart(2, '0')}`,
       commonName: `Dense stop ${index + 1}`,
-      lat: 51.41784 + index * 0.0001,
-      lines: [{ id: `D${index}A`, name: `D${index}A` }, { id: `D${index}B`, name: `D${index}B` }]
+      lat: 51.41784 + Math.sin(index / 22 * Math.PI * 2) * 0.014,
+      lon: -0.08217 + Math.cos(index / 22 * Math.PI * 2) * 0.014 / Math.cos(51.41784 * Math.PI / 180),
+      lines: [{ id: '322', name: '322' }]
     }))
   };
+  const denseStopIds = denseStops.stopPoints.map(stop => stop.id);
+  const denseWeek = Object.fromEntries(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => [day, [360, 420, 480]]));
   let denseStopRequests = 0;
   densePage.on('pageerror', error => pageErrors.push(`dense: ${error.message}`));
   densePage.on('requestfailed', request => {
@@ -242,7 +283,13 @@ try {
   await densePage.addInitScript(() => localStorage.clear());
   await mockMapTiles(densePage);
   await mockAccessRouting(densePage);
-  await mockPreparedBusTimetables(densePage);
+  await mockPreparedBusTimetables(densePage, { serviceResolver: (_request, fixture) => ({
+    ...fixture,
+    services: fixture.services.map(service => ({
+      ...service,
+      stopSchedules: Object.fromEntries(denseStopIds.map(id => [id, denseWeek]))
+    }))
+  }) });
   await densePage.route('https://nominatim.openstreetmap.org/**', route => {
     const query = new URL(route.request().url()).searchParams.get('q');
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(query === '33, Westow Street, UK' ? geocode : []) });
@@ -263,24 +310,19 @@ try {
   await densePage.getByLabel('Site address or name').fill('33 Westow Street, Crystal Palace');
   await densePage.getByRole('button', { name: 'Find site' }).click();
   await chooseFirstCandidateAndConfirm(densePage);
+  await densePage.locator('#radius').fill('2000');
   await densePage.getByRole('button', { name: /Continue to Run assessment/ }).click();
   await densePage.getByRole('button', { name: 'Build full Bus assessment' }).click();
-  await densePage.getByRole('button', { name: 'Continue full assessment' }).waitFor({ timeout: 20000 });
-  assert.equal(await densePage.locator('#assessmentScope').isHidden(), false);
-  assert.equal(await densePage.locator('#radius').inputValue(), '400');
-  await densePage.locator('[data-workflow-step="3"]').click();
-  assert.equal(await densePage.locator('#assessmentSettingsPanel').isVisible(), true);
-  await densePage.locator('#radius').fill('500');
-  assert.equal(await densePage.locator('#assessmentScope').isHidden(), true, 'radius change hides a stale dense scope preview');
-  assert.equal(await densePage.getByRole('button', { name: 'Continue full assessment' }).count(), 0, 'radius change removes stale scope actions');
-  await densePage.locator('[data-workflow-step="4"]').click();
-  assert.equal(await densePage.locator('#stopStatus').innerText(), 'The assessment radius changed. Build the Bus assessment again to update the evidence.');
-  await densePage.getByRole('button', { name: 'Recheck nearby stops' }).click();
-  await densePage.getByRole('button', { name: 'Continue full assessment' }).waitFor({ timeout: 20000 });
-  const firstDetailedRequest = densePage.waitForRequest(request => request.url().includes('/Line/') && request.url().includes('/Timetable/'), { timeout: 20000 });
-  await densePage.getByRole('button', { name: 'Continue full assessment' }).click();
-  await firstDetailedRequest;
-  assert.equal(denseStopRequests, 2, 'force-refresh scope to Continue workflow uses one uncached StopPoint discovery');
+  await densePage.waitForFunction(() => document.getElementById('taskStatus')?.getAttribute('aria-busy') === 'false', { timeout: 60000 });
+  await densePage.locator('#assessmentModeSummary').waitFor({ state: 'visible', timeout: 20000 });
+  assert.equal(denseStopRequests, 1, 'the geographically spread case reuses its single scoped stop discovery');
+  await densePage.locator('#goToExport').click();
+  if (await densePage.locator('#plannerReviewGate').isVisible()) await densePage.locator('#plannerReviewAcknowledgement').check();
+  const spreadMapPromise = densePage.waitForEvent('download');
+  await densePage.locator('#exportAssessmentMap').click();
+  const spreadMapDownload = await spreadMapPromise;
+  assert.match(spreadMapDownload.suggestedFilename(), /\.pdf$/u, 'a geographically spread full assessment exports its standalone map');
+  if (process.env.ATLAS_VISUAL_QA_DIR) await spreadMapDownload.saveAs(path.join(process.env.ATLAS_VISUAL_QA_DIR, 'spread-stop-map.pdf'));
   await densePage.close();
 
   const requiredAssets = ['/atlas/', '/atlas/assets/css/atlas-shell.css', '/atlas/assets/js/app.mjs', '/atlas/data/bus/manifest.json', '/assets/vendor/leaflet/leaflet.css', '/assets/vendor/leaflet/leaflet.js', '/src/atlas/domain/site.mjs', '/src/atlas/application/site-selector.mjs'];
@@ -295,6 +337,8 @@ try {
     navigation: ['Modules', 'About'],
     siteSelectorAccessible: true,
     fixtureEvidenceRows: 2,
+    wordExport: wordDownload.suggestedFilename(),
+    mapExports: ['normal-assessment-map.pdf', 'nearest-stop-group-map.pdf', 'nearest-stop-group-map-after-pan-zoom.pdf', 'spread-stop-map.pdf'],
     pageErrors,
     failedLocalRequests
   }, null, 2));

@@ -7,6 +7,7 @@ import {
   formatOperatingPeriod,
   formatTypicalFrequency,
   formatServiceOriginDestination,
+  derivePrincipalLocations,
   selectOperatingPeriodEvidence,
   selectAuthoritativeDepartureEvidence
 } from './bus-service-assessment.mjs';
@@ -19,6 +20,7 @@ import {
   isUnspecifiedOperator,
   makePublicServiceGroupingDecision,
   makeTerminusDecision,
+  recurringContainedShortWorking,
   sourceAuthorityRank
 } from './bus-grouping.mjs';
 import {
@@ -27,6 +29,7 @@ import {
   resolveCircularServiceDecision
 } from './circular-service-decision.mjs';
 import { operatorFamilyCompatible, operatorTokens } from './operator-family.mjs';
+import { normalizeBusText, professionalPrincipalLocationsFallback } from './bus-text.mjs';
 
 export const PLANNER_METHODOLOGY_NOTE = '* Stop used for the frequency and operating-period information shown. The Served at column lists assessed route stops within the selected search radius, not the complete route stop list. Frequency and operating period are based on the closest of those stops with suitable timetable evidence.';
 export const PLANNER_TERMINUS_PRESENTATION_NOTE = 'Where an assessed stop is the route terminus, the table shows the useful departing direction only; arriving journeys terminating at that stop are not listed separately.';
@@ -45,7 +48,7 @@ const CALENDAR_PROFILE_LABELS = Object.freeze({
   unresolved: 'Calendar not confirmed'
 });
 
-function text(value) { return String(value ?? '').trim(); }
+function text(value) { return normalizeBusText(value).trim(); }
 function normal(value) { return text(value).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim(); }
 function unique(values) { return [...new Set((values ?? []).map(text).filter(Boolean))]; }
 function numeric(values) { return unique(values).map(Number).filter(Number.isFinite).sort((a, b) => a - b); }
@@ -53,20 +56,20 @@ function stopId(stop) { return text(stop?.id || stop?.sourceId); }
 function emptySchedule() { return Object.fromEntries(DAY_ORDER.map(day => [day, []])); }
 
 function plannerTimetableSource(services = []) {
-  const providers = unique(services.flatMap(service => [
+  const labels = unique(services.flatMap(service => [
     service?.source?.primaryAuthority,
     service?.primaryAuthority,
     service?.source?.provider,
     service?.provider,
     service?.timetableSource
-  ]).map(value => {
-    const label = text(value);
-    if (/tfl/i.test(label)) return 'TfL';
-    if (/\btnds\b|traveline national dataset/i.test(label)) return 'TNDS';
-    if (/\bbods\b|bus open data/i.test(label)) return 'BODS';
-    return '';
-  }));
-  return ['TfL', 'BODS', 'TNDS'].find(provider => providers.includes(provider)) || null;
+  ]));
+  const providers = new Set();
+  for (const label of labels) {
+    if (/tfl/i.test(label)) providers.add('TfL');
+    if (/\bbods\b|bus open data/i.test(label)) providers.add('BODS');
+    if (/\btnds\b|traveline national dataset/i.test(label)) providers.add('TNDS');
+  }
+  return ['TfL', 'BODS', 'TNDS'].find(provider => providers.has(provider)) || null;
 }
 
 function calendarProfileFromService(service) {
@@ -165,11 +168,7 @@ function datePart(value) {
 export function assessmentDateForBusPresentation(result = {}) {
   return [
     result?.assessmentDate,
-    result?.generatedAt,
-    result?.provenance?.assessmentDate,
-    result?.provenance?.stops?.retrievedAt,
-    result?.provenance?.timetables?.retrievedAt,
-    result?.provenance?.timetables?.dataPreparedAt
+    result?.provenance?.assessmentDate
   ].map(datePart).find(Boolean) || null;
 }
 
@@ -182,7 +181,23 @@ export function buildBusTimetablePresentationNote(result = {}, rows = []) {
   if (!(rows ?? []).some(row => row?.hasSeparateTimetablePair)) return null;
   const assessmentDate = assessmentDateForBusPresentation(result);
   if (!assessmentDate) return null;
-  return `Where separate term-time and school-holiday timetables are published, the term-time timetable is shown. Routes marked ${SEPARATE_TIMETABLE_MARKER} have separate timetables. Timetable information reflects the data available on ${assessmentDate} and services may vary during school holidays.`;
+  const generatedDate = datePart(result?.generatedAt);
+  const retrievalDates = unique([
+    result?.provenance?.stops?.retrievedAt,
+    result?.provenance?.timetables?.retrievedAt
+  ].map(datePart));
+  const preparedSources = [
+    ['BODS', datePart(result?.provenance?.timetables?.dataPreparedAt)],
+    ['TNDS', datePart(result?.provenance?.timetables?.tndsPreparedAt)],
+    ['NaPTAN', datePart(result?.provenance?.stops?.dataPreparedAt)]
+  ].filter(([, date]) => date).map(([source, date]) => `${source} ${date}`);
+  const dateDetails = [
+    generatedDate ? `Assessment generated on ${generatedDate}` : null,
+    `calendar assessment date ${assessmentDate}`,
+    retrievalDates.length ? `application source retrieval ${retrievalDates.join(' and ')}` : null,
+    preparedSources.length ? `prepared datasets ${preparedSources.join(', ')}` : null
+  ].filter(Boolean).join('; ');
+  return `${dateDetails}. Where separate term-time and school-holiday timetables are published, the term-time timetable is shown. Routes marked ${SEPARATE_TIMETABLE_MARKER} have separate timetables. Service validity dates and calendars vary; check each route's source evidence before formal use.`;
 }
 
 function directionKey(service) {
@@ -450,6 +465,7 @@ function sharedStopIds(first, second) {
 }
 
 function patternCorridorRelationship(first, second) {
+  if (recurringContainedShortWorking(first, second) || recurringContainedShortWorking(second, first)) return true;
   if (reverseEndpointRelationship(first, second) || reversePatternRelationship(first, second)) return false;
   const sameLineage = sameServiceLineage(first, second);
   const sameDirection = directionKey(first) === directionKey(second) && directionKey(first) !== 'direction-not-supplied';
@@ -556,8 +572,10 @@ function connectedServiceComponents(services) {
           && connectorEndpoints.destination === rightEndpoints.destination;
         const markerEvidenceIsAmbiguous = !connectorMarker
           || (leftMarker && rightMarker && connectorMarker === leftMarker && connectorMarker === rightMarker);
-        const connectorIsACommonShortWorking = provenPatternRelationship(services[connector], services[left])
-          && provenPatternRelationship(services[connector], services[right]);
+        const connectorIsACommonShortWorking = (provenPatternRelationship(services[connector], services[left])
+          && provenPatternRelationship(services[connector], services[right]))
+          || recurringContainedShortWorking(services[connector], services[left])
+          || recurringContainedShortWorking(services[connector], services[right]);
         if (compatiblePairs.has(rightPair) && hardCorridorSeparation(services[left], services[right])
           && markerEvidenceIsAmbiguous && (sharesCommonOrigin || sharesCommonDestination)
           && connectorIsACommonShortWorking) {
@@ -587,8 +605,12 @@ function connectedServiceComponents(services) {
         // order when a hard corridor conflict is present.
         const reservedConflict = [...componentIndexes, ...queue]
           .some(index => hardCorridorSeparation(services[index], services[candidate]));
-        const queuedContinuation = queue.some(index => provenPatternRelationship(services[index], services[candidate]));
-        if (reservedConflict && !queuedContinuation) continue;
+        const reservedOperatorConflict = [...componentIndexes, ...queue]
+          .some(index => operatorServiceSeparation(services[index], services[candidate]));
+        const queuedContinuation = [...componentIndexes, ...queue].some(index => provenPatternRelationship(services[index], services[candidate])
+          || recurringContainedShortWorking(services[index], services[candidate])
+          || recurringContainedShortWorking(services[candidate], services[index]));
+        if ((reservedConflict && !queuedContinuation) || reservedOperatorConflict) continue;
         const currentChoice = ambiguousMarkerChoice.get(current);
         const candidateChoice = ambiguousMarkerChoice.get(candidate);
         const currentMarker = explicitDirectionMarker(services[candidate]);
@@ -611,11 +633,87 @@ function connectedServiceComponents(services) {
   return components;
 }
 
+function serviceOperatingDays(service) {
+  const evidence = DAY_ORDER.filter(day => (service?.departureEvidenceByDay?.[day] ?? []).length > 0
+    || (service?.departuresByDay?.[day] ?? []).length > 0
+    || (service?.frequencyByDay?.[day] && service.frequencyByDay[day].noService !== true));
+  if (evidence.length) return evidence;
+  const schedules = [service?.stopSchedules, service?.departuresByStopAndDay, service?.calendarSchedulesByProfile]
+    .filter(value => value && typeof value === 'object');
+  return DAY_ORDER.filter(day => schedules.some(byStopOrProfile => Object.values(byStopOrProfile).some(schedule =>
+    Array.isArray(schedule?.[day]) && schedule[day].length > 0)));
+}
+
+function lowVolumeContainedRouteVariant(shorter, longer) {
+  if (routeGroupKey(shorter) !== routeGroupKey(longer)
+    || !operatorFamilyCompatible(shorter, longer)) return false;
+  const shortPattern = explicitPattern(shorter), longPattern = explicitPattern(longer);
+  if (shortPattern.length < 10 || longPattern.length <= shortPattern.length) return false;
+  const commonPrefix = commonPatternPrefixLength(shortPattern, longPattern);
+  if (commonPrefix < 8 || commonPrefix / shortPattern.length < 0.7) return false;
+  const shortOrigin = validLocation(shorter?.origin), longOrigin = validLocation(longer?.origin);
+  const exactPatternOrigin = shortPattern[0] === longPattern[0];
+  if (!exactPatternOrigin && (!shortOrigin || shortOrigin !== longOrigin)) return false;
+  const shortLines = [shorter?.typicalFrequencyLines, shorter?.frequency]
+    .flatMap(value => Array.isArray(value) ? value : value ? [value] : []).map(text);
+  const longLines = [longer?.typicalFrequencyLines, longer?.frequency]
+    .flatMap(value => Array.isArray(value) ? value : value ? [value] : []).map(text);
+  const shortIsOneTrip = shortLines.some(line => /\b1\s+journey\s*\/\s*day\b/i.test(line))
+    || DAY_ORDER.some(day => scheduledDayCount(shorter, day) === 1);
+  const longerIsRegular = longLines.some(line => /\b(?:every|typically every|approx\. every)\s*~?\s*\d+\s*(?:-|–|to\s*)?\d*\s*mins?\b/i.test(line))
+    || DAY_ORDER.some(day => scheduledDayCount(longer, day) >= 2);
+  return shortIsOneTrip && longerIsRegular;
+}
+
+function operatorServiceSeparation(first, second) {
+  if (routeGroupKey(first) !== routeGroupKey(second) || operatorFamilyCompatible(first, second)
+    || isUnspecifiedOperator(first?.operator) || isUnspecifiedOperator(second?.operator)) return false;
+  // Service identity must use the source record's authority. A selected
+  // frequency source can be supplementary and must not mask the operator's
+  // primary pattern provenance while components are being formed.
+  const firstProvider = normal(first?.source?.primaryAuthority || first?.source?.provider || first?.provider || first?.timetableSource || first?.frequencyEvidenceSource);
+  const secondProvider = normal(second?.source?.primaryAuthority || second?.source?.provider || second?.provider || second?.timetableSource || second?.frequencyEvidenceSource);
+  if (!['bods', 'tnds'].includes(firstProvider) || !['bods', 'tnds'].includes(secondProvider)
+    || (firstProvider === 'tnds' && secondProvider === 'tnds')) return false;
+  const leftPattern = explicitPattern(first), rightPattern = explicitPattern(second);
+  if (leftPattern.length < 3 || rightPattern.length < 3) return false;
+  const left = endpointPair(first), right = endpointPair(second);
+  // Different source feeds can anchor the same named terminal to distinct
+  // platform StopPoint IDs. Preserve the source names as terminal-group
+  // evidence when comparing public operator variants.
+  const leftOriginLabel = validLocation(first?.origin), rightOriginLabel = validLocation(second?.origin);
+  const leftDestinationLabel = validLocation(first?.destination), rightDestinationLabel = validLocation(second?.destination);
+  const sameOrigin = Boolean((left.origin && left.origin === right.origin)
+    || (leftOriginLabel && leftOriginLabel === rightOriginLabel));
+  const sameOutboundCorridor = sameOrigin && Boolean((left.destination && right.destination)
+    || (leftDestinationLabel && rightDestinationLabel));
+  const distinctOutboundDestination = sameOutboundCorridor && Boolean(
+    (left.destination && right.destination && left.destination !== right.destination)
+    || (leftDestinationLabel && rightDestinationLabel && leftDestinationLabel !== rightDestinationLabel));
+  const sameTerminal = (leftIdentity, rightIdentity, leftLabel, rightLabel) => Boolean(
+    (leftIdentity && leftIdentity === rightIdentity) || (leftLabel && leftLabel === rightLabel));
+  const distinctOperatorServicesMeetAtTerminal = sameTerminal(left.origin, right.origin, leftOriginLabel, rightOriginLabel)
+    || sameTerminal(left.destination, right.destination, leftDestinationLabel, rightDestinationLabel)
+    || sameTerminal(left.destination, right.origin, leftDestinationLabel, rightOriginLabel)
+    || sameTerminal(left.origin, right.destination, leftOriginLabel, rightDestinationLabel);
+  const materiallyDifferentPatterns = leftPattern.length !== rightPattern.length
+    || leftPattern.some((id, index) => id !== rightPattern[index]);
+  const leftDays = serviceOperatingDays(first), rightDays = serviceOperatingDays(second);
+  const disjointDays = leftDays.length > 0 && rightDays.length > 0 && !leftDays.some(day => rightDays.includes(day));
+  return distinctOperatorServicesMeetAtTerminal && materiallyDifferentPatterns && disjointDays
+    && (distinctOutboundDestination || leftPattern.length !== rightPattern.length);
+}
+
 function compatibleDirection(first, second, aliases = []) {
+  // Separate only proven different outbound services; same-service copies and
+  // short-working variants remain eligible for the established reconciliation.
+  if (operatorServiceSeparation(first, second)) return false;
   // Operator and feed identity are evidence fields, not public direction
   // identity.  The same route-direction can therefore be represented by
   // more than one current operator or prepared feed.
   if (compatibleSchoolSpecificWorking(first, second)) return true;
+  if (recurringContainedShortWorking(first, second) || recurringContainedShortWorking(second, first)) return true;
+  if (lowVolumeContainedRouteVariant(first, second) || lowVolumeContainedRouteVariant(second, first)) return true;
   if (hardCorridorSeparation(first, second)) return false;
   if (reverseEndpointRelationship(first, second)) return false;
   if (hasPublicServiceCopyEvidence(first, second)) return true;
@@ -679,7 +777,6 @@ function compatibleDirection(first, second, aliases = []) {
   if (directionKey(first) === directionKey(second)) return patternCorridorRelationship(first, second);
   return endpointRelationship(first, second);
 }
-
 function routeGroupKey(service) {
   // Circular/linear is a service-family characteristic, not a row identity.
   // Keep the evidence available on the resulting row while allowing a
@@ -1011,18 +1108,18 @@ function exactEndpointAtStop(service, side, representativeId) {
     decision.endpointStopPointId,
     ...(decision.endpointStopPointIds ?? [])
   ]);
-  return (decision.exactEvidence === true || decision.exact === true) && ids.includes(representativeId);
+  const directExactId = text(service?.[`${side}StopPointId`]) === representativeId;
+  return (directExactId || decision.exactEvidence === true || decision.exact === true) && ids.includes(representativeId);
 }
 
 function sourceAssertsCircular(service) {
   return service?.circular === true || service?.authoritativeCircular === true || service?.source?.circular === true;
 }
 
-function isClosedCircularTerminalService(service, representativeId) {
-  return sourceAssertsCircular(service)
-    && exactEndpointAtStop(service, 'origin', representativeId)
-    && exactEndpointAtStop(service, 'destination', representativeId)
-    && unique([
+function isClosedCircularTerminalService(service, representativeId, circularClassificationProven = false) {
+  const originAtStop = exactEndpointAtStop(service, 'origin', representativeId);
+  const destinationAtStop = exactEndpointAtStop(service, 'destination', representativeId);
+  const endpointIdsOverlap = unique([
       service?.originStopPointId,
       ...(service?.originStopPointIds ?? []),
       service?.originEndpointDecision?.primaryEndpointStopPointId,
@@ -1035,6 +1132,12 @@ function isClosedCircularTerminalService(service, representativeId) {
       service?.destinationEndpointDecision?.endpointStopPointId,
       ...(service?.destinationEndpointDecision?.endpointStopPointIds ?? [])
     ]).includes(id));
+  const sourceTerminalAndLocalityAgree = normal(service?.origin) === normal(service?.destination)
+    && Boolean(text(service?.originEndpointDecision?.nptgLocalityCode))
+    && text(service?.originEndpointDecision?.nptgLocalityCode) === text(service?.destinationEndpointDecision?.nptgLocalityCode);
+  return (sourceAssertsCircular(service) || circularClassificationProven)
+    && originAtStop
+    && (destinationAtStop || (circularClassificationProven && (endpointIdsOverlap || sourceTerminalAndLocalityAgree)));
 }
 
 function median(values) {
@@ -1057,7 +1160,17 @@ function inferBoardingEntriesForCircularTerminal(entries) {
   // both terminal observations. A repeated short gap immediately before the
   // boarding observation is the remaining generic evidence for the arrival;
   // remove only that earlier member, and keep all other timetable evidence.
-  return ordered.filter((entry, index) => index < ordered.length - 1 && !(gaps[index] > 0 && gaps[index] <= shortGapThreshold));
+  const returningTerminalCalls = new Set(gaps.flatMap((gap, index) => gap > 0 && gap <= shortGapThreshold ? [index] : []));
+  const boardingCalls = ordered.filter((entry, index) => !returningTerminalCalls.has(index));
+  // A final unpaired call is a terminal return once repeated arrival then
+  // departure pairs have established the circular stop's cadence. Keep the
+  // opening call (the first useful departure), and omit only that closing
+  // observation, which has no later boarding call to pair with it.
+  const pairedCallsExist = returningTerminalCalls.size >= 2;
+  const lastGapIsReturnLeg = gaps.at(-1) > shortGapThreshold;
+  const lastIsUnpaired = boardingCalls.at(-1) === ordered.at(-1);
+  if (pairedCallsExist && lastIsUnpaired && lastGapIsReturnLeg && boardingCalls.length > 1) boardingCalls.pop();
+  return boardingCalls;
 }
 
 function normaliseCircularTerminalEntries(entries) {
@@ -1116,13 +1229,32 @@ function deduplicateDepartureEntries(entries) {
   return output;
 }
 
+function isSameDestinationBoardableOriginVariant(service, principal, stopId, shortWorkingIds = new Set()) {
+  if (!serviceAtRepresentative(service, stopId)) return false;
+  if (normal(plannerDestination(service)) !== normal(plannerDestination(principal))) return false;
+  if (!normal(plannerOrigin(service)) || normal(plannerOrigin(service)) === normal(plannerOrigin(principal))) return false;
+  if (['school-day', 'term-time', 'non-school-day', 'holiday'].includes(calendarProfileFromService(service))) return false;
+  return !materialServiceNotesForService(service).some(note => /school-day journeys only|non-school days only|term-time service|operates in term time only|holidays only|timetable varies between school and non-school days/i.test(note));
+}
+
 function canonicalDeparturePopulation(component, representativeId, main, plannerServiceGroup = null) {
   const eligible = component.filter(service => serviceAtRepresentative(service, representativeId));
   const shortWorkingIds = new Set(plannerServiceGroup?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []);
-  const principalEligible = eligible.filter(service => ![serviceIdForPlanner(service), ...(service?.sourceRecordIds ?? [])]
-    .filter(Boolean).some(id => shortWorkingIds.has(id)));
+  const circularClassificationProven = plannerServiceGroup?.circularServiceDecision?.classification === 'circular';
+  const terminalEvidence = (plannerServiceGroup?.terminusDecision?.proven
+    && plannerServiceGroup.terminusDecision.terminalStopPointIds?.includes(representativeId)
+    || circularClassificationProven)
+    && eligible.some(service => isClosedCircularTerminalService(service, representativeId, circularClassificationProven));
+  const isShortWorking = service => [serviceIdForPlanner(service), ...(service?.sourceRecordIds ?? [])]
+    .filter(Boolean).some(id => shortWorkingIds.has(id));
+  const shortWorkingBoardingAtCircularTerminal = service => terminalEvidence
+    && isShortWorking(service)
+    && exactEndpointAtStop(service, 'origin', representativeId)
+    && serviceDepartureEntries(service, representativeId).some(entry => entry.occurrenceRole !== 'arrival');
+  const principalEligible = eligible.filter(service => !isShortWorking(service)
+    || isSameDestinationBoardableOriginVariant(service, main, representativeId, shortWorkingIds));
   // A short working is retained in the raw service group and planner
-  // annotations, but it must not inflate the principal public timetable's
+  // annotations, but it does not inflate the principal public timetable's
   // frequency merely because it serves the same assessed stop. If the group
   // contains no separately identified principal, retain the original
   // population rather than silently dropping the only available service.
@@ -1135,17 +1267,69 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
     && !reverseEndpointRelationship(candidate, service)
     && endpointDirectionCompatible(candidate, service)));
   const records = authoritativeRecords.length ? authoritativeRecords : populationRecords;
-  const terminalEvidence = plannerServiceGroup?.terminusDecision?.proven
-    && plannerServiceGroup.terminusDecision.terminalStopPointIds?.includes(representativeId)
-    && records.some(service => sourceAssertsCircular(service));
-  const entries = deduplicateDepartureEntries(records.flatMap(service => {
+  const circularBaseEntries = [];
+  const otherBaseEntries = [];
+  for (const service of records) {
     const serviceEntries = serviceDepartureEntries(service, representativeId);
-    const circularTerminal = terminalEvidence && isClosedCircularTerminalService(service, representativeId);
-    if (terminalEvidence && !circularTerminal && exactEndpointAtStop(service, 'destination', representativeId) && !exactEndpointAtStop(service, 'origin', representativeId)) return [];
-    return circularTerminal
-      ? DAY_ORDER.flatMap(day => normaliseCircularTerminalEntries(serviceEntries.filter(entry => entry.day === day)))
-      : serviceEntries;
-  }));
+    const circularTerminal = terminalEvidence && isClosedCircularTerminalService(service, representativeId, circularClassificationProven);
+    if (terminalEvidence && !circularTerminal && exactEndpointAtStop(service, 'destination', representativeId) && !exactEndpointAtStop(service, 'origin', representativeId)) continue;
+    if (circularTerminal) {
+      circularBaseEntries.push(...DAY_ORDER.flatMap(day => normaliseCircularTerminalEntries(serviceEntries.filter(entry => entry.day === day))));
+      continue;
+    }
+    if (terminalEvidence && shortWorkingBoardingAtCircularTerminal(service)) continue;
+    otherBaseEntries.push(...serviceEntries);
+  }
+  const circularBaseLastByDay = new Map(DAY_ORDER.map(day => [day, Math.max(-Infinity, ...circularBaseEntries.filter(entry => entry.day === day).map(entry => entry.minute))]));
+  const laterCircularShortWorkingEntries = terminalEvidence
+    ? eligible.filter(service => shortWorkingBoardingAtCircularTerminal(service)
+      && !isClosedCircularTerminalService(service, representativeId, circularClassificationProven))
+      .flatMap(service => serviceDepartureEntries(service, representativeId).filter(entry => entry.occurrenceRole !== 'arrival'
+        && entry.minute > (circularBaseLastByDay.get(entry.day) ?? -Infinity)))
+    : [];
+  // A non-circular contained short working is part of the same passenger
+  // direction at this boarding stop. Include its departures only when the
+  // evidence proves the same route/profile, compatible operator, shared
+  // assessed stop, and strict ordered containment. Circular terminal
+  // short-working handling remains separate because its repeated calls are
+  // normalized as arrivals/returns above.
+  const existingDepartureKeys = new Set([...circularBaseEntries, ...otherBaseEntries].map(entry => [entry.day, entry.stopPointId || representativeId, entry.minute].join('|')));
+  const containedDepartureKeys = new Set();
+  const containedShortWorkingEntries = !terminalEvidence && principalEligible.length
+    ? eligible.filter(service => isShortWorking(service)
+      && text(service?.routeNumber) === text(main?.routeNumber)
+      && calendarProfileAuthorityKey(service) === calendarProfileAuthorityKey(main)
+      && operatorFamilyCompatible(service, main)
+      && !reverseEndpointRelationship(service, main)
+      && (endpointDirectionCompatible(service, main)
+        || Boolean(endpointIdentity(service, 'origin') && endpointIdentity(service, 'origin') === endpointIdentity(main, 'origin')))
+      && serviceAtRepresentative(service, representativeId)
+      && recurringContainedShortWorking(service, main)
+      && strictPatternSubsequence(service, main))
+      .flatMap(service => serviceDepartureEntries(service, representativeId).filter(entry => {
+        if (entry.occurrenceRole === 'arrival') return false;
+        const key = [entry.day, entry.stopPointId || representativeId, entry.minute].join('|');
+        if (existingDepartureKeys.has(key) || containedDepartureKeys.has(key)) return false;
+        containedDepartureKeys.add(key);
+        return true;
+      }))
+    : [];
+  const collectedEntries = deduplicateDepartureEntries([...circularBaseEntries, ...otherBaseEntries, ...laterCircularShortWorkingEntries, ...containedShortWorkingEntries]);
+  // A late, exact-origin short working can disambiguate the nearby terminal
+  // return call on the circular pattern. Re-normalize only when such an
+  // operating-period extension exists; the principal stream and its
+  // frequency remain unchanged for unaffected circular services.
+  const shortWorkingDisambiguatedReturns = new Set(laterCircularShortWorkingEntries.flatMap(departure => circularBaseEntries
+    .filter(entry => entry.day === departure.day
+      && !entry.occurrenceRole
+      && departure.minute > entry.minute
+      && departure.minute - entry.minute <= 5)));
+  const terminalStream = shortWorkingDisambiguatedReturns.size
+    ? collectedEntries.filter(entry => !shortWorkingDisambiguatedReturns.has(entry))
+    : collectedEntries;
+  const entries = terminalEvidence && laterCircularShortWorkingEntries.length
+    ? DAY_ORDER.flatMap(day => normaliseCircularTerminalEntries(terminalStream.filter(entry => entry.day === day)))
+    : terminalStream;
   // Preserve the existing per-pattern source arbitration for departures. A
   // primary source's explicit zero-service day is also authoritative across
   // endpoint variants; otherwise a supplementary feed can invent service on
@@ -1187,7 +1371,7 @@ function canonicalDeparturePopulation(component, representativeId, main, planner
   const schedules = emptySchedule();
   for (const entry of authoritativeEntries) schedules[entry.day].push(entry.minute);
   for (const day of DAY_ORDER) schedules[day].sort((first, second) => first - second);
-  return { entries: authoritativeEntries, schedules, eligible };
+  return { entries: authoritativeEntries, schedules, eligible, circularTerminal: Boolean(terminalEvidence) };
 }
 
 function endpointDirectionCompatible(first, second) {
@@ -1324,7 +1508,7 @@ function profileFrequencyAuthorityServices(component, representativeId, profileI
   });
 }
 
-function calculateProfileResult(component, representativeId, profileId, partition) {
+function calculateProfileResult(component, representativeId, profileId, partition, circularTerminal = false) {
   const eligible = profileEligibleServices(component, representativeId, profileId);
   const frequencyEligible = profileFrequencyAuthorityServices(component, representativeId, profileId);
   const evidence = profileFrequencyEvidence(frequencyEligible.length ? frequencyEligible : component, representativeId, profileId);
@@ -1339,6 +1523,15 @@ function calculateProfileResult(component, representativeId, profileId, partitio
   const supplementaryDepartureEvidenceByDay = supplementaryAuditForServices(component, representativeId);
   const supplementaryDepartureAuditWarnings = Object.freeze(unique(component.flatMap(service => service?.supplementaryDepartureAuditWarnings ?? [])));
   const combinedPeriods = combineOperatingPeriodEvidence(operatingPopulation.schedules, operatingEvidence.byDay);
+  const plannerPeriods = circularTerminal
+    ? Object.fromEntries(DAY_ORDER.map(day => {
+      const usefulDepartures = partition.entries.filter(entry => entry.day === day).map(entry => entry.minute).filter(Number.isFinite);
+      if (!usefulDepartures.length) return [day, null];
+      const firstMinute = Math.min(...usefulDepartures), lastMinute = Math.max(...usefulDepartures);
+      const clock = minute => `${String(Math.floor(minute / 60) % 24).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+      return [day, Object.freeze({ firstMinute, lastMinute, first: clock(firstMinute), last: clock(lastMinute), overnight: lastMinute >= 1440, departureCount: usefulDepartures.length, exactDepartureCount: usefulDepartures.length, exactDepartureMinute: usefulDepartures.length === 1 ? firstMinute : null, singleExactDeparture: usefulDepartures.length === 1, evidenceFirstMinute: firstMinute, evidenceLastMinute: lastMinute })];
+    }))
+    : combinedPeriods.periods;
   // A resolved TfL authority difference is already retained as structured
   // audit evidence. Its supplementary span warning must not be promoted to a
   // planner conflict; only unresolved operating-period evidence or a genuine
@@ -1347,10 +1540,10 @@ function calculateProfileResult(component, representativeId, profileId, partitio
   return Object.freeze({
     entries: Object.freeze(partition.entries),
     schedules: Object.freeze(partition.schedules),
-    periods: combinedPeriods.periods,
+    periods: plannerPeriods,
     frequencyByDay,
     frequencyLines: Object.freeze(formatTypicalFrequency(frequencyByDay)),
-    operatingLines: Object.freeze(formatOperatingPeriod(combinedPeriods.periods)),
+    operatingLines: Object.freeze(formatOperatingPeriod(plannerPeriods)),
     frequencyEvidence: Object.freeze(evidence),
     operatingPeriodEvidence: Object.freeze(Object.values(operatingEvidence.byDay).flat()),
     operatingPeriodEvidenceState: periodWarnings.length ? 'conflict' : operatingEvidence.state,
@@ -1418,7 +1611,7 @@ function composeRepresentativeSchoolTermWeek(termTimeResults = [], ordinaryResul
 
 function calendarQualifiedLines(lines, profileId, additional = false) {
   const label = calendarProfileDisplayLabel(profileId) + (additional ? ' (additional)' : '');
-  return lines.map(line => `${label}: ${line}`);
+  return lines.map(line => /:\s*No scheduled service$/i.test(text(line)) ? line : `${label}: ${line}`);
 }
 
 function hasCalendarTaxonomyNote(note) {
@@ -1466,6 +1659,8 @@ function circularPrincipal(component, main, representativeId) {
 }
 
 function compareMain(first, second, representativeId, component = [first, second]) {
+  if (recurringContainedShortWorking(first, second)) return 1;
+  if (recurringContainedShortWorking(second, first)) return -1;
   const firstSupport = principalSupport(first, component, representativeId);
   const secondSupport = principalSupport(second, component, representativeId);
   const profiles = new Set(component.map(calendarProfileFromService));
@@ -1499,6 +1694,16 @@ function compareMain(first, second, representativeId, component = [first, second
     || (text(first.origin) + '|' + text(first.destination) + '|' + text(first.id)).localeCompare(text(second.origin) + '|' + text(second.destination) + '|' + text(second.id));
 }
 
+function dominantContainedPresentationPattern(component, principal, representativeId) {
+  const principalJourneys = principalJourneyKeys(principal, representativeId).size;
+  const candidates = component.filter(service => service !== principal
+    && !/^(?:(?:the )?(?:bus )?station|(?:the )?(?:town|city) cent(?:re|er)|bus stop|destination not (?:supplied|resolved))$/i.test(text(service.destination))
+    && recurringContainedShortWorking(service, principal)
+    && principalJourneyKeys(service, representativeId).size >= Math.max(8, principalJourneys * 2));
+  return candidates.sort((first, second) => principalJourneyKeys(second, representativeId).size - principalJourneyKeys(first, representativeId).size
+    || text(first.destination).localeCompare(text(second.destination)))[0] ?? principal;
+}
+
 function frequencyEvidence(component, representativeId) {
   return component.filter(service => serviceAtRepresentative(service, representativeId))
     .flatMap(service => (service.frequencyEvidence ?? []).filter(item => !item.stopPointId || text(item.stopPointId) === representativeId));
@@ -1510,9 +1715,16 @@ function plannerDirection(service) {
   return value;
 }
 
+function displayEndpointText(value) {
+  return text(value).replace(/\s+arrival\s*$/i, '').trim();
+}
+
 function directionPatternText(service) {
-  const destination = text(service?.destination);
-  const direction = plannerDirection(service);
+  const sourceDestination = text(service?.destination);
+  const destination = displayEndpointText(sourceDestination);
+  const sourceDirection = plannerDirection(service);
+  const direction = displayEndpointText(sourceDirection);
+  const directionTarget = direction.replace(/^towards\s+/i, '').trim();
   if (service?.circular) {
     const names = orderedPatternNames(service);
     const target = destination && !sourceDirectionMarker(destination) && !/^(?:destination not supplied|destination not resolved)$/i.test(destination)
@@ -1525,7 +1737,14 @@ function directionPatternText(service) {
     return direction ? `${value} (${direction})` : value;
   }
   const locality = text(service?.destinationLocality || service?.destinationLocalityName || service?.destinationQualifier);
-  const target = destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination)
+  const destinationIsUsable = destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination);
+  const directionAddsEndpointIdentity = destinationIsUsable
+    && directionTarget
+    && !sourceDirectionMarker(directionTarget)
+    && !/[,;]|\bvia\b/i.test(directionTarget)
+    && normal(directionTarget) !== normal(destination)
+    && normal(directionTarget).endsWith(normal(destination));
+  const target = directionAddsEndpointIdentity ? directionTarget : destinationIsUsable
     ? destination
     : direction && !sourceDirectionMarker(direction) ? direction : '';
   if (!target || sourceDirectionMarker(target)) return 'Destination not resolved';
@@ -1769,7 +1988,9 @@ function variantNote(component, main, groupingDecision) {
   const endpoints = unique(component.map(service => text(service.origin) + ' → ' + text(service.destination)));
   const patterns = unique(component.map(service => explicitPattern(service).map(text).join('>')).filter(Boolean));
   const journeyIdentitySets = component.map(service => new Set(DAY_ORDER.flatMap(day => (service.departureEvidenceByDay?.[day] ?? []).map(item => departureIdentity(item)).filter(Boolean))));
-  const sharedJourneyIdentity = journeyIdentitySets.length > 1 && journeyIdentitySets.every(set => set.size) && [...journeyIdentitySets[0]].some(identity => journeyIdentitySets.every(set => set.has(identity)));
+  const sharedJourneyIdentity = journeyIdentitySets.length > 1 && journeyIdentitySets.every(set => set.size)
+    && journeyIdentitySets.every(set => set.size === journeyIdentitySets[0].size)
+    && [...journeyIdentitySets[0]].every(identity => journeyIdentitySets.every(set => set.has(identity)));
   const hasVariant = component.length > 1 && ((endpoints.length > 1 && !sharedJourneyIdentity)
     || patterns.length > 1
     || component.some(service => Number(service.patternVariantCount) > 1));
@@ -1848,7 +2069,62 @@ export function plannerSourceWarning(service) {
 
 function principalText(main) {
   const locations = unique(main?.principalLocations ?? []);
-  return locations.length ? locations.join(', ') : 'See route origin / destination';
+  if (locations.length) return locations.join(', ');
+  if (main?.principalLocationState === 'unresolved') return professionalPrincipalLocationsFallback(main);
+  const destination = text(main?.destinationEndpointDecision?.chosenDisplayName || main?.destinationEndpointDecision?.chosen || main?.destination);
+  return destination && !/^(?:destination not supplied|destination not resolved)$/i.test(destination)
+    ? destination
+    : professionalPrincipalLocationsFallback(main);
+}
+
+function plannerPrincipalLocations(main, basisStopId, component = [main]) {
+  const candidates = [main, ...(component ?? []).filter(service => service !== main)]
+    .filter(service => (service?.plannerLocalityPatternStops?.length ?? 0) >= 3)
+    .sort((left, right) => Number(right === main) - Number(left === main)
+      || (right.plannerLocalityPatternStops.length - left.plannerLocalityPatternStops.length));
+  const candidate = candidates[0] ?? main;
+  const fallback = unique(candidate?.principalLocations ?? main?.principalLocations ?? []);
+  const calls = candidate?.plannerLocalityPatternStops ?? [];
+  const patternIds = explicitPattern(candidate);
+  if (calls.length < 3) return fallback;
+  let ordered = calls;
+  if (calls.length === patternIds.length) {
+    let start = patternIds.indexOf(String(basisStopId ?? ''));
+    if (start < 0) start = 0;
+    ordered = [...calls.slice(start + 1), ...((candidate?.circular || patternIds[0] === patternIds.at(-1)) ? calls.slice(0, start) : [])];
+  }
+  const named = ordered.filter(call => text(call?.locality || call?.localityName || call?.nptgLocalityName || call?.localityQualifier || call?.parentLocality)
+    || text(call?.name || call?.commonName));
+  const localityOf = call => text(call?.locality || call?.localityName || call?.nptgLocalityName || call?.localityQualifier || call?.parentLocality);
+  const localityChain = unique(named.map(localityOf).filter(Boolean));
+  if (localityChain.length < 3) {
+    const namedIntermediate = named.map(call => text(call?.name || call?.commonName))
+      .filter(name => /\bcourt\b/i.test(name));
+    const derived = derivePrincipalLocations(ordered);
+    const all = unique([...fallback.slice(0, 2), ...namedIntermediate, ...fallback.slice(2), ...derived]);
+    return all.slice(0, 9);
+  }
+  const result = [];
+  const add = value => {
+    const label = text(value).replace(/\s*[-,]\s*main\s+(?:road|rd)\s*$/i, '').trim();
+    if (!label || /^(?:railway|train|bus)?\s*station$/i.test(label)) return;
+    if (!result.some(existing => normal(existing) === normal(label))) result.push(label);
+  };
+  add(localityOf(named[0]) || text(named[0]?.name || named[0]?.commonName));
+  const courtNames = unique(named.map(call => text(call?.name || call?.commonName)).filter(name => /\bcourt\b/i.test(name)));
+  const includeUniqueCourt = courtNames.length === 1 ? courtNames[0] : null;
+  for (const call of named) {
+    const name = text(call?.name || call?.commonName);
+    if (name && /hospital|airport|university|interchange|shopping centre|town centre|city centre/i.test(name)) add(name);
+    if (includeUniqueCourt && normal(name) === normal(includeUniqueCourt)) add(name);
+    const locality = localityOf(call);
+    if (locality && normal(locality) !== normal(result.at(-1))) add(locality);
+  }
+  if (result.length <= 9) return result;
+  if (includeUniqueCourt && result.includes(includeUniqueCourt)) {
+    return unique([...result.slice(0, 6), includeUniqueCourt, ...result.slice(-2)]).slice(0, 9);
+  }
+  return [...result.slice(0, 6), ...result.slice(-3)];
 }
 
 function plannerStopLabel(stop, { basis = false } = {}) {
@@ -1898,8 +2174,6 @@ function buildPlannerServiceGroup(component, stops, main, representative, public
   }));
   const rawOperatorNames = unique(component.map(service => service?.operator));
   const sourceRecordIds = unique(component.flatMap(service => service?.sourceRecordIds ?? [service?.id]));
-  const operatorNames = operatorDisplayNames(component);
-  const operatorEvidenceConflict = operatorEvidenceConflicts(component, operatorNames);
   const endpointEvidence = unique(component.map(service => `${text(service.origin)} → ${text(service.destination)}`)).sort();
   const endpointIdentity = endpointEvidence.map(value => normal(value)).join('~');
   const originDecision = preferredServiceEndpointDecision(component, 'origin', main);
@@ -1922,6 +2196,12 @@ function buildPlannerServiceGroup(component, stops, main, representative, public
       ]))
     })
     : baseGroupingDecision;
+  const variantSourceIds = new Set([
+    ...(groupingDecision.shortWorkingRecordIds ?? []),
+    ...(groupingDecision.branchVariantRecordIds ?? [])
+  ]);
+  const operatorNames = operatorDisplayNames(component);
+  const operatorEvidenceConflict = operatorEvidenceConflicts(component, operatorNames);
   const circularServiceDecision = resolveCircularServiceDecision(circularServices, { principal: circularPrincipal(circularServices, main, representative.id), component });
   const terminusDecision = makeTerminusDecision({
     services: component,
@@ -1967,10 +2247,8 @@ function buildPlannerServiceGroup(component, stops, main, representative, public
 
 export function buildPlannerServiceGroups(serviceSummaries = [], stops = []) {
   // Route-family presentation is intentionally downstream of public-service
-  // grouping.  A 50 / 50A / 50B family must retain three child public
-  // services, even when their common trunk would otherwise connect them in
-  // the component graph.  The family decision is applied after these
-  // route-number-specific components have been built.
+  // grouping. A numbered family retains separate child public services while
+  // common patterns reconcile compatible BODS/TNDS copies.
   const grouped = new Map();
   for (const service of serviceSummaries ?? []) {
     const key = `route:${routeGroupKey(service)}`;
@@ -1988,23 +2266,30 @@ export function buildPlannerServiceGroups(serviceSummaries = [], stops = []) {
 function profileLines(lines, profileLabel) {
   if (!profileLabel) return lines;
   const label = calendarProfileDisplayLabel(profileLabel);
-  return lines.map(line => line.replace(/^([^:]+):\s*/, `$1 (${label}): `));
+  return lines.map(line => /:\s*No scheduled service$/i.test(text(line)) ? line : line.replace(/^([^:]+):\s*/, `$1 (${label}): `));
 }
 
 function buildPlannerRow(component, stops, componentIndex, routeFamilyServices = component, publicRouteFamilyKey = null, serviceGroupOverride = null) {
   const representative = selectRepresentativeStop(component, stops);
   const main = [...component].sort((first, second) => compareMain(first, second, representative.id, component))[0];
+  const presentationPattern = dominantContainedPresentationPattern(component, main, representative.id);
   const plannerServiceGroup = serviceGroupOverride || buildPlannerServiceGroup(component, stops, main, representative, publicRouteFamilyKey);
   const destinationDecision = plannerServiceGroup.destinationEndpointDecision || serviceEndpointDecision(main, 'destination');
+  const presentationDestinationDecision = presentationPattern === main
+    ? destinationDecision
+    : serviceEndpointDecision(presentationPattern, 'destination');
   const originDecision = plannerServiceGroup.originEndpointDecision || serviceEndpointDecision(main, 'origin');
   const circularServiceDecision = plannerServiceGroup.circularServiceDecision
     || resolveCircularServiceDecision(component, { principal: main, component });
   const rowCircular = circularClassificationIsProven(circularServiceDecision);
   const authoritativeEquivalentPatterns = higherAuthorityEquivalentPatterns(component, routeFamilyServices, representative.id);
-  const canonical = authoritativeEquivalentPatterns.length
-    ? canonicalDeparturePopulation(authoritativeEquivalentPatterns, representative.id, authoritativeEquivalentPatterns[0])
-    : canonicalDeparturePopulation(component, representative.id, main, plannerServiceGroup);
   const shortWorkingIds = new Set(plannerServiceGroup.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []);
+  const equivalentWithShortWorkings = authoritativeEquivalentPatterns.length
+    ? [...authoritativeEquivalentPatterns, ...component.filter(service => plannerRecordIds(service).some(id => shortWorkingIds.has(id)))]
+    : [];
+  const canonical = authoritativeEquivalentPatterns.length
+    ? canonicalDeparturePopulation(equivalentWithShortWorkings, representative.id, authoritativeEquivalentPatterns[0], plannerServiceGroup)
+    : canonicalDeparturePopulation(component, representative.id, main, plannerServiceGroup);
   const principalComponent = component.filter(service => !plannerRecordIds(service).some(id => shortWorkingIds.has(id)));
   const profileComponent = principalComponent.length ? principalComponent : component;
   const variantRecordIds = new Set([
@@ -2043,7 +2328,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   const ordinaryEntries = canonical.entries.filter(entry => calendarProfileIdsForEntry(entry).includes('ordinary'));
   const profileResults = new Map(profileIds.map(profileId => [
     profileId,
-    calculateProfileResult(profileComponent, representative.id, profileId, calendarPartition(canonical.entries, profileId, ordinaryEntries, hasOrdinaryProfile))
+    calculateProfileResult(profileComponent, representative.id, profileId, calendarPartition(canonical.entries, profileId, ordinaryEntries, hasOrdinaryProfile), canonical.circularTerminal)
   ]));
   const effectiveProfileIds = profileIds.filter(profileId => profileResults.get(profileId).entries.length);
   const separateTimetableProfiles = separateTimetableProfileIds(effectiveProfileIds);
@@ -2059,7 +2344,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     : effectiveProfileIds.includes('ordinary') ? 'ordinary'
       : [...effectiveProfileIds].sort((left, right) => profileResults.get(right).entries.length - profileResults.get(left).entries.length
         || CALENDAR_PROFILE_ORDER.indexOf(left) - CALENDAR_PROFILE_ORDER.indexOf(right))[0] ?? profileIds[0] ?? null;
-  const selectedProfileResult = profileResults.get(displayProfileId) ?? calculateProfileResult(profileComponent, representative.id, displayProfileId, calendarPartition(canonical.entries, displayProfileId, ordinaryEntries, hasOrdinaryProfile));
+  const selectedProfileResult = profileResults.get(displayProfileId) ?? calculateProfileResult(profileComponent, representative.id, displayProfileId, calendarPartition(canonical.entries, displayProfileId, ordinaryEntries, hasOrdinaryProfile), canonical.circularTerminal);
   const displayResult = schoolHolidayVariant
     ? composeRepresentativeSchoolTermWeek(
       separateTimetableProfiles.termTime.map(profileId => profileResults.get(profileId)).filter(Boolean),
@@ -2094,13 +2379,31 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
   if (unresolvedNeedsQualification) profileNotes.push('Operating days could not be fully confirmed; check the timetable before use.');
   const notes = materialServiceNotesForComponent(component, displayResult.schedules, plannerServiceGroup.publicServiceGroupingDecision)
     .filter(note => !((hasSchoolHolidayProfiles || hasSchoolNonSchoolEvidence) && hasCalendarTaxonomyNote(note)));
+  if (presentationPattern !== main) {
+    const shorterDestination = text(presentationPattern.destination);
+    const longerDestination = text(main.destination);
+    if (shorterDestination && longerDestination) notes.push(`Less frequent journeys continue beyond ${shorterDestination} to ${longerDestination}.`);
+  }
   notes.push(...profileNotes);
   const ids = unique(component.flatMap(service => service.sourceRecordIds ?? []));
   const groupingDecision = Object.freeze({
     ...plannerServiceGroup.publicServiceGroupingDecision,
     deduplicatedSourceRecordIds: Object.freeze(plannerServiceGroup.publicServiceGroupingDecision.deduplicatedSourceRecordIds ?? [])
   });
-  const principalLocations = unique(main.principalLocations ?? []);
+  const principalLocations = plannerPrincipalLocations(presentationPattern, representative.id, component);
+  const displayDestination = presentationDestinationDecision.chosen || text(presentationPattern.destination) || destinationDecision.chosen;
+  const richerMatchedDirection = [main, ...component]
+    .map(service => text(service?.direction))
+    .filter(direction => {
+      const cleanedDirection = displayEndpointText(direction).replace(/^towards\s+/i, '').trim();
+      const cleanedDestination = displayEndpointText(displayDestination);
+      return cleanedDirection && cleanedDestination
+        && !/[,;]|\bvia\b/i.test(cleanedDirection)
+        && !sourceDirectionMarker(cleanedDirection)
+        && normal(cleanedDirection) !== normal(cleanedDestination)
+        && normal(cleanedDirection).endsWith(normal(cleanedDestination));
+    })
+    .sort((first, second) => displayEndpointText(second).length - displayEndpointText(first).length)[0];
   const profileSchedules = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).schedules])));
   const profilePopulations = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).entries])));
   const profileFrequency = Object.freeze(Object.fromEntries(profileIds.map(profileId => [profileId, profileResults.get(profileId).frequencyByDay])));
@@ -2119,6 +2422,8 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     operatorEvidenceConflict: plannerServiceGroup.operatorEvidenceConflict,
     origin: text(main.origin) || 'Origin not supplied',
     destination: destinationDecision.chosen || text(main.destination) || 'Destination not resolved',
+    presentationDestination: presentationDestinationDecision.chosen || text(presentationPattern.destination) || null,
+    presentationExtensionDestination: presentationPattern === main ? null : text(main.destination) || null,
     rawDestination: destinationDecision.raw || text(main.destination) || null,
     rawOrigin: originDecision.raw || text(main.origin) || null,
     originEndpointDecision: originDecision,
@@ -2132,7 +2437,15 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     calendarProfileLabels: Object.freeze(profileIds.map(calendarProfileDisplayLabel)),
     hasSeparateTimetablePair: hasSchoolHolidayProfiles || hasSchoolNonSchoolEvidence,
     directionFamily: directionKey(main),
-    directionPatternText: directionPatternText({ ...main, destination: destinationDecision.chosen, destinationLocality: null, circular: rowCircular, circularServiceDecision }),
+    directionPatternText: directionPatternText({
+      ...presentationPattern,
+      direction: richerMatchedDirection || (rowCircular || !displayDestination || sourceDirectionMarker(displayDestination) ? plannerDirection(presentationPattern) : ''),
+      stopDirection: richerMatchedDirection ? '' : presentationPattern.stopDirection,
+      destination: displayDestination,
+      destinationLocality: null,
+      circular: rowCircular,
+      circularServiceDecision
+    }),
     servedAtStopId: representative.id,
     servedAtText: servedAtLines.join('\n') || servedAtText(representative),
     servedAtStops: Object.freeze(servedAtLines),
@@ -2141,7 +2454,8 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     frequencyBasisStopId: representative.id,
     frequencyBasisStopName: representative.name,
     principalLocations: Object.freeze(principalLocations),
-    principalLocationsText: principalText(main),
+    principalLocationState: principalLocations.length ? 'resolved' : main.principalLocationState || 'unresolved',
+    principalLocationsText: principalLocations.length ? principalLocations.join(', ') : principalText(main),
     typicalFrequency: displayResult.frequencyByDay[DAY_ORDER.find(day => !displayResult.frequencyByDay[day].noService) ?? 'monday'],
     typicalFrequencyLines: Object.freeze(frequencyLines),
     typicalFrequencyText: frequencyLines.join('\n'),
@@ -2172,7 +2486,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     routePatternExtent: Math.max(0, ...component.map(service => Number(service.routePatternExtent) || explicitPattern(service).length)),
     routePatternStops: Object.freeze([...(main.routePatternStops ?? [])]),
     recordActivity: Math.max(0, ...component.map(service => Number(service.recordActivity) || 0)),
-    presentation: Object.freeze({ principalLocationsText: principalText(main), rank: 0 }),
+    presentation: Object.freeze({ principalLocationsText: principalLocations.length ? principalLocations.join(', ') : principalText(main), rank: 0 }),
     rawServiceSummaries: Object.freeze(component),
     ambiguousServiceSummaries: Object.freeze([...(component.ambiguousServices ?? [])]),
     plannerServiceGroup,
@@ -2180,7 +2494,7 @@ function buildPlannerRow(component, stops, componentIndex, routeFamilyServices =
     operatorRawNames: plannerServiceGroup.rawOperatorNames,
     operatorIdentities: plannerServiceGroup.operatorIdentities,
     sourceSelection: canonical.eligible.length ? 'representative-stop scheduled evidence' : 'representative-stop summary fallback',
-    routeVariantNote: variantNote(component, main, groupingDecision),
+    routeVariantNote: variantNote(component, presentationPattern, groupingDecision),
     alternateDestinationNames: Object.freeze(alternateDestinations(component, main)),
     materialAlternateDestinations: groupingDecision.materialDestinationEvidence,
     publicServiceGroupingDecision: groupingDecision,
@@ -2445,6 +2759,7 @@ export function buildPublicRouteFamilyDecisions(rows = []) {
 }
 
 function familyMemberForPresentation(row) {
+  const canonicalPopulation = row?.canonicalDeparturePopulationAll ?? {};
   return Object.freeze({
     routeNumber: text(row?.routeNumber) || null,
     operator: text(row?.operator) || null,
@@ -2454,6 +2769,8 @@ function familyMemberForPresentation(row) {
     principalLocationsText: text(row?.principalLocationsText) || null,
     destinationEndpointDecision: row?.destinationDecision ?? row?.destinationEndpointDecision ?? null,
     originEndpointDecision: row?.originEndpointDecision ?? null,
+    frequencyBasisStopId: text(row?.frequencyBasisStopId) || null,
+    terminusDecision: row?.terminusDecision ?? null,
     destinationLocality: text(row?.destinationLocality || row?.destinationLocalityName) || null,
     routePatternExtent: Number(row?.routePatternExtent) || 0,
     recordActivity: Number(row?.recordActivity) || 0,
@@ -2462,6 +2779,12 @@ function familyMemberForPresentation(row) {
     calendarProfileLabels: Object.freeze([...(row?.calendarProfileLabels ?? [])]),
     frequencyLines: Object.freeze([...(row?.typicalFrequencyLines ?? [])]),
     operatingPeriodLines: Object.freeze([...(row?.operatingPeriodLines ?? [])]),
+    departureCountsByDay: Object.freeze(Object.fromEntries(DAY_ORDER.map(day => [day, (canonicalPopulation[day] ?? []).length]))),
+    serviceVariants: Object.freeze(familyMemberServiceVariants(row).map(variant => Object.freeze({
+      origin: variant.origin,
+      destination: variant.destination,
+      departureCountsByDay: Object.freeze(variant.departureCountsByDay)
+    }))),
     serviceNote: text(row?.serviceNote) || null,
     routeVariantNote: text(row?.routeVariantNote) || null,
     sourceRecordIds: Object.freeze([...(row?.sourceRecordIds ?? [])]),
@@ -2624,7 +2947,7 @@ function collapseCrossProviderPlannerCopies(rows = []) {
   }
   const consumed = new Set();
   const replacements = new Map();
-  for (const members of buckets.values()) {
+  for (const [key, members] of buckets) {
     const bods = members.filter(row => plannerSourceKind(row) === 'BODS');
     const tnds = members.filter(row => plannerSourceKind(row) === 'TNDS');
     // This is a planner presentation reconciliation only. Exact copies can
@@ -2646,7 +2969,9 @@ function collapseCrossProviderPlannerCopies(rows = []) {
     const sameDaySupplementary = samePublicOperator && sameCalendar && sameOperatingDays;
     const tndsCarriesBodsPopulation = samePublicOperator && sameCalendar && populationContainsAll(tndsRow, bodsRow);
     if (!exactCopies && !subordinateSupplementary && !sameDaySupplementary && !tndsCarriesBodsPopulation) continue;
-    const principal = tndsCarriesBodsPopulation ? tndsRow : bodsRow;
+    // National BODS remains the primary planner authority. TNDS may add
+    // supplementary annotations or provenance, but cannot replace its row.
+    const principal = bodsRow;
     const supplementary = principal === bodsRow ? [tndsRow] : [bodsRow];
     const copies = supplementary.map(row => Object.freeze({
       source: plannerSourceKind(row),
@@ -2669,9 +2994,10 @@ function collapseCrossProviderPlannerCopies(rows = []) {
     }));
     for (const row of members) consumed.add(row.id);
   }
-  return rows.flatMap(row => consumed.has(row.id)
-    ? (replacements.has(row.id) ? [replacements.get(row.id)] : [])
-    : [row]);
+  return rows.flatMap(row => {
+    if (consumed.has(row.id)) return replacements.has(row.id) ? [replacements.get(row.id)] : [];
+    return [row];
+  });
 }
 
 function endpointLocationKeys(decision = {}) {
@@ -2764,29 +3090,104 @@ function plannerNaturalList(values = []) {
   return `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
 }
 
+function familyMemberServiceVariants(member = {}) {
+  const basisStopId = text(member.frequencyBasisStopId);
+  const variants = new Map();
+  for (const service of member.rawServiceSummaries ?? []) {
+    const origin = text(plannerOrigin(service));
+    const destination = text(plannerDestination(service));
+    if (!destination) continue;
+    const key = `${normal(origin)}|${normal(destination)}`;
+    const current = variants.get(key) ?? { origin, destination, entries: [] };
+    current.entries.push(...serviceDepartureEntries(service, basisStopId).filter(entry => entry.occurrenceRole !== 'arrival'));
+    variants.set(key, current);
+  }
+  return [...variants.values()].map(variant => {
+    const entries = deduplicateDepartureEntries(variant.entries);
+    return {
+      ...variant,
+      departureCountsByDay: Object.fromEntries(DAY_ORDER.map(day => [day, entries.filter(entry => entry.day === day).length]))
+    };
+  }).filter(variant => Object.values(variant.departureCountsByDay).some(count => count > 0));
+}
+
+function availabilityDetailFromCounts(counts = {}) {
+  const weekdayCounts = DAY_ORDER.slice(0, 5).map(day => Number(counts[day]) || 0);
+  const saturday = Number(counts.saturday) || 0;
+  const sunday = Number(counts.sunday) || 0;
+  const details = [];
+  if (weekdayCounts.every(count => count === weekdayCounts[0]) && weekdayCounts[0] > 0) {
+    details.push(`Mon-Fri: ${weekdayCounts[0]} ${weekdayCounts[0] === 1 ? 'journey' : 'journeys'}/day`);
+  } else {
+    for (const [index, day] of DAY_ORDER.slice(0, 5).entries()) {
+      const count = weekdayCounts[index];
+      if (count > 0) details.push(`${day.slice(0, 1).toUpperCase() + day.slice(1, 3)}: ${count} ${count === 1 ? 'journey' : 'journeys'}/day`);
+    }
+  }
+  if (saturday > 0) details.push(`Sat: ${saturday} ${saturday === 1 ? 'journey' : 'journeys'}/day`);
+  if (sunday > 0) details.push(`Sun: ${sunday} ${sunday === 1 ? 'journey' : 'journeys'}/day`);
+  if (weekdayCounts.every(count => count === 0)) details.push('no weekday service');
+  if (saturday === 0 && sunday === 0) details.push('no weekend service');
+  else if (sunday === 0) details.push('no Sunday service');
+  return details.join('; ');
+}
+
+function familyMemberAvailabilityNote(member = {}) {
+  const terminus = member.terminusDecision;
+  if (terminus?.proven
+    && terminus.terminalStopPointIds?.includes(member.frequencyBasisStopId)
+    && terminus.terminalSides?.includes('destination')
+    && !terminus.terminalSides.includes('origin')) return 'terminating arrivals only; no departures from this stop';
+  const variants = member.serviceVariants ?? familyMemberServiceVariants(member);
+  const variantCounts = variants.map(variant => DAY_ORDER.map(day => variant.departureCountsByDay[day]));
+  if (variants.length > 1 && variantCounts.some(counts => JSON.stringify(counts) !== JSON.stringify(variantCounts[0]))) {
+    const repeatedDestinations = new Set(variants.map(variant => normal(variant.destination))
+      .filter((destination, index, destinations) => destination && destinations.indexOf(destination) !== index));
+    const detail = variants.map(variant => `${repeatedDestinations.has(normal(variant.destination))
+      ? `from ${variant.origin || 'an unlabelled origin'} to ` : ''}${variant.destination}: ${availabilityDetailFromCounts(variant.departureCountsByDay)}`).join('; ');
+    return detail;
+  }
+  const counts = member.departureCountsByDay ?? {};
+  const weekdayCounts = DAY_ORDER.slice(0, 5).map(day => Number(counts[day]) || 0);
+  const saturday = Number(counts.saturday) || 0;
+  const sunday = Number(counts.sunday) || 0;
+  const activeCounts = [...weekdayCounts, saturday, sunday].filter(count => count > 0);
+  if (!activeCounts.length || Math.max(...activeCounts) > 6) return '';
+  return availabilityDetailFromCounts(counts);
+}
+
+function familyMemberAvailabilityDiffers(member = {}, principal = {}) {
+  return DAY_ORDER.some(day => Number(member.departureCountsByDay?.[day] ?? 0) !== Number(principal.departureCountsByDay?.[day] ?? 0))
+    || JSON.stringify(member.calendarProfileIds ?? []) !== JSON.stringify(principal.calendarProfileIds ?? []);
+}
+
 function plannerAdditionalSentence(entries = []) {
   const grouped = new Map();
   for (const entry of entries) {
     const route = text(entry?.routeNumber);
     const locations = unique(entry?.locations ?? []);
     if (!route || !locations.length) continue;
-    const current = grouped.get(route) ?? { locations: [], variantKinds: new Set() };
+    const current = grouped.get(route) ?? { locations: [], variantKinds: new Set(), serviceDetails: [] };
     for (const location of locations) if (!current.locations.some(existing => normal(existing) === normal(location))) current.locations.push(location);
     if (text(entry?.variantKind)) current.variantKinds.add(text(entry.variantKind));
+    for (const serviceDetail of unique([...(entry?.serviceDetails ?? []), entry?.serviceDetail])) {
+      if (serviceDetail && !current.serviceDetails.some(existing => normal(existing) === normal(serviceDetail))) current.serviceDetails.push(serviceDetail);
+    }
     grouped.set(route, current);
   }
   const multipleEntries = grouped.size > 1;
   return [...grouped.entries()].map(([route, entry], index) => {
-    const { locations, variantKinds } = entry;
+    const { locations, variantKinds, serviceDetails } = entry;
     const placeText = plannerNaturalList(locations);
+    const detailText = serviceDetails.length ? ` (${serviceDetails.join('; ')})` : '';
     if (variantKinds.has('branch-variant') && locations.length === 1) {
-      return `Some route ${route} journeys also serve ${placeText}`;
+      return `Some route ${route} journeys also serve ${placeText}${detailText}`;
     }
     const verb = locations.length > 1
       ? (multipleEntries ? 'also serves' : 'provides connections to')
       : (multipleEntries ? 'operates to' : 'also serves');
     const routeLabel = index === 0 ? 'Route' : 'route';
-    return `${routeLabel} ${route} ${verb} ${placeText}`;
+    return `${routeLabel} ${route} ${verb} ${placeText}${detailText}`;
   }).join('; ');
 }
 
@@ -2795,16 +3196,18 @@ function plannerShortWorkingSentence(entries = []) {
   for (const entry of entries) {
     const route = text(entry?.routeNumber);
     const location = text(entry?.location);
+    const endpointRole = entry?.endpointRole === 'origin' ? 'origin' : 'destination';
     if (!route || !location) continue;
-    const current = grouped.get(route) ?? [];
+    const key = `${route}|${endpointRole}`;
+    const current = grouped.get(key) ?? { route, endpointRole, locations: [] };
     const qualification = text(entry?.qualification);
     const label = `${location}${qualification ? ` (${qualification})` : ''}`;
-    if (!current.some(existing => normal(existing) === normal(label))) current.push(label);
-    grouped.set(route, current);
+    if (!current.locations.some(existing => normal(existing) === normal(label))) current.locations.push(label);
+    grouped.set(key, current);
   }
-  return [...grouped.entries()].map(([route, locations]) => {
+  return [...grouped.values()].map(({ route, endpointRole, locations }) => {
     const placeText = locations.length > 1 ? `${locations.slice(0, -1).join(', ')} and ${locations.at(-1)}` : locations[0];
-    return `Some route ${route} journeys operate to ${placeText}`;
+    return `Some route ${route} journeys operate ${endpointRole === 'origin' ? 'from' : 'to'} ${placeText}`;
   }).join('; ');
 }
 
@@ -2827,7 +3230,8 @@ export function plannerAnnotationTaxonomy(row) {
   const qualifications = [];
   const additionalServiceEntries = [];
   const shortWorkingEntries = [];
-  const mainDestination = normal(plannerDestination(row));
+  const mainDestination = normal(row?.presentationDestination || plannerDestination(row));
+  const presentationExtensionDestination = normal(row?.presentationExtensionDestination);
   const mainOrigin = normal(plannerOrigin(row) || row?.origin);
   const assessedTerminus = normal(row?.terminusDecision?.assessedPlace);
   const annotationPattern = service => unique([
@@ -2848,7 +3252,7 @@ export function plannerAnnotationTaxonomy(row) {
     const clean = text(value);
     if (clean && !target.some(existing => normal(existing) === normal(clean))) target.push(clean);
   };
-  const addAdditionalEntry = (route, locations, variantKind = null, service = null) => {
+  const addAdditionalEntry = (route, locations, variantKind = null, service = null, serviceDetail = '') => {
     const cleanLocations = unique(locations);
     if (!text(route) || !cleanLocations.length) return;
     const existingIndex = additionalServiceEntries.findIndex(entry => entry.routeNumber === text(route)
@@ -2858,30 +3262,54 @@ export function plannerAnnotationTaxonomy(row) {
         routeNumber: text(route),
         locations: Object.freeze(cleanLocations),
         variantKind: text(variantKind) || null,
+        serviceDetails: Object.freeze(text(serviceDetail) ? [text(serviceDetail)] : []),
         evidenceKey: annotationEvidenceKey(service, route, cleanLocations.join('|')),
         patternComplete: annotationPatternComplete(service),
         pattern: Object.freeze(annotationPattern(service))
       }));
-    else if (!additionalServiceEntries[existingIndex].variantKind && text(variantKind)) {
-      additionalServiceEntries[existingIndex] = Object.freeze({ ...additionalServiceEntries[existingIndex], variantKind: text(variantKind) });
+    else {
+      const existing = additionalServiceEntries[existingIndex];
+      const serviceDetails = unique([...(existing.serviceDetails ?? []), text(serviceDetail)]);
+      if ((!existing.variantKind && text(variantKind)) || serviceDetails.length !== (existing.serviceDetails?.length ?? 0)) {
+        additionalServiceEntries[existingIndex] = Object.freeze({
+          ...existing,
+          ...( !existing.variantKind && text(variantKind) ? { variantKind: text(variantKind) } : {} ),
+          serviceDetails: Object.freeze(serviceDetails)
+        });
+      }
     }
     addUnique(additionalServices, `${text(route)} – ${cleanLocations.join(', ')}`);
   };
-  const addShortWorkingEntry = (route, location, service = null, variantKind = null, qualification = '') => {
+  const addShortWorkingEntry = (route, location, service = null, variantKind = null, qualification = '', endpointRole = 'destination') => {
     const cleanLocation = text(location);
     if (!text(route) || !cleanLocation) return;
     const evidenceKey = annotationEvidenceKey(service, route, cleanLocation);
-    const existingIndex = shortWorkingEntries.findIndex(entry => entry.evidenceKey === evidenceKey);
+    const locationAliases = value => {
+      const label = text(value);
+      return new Set([normal(label), ...[...label.matchAll(/\(([^)]+)\)/g)].map(match => normal(match[1]))].filter(Boolean));
+    };
+    const aliases = locationAliases(cleanLocation);
+    const existingIndex = shortWorkingEntries.findIndex(entry => entry.routeNumber === text(route)
+      && (entry.evidenceKey === evidenceKey
+        || [...locationAliases(entry.location)].some(alias => aliases.has(alias))));
     if (existingIndex >= 0) {
       const existing = shortWorkingEntries[existingIndex];
-      if (!existing.qualification && text(qualification)) {
-        shortWorkingEntries[existingIndex] = Object.freeze({ ...existing, qualification: text(qualification) });
+      const preferredLocation = cleanLocation.includes('(') && !existing.location.includes('(') ? cleanLocation : existing.location;
+      if ((!existing.qualification && text(qualification)) || preferredLocation !== existing.location) {
+        shortWorkingEntries[existingIndex] = Object.freeze({ ...existing, location: preferredLocation, evidenceKey: preferredLocation === cleanLocation ? evidenceKey : existing.evidenceKey, ...( !existing.qualification && text(qualification) ? { qualification: text(qualification) } : {} ) });
+      }
+      if (preferredLocation !== existing.location) {
+        const oldLabel = `${text(route)} – ${existing.location}`;
+        const oldString = shortWorkings.findIndex(value => normal(value) === normal(oldLabel));
+        if (oldString >= 0) shortWorkings.splice(oldString, 1);
+        addUnique(shortWorkings, `${text(route)} – ${preferredLocation}`);
       }
       return;
     }
     shortWorkingEntries.push(Object.freeze({
       routeNumber: text(route),
       location: cleanLocation,
+      endpointRole,
       variantKind: text(variantKind) || null,
       qualification: text(qualification) || null,
       evidenceKey,
@@ -2902,6 +3330,14 @@ export function plannerAnnotationTaxonomy(row) {
   const hasUnrestrictedPrincipal = services.some(service => !isVariantService(service)
     && !['school-day', 'non-school-day', 'holiday'].includes(calendarProfileFromService(service)));
   const mixedSchoolCalendar = hasSchoolAndNonSchoolProfiles(services);
+  const hasFlexibleCallConnectSource = services.some(service => {
+    const sourceText = [service?.operator, service?.direction, service?.origin, service?.destination,
+      ...(service?.routePatternStopNames ?? []), ...(service?.routePatternStops ?? []).map(stop => typeof stop === 'string' ? stop : stop?.name ?? stop?.commonName)]
+      .map(text).join(' ');
+    return /callconnect/i.test(sourceText) && /demand\s+responsive\s+area/i.test(sourceText);
+  });
+  if (hasFlexibleCallConnectSource) addUnique(qualifications,
+    'CallConnect operates flexibly; published times are notional, and journeys must be booked in advance. Check availability with the operator.');
   const shortWorkingRecordIds = new Set(row?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []);
   const variantQualificationNotes = new Set(services.filter(service => isVariantService(service))
     .flatMap(service => materialServiceNotesForService(service).map(note => materialServiceNote(note) || note)));
@@ -2923,7 +3359,11 @@ export function plannerAnnotationTaxonomy(row) {
         .filter(location => location.textKey && location.textKey !== assessedTerminus)
         .filter(location => !principalLocations.some(principalLocation => sameFamilyLocation(location, principalLocation)))
         .map(location => location.label);
-       if (uniqueLocations.length) addAdditionalEntry(memberRoute, uniqueLocations);
+      const serviceDetail = familyMemberAvailabilityNote(member);
+      if (uniqueLocations.length) addAdditionalEntry(memberRoute, uniqueLocations, null, member, serviceDetail);
+      else if (serviceDetail && familyMemberAvailabilityDiffers(member, principal) && text(member.destination)) {
+        addAdditionalEntry(memberRoute, [text(member.destination)], null, member, serviceDetail);
+      }
       const profiles = (member.calendarProfileLabels ?? []).filter(label => label
         && !/^standard days$/i.test(label)
         && !/^calendar not confirmed$/i.test(label)
@@ -2935,6 +3375,7 @@ export function plannerAnnotationTaxonomy(row) {
   const decisionVariants = samePhysicalJourney ? [] : (row?.publicServiceGroupingDecision?.variantDestinationEvidence ?? []);
   const mainDestinationKeys = plannerServiceDestinationKeys(row?.destinationDecision ?? row?.destinationEndpointDecision);
   for (const variant of decisionVariants) {
+    if (presentationExtensionDestination && normal(variant.destination) === presentationExtensionDestination) continue;
     const idSet = new Set(variant.sourceRecordIds ?? []);
     if ([...idSet].some(id => principalSourceIds.has(id))) continue;
     if (variant.sourceRecordIds?.length && [...idSet].every(id => duplicateIds.has(id))) continue;
@@ -2960,7 +3401,7 @@ export function plannerAnnotationTaxonomy(row) {
     if ((shortWorkingVariant && origin && normal(origin) !== mainOrigin)
       || (origin && normal(destination) === mainDestination && normal(origin) !== mainOrigin)) {
       const location = origin || destination;
-       addShortWorkingEntry(route, location, service, shortWorkingVariant ? 'short-working' : variant.kind, scopedQualification);
+       addShortWorkingEntry(route, location, service, shortWorkingVariant ? 'short-working' : variant.kind, scopedQualification, 'origin');
     } else if (shortWorkingVariant && destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
        addShortWorkingEntry(route, destination, service, 'short-working', scopedQualification);
     } else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
@@ -2977,6 +3418,7 @@ export function plannerAnnotationTaxonomy(row) {
       if (!id || duplicateIds.has(id)) continue;
       if ((service.sourceRecordIds ?? []).some(sourceId => principalSourceIds.has(sourceId)) && service !== services[0]) continue;
       const destination = plannerDestination(service);
+      if (presentationExtensionDestination && normal(destination) === presentationExtensionDestination) continue;
       const origin = plannerOrigin(service);
       if (!destination && !origin) continue;
       const originDiffers = origin && normal(origin) !== mainOrigin;
@@ -2990,13 +3432,13 @@ export function plannerAnnotationTaxonomy(row) {
         ? variantCalendarQualification(service)
         : (!mixedSchoolCalendar && variantOnlyQualification ? variantCalendarQualification(service) : '');
       if (knownShortWorking && originDiffers && destination && (normal(destination) === mainDestination || sameMainPlace)) {
-         addShortWorkingEntry(route, origin, service, null, scopedQualification);
+         addShortWorkingEntry(route, origin, service, null, scopedQualification, 'origin');
       }
-      else if (knownShortWorking && destination && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
+      else if (knownShortWorking && destination && normal(destination) !== mainDestination && !sameMainPlace && normal(destination) !== assessedTerminus) {
          addShortWorkingEntry(route, destination, service, 'short-working', scopedQualification);
       }
       else if (originDiffers && destination && (normal(destination) === mainDestination || sameMainPlace)) {
-         addShortWorkingEntry(route, origin, service);
+         addShortWorkingEntry(route, origin, service, null, '', 'origin');
       }
       else if (destination && !sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
          addAdditionalEntry(route, [destination], null, service);
@@ -3014,6 +3456,7 @@ export function plannerAnnotationTaxonomy(row) {
       ...(row.alternateDestinationNames ?? []),
       ...services.map(service => plannerDestination(service))
     ])) {
+      if (presentationExtensionDestination && normal(destination) === presentationExtensionDestination) continue;
       const matchingVariant = decisionVariants.find(variant => normal(variant.destination) === normal(destination));
       const matchingService = services.find(service => normal(plannerDestination(service)) === normal(destination));
       const candidateKeys = matchingVariant
@@ -3023,7 +3466,7 @@ export function plannerAnnotationTaxonomy(row) {
         || sameStructuredPlannerPlace(mainDestinationKeys, candidateKeys);
       const isShortVariant = matchingVariant?.kind === 'short-working'
         || (matchingService?.sourceRecordIds ?? []).some(sourceId => (row?.publicServiceGroupingDecision?.shortWorkingRecordIds ?? []).includes(sourceId));
-      if (isShortVariant && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
+      if (isShortVariant && normal(destination) !== mainDestination && !sameMainPlace && normal(destination) !== assessedTerminus) {
          addShortWorkingEntry(row.routeNumber, destination, matchingService, 'short-working');
       }
       else if (!sameMainPlace && normal(destination) !== mainDestination && normal(destination) !== assessedTerminus) {
@@ -3040,7 +3483,11 @@ export function plannerAnnotationTaxonomy(row) {
     && !/circular service/i.test(rowQualification)
     && !qualifications.some(existing => normal(existing).includes(normal(rowQualification)))) addUnique(qualifications, rowQualification);
   const shortLocation = value => text(value).replace(/^[^–-]+[–-]\s*/u, '');
-  const compactShortWorkings = shortWorkings.filter(candidate => !shortWorkings.some(other => other !== candidate
+  const retainedShortWorkingEntries = presentationExtensionDestination
+    ? shortWorkingEntries.filter(entry => normal(entry.location) !== presentationExtensionDestination)
+    : shortWorkingEntries;
+  const compactShortWorkings = shortWorkings.filter(candidate => (!presentationExtensionDestination || normal(shortLocation(candidate)) !== presentationExtensionDestination)
+    && !shortWorkings.some(other => other !== candidate
     && normal(shortLocation(other)).includes(normal(shortLocation(candidate)))));
   // One ordered-pattern evidence item can have only one semantic display.
   // Distinct patterns retain separate keys, so a real branch and a real short
@@ -3048,7 +3495,7 @@ export function plannerAnnotationTaxonomy(row) {
   const annotationLabel = (route, location) => `${normal(route)}|${normal(location)}`;
   const additionalEvidenceKeys = new Set(additionalServiceEntries.map(entry => entry.evidenceKey).filter(Boolean));
   const additionalLabels = new Set(additionalServiceEntries.flatMap(entry => entry.locations.map(location => annotationLabel(entry.routeNumber, location))));
-  const shortWorkingWins = new Set(shortWorkingEntries.filter(entry => {
+  const shortWorkingWins = new Set(retainedShortWorkingEntries.filter(entry => {
     const sameLabel = additionalLabels.has(annotationLabel(entry.routeNumber, entry.location));
     if (!sameLabel) return false;
     const additional = additionalServiceEntries.find(candidate => candidate.routeNumber === entry.routeNumber
@@ -3066,7 +3513,7 @@ export function plannerAnnotationTaxonomy(row) {
       locations: Object.freeze(entry.locations.filter(location => !shortWorkingWins.has(annotationLabel(entry.routeNumber, location))))
     }))
     .filter(entry => entry.locations.length);
-  const exclusiveShortWorkingEntries = shortWorkingEntries.filter(entry => {
+  const exclusiveShortWorkingEntries = retainedShortWorkingEntries.filter(entry => {
     if (shortWorkingWins.has(annotationLabel(entry.routeNumber, entry.location))) return true;
     if (additionalEvidenceKeys.has(entry.evidenceKey)) return false;
     return !additionalLabels.has(annotationLabel(entry.routeNumber, entry.location));
@@ -3137,29 +3584,51 @@ function legacyVariantCompatibilityNote(group) {
   return 'Additional short workings and timetable variants operate.';
 }
 
+function combineIntermediatePatternNotes(notes = []) {
+  const pattern = /^Intermediate stop patterns vary, including (.+)\.$/i;
+  const matches = notes.map(note => ({ note, match: text(note).match(pattern) })).filter(item => item.match);
+  if (matches.length < 2) return notes;
+  const combined = `Intermediate stop patterns vary, including ${unique(matches.map(item => item.match[1])).join('; ')}.`;
+  const first = notes.indexOf(matches[0].note);
+  const filtered = notes.filter(note => !matches.some(item => item.note === note));
+  filtered.splice(Math.min(first, filtered.length), 0, combined);
+  return filtered;
+}
+
 function attachRouteNotes(rows) {
   const prepared = rows.map(row => Object.freeze({ ...row, plannerNotes: plannerAnnotationTaxonomy(row) }));
   const groups = new Map();
   prepared.forEach((row, index) => { const key = row.publicRouteFamilyKey || row.routeGroupKey; if (!groups.has(key)) groups.set(key, []); groups.get(key).push({ row, index }); });
-  const notesFor = row => unique(text(row.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean))
-    .filter(note => !(row?.hasSeparateTimetablePair && /^(?:School-day journeys only\.|School days only\.|Non-school days only\.|Term-time service\.)$/i.test(note)));
+  const notesFor = row => {
+    const qualifications = new Set(text(row?.plannerNotes?.serviceQualification).split(';').map(value => normal(value)));
+    const notes = unique(text(row.serviceNote).split(/(?<=[.!?])\s+(?=[A-Z])/u).map(materialServiceNote).filter(Boolean))
+      .filter(note => !qualifications.has(normal(note)))
+      .filter(note => !(row?.hasSeparateTimetablePair && /^(?:School-day journeys only\.|School days only\.|Non-school days only\.|Term-time service\.)$/i.test(note)));
+    return combineIntermediatePatternNotes(notes);
+  };
   const structuredQualification = note => /school[- ]?days?|term[- ]time|non[- ]school|holiday|operating days could not be fully confirmed/i.test(text(note));
   const sharedTaxonomy = new Set(['School-day journeys only.', 'School days only.', 'Term-time service.', 'Non-school days only.', 'Circular service.']);
   const updates = new Map();
   for (const group of groups.values()) {
     const principalDestinations = new Set(group.flatMap(({ row }) => [
-      plannerDestination(row), row?.destinationDecision?.chosenDisplayName, row?.destinationEndpointDecision?.chosenDisplayName
+      plannerDestination(row), row?.destinationDecision?.chosenDisplayName, row?.destinationEndpointDecision?.chosenDisplayName,
+      row?.presentationExtensionDestination
     ]).map(normal).filter(Boolean));
     const notesForRow = row => {
       const notes = row.plannerNotes ?? {};
       const entries = (notes.additionalServiceEntries ?? []).map(entry => ({
         ...entry,
-        locations: (entry.locations ?? []).filter(location => !principalDestinations.has(normal(location)))
+        locations: (entry.locations ?? []).filter(location =>
+          (Boolean(entry.serviceDetails?.length) && row.publicRouteFamilyDecision?.state === 'proven-family')
+          || !principalDestinations.has(normal(location)))
       })).filter(entry => entry.locations.length);
+      const shortWorkingEntries = (notes.shortWorkingEntries ?? []).filter(entry => !principalDestinations.has(normal(entry.location)));
       return Object.freeze({
         ...notes,
         additionalServiceEntries: Object.freeze(entries.map(entry => Object.freeze(entry))),
-        additionalServices: entries.length ? plannerAdditionalSentence(entries) : null
+        additionalServices: entries.length ? plannerAdditionalSentence(entries) : null,
+        shortWorkingEntries: Object.freeze(shortWorkingEntries),
+        shortWorkings: shortWorkingEntries.length ? plannerShortWorkingSentence(shortWorkingEntries) : null
       });
     };
     const rowNotes = group.map(({ row }) => notesFor(row));
@@ -3211,6 +3680,7 @@ function attachRouteNotes(rows) {
       const existing = target[existingIndex];
       target[existingIndex] = {
         ...existing,
+        serviceDetails: Object.freeze(unique([...(existing.serviceDetails ?? []), ...(entry.serviceDetails ?? [])])),
         ...(!existing.qualification && entry.qualification ? { qualification: entry.qualification } : {}),
         ...(existing.variantKind !== 'short-working' && entry.variantKind === 'short-working' ? { variantKind: 'short-working' } : {}),
         ...(!existing.patternComplete && entry.patternComplete ? { patternComplete: true, pattern: entry.pattern } : {})
@@ -3218,7 +3688,7 @@ function attachRouteNotes(rows) {
     };
     group.forEach(({ row }) => {
       (notesForRow(row).additionalServiceEntries ?? []).forEach(entry => mergeEntry(mergedAdditionalServiceEntries, entry));
-      (row.plannerNotes?.shortWorkingEntries ?? []).forEach(entry => mergeEntry(mergedShortWorkingEntries, entry));
+      (notesForRow(row).shortWorkingEntries ?? []).forEach(entry => mergeEntry(mergedShortWorkingEntries, entry));
       text(row.plannerNotes?.serviceQualification).split(';').map(text).filter(Boolean).forEach(qualification => {
         if (!mergedQualifications.some(existing => normal(existing) === normal(qualification))) mergedQualifications.push(qualification);
       });
@@ -3253,9 +3723,9 @@ function attachRouteNotes(rows) {
       });
       return Object.freeze({
         ...notesForRow(row),
-        additionalServices: additionalEntries.length ? plannerAdditionalSentence(additionalEntries) : row.plannerNotes?.additionalServices || null,
+        additionalServices: additionalEntries.length ? plannerAdditionalSentence(additionalEntries) : notesForRow(row).additionalServices || null,
         additionalServiceEntries: Object.freeze(additionalEntries),
-        shortWorkings: exclusiveShortEntries.length ? plannerShortWorkingSentence(exclusiveShortEntries) : (additionalEntries.length ? null : row.plannerNotes?.shortWorkings || null),
+        shortWorkings: exclusiveShortEntries.length ? plannerShortWorkingSentence(exclusiveShortEntries) : (additionalEntries.length ? null : notesForRow(row).shortWorkings || null),
         shortWorkingEntries: Object.freeze(exclusiveShortEntries),
         serviceQualification: mergedQualifications.length ? mergedQualifications.join('; ') : row.plannerNotes?.serviceQualification || null
       });
@@ -3278,6 +3748,234 @@ function attachRouteNotes(rows) {
     });
   }
   return prepared.map((row, index) => Object.freeze({ ...row, ...(updates.get(index) ?? { routeGroupNote: null }) }));
+}
+
+function rowSourceRecords(row) {
+  return row?.plannerServiceGroup?.services ?? row?.services ?? [];
+}
+
+function rowEndpointNames(row, side) {
+  return unique(rowSourceRecords(row).flatMap(service => [
+    service?.[`${side}EndpointDecision`]?.chosenDisplayName,
+    service?.[`${side}EndpointDecision`]?.chosen,
+    service?.[side]
+  ]).map(text).filter(value => value && !/^(?:origin|destination) not supplied|destination not resolved$/i.test(value)));
+}
+
+function exactDepartureAnchor(row, stopId) {
+  if (!stopId) return false;
+  return rowSourceRecords(row).some(service => {
+    const ids = explicitPattern(service);
+    return ids[0] === stopId
+      && (text(service.frequencyBasisStopId) === stopId
+        || (service.stopIds ?? service.assessedStops ?? []).map(text).includes(stopId));
+  });
+}
+
+function exactArrivalTerminalAnchor(row, stopId) {
+  if (!stopId) return false;
+  return rowSourceRecords(row).some(service => {
+    const ids = explicitPattern(service);
+    return ids.at(-1) === stopId
+      && (text(service.frequencyBasisStopId) === stopId
+        || (service.stopIds ?? service.assessedStops ?? []).map(text).includes(stopId));
+  });
+}
+
+function activeLogicalStopGroups(stops, stopId) {
+  const stop = (stops ?? []).find(candidate => text(candidate?.id || candidate?.sourceId) === stopId);
+  return unique((stop?.logicalGroupRefs ?? [])
+    .filter(ref => text(ref?.source).toLowerCase() === 'naptan'
+      && text(ref?.status).toLowerCase() === 'active'
+      && ref?.targetExists === true)
+    .map(ref => ref?.id));
+}
+
+function sameProvenTerminalGroup(firstStopId, secondStopId, stops) {
+  if (firstStopId && firstStopId === secondStopId) return { sameStopPoint: true, groupIds: [] };
+  const right = new Set(activeLogicalStopGroups(stops, secondStopId));
+  const groupIds = activeLogicalStopGroups(stops, firstStopId).filter(id => right.has(id));
+  return groupIds.length ? { sameStopPoint: false, groupIds } : null;
+}
+
+function pairedReciprocalTerminusDeparture(departing, arriving, stops = []) {
+  if (!departing || !arriving || departing === arriving) return false;
+  if (text(departing.routeNumber).toUpperCase() !== text(arriving.routeNumber).toUpperCase()) return false;
+  const arrivalStopId = text(arriving.frequencyBasisStopId || arriving.servedAtStopId);
+  const departureStopId = text(departing.frequencyBasisStopId || departing.servedAtStopId);
+  const terminalGroup = sameProvenTerminalGroup(arrivalStopId, departureStopId, stops);
+  if (!terminalGroup || !exactDepartureAnchor(departing, departureStopId) || !exactArrivalTerminalAnchor(arriving, arrivalStopId)) return false;
+  const arrivalServices = rowSourceRecords(arriving);
+  const departureServices = rowSourceRecords(departing);
+  const hasCompatibleOperator = departureServices.some(outbound => arrivalServices.some(inbound => operatorFamilyCompatible(outbound, inbound)));
+  if (!hasCompatibleOperator) return false;
+  const originNames = new Set(rowEndpointNames(arriving, 'origin').map(normal));
+  const reciprocalDestination = rowEndpointNames(departing, 'destination').some(name => originNames.has(normal(name)));
+  const exactEndpointIdentity = departureServices.some(outbound => arrivalServices.some(inbound => {
+    return hasResolvedExactEndpointEvidence(outbound, 'destination')
+      && endpointIdentity(outbound, 'destination') === endpointIdentity(inbound, 'origin');
+  }));
+  return reciprocalDestination || exactEndpointIdentity
+    ? Object.freeze({ arrivalStopId, departureStopId, sameStopPoint: terminalGroup.sameStopPoint, groupIds: terminalGroup.groupIds, reciprocalEndpoint: true })
+    : false;
+}
+
+function promotePairedDepartureRows(rows, stops = []) {
+  const pairedArrivals = new Map();
+  const pairedDepartures = new Map();
+  for (let arrivalIndex = 0; arrivalIndex < rows.length; arrivalIndex += 1) {
+    const arriving = rows[arrivalIndex];
+    const arrivalAlreadyProven = arriving.terminusDecision?.proven
+      && arriving.terminusDecision.presentation === 'arrival-only-suppress';
+    // Pairing may extend an existing physical-stop proof across a logical
+    // StopArea. For an unproven arrival, only distinct StopPoints in a shared
+    // active group can add the missing terminal proof; reciprocal labels at
+    // the same StopPoint alone must not remove an ordinary opposite direction.
+    if (arriving.terminusDecision?.status === 'through-service') continue;
+    for (let departureIndex = 0; departureIndex < rows.length; departureIndex += 1) {
+      if (arrivalIndex === departureIndex) continue;
+      const departing = rows[departureIndex];
+      if (departing.terminusDecision?.status === 'through-service') continue;
+      const evidence = pairedReciprocalTerminusDeparture(departing, arriving, stops);
+      if (!evidence) continue;
+      if (!arrivalAlreadyProven && evidence.sameStopPoint) continue;
+      pairedArrivals.set(arrivalIndex, [...(pairedArrivals.get(arrivalIndex) ?? []), { row: departing, evidence }]);
+      pairedDepartures.set(departureIndex, [...(pairedDepartures.get(departureIndex) ?? []), { row: arriving, evidence }]);
+    }
+  }
+  if (!pairedArrivals.size) return rows;
+  return rows.map(row => {
+    const rowIndex = rows.indexOf(row);
+    const arrivingPairs = pairedArrivals.get(rowIndex) ?? [];
+    const departingPairs = pairedDepartures.get(rowIndex) ?? [];
+    if (!arrivingPairs.length && !departingPairs.length) return row;
+    if (row.terminusDecision?.proven) {
+      if (row.terminusDecision.presentation !== 'arrival-only-suppress' || !arrivingPairs.length) return row;
+      const groupPairs = arrivingPairs.filter(pair => pair.evidence.groupIds.length);
+      const canonicalPlace = groupPairs.map(pair => text(pair.row.terminusDecision?.assessedPlace))
+        .find(value => value && !/^bus station$/i.test(value));
+      if (!canonicalPlace || canonicalPlace === row.terminusDecision.assessedPlace) return row;
+      const terminusDecision = Object.freeze({
+        ...row.terminusDecision,
+        assessedPlace: canonicalPlace,
+        note: `${canonicalPlace} is the route terminus.`,
+        evidence: Object.freeze({
+          ...(row.terminusDecision.evidence ?? {}),
+          pairedDepartureSourceRecordIds: Object.freeze(groupPairs.flatMap(pair => pair.row.sourceRecordIds ?? [])),
+          activeNaPTANLogicalGroupIds: Object.freeze(unique(groupPairs.flatMap(pair => pair.evidence.groupIds)))
+        })
+      });
+      return Object.freeze({ ...row, terminusDecision });
+    }
+    if (!arrivingPairs.length && row.terminusDecision?.proven
+      && row.terminusDecision.presentation === 'departing-only') return row;
+    const proofPairs = [...arrivingPairs, ...departingPairs];
+    const primaryPair = proofPairs[0];
+    const stopIds = unique(proofPairs.flatMap(pair => [pair.evidence.arrivalStopId, pair.evidence.departureStopId]));
+    const groupIds = unique(proofPairs.flatMap(pair => pair.evidence.groupIds));
+    const groupStop = (stops ?? []).find(stop => stopIds.includes(text(stop?.id || stop?.sourceId)));
+    const fallbackPlace = [groupStop?.logicalGroupName, groupStop?.stopAreaName, groupStop?.stopArea?.name,
+      groupStop?.name && groupStop?.locality ? `${groupStop.locality} ${groupStop.name}` : groupStop?.name]
+      .map(text).find(Boolean);
+    const pairedTerminalPlace = proofPairs.map(pair => text(pair.row.terminusDecision?.assessedPlace))
+      .find(value => value && !/^bus station$/i.test(value));
+    const logicalGroupPlace = groupIds.length ? pairedTerminalPlace || fallbackPlace : '';
+    const place = text(logicalGroupPlace || row.terminusDecision?.assessedPlace
+      || primaryPair.row.terminusDecision?.assessedPlace || 'assessed bus station');
+    const existing = row.terminusDecision ?? {};
+    if (arrivingPairs.length) {
+      const arrivalEvidence = unique([
+        ...(existing.arrivalEvidence ?? []),
+        ...row.sourceRecordIds ?? [],
+        ...arrivingPairs.flatMap(pair => pair.row.sourceRecordIds ?? [])
+      ]);
+      const terminusDecision = Object.freeze({
+        ...existing, type: 'TerminusDecision', status: 'proven-terminus', presentation: 'arrival-only-suppress',
+        proven: true, assessedPlace: place, terminalSides: Object.freeze(['destination']),
+        terminalStopPointIds: Object.freeze(unique([...(existing.terminalStopPointIds ?? []), ...stopIds])),
+        arrivalEvidence: Object.freeze(arrivalEvidence), departureEvidence: Object.freeze([]),
+        reason: 'The exact ordered arrival ends at a StopPoint in an active NaPTAN logical StopArea shared with the reciprocal departing pattern; no onward call follows that terminal.',
+        note: `${place} is the route terminus.`,
+        evidence: Object.freeze({ ...(existing.evidence ?? {}), pairedDepartureSourceRecordIds: Object.freeze(arrivingPairs.flatMap(pair => pair.row.sourceRecordIds ?? [])), activeNaPTANLogicalGroupIds: Object.freeze(groupIds), exactArrivalStopPointAnchor: primaryPair.evidence.arrivalStopId })
+      });
+      return Object.freeze({ ...row, terminusDecision });
+    }
+    const arrivalIds = unique([
+      ...(existing.arrivalEvidence ?? []),
+      ...departingPairs.flatMap(pair => pair.row.terminusDecision?.arrivalEvidence ?? []),
+      ...departingPairs.flatMap(pair => pair.row.sourceRecordIds ?? [])
+    ]);
+    const stopId = text(row.frequencyBasisStopId || row.servedAtStopId);
+    const terminusDecision = Object.freeze({
+      ...existing,
+      type: 'TerminusDecision',
+      status: 'proven-terminus',
+      presentation: 'departing-only',
+      proven: true,
+      assessedPlace: place,
+      terminalSides: Object.freeze(['origin']),
+      terminalStopPointIds: Object.freeze(unique([...(row.terminusDecision?.terminalStopPointIds ?? []), stopId])),
+      arrivalEvidence: Object.freeze(arrivalIds),
+      departureEvidence: Object.freeze(unique([...(row.sourceRecordIds ?? []), ...(existing.departureEvidence ?? [])])),
+      reason: 'The departing ordered pattern starts at the exact assessed StopPoint in an active NaPTAN logical StopArea shared with the paired arrival, and its destination reciprocates the arrival origin.',
+      note: `${place} is the route terminus.`,
+      evidence: Object.freeze({
+        ...(existing.evidence ?? {}),
+        pairedArrivalSourceRecordIds: Object.freeze(departingPairs.flatMap(pair => pair.row.sourceRecordIds ?? [])),
+        activeNaPTANLogicalGroupIds: Object.freeze(groupIds),
+        exactDepartingStopPointAnchor: stopId
+      })
+    });
+    return Object.freeze({ ...row, terminusDecision });
+  });
+}
+
+export function foldLowVolumeContainedPlannerRows(rows = []) {
+  const output = [...rows];
+  const patternFor = row => row?.publicServiceGroupingDecision?.principalPattern?.orderedRoutePatternStopIds ?? [];
+  const hasOneTripDay = row => (row?.typicalFrequencyLines ?? []).some(line => /\b1\s+journey\s*\/\s*day\b/i.test(text(line)));
+  const hasRegularService = row => (row?.typicalFrequencyLines ?? []).some(line => /\b(?:every|typically every|approx\. every)\s*~?\s*\d+\s*(?:-|–|to\s*)?\d*\s*mins?\b/i.test(text(line)));
+  const commonPrefixLength = (left, right) => {
+    let index = 0;
+    while (index < left.length && index < right.length && left[index] === right[index]) index += 1;
+    return index;
+  };
+  for (const shortRow of rows) {
+    if (!hasOneTripDay(shortRow)) continue;
+    const shortPattern = patternFor(shortRow);
+    if (shortPattern.length < 10) continue;
+    const principalRow = output.find(candidate => candidate !== shortRow
+      && text(candidate.routeNumber) === text(shortRow.routeNumber)
+      && operatorFamilyCompatible(candidate, shortRow)
+      && hasRegularService(candidate)
+      && text(candidate.frequencyBasisStopId) === text(shortRow.frequencyBasisStopId)
+      && normal(candidate.origin) === normal(shortRow.origin)
+      && patternFor(candidate).length > shortPattern.length
+      && commonPrefixLength(shortPattern, patternFor(candidate)) >= 8
+      && commonPrefixLength(shortPattern, patternFor(candidate)) / shortPattern.length >= 0.7);
+    if (!principalRow) continue;
+    const extraDestination = text(shortRow.destination);
+    const note = extraDestination ? `Some route ${shortRow.routeNumber} journeys operate to ${extraDestination}` : '';
+    const notes = unique([principalRow.serviceNote, note].map(text).filter(Boolean));
+    const shortIds = unique(shortRow.sourceRecordIds ?? []);
+    const grouping = principalRow.publicServiceGroupingDecision ?? {};
+    const mergedGrouping = Object.freeze({
+      ...grouping,
+      shortWorkingRecordIds: Object.freeze(unique([...(grouping.shortWorkingRecordIds ?? []), ...shortIds])),
+      groupedSourceRecordIds: Object.freeze(unique([...(grouping.groupedSourceRecordIds ?? []), ...shortIds])),
+      sourceRecordIds: Object.freeze(unique([...(grouping.sourceRecordIds ?? []), ...shortIds]))
+    });
+    const merged = Object.freeze({
+      ...principalRow,
+      sourceRecordIds: Object.freeze(unique([...(principalRow.sourceRecordIds ?? []), ...shortIds])),
+      publicServiceGroupingDecision: mergedGrouping,
+      serviceNote: notes.map(note => text(note).replace(/[.]+$/u, '')).filter(Boolean).join('. '),
+      variantCount: (Number(principalRow.variantCount) || 0) + (Number(shortRow.variantCount) || 0) + 1
+    });
+    output[output.indexOf(principalRow)] = merged;
+    output.splice(output.indexOf(shortRow), 1);
+  }
+  return output;
 }
 
 export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = []) {
@@ -3305,7 +4003,7 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
       if (!representedByResolvedRow) provisionalRows.push(Object.freeze({ ...row, destination: 'Destination requires review', directionPatternText: 'Destination requires review', unresolvedPublicIdentity: true, serviceNote: unique([row.serviceNote, 'Destination requires review before formal use.']).join(' ') }));
     }
   }
-  let familyRows = collapseCrossProviderPlannerCopies(collapsePublicRouteFamilies(provisionalRows));
+  let familyRows = promotePairedDepartureRows(collapseCrossProviderPlannerCopies(collapsePublicRouteFamilies(provisionalRows)), stops);
   const plannerRouteNumbers = row => new Set(row?.publicRouteNumbers ?? row?.routeNumbers ?? [row?.routeNumber]);
   const sharesPlannerRouteNumber = (first, second) => [...plannerRouteNumbers(first)].some(route => plannerRouteNumbers(second).has(route));
   const hasDepartingTerminus = row => familyRows.some(candidate => candidate !== row
@@ -3316,7 +4014,7 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
     && candidate.terminusDecision.terminalSides.includes('origin')
     && candidate.terminusDecision.assessedPlace === row.terminusDecision?.assessedPlace);
   const suppressedArrivals = familyRows.filter(row => row.terminusDecision?.presentation === 'arrival-only-suppress' && hasDepartingTerminus(row));
-  let rows = familyRows.filter(row => !suppressedArrivals.includes(row));
+  let rows = foldLowVolumeContainedPlannerRows(familyRows.filter(row => !suppressedArrivals.includes(row)));
   rows = rows.map(row => {
     if (!row.terminusDecision?.proven || !row.terminusDecision.terminalSides.includes('origin')) return row;
     const matchedSuppressed = suppressedArrivals.filter(candidate => candidate.routeNumber === row.routeNumber
@@ -3339,6 +4037,16 @@ export function buildPlannerBusServiceSummaries(serviceSummaries = [], stops = [
     || text(first.directionPatternText).localeCompare(text(second.directionPatternText))
     || text(first.id).localeCompare(text(second.id)));
   return attachRouteNotes(sorted);
+}
+
+// The assessment pipeline resolves endpoints and source evidence before it
+// returns plannerServiceSummaries. Rebuilding those rows from raw service
+// summaries in the UI discards those decisions and can silently shorten a
+// principal-location chain. Use the resolved rows when present; retain the
+// builder as a compatibility path for older callers.
+export function plannerServiceSummariesForResult(result) {
+  if (Array.isArray(result?.plannerServiceSummaries)) return result.plannerServiceSummaries;
+  return buildPlannerBusServiceSummaries(result?.serviceSummaries ?? [], result?.stops ?? []);
 }
 
 export const buildPlannerBusServiceSummary = buildPlannerBusServiceSummaries;

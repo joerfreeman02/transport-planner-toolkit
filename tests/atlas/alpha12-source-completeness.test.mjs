@@ -229,9 +229,11 @@ const nearestNoMatch = createBusAssessment({
   accessRouting: { matrix: routed }
 });
 const nearestNoMatchResult = await nearestNoMatch.assess({ latitude: 51.7, longitude: -0.1 }, { mode: 'nearest' });
-assert.equal(noMatchCalls, 2);
-assert.equal(nearestNoMatchResult.nearestGroup.anchorStopId, 'FARTHER-B');
-assert.equal(nearestNoMatchResult.status, 'complete');
+assert.equal(noMatchCalls, 1, 'The approved Product Owner nearest-group rule prevents a farther timetable group from replacing the closest routed group after NO_CURRENT_MATCH.');
+assert.equal(nearestNoMatchResult.nearestGroup.anchorStopId, 'NEAREST-A');
+assert.equal(nearestNoMatchResult.nearestGroup.conclusion, 'NO_CURRENT_MATCH');
+assert.equal(nearestNoMatchResult.status, 'partial');
+assert.match(nearestNoMatchResult.wording, /No current timetable match was established/);
 
 const ambiguousFallbackService = { id: 'bods-279', routeNumber: '279', operator: 'National operator', origin: 'Origin', destination: 'Terminus', direction: 'Terminus', timetableSource: 'BODS', stopSchedules: { 'TFL-STOP': schedule([450]) } };
 const ambiguousFallback = createAuthoritativeBusTimetableAdapter({
@@ -275,6 +277,6 @@ const redundantTflFailureAssessment = createBusAssessment({
 const redundantTflResult = await redundantTflFailureAssessment.assess({ latitude: 51.7, longitude: -0.1 });
 assert.ok(redundantTflResult.provenance.timetables.unresolvedRequestIdentities.includes('279|REDUNDANT-STOP'), 'the failed request stays in technical provenance');
 assert.doesNotMatch(stopRoutesPresentation(redundantTflResult.stops.find(stop => stop.id === 'REDUNDANT-STOP')), /unavailable\/incomplete/i, 'a redundant TfL call does not contaminate the normal Routes serving stop text after the same route resolved from TfL');
-assert.equal(redundantTflResult.reviewItems.some(item => item.code === 'unresolved-timetable-request' && item.route === '279'), false, 'redundant TfL request failure is not promoted to planner review');
+assert.ok(redundantTflResult.reviewItems.some(item => item.code === 'unresolved-timetable-request' && item.route === '279' && item.stop === 'REDUNDANT-STOP'), 'a successful same-route call at another stop cannot resolve this exact route/stop request');
 
 console.log('PASS Alpha.12 source completeness, selected-stop duplicate coverage, evidence, nearest, and ambiguous-TfL regressions.');

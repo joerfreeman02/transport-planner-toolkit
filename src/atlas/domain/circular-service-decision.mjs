@@ -163,6 +163,19 @@ function endpointClosure(stops, service = {}) {
   const lastStopAreaId = stopAreaId(last) || authoritativeEndpointPlace(service, 'destination', last);
   const sameAuthoritativeStopArea = Boolean(firstStopAreaId && lastStopAreaId && firstStopAreaId === lastStopAreaId);
   const sameLogicalPlace = sameAuthoritativeStopArea;
+  const originDecision = destinationDecision(service, 'origin');
+  const destinationEndpointDecision = destinationDecision(service, 'destination');
+  const sameResolvedLocality = Boolean(originDecision?.exactEvidence === true
+    && destinationEndpointDecision?.exactEvidence === true
+    && text(originDecision.nptgLocalityCode)
+    && text(originDecision.nptgLocalityCode) === text(destinationEndpointDecision.nptgLocalityCode));
+  const sameSourceTerminalName = Boolean(normal(service?.origin) && normal(service.origin) === normal(service?.destination));
+  // Some national feeds retain the same named public terminal in the service
+  // record but end the ordered pattern at another exact StopPoint in that
+  // terminal's NPTG locality. Treat this as a closed service only when both
+  // endpoint identities were independently hydrated and their authoritative
+  // locality agrees; locality alone is not enough to prove a loop.
+  const sameNamedTerminalInResolvedLocality = sameSourceTerminalName && sameResolvedLocality;
   return Object.freeze({
     firstStopPointId: stopPointId(first),
     lastStopPointId: stopPointId(last),
@@ -171,8 +184,10 @@ function endpointClosure(stops, service = {}) {
     samePhysicalStopPoint,
     sameAuthoritativeStopArea,
     sameLogicalPlace,
-    proven: samePhysicalStopPoint || sameAuthoritativeStopArea,
-    basis: samePhysicalStopPoint ? 'same-physical-stop-point' : sameAuthoritativeStopArea ? 'same-authoritative-stop-area' : null
+    proven: samePhysicalStopPoint || sameAuthoritativeStopArea || sameNamedTerminalInResolvedLocality,
+    basis: samePhysicalStopPoint ? 'same-physical-stop-point'
+      : sameAuthoritativeStopArea ? 'same-authoritative-stop-area'
+        : sameNamedTerminalInResolvedLocality ? 'same-named-terminal-in-resolved-locality' : null
   });
 }
 

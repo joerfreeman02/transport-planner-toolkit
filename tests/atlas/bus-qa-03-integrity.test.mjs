@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import zlib from 'node:zlib';
+import { fileURLToPath } from 'node:url';
 import { createAuthoritativeBusTimetableAdapter } from '../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
 import { createTflBusStopAdapter } from '../../src/atlas/adapters/tfl-bus-stop-adapter.mjs';
 import { createTflBusTimetableAdapter } from '../../src/atlas/adapters/tfl-bus-timetable-adapter.mjs';
@@ -133,13 +135,13 @@ const noMatchExpansion = createBusAssessment({
   accessRouting: { matrix: routed }
 });
 const noMatchResult = await noMatchExpansion.assess({ latitude: 51.685, longitude: -0.033 }, { mode: 'nearest', radius: 400, onProgress: progress => noMatchProgress.push(progress) });
-assert.deepEqual(noMatchExpansionCalls, [400, 2000], 'nearest mode expands only after an explicit no-current-match conclusion');
-assert.equal(noMatchResult.provenance.stops.actualDiscoveryRadiusMetres, 2000);
+assert.deepEqual(noMatchExpansionCalls, [400], 'The approved Product Owner nearest-group rule retains the closest routed group after NO_CURRENT_MATCH instead of expanding to seek a farther served group.');
+assert.equal(noMatchResult.provenance.stops.actualDiscoveryRadiusMetres, 400);
 assert.ok(noMatchProgress.some(progress => progress.phase === 'routing-stops' && progress.total === 1));
 assert.ok(noMatchProgress.some(progress => progress.phase === 'checking-timetables'));
-assert.equal(noMatchTimetableCalls, 2, 'nearest expansion makes exactly one additional timetable request');
-assert.ok(noMatchProgress.filter(progress => progress.phase === 'checking-timetables' && progress.completed === 0).length >= 2, 'expanded nearest forwards the initial checking-timetables progress event');
-assert.ok(noMatchProgress.filter(progress => progress.phase === 'checking-timetables' && progress.completed === 1 && progress.total === 1).length >= 2, 'expanded nearest forwards the completed checking-timetables progress event');
+assert.equal(noMatchTimetableCalls, 1, 'a confirmed no-match at the nearest group makes no farther-group or expanded-scope timetable request');
+assert.equal(noMatchResult.nearestGroup.anchorStopId, 'EXPANSION-NO-MATCH');
+assert.equal(noMatchResult.nearestGroup.conclusion, 'NO_CURRENT_MATCH');
 
 let clock = 0;
 const sleeps = [];
@@ -151,7 +153,7 @@ assert.equal(scheduler.snapshot().requestsInWindow, 1, 'the rolling window never
 
 const partialAssessment = createBusAssessment({
   stopDiscovery: { nearbyStops: async () => ({ ok: true, data: [{ id: 'PARTIAL', name: 'Partial stop', routes: ['10'] }], evidence: [], warnings: [], provenance: {} }) },
-  timetableData: { servicesForStops: async () => ({ ok: true, data: [{ id: 'partial', routeNumber: '10', operator: 'Example', origin: 'A', destination: 'B', direction: 'B', stopSchedules: { PARTIAL: schedule({ monday: [420] }) } }], warnings: [], provenance: { processedRequests: 1, unprocessedRequests: 1, unresolvedRequests: 0 } }) },
+  timetableData: { servicesForStops: async () => ({ ok: true, data: [{ id: 'partial', routeNumber: '10', operator: 'Example', origin: 'A', destination: 'B', direction: 'B', routePatternStopIds: ['ORIGIN', 'PARTIAL', 'DEST'], routePatternStops: [{ id: 'ORIGIN', name: 'A' }, { id: 'PARTIAL', name: 'Partial stop' }, { id: 'DEST', name: 'B' }], stopSchedules: { PARTIAL: schedule({ monday: [420] }) } }], warnings: [], provenance: { processedRequests: 1, unprocessedRequests: 1, unresolvedRequests: 0 } }) },
   accessRouting: { matrix: routed }
 });
 const partialProgress = [];
@@ -308,7 +310,10 @@ assert.ok(sharedSleeps[0] >= 60000);
 assert.equal(sharedScheduler.snapshot().requestsInWindow, 1);
 assert.equal(TFL_SAFE_DETAILED_PAIR_LIMIT, 43, 'dense-scope threshold reserves StopPoint discovery and route metadata budget');
 
-const preparedPath = new URL('../../atlas/data/bus/services/49000-london.json.gz', import.meta.url);
+const busDataRoot = process.env.ATLAS_TEST_BUS_DATA_ROOT
+  ? path.resolve(process.env.ATLAS_TEST_BUS_DATA_ROOT)
+  : fileURLToPath(new URL('../../atlas/data/bus/', import.meta.url));
+const preparedPath = path.join(busDataRoot, 'services', '49000-london.json.gz');
 const prepared = JSON.parse(zlib.gunzipSync(fs.readFileSync(preparedPath)));
 const actualStopId = '490003378G';
 const londonRows = prepared.services.filter(service => ['279', '217', 'N279'].includes(String(service.routeNumber)) && service.stopSchedules?.[actualStopId]);

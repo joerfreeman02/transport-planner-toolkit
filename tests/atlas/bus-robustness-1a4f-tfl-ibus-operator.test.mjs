@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { resolveTflIbusOperatorEvidence, validateTflIbusOperatorIndex, createTflIbusOperatorAdapter } from '../../src/atlas/adapters/tfl-ibus-operator-adapter.mjs';
 import { createAuthoritativeBusTimetableAdapter } from '../../src/atlas/adapters/authoritative-bus-timetable-adapter.mjs';
 import { buildBusWordTables } from '../../src/atlas/presentation/bus-word-export.mjs';
@@ -8,7 +10,12 @@ import { operatorProvenanceLabel } from '../../src/atlas/domain/bus-service-asse
 
 const baseVersion = '20261009';
 const assessmentDate = '2026-10-09';
-const currentIndex = JSON.parse(fs.readFileSync(new URL('../../atlas/data/tfl-ibus/20261009/operator-index.json', import.meta.url), 'utf8'));
+const tflIbusRoot = process.env.ATLAS_TEST_TFL_IBUS_ROOT
+  ? path.resolve(process.env.ATLAS_TEST_TFL_IBUS_ROOT)
+  : fileURLToPath(new URL('../../atlas/data/tfl-ibus/', import.meta.url));
+const indexPath = path.join(tflIbusRoot, '20261009', 'operator-index.json');
+const manifestPath = path.join(tflIbusRoot, 'manifest.json');
+const currentIndex = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
 const makeIndex = () => ({
   schema: 'tfl-ibus-operator-index-v1',
   baseVersion,
@@ -238,12 +245,12 @@ assert.deepEqual(word.headers, ['Route', 'Operator', 'Direction / main service p
 assert.equal(operatorProvenanceLabel(summary), `TfL iBus Static Data · Base_Version ${currentIndex.baseVersion}`, 'Planner-row projection retains provenance in the engineering model and audit evidence');
 assert.equal(resolvedService.source.operatorProvenance.tier, 'tfl-ibus', 'removing the report column does not remove operator provenance');
 
-const manifest = JSON.parse(fs.readFileSync(new URL('../../atlas/data/tfl-ibus/manifest.json', import.meta.url), 'utf8'));
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 assert.equal(manifest.baseVersion, currentIndex.baseVersion);
 assert.equal(manifest.validFrom, currentIndex.validFrom);
 assert.equal(manifest.validTo, currentIndex.validTo);
 assert.equal(manifest.indexPath, '20261009/operator-index.json');
-const checkedInIndexBytes = fs.readFileSync(new URL('../../atlas/data/tfl-ibus/20261009/operator-index.json', import.meta.url));
+const checkedInIndexBytes = fs.readFileSync(indexPath);
 assert.equal(createHash('sha256').update(checkedInIndexBytes).digest('hex'), manifest.indexSha256, 'Manifest digest matches the exact cross-platform checked-in index bytes.');
 const tamperedManifestAdapter = createTflIbusOperatorAdapter({
   manifestUrl: 'https://atlas.invalid/manifest.json',

@@ -1,0 +1,42 @@
+{
+  "schema": "atlas-ibus-regression-fixture-provenance-v1",
+  "fixtureId": "atlas-run75-ibus-20261009-coherent-pair-v1",
+  "parent": {
+    "producerRunId": "39430415441",
+    "artifactId": "12275615359",
+    "artifactDigest": "sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471",
+    "producerCommit": "151199cc914c235870f444d26b03c2309edbd035",
+    "notes": "Original Run #75 artifact remains immutable; its mounted iBus files are mixed and are not used in this fixture."
+  },
+  "overlaySource": {
+    "repository": "joerfreeman02/transport-planner-toolkit",
+    "branch": "codex/atlas-bus-tfl-ibus-calendar-stability",
+    "commit": "649de0dfa3aff7250a37231dedbf201904ace038",
+    "sourceFiles": {
+      "manifest": "atlas/data/tfl-ibus/manifest.json",
+      "index": "atlas/data/tfl-ibus/20261009/operator-index.json"
+    },
+    "recoveredFrom": "Retained local source checkout in the same commit lineage; no data acquisition performed.",
+    "sourceTreeCommit": "737f26a108deba5f6fb22dac00bce02af4f87e6b",
+    "sourceTreeStatus": "clean",
+    "sourceCheckout": "Windows worktree with core.autocrlf=true; the clean checkout materializes committed LF JSON as CRLF, which is the raw-byte form declared and verified by the source manifest.",
+    "committedGitBlobs": {
+      "index": "90e88205a5b37f20cc82eddcb98b49ebedb32929",
+      "manifest": "75de0b549b1c65ccd1a34b2bdad6b9bdb3c2be0b"
+    },
+    "sourceBytesNote": "The fixture preserves the clean Windows checkout bytes with explicit -text attributes. It does not claim the LF-normalized Git blob bytes are the manifest-declared raw dataset files."
+  },
+  "identity": {
+    "manifestSha256": "3090e1da6da21878725d0b30343757bd32c65fcdd56d9fdecb6f6ae6c75b5d53",
+    "indexSha256": "39b0eae384ec7a44115f898b940b3f35213577195706d38a82fa97707d2610de",
+    "indexPath": "20261009/operator-index.json",
+    "baseVersion": "20261009",
+    "validFrom": "2026-10-08T00:00:00",
+    "validTo": "2026-11-05T00:00:00"
+  },
+  "compatibility": {
+    "busManifestSha256": "1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f",
+    "tndsManifestSha256": "2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f",
+    "note": "Bus/TNDS stay from Run #75; this combination was previously exercised in local deterministic and browser audit evidence."
+  }
+}

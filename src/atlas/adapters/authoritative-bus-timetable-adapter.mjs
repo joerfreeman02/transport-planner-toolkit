@@ -3,6 +3,7 @@ import { deriveTimetableConclusion, hasScheduledEvidenceAt, scheduledStopIds, sc
 import { timetableProviderLabelsFromText } from '../domain/bus-source-presentation.mjs';
 import { sourceFailure, sourceSuccess } from './source-adapter.mjs';
 import { tflRouteSequenceEvidenceForService } from './tfl-bus-timetable-adapter.mjs';
+import { operatorFamilyCompatible, operatorTokens } from '../domain/operator-family.mjs';
 
 const text = value => String(value ?? '').trim();
 const normal = value => text(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -49,6 +50,7 @@ function stagedRequests(stops, { insideLondon = false, crossBoundaryTfLRoutes = 
   const entries = stops.flatMap(stop => (stop.routes ?? []).map(line => {
     const lineId = text(line), stopPointId = stopKey(stop);
     const routeHasTfLCoverage = crossBoundaryTfLRoutes.has(normal(lineId));
+    if (insideLondon && stop?.routeAuthorities && !routeAuthorities(stop, lineId).includes('tfl')) return [];
     if (!insideLondon && !routeAuthorities(stop, lineId).includes('tfl') && !routeHasTfLCoverage) return [];
     return lineId && stopPointId ? [`${lineId}|${stopPointId}`, { lineId, stopPointId, stop }] : [];
   })).filter(entry => Array.isArray(entry) && entry.length === 2);
@@ -80,12 +82,141 @@ function matchNationalRequest(lineId, stopPointId, nationalServices) {
   return candidates.length === 1 ? candidates[0] : null;
 }
 
+function routeMetadataLineSections(metadataResult, lineId) {
+  if (!metadataResult || metadataResult.ok === false) return [];
+  const metadata = metadataResult && typeof metadataResult === 'object' && 'data' in metadataResult
+    ? metadataResult.data
+    : metadataResult;
+  const lines = Array.isArray(metadata) ? metadata : [metadata];
+  return lines.filter(line => normal(line?.id ?? line?.name) === normal(lineId))
+    .flatMap(line => Array.isArray(line?.routeSections) ? line.routeSections : Array.isArray(line?.sections) ? line.sections : [])
+    .filter(section => text(section?.direction) && text(section?.originationName) && text(section?.destinationName));
+}
+
+function fallbackRouteSections(service, routeSections) {
+  const origin = normal(service?.origin);
+  const destination = normal(service?.destination);
+  const direction = normal(service?.direction);
+  const originIds = unique([service?.originStopPointId, ...(service?.originStopPointIds ?? [])]);
+  const destinationIds = unique([service?.destinationStopPointId, ...(service?.destinationStopPointIds ?? [])]);
+  return routeSections.filter(section => {
+    if (origin && normal(section.originationName) !== origin) return false;
+    if (destination && normal(section.destinationName) !== destination) return false;
+    if (direction && ['inbound', 'outbound'].includes(direction) && normal(section.direction) !== direction) return false;
+    if (originIds.length && !originIds.includes(text(section.originator))) return false;
+    if (destinationIds.length && !destinationIds.includes(text(section.destination))) return false;
+    return Boolean(origin || destination || originIds.length || destinationIds.length);
+  });
+}
+
+function sameStopId(left, right) { return normal(left) === normal(right); }
+
+function fallbackTflRouteSequenceEvidence(service, request, routeMetadata, routeSequenceResult) {
+  const lineId = text(request?.lineId);
+  const stopPointId = text(request?.stopPointId);
+  const sections = fallbackRouteSections(service, routeMetadataLineSections(routeMetadata, lineId));
+  if (sections.length !== 1) return null;
+  const section = sections[0];
+  const sequences = (routeSequenceResult?.data ?? [])
+    .filter(entry => normal(entry.lineId) === normal(lineId) && normal(entry.direction) === normal(section.direction))
+    .flatMap(entry => (entry.sequences ?? []).map(sequence => ({ entry, sequence })))
+    .filter(({ sequence }) => {
+      const ids = sequence.orderedStopPointIds ?? [];
+      if (!ids.some(id => sameStopId(id, stopPointId))) return false;
+      if (section.serviceType && sequence.serviceType && normal(section.serviceType) !== normal(sequence.serviceType)) return false;
+      if (section.originator && !sameStopId(section.originator, ids[0])) return false;
+      if (section.destination && !sameStopId(section.destination, ids.at(-1))) return false;
+      if (!section.originator && normal(sequence.orderedStops?.[0]?.name) !== normal(section.originationName)) return false;
+      if (!section.destination && normal(sequence.orderedStops?.at(-1)?.name) !== normal(section.destinationName)) return false;
+      return true;
+    });
+  const uniqueSequences = sequences.filter(({ sequence }, index) => !sequences.slice(0, index).some(({ sequence: prior }) =>
+    text(prior.branchId) === text(sequence.branchId)
+      && normal(prior.serviceType) === normal(sequence.serviceType)
+      && (prior.orderedStopPointIds ?? []).length === (sequence.orderedStopPointIds ?? []).length
+      && (prior.orderedStopPointIds ?? []).every((id, position) => sameStopId(id, sequence.orderedStopPointIds[position]))));
+  if (uniqueSequences.length !== 1) return null;
+  const { entry, sequence } = uniqueSequences[0];
+  return Object.freeze({
+    provider: 'Transport for London Unified API',
+    lineId,
+    direction: text(section.direction),
+    status: 'resolved',
+    matchType: 'route-topology-only-for-timetable-fallback',
+    candidateCount: 1,
+    routeTopologyEndpoints: Object.freeze({ origin: sequence.orderedStopPointIds[0], destination: sequence.orderedStopPointIds.at(-1) }),
+    matchedSequence: Object.freeze({
+      branchId: sequence.branchId ?? null,
+      serviceType: sequence.serviceType ?? section.serviceType ?? null,
+      orderedLineRoutes: Object.freeze([...(sequence.orderedLineRoutes ?? [])]),
+      orderedStops: Object.freeze((sequence.orderedStops ?? []).map(stop => Object.freeze({ ...stop }))),
+      orderedStopPointIds: Object.freeze([...(sequence.orderedStopPointIds ?? [])])
+    }),
+    matchedRouteSections: Object.freeze([Object.freeze({
+      id: text(section.id) || null,
+      direction: text(section.direction),
+      originStopPointId: text(section.originator) || null,
+      destinationStopPointId: text(section.destination) || null,
+      serviceType: text(section.serviceType) || null,
+      validFrom: text(section.validFrom) || null,
+      validTo: text(section.validTo) || null
+    })]),
+    provenance: entry.provenance ?? null,
+    scheduledTimetableUsed: false
+  });
+}
+
+function exactPreparedPatternTflEvidence(service, request, composedServices) {
+  const pattern = (service?.routePatternStopIds ?? []).map(text).filter(Boolean);
+  if (pattern.length < 2 || !pattern.some(id => sameStopId(id, request.stopPointId))) return null;
+  const candidates = (composedServices ?? []).flatMap(candidate => {
+    const evidence = candidate?.tflRouteSequenceEvidence;
+    const sequence = evidence?.matchedSequence?.orderedStopPointIds ?? [];
+    if (normal(candidate?.provider ?? candidate?.timetableSource ?? candidate?.source?.provider) !== 'tfl'
+      || evidence?.status !== 'resolved'
+      || normal(evidence.lineId) !== normal(request.lineId)
+      || sequence.length !== pattern.length
+      || !sameSequence(sequence, pattern)
+      || !operatorFamilyCompatible(candidate, service)) return [];
+    return [evidence];
+  });
+  const signatures = new Map(candidates.map(evidence => [JSON.stringify([
+    normal(evidence.lineId), normal(evidence.direction), evidence.matchedSequence?.branchId,
+    evidence.matchedSequence?.serviceType, evidence.matchedSequence?.orderedStopPointIds
+  ]), evidence]));
+  if (signatures.size !== 1) return null;
+  const evidence = [...signatures.values()][0];
+  return Object.freeze({
+    ...evidence,
+    matchType: 'exact-prepared-pattern-match-for-timetable-fallback',
+    scheduledTimetableUsed: false,
+    provenance: Object.freeze({
+      ...(evidence.provenance ?? {}),
+      topologyAppliedTo: 'exact BODS/TNDS fallback ordered StopPoint pattern',
+      timetableAuthorityRetained: text(service?.timetableSource ?? service?.source?.provider) || 'national fallback'
+    })
+  });
+}
+
 function requestIdentity(request) { return request?.lineId && request?.stopPointId ? `${request.lineId}|${request.stopPointId}` : null; }
 
 function matchBods(tfl, bods) {
   const tflStopIds = scheduledStopIds(tfl);
   const candidates = (bods ?? []).filter(service => normal(service.routeNumber) === normal(tfl.routeNumber) && tflStopIds.some(id => hasScheduledEvidenceAt(service, id)));
   if (!candidates.length) return null;
+  const tflPattern = tfl?.routePatternStopIds ?? [];
+  const exactPatternMatches = tflPattern.length > 1 ? candidates.filter(service => {
+    const pattern = service?.routePatternStopIds ?? [];
+    return pattern.length === tflPattern.length
+      && sameSequence(pattern, tflPattern)
+      && operatorFamilyCompatible(tfl, service)
+      && operatorTokens(service.operator).size > 0;
+  }) : [];
+  if (exactPatternMatches.length === 1) return exactPatternMatches[0];
+  if (exactPatternMatches.length > 1) {
+    const signatures = new Set(exactPatternMatches.map(service => JSON.stringify(service.principalLocations ?? [])));
+    if (signatures.size === 1) return exactPatternMatches[0];
+  }
   const sameDirection = candidates.filter(service => normal(service.direction || service.destination || service.origin) === normal(tfl.direction || tfl.destination || tfl.origin));
   return sameDirection.length === 1 ? sameDirection[0] : candidates.length === 1 ? candidates[0] : null;
 }
@@ -238,6 +369,40 @@ function supplement(tfl, bods) {
   else if (match && service.principalLocations?.length && match.principalLocations?.length && !sameSequence(service.principalLocations, match.principalLocations)) conflictFields.push('principalLocations');
   if (match && (!Array.isArray(service.routePatternStopIds) || !service.routePatternStopIds.length) && Array.isArray(match.routePatternStopIds) && match.routePatternStopIds.length) { service.routePatternStopIds = [...match.routePatternStopIds]; supplemented = true; }
   else if (match && service.routePatternStopIds?.length && match.routePatternStopIds?.length && !sameSequence(service.routePatternStopIds, match.routePatternStopIds)) conflictFields.push('routePatternStopIds');
+  const effectiveTfLOperator = text(service.operator) || text(operatorConsensus?.operator);
+  const alignedCompletePattern = Boolean(match
+    && service.routePatternStopIds?.length > 1
+    && sameSequence(service.routePatternStopIds, match.routePatternStopIds)
+    && operatorFamilyCompatible({ ...service, operator: effectiveTfLOperator }, match)
+    && operatorTokens(effectiveTfLOperator).size > 0
+    && operatorTokens(match.operator).size > 0
+    && Array.isArray(match.routePatternStops)
+    && match.routePatternStops.length === service.routePatternStopIds.length
+    && match.routePatternStops.every((call, index) => text(call?.id ?? call?.stopPointId ?? call?.sourceId) === text(service.routePatternStopIds[index])
+      && Boolean(text(call?.name ?? call?.commonName ?? call?.locality ?? call?.nptgLocalityName))));
+  if (alignedCompletePattern) {
+    const existingCalls = service.routePatternStops ?? [];
+    const existingLabelsUnavailable = existingCalls.length !== service.routePatternStopIds.length
+      || existingCalls.some((call, index) => {
+        const label = text(call?.name ?? call?.commonName ?? call?.locality ?? call?.nptgLocalityName);
+        return !label || label === text(service.routePatternStopIds[index]);
+      });
+    if (existingLabelsUnavailable) {
+      service.routePatternStops = match.routePatternStops.map(call => ({ ...call }));
+      supplemented = true;
+    }
+    if ((!service.principalLocations?.length) && Array.isArray(match.principalLocations) && match.principalLocations.length) {
+      service.principalLocations = [...match.principalLocations];
+      supplemented = true;
+    }
+    service.source = {
+      ...(service.source ?? {}),
+      alignedBodsCallLabelSupplement: Object.freeze({
+        provider: 'BODS', status: 'exact-ordered-stop-pattern-and-operator-aligned',
+        sourceRecordId: text(match.id) || null, authorityUnchanged: 'TfL'
+      })
+    };
+  }
   const withSupplementaryDepartures = match ? retainSupplementaryDepartures(service, match) : { service, addedDeparture: false, retained: false };
   if (withSupplementaryDepartures.service !== service) service = withSupplementaryDepartures.service;
   service.provider = 'TfL';
@@ -517,6 +682,22 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
         const retained = nationalCoverageAfterAuthority(service, services, fallbackServices, nationalOnlyStopIds);
         if (retained) composed.push(retained);
       }
+    } else {
+      // In London, retain national evidence for routes explicitly associated
+      // with an assessed StopPoint by NaPTAN but absent from TfL's route list.
+      // TfL remains primary wherever it claims that route at that StopPoint.
+      const nationalOnlyStopIdsByRoute = new Map();
+      for (const stop of stops.filter(candidate => candidate?.routeAuthorities && typeof candidate.routeAuthorities === 'object')) for (const route of nationalRoutesForStop(stop)) {
+        const key = normal(route);
+        const ids = nationalOnlyStopIdsByRoute.get(key) ?? new Set();
+        ids.add(stopKey(stop));
+        nationalOnlyStopIdsByRoute.set(key, ids);
+      }
+      for (const service of nationalServices) {
+        const routeStopIds = nationalOnlyStopIdsByRoute.get(normal(service.routeNumber)) ?? new Set();
+        const matchingStopIds = scheduledStopIds(service).filter(stopId => routeStopIds.has(stopId));
+        if (matchingStopIds.length) composed.push(scopedScheduledService(service, matchingStopIds));
+      }
     }
     if (conflicts) warnings.push(conflictWarning);
     if (materialUnresolvedObserved.length && (materialFallbackServices.length || unresolvedEntries.length)) warnings.push(partialWarning);
@@ -525,20 +706,35 @@ export function createAuthoritativeBusTimetableAdapter({ tflAdapter, nationalAda
     if (materialFallbackServices.length) warnings.push(fallbackWarning);
     if (unprocessed.length) warnings.push(`Unprocessed timetable scope: ${unprocessed.map(request => `${request.lineId}/${request.stopPointId}`).join(', ')}.`);
     let routeSequenceResult = null;
-    if (typeof tflAdapter.routeSequencesForLineDirections === 'function' && services.length) {
-      const sequenceRequests = [...new Map(services.map(service => {
+    if (typeof tflAdapter.routeSequencesForLineDirections === 'function' && (services.length || fallbackServices.length)) {
+      const directSequenceRequests = services.map(service => {
         const lineId = text(service.source?.lineId);
         const direction = text(service.direction);
-        return [`${normal(lineId)}|${normal(direction)}`, { lineId, direction }];
-      }).filter(([, request]) => request.lineId && request.direction)).values()];
+        return { lineId, direction };
+      }).filter(request => request.lineId && request.direction);
+      const fallbackSequenceRequests = fallbackServices.flatMap(service => {
+        const request = { lineId: text(service.source?.requestedLineId), stopPointId: text(service.source?.requestedStopPointId) };
+        return fallbackRouteSections(service, routeMetadataLineSections(routeMetadata, request.lineId))
+          .map(section => ({ lineId: request.lineId, direction: text(section.direction) }));
+      });
+      const sequenceRequests = [...new Map([...directSequenceRequests, ...fallbackSequenceRequests]
+        .filter(request => request.lineId && request.direction)
+        .map(request => [`${normal(request.lineId)}|${normal(request.direction)}`, request])).values()];
       routeSequenceResult = await tflAdapter.routeSequencesForLineDirections(sequenceRequests, {
         forceRefresh: options.forceRefresh,
         progress: { phase: 'checking-timetables', completed: processedRequests.length, total: processedRequests.length }
       });
       for (let index = 0; index < composed.length; index += 1) {
         const service = composed[index];
-        if (normal(service.provider ?? service.timetableSource ?? service.source?.provider) !== 'tfl') continue;
-        composed[index] = { ...service, tflRouteSequenceEvidence: tflRouteSequenceEvidenceForService(service, { ...routeSequenceResult, routeMetadata }) };
+        if (normal(service.provider ?? service.timetableSource ?? service.source?.provider) === 'tfl') {
+          composed[index] = { ...service, tflRouteSequenceEvidence: tflRouteSequenceEvidenceForService(service, { ...routeSequenceResult, routeMetadata }) };
+          continue;
+        }
+        const request = { lineId: text(service.source?.requestedLineId), stopPointId: text(service.source?.requestedStopPointId) };
+        if (!request.lineId || !request.stopPointId) continue;
+        const evidence = fallbackTflRouteSequenceEvidence(service, request, routeMetadata, routeSequenceResult)
+          ?? exactPreparedPatternTflEvidence(service, request, composed);
+        if (evidence) composed[index] = { ...service, tflRouteSequenceEvidence: evidence };
       }
       warnings.push(...(routeSequenceResult.warnings ?? []));
     }

@@ -11,10 +11,11 @@ const PHASE_LABELS = Object.freeze({
 });
 const PHASE_NUMBERS = Object.freeze({ 'finding-stops': 1, 'routing-stops': 2, 'checking-timetables': 3, 'reconciling-evidence': 4, 'preparing-assessment': 5 });
 
-export function formatAtlasTaskStatus({ phase = 'idle', detail = '', completed = null, total = null, waiting = false } = {}) {
+export function formatAtlasTaskStatus({ phase = 'idle', detail = '', completed = null, total = null, waiting = false, reviewCount = 0 } = {}) {
   const label = PHASE_LABELS[phase] || 'Working';
   if (phase === 'idle') return label;
-  if (phase === 'complete' || phase === 'partial') return label;
+  if (phase === 'complete') return Number(reviewCount) > 0 ? 'Assessment execution complete · professional evidence review required' : label;
+  if (phase === 'partial') return 'Assessment execution complete · source or routing checks incomplete';
   if (phase === 'unavailable') return detail ? label + ' — ' + detail : label;
   const hasProgress = Number.isFinite(Number(completed)) && Number.isFinite(Number(total)) && Number(total) > 0;
   const progress = hasProgress ? ' — ' + Number(completed) + ' of ' + Number(total) : '';

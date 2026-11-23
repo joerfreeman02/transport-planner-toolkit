@@ -49,6 +49,45 @@ test('nearest normal stop group keeps matching CommonName pair only', () => {
   assert.deepEqual(result.stops.map(item => item.id), ['A', 'B']);
 });
 
+test('nearest group ranking uses routed walking distance when radial order differs', () => {
+  const straightLineMetres = (first, second) => {
+    const radians = value => value * Math.PI / 180;
+    const latitudeDelta = radians(second.latitude - first.latitude);
+    const longitudeDelta = radians(second.longitude - first.longitude);
+    const haversine = Math.sin(latitudeDelta / 2) ** 2
+      + Math.cos(radians(first.latitude)) * Math.cos(radians(second.latitude)) * Math.sin(longitudeDelta / 2) ** 2;
+    return 6371000 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+  };
+  const site = { latitude: 51.53, longitude: 0.02 };
+  const radialNear = stop({ id: 'radial-near', name: 'Stop A', latitude: 51.5305, walking: { status: 'routed', distanceMetres: 310, durationSeconds: 280 } });
+  const walkingNear = stop({ id: 'walking-near', name: 'Stop B', latitude: 51.535, walking: { status: 'routed', distanceMetres: 120, durationSeconds: 100 } });
+  assert.ok(straightLineMetres(site, radialNear) < straightLineMetres(site, walkingNear), 'Stop A must be closer radially for this adversarial case.');
+  const result = selectNearestStopGroup([radialNear, walkingNear]);
+  assert.equal(result.ok, true);
+  assert.equal(result.anchor.id, 'walking-near', 'The routed-walking-nearer Stop B must rank first even though it is farther radially.');
+  assert.deepEqual(result.stops.map(item => item.id), ['walking-near']);
+});
+
+test('nearest logical group includes all physical stops linked by the same authoritative group ID', () => {
+  const result = selectNearestStopGroup([
+    stop({ id: 'anchor', name: 'Stop A', logicalGroupIds: ['stop-area:123'], walking: { status: 'routed', distanceMetres: 58, durationSeconds: 60 } }),
+    stop({ id: 'associated', name: 'Stop B', logicalGroupIds: ['stop-area:123'], walking: { status: 'routed', distanceMetres: 78, durationSeconds: 65 } }),
+    stop({ id: 'other', name: 'Stop C', logicalGroupIds: ['stop-area:456'], walking: { status: 'routed', distanceMetres: 60, durationSeconds: 62 } })
+  ]);
+  assert.equal(result.ok, true);
+  assert.equal(result.anchor.id, 'anchor');
+  assert.deepEqual(result.stops.map(item => item.id), ['anchor', 'associated']);
+});
+
+test('nearest group ignores a radially nearer stop when its walking route failed', () => {
+  const radialNearUnavailable = stop({ id: 'radial-near-unavailable', name: 'Stop A', latitude: 51.5305, walking: { status: 'unavailable', distanceMetres: null, durationSeconds: null } });
+  const routedStop = stop({ id: 'routed-stop', name: 'Stop B', latitude: 51.535, walking: { status: 'routed', distanceMetres: 120, durationSeconds: 100 } });
+  const result = selectNearestStopGroup([radialNearUnavailable, routedStop]);
+  assert.equal(result.ok, true);
+  assert.equal(result.anchor.id, 'routed-stop', 'A straight-line-nearer stop with failed routing must not be selected as the fallback.');
+  assert.deepEqual(result.stops.map(item => item.id), ['routed-stop']);
+});
+
 test('nearest bus-station group keeps all stands in the same locality', () => {
   const stops = [
     stop({ id: 'A', name: 'Waltham Cross Bus Station', locality: 'Waltham Cross', latitude: 51.6849, longitude: -0.0330, walking: { status: 'routed', distanceMetres: 140, durationSeconds: 110 } }),

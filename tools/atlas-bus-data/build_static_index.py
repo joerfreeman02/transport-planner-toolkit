@@ -529,6 +529,9 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             "locality": (stop or {}).get("locality") or (stop or {}).get("parentLocality") or "",
             "stop_id": alias,
             "departure": departure,
+            "pickup_type": clean(row.get("pickup_type")) or "0",
+            "drop_off_type": clean(row.get("drop_off_type")) or "0",
+            "stop_sequence": int(row.get("stop_sequence", 0) or 0),
             "gtfs_stop_id": gtfs_id,
             "gtfs_stop_code": clean(details.get("stop_code")),
             "gtfs_stop_name": clean(details.get("stop_name")),
@@ -536,7 +539,7 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             "match_method": match_method,
         })
         if stop and departure is not None and stop.get("timetableCallEligible") is not False:
-            matched.append((stop, departure))
+            matched.append((stop, departure, calls[-1]))
     if not matched or len(calls) < 2:
         return
     route_pattern_stop_ids = [route_pattern_stop_identity(region, call, position) for position, call in enumerate(calls)]
@@ -560,6 +563,13 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
             "direction": clean(trip.get("trip_headsign")) or (f"towards {last_name}" if last_name else ""),
             "circular": circular,
             "principalLocations": principal_locations(calls),
+            # Retain stop labels beside the ordered pattern identity so the
+            # planner can derive locations downstream of its representative
+            # evidence stop instead of reusing a route-wide list.
+            "routePatternStops": [
+                {"id": stop_id, "name": clean(call.get("name")), "locality": clean(call.get("locality"))}
+                for stop_id, call in zip(route_pattern_stop_ids, calls)
+            ],
             # Keep the complete ordered BODS call sequence available to the
             # circular-service assessor without changing the historical
             # GROUP-facing routePatternStopIds contract.  Before CIRC, BODS
@@ -597,10 +607,23 @@ def process_trip(region: str, rows: list[dict], trip: dict, agencies: dict, rout
         trip.get("service_id"), trip.get("trip_headsign"), trip.get("trip_short_name"),
         route.get("route_long_name"), route.get("route_desc")
     )).lower()
-    if re.search(r"\b(?:school|schools|schoolday|school day|college day|term time|pupil)\b", service_description):
+    # A school-named endpoint is not evidence that the trip calendar is
+    # restricted to school days. Require explicit calendar wording.
+    if re.search(r"\b(?:school[- ]?days?|schoolday|college[- ]?days?|term[- ]time|pupil)\b", service_description):
         record["qualifications"].add("School-day or term-time service identified in the source timetable; check the assessment date before formal use.")
-    for stop, departure in matched:
+    for stop, departure, call in matched:
         stop["routes"].add(route_number)
+        if call["pickup_type"] in {"1", "2", "3"}:
+            record.setdefault("nonBoardingCalls", []).append({
+                "stopPointId": stop["id"],
+                "minute": departure,
+                "journeyIdentity": clean(trip.get("trip_id")) or None,
+                "stopSequence": call["stop_sequence"],
+                "pickupType": call["pickup_type"],
+                "dropOffType": call["drop_off_type"],
+                "occurrenceRole": "arrival" if call["pickup_type"] == "1" else "conditional-pickup",
+            })
+            continue
         schedule = record["stopSchedules"].setdefault(stop["id"], {day: [] for day in DAYS})
         for day in trip["active_days"]:
             schedule[day].append(departure)

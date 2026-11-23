@@ -57,15 +57,16 @@ test('all selected national service shards succeed and remain complete', async (
   assert.equal(result.provenance.failedShardCount, 0);
 });
 
-test('one missing shard retains successful evidence and records unresolved scope', async () => {
+test('an absent manifest prefix is a no-published-shard result while configured shards remain complete', async () => {
   const adapter = adapterFor({ manifest: { ...baseManifest, serviceShards: { AAAAA: ['services/AAAAA.json.gz'] } }, shardPayloads: { 'services/AAAAA.json.gz': { schema: 'atlas-prepared-bus-data-v2', services: [serviceFor('a', '10', 'AAAAA')] } } });
   const result = await adapter.servicesForStops([stopA, stopB]);
   assert.equal(result.ok, true);
-  assert.equal(result.provenance.sourceCompleteness, 'PARTIAL');
+  assert.equal(result.provenance.sourceCompleteness, 'COMPLETE');
   assert.equal(result.provenance.timetableConclusion, 'MATCHED');
-  assert.deepEqual(result.provenance.unresolvedStopIds, ['BBBBB']);
+  assert.deepEqual(result.provenance.unresolvedStopIds, []);
   assert.equal(result.data[0].routeNumber, '10');
-  assert.equal(result.provenance.failedShardDiagnostics[0].status, 'missing');
+  assert.deepEqual(result.provenance.unconfiguredShardKeys, ['BBBBB']);
+  assert.equal(result.provenance.failedShardCount, 0);
 });
 
 test('malformed and validation-failed shards are isolated independently', async () => {
@@ -106,10 +107,10 @@ test('route metadata survives partial timetable evidence and is presented as qua
   assert.deepEqual(assessment.stops.map(stop => stop.routes), [['10'], ['20']]);
   assert.equal(assessment.stops[0].timetableEvidenceStatus, 'MATCHED');
   assert.equal(assessment.stops[1].timetableEvidenceStatus, 'SOURCE_UNAVAILABLE');
-  assert.match(assessment.wording, /not been treated as absent/);
+  assert.doesNotMatch(assessment.wording, /routes? .* not been treated as absent/);
   assert.ok(assessment.reviewItems.some(item => item.code === 'timetable-shard-failure'));
-  assert.match(stopRoutesPresentation(assessment.stops[1]), /not treated as absent/);
-  assert.match(partialTimetableQualification(assessment.stops), /routes 20/);
+  assert.equal(stopRoutesPresentation(assessment.stops[1]), '20');
+  assert.match(partialTimetableQualification(assessment.stops), /route\/stop/);
 });
 
 test('genuine no-route and no-current-match conclusions remain distinct', async () => {
@@ -121,7 +122,7 @@ test('genuine no-route and no-current-match conclusions remain distinct', async 
   const noMatchStop = { id: 'NOMATCH', name: 'No Match Stop', routes: ['30'], routeAuthorities: { '30': ['BODS'] } };
   const noMatch = await assessmentFor([noMatchStop], { ok: true, data: [], warnings: [], provenance: { source: 'Department for Transport Bus Open Data Service', sourceCompleteness: 'COMPLETE', timetableConclusion: 'NO_CURRENT_MATCH' } }).assess({});
   assert.equal(noMatch.stops[0].timetableEvidenceStatus, 'NO_CURRENT_MATCH');
-  assert.match(stopRoutesPresentation(noMatch.stops[0]), /no current timetable match/);
+  assert.equal(stopRoutesPresentation(noMatch.stops[0]), '30');
 });
 
 test('stop-scoped outcomes survive unrelated national failures and repeated route numbers', async () => {
@@ -161,7 +162,11 @@ test('source-unavailable route-bearing stops remain recommended while Other near
   assert.equal(plannerStopWarning('The prepared dataset reported no bus stops within the selected distance.', { stops: [{ id: 'waltham-1' }] }), '');
   assert.equal(plannerStopWarning('The prepared dataset reported no bus stops within the selected distance.', { stops: [] }), 'No bus stops were found within the selected distance.');
   assert.equal(plannerStopWarning('TNDS JP_52-230 includes special-day operating metadata (SpecialDaysOperation); regular-day evidence was retained, but special dates require review.'), '');
-  assert.equal(plannerStopWarning('Some timetables contain date-specific changes. Check the assessment date before formal use.'), 'Some timetables contain date-specific changes. Check the assessment date before formal use.');
+  assert.equal(plannerStopWarning('Some timetables contain date-specific changes. Check the assessment date before formal use.'), 'Some timetable records include date-specific changes. Check the operator timetable for the assessment date before relying on those days.');
+  assert.equal(plannerStopWarning('The prepared bus dataset is 32 days old and should be refreshed before formal use.'), 'The national bus timetable snapshot is 32 days old. Check the operator’s current timetable before relying on it.');
+  assert.equal(plannerStopWarning('The prepared bus dataset does not contain a valid update time.'), 'The national bus timetable snapshot has no recorded preparation date; check a current operator timetable before relying on it.');
+  assert.equal(plannerStopWarning('TfL StopPoint records were checked at this confirmed point outside the Greater London boundary; TfL timetable authority is limited to returned records.'), 'Transport for London bus stop records were returned for this location. Timetable information from Transport for London applies only to those stops.');
+  assert.equal(plannerStopWarning('TfL supplied operating-period/frequency evidence; ATLAS retained period boundaries separately from exact scheduled journeys.'), '');
 });
 
 test('station access infrastructure is not reported as a missing timetable call point', async () => {

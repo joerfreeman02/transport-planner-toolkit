@@ -18,9 +18,9 @@ export function withNumericMapReferences(result, { referenceStops = result?.stop
     if (id) byStopId.set(id, reference);
     if (stop?.mapReference) byPreviousReference.set(String(stop.mapReference), reference);
   });
-  const remapLabel = value => String(value ?? '').replace(/\[([^\]]+)\]/gu, (match, oldReference) => {
+  const remapLabel = value => String(value ?? '').replace(/\s*\[([A-Z]+|\d+)\]/gu, (match, oldReference) => {
     const reference = byPreviousReference.get(oldReference);
-    return reference ? `[${reference}]` : match;
+    return reference ? ` [${reference}]` : '';
   });
   const stops = (result.stops ?? []).map(stop => {
     const reference = byStopId.get(stopId(stop));
@@ -33,7 +33,7 @@ export function withNumericMapReferences(result, { referenceStops = result?.stop
     timetableBasisStopLabel: remapLabel(service.timetableBasisStopLabel),
     servedStopEvidence: service.servedStopEvidence?.map(stop => {
       const reference = byStopId.get(String(stop.id ?? ''));
-      if (!reference) return { ...stop };
+      if (!reference) return { ...stop, mapReference: null, label: remapLabel(stop.label) };
       return { ...stop, mapReference: reference, label: remapLabel(stop.label).replace(/\[[^\]]+\]/u, `[${reference}]`) };
     })
   }));

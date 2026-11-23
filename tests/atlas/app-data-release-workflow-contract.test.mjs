@@ -1,0 +1,46 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+
+const read = file => fs.readFile(new URL(`../../${file}`, import.meta.url), 'utf8');
+const [appRelease, refresh, frozen] = await Promise.all([
+  read('.github/workflows/atlas-app-only-release.yml'),
+  read('.github/workflows/atlas-bus-data-refresh.yml'),
+  read('.github/workflows/atlas-bus-frozen-beta-publish.yml')
+]);
+assert.match(appRelease, /group: atlas-bus-pages/);
+assert.match(appRelease, /authorize_publication == true/);
+assert.match(appRelease, /application_commit_sha/);
+assert.match(appRelease, /working-directory: application/);
+assert.match(appRelease, /assertReviewedFileScope/);
+assert.match(appRelease, /approved_live_data_identity_sha256/);
+assert.match(appRelease, /assertApprovedLiveDataIdentity/);
+assert.match(appRelease, /Published data-status manifest changed during the app-only release/);
+assert.match(appRelease, /Tested application SHA and assembled artifact SHA/);
+assert.match(appRelease, /rm -rf \"\$CANDIDATE_SITE\/atlas\/data\/tfl-ibus\"\s+cp -a last-known-good\/atlas\/data\/tfl-ibus/);
+assert.match(appRelease, /atlas-release-identity\.json/);
+assert.match(appRelease, /actions\/upload-pages-artifact@v3/);
+assert.match(appRelease, /CANDIDATE_ARTIFACT_DIGEST/);
+assert.match(appRelease, /1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f/);
+assert.doesNotMatch(appRelease, /source_snapshot\.py --acquire|refresh_bus_data\.py|publish-bank\.mjs|publish-snapshot\.mjs/);
+assert.match(refresh, /group: atlas-bus-pages/);
+assert.match(refresh, /application-pin/);
+assert.match(refresh, /merge-base.*is-ancestor/);
+assert.match(refresh, /git archive.*APP_SHA/);
+assert.match(refresh, /refresh-identity-cli\.mjs/);
+assert.match(refresh, /Live data-status manifest differs from the published identity/);
+const validation = await read('.github/workflows/atlas-beta2-release-validation.yml');
+assert.match(validation, /pull_request:/);
+assert.match(validation, /github\.event\.pull_request\.head\.sha \|\| github\.sha/);
+assert.doesNotMatch(validation, /workflow_dispatch/);
+assert.match(validation, /Verify privacy-safe 135-response TfL capture/);
+assert.match(validation, /Run required exact-head 16-control Browser\/Word\/A3 audit/);
+assert.match(validation, /verify-audit release-audit-tfl\.json/);
+assert.match(validation, /steps\.fixture\.outputs\.artifact-digest/);
+assert.match(validation, /FIXTURE_ARTIFACT_NAME" == "atlas-run75-ibus-fixture-\$SOURCE_SHA"/);
+assert.match(validation, /PRODUCER_RUN_ID/);
+assert.doesNotMatch(validation, /gh api "repos\/\$GITHUB_REPOSITORY\/actions\/artifacts/);
+assert.match(validation, /Original Run #75 artifact identity retained/);
+assert.doesNotMatch(validation, /pages:\s*write|deploy-pages|upload-pages-artifact/);
+assert.match(frozen, /retired-workflow-guard/);
+assert.match(frozen, /if: false/);
+console.log('Application/data release workflow contract passed.');

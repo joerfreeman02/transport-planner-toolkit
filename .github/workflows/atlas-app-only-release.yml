@@ -1,0 +1,334 @@
+name: ATLAS application-only release
+
+on:
+  workflow_dispatch:
+    inputs:
+      application_commit_sha:
+        description: Exact reviewed application commit SHA reachable from main
+        required: true
+        type: string
+      tfl_capture_run_id:
+        description: Hosted artifact run containing the exact recorded 135-response TfL replay JSON
+        required: true
+        type: string
+      tfl_capture_artifact_id:
+        description: Exact hosted artifact ID for the recorded TfL replay
+        required: true
+        type: string
+      tfl_capture_artifact_digest:
+        description: Exact GitHub SHA-256 digest of the recorded TfL replay artifact
+        required: true
+        type: string
+      approved_live_data_identity_sha256:
+        description: Independently approved SHA-256 of the currently published data identity manifest
+        required: true
+        type: string
+      authorize_publication:
+        description: Product Owner deployment authorisation for this exact run
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: atlas-bus-pages
+  cancel-in-progress: false
+
+env:
+  CANDIDATE_RUN_ID: '39430415441'
+  CANDIDATE_ARTIFACT_ID: '12275615359'
+  CANDIDATE_PRODUCER_SHA: '151199cc914c235870f444d26b03c2309edbd035'
+  CANDIDATE_ARTIFACT_DIGEST: 'sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471'
+  CANDIDATE_ARTIFACT_SIZE: '2549732499'
+  BUS_MANIFEST_SHA256: '1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f'
+  TNDS_MANIFEST_SHA256: '2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f'
+  IBUS_MANIFEST_SHA256: '3090e1da6da21878725d0b30343757bd32c65fcdd56d9fdecb6f6ae6c75b5d53'
+  IBUS_INDEX_SHA256: '39b0eae384ec7a44115f898b940b3f35213577195706d38a82fa97707d2610de'
+
+jobs:
+  prepare:
+    if: github.repository == 'joerfreeman02/transport-planner-toolkit' && github.ref == 'refs/heads/main' && inputs.authorize_publication == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    permissions:
+      actions: read
+      contents: read
+      pages: write
+    outputs:
+      application_sha: ${{ steps.identity.outputs.application_sha }}
+      build: ${{ steps.identity.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Require an exact reviewed main-reachable application commit
+        env:
+          APP_SHA: ${{ inputs.application_commit_sha }}
+        run: |
+          [[ "$APP_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git cat-file -e "$APP_SHA^{commit}"
+          git merge-base --is-ancestor "$APP_SHA" origin/main
+          echo "APP_SHA=$APP_SHA" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.application_commit_sha }}
+          path: application
+          persist-credentials: false
+      - name: Install dependencies from the selected application checkout
+        working-directory: application
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium and operating system dependencies
+        working-directory: application
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Confirm the exact application checkout and bounded product diff
+        env:
+          APP_SHA: ${{ inputs.application_commit_sha }}
+        run: |
+          test "$(git -C application rev-parse HEAD)" = "$APP_SHA"
+          git diff --name-only 8f1d8ae50405ec4acf38dd66d6c8f60896a5649e "$APP_SHA" > "$RUNNER_TEMP/app-files.txt"
+          node --input-type=module - "$RUNNER_TEMP/app-files.txt" <<'JS'
+          import fs from 'node:fs/promises';
+          import { assertReviewedFileScope } from './tools/atlas-release/release-boundary.mjs';
+          const manifest=JSON.parse(await fs.readFile('tools/atlas-release/reviewed-beta2-files.json','utf8'));
+          const files=(await fs.readFile(process.argv[2],'utf8')).split(/\r?\n/).filter(Boolean);
+          assertReviewedFileScope(files,manifest);
+          console.log(`Exact reviewed-file allowlist accepted ${files.length} changed paths.`);
+          JS
+      - name: Verify exact immutable Run #75 artifact identity and source manifests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$CANDIDATE_ARTIFACT_ID" > "$RUNNER_TEMP/run75.json"
+          python - "$RUNNER_TEMP/run75.json" <<'PY'
+          import json, os, sys
+          a=json.load(open(sys.argv[1])); w=a.get('workflow_run') or {}
+          expected={'id':int(os.environ['CANDIDATE_ARTIFACT_ID']),'name':'atlas-bus-beta-review-candidate-'+os.environ['CANDIDATE_RUN_ID'],'size_in_bytes':int(os.environ['CANDIDATE_ARTIFACT_SIZE']),'digest':os.environ['CANDIDATE_ARTIFACT_DIGEST'],'expired':False}
+          if any(a.get(k)!=v for k,v in expected.items()): raise SystemExit('Exact Run #75 artifact metadata mismatch.')
+          if w.get('id')!=int(os.environ['CANDIDATE_RUN_ID']) or w.get('head_sha')!=os.environ['CANDIDATE_PRODUCER_SHA']: raise SystemExit('Run #75 artifact producer identity mismatch.')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 12275615359
+          run-id: 39430415441
+          repository: joerfreeman02/transport-planner-toolkit
+          github-token: ${{ github.token }}
+          path: restored
+      - name: Validate restored candidate and immutable data roots
+        run: |
+          ROOT="$GITHUB_WORKSPACE/restored/atlas-bus-beta-review-candidate-$CANDIDATE_RUN_ID"
+          CANDIDATE="$ROOT/candidate-site"
+          export CANDIDATE_SITE="$CANDIDATE"
+          node tools/atlas-data-publication/review-candidate-checkpoint.mjs verify --candidate-root "$CANDIDATE" --checkpoint-root "$ROOT/review-checkpoint" --expected-run-id "$CANDIDATE_RUN_ID" --expected-commit-sha "$CANDIDATE_PRODUCER_SHA"
+          python tools/atlas-bus-data/validate_candidate.py --site-root "$CANDIDATE"
+          test "$(sha256sum "$CANDIDATE/atlas/data/bus/manifest.json" | cut -d' ' -f1)" = "$BUS_MANIFEST_SHA256"
+          test "$(sha256sum "$CANDIDATE/atlas/data/bus-tnds/manifest.json" | cut -d' ' -f1)" = "$TNDS_MANIFEST_SHA256"
+          test "$(sha256sum "$CANDIDATE/atlas/data/tfl-ibus/manifest.json" | cut -d' ' -f1)" = '14b416823cb648c869750db90939bac33a027f2f91485322f08c2d9c4394914f'
+          test "$(sha256sum "$CANDIDATE/atlas/data/tfl-ibus/20261009/operator-index.json" | cut -d' ' -f1)" = '5efcf64bfe1e158ecac52a8df8609984600b90ddd9b1b25b5112de7f6e24ebc1'
+          echo 'Original Run #75 candidate preserved and identified as a mixed iBus mount; immutable source archive is not modified.'
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs/promises';
+          import path from 'node:path';
+          import { verifyIbusFixture } from './tools/atlas-release/release-boundary.mjs';
+          const source='tests/atlas/fixtures/run75-ibus-20261009';
+          const fixture=await verifyIbusFixture(source,{manifestSha256:process.env.IBUS_MANIFEST_SHA256,indexSha256:process.env.IBUS_INDEX_SHA256});
+          const provenance=JSON.parse(await fs.readFile(path.join(source,'provenance.json'),'utf8'));
+          if(provenance.identity.manifestSha256!==fixture.manifestSha256||provenance.identity.indexSha256!==fixture.indexSha256) throw new Error('Recovered frozen iBus fixture provenance mismatch.');
+          const target=path.join(process.env.CANDIDATE_SITE,'atlas/data/tfl-ibus');
+          await fs.rm(target,{recursive:true,force:true}); await fs.mkdir(path.join(target,'20261009'),{recursive:true});
+          await fs.copyFile(path.join(source,'manifest.json'),path.join(target,'manifest.json'));
+          await fs.copyFile(path.join(source,'20261009/operator-index.json'),path.join(target,'20261009/operator-index.json'));
+          console.log(`Frozen regression iBus pair restored from ${provenance.overlaySource.commit}`);
+          JS
+          node --input-type=module -e "import {verifyIbusFixture} from './tools/atlas-release/release-boundary.mjs'; await verifyIbusFixture(process.env.CANDIDATE_SITE+'/atlas/data/tfl-ibus',{manifestSha256:process.env.IBUS_MANIFEST_SHA256,indexSha256:process.env.IBUS_INDEX_SHA256}); console.log('Frozen iBus pair verified')"
+          echo "CANDIDATE_SITE=$CANDIDATE" >> "$GITHUB_ENV"
+      - name: Validate hosted TfL replay artifact identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CAPTURE_RUN: ${{ inputs.tfl_capture_run_id }}
+          CAPTURE_ARTIFACT: ${{ inputs.tfl_capture_artifact_id }}
+          CAPTURE_DIGEST: ${{ inputs.tfl_capture_artifact_digest }}
+        run: |
+          [[ "$CAPTURE_RUN" =~ ^[0-9]+$ && "$CAPTURE_ARTIFACT" =~ ^[0-9]+$ && "$CAPTURE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$CAPTURE_ARTIFACT" > "$RUNNER_TEMP/tfl-capture-artifact.json"
+          python - "$RUNNER_TEMP/tfl-capture-artifact.json" <<'PY'
+          import json,os,sys
+          a=json.load(open(sys.argv[1])); w=a.get('workflow_run') or {}
+          if a.get('id')!=int(os.environ['CAPTURE_ARTIFACT']) or a.get('digest')!=os.environ['CAPTURE_DIGEST'] or a.get('expired') is not False or a.get('name')!='atlas-tfl-replay-capture': raise SystemExit('TfL replay artifact ID/name/digest/expiry mismatch.')
+          if w.get('id')!=int(os.environ['CAPTURE_RUN']): raise SystemExit('TfL replay artifact producer run mismatch.')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ inputs.tfl_capture_artifact_id }}
+          run-id: ${{ inputs.tfl_capture_run_id }}
+          repository: joerfreeman02/transport-planner-toolkit
+          github-token: ${{ github.token }}
+          path: restored-tfl
+      - name: Require the exact captured 135-response replay payload
+        run: |
+          mapfile -t FILES < <(find restored-tfl -type f -name '*.json' -print)
+          test "${#FILES[@]}" -eq 1
+          python - "${FILES[0]}" <<'PY'
+          import json,sys
+          x=json.load(open(sys.argv[1])); responses=x.get('responses') or x.get('requests') or []
+          if len(responses)!=135: raise SystemExit('Recorded TfL replay does not contain exactly 135 responses.')
+          PY
+          echo "ATLAS_TFL_REPLAY_CAPTURE=$GITHUB_WORKSPACE/${FILES[0]}" >> "$GITHUB_ENV"
+      - name: Run exact selected application checkout deterministic, static-index and 16-control Browser/Word/A3 validation
+        env:
+          ATLAS_TEST_BUS_DATA_ROOT: ${{ github.workspace }}/restored/atlas-bus-beta-review-candidate-39430415441/candidate-site/atlas/data/bus
+          ATLAS_TEST_BUS_TNDS_DATA_ROOT: ${{ github.workspace }}/restored/atlas-bus-beta-review-candidate-39430415441/candidate-site/atlas/data/bus-tnds
+          ATLAS_TEST_TFL_IBUS_ROOT: ${{ github.workspace }}/restored/atlas-bus-beta-review-candidate-39430415441/candidate-site/atlas/data/tfl-ibus
+          ATLAS_AUDIT_APP_ROOT: ${{ github.workspace }}/application
+          ATLAS_AUDIT_APP_BUILD: ${{ inputs.application_commit_sha }}
+          ATLAS_C4_TRACE_OPERATOR_STAGES: '1'
+        working-directory: application
+        run: |
+          test "$(git rev-parse HEAD)" = "$APP_SHA"
+          pnpm test:atlas
+          python -m unittest discover -s tools/atlas-bus-data -p 'test_build_static_index.py' -v
+          node tests/atlas/s2e1-manual-product-audit.mjs "$CANDIDATE_SITE" acceptance-report.json
+      - name: Obtain the currently published data configuration and validate independent approved live identity
+        env:
+          APPROVED_LIVE_DATA_IDENTITY_SHA256: ${{ inputs.approved_live_data_identity_sha256 }}
+        working-directory: application
+        run: |
+          node tools/atlas-data-publication/fetch-last-known-good.mjs 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/' last-known-good
+          test -s last-known-good/atlas/config/atlas-data-sources.json
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs/promises';
+          import path from 'node:path';
+          import { assertApprovedLiveDataIdentity, dataPublicationIdentity, verifyIbusFixture } from './tools/atlas-release/release-boundary.mjs';
+          const root='last-known-good';
+          const read=async p=>JSON.parse(await fs.readFile(path.join(root,p),'utf8'));
+          const sources=await read('atlas/config/atlas-data-sources.json');
+          const status=await read('atlas/data/status/manifest.json');
+          const bus=await read('atlas/data/bus/manifest.json');
+          const tnds=[];
+          async function walk(dir){for(const ent of await fs.readdir(dir,{withFileTypes:true})){const p=path.join(dir,ent.name);if(ent.isDirectory())await walk(p);else if(ent.name==='manifest.json')tnds.push(JSON.parse(await fs.readFile(p,'utf8')));}}
+          await walk(path.join(root,'atlas/data/bus-tnds'));
+          const ibusRoot=path.join(root,'atlas/data/tfl-ibus');
+          const pair=await verifyIbusFixture(ibusRoot);
+          const normalized=value=>`${JSON.stringify(value,null,2)}\n`;
+          const hash=async value=>{const {createHash}=await import('node:crypto');return createHash('sha256').update(normalized(value)).digest('hex');};
+          const identity=dataPublicationIdentity({dataSources:sources,dataStatus:status,busManifestSha256:await hash(bus),tndsManifestSha256:await Promise.all(tnds.map(hash)),ibusManifestSha256:await hash(pair.manifest),ibusIndexSha256:await hash(pair.index)});
+          const identitySha256=assertApprovedLiveDataIdentity(identity,process.env.APPROVED_LIVE_DATA_IDENTITY_SHA256);
+          console.log(`Approved live data publication identity verified: ${identitySha256}; publication=${identity.publicationVersion}; currentness=${identity.currentness}`);
+          JS
+          cp last-known-good/atlas/config/atlas-data-sources.json "$CANDIDATE_SITE/atlas/config/atlas-data-sources.json"
+          cp last-known-good/atlas/data/status/manifest.json "$CANDIDATE_SITE/atlas/data/status/manifest.json"
+          rm -rf "$CANDIDATE_SITE/atlas/data/bus" "$CANDIDATE_SITE/atlas/data/bus-tnds"
+          mkdir -p "$CANDIDATE_SITE/atlas/data/bus" "$CANDIDATE_SITE/atlas/data/bus-tnds"
+          cp last-known-good/atlas/data/bus/manifest.json "$CANDIDATE_SITE/atlas/data/bus/manifest.json"
+          cp -a last-known-good/atlas/data/bus-tnds/. "$CANDIDATE_SITE/atlas/data/bus-tnds/"
+          rm -rf "$CANDIDATE_SITE/atlas/data/tfl-ibus"
+          cp -a last-known-good/atlas/data/tfl-ibus "$CANDIDATE_SITE/atlas/data/tfl-ibus"
+          node --input-type=module -e "import fs from 'node:fs'; import {renderAtlasDataSourcesModule} from './tools/atlas-data-publication/publication.mjs'; const c=JSON.parse(fs.readFileSync('last-known-good/atlas/config/atlas-data-sources.json')); fs.writeFileSync(process.env.CANDIDATE_SITE+'/atlas/config/atlas-data-sources.mjs',renderAtlasDataSourcesModule(c));"
+          node tools/atlas-data-publication/preflight-publication.mjs --config "$CANDIDATE_SITE/atlas/config/atlas-data-sources.json"
+      - name: Assemble application-only artifact and record proposed Beta.2 identity
+        id: identity
+        working-directory: application
+        env:
+          APPROVED_LIVE_DATA_IDENTITY_SHA256: ${{ inputs.approved_live_data_identity_sha256 }}
+        run: |
+          BUILD="ATLAS-2.0.0-beta.2-$(date -u +%Y%m%d)"
+          export BUILD
+          node --input-type=module <<'JS'
+          import fs from 'node:fs/promises';
+          import path from 'node:path';
+          import { createHash } from 'node:crypto';
+          import { assembleAppOnlyArtifact } from './tools/atlas-release/release-identity.mjs';
+          import { assertApprovedLiveDataIdentity, dataPublicationIdentity } from './tools/atlas-release/release-boundary.mjs';
+          const root=process.env.CANDIDATE_SITE;
+          const read=async p=>JSON.parse(await fs.readFile(path.join(root,p),'utf8'));
+          const tndsRoot=path.join(root,'atlas/data/bus-tnds');
+          const manifests=[];
+          async function walk(dir){for(const ent of await fs.readdir(dir,{withFileTypes:true})){const p=path.join(dir,ent.name);if(ent.isDirectory())await walk(p);else if(ent.name==='manifest.json')manifests.push(JSON.parse(await fs.readFile(p,'utf8')));}}
+          await walk(tndsRoot);
+          const ibusManifest=await read('atlas/data/tfl-ibus/manifest.json');
+          const ibusIndex=await read(path.join('atlas/data/tfl-ibus',ibusManifest.indexPath));
+          const dataSources=await read('atlas/config/atlas-data-sources.json');
+          const busManifest=await read('atlas/data/bus/manifest.json');
+          const dataStatus=await read('atlas/data/status/manifest.json');
+          const canonicalHash=value=>createHash('sha256').update(`${JSON.stringify(value,null,2)}\n`).digest('hex');
+          const liveIdentity=dataPublicationIdentity({dataSources,dataStatus,busManifestSha256:canonicalHash(busManifest),tndsManifestSha256:manifests.map(canonicalHash),ibusManifestSha256:canonicalHash(ibusManifest),ibusIndexSha256:canonicalHash(ibusIndex)});
+          assertApprovedLiveDataIdentity(liveIdentity,process.env.APPROVED_LIVE_DATA_IDENTITY_SHA256);
+          await assembleAppOnlyArtifact({appRoot:'.',snapshotRoot:root,outputRoot:'pages-site',expectedApplicationSha:process.env.APP_SHA,version:'2.0.0-beta.2',build:process.env.BUILD,dataSources,dataStatus,busManifest,tndsManifests:manifests,ibusManifest,ibusIndex});
+          const artifactIdentity=JSON.parse(await fs.readFile('pages-site/atlas/config/atlas-release-identity.json','utf8'));
+          if(artifactIdentity.application.commitSha!==process.env.APP_SHA) throw new Error('Assembled Pages artifact application SHA differs from the tested checkout.');
+          if(JSON.stringify(artifactIdentity.data)!==JSON.stringify(liveIdentity)) throw new Error('Assembled Pages artifact data identity differs from the separately approved live data identity.');
+          console.log(`Tested application SHA and assembled artifact SHA: ${artifactIdentity.application.commitSha}; artifact tree ${artifactIdentity.artifactTreeSha256}`);
+          JS
+          echo "application_sha=$APP_SHA" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: application/pages-site
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlas-beta2-app-only-${{ inputs.application_commit_sha }}
+          path: application/pages-site
+          if-no-files-found: error
+          retention-days: 90
+
+  deploy:
+    needs: prepare
+    if: needs.prepare.result == 'success' && inputs.authorize_publication == true && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/deploy-pages@v4
+
+  verify-live:
+    needs: [prepare, deploy]
+    if: needs.prepare.result == 'success' && needs.deploy.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Verify the exact published application identity
+        env:
+          EXPECTED_SHA: ${{ needs.prepare.outputs.application_sha }}
+          EXPECTED_BUILD: ${{ needs.prepare.outputs.build }}
+        run: |
+          for n in $(seq 1 30); do curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/config/atlas-release-identity.json' -o "$RUNNER_TEMP/release-identity.json" && break; sleep 10; done
+          curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/config/atlas-data-sources.json' -o "$RUNNER_TEMP/live-config.json"
+          curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/config/atlas-release.json' -o "$RUNNER_TEMP/live-release.json"
+          curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/data/status/manifest.json' -o "$RUNNER_TEMP/live-status.json"
+          curl --fail --silent --show-error 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/data/tfl-ibus/manifest.json' -o "$RUNNER_TEMP/live-ibus-manifest.json"
+          python - "$RUNNER_TEMP/release-identity.json" "$RUNNER_TEMP/live-config.json" "$RUNNER_TEMP/live-status.json" "$RUNNER_TEMP/live-ibus-manifest.json" "$RUNNER_TEMP/live-release.json" <<'PY'
+          import hashlib,json,os,sys,urllib.parse,urllib.request
+          identity=json.load(open(sys.argv[1])); config=json.load(open(sys.argv[2])); status=json.load(open(sys.argv[3])); ibus=json.load(open(sys.argv[4])); release=json.load(open(sys.argv[5]))
+          app=identity.get('application') or {}; data=identity.get('data') or {}
+          if app.get('commitSha')!=os.environ['EXPECTED_SHA'] or app.get('build')!=os.environ['EXPECTED_BUILD'] or app.get('version')!='2.0.0-beta.2': raise SystemExit('Published application identity differs from the authorized candidate.')
+          if release.get('version')!=app['version'] or release.get('build')!=app['build']: raise SystemExit('Published About/runtime version metadata differs from the release identity.')
+          def digest(value): return hashlib.sha256((json.dumps(value,indent=2)+'\n').encode()).hexdigest()
+          if digest(config)!=data.get('dataSourcesSha256'): raise SystemExit('Published data-source configuration changed during the app-only release.')
+          if digest(status)!=data.get('dataStatusSha256'): raise SystemExit('Published data-status manifest changed during the app-only release.')
+          if (status.get('generatedAt') or status.get('snapshotDate') or status.get('candidateGeneratedAt'))!=data.get('currentness'): raise SystemExit('Published data currentness changed during the app-only release.')
+          base='https://joerfreeman02.github.io/transport-planner-toolkit/atlas/'
+          def get_json(url):
+            with urllib.request.urlopen(url,timeout=45) as r: return json.loads(r.read())
+          cfgbase=base+'config/'
+          bus=config['datasets']['bus']; busbase=urllib.parse.urljoin(cfgbase,bus['baseUrl'])
+          if digest(get_json(urllib.parse.urljoin(busbase,bus.get('manifest','manifest.json'))))!=data.get('busManifestSha256'): raise SystemExit('Published Bus manifest changed during app-only release.')
+          roots=config['datasets']['tnds'].get('activeRoots') or config['datasets']['tnds'].get('roots') or []
+          actual=sorted(digest(get_json(urllib.parse.urljoin(urllib.parse.urljoin(cfgbase,x['baseUrl']),config['datasets']['tnds'].get('manifest','manifest.json')))) for x in roots)
+          if actual!=sorted(data.get('tndsManifestSha256') or []): raise SystemExit('Published TNDS manifest identities changed during app-only release.')
+          if digest(ibus)!=data.get('ibusManifestSha256'): raise SystemExit('Published iBus manifest changed during app-only release.')
+          index=get_json(urllib.parse.urljoin(base+'data/tfl-ibus/',ibus['indexPath']))
+          if digest(index)!=data.get('ibusIndexSha256'): raise SystemExit('Published iBus index changed during app-only release.')
+          print('Published application and preserved Bus/TNDS/iBus identities match the authorized release manifest.')
+          PY

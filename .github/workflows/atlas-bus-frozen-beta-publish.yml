@@ -27,8 +27,18 @@ env:
   ATLAS_TNDS_BANKS_JSON: ${{ vars.ATLAS_TNDS_BANKS_JSON }}
   ATLAS_REFERENCE_DATA_BRANCH: ${{ vars.ATLAS_REFERENCE_DATA_BRANCH || 'pages-publish' }}
 jobs:
+  retired-workflow-guard:
+    name: Refuse superseded combined Beta.1 publication path
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require the independently gated application-only route
+        run: |
+          echo '::error::This combined Beta.1 app/data publication path is retired. Use atlas-app-only-release.yml with the exact approved application and current frozen source identities.'
+          exit 1
   publish:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.authorize_publication == true
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 360
     permissions:

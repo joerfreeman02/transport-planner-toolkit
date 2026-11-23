@@ -17,13 +17,15 @@ import { createBusStopDiscovery } from '../../../src/atlas/application/bus-stop-
 import { createBusAssessment, TFL_SAFE_DETAILED_PAIR_LIMIT } from '../../../src/atlas/application/bus-assessment.mjs';
 import { buildBusTransportStatement, buildBusWordTables, busWordFilename } from '../../../src/atlas/presentation/bus-word-export.mjs';
 import { withNumericMapReferences } from '../../../src/atlas/presentation/bus-map-references.mjs';
+import { buildAssessmentMapExtent } from '../../../src/atlas/presentation/bus-map-extent.mjs';
 import { layoutNumberedMapMarkers } from '../../../src/atlas/presentation/bus-map-layout.mjs';
 import { buildAssessmentMapPdf } from '../../../src/atlas/presentation/bus-map-pdf.mjs';
 import { createAtlasTaskStatus } from '../../../src/atlas/presentation/atlas-task-status.mjs';
-import { buildBusTimetablePresentationNote, buildPlannerBusServiceSummaries, plannerRouteDisplayNumber, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
+import { buildBusTimetablePresentationNote, plannerRouteDisplayNumber, plannerServiceSummariesForResult, PLANNER_TERMINUS_PRESENTATION_NOTE } from '../../../src/atlas/domain/bus-planner-summary.mjs';
 import { buildServicePresentation, formatServiceOriginDestination } from '../../../src/atlas/domain/bus-service-assessment.mjs';
 import { buildStopDiscoverySourceLabel, buildTimetableSourcePresentation, isOtherNearbyStopRecord, partialTimetableQualification, plannerFacingServiceNote, stopRoutesPresentation } from '../../../src/atlas/domain/bus-source-presentation.mjs';
 import { plannerStopWarning, recommendedBusStop } from '../../../src/atlas/domain/bus-planner-trust.mjs';
+import { describeReviewDiagnostics, describeReviewTopic, groupReviewItems, plannerSourceLabel, reviewStopLabel } from '../../../src/atlas/domain/review-topics.mjs';
 import { downloadWordDocument } from '../../../assets/js/word-export.js';
 
 const $ = id => document.getElementById(id);
@@ -74,7 +76,6 @@ const METHOD_LABELS = Object.freeze({
 });
 let confirmedSite = null;
 let map = null;
-let mapExportContext = null;
 let assessmentMarker = null;
 let radiusCircle = null;
 let busStopMarkers = [];
@@ -96,9 +97,7 @@ function selectedResult() {
   if (!currentBusResult) return null;
   const stops = currentBusResult.stops.filter(stop => selectedStopIds.has(stopKey(stop)));
   const stopIds = new Set(stops.map(stopKey));
-  const sourceServices = Array.isArray(currentBusResult.plannerServiceSummaries)
-    ? currentBusResult.plannerServiceSummaries
-    : buildPlannerBusServiceSummaries(currentBusResult.serviceSummaries, currentBusResult.stops);
+  const sourceServices = plannerServiceSummariesForResult(currentBusResult);
   const plannerServiceSummaries = sourceServices.filter(service => selectedServiceIds.has(serviceKey(service)) && service.stopIds?.some(id => stopIds.has(String(id))));
   const serviceSummaries = currentBusResult.serviceSummaries.filter(service => service.stopIds?.some(id => stopIds.has(String(id))));
   const report = { ...currentBusResult, stops, serviceSummaries, plannerServiceSummaries };
@@ -155,7 +154,7 @@ function showView(name) {
     else button.removeAttribute('aria-current');
   });
   if (location.hash !== `#${selected}`) history.replaceState(null, '', `#${selected}`);
-  if ((selected === 'modules' || selected === 'bus') && map) setTimeout(() => map.invalidateSize({ pan: false, animate: false }), 0);
+  if (selected === 'modules' || selected === 'bus') invalidateMapAfterLayout();
 }
 
 function activateWorkflowStage(stage, { scrollToStage = true } = {}) {
@@ -166,9 +165,6 @@ function activateWorkflowStage(stage, { scrollToStage = true } = {}) {
   workflowStage = next;
   $('workflowHint').textContent = '';
   if (next === 5 || next === 6) showView('bus');
-  if (next === 6) {
-    try { mapExportContext = captureMapExportContext() || mapExportContext; } catch { /* Export context is best-effort; it must not block the workflow. */ }
-  }
   document.body.dataset.busWorkflowStage = String(next);
   const layout = document.querySelector('.workflow-layout');
   const evidencePanel = $('evidencePanel');
@@ -229,10 +225,10 @@ function activateWorkflowStage(stage, { scrollToStage = true } = {}) {
   })[next] || 'Assessment map and deterministic stop references.';
   if (next < 5) moveResultsMap(false);
   if (next === 5) moveResultsMap(true);
-  setTimeout(() => {
-    map?.invalidateSize({ pan: false, animate: false });
+  requestAnimationFrame(() => {
+    invalidateMapAfterLayout();
     if (scrollToStage && next === 5) evidencePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 0);
+  });
 }
 
 function setCallout(element, message, state = 'neutral') {
@@ -300,11 +296,18 @@ function moveResultsMap(showResults) {
   const target = showResults ? $('resultsMapHost') : $('persistentMapHost');
   if (!frame || !target || frame.parentElement === target) return;
   target.append(frame);
-  setTimeout(() => map?.invalidateSize({ pan: false, animate: false }), 0);
+  invalidateMapAfterLayout();
 }
 
-function captureMapExportContext() {
-  const leafletMap = map;
+function invalidateMapAfterLayout() {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (!map) return;
+    const rect = map.getContainer().getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) map.invalidateSize({ pan: false, animate: false });
+  }));
+}
+
+function captureMapExportContext(leafletMap = map) {
   const tileLayer = Object.values(leafletMap?._layers ?? {}).find(layer => layer instanceof window.L.TileLayer);
   const zoom = leafletMap?.getZoom();
   const pixelOrigin = leafletMap?.getPixelOrigin();
@@ -320,6 +323,36 @@ function captureMapExportContext() {
     size: { x: Number(measuredSize.x), y: Number(measuredSize.y) },
     tiles
   };
+}
+
+async function createDeterministicMapExportContext({ site, stops, radiusMetres }) {
+  const leaflet = window.L;
+  if (!leaflet) throw new Error('Leaflet is unavailable.');
+  const container = document.createElement('div');
+  Object.assign(container.style, { position: 'fixed', left: '-10000px', top: '0', width: '1200px', height: '720px', visibility: 'hidden', pointerEvents: 'none' });
+  document.body.append(container);
+  const exportMap = leaflet.map(container, { zoomControl: false, attributionControl: false, preferCanvas: true, zoomAnimation: false });
+  const tileLayer = leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors', crossOrigin: 'anonymous', updateWhenIdle: true, keepBuffer: 1
+  });
+  const tilesLoaded = new Promise(resolve => tileLayer.once('load', resolve));
+  tileLayer.addTo(exportMap);
+  const bounds = buildAssessmentMapExtent({ site, stops, radiusMetres });
+  exportMap.fitBounds(leaflet.latLngBounds(bounds.map(item => [item.latitude, item.longitude])), { padding: [54, 54], maxZoom: 16, animate: false });
+  exportMap.invalidateSize({ pan: false, animate: false });
+  try {
+    let timer;
+    await Promise.race([tilesLoaded, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Map tiles did not finish loading.')), 15000); })]);
+    clearTimeout(timer);
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const context = captureMapExportContext(exportMap);
+    if (!context) throw new Error('No readable map tiles were available.');
+    return { map: exportMap, context, dispose: () => { exportMap.remove(); container.remove(); } };
+  } catch (error) {
+    exportMap.remove();
+    container.remove();
+    throw error;
+  }
 }
 
 function collapseSiteSetup(collapsed) {
@@ -340,7 +373,6 @@ function clearBusEvidence(message = 'Confirm the assessment point before checkin
   radiusTouched = false;
   detailedEvidenceVisible = false;
   currentBusResult = null;
-  mapExportContext = null;
   pendingScopeDiscovery = null;
   pendingScopeContext = null;
   busStopMarkers.forEach(marker => map?.removeLayer(marker));
@@ -657,13 +689,18 @@ function reviewItemText(item) {
   return scope ? scope + ': ' + item.message : item.message;
 }
 
+function labelledReviewNote(labelText, value, className) {
+  const paragraph = document.createElement('p'); paragraph.className = className;
+  const label = document.createElement('strong'); label.textContent = labelText;
+  paragraph.append(label, document.createTextNode(' '), document.createTextNode(value));
+  return paragraph;
+}
+
 
 function renderAssessment(result) {
   currentBusResult = result;
   result = withNumericMapReferences(result);
-  const presentedServices = Array.isArray(result.plannerServiceSummaries)
-    ? result.plannerServiceSummaries
-    : buildPlannerBusServiceSummaries(result.serviceSummaries, result.stops);
+  const presentedServices = plannerServiceSummariesForResult(result);
   if (!selectionInitialised) {
     selectedStopIds = new Set(result.stops.filter(recommendedBusStop).map(stopKey));
     selectedServiceIds = new Set(presentedServices.map(serviceKey));
@@ -710,7 +747,7 @@ function renderAssessment(result) {
     appendCell(row, 'Direction / indicator', stop.displayDirection);
     const walking = appendCell(row, 'Walking distance / time', formatAccess(stop.walking));
     if (stop.walking.status !== 'routed') walking.classList.add('route-unavailable');
-    appendCell(row, 'Routes serving stop', stopRoutesPresentation(stop, { selectedForReport }));
+    appendCell(row, 'Routes recorded or matched at stop', stopRoutesPresentation(stop, { selectedForReport }));
     row.addEventListener('click', event => {
       if (event.target.closest('input, a, button')) return;
       const marker = busStopMarkers.find(candidate => candidate.__atlasStopId === stopKey(stop));
@@ -884,6 +921,8 @@ function renderAssessment(result) {
   $('resultSource').textContent = `${stopSource}; ${timetableLabel}; OpenStreetMap routing`;
   $('resultChecked').textContent = checked;
   const reviewItems = result.reviewItems ?? [];
+  const reviewDiagnostics = result.reviewDiagnostics ?? [];
+  const reviewTopics = groupReviewItems(reviewItems);
   const rawEndpointEvidence = $('rawEndpointEvidence');
   if (rawEndpointEvidence) {
     rawEndpointEvidence.replaceChildren();
@@ -907,32 +946,96 @@ function renderAssessment(result) {
   }
   $('plannerReviewGate').hidden = reviewItems.length === 0;
   $('plannerReviewAcknowledgement').checked = false;
-  $('plannerReviewGateStatus').textContent = reviewItems.length ? `${reviewItems.length} flagged item${reviewItems.length === 1 ? '' : 's'} remain visible in Sources & Checks.` : 'No flagged evidence requires acknowledgement.';
+  $('plannerReviewGateStatus').textContent = reviewItems.length ? `${reviewTopics.length} source review topic${reviewTopics.length === 1 ? '' : 's'} need${reviewTopics.length === 1 ? 's' : ''} your attention. Open each topic, then acknowledge before export.` : 'No flagged evidence requires acknowledgement.';
   updateFormalExportAvailability();
-  $('resultFreshness').textContent = 'Assessment complete';
+  const assessmentResultLabel = result.status === 'partial'
+    ? 'Assessment execution complete · source or routing checks incomplete'
+    : 'Assessment complete';
+  $('resultFreshness').textContent = assessmentResultLabel;
   $('resultFreshness').className = 'completion-badge';
-  $('sourceReviewBadge').textContent = reviewItems.length ? `${reviewItems.length} item${reviewItems.length === 1 ? '' : 's'} require review` : 'No review items';
-  $('sourceReviewBadge').hidden = reviewItems.length === 0;
+  const reviewBadge = $('sourceReviewBadge');
+  reviewBadge.replaceChildren();
+  if (reviewItems.length) {
+    const topicCount = document.createElement('strong');
+    topicCount.textContent = `${reviewTopics.length} review topic${reviewTopics.length === 1 ? '' : 's'}`;
+    const recordCount = document.createElement('small');
+    recordCount.textContent = `${reviewItems.length} underlying records`;
+    reviewBadge.append(topicCount, recordCount);
+    reviewBadge.dataset.topicCount = String(reviewTopics.length);
+    reviewBadge.dataset.recordCount = String(reviewItems.length);
+    reviewBadge.setAttribute('aria-label', `${reviewTopics.length} review topics, ${reviewItems.length} underlying evidence records`);
+  } else {
+    reviewBadge.textContent = 'No review items';
+    delete reviewBadge.dataset.topicCount;
+    delete reviewBadge.dataset.recordCount;
+    reviewBadge.removeAttribute('aria-label');
+  }
+  reviewBadge.hidden = reviewItems.length === 0;
   $('sourceChecksDetails').open = false;
   $('busDataCurrent').textContent = $('dataStatusMessage').textContent;
   $('busDataCurrent').className = `current-badge${$('dataStatusMessage').classList.contains('warning') ? ' warning' : ''}`;
   const plannerChecks = $('plannerChecks');
   plannerChecks.replaceChildren();
-  for (const [labelText, value] of [['Stops', stopSource], ['Timetables', timetableLabel], ['Access routes', 'OpenStreetMap routing through OSRM'], ['Checked', checked], ['Result', 'Assessment complete']]) {
+  for (const [labelText, value] of [['Stops', plannerSourceLabel(stopSource)], ['Timetables', plannerSourceLabel(timetableLabel)], ['Walking routes', 'Estimated using street mapping'], ['Checked', checked], ['Result', assessmentResultLabel]]) {
     const line = document.createElement('p'); const label = document.createElement('strong'); label.textContent = `${labelText}: `; line.append(label, value); plannerChecks.append(line);
   }
   const plannerWarnings = [...new Set(result.warnings.map(warning => plannerStopWarning(warning, result)).filter(Boolean))];
   if (plannerWarnings.length) {
     const heading = document.createElement('strong'); heading.textContent = 'Points to note';
     const list = document.createElement('ul');
-    plannerWarnings.forEach(warning => { const item = document.createElement('li'); item.textContent = warning; list.append(item); });
+    plannerWarnings.forEach(warning => { const item = document.createElement('li'); item.textContent = plannerSourceLabel(warning).replace(/\bStopPoints?\b/gi, match => /^StopPoint$/i.test(match) ? 'bus stop' : 'bus stops'); list.append(item); });
     plannerChecks.append(heading, list);
   }
+  if ((result.warnings ?? []).some(warning => /(?:\bTfL\b|Transport for London) supplied operating-period\/frequency evidence/i.test(String(warning)))) {
+    const methodology = document.createElement('details');
+    methodology.className = 'source-methodology';
+    const summary = document.createElement('summary'); summary.textContent = 'How timetable periods and frequency ranges are used';
+    const note = document.createElement('p');
+    note.textContent = 'When a source provides an operating period or frequency range rather than exact departure times, ATLAS keeps it as a period or range. It does not turn that range into invented scheduled departures.';
+    methodology.append(summary, note);
+    plannerChecks.append(methodology);
+  }
   if (reviewItems.length) {
-    const heading = document.createElement('strong'); heading.textContent = 'Evidence items to review';
+    const heading = document.createElement('strong'); heading.textContent = 'Review topics';
     const list = document.createElement('ul');
-    reviewItems.forEach(item => { const line = document.createElement('li'); line.textContent = reviewItemText(item); list.append(line); });
+    reviewTopics.forEach(topic => {
+      const line = document.createElement('li');
+      const detail = document.createElement('details');
+      const summary = document.createElement('summary');
+      const routeText = topic.routes.length ? `Routes ${topic.routes.join(', ')}` : 'Assessment-wide';
+      const stopIds = [...new Set(topic.items.map(item => String(item?.stop ?? '').trim()).filter(Boolean))];
+      const stopText = stopIds.length ? stopIds.map(id => reviewStopLabel({ stops: result.stops }, id)).join(', ') : 'all assessed stops';
+      const explanation = describeReviewTopic(topic, { plannerServiceSummaries: presentedServices, stops: result.stops });
+      const title = document.createElement('strong'); title.className = 'review-topic-title'; title.textContent = explanation.heading;
+      const scope = document.createElement('span'); scope.className = 'review-topic-scope'; scope.textContent = `${routeText} · ${stopText} · ${plannerSourceLabel(topic.source)}`;
+      const count = document.createElement('small'); count.className = 'review-topic-count'; count.textContent = `${topic.items.length} record${topic.items.length === 1 ? '' : 's'}`;
+      summary.className = 'review-topic-summary';
+      summary.append(title, scope, count);
+      const what = labelledReviewNote('What happened?', explanation.what, 'review-topic-what');
+      const impact = labelledReviewNote('Effect on this assessment', explanation.impact, 'review-topic-impact');
+      const action = labelledReviewNote('What to do', explanation.action, 'review-topic-action');
+      const raw = document.createElement('details');
+      raw.className = 'review-topic-evidence';
+      const rawSummary = document.createElement('summary'); rawSummary.textContent = `Technical evidence and source references (${topic.items.length})`;
+      const sourceReference = document.createElement('p');
+      sourceReference.textContent = `Recorded source: ${topic.source || 'not supplied'}; exact bus stop identifier: ${topic.stop || 'not supplied'}.`;
+      const evidenceList = document.createElement('ul');
+      topic.items.forEach(item => { const evidence = document.createElement('li'); evidence.textContent = reviewItemText(item); evidenceList.append(evidence); });
+      raw.append(rawSummary, sourceReference, evidenceList);
+      detail.append(summary, what, impact, action, raw); line.append(detail); list.append(line);
+    });
     plannerChecks.append(heading, list);
+  }
+  if (reviewDiagnostics.length) {
+    const details = document.createElement('details');
+    const summary = document.createElement('summary'); summary.textContent = `Supplementary source checks · ${reviewDiagnostics.length} records`;
+    const note = document.createElement('p'); note.textContent = describeReviewDiagnostics(reviewDiagnostics);
+    const raw = document.createElement('details');
+    const rawSummary = document.createElement('summary'); rawSummary.textContent = 'Technical evidence and source references';
+    const list = document.createElement('ul');
+    reviewDiagnostics.forEach(item => { const line = document.createElement('li'); line.textContent = reviewItemText(item); list.append(line); });
+    raw.append(rawSummary, list);
+    details.append(summary, note, raw); plannerChecks.append(details);
   }
   if (diagnosticMode) {
   const diagnostics = $('diagnostics');
@@ -1168,7 +1271,7 @@ async function exportBusWord() {
   try { if (includeMap) mapPngDataUrl = await exportAssessmentMap({ download: false, includeStopKey: false }); }
   catch { return setCallout($('exportStatus'), 'The assessment map could not be prepared for the Word report. Turn off the map option or return to Results and try again.', 'error'); }
   if (includeMap && !mapPngDataUrl) return setCallout($('exportStatus'), 'The assessment map could not be prepared for the Word report.', 'error');
-  const presentationReport = withNumericMapReferences(report, { referenceStops: currentBusResult.stops });
+  const presentationReport = withNumericMapReferences(report, { referenceStops: report.stops });
   downloadWordDocument(busWordFilename(confirmedSite), 'Bus Assessment', buildBusWordTables(presentationReport, { includeMap }), report.wording, { wordingPlacement: 'before', mapPngDataUrl });
   setCallout($('exportStatus'), 'Word assessment created from the checked Bus results.', 'success');
 }
@@ -1180,7 +1283,8 @@ function escapeSvg(value) {
 async function exportAssessmentMap({ download = true, includeStopKey = download } = {}) {
   if (!currentBusResult?.ok || !confirmedSite) { if (download) setCallout($('exportStatus'), 'Build a Bus assessment before exporting the map.', 'warning'); return null; }
   if ((currentBusResult.reviewItems?.length ?? 0) && !$('plannerReviewAcknowledgement').checked) { if (download) setCallout($('exportStatus'), 'Review the flagged Sources & Checks and acknowledge them before formal export.', 'warning'); return null; }
-  const report = withNumericMapReferences(selectedResult(), { referenceStops: currentBusResult.stops });
+  const selectedReport = selectedResult();
+  const report = withNumericMapReferences(selectedReport, { referenceStops: selectedReport.stops });
   const assessedStops = report.stops.filter(stop => !isOtherNearbyStopRecord(stop));
   const mapReferenceByStopId = new Map(assessedStops.map((stop, index) => {
     const displayReference = String(stop.displayMapReference ?? '');
@@ -1189,12 +1293,17 @@ async function exportAssessmentMap({ download = true, includeStopKey = download 
     return [String(stop.id ?? stop.sourceId ?? ''), reference];
   }));
   const stops = assessedStops.filter(stop => Number.isFinite(Number(stop.latitude)) && Number.isFinite(Number(stop.longitude)));
-  const leafletMap = map;
-  let context = mapExportContext;
-  if (!context) {
-    try { context = captureMapExportContext(); } catch { /* Report an unavailable map context below. */ }
+  const site = { latitude: Number(confirmedSite.latitude), longitude: Number(confirmedSite.longitude) };
+  const radius = Number(report.provenance?.stops?.actualDiscoveryRadiusMetres || report.provenance?.stops?.radiusMetres || selectedRadius());
+  let exportContext;
+  try {
+    exportContext = await createDeterministicMapExportContext({ site, stops, radiusMetres: report.assessmentMode === 'nearest' ? 0 : radius });
+  } catch {
+    if (download) setCallout($('exportStatus'), 'A standalone map could not be prepared from the assessment point, selected stops and assessment radius.', 'error');
+    return null;
   }
-  if (!context) return setCallout($('exportStatus'), 'The browser map context is not available yet. Return to Results, wait for the map, and try again.', 'warning');
+  const leafletMap = exportContext.map;
+  const context = exportContext.context;
   const { zoom, pixelOrigin } = context;
   const mapSize = context.size;
   setCallout($('exportStatus'), 'Preparing the standalone map from the displayed OpenStreetMap tiles…', 'neutral');
@@ -1221,7 +1330,6 @@ async function exportAssessmentMap({ download = true, includeStopKey = download 
       const pixel = leafletMap.project([Number(point.latitude), Number(point.longitude)], zoom);
       return { x: (pixel.x - pixelOrigin.x) * scale, y: top + (pixel.y - pixelOrigin.y) * scale };
     };
-    const site = { latitude: Number(confirmedSite.latitude), longitude: Number(confirmedSite.longitude) };
     const sitePoint = project(site);
     const projectedStops = stops.map(stop => ({ stop, ...project(stop) }));
     const positionedStops = layoutNumberedMapMarkers(projectedStops.map(({ stop, ...point }) => ({ ...point, item: stop })), { width, top, mapHeight });
@@ -1232,7 +1340,6 @@ async function exportAssessmentMap({ download = true, includeStopKey = download 
       const leader = displaced ? `<line x1="${original.x.toFixed(1)}" y1="${original.y.toFixed(1)}" x2="${point.x.toFixed(1)}" y2="${point.y.toFixed(1)}" stroke="#061d37" stroke-opacity=".7" stroke-width="1"/>` : '';
       return `<g>${leader}<circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="13" fill="#002761" stroke="#fff" stroke-width="4"/><text x="${point.x.toFixed(1)}" y="${(point.y + 4).toFixed(1)}" text-anchor="middle" font-family="Roboto,Arial,sans-serif" font-size="10" font-weight="700" fill="#fff">${reference}</text></g>`;
     }).join('');
-    const radius = Number(report.provenance?.stops?.actualDiscoveryRadiusMetres || report.provenance?.stops?.radiusMetres || selectedRadius());
     const metresPerPixel = 156543.03392 * Math.max(.15, Math.cos(site.latitude * Math.PI / 180)) / (2 ** zoom);
     const radiusPx = report.assessmentMode === 'nearest' ? 0 : radius / metresPerPixel * scale;
     const ring = radiusPx > 0 ? `<circle cx="${sitePoint.x.toFixed(1)}" cy="${sitePoint.y.toFixed(1)}" r="${radiusPx.toFixed(1)}" fill="#154a8b" fill-opacity=".08" stroke="#154a8b" stroke-opacity=".8" stroke-width="2" stroke-dasharray="8 7"/>` : '';
@@ -1268,10 +1375,12 @@ async function exportAssessmentMap({ download = true, includeStopKey = download 
     const objectUrl = URL.createObjectURL(new Blob([pdfBytes], { type: 'application/pdf' }));
     const link = document.createElement('a'); link.href = objectUrl; link.download = busWordFilename(confirmedSite).replace(/\.docx$/i, '').replace(/^Bus Assessment - /, 'Bus Assessment Map - ') + '.pdf'; link.click();
     setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
-    setCallout($('exportStatus'), `Standalone A3 PDF map exported with ${stops.length} numbered stop references and the displayed map context.`, 'success');
+    setCallout($('exportStatus'), `Standalone A3 PDF map exported with ${stops.length} numbered stop references and a deterministic assessment extent.`, 'success');
   } catch {
     if (download) setCallout($('exportStatus'), 'A standalone map could not be prepared from the displayed assessment map tiles. Return to Results, wait for the map to finish loading, and try again.', 'error');
     return null;
+  } finally {
+    exportContext.dispose();
   }
 }
 
@@ -1292,11 +1401,13 @@ function initMap() {
   tiles.addTo(map);
   leaflet.control.scale({ imperial: false }).addTo(map);
   map.on('click', event => chooseMapPoint(event.latlng.lat, event.latlng.lng));
-  const refresh = () => requestAnimationFrame(() => map.invalidateSize({ pan: false, animate: false }));
-  if ('ResizeObserver' in window) new ResizeObserver(refresh).observe($('siteMap'));
-  window.addEventListener('resize', refresh, { passive: true });
-  setTimeout(refresh, 0);
-  setTimeout(refresh, 250);
+  if ('ResizeObserver' in window) {
+    const observer = new ResizeObserver(invalidateMapAfterLayout);
+    observer.observe($('siteMap'));
+    observer.observe($('siteMapFrame'));
+  }
+  window.addEventListener('resize', invalidateMapAfterLayout, { passive: true });
+  invalidateMapAfterLayout();
 }
 
 document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', event => {
@@ -1333,7 +1444,11 @@ $('copyAssessmentWording').addEventListener('click', async () => {
 $('editAssessment').addEventListener('click', () => activateWorkflowStage(4));
 $('returnToResults').addEventListener('click', () => activateWorkflowStage(5));
 $('exportAssessmentMap').addEventListener('click', () => exportAssessmentMap());
-$('plannerReviewAcknowledgement').addEventListener('change', () => { $('plannerReviewGateStatus').textContent = $('plannerReviewAcknowledgement').checked ? 'Sources & Checks reviewed. The evidence items remain recorded.' : 'Review the evidence drawer before formal export.'; updateFormalExportAvailability(); });
+$('plannerReviewAcknowledgement').addEventListener('change', () => {
+  $('plannerReviewGateStatus').textContent = $('plannerReviewAcknowledgement').checked
+    ? 'Sources & Checks reviewed. The evidence items remain recorded.' : 'Review the evidence drawer before formal export.';
+  updateFormalExportAvailability();
+});
 $('addressForm').addEventListener('submit', searchAddress);
 $('chooseOnMap').addEventListener('click', () => {
   setCallout($('mapStatus'), 'Pan or zoom if needed, then click the map to place the assessment point.', 'warning');
@@ -1385,5 +1500,13 @@ window.__ATLAS_BUS_UI__ = Object.freeze({
       viewBounds: { south: viewSouthWest.lat, west: viewSouthWest.lng, north: viewNorthEast.lat, east: viewNorthEast.lng }
     };
   },
-  getTaskStatus: () => taskStatus.getState()
+  getTaskStatus: () => taskStatus.getState(),
+  getMapLayout: () => {
+    const container = map?.getContainer();
+    const rect = container?.getBoundingClientRect();
+    const size = map?.getSize();
+    return container && rect && size ? { hostId: $('siteMapFrame')?.parentElement?.id || null, width: rect.width, height: rect.height, leafletWidth: size.x, leafletHeight: size.y } : null;
+  },
+  getMapView: () => map ? { center: { latitude: map.getCenter().lat, longitude: map.getCenter().lng }, zoom: map.getZoom() } : null,
+  setMapViewForQa: (latitude, longitude, zoom) => map?.setView([Number(latitude), Number(longitude)], Number(zoom), { animate: false })
 });

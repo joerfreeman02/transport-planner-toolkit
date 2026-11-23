@@ -8,7 +8,7 @@ import {
 import { buildPlannerBusServiceSummaries, plannerSourceWarning, resolvedPlannerDestination } from '../domain/bus-planner-summary.mjs';
 import { DEFAULT_TFL_REQUEST_LIMIT } from '../adapters/tfl-request-scheduler.mjs';
 import { deriveTimetableConclusion, hasScheduledEvidence } from '../domain/scheduled-evidence.mjs';
-import { buildStopTimetableSourcePresentation, partialTimetableQualification } from '../domain/bus-source-presentation.mjs';
+import { buildStopTimetableSourcePresentation } from '../domain/bus-source-presentation.mjs';
 import { reviewItemTaxonomy } from '../domain/review-item-taxonomy.mjs';
 import { resolvePlannerEndpointDecisions } from '../domain/planner-endpoint-decision.mjs';
 
@@ -51,22 +51,36 @@ function nationalEvidenceUnavailableForStop(stop, provenance = {}) {
 
 function incompleteTimetableIdentitiesForStop(stop, provenance = {}, services = []) {
   const identitySuffix = `|${stopKey(stop)}`;
-  const tflIdentities = new Set((provenance.tflTimetableRequestIdentities ?? []).map(String));
-  const resolvedTfLRoutes = new Set((services ?? []).filter(service => /\btfl\b/i.test(String(service.timetableSource || service.source?.provider || ''))
-    && Object.values(service.stopSchedules ?? {}).some(hasScheduledEvidence))
-    .map(service => String(service.routeNumber ?? '').trim()).filter(Boolean));
   return [...new Set([
     ...(provenance.unresolvedRequestIdentities ?? []),
     ...(provenance.nationalUnresolvedRequestIdentities ?? []),
     ...(provenance.unprocessedRequestIdentities ?? []),
     ...(provenance.quarantinedRequestIdentities ?? [])
-  ].map(String).filter(identity => identity.endsWith(identitySuffix)))].filter(identity => {
-    const route = identity.split('|')[0];
-    // Preserve the failed request in provenance. It is redundant for the
-    // normal stop summary only when this exact TfL request's public route has
-    // already resolved from scheduled TfL evidence elsewhere in the selected
-    // assessment. National, unprocessed and quarantined requests stay visible.
-    return !(tflIdentities.has(identity) && resolvedTfLRoutes.has(route));
+  ].map(String).filter(identity => identity.endsWith(identitySuffix)))];
+}
+
+function exactRouteStopEvidence(stop, route, services = [], provenance = {}) {
+  const stopId = stopKey(stop);
+  const identity = `${route}|${stopId}`;
+  const unresolvedSets = [
+    ['TfL', provenance.unresolvedRequestIdentities ?? []],
+    [provenance.nationalTimetableProviders?.join('/') || 'BODS/TNDS', provenance.nationalUnresolvedRequestIdentities ?? []],
+    ['timetable source', provenance.unprocessedRequestIdentities ?? []],
+    ['BODS/TNDS', provenance.quarantinedRequestIdentities ?? []]
+  ];
+  const unresolvedProviders = [...new Set(unresolvedSets.filter(([, identities]) => identities.map(String).includes(identity)).map(([provider]) => provider))];
+  const noCurrent = (provenance.noCurrentRequestIdentities ?? []).map(String).includes(identity);
+  const matches = (services ?? []).filter(service => String(service.routeNumber ?? '').trim() === String(route)
+    && hasScheduledEvidence(service.stopSchedules?.[stopId] || {}));
+  const sources = [...new Set(matches.map(sourceLabel))];
+  const authorities = routeAuthorities(stop, route);
+  const status = matches.length
+    ? unresolvedProviders.length || noCurrent ? 'PARTIAL' : sources.some(source => /fallback/i.test(source)) ? 'FALLBACK' : 'MATCHED'
+    : noCurrent ? 'NO_CURRENT_MATCH' : unresolvedProviders.length ? 'SOURCE_UNAVAILABLE' : 'RECORDED_UNVERIFIED';
+  return Object.freeze({
+    route: String(route), stopId, authorities: Object.freeze(authorities), status,
+    scheduledEvidence: matches.length > 0, sources: Object.freeze(sources),
+    unresolvedProviders: Object.freeze(unresolvedProviders), noCurrentMatch: noCurrent
   });
 }
 
@@ -185,13 +199,103 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
   };
   const provenance = servicesResult?.provenance ?? {};
   const tflRequestIdentities = new Set((provenance.tflTimetableRequestIdentities ?? []).map(String));
-  const resolvedTfLRoutes = new Set((serviceSummaries ?? []).filter(service => /\btfl\b/i.test(String(service.timetableSource || service.frequencyEvidenceSource || service.provider || service.sourceProviders?.join(' ') || service.sourceAuthorities?.join(' ') || service.source?.provider || ''))
-    && String(service.routeNumber ?? '').trim())
-    .map(service => String(service.routeNumber).trim()));
+  const safelyPresentedBodsRouteStops = new Map();
+  for (const service of serviceSummaries ?? []) {
+    const authority = [...(service.sourceAuthorities ?? []), ...(service.sourceProviders ?? []), service.timetableSource, service.provider]
+      .map(value => String(value ?? '')).join(' ');
+    if (!/\bBODS\b/i.test(authority) || !service.frequencyByDay || (service.calendarReconciliation ?? []).length
+      || (service.plannerReviewWarnings ?? []).length || service.operatingPeriodEvidenceState === 'conflict'
+      || (service.operatingPeriodReviewWarnings ?? []).length
+      || (service.sourceWarnings ?? []).some(warning => /calendar/i.test(String(warning)))) continue;
+    const route = String(service.routeNumber ?? '').trim();
+    if (!route) continue;
+    const stops = safelyPresentedBodsRouteStops.get(route) ?? new Set();
+    for (const stop of service.stopIds ?? []) stops.add(String(stop));
+    safelyPresentedBodsRouteStops.set(route, stops);
+  }
+  const materialIdentityIssues = new Map();
+  for (const service of services ?? []) {
+    const diagnostics = (service.sourceAuthorityDiagnostics ?? []).filter(diagnostic => diagnostic?.classification === 'material-identity-ambiguity' && (diagnostic.materialFields ?? []).length);
+    if (!diagnostics.length) continue;
+    const route = String(service.routeNumber ?? '').trim();
+    const stop = String(service.source?.assessedStopPointId || service.source?.requestedStopPointId || service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0] || '').trim();
+    if (!route) continue;
+    const key = `${route.toLowerCase()}|${stop}`;
+    const issue = materialIdentityIssues.get(key) ?? { route, stop, fields: new Set(), providers: new Set(), authorities: new Set() };
+    for (const diagnostic of diagnostics) {
+      for (const field of diagnostic.materialFields) issue.fields.add(String(field));
+      if (diagnostic.provider) issue.providers.add(String(diagnostic.provider));
+      if (diagnostic.authoritativeProvider) issue.authorities.add(String(diagnostic.authoritativeProvider));
+    }
+    materialIdentityIssues.set(key, issue);
+  }
+  for (const issue of materialIdentityIssues.values()) {
+    const fields = [...issue.fields].sort();
+    const supplementary = [...issue.providers].sort().join(' + ') || 'supplementary national';
+    const authority = [...issue.authorities].sort().join(' + ') || 'TfL';
+    add({
+      code: 'supplementary-identity-conflict', route: issue.route, stop: issue.stop,
+      source: `${authority} / ${supplementary}`,
+      factKey: fields.join('|'),
+      message: `Material ${supplementary} disagreement with ${authority} evidence affects ${fields.join(', ')}; the authoritative schedule was retained, but route identity requires professional review before formal use.`
+    });
+  }
+  for (const service of serviceSummaries ?? []) for (const message of service.plannerReviewWarnings ?? []) {
+    const route = String(service.routeNumber ?? '').trim();
+    const providers = [...(service.sourceAuthorities ?? []), ...(service.sourceProviders ?? []), service.timetableSource, service.provider]
+      .map(value => String(value ?? '')).join(' ').trim().split(/\s*\+\s*|\s*,\s*/).filter(Boolean);
+    const tndsOnly = providers.length > 0 && providers.every(value => /TNDS|Traveline National Dataset/i.test(value));
+    const tndsHasSafeBodsCounterpart = tndsOnly && (service.stopIds ?? []).some(stop => safelyPresentedBodsRouteStops.get(route)?.has(String(stop)));
+    if (tndsHasSafeBodsCounterpart) continue;
+    add({
+      code: 'service-source-evidence',
+      route,
+      stop: service.frequencyBasisStopId,
+      source: service.frequencyEvidenceSource || service.provider || 'TNDS',
+      groupKey: `calendar-reconciliation:${route}`,
+      message
+    });
+  }
+  const stopById = new Map((selectedStops ?? []).map(stop => [stopKey(stop), stop]));
+  const hasSafeNationalPrimaryFallback = (route, stop, stopRecord) => {
+    const authorities = (stopRecord?.routeAuthorities?.[String(route ?? '')] ?? []).map(value => String(value).toLowerCase());
+    return authorities.some(value => /\bbods\b/.test(value))
+      && !authorities.some(value => /\btfl\b|transport for london/.test(value))
+      && safelyPresentedBodsRouteStops.get(String(route ?? ''))?.has(String(stop ?? '')) === true;
+  };
+  const nationalUnresolved = new Set((provenance.nationalUnresolvedRequestIdentities ?? []).map(String));
+  const noCurrentIdentities = new Set((provenance.noCurrentRequestIdentities ?? []).map(String));
   for (const identity of [...(provenance.unresolvedRequestIdentities ?? []), ...(provenance.nationalUnresolvedRequestIdentities ?? [])]) {
     const parts = requestParts(identity);
-    if (tflRequestIdentities.has(String(identity)) && resolvedTfLRoutes.has(String(parts.route ?? ''))) continue;
-    add({ code: 'unresolved-timetable-request', route: parts.route, stop: parts.stop, source: 'timetable source', message: 'This route/stop timetable request remained unresolved; inspect the returned source evidence before formal use.' });
+    const stopRecord = stopById.get(String(parts.stop ?? ''));
+    const provider = nationalUnresolved.has(String(identity)) ? (provenance.nationalTimetableProviders?.join('/') || 'BODS/TNDS') : tflRequestIdentities.has(String(identity)) ? 'TfL' : 'timetable source';
+    const fallback = [...(services ?? []), ...(serviceSummaries ?? [])].some(service => String(service.routeNumber ?? '').trim() === String(parts.route ?? '')
+      && /BODS/i.test(String(service.timetableSource || service.source?.provider || ''))
+      && (hasScheduledEvidence(service.stopSchedules?.[String(parts.stop ?? '')] || {})
+        || (service.stopIds ?? []).map(String).includes(String(parts.stop ?? ''))
+        || String(service.frequencyBasisStopId ?? '') === String(parts.stop ?? '')));
+    const resolvedByNationalAuthority = provider === 'TfL' && hasSafeNationalPrimaryFallback(parts.route, parts.stop, stopRecord);
+    add({
+      code: 'unresolved-timetable-request', route: parts.route, stop: parts.stop, source: provider,
+      severity: resolvedByNationalAuthority ? 'information' : 'warning',
+      actionability: resolvedByNationalAuthority ? 'diagnostic' : 'review',
+      message: `Route ${parts.route ?? 'unknown'} at ${stopRecord?.name || 'the recorded stop'} (stop ${parts.stop ?? 'unknown'}): ${provider} timetable evidence remained unresolved${fallback ? '; exact-stop BODS evidence is retained and any frequency shown is based on that schedule' : '; no exact-stop schedule from this request is available, so do not rely on a frequency for this route/stop'}.${resolvedByNationalAuthority ? ' BODS is the recorded authority at this StopPoint and supplies the displayed schedule, so this supplementary TfL result requires no separate planner action.' : ' The stop-source route association is preserved.'}`
+    });
+  }
+  for (const identity of noCurrentIdentities) {
+    if ([...(provenance.unresolvedRequestIdentities ?? []), ...(provenance.nationalUnresolvedRequestIdentities ?? [])].map(String).includes(identity)) continue;
+    const parts = requestParts(identity);
+    const stopRecord = stopById.get(String(parts.stop ?? ''));
+    const provider = tflRequestIdentities.has(identity) ? 'TfL' : (provenance.nationalTimetableProviders?.join('/') || 'BODS/TNDS');
+    const recorded = (stopRecord?.routes ?? []).map(String).includes(String(parts.route ?? ''));
+    if (!recorded) continue;
+    const resolvedByNationalAuthority = provider === 'TfL' && hasSafeNationalPrimaryFallback(parts.route, parts.stop, stopRecord);
+    add({
+      code: 'no-current-timetable-match', route: parts.route, stop: parts.stop, source: provider,
+      severity: resolvedByNationalAuthority ? 'information' : 'warning',
+      actionability: resolvedByNationalAuthority ? 'diagnostic' : 'review',
+      message: `Route ${parts.route} is recorded at ${stopRecord?.name || 'this stop'} (stop ${parts.stop}); ${provider} returned no current timetable match for this exact stop. No departure was added, and this result does not establish that the public route is absent elsewhere.${resolvedByNationalAuthority ? ' BODS is the recorded authority at this StopPoint and supplies the displayed schedule, so this supplementary TfL result requires no separate planner action.' : ''}`
+    });
   }
   for (const row of plannerServiceSummaries ?? []) if (row.operatorEvidenceConflict) {
     add({
@@ -222,10 +326,81 @@ function buildReviewItems({ selectedStops = [], services = [], serviceSummaries 
     const targets = exactStops.length ? exactStops : [null];
     for (const stop of targets) add({ code: 'national-route-evidence', route, stop, source: 'BODS/TNDS', message: 'Required national timetable evidence could not be checked for this route; do not infer zero service.' });
   }
+  const specialDayProfileIssues = new Map();
   for (const service of services) for (const warning of [...(service.sourceWarnings ?? []), ...(service.qualifications ?? [])]) {
+    const specialDayProfile = String(warning).match(/unsupported complex operating profile \(SpecialDaysOperation\)/i);
+    if (specialDayProfile) {
+      const route = String(service.routeNumber ?? '').trim();
+      const source = String(service.timetableSource || service.source?.provider || 'timetable source').trim();
+      const stop = String(service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0] || '').trim();
+      const tndsOnlyEvidence = /TNDS|Traveline National Dataset/i.test(source);
+      if (tndsOnlyEvidence && route && stop && safelyPresentedBodsRouteStops.get(route)?.has(stop)) continue;
+      if (!route) {
+        add({ code: 'service-source-evidence', route: null, stop, source, message: String(warning) });
+        continue;
+      }
+      const key = [route, source].map(value => value.toLowerCase()).join('|');
+      const issue = specialDayProfileIssues.get(key) ?? { route, source, stops: new Set(), profiles: new Set() };
+      if (stop) issue.stops.add(stop);
+      const profile = String(warning).match(/\b(?:TNDS\s+)?([^\s]+)\s+has an unsupported complex operating profile/i)?.[1];
+      const identity = profile || (service.sourceRecordIds ?? []).map(String).sort().join(',') || String(service.id ?? warning);
+      issue.profiles.add(identity);
+      specialDayProfileIssues.set(key, issue);
+      continue;
+    }
     if (!/could not|unresolved|unsupported|quarantin|incomplete|not supplied|no deterministically/i.test(String(warning))) continue;
     add({ code: 'service-source-evidence', route: service.routeNumber, stop: service.frequencyBasisStopId || Object.keys(service.stopSchedules ?? {})[0], source: service.timetableSource || service.source?.provider || 'timetable source', message: String(warning) });
   }
+  for (const issue of specialDayProfileIssues.values()) {
+    const count = issue.profiles.size;
+    add({
+      code: 'service-source-evidence',
+      route: issue.route,
+      stop: [...issue.stops].sort((left, right) => left.localeCompare(right)).join(', ') || null,
+      source: issue.source,
+      groupKey: `special-days-profile:${issue.source}`,
+      message: `${issue.source} supplied ${count} timetable pattern${count === 1 ? '' : 's'} with unsupported complex special-day operating profiles; operating days remain unresolved and no timetable days were fabricated.`
+    });
+  }
+  const directionalLocationIssues = new Map();
+  const safelyResolvedPrincipalSources = new Set((plannerServiceSummaries ?? [])
+    .filter(row => row?.principalLocationState !== 'unresolved' && (row?.principalLocations?.length ?? 0) > 0)
+    .flatMap(row => (row?.rawServiceSummaries ?? []).flatMap(service => [
+      service?.id,
+      ...(service?.sourceRecordIds ?? [])
+    ]).map(value => String(value ?? '').trim()).filter(Boolean)));
+  const resolvedPrincipalRoutes = new Set((plannerServiceSummaries ?? [])
+    .filter(row => row?.principalLocationState !== 'unresolved' && (row?.principalLocations?.length ?? 0) > 0)
+    .flatMap(row => [row.routeNumber, ...(row.publicRouteNumbers ?? []), ...(row.routeNumbers ?? [])]
+      .map(value => String(value ?? '').trim()).filter(Boolean)));
+  const unresolvedPrincipalRoutes = new Set((plannerServiceSummaries ?? [])
+    .filter(row => row?.principalLocationState === 'unresolved' || !(row?.principalLocations?.length ?? 0))
+    .flatMap(row => [row.routeNumber, ...(row.publicRouteNumbers ?? []), ...(row.routeNumbers ?? [])]
+      .map(value => String(value ?? '').trim()).filter(Boolean)));
+  for (const service of serviceSummaries) for (const warning of service.sourceWarnings ?? []) {
+    if (!/principal locations could not be safely mapped/i.test(String(warning))) continue;
+    const sourceIds = [service?.id, ...(service?.sourceRecordIds ?? [])].map(value => String(value ?? '').trim()).filter(Boolean);
+    if (sourceIds.length && sourceIds.every(id => safelyResolvedPrincipalSources.has(id))) continue;
+    const route = String(service.routeNumber ?? '').trim();
+    if (route && resolvedPrincipalRoutes.has(route) && !unresolvedPrincipalRoutes.has(route)) continue;
+    const message = String(warning).trim();
+    const key = route || message.toLowerCase();
+    const issue = directionalLocationIssues.get(key) ?? { route, messages: new Set(), sources: new Set(), stops: new Set() };
+    issue.messages.add(message);
+    const stop = String(service.frequencyBasisStopId ?? '').trim();
+    if (stop) issue.stops.add(stop);
+    const source = service.timetableSource || service.frequencyEvidenceSource || service.provider || service.source?.provider || 'timetable source';
+    issue.sources.add(String(source).trim());
+    directionalLocationIssues.set(key, issue);
+  }
+  for (const issue of directionalLocationIssues.values()) add({
+    code: 'directional-principal-location',
+    route: issue.route,
+    stop: [...issue.stops].sort((left, right) => left.localeCompare(right)).join(', ') || null,
+    source: [...issue.sources].sort((left, right) => left.localeCompare(right)).join(' + '),
+    factKey: 'principal-location-unresolved',
+    message: issue.messages.size === 1 ? [...issue.messages][0] : 'Principal locations could not be safely mapped for one or more timetable patterns; review the source journey pattern.'
+  });
   for (const service of serviceSummaries) if (!service.routeNumber || !resolvedPlannerDestination(service)) add({ code: 'planner-route-identity', route: service.routeNumber, stop: service.frequencyBasisStopId, source: service.frequencyEvidenceSource || 'timetable source', message: 'The timetable pattern did not provide a complete planner-facing destination; review Detailed Evidence before using the row.' });
   for (const service of serviceSummaries) for (const side of ['origin', 'destination']) {
     const decision = service[`${side}EndpointDecision`];
@@ -356,6 +531,15 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
           warnings: [...new Set([...(warnings ?? []), 'The nearest candidate group was retained because timetable evidence was unavailable or unresolved; ATLAS did not substitute a farther group.'])]
         };
       }
+      if (conclusion === 'NO_CURRENT_MATCH') {
+        return {
+          selectedStops: selection.stops,
+          services: result.data ?? [],
+          servicesResult: result,
+          nearestGroup: Object.freeze({ name: selection.groupName, anchorStopId: selection.anchor.id, anchorWalkingDistanceMetres: selection.anchor.walking.distanceMetres, conclusion, basis: `${selection.basis} The nearest candidate was retained after no current timetable match was established; a farther group was not substituted.` }),
+          warnings: [...new Set([...(warnings ?? []), 'The nearest candidate group was retained because no current timetable match was established. This does not establish that no public service operates where source coverage is incomplete.'])]
+        };
+      }
       const selectedIds = new Set(selection.stops.map(stopKey));
       remaining.splice(0, remaining.length, ...remaining.filter(stop => !selectedIds.has(stopKey(stop))));
     }
@@ -408,13 +592,13 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     let assessmentWarnings = commonWarnings;
     if (assessmentMode === 'nearest') {
       let nearest = await nearestTimetable(enrichedDiscoveredStops, { forceRefresh, site }, commonWarnings, onProgress);
-      if (!nearest.selectedStops.length && Number(radius) < 2000) {
+      if (!nearest.nearestGroup && Number(radius) < 2000) {
         const expanded = await prepareStops(site, 2000, forceRefresh, null, onProgress);
         if (expanded.stopsResult.ok) {
           prepared = expanded;
           actualDiscoveryRadiusMetres = 2000;
           enrichedDiscoveredStops = expanded.enriched;
-          nearest = await nearestTimetable(expanded.enriched, { forceRefresh, site }, [...commonWarnings, `Nearest search expanded from ${selectedRadiusMetres} m to 2,000 m because no matched scheduled service was established in the initial radius.`], onProgress);
+          nearest = await nearestTimetable(expanded.enriched, { forceRefresh, site }, [...commonWarnings, `Nearest search expanded from ${selectedRadiusMetres} m to 2,000 m because no stop group with a valid routed walking distance was identified in the initial radius.`], onProgress);
         }
       }
       assessmentWarnings = nearest.warnings;
@@ -438,17 +622,48 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     // service reconciliation.  This prevents an unresolved national copy
     // from warning against a row whose named authoritative operator already
     // won the public-service decision.
+    const resolvedPrincipalSourceIds = new Set(plannerServiceSummaries
+      .filter(row => row?.principalLocationState !== 'unresolved' && (row?.principalLocations?.length ?? 0) > 0)
+      .flatMap(row => (row?.rawServiceSummaries ?? []).flatMap(service => [service?.id, ...(service?.sourceRecordIds ?? [])]))
+      .map(value => String(value ?? '').trim()).filter(Boolean));
+    const resolvedPrincipalRoutes = new Set(plannerServiceSummaries
+      .filter(row => row?.principalLocationState !== 'unresolved' && (row?.principalLocations?.length ?? 0) > 0)
+      .flatMap(row => [row.routeNumber, ...(row.publicRouteNumbers ?? []), ...(row.routeNumbers ?? [])]
+        .map(value => String(value ?? '').trim()).filter(Boolean)));
+    const unresolvedPrincipalRoutes = new Set(plannerServiceSummaries
+      .filter(row => row?.principalLocationState === 'unresolved' || !(row?.principalLocations?.length ?? 0))
+      .flatMap(row => [row.routeNumber, ...(row.publicRouteNumbers ?? []), ...(row.routeNumbers ?? [])]
+        .map(value => String(value ?? '').trim()).filter(Boolean)));
     const plannerSourceWarnings = [...new Set([
-      ...resolvedServiceSummaries.flatMap(service => [...(service.sourceWarnings ?? []), ...(service.endpointResolutionWarnings ?? [])]),
+      ...resolvedServiceSummaries.flatMap(service => [
+        ...(service.sourceWarnings ?? []).filter(warning => !/principal locations could not be safely mapped/i.test(String(warning))
+          || ![service?.id, ...(service?.sourceRecordIds ?? [])].map(value => String(value ?? '').trim()).filter(Boolean).every(id => resolvedPrincipalSourceIds.has(id))),
+        ...(service.endpointResolutionWarnings ?? [])
+      ]),
       ...plannerServiceSummaries.flatMap(service => plannerSourceWarning(service))
     ])];
+    const sourceWarningIsSafelyResolved = service => {
+      const ids = [service?.id, ...(service?.sourceRecordIds ?? [])]
+        .map(value => String(value ?? '').trim()).filter(Boolean);
+      if (ids.length > 0 && ids.every(id => resolvedPrincipalSourceIds.has(id))) return true;
+      const route = String(service?.routeNumber ?? '').trim();
+      return Boolean(route && resolvedPrincipalRoutes.has(route) && !unresolvedPrincipalRoutes.has(route));
+    };
+    const unresolvedPrincipalLocationWarnings = new Set(services
+      .filter(service => !sourceWarningIsSafelyResolved(service))
+      .flatMap(service => service.sourceWarnings ?? [])
+      .map(String).filter(warning => /principal locations could not be safely mapped/i.test(warning)));
+    const reconcilePrincipalLocationWarning = warning => !/principal locations could not be safely mapped/i.test(String(warning))
+      || unresolvedPrincipalLocationWarnings.has(String(warning));
     const routesByStop = new Map(selectedStops.map(stop => [stopKey(stop), new Set()]));
     for (const service of services) for (const [id, schedule] of Object.entries(service.stopSchedules ?? {})) if (routesByStop.has(id) && service.routeNumber && hasScheduledEvidence(schedule)) routesByStop.get(id).add(String(service.routeNumber));
     selectedStops = selectedStops.map(stop => {
       const timetableEvidence = buildStopTimetableEvidence(stop, services, servicesResult);
-      return Object.freeze({ ...stop, routes: [...new Set([...(stop.routes ?? []), ...(routesByStop.get(stopKey(stop)) ?? new Set())])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })), timetableMatch: (routesByStop.get(stopKey(stop))?.size ?? 0) > 0, timetableEvidence: timetableEvidence.label, timetableEvidenceStatus: timetableEvidence.status, timetableEvidenceSources: timetableEvidence.sources ?? [] });
+      const routes = [...new Set([...(stop.routes ?? []), ...(routesByStop.get(stopKey(stop)) ?? new Set())])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      const routeEvidence = routes.map(route => exactRouteStopEvidence(stop, route, services, servicesResult?.provenance ?? {}));
+      return Object.freeze({ ...stop, routes, routeEvidence: Object.freeze(routeEvidence), timetableMatch: (routesByStop.get(stopKey(stop))?.size ?? 0) > 0, timetableEvidence: timetableEvidence.label, timetableEvidenceStatus: timetableEvidence.status, timetableEvidenceSources: timetableEvidence.sources ?? [] });
     });
-    const warnings = [...new Set([...(assessmentWarnings ?? commonWarnings), ...(servicesResult?.warnings ?? []), ...collectServiceWarnings(services), ...plannerSourceWarnings, ...(!servicesResult?.ok ? ['Timetable information is unavailable. Stop and routed-access results are still shown.'] : []), ...(!prepared.walkingResult?.ok ? ['Walking routes could not be checked. Please try again.'] : []), ...(!prepared.cyclingResult?.ok ? ['Cycling routes could not be checked. Please try again.'] : [])])];
+    const warnings = [...new Set([...(assessmentWarnings ?? commonWarnings), ...(servicesResult?.warnings ?? []), ...collectServiceWarnings(services), ...plannerSourceWarnings, ...(!servicesResult?.ok ? ['Timetable information is unavailable. Stop and routed-access results are still shown.'] : []), ...(!prepared.walkingResult?.ok ? ['Walking routes could not be checked. Please try again.'] : []), ...(!prepared.cyclingResult?.ok ? ['Cycling routes could not be checked. Please try again.'] : [])].filter(reconcilePrincipalLocationWarning))];
     const routingComplete = selectedStops.every(stop => stop.walking.status === 'routed' && stop.cycling.status === 'routed');
     const stopCoverageComplete = prepared.stopsResult.provenance?.stopCoverageComplete !== false;
     const nationalEvidenceComplete = servicesResult?.provenance?.nationalSourceAvailable !== false && !(servicesResult?.provenance?.nationalUnresolvedRoutes?.length);
@@ -458,13 +673,14 @@ export function createBusAssessment({ stopDiscovery, timetableData, accessRoutin
     ].map(String)).size;
     const timetablesComplete = Boolean(servicesResult?.ok) && servicesResult?.provenance?.sourceCompleteness !== 'PARTIAL' && !Number(servicesResult?.provenance?.failedShardCount || 0) && nationalEvidenceComplete && Number(servicesResult?.provenance?.unprocessedRequests || 0) === 0 && Math.max(Number(servicesResult?.provenance?.unresolvedRequests || 0), unresolvedIdentityCount) === 0;
     const status = stopCoverageComplete && timetablesComplete && serviceSummaries.length && routingComplete ? 'complete' : 'partial';
-    const reviewItems = buildReviewItems({ selectedStops, services, serviceSummaries: resolvedServiceSummaries, plannerServiceSummaries, servicesResult, warnings, prepared, stopCoverageComplete, routingComplete });
+    const reviewEvidence = buildReviewItems({ selectedStops, services, serviceSummaries: resolvedServiceSummaries, plannerServiceSummaries, servicesResult, warnings, prepared, stopCoverageComplete, routingComplete });
+    const reviewItems = reviewEvidence.filter(item => item.actionability !== 'diagnostic');
+    const reviewDiagnostics = reviewEvidence.filter(item => item.actionability === 'diagnostic');
     const selectedIds = new Set(selectedStops.map(stopKey));
     const routes = new Set(enrichedDiscoveredStops.flatMap(stop => stop.routes ?? []));
     onProgress({ phase: status === 'complete' ? 'complete' : 'partial', detail: status === 'complete' ? 'Complete' : partialDetail(reviewItems) });
-    const wordingBase = buildControlledBusWording(plannerServiceSummaries, { nearestGroupName: nearestGroup?.name ?? null });
-    const wordingQualification = partialTimetableQualification(selectedStops);
-    return Object.freeze({ ok: true, status, assessmentMode, discoveredStopCount: enrichedDiscoveredStops.length, scope: { stopCount: enrichedDiscoveredStops.length, routeCount: routes.size, pairCount: routePairs(enrichedDiscoveredStops).size }, nearestGroup, stops: Object.freeze(selectedStops), services: Object.freeze(services), serviceSummaries: Object.freeze(resolvedServiceSummaries), plannerServiceSummaries: Object.freeze(plannerServiceSummaries), endpointResolution: Object.freeze(endpointResolution), wording: wordingQualification ? `${wordingBase} ${wordingQualification}` : wordingBase, warnings: Object.freeze(warnings), reviewItems: Object.freeze(reviewItems), provenance: Object.freeze({ stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres }, timetables: servicesResult?.provenance ?? {}, endpoints: endpointResolution.provenance ?? {}, walking: prepared.walkingResult?.provenance ?? {}, cycling: prepared.cyclingResult?.provenance ?? {} }), evidence: Object.freeze((prepared.stopsResult.evidence ?? []).filter(item => assessmentMode === 'full' || selectedIds.has(item?.subject?.id))) });
+    const wordingBase = buildControlledBusWording(plannerServiceSummaries, { nearestGroupName: nearestGroup?.name ?? null, nearestConclusion: nearestGroup?.conclusion ?? null });
+    return Object.freeze({ ok: true, status, assessmentMode, discoveredStopCount: enrichedDiscoveredStops.length, scope: { stopCount: enrichedDiscoveredStops.length, routeCount: routes.size, pairCount: routePairs(enrichedDiscoveredStops).size }, nearestGroup, stops: Object.freeze(selectedStops), services: Object.freeze(services), serviceSummaries: Object.freeze(resolvedServiceSummaries), plannerServiceSummaries: Object.freeze(plannerServiceSummaries), endpointResolution: Object.freeze(endpointResolution), wording: wordingBase, warnings: Object.freeze(warnings), reviewItems: Object.freeze(reviewItems), reviewDiagnostics: Object.freeze(reviewDiagnostics), provenance: Object.freeze({ stops: { ...prepared.stopsResult.provenance, radiusMetres: actualDiscoveryRadiusMetres, selectedRadiusMetres, actualDiscoveryRadiusMetres }, timetables: servicesResult?.provenance ?? {}, endpoints: endpointResolution.provenance ?? {}, walking: prepared.walkingResult?.provenance ?? {}, cycling: prepared.cyclingResult?.provenance ?? {} }), evidence: Object.freeze((prepared.stopsResult.evidence ?? []).filter(item => assessmentMode === 'full' || selectedIds.has(item?.subject?.id))) });
   }
 
   async function inspectScope(site, { radius = 700, forceRefresh = false } = {}) {

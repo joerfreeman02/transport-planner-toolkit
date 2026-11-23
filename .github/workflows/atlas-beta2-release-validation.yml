@@ -75,10 +75,19 @@ jobs:
           ROOT="$GITHUB_WORKSPACE/restored/atlas-bus-beta-review-candidate-39430415441"
           CANDIDATE="$ROOT/candidate-site"
           node tools/atlas-data-publication/review-candidate-checkpoint.mjs verify --candidate-root "$CANDIDATE" --checkpoint-root "$ROOT/review-checkpoint" --expected-run-id 39430415441 --expected-commit-sha 151199cc914c235870f444d26b03c2309edbd035
-          test "$(sha256sum "$CANDIDATE/atlas/data/bus/manifest.json" | cut -d' ' -f1)" = '1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f'
-          test "$(sha256sum "$CANDIDATE/atlas/data/bus-tnds/manifest.json" | cut -d' ' -f1)" = '2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f'
-          test "$(sha256sum "$CANDIDATE/atlas/data/tfl-ibus/manifest.json" | cut -d' ' -f1)" = '3090e1da6da21878725d0b30343757bd32c65fcdd56d9fdecb6f6ae6c75b5d53'
-          test "$(sha256sum "$CANDIDATE/atlas/data/tfl-ibus/20261009/operator-index.json" | cut -d' ' -f1)" = '39b0eae384ec7a44115f898b940b3f35213577195706d38a82fa97707d2610de'
+          check_sha256() {
+            local path="$1" expected="$2" actual
+            actual="$(sha256sum "$path" | cut -d' ' -f1)"
+            echo "SHA256 $path = $actual (expected $expected)"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "Run #75 frozen-file identity mismatch: $path" >&2
+              return 1
+            fi
+          }
+          check_sha256 "$CANDIDATE/atlas/data/bus/manifest.json" '1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f'
+          check_sha256 "$CANDIDATE/atlas/data/bus-tnds/manifest.json" '2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f'
+          check_sha256 "$CANDIDATE/atlas/data/tfl-ibus/manifest.json" '3090e1da6da21878725d0b30343757bd32c65fcdd56d9fdecb6f6ae6c75b5d53'
+          check_sha256 "$CANDIDATE/atlas/data/tfl-ibus/20261009/operator-index.json" '39b0eae384ec7a44115f898b940b3f35213577195706d38a82fa97707d2610de'
           echo "ATLAS_TEST_BUS_DATA_ROOT=$CANDIDATE/atlas/data/bus" >> "$GITHUB_ENV"
           echo "ATLAS_TEST_BUS_TNDS_DATA_ROOT=$CANDIDATE/atlas/data/bus-tnds" >> "$GITHUB_ENV"
           echo "ATLAS_TEST_TFL_IBUS_ROOT=$CANDIDATE/atlas/data/tfl-ibus" >> "$GITHUB_ENV"

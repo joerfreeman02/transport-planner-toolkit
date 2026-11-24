@@ -3,7 +3,7 @@
 **Date:** 24 November 2026  
 **Starting checkpoint:** `bf497b953a848525b67b646798cc48858680a200`  
 **Branch:** `codex/atlas-auto-updater-au1-20261124`  
-**Implementation checkpoint:** `355b735daaaeb0850e8869e414955b5e7f9ced03` (parent `bf497b953a848525b67b646798cc48858680a200`).  
+**Implementation checkpoint:** `355b735daaaeb0850e8869e414955b5e7f9ced03` (parent `bf497b953a848525b67b646798cc48858680a200`).
 **Exact-SHA hosted validation:** [Run 45430128275](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45430128275) passed for `355b735daaaeb0850e8869e414955b5e7f9ced03`. The documentation closeout commit is validated again by the branch workflow on its exact pushed SHA.
 
 ## Scope and protection boundaries

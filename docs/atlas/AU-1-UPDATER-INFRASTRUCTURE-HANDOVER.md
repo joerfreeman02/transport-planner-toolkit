@@ -3,7 +3,8 @@
 **Date:** 24 November 2026  
 **Starting checkpoint:** `bf497b953a848525b67b646798cc48858680a200`  
 **Branch:** `codex/atlas-auto-updater-au1-20261124`  
-**Final checkpoint:** recorded after the first AU-1 push; exact-SHA hosted results and final branch SHA are recorded below.
+**Implementation checkpoint:** `355b735daaaeb0850e8869e414955b5e7f9ced03` (parent `bf497b953a848525b67b646798cc48858680a200`).  
+**Exact-SHA hosted validation:** [Run 45430128275](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45430128275) passed for `355b735daaaeb0850e8869e414955b5e7f9ced03`. The documentation closeout commit is validated again by the branch workflow on its exact pushed SHA.
 
 ## Scope and protection boundaries
 
@@ -25,7 +26,7 @@ Three inactive roots provide at most 2,700,000,000 bytes and cannot hold a compa
 
 ## Hosted refresh test runtime
 
-The refresh workflow's validation job uses Ubuntu 24.04, Python 3.11, Node 22, pnpm 10, the frozen lockfile, and the project's locked Playwright dependency with Chromium installed through `playwright install --with-deps chromium`. Browser tests remain enabled. The reviewed failed runs [43880555641](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/43880555641) and [45215867838](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45215867838) both failed in `tnds-runtime-shard-browser.test.mjs` with `Cannot find module 'playwright'`; the primary refresh steps were blocked before acquisition. A separate `.github/workflows/atlas-au1-validation.yml` runs only after a push to this AU-1 branch, checks out exactly `github.sha`, grants only `contents: read`, installs the same locked runtime, and runs the deterministic ATLAS suite, offline publication/recovery checks, and static-index Python test. It contains no national credentials or acquisition/publication/deployment action. Hosted results and the exact final SHA are added to this record after push.
+The refresh workflow's validation job uses Ubuntu 24.04, Python 3.11, Node 22, pnpm 10, the frozen lockfile, and the project's locked Playwright dependency with Chromium installed through `playwright install --with-deps chromium`. Browser tests remain enabled. The reviewed failed runs [43880555641](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/43880555641) and [45215867838](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45215867838) both failed in `tnds-runtime-shard-browser.test.mjs` with `Cannot find module 'playwright'`; the primary refresh steps were blocked before acquisition. A separate `.github/workflows/atlas-au1-validation.yml` runs only after a push to this AU-1 branch, checks out exactly `github.sha`, grants `actions: read` and `contents: read`, restores and verifies the exact Run #75 artifact plus coherent frozen iBus overlay, installs the locked runtime, then runs the deterministic ATLAS suite, offline publication/recovery checks, and static-index Python test. It contains no national credentials or acquisition/publication/deployment action. Run [45430128275](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45430128275) passed every hosted step on exact SHA `355b735daaaeb0850e8869e414955b5e7f9ced03`, including Python 3.11 and Chromium setup.
 
 ## Application-only release and production gate
 
@@ -47,10 +48,10 @@ The full deterministic Node suite passed locally (`pnpm test:atlas`) against the
 | Candidate checkpoint and Recovery-0F.2 tests | Passed, including exact producer/provenance and explicit cross-run restore checks. |
 | `publication-lifecycle.integration.test.mjs` | Passed locally with isolated temporary Git remotes: activation only after complete verification, stale-aware bank rotation, and failed candidate leaves the active bank unchanged. |
 | Full `pnpm test:atlas` | Passed locally against immutable Run #75 roots: `ATLAS Alpha.15 deterministic suite passed`. |
-| Python static-index test | Not run locally; Python 3.11 is unavailable. Included in the isolated hosted workflow. |
-| Exact-SHA GitHub-hosted validation | Pending AU-1 branch push; exact outcome is recorded below. |
+| Python static-index test | Hosted Ubuntu Python 3.11 passed in Run 45430128275; local Python 3.11 is unavailable. |
+| Exact-SHA GitHub-hosted validation | Passed: [Run 45430128275](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45430128275), exact source SHA `355b735daaaeb0850e8869e414955b5e7f9ced03`; immutable Run #75, full Node suite, focused lifecycle/recovery/release checks, and Python all passed. |
 
-**First AU-1 checkpoint:** pending. **Exact-SHA hosted validation:** pending.
+**First AU-1 checkpoint:** `355b735daaaeb0850e8869e414955b5e7f9ced03`; exact-SHA hosted validation passed. The subsequent handover-only commit is revalidated by the same branch-scoped workflow.
 
 ## Source limitations and outstanding release blockers
 

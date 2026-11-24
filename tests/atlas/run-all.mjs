@@ -94,6 +94,7 @@ await import('./reference-data-workflow-contract.test.mjs');
 await import('./refresh-freshness.test.mjs');
 await import('./atlas-data-publication.test.mjs');
 await import('./app-data-release.test.mjs');
+await import('./app-only-data-preflight.test.mjs');
 await import('./app-data-release-workflow-contract.test.mjs');
 await import('./re1-release-boundary.test.mjs');
 await import('./tfl-replay-privacy.test.mjs');

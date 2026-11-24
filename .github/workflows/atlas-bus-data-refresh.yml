@@ -120,7 +120,7 @@ concurrency:
 jobs:
   main-guard:
     name: Check refresh execution context
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       trust_mode: ${{ steps.s2e-1-selector.outputs.trust_mode || steps.s2d-1-selector.outputs.trust_mode || steps.s2c-3-selector.outputs.trust_mode || steps.s2c-2-selector.outputs.trust_mode || steps.s2c-1-selector.outputs.trust_mode || steps.s2b-c4-selector.outputs.trust_mode || steps.s2b-c3-selector.outputs.trust_mode || steps.s2b-c2-selector.outputs.trust_mode || steps.s2b-c1-selector.outputs.trust_mode || steps.s2a-c3-selector.outputs.trust_mode || steps.s2a-c2-selector.outputs.trust_mode || steps.s2a-c1-selector.outputs.trust_mode || steps.trust-selector.outputs.trust_mode }}
       trust_prior_producer_run_id: ${{ steps.s2a-c3-selector.outputs.prior_producer_run_id || steps.s2a-c2-selector.outputs.prior_producer_run_id || steps.s2a-c1-selector.outputs.prior_producer_run_id || steps.trust-selector.outputs.prior_producer_run_id }}
@@ -796,7 +796,7 @@ jobs:
     name: Build and validate Bus/TNDS candidate
     needs: [main-guard, freshness, application-pin]
     if: inputs.prepared_schema != 'v2' && needs.main-guard.outputs.trust_mode == '' && needs.freshness.result == 'success' && needs.freshness.outputs.refresh_required == 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && (github.ref != 'refs/heads/main' || needs.application-pin.result == 'success')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
     outputs:
       application_sha: ${{ steps.release-identity.outputs.application_sha }}
@@ -820,10 +820,17 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.11'
       - uses: actions/setup-node@v4
         with:
           node-version: '22.x'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Install frozen JavaScript dependencies and Chromium before candidate work
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
       - name: Prepare isolated Pages site
         run: |
           APP_SHA="$ATLAS_PINNED_APPLICATION_SHA"
@@ -918,8 +925,12 @@ jobs:
       - name: Run deterministic ATLAS checks
         if: always()
         run: node tests/atlas/run-all.mjs
-      - name: Measure candidate publication capacity
-        run: node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json ${{ inputs.prepared_schema == 'v2' && '--bus-only' || '' }}
+      - name: Measure complete candidate against the configured inactive TNDS bank
+        if: inputs.prepared_schema != 'v2'
+        run: node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json --config last-known-good/atlas/config/atlas-data-sources.json --banks-json "$ATLAS_TNDS_BANKS_JSON"
+      - name: Measure Bus-only diagnostic candidate
+        if: inputs.prepared_schema == 'v2'
+        run: node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json --bus-only
       - name: Write diagnostic source-cache manifest
         if: inputs.prepared_schema == 'v2' && (inputs.measure_only == true || github.ref != 'refs/heads/main')
         run: |

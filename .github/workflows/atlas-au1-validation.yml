@@ -1,0 +1,100 @@
+name: ATLAS AU-1 exact-commit validation
+
+on:
+  push:
+    branches:
+      - codex/atlas-auto-updater-au1-20261124
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: atlas-au1-validation-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  isolated-validation:
+    if: github.repository == 'joerfreeman02/transport-planner-toolkit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Verify exact pushed candidate
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install locked test and browser dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+      - name: Verify immutable Run #75 artifact identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/12275615359" > "$RUNNER_TEMP/run75.json"
+          python - "$RUNNER_TEMP/run75.json" <<'PY'
+          import json,sys
+          a=json.load(open(sys.argv[1])); w=a.get('workflow_run') or {}
+          if a.get('name')!='atlas-bus-beta-review-candidate-39430415441' or a.get('digest')!='sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471' or a.get('expired') is not False: raise SystemExit('Immutable Run #75 artifact metadata mismatch.')
+          if w.get('id')!=39430415441 or w.get('head_sha')!='151199cc914c235870f444d26b03c2309edbd035': raise SystemExit('Immutable Run #75 producer identity mismatch.')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: 12275615359
+          run-id: 39430415441
+          repository: joerfreeman02/transport-planner-toolkit
+          github-token: ${{ github.token }}
+          path: restored
+      - name: Verify Run #75 checkpoint and mount the coherent frozen iBus regression pair
+        run: |
+          ROOT="$GITHUB_WORKSPACE/restored/atlas-bus-beta-review-candidate-39430415441"
+          CANDIDATE="$ROOT/candidate-site"
+          node tools/atlas-data-publication/review-candidate-checkpoint.mjs verify --candidate-root "$CANDIDATE" --checkpoint-root "$ROOT/review-checkpoint" --expected-run-id 39430415441 --expected-commit-sha 151199cc914c235870f444d26b03c2309edbd035
+          test "$(sha256sum "$CANDIDATE/atlas/data/bus/manifest.json" | cut -d' ' -f1)" = '1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f'
+          test "$(sha256sum "$CANDIDATE/atlas/data/bus-tnds/manifest.json" | cut -d' ' -f1)" = '2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f'
+          test "$(sha256sum "$CANDIDATE/atlas/data/tfl-ibus/manifest.json" | cut -d' ' -f1)" = '14b416823cb648c869750db90939bac33a027f2f91485322f08c2d9c4394914f'
+          test "$(sha256sum "$CANDIDATE/atlas/data/tfl-ibus/20261009/operator-index.json" | cut -d' ' -f1)" = '5efcf64bfe1e158ecac52a8df8609984600b90ddd9b1b25b5112de7f6e24ebc1'
+          node --input-type=module - "$CANDIDATE/atlas/data/tfl-ibus" <<'JS'
+          import fs from 'node:fs/promises';
+          import path from 'node:path';
+          import { verifyIbusFixture } from './tools/atlas-release/release-boundary.mjs';
+          const source=path.resolve('tests/atlas/fixtures/run75-ibus-20261009');
+          const target=process.argv[2];
+          const result=await verifyIbusFixture(source,{manifestSha256:'3090e1da6da21878725d0b30343757bd32c65fcdd56d9fdecb6f6ae6c75b5d53',indexSha256:'39b0eae384ec7a44115f898b940b3f35213577195706d38a82fa97707d2610de'});
+          const provenance=JSON.parse(await fs.readFile(path.join(source,'provenance.json'),'utf8'));
+          if(provenance.identity.manifestSha256!==result.manifestSha256||provenance.identity.indexSha256!==result.indexSha256) throw new Error('Frozen iBus fixture provenance mismatch.');
+          await fs.rm(target,{recursive:true,force:true}); await fs.mkdir(path.join(target,'20261009'),{recursive:true});
+          await fs.copyFile(path.join(source,'manifest.json'),path.join(target,'manifest.json'));
+          await fs.copyFile(path.join(source,'20261009/operator-index.json'),path.join(target,'20261009/operator-index.json'));
+          JS
+          echo "ATLAS_TEST_BUS_DATA_ROOT=$CANDIDATE/atlas/data/bus" >> "$GITHUB_ENV"
+          echo "ATLAS_TEST_BUS_TNDS_DATA_ROOT=$CANDIDATE/atlas/data/bus-tnds" >> "$GITHUB_ENV"
+          echo "ATLAS_TEST_TFL_IBUS_ROOT=$CANDIDATE/atlas/data/tfl-ibus" >> "$GITHUB_ENV"
+      - name: Run complete deterministic ATLAS suite
+        run: pnpm test:atlas
+      - name: Run publication topology, lifecycle, recovery and release-boundary checks
+        if: always()
+        run: |
+          node tests/atlas/atlas-data-publication.test.mjs
+          node tests/atlas/publication-preflight.test.mjs
+          node tests/atlas/publication-lifecycle.integration.test.mjs
+          node tests/atlas/atlas-recovery-0f-publication.integration.test.mjs
+          node tests/atlas/app-data-release.test.mjs
+          node tests/atlas/app-only-data-preflight.test.mjs
+      - name: Run offline static-index build validation
+        if: always()
+        run: python -m unittest discover -s tools/atlas-bus-data -p 'test_build_static_index.py' -v

@@ -7,11 +7,18 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { checkRemoteStorageHealth, parsePublicationBanks, preflightPublication, readDeployedConfiguration } from '../../tools/atlas-data-publication/preflight-publication.mjs';
 
+const regionsA = [['SW', 'EA', 'WM'], ['SE', 'NE'], ['EM', 'NW', 'Y']];
+const regionsB = [['SW'], ['SE'], ['EA', 'NW'], ['NE', 'WM'], ['EM', 'Y']];
+const makeRoots = (bank, regions) => regions.map((assigned, index) => {
+  const id = `${bank}${index + 1}`;
+  return { id, repository: `owner/${id.toLowerCase()}`, siteUrl: `https://owner.github.io/${id.toLowerCase()}/`, regions: assigned };
+});
 const banks = [
-  { id: 'A', roots: ['A1', 'A2', 'A3'].map(id => ({ id, repository: `owner/${id.toLowerCase()}`, siteUrl: `https://owner.github.io/${id.toLowerCase()}/` })) },
-  { id: 'B', roots: ['B1', 'B2', 'B3'].map(id => ({ id, repository: `owner/${id.toLowerCase()}`, siteUrl: `https://owner.github.io/${id.toLowerCase()}/` })) }
+  { id: 'A', roots: makeRoots('A', regionsA) },
+  { id: 'B', roots: makeRoots('B', regionsB) }
 ];
-const valid = { busRepository: 'owner/bus-data', busSiteUrl: 'https://owner.github.io/bus-data/', banksJson: JSON.stringify(banks), activeConfig: { datasets: { tnds: { activeBank: 'A', activeRoots: [{ id: 'A1', baseUrl: 'https://owner.github.io/a1/' }] } } }, token: 'INJECTED_TEST_TOKEN', branch: 'pages-publish', toolkitRepository: 'owner/transport-planner-toolkit' };
+const deployedRoots = roots => roots.map(root => ({ id: root.id, baseUrl: root.siteUrl, regions: root.regions }));
+const valid = { busRepository: 'owner/bus-data', busSiteUrl: 'https://owner.github.io/bus-data/', banksJson: JSON.stringify(banks), activeConfig: { datasets: { tnds: { activeBank: 'A', activeRoots: deployedRoots(banks[0].roots) } } }, token: 'INJECTED_TEST_TOKEN', branch: 'pages-publish', toolkitRepository: 'owner/transport-planner-toolkit' };
 const healthyProbe = async () => ({ branchPresent: true });
 const healthy = async ({ remote }) => ({ status: 'measured', remote, sizeBytes: 1024, sizeLimitBytes: 3_000_000_000, warning: null });
 const writable = async () => ({ push: true, metadata: { size: 1 } });
@@ -48,6 +55,31 @@ const bootstrap = await preflightPublication({ ...valid, activeConfig: null, ...
 assert.equal(bootstrap.ok, true);
 assert.equal(bootstrap.bootstrap, true);
 assert.equal(bootstrap.repositories.every(item => item.branchPresent && item.writePermission && item.siteHealth.ok), true);
+
+const acceptedLiveTopology = [
+  { id: 'A', roots: makeRoots('A', regionsA) },
+  { id: 'B', roots: makeRoots('B', regionsB) }
+];
+const liveFiveThree = await preflightPublication({
+  ...valid,
+  banksJson: JSON.stringify(acceptedLiveTopology),
+  activeConfig: { datasets: { tnds: { activeBank: 'B', activeRoots: deployedRoots(acceptedLiveTopology[1].roots) } } },
+  ...dependencies
+});
+assert.equal(liveFiveThree.ok, true, 'The measured current five-root active / three-root rollback topology is valid.');
+assert.equal(liveFiveThree.activeBank, 'B');
+assert.equal(liveFiveThree.candidateBank, 'A');
+assert.equal(liveFiveThree.repositories.length, 9);
+
+const incompleteRegions = structuredClone(acceptedLiveTopology);
+incompleteRegions[1].roots[0].regions = ['SW', 'SE'];
+await assert.rejects(() => preflightPublication({ ...valid, banksJson: JSON.stringify(incompleteRegions), ...dependencies }), /each authoritative region exactly once/);
+
+const mismatchedActive = { datasets: { tnds: { activeBank: 'A', activeRoots: deployedRoots(acceptedLiveTopology[1].roots) } } };
+await assert.rejects(() => preflightPublication({ ...valid, activeConfig: mismatchedActive, ...dependencies }), /do not match configured bank A|does not match configured bank A/);
+const mismatchedRegions = structuredClone(deployedRoots(acceptedLiveTopology[1].roots));
+mismatchedRegions[0].regions = ['SE'];
+await assert.rejects(() => preflightPublication({ ...valid, activeConfig: { datasets: { tnds: { activeBank: 'B', activeRoots: mismatchedRegions } } }, banksJson: JSON.stringify(acceptedLiveTopology), ...dependencies }), /region allocation does not match configured bank B/);
 
 await assert.rejects(() => preflightPublication({ ...valid, ...dependencies, probe: async () => ({ branchPresent: false }) }), /required pages-publish branch is absent/);
 await assert.rejects(() => preflightPublication({ ...valid, ...dependencies, permissionProbe: async () => ({ push: false }) }), /push permission/);

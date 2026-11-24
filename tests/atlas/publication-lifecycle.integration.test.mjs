@@ -30,7 +30,8 @@ await run(temp, ['init', '--bare', 'bus.git']);
 await run(temp, ['init', '--quiet', 'bus']);
 await run(busRepository, ['remote', 'add', 'origin', busRemote]);
 
-const bankDefinitions = ['A', 'B'].flatMap(bank => [1, 2, 3].map(index => ({ id: `${bank}${index}`, repository: path.join(temp, `${bank}${index}`), siteUrl: `https://${bank.toLowerCase()}${index}.example.test/` })));
+const lifecycleRegions = [['EA', 'EM', 'NE'], ['NW', 'SE'], ['SW', 'WM', 'Y']];
+const bankDefinitions = ['A', 'B'].flatMap(bank => [1, 2, 3].map((index, position) => ({ id: `${bank}${index}`, repository: path.join(temp, `${bank}${index}`), siteUrl: `https://${bank.toLowerCase()}${index}.example.test/`, regions: lifecycleRegions[position] })));
 for (const root of bankDefinitions) {
   const remote = path.join(temp, `${root.id}.git`);
   await run(temp, ['init', '--bare', `${root.id}.git`]);
@@ -39,7 +40,7 @@ for (const root of bankDefinitions) {
 }
 const banks = ['A', 'B'].map(id => ({ id, roots: bankDefinitions.filter(root => root.id.startsWith(id)) }));
 let markerChecks = 0;
-const preflightBanks = ['A', 'B'].map(bank => ({ id: bank, roots: [1, 2, 3].map(index => ({ id: `${bank}${index}`, repository: `owner/${bank.toLowerCase()}${index}`, siteUrl: `https://${bank.toLowerCase()}${index}.example.test/` })) }));
+const preflightBanks = ['A', 'B'].map(bank => ({ id: bank, roots: [1, 2, 3].map((index, position) => ({ id: `${bank}${index}`, repository: `owner/${bank.toLowerCase()}${index}`, siteUrl: `https://${bank.toLowerCase()}${index}.example.test/`, regions: lifecycleRegions[position] })) }));
 const bootstrapPreflight = await preflightPublication({ busRepository: 'owner/bus-data', busSiteUrl: 'https://bus.example.test/', banksJson: JSON.stringify(preflightBanks), activeConfig: null, token: 'INJECTED_TEST_TOKEN', probe: async () => ({ branchPresent: true }), permissionProbe: async () => ({ push: true, metadata: { size: 1 } }), siteHealthProbe: async ({ siteUrl }) => { markerChecks += 1; return { ok: true, markerUrl: `${siteUrl}atlas-publication-site.json` }; }, healthCheck: async ({ remote, sizeLimitBytes }) => ({ status: 'measured', source: 'fixture', remote, sizeBytes: 1024, sizeLimitBytes, warning: null }) });
 assert.equal(bootstrapPreflight.bootstrap, true);
 assert.equal(bootstrapPreflight.repositories.length, 7);

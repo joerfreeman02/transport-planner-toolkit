@@ -36,9 +36,10 @@ export function assertReviewedFileScope(files, manifest, expectedBaseSha = BASE_
   return true;
 }
 
-export function dataPublicationIdentity({ dataSources, dataStatus, busManifestSha256, tndsManifestSha256, ibusManifestSha256, ibusIndexSha256 }) {
+export function dataPublicationIdentity({ dataSources, dataStatus, busManifestSha256, tndsManifestSha256, ibusManifestSha256, ibusIndexSha256, nptgManifestSha256 = null }) {
   const jsonHash = value => sha256(Buffer.from(`${JSON.stringify(value, null, 2)}\n`, 'utf8'));
   if (!dataSources?.publicationVersion || !dataStatus || !busManifestSha256 || !tndsManifestSha256?.length || !ibusManifestSha256 || !ibusIndexSha256) throw new Error('Approved live-data identity is incomplete.');
+  if (dataSources.datasets?.nptg && !nptgManifestSha256) throw new Error('Configured NPTG dataset is missing its manifest identity.');
   return {
     publicationVersion: dataSources.publicationVersion,
     currentness: dataStatus.generatedAt ?? dataStatus.snapshotDate ?? dataStatus.candidateGeneratedAt ?? null,
@@ -46,6 +47,7 @@ export function dataPublicationIdentity({ dataSources, dataStatus, busManifestSh
     dataSourcesSha256: jsonHash(dataSources),
     busManifestSha256,
     tndsManifestSha256: [...tndsManifestSha256].sort(),
+    nptgManifestSha256: nptgManifestSha256 ?? null,
     ibusManifestSha256,
     ibusIndexSha256
   };

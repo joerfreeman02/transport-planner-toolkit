@@ -7,6 +7,7 @@ const [appRelease, refresh, frozen] = await Promise.all([
   read('.github/workflows/atlas-bus-data-refresh.yml'),
   read('.github/workflows/atlas-bus-frozen-beta-publish.yml')
 ]);
+const au1 = await read('.github/workflows/atlas-au1-validation.yml');
 assert.match(appRelease, /group: atlas-bus-pages/);
 assert.match(appRelease, /authorize_publication == true/);
 assert.match(appRelease, /application_commit_sha/);
@@ -14,6 +15,8 @@ assert.match(appRelease, /working-directory: application/);
 assert.match(appRelease, /assertReviewedFileScope/);
 assert.match(appRelease, /approved_live_data_identity_sha256/);
 assert.match(appRelease, /assertApprovedLiveDataIdentity/);
+assert.match(appRelease, /app-only-data-preflight\.mjs/);
+assert.doesNotMatch(appRelease, /tools\/atlas-data-publication\/preflight-publication\.mjs/);
 assert.match(appRelease, /Published data-status manifest changed during the app-only release/);
 assert.match(appRelease, /Tested application SHA and assembled artifact SHA/);
 assert.match(appRelease, /rm -rf \"\$CANDIDATE_SITE\/atlas\/data\/tfl-ibus\"\s+cp -a last-known-good\/atlas\/data\/tfl-ibus/);
@@ -22,6 +25,17 @@ assert.match(appRelease, /actions\/upload-pages-artifact@v3/);
 assert.match(appRelease, /CANDIDATE_ARTIFACT_DIGEST/);
 assert.match(appRelease, /1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f/);
 assert.doesNotMatch(appRelease, /source_snapshot\.py --acquire|refresh_bus_data\.py|publish-bank\.mjs|publish-snapshot\.mjs/);
+assert.match(au1, /branches:\s*\n\s*- codex\/atlas-auto-updater-au1-20261124/);
+assert.match(au1, /contents:\s*read/);
+assert.match(au1, /actions:\s*read/);
+assert.match(au1, /ref: \$\{\{ github\.sha \}\}/);
+assert.match(au1, /pnpm install --frozen-lockfile/);
+assert.match(au1, /playwright install --with-deps chromium/);
+assert.match(au1, /pnpm test:atlas/);
+assert.match(au1, /artifact-ids: 12275615359/);
+assert.match(au1, /sha256:5cad24e0a47a4c77a8ec8616d746bf9f538404420fcb9505f297607632e1a471/);
+assert.match(au1, /ATLAS_TEST_BUS_TNDS_DATA_ROOT/);
+assert.doesNotMatch(au1, /secrets\.|ATLAS_REFERENCE_DATA_TOKEN|publish-snapshot|publish-bank|refresh_bus_data|source_snapshot\.py/);
 assert.match(refresh, /group: atlas-bus-pages/);
 assert.match(refresh, /application-pin/);
 assert.match(refresh, /merge-base.*is-ancestor/);

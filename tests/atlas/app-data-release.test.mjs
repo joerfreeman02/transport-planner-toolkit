@@ -8,7 +8,7 @@ const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'atlas-release-contract-'))
 try {
   const app = path.join(temp, 'app'), snapshot = path.join(temp, 'snapshot'), output = path.join(temp, 'out');
   const write = async (root, relative, value) => { const file = path.join(root, relative); await fs.mkdir(path.dirname(file), { recursive: true }); await fs.writeFile(file, value); };
-  const sources = { schema: 'atlas-data-sources-v2', publicationVersion: 'run75-frozen', datasets: { bus: { baseUrl: 'https://data.example/bus/' }, tnds: { activeRoots: [{ id: 'root-a', baseUrl: 'https://data.example/tnds/' }] } } };
+  const sources = { schema: 'atlas-data-sources-v2', publicationVersion: 'run75-frozen', datasets: { bus: { baseUrl: 'https://data.example/bus/' }, tnds: { activeRoots: [{ id: 'root-a', baseUrl: 'https://data.example/tnds/' }] }, nptg: { baseUrl: 'https://data.example/nptg/' } } };
   const status = { generatedAt: '2026-10-25T00:00:00Z' }, busManifest = { snapshotId: 'bus-75' }, tndsManifests = [{ snapshotId: 'tnds-75' }], ibusManifest = { baseVersion: '20261025', indexPath: 'operator-index.json' }, ibusIndex = { operators: [] };
   await write(app, 'index.html', 'app root');
   await write(app, 'atlas/index.html', '<dd>2.0.0-beta.1</dd><link href="assets/css/atlas-shell.css?build=ATLAS-2.0.0-beta.1-20261025">');
@@ -24,7 +24,9 @@ try {
   await write(snapshot, 'atlas/data/tfl-ibus/manifest.json', JSON.stringify(ibusManifest));
   await write(snapshot, 'atlas/data/tfl-ibus/operator-index.json', JSON.stringify(ibusIndex));
   await write(snapshot, 'atlas/data/bus/manifest.json', JSON.stringify(busManifest));
-  const args = { appRoot: app, snapshotRoot: snapshot, outputRoot: output, expectedApplicationSha: 'd1a478d584dc402df4d6d225a2fa797959f657d5', version: '2.0.0-beta.2', build: 'ATLAS-2.0.0-beta.2-20261123', dataSources: sources, dataStatus: status, busManifest, tndsManifests, ibusManifest, ibusIndex };
+  const nptgManifest = { schema: 'atlas-nptg-v1', generatedAt: '2026-10-25T00:00:00Z' };
+  const args = { appRoot: app, snapshotRoot: snapshot, outputRoot: output, expectedApplicationSha: 'd1a478d584dc402df4d6d225a2fa797959f657d5', version: '2.0.0-beta.2', build: 'ATLAS-2.0.0-beta.2-20261123', dataSources: sources, dataStatus: status, busManifest, tndsManifests, nptgManifest, ibusManifest, ibusIndex };
+  await write(snapshot, 'atlas/data/nptg/manifest.json', JSON.stringify(nptgManifest));
   const identity = await assembleAppOnlyArtifact(args);
   assert.equal(await fs.readFile(path.join(output, 'index.html'), 'utf8'), 'app root');
   assert.equal(await fs.readFile(path.join(output, 'atlas/assets/js/app.mjs'), 'utf8'), 'candidate app');
@@ -34,21 +36,24 @@ try {
   assert.match(await fs.readFile(path.join(output, 'atlas/index.html'), 'utf8'), /2\.0\.0-beta\.2/);
   assert.equal(JSON.parse(await fs.readFile(path.join(output, 'atlas/config/atlas-release-identity.json'), 'utf8')).application.commitSha, args.expectedApplicationSha);
   assert.equal(JSON.parse(await fs.readFile(path.join(output, 'atlas/config/atlas-release-identity.json'), 'utf8')).data.dataStatusSha256, identity.data.dataStatusSha256);
+  assert.equal(JSON.parse(await fs.readFile(path.join(output, 'atlas/config/atlas-release-identity.json'), 'utf8')).data.nptgManifestSha256, identity.data.nptgManifestSha256);
   assert.equal(JSON.parse(await fs.readFile(path.join(output, 'atlas/config/atlas-release-identity.json'), 'utf8')).artifactTreeSha256, await artifactTreeSha256(output));
   assertAppOnlyPreservesData(identity, structuredClone(identity));
   assert.throws(() => assertAppOnlyPreservesData(identity, { ...structuredClone(identity), data: { ...identity.data, publicationVersion: 'changed' } }), /would change approved data/);
   assert.throws(() => assertAppOnlyPreservesData(identity, { ...structuredClone(identity), data: { ...identity.data, dataStatusSha256: 'unapproved-status' } }), /would change approved data dataStatusSha256/);
+  assert.throws(() => assertAppOnlyPreservesData(identity, { ...structuredClone(identity), data: { ...identity.data, nptgManifestSha256: 'unapproved-nptg' } }), /would change approved data nptgManifestSha256/);
   assertApplicationPinned(identity, { ...structuredClone(identity), data: { ...identity.data, publicationVersion: 'next-data-refresh', currentness: 'next-date' } });
   assert.throws(() => assertApplicationPinned(identity, { ...structuredClone(identity), application: { ...identity.application, commitSha: '8f1d8ae50405ec4acf38dd66d6c8f60896a5649e' } }), /replace approved application commitSha/);
   const patchedArgs = { ...args, expectedApplicationSha: '365b1d34ff5117a3e015edea6e57d8c252cf8675', build: 'ATLAS-2.0.0-beta.2-20261124' };
   const appPatchedIdentity = createReleaseIdentity({ ...patchedArgs, applicationSha: patchedArgs.expectedApplicationSha });
   assert.notEqual(identity.application.commitSha, appPatchedIdentity.application.commitSha, 'An app-only patch must have an independently identified application SHA.');
   assertAppOnlyPreservesData(identity, appPatchedIdentity);
-  const refreshedIdentity = createReleaseIdentity({ ...patchedArgs, applicationSha: patchedArgs.expectedApplicationSha, dataSources: { ...sources, publicationVersion: 'approved-later-publication' }, dataStatus: { generatedAt: '2026-11-24T00:00:00Z' }, busManifest: { snapshotId: 'bus-later' }, tndsManifests: [{ snapshotId: 'tnds-later' }], ibusManifest: { ...ibusManifest, baseVersion: '20261124' }, ibusIndex: { operators: [{ id: 'later' }] } });
+  const refreshedIdentity = createReleaseIdentity({ ...patchedArgs, applicationSha: patchedArgs.expectedApplicationSha, dataSources: { ...sources, publicationVersion: 'approved-later-publication' }, dataStatus: { generatedAt: '2026-11-24T00:00:00Z' }, busManifest: { snapshotId: 'bus-later' }, tndsManifests: [{ snapshotId: 'tnds-later' }], nptgManifest: { schema: 'atlas-nptg-v1', generatedAt: '2026-11-24T00:00:00Z' }, ibusManifest: { ...ibusManifest, baseVersion: '20261124' }, ibusIndex: { operators: [{ id: 'later' }] } });
   assert.notDeepEqual(appPatchedIdentity.data, refreshedIdentity.data, 'The approved later data publication must have a distinct identity.');
   assert.notEqual(appPatchedIdentity.data.dataStatusSha256, refreshedIdentity.data.dataStatusSha256, 'The refreshed freshness/status manifest must have its own identity.');
   assertApplicationPinned(appPatchedIdentity, refreshedIdentity);
   assert.throws(() => assertApplicationPinned(appPatchedIdentity, { ...refreshedIdentity, application: identity.application }), /replace approved application/);
+  assert.throws(() => assertApplicationPinned(appPatchedIdentity, { ...refreshedIdentity, data: Object.fromEntries(Object.entries(refreshedIdentity.data).filter(([key]) => key !== 'nptgManifestSha256')) }), /omits its NPTG manifest field/);
   assert.throws(() => createReleaseIdentity({ ...args, applicationSha: 'not-a-sha' }), /full 40-character/);
   assert.throws(() => createReleaseIdentity({ ...args, applicationSha: args.expectedApplicationSha, dataSources: { ...sources, publicationVersion: null } }), /identities are incomplete/);
   console.log('Application/data release artifact contract passed (isolated fixture dry run).');

@@ -1,19 +1,35 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { measureCandidateDatasets, measurePublicationTree } from './publication.mjs';
+import { measureCandidateDatasets, measurePublicationTree, selectOppositeTndsBank } from './publication.mjs';
+
+function option(name) {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : null;
+}
 
 async function main() {
-  const candidateIndex = process.argv.indexOf('--candidate-site');
-  if (candidateIndex < 0 || !process.argv[candidateIndex + 1]) throw new Error('Missing --candidate-site');
-  const outputIndex = process.argv.indexOf('--output');
-  const candidateSite = path.resolve(process.argv[candidateIndex + 1]);
+  const candidateSiteArg = option('--candidate-site');
+  if (!candidateSiteArg) throw new Error('Missing --candidate-site');
+  const outputArg = option('--output');
+  const candidateSite = path.resolve(candidateSiteArg);
   const busOnly = process.argv.includes('--bus-only');
-  const result = busOnly
-    ? { diagnosticSchema: 'atlas-bus-only-capacity-diagnostic-v1', diagnosticOnly: true, productionEligible: false, bus: await measurePublicationTree(path.join(candidateSite, 'atlas', 'data', 'bus')), tnds: null }
-    : await measureCandidateDatasets(candidateSite);
-  if (outputIndex >= 0 && process.argv[outputIndex + 1]) {
-    const output = path.resolve(process.argv[outputIndex + 1]);
+  let result;
+  if (busOnly) result = { diagnosticSchema: 'atlas-bus-only-capacity-diagnostic-v1', diagnosticOnly: true, productionEligible: false, bus: await measurePublicationTree(path.join(candidateSite, 'atlas', 'data', 'bus')), tnds: null };
+  else {
+    const configArg = option('--config');
+    const banksArg = option('--banks-json');
+    if (!configArg || !banksArg) throw new Error('Full candidate measurement requires --config and --banks-json to measure the actual inactive TNDS bank.');
+    const activeConfig = JSON.parse(await fs.readFile(path.resolve(configArg), 'utf8'));
+    const banks = JSON.parse(banksArg);
+    if (!Array.isArray(banks)) throw new Error('Configured TNDS banks must be a JSON array.');
+    const candidateBank = selectOppositeTndsBank(activeConfig.datasets?.tnds?.activeBank ?? null, banks);
+    if (!candidateBank?.id || !Array.isArray(candidateBank.roots) || !candidateBank.roots.length) throw new Error('The inactive TNDS bank does not have configured roots for capacity measurement.');
+    result = await measureCandidateDatasets(candidateSite, { rootIds: candidateBank.roots.map(root => String(root.id)) });
+    result.tnds.candidateBankId = String(candidateBank.id);
+  }
+  if (outputArg) {
+    const output = path.resolve(outputArg);
     await fs.mkdir(path.dirname(output), { recursive: true });
     await fs.writeFile(output, `${JSON.stringify(result, null, 2)}\n`);
   }

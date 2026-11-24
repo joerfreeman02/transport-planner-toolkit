@@ -21,7 +21,7 @@ export async function artifactTreeSha256(root) {
   return sha256(files.join(''));
 }
 
-export function createReleaseIdentity({ applicationSha, version, build, dataSources, dataStatus, busManifest, tndsManifests, ibusManifest, ibusIndex }) {
+export function createReleaseIdentity({ applicationSha, version, build, dataSources, dataStatus, busManifest, tndsManifests, nptgManifest = null, ibusManifest, ibusIndex }) {
   if (!validCommit(applicationSha)) throw new Error('Application commit SHA must be a full 40-character Git SHA.');
   const supportedBuild = (version === '2.0.0-beta.2' && /^ATLAS-2\.0\.0-beta\.2-[0-9]{8}$/.test(String(build)))
     || (version === '2.0.0-beta.1' && build === 'ATLAS-2.0.0-beta.1-20261025');
@@ -29,6 +29,7 @@ export function createReleaseIdentity({ applicationSha, version, build, dataSour
   if (dataSources?.schema !== 'atlas-data-sources-v2') throw new Error('A published atlas-data-sources-v2 configuration is required.');
   if (!dataSources.publicationVersion || !dataStatus || !dataSources.datasets?.bus?.baseUrl || !(dataSources.datasets?.tnds?.activeRoots?.length || dataSources.datasets?.tnds?.roots?.length)) throw new Error('Published Bus, TNDS and data-status identities are incomplete.');
   if (!busManifest || !tndsManifests?.length || !ibusManifest || !ibusIndex) throw new Error('Bus, TNDS, iBus manifest and iBus index evidence are all required.');
+  if (dataSources.datasets?.nptg && !nptgManifest) throw new Error('Configured NPTG dataset is missing its manifest evidence.');
   return {
     schema: 'atlas-release-identity-v1',
     application: { version, build, commitSha: applicationSha.toLowerCase() },
@@ -39,6 +40,7 @@ export function createReleaseIdentity({ applicationSha, version, build, dataSour
       dataSourcesSha256: sha256(normaliseJson(dataSources)),
       busManifestSha256: sha256(normaliseJson(busManifest)),
       tndsManifestSha256: tndsManifests.map(manifest => sha256(normaliseJson(manifest))).sort(),
+      nptgManifestSha256: nptgManifest ? sha256(normaliseJson(nptgManifest)) : null,
       ibusManifestSha256: sha256(normaliseJson(ibusManifest)),
       ibusIndexSha256: sha256(normaliseJson(ibusIndex))
     }
@@ -50,13 +52,14 @@ export function assertApplicationPinned(previous, next) {
   for (const key of ['version', 'build', 'commitSha']) {
     if (previous.application?.[key] !== next.application?.[key]) throw new Error(`Data-refresh would replace approved application ${key}.`);
   }
+  if (!Object.hasOwn(next.data ?? {}, 'nptgManifestSha256')) throw new Error('Data-refresh publication identity omits its NPTG manifest field.');
   if (!next.data?.publicationVersion || !next.data?.dataStatusSha256 || !next.data?.dataSourcesSha256 || !next.data?.busManifestSha256 || !next.data?.tndsManifestSha256?.length || !next.data?.ibusManifestSha256 || !next.data?.ibusIndexSha256) throw new Error('Data-refresh publication identity is incomplete.');
   return true;
 }
 
 export function assertAppOnlyPreservesData(previous, next) {
   if (previous?.schema !== 'atlas-release-identity-v1' || next?.schema !== 'atlas-release-identity-v1') throw new Error('Release identity schema mismatch.');
-  for (const key of ['publicationVersion', 'currentness', 'dataStatusSha256', 'dataSourcesSha256', 'busManifestSha256', 'ibusManifestSha256', 'ibusIndexSha256']) {
+  for (const key of ['publicationVersion', 'currentness', 'dataStatusSha256', 'dataSourcesSha256', 'busManifestSha256', 'nptgManifestSha256', 'ibusManifestSha256', 'ibusIndexSha256']) {
     if (previous.data?.[key] !== next.data?.[key]) throw new Error(`Application-only release would change approved data ${key}.`);
   }
   if (JSON.stringify(previous.data?.tndsManifestSha256) !== JSON.stringify(next.data?.tndsManifestSha256)) throw new Error('Application-only release would change approved TNDS manifest identities.');
@@ -83,9 +86,9 @@ async function copyOverlay(source, target, prefix = '') {
   }
 }
 
-export async function assembleAppOnlyArtifact({ appRoot, snapshotRoot, outputRoot, expectedApplicationSha, version, build, dataSources, dataStatus, busManifest, tndsManifests, ibusManifest, ibusIndex }) {
+export async function assembleAppOnlyArtifact({ appRoot, snapshotRoot, outputRoot, expectedApplicationSha, version, build, dataSources, dataStatus, busManifest, tndsManifests, nptgManifest = null, ibusManifest, ibusIndex }) {
   if (!validCommit(expectedApplicationSha)) throw new Error('Expected application SHA is required.');
-  const identity = createReleaseIdentity({ applicationSha: expectedApplicationSha, version, build, dataSources, dataStatus, busManifest, tndsManifests, ibusManifest, ibusIndex });
+  const identity = createReleaseIdentity({ applicationSha: expectedApplicationSha, version, build, dataSources, dataStatus, busManifest, tndsManifests, nptgManifest, ibusManifest, ibusIndex });
   await fs.rm(outputRoot, { recursive: true, force: true });
   await fs.mkdir(outputRoot, { recursive: true });
   // Rebuild app code from the exact checkout, while preserving accepted root data/config from the snapshot.
@@ -101,7 +104,7 @@ export async function assembleAppOnlyArtifact({ appRoot, snapshotRoot, outputRoo
     try { await fs.copyFile(path.join(appRoot, relative), path.join(outputRoot, relative)); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
   // Carry only the accepted live source configuration and iBus/static freshness records from the snapshot.
-  for (const relative of ['atlas/config/atlas-data-sources.json', 'atlas/config/atlas-data-sources.mjs', 'atlas/data/status', 'atlas/data/tfl-ibus']) {
+  for (const relative of ['atlas/config/atlas-data-sources.json', 'atlas/config/atlas-data-sources.mjs', 'atlas/data/status', 'atlas/data/tfl-ibus', ...(nptgManifest ? ['atlas/data/nptg'] : [])]) {
     const from = path.join(snapshotRoot, relative);
     try { await fs.access(from); } catch { throw new Error(`Accepted data snapshot is missing ${relative}.`); }
     const to = path.join(outputRoot, relative);

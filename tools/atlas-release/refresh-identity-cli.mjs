@@ -9,6 +9,7 @@ const readManifest = async relative => JSON.parse(await fs.readFile(path.join(ma
 const prior = JSON.parse(await fs.readFile(priorIdentityPath, 'utf8'));
 const sources = await read('atlas/config/atlas-data-sources.json');
 const bus = await readManifest('atlas/data/bus/manifest.json');
+const nptg = sources.datasets?.nptg ? await readManifest('atlas/data/nptg/manifest.json') : null;
 const status = await read('atlas/data/status/manifest.json');
 const ibus = await read('atlas/data/tfl-ibus/manifest.json');
 const index = await read(path.join('atlas/data/tfl-ibus', ibus.indexPath));
@@ -29,6 +30,7 @@ const next = createReleaseIdentity({
   dataStatus: status,
   busManifest: bus,
   tndsManifests: tnds,
+  nptgManifest: nptg,
   ibusManifest: ibus,
   ibusIndex: index
 });

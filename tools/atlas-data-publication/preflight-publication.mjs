@@ -10,6 +10,9 @@ export const DEFAULT_REPOSITORY_SIZE_LIMIT_BYTES = 3_000_000_000;
 export const SITE_HEALTH_MARKER_FILE = 'atlas-publication-site.json';
 export const SITE_HEALTH_MARKER_SCHEMA = 'atlas-publication-site-v1';
 const REPOSITORY_CONTRACT = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const TNDS_REGIONS = Object.freeze(['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y']);
+const MIN_TNDS_ROOTS_PER_BANK = 3;
+const MAX_TNDS_ROOTS_PER_BANK = 8;
 
 function repositoryRemote(repository) { return publicRemote(`https://github.com/${repository}.git`); }
 function unique(values) { return new Set(values).size === values.length; }
@@ -58,29 +61,60 @@ function synchronousContractChecks({ busRepository, busSiteUrl, banks, activeCon
   const bankIds = banks.map(bank => String(bank?.id ?? ''));
   if (bankIds.some(id => !id)) errors.push('Every TNDS bank must have a non-empty id.');
   if (!unique(bankIds)) errors.push('TNDS bank IDs must be unique.');
+  if (banks.length === 2 && (bankIds.length !== 2 || !['A', 'B'].every(id => bankIds.includes(id)))) errors.push('TNDS publication banks must be the distinct A and B banks.');
   const rootIds = [];
   const repositories = [String(busRepository ?? '').toLowerCase()];
   const sites = [];
+  const rootsByBank = new Map();
   try { sites.push(validatePagesContract(busSiteUrl, busRepository, 'ATLAS_BUS_DATA_SITE_URL')); } catch {}
   for (const bank of banks) {
+    const bankId = String(bank?.id ?? '');
     const roots = Array.isArray(bank?.roots) ? bank.roots : [];
-    if (roots.length !== 3) errors.push(`TNDS bank ${bank?.id ?? '<missing>'} must contain exactly three roots.`);
+    if (roots.length < MIN_TNDS_ROOTS_PER_BANK || roots.length > MAX_TNDS_ROOTS_PER_BANK) errors.push(`TNDS bank ${bankId || '<missing>'} must configure between ${MIN_TNDS_ROOTS_PER_BANK} and ${MAX_TNDS_ROOTS_PER_BANK} roots.`);
+    const assignedRegions = [];
     for (const root of roots) {
       const rootId = String(root?.id ?? '');
       const repository = String(root?.repository ?? '');
       rootIds.push(rootId);
       if (!rootId) errors.push(`TNDS bank ${bank?.id ?? '<missing>'} contains a root without an id.`);
+      if (bankId && !new RegExp(`^${bankId}[1-8]$`).test(rootId)) errors.push(`TNDS bank ${bankId} root ${rootId || '<missing>'} must use an explicit ${bankId}1–${bankId}8 root identity.`);
       if (!REPOSITORY_CONTRACT.test(repository)) errors.push(`TNDS root ${rootId || '<missing>'} must use the owner/repository contract.`);
       if (repository.toLowerCase() === String(toolkitRepository).toLowerCase()) errors.push(`TNDS root ${rootId || '<missing>'} must not point to transport-planner-toolkit itself.`);
       repositories.push(repository.toLowerCase());
       try { sites.push(validatePagesContract(root?.siteUrl ?? root?.baseUrl, repository, `TNDS ${bank?.id ?? '<missing>'}/${rootId || '<missing>'} site URL`)); } catch (error) { errors.push(error.message); }
+      if (!Array.isArray(root?.regions) || root.regions.length === 0) errors.push(`TNDS root ${rootId || '<missing>'} must declare at least one authoritative region.`);
+      else {
+        const regions = root.regions.map(region => String(region).toUpperCase());
+        if (!unique(regions)) errors.push(`TNDS root ${rootId || '<missing>'} contains a duplicated region assignment.`);
+        for (const region of regions) {
+          if (!TNDS_REGIONS.includes(region)) errors.push(`TNDS root ${rootId || '<missing>'} contains unsupported region ${region}.`);
+          assignedRegions.push(region);
+        }
+      }
     }
+    rootsByBank.set(bankId, roots);
+    if (assignedRegions.length !== TNDS_REGIONS.length || !unique(assignedRegions) || TNDS_REGIONS.some(region => !assignedRegions.includes(region))) errors.push(`TNDS bank ${bankId || '<missing>'} must assign each authoritative region exactly once (${TNDS_REGIONS.join(', ')}).`);
   }
   if (!unique(rootIds)) errors.push('TNDS root IDs must be unique across both banks.');
   if (!unique(repositories)) errors.push('Publication repository identities must be unique, including the Bus repository.');
   if (!unique(sites)) errors.push('Public publication site URLs must be unique.');
   const activeBank = activeConfig?.datasets?.tnds?.activeBank ?? null;
   if (activeBank !== null && !bankIds.includes(String(activeBank))) errors.push(`Currently deployed active TNDS bank ${activeBank} is absent from ATLAS_TNDS_BANKS_JSON.`);
+  if (activeBank !== null && bankIds.includes(String(activeBank))) {
+    const configuredActiveRoots = rootsByBank.get(String(activeBank)) ?? [];
+    const deployedActiveRoots = activeConfig?.datasets?.tnds?.activeRoots ?? activeConfig?.datasets?.tnds?.roots ?? [];
+    const configuredById = new Map(configuredActiveRoots.map(root => [String(root.id), root]));
+    if (!Array.isArray(deployedActiveRoots) || deployedActiveRoots.length !== configuredActiveRoots.length) errors.push(`Currently deployed active TNDS roots do not match configured bank ${activeBank}.`);
+    for (const root of deployedActiveRoots) {
+      const configured = configuredById.get(String(root?.id ?? ''));
+      const configuredUrl = configured?.siteUrl ?? configured?.baseUrl;
+      const deployedUrl = root?.baseUrl ?? root?.siteUrl;
+      if (!configured || !configuredUrl || !deployedUrl || normaliseSiteUrl(deployedUrl).toLowerCase() !== normaliseSiteUrl(configuredUrl).toLowerCase()) errors.push(`Currently deployed TNDS root ${root?.id ?? '<missing>'} does not match configured bank ${activeBank}.`);
+      const configuredRegions = [...(configured?.regions ?? [])].map(region => String(region).toUpperCase()).sort();
+      const deployedRegions = [...(root?.regions ?? [])].map(region => String(region).toUpperCase()).sort();
+      if (!configuredRegions.length || configuredRegions.length !== deployedRegions.length || configuredRegions.some((region, index) => region !== deployedRegions[index])) errors.push(`Currently deployed TNDS root ${root?.id ?? '<missing>'} region allocation does not match configured bank ${activeBank}.`);
+    }
+  }
   const candidateBank = activeBank === null ? banks[0] : banks.find(bank => String(bank.id) !== String(activeBank));
   if (!candidateBank) errors.push('The inactive/candidate TNDS bank is not unambiguous.');
   const activeSites = new Set((activeConfig?.datasets?.tnds?.activeRoots ?? activeConfig?.datasets?.tnds?.roots ?? []).map(root => String(root.baseUrl ?? '').replace(/\/$/, '').toLowerCase()));

@@ -27,6 +27,8 @@ await fs.mkdir(path.join(busRoot, 'services'), { recursive: true });
 await fs.mkdir(path.join(tndsRoot, 'services'), { recursive: true });
 await fs.mkdir(path.join(candidate, 'atlas', 'data', 'status'), { recursive: true });
 await fs.mkdir(path.join(candidate, 'atlas', 'config'), { recursive: true });
+const measurementConfig = path.join(temp, 'measurement-config.json');
+await fs.writeFile(measurementConfig, JSON.stringify({ schema: 'atlas-data-sources-v2', publicationVersion: 'fixture', datasets: { tnds: { activeBank: 'B' } } }));
 await fs.writeFile(path.join(busRoot, 'manifest.json'), JSON.stringify({ schema: 'atlas-prepared-bus-data-v1', generatedAt, refreshAfterDays: 8, serviceShards: { fixture: ['services/bus.json'] } }));
 await fs.writeFile(path.join(busRoot, 'services', 'bus.json'), 'synthetic-bus-candidate');
 await fs.writeFile(path.join(tndsRoot, 'manifest.json'), JSON.stringify({ schema: 'atlas-prepared-bus-tnds-v1', generatedAt, expectedRegions: TNDS_REGIONS, regions: TNDS_REGIONS, serviceShards: Object.fromEntries(TNDS_REGIONS.map(region => [region, [`services/national-${region}.json`]])) }));
@@ -39,7 +41,8 @@ const tndsMeasurement = await measurePublicationTree(tndsRoot);
 await fs.writeFile(path.join(candidate, 'atlas', 'config', 'atlas-candidate-measurement.json'), JSON.stringify({ diagnosticSchema: 'atlas-publication-capacity-diagnostic-v3', bus: { sha256: busMeasurement.sha256, fitsSafeLimit: true }, tnds: { sha256: tndsMeasurement.sha256, proposedPublication: { allRootsFitSafeLimit: true } } }));
 
 const runCheckpointCli = args => execFileAsync(process.execPath, [checkpointCli, ...args], { cwd: root, maxBuffer: 10 * 1024 * 1024 });
-await execFileAsync(process.execPath, [measureCli, '--candidate-site', candidate, '--output', path.join(candidate, 'atlas', 'config', 'atlas-candidate-measurement.json')], { cwd: root, maxBuffer: 10 * 1024 * 1024 });
+const measurementBanks = ['A', 'B'].map(bankId => ({ id: bankId, roots: ['1', '2', '3'].map(rootId => ({ id: `${bankId}${rootId}` })) }));
+await execFileAsync(process.execPath, [measureCli, '--candidate-site', candidate, '--output', path.join(candidate, 'atlas', 'config', 'atlas-candidate-measurement.json'), '--config', measurementConfig, '--banks-json', JSON.stringify(measurementBanks)], { cwd: root, maxBuffer: 10 * 1024 * 1024 });
 const capacity = await runCheckpointCli(['--capacity-only', '--candidate-site', candidate]);
 assert.match(capacity.stdout, /"ok": true/);
 const timestamp = await runCheckpointCli(['--timestamp-only', '--candidate-site', candidate]);
@@ -70,7 +73,8 @@ if (!restored.ok) acquisitionAttempts += 1;
 assert.equal(acquisitionAttempts, 0, 'a verified cross-run restore must skip national acquisition');
 
 const repository = id => path.join(temp, 'repositories', id);
-const banks = ['A', 'B'].map(bankId => ({ id: bankId, roots: ['1', '2', '3'].map(rootId => ({ id: `${bankId}${rootId}`, repository: repository(`${bankId}${rootId}`), siteUrl: `https://${bankId.toLowerCase()}${rootId}.example.test/` })) }));
+const recoveryRegions = [['EA', 'EM', 'NE'], ['NW', 'SE'], ['SW', 'WM', 'Y']];
+const banks = ['A', 'B'].map(bankId => ({ id: bankId, roots: ['1', '2', '3'].map((rootId, index) => ({ id: `${bankId}${rootId}`, repository: repository(`${bankId}${rootId}`), siteUrl: `https://${bankId.toLowerCase()}${rootId}.example.test/`, regions: recoveryRegions[index] })) }));
 const prepared = await preparePublications({ candidateSite: currentCandidate, busRepository: repository('bus'), tndsBanks: banks, candidateTndsBank: 'A', publicationVersion: `${currentRunId}-${currentSha}`, generatedAt: restored.checkpoint.identity.candidateGenerationTimestamp, busSiteUrl: 'https://bus.example.test/', activeBusSlot: 'slot-a', configOutput: path.join(temp, 'publication-config', 'atlas-data-sources.mjs') });
 assert.equal(prepared.config.publicationVersion, `${currentRunId}-${currentSha}`);
 assert.equal(prepared.config.generatedAt, generatedAt);

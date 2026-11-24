@@ -56,7 +56,11 @@ export async function validatePublishedRoot({ dataset, baseUrl, expectedVersion,
   return { dataset, bankId: publicationManifest.bankId ?? null, rootId: publicationManifest.rootId ?? null, publicationVersion: publicationManifest.publicationVersion, manifest, publicationManifest, indexedPaths: new Set(files.map(file => file.path)), measured };
 }
 
-function configuredTndsRoots(config) { return config?.datasets?.tnds?.activeRoots?.length ? config.datasets.tnds.activeRoots : config?.datasets?.tnds?.roots?.length ? config.datasets.tnds.roots : [{ id: 'root-1', baseUrl: config.datasets.tnds.baseUrl }]; }
+function configuredTndsRoots(config) {
+  const roots = config?.datasets?.tnds?.activeRoots?.length ? config.datasets.tnds.activeRoots : config?.datasets?.tnds?.roots;
+  if (!Array.isArray(roots) || !roots.length || roots.some(root => !root?.id || !root?.baseUrl)) throw new Error('Candidate TNDS configuration must contain explicit active root identities and URLs.');
+  return roots;
+}
 
 export async function validatePublishedConfiguration({ config, fetchImpl = globalThis.fetch }) {
   if (!config?.publicationVersion) throw new Error('Candidate data-source configuration has no publication version.');

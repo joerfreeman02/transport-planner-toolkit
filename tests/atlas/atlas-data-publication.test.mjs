@@ -3,13 +3,14 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { allocateTndsPublicationRoots, allocateTndsRegions, assertPublicationFits, assertPublicationGitBlobsFit, measurePublicationTree, preparePublications, rollbackToOppositeBank, SAFE_GIT_BLOB_LIMIT_BYTES, SAFE_PUBLICATION_LIMIT_BYTES, SITE_HEALTH_MARKER_FILE, TNDS_REGIONS } from '../../tools/atlas-data-publication/publication.mjs';
+import { allocateTndsPublicationRoots, allocateTndsRegions, assertPublicationFits, assertPublicationGitBlobsFit, measureCandidateDatasets, measurePublicationTree, preparePublications, rollbackToOppositeBank, SAFE_GIT_BLOB_LIMIT_BYTES, SAFE_PUBLICATION_LIMIT_BYTES, SITE_HEALTH_MARKER_FILE, TNDS_REGIONS } from '../../tools/atlas-data-publication/publication.mjs';
 import { validatePublishedConfiguration } from '../../tools/atlas-data-publication/validate-publication.mjs';
 import { createAtlasDataSourceResolver } from '../../src/atlas/infrastructure/atlas-data-sources.mjs';
 
 const run22 = { EA: 60_883_253, EM: 275_641_976, NE: 110_188_604, NW: 414_171_929, SE: 519_315_700, SW: 359_859_025, WM: 307_380_041, Y: 273_746_344 };
 const run22Measurement = { files: [{ path: 'manifest.json', bytes: 24_599, sha256: 'common' }, ...TNDS_REGIONS.map(region => ({ path: `services/national-${region}.json.gz`, bytes: run22[region], sha256: region }))] };
 const allocation = allocateTndsPublicationRoots(run22Measurement, { rootIds: ['A1', 'A2', 'A3'] });
+assert.throws(() => allocateTndsPublicationRoots(run22Measurement), /explicit configured root identities/);
 assert.equal(allocation.roots.length, 3, 'Run #22 must fit the approved three-root candidate bank.');
 assert.ok(allocation.roots.every(root => root.projectedTotalPublicationFootprintBytes < SAFE_PUBLICATION_LIMIT_BYTES));
 assert.deepEqual(allocation.roots.flatMap(root => root.regions).sort(), [...TNDS_REGIONS].sort());
@@ -17,6 +18,20 @@ assert.equal(Object.keys(allocation.shardToRoot).length, 8);
 assert.equal(new Set(Object.keys(allocation.shardToRoot)).size, 8);
 assert.deepEqual(allocateTndsPublicationRoots(run22Measurement, { rootIds: ['A1', 'A2', 'A3'] }), allocation, 'Run #22 allocation must be deterministic.');
 assert.equal(Object.keys(allocateTndsRegions(run22Measurement, TNDS_REGIONS).regions).length, 8);
+
+const currentRegionBytes = { EA: 88_570_666, EM: 372_923_847, NE: 127_369_702, NW: 578_996_887, SE: 745_993_021, SW: 824_113_726, WM: 462_356_640, Y: 422_940_328 };
+const currentNationalSnapshot = { files: [
+  { path: 'manifest.json', bytes: 12_849_980, sha256: 'retained-common-metadata' },
+  ...TNDS_REGIONS.map(region => ({ path: `services/retained-${region}.json.gz`, bytes: currentRegionBytes[region], sha256: `retained-${region}` }))
+] };
+assert.throws(() => allocateTndsPublicationRoots(currentNationalSnapshot, { rootIds: ['A1', 'A2', 'A3'] }), /cannot contain the complete candidate/);
+assert.throws(() => allocateTndsPublicationRoots(currentNationalSnapshot, { rootIds: ['A1', 'A2', 'A3', 'A4'] }), /cannot contain the complete candidate/);
+const fiveRootRotation = allocateTndsPublicationRoots(currentNationalSnapshot, { rootIds: ['A1', 'A2', 'A3', 'A4', 'A5'] });
+assert.equal(fiveRootRotation.roots.length, 5);
+assert.ok(fiveRootRotation.roots.every(root => root.fit));
+assert.equal(fiveRootRotation.roots.find(root => root.regions.includes('SW')).projectedTotalPublicationFootprintBytes, 837_963_706);
+assert.equal(fiveRootRotation.roots.find(root => root.regions.includes('SW')).safetyMarginRemainingBytes, 62_036_294);
+assert.deepEqual(allocateTndsPublicationRoots(currentNationalSnapshot, { rootIds: ['A1', 'A2', 'A3', 'A4', 'A5'] }), fiveRootRotation, 'Retained manifest allocation must be deterministic at the minimum fitting bank size.');
 assert.throws(() => allocateTndsPublicationRoots({ files: [{ path: 'manifest.json', bytes: 1, sha256: 'x' }, ...['EA', 'EM', 'NE', 'NW'].map(region => ({ path: `services/${region}.json`, bytes: 450_000_000, sha256: region }))] }, { expectedRegions: ['EA', 'EM', 'NE', 'NW'], rootIds: ['A1', 'A2', 'A3'] }), /cannot contain the complete candidate/);
 assert.throws(() => assertPublicationFits({ bytes: SAFE_PUBLICATION_LIMIT_BYTES + 1, fileCount: 1 }, 'total site'), /safe bounded-publication limit/);
 assert.doesNotThrow(() => assertPublicationGitBlobsFit({ files: [{ path: 'services/national-SE.json.gz', bytes: 87_203_939 }] }, 'Run #22-scale TNDS root'));
@@ -32,6 +47,10 @@ await fs.writeFile(path.join(busRoot, 'manifest.json'), JSON.stringify({ schema:
 await fs.writeFile(path.join(busRoot, 'services', 'bus.json'), 'bus');
 await fs.writeFile(path.join(tndsRoot, 'manifest.json'), JSON.stringify({ schema: 'atlas-prepared-bus-tnds-v1', generatedAt: '2026-09-17T00:00:00Z', expectedRegions: TNDS_REGIONS, regions: TNDS_REGIONS, serviceShards: Object.fromEntries(TNDS_REGIONS.map(region => [region, [`services/national-${region}.json`]])) }));
 for (const region of TNDS_REGIONS) await fs.writeFile(path.join(tndsRoot, 'services', `national-${region}.json`), `tnds-${region}`);
+const configuredCandidateMeasure = await measureCandidateDatasets(candidate, { rootIds: ['A1', 'A2', 'A3', 'A4', 'A5'] });
+assert.deepEqual(configuredCandidateMeasure.proposedPublication.rootIds, ['A1', 'A2', 'A3', 'A4', 'A5']);
+assert.equal(configuredCandidateMeasure.proposedPublication.bankRootCount, 5);
+await assert.rejects(() => measureCandidateDatasets(candidate), /requires the configured inactive TNDS root identities/);
 
 const repo = id => path.join(temp, 'repos', id);
 const site = id => `https://${id.toLowerCase()}.example.test/`;

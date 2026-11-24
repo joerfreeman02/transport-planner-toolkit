@@ -203,37 +203,19 @@ jobs:
         working-directory: application
         run: |
           node tools/atlas-data-publication/fetch-last-known-good.mjs 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/' last-known-good
-          test -s last-known-good/atlas/config/atlas-data-sources.json
-          node --input-type=module - <<'JS'
-          import fs from 'node:fs/promises';
-          import path from 'node:path';
-          import { assertApprovedLiveDataIdentity, dataPublicationIdentity, verifyIbusFixture } from './tools/atlas-release/release-boundary.mjs';
-          const root='last-known-good';
-          const read=async p=>JSON.parse(await fs.readFile(path.join(root,p),'utf8'));
-          const sources=await read('atlas/config/atlas-data-sources.json');
-          const status=await read('atlas/data/status/manifest.json');
-          const bus=await read('atlas/data/bus/manifest.json');
-          const tnds=[];
-          async function walk(dir){for(const ent of await fs.readdir(dir,{withFileTypes:true})){const p=path.join(dir,ent.name);if(ent.isDirectory())await walk(p);else if(ent.name==='manifest.json')tnds.push(JSON.parse(await fs.readFile(p,'utf8')));}}
-          await walk(path.join(root,'atlas/data/bus-tnds'));
-          const ibusRoot=path.join(root,'atlas/data/tfl-ibus');
-          const pair=await verifyIbusFixture(ibusRoot);
-          const normalized=value=>`${JSON.stringify(value,null,2)}\n`;
-          const hash=async value=>{const {createHash}=await import('node:crypto');return createHash('sha256').update(normalized(value)).digest('hex');};
-          const identity=dataPublicationIdentity({dataSources:sources,dataStatus:status,busManifestSha256:await hash(bus),tndsManifestSha256:await Promise.all(tnds.map(hash)),ibusManifestSha256:await hash(pair.manifest),ibusIndexSha256:await hash(pair.index)});
-          const identitySha256=assertApprovedLiveDataIdentity(identity,process.env.APPROVED_LIVE_DATA_IDENTITY_SHA256);
-          console.log(`Approved live data publication identity verified: ${identitySha256}; publication=${identity.publicationVersion}; currentness=${identity.currentness}`);
-          JS
+          node tools/atlas-release/app-only-data-preflight.mjs --snapshot-root last-known-good --application-sha "$APP_SHA" --approved-data-identity-sha256 "$APPROVED_LIVE_DATA_IDENTITY_SHA256"
           cp last-known-good/atlas/config/atlas-data-sources.json "$CANDIDATE_SITE/atlas/config/atlas-data-sources.json"
+          cp last-known-good/atlas/config/atlas-data-sources.mjs "$CANDIDATE_SITE/atlas/config/atlas-data-sources.mjs"
           cp last-known-good/atlas/data/status/manifest.json "$CANDIDATE_SITE/atlas/data/status/manifest.json"
           rm -rf "$CANDIDATE_SITE/atlas/data/bus" "$CANDIDATE_SITE/atlas/data/bus-tnds"
           mkdir -p "$CANDIDATE_SITE/atlas/data/bus" "$CANDIDATE_SITE/atlas/data/bus-tnds"
           cp last-known-good/atlas/data/bus/manifest.json "$CANDIDATE_SITE/atlas/data/bus/manifest.json"
+          cp last-known-good/atlas/data/bus/publication-manifest.json "$CANDIDATE_SITE/atlas/data/bus/publication-manifest.json"
           cp -a last-known-good/atlas/data/bus-tnds/. "$CANDIDATE_SITE/atlas/data/bus-tnds/"
+          rm -rf "$CANDIDATE_SITE/atlas/data/nptg"
+          cp -a last-known-good/atlas/data/nptg "$CANDIDATE_SITE/atlas/data/nptg"
           rm -rf "$CANDIDATE_SITE/atlas/data/tfl-ibus"
           cp -a last-known-good/atlas/data/tfl-ibus "$CANDIDATE_SITE/atlas/data/tfl-ibus"
-          node --input-type=module -e "import fs from 'node:fs'; import {renderAtlasDataSourcesModule} from './tools/atlas-data-publication/publication.mjs'; const c=JSON.parse(fs.readFileSync('last-known-good/atlas/config/atlas-data-sources.json')); fs.writeFileSync(process.env.CANDIDATE_SITE+'/atlas/config/atlas-data-sources.mjs',renderAtlasDataSourcesModule(c));"
-          node tools/atlas-data-publication/preflight-publication.mjs --config "$CANDIDATE_SITE/atlas/config/atlas-data-sources.json"
       - name: Assemble application-only artifact and record proposed Beta.2 identity
         id: identity
         working-directory: application
@@ -259,10 +241,11 @@ jobs:
           const dataSources=await read('atlas/config/atlas-data-sources.json');
           const busManifest=await read('atlas/data/bus/manifest.json');
           const dataStatus=await read('atlas/data/status/manifest.json');
+          const nptgManifest=await read('atlas/data/nptg/manifest.json');
           const canonicalHash=value=>createHash('sha256').update(`${JSON.stringify(value,null,2)}\n`).digest('hex');
-          const liveIdentity=dataPublicationIdentity({dataSources,dataStatus,busManifestSha256:canonicalHash(busManifest),tndsManifestSha256:manifests.map(canonicalHash),ibusManifestSha256:canonicalHash(ibusManifest),ibusIndexSha256:canonicalHash(ibusIndex)});
+          const liveIdentity=dataPublicationIdentity({dataSources,dataStatus,busManifestSha256:canonicalHash(busManifest),tndsManifestSha256:manifests.map(canonicalHash),nptgManifestSha256:canonicalHash(nptgManifest),ibusManifestSha256:canonicalHash(ibusManifest),ibusIndexSha256:canonicalHash(ibusIndex)});
           assertApprovedLiveDataIdentity(liveIdentity,process.env.APPROVED_LIVE_DATA_IDENTITY_SHA256);
-          await assembleAppOnlyArtifact({appRoot:'.',snapshotRoot:root,outputRoot:'pages-site',expectedApplicationSha:process.env.APP_SHA,version:'2.0.0-beta.2',build:process.env.BUILD,dataSources,dataStatus,busManifest,tndsManifests:manifests,ibusManifest,ibusIndex});
+          await assembleAppOnlyArtifact({appRoot:'.',snapshotRoot:root,outputRoot:'pages-site',expectedApplicationSha:process.env.APP_SHA,version:'2.0.0-beta.2',build:process.env.BUILD,dataSources,dataStatus,busManifest,tndsManifests:manifests,nptgManifest,ibusManifest,ibusIndex});
           const artifactIdentity=JSON.parse(await fs.readFile('pages-site/atlas/config/atlas-release-identity.json','utf8'));
           if(artifactIdentity.application.commitSha!==process.env.APP_SHA) throw new Error('Assembled Pages artifact application SHA differs from the tested checkout.');
           if(JSON.stringify(artifactIdentity.data)!==JSON.stringify(liveIdentity)) throw new Error('Assembled Pages artifact data identity differs from the separately approved live data identity.');
@@ -317,6 +300,7 @@ jobs:
           def digest(value): return hashlib.sha256((json.dumps(value,indent=2)+'\n').encode()).hexdigest()
           if digest(config)!=data.get('dataSourcesSha256'): raise SystemExit('Published data-source configuration changed during the app-only release.')
           if digest(status)!=data.get('dataStatusSha256'): raise SystemExit('Published data-status manifest changed during the app-only release.')
+          if status.get('diagnosticOnly') is not False or status.get('productionEligible') is not True or status.get('publicationEligible') is not True or status.get('plannerEligible') is not True: raise SystemExit('Published data no longer meets production eligibility requirements.')
           if (status.get('generatedAt') or status.get('snapshotDate') or status.get('candidateGeneratedAt'))!=data.get('currentness'): raise SystemExit('Published data currentness changed during the app-only release.')
           base='https://joerfreeman02.github.io/transport-planner-toolkit/atlas/'
           def get_json(url):
@@ -330,5 +314,9 @@ jobs:
           if digest(ibus)!=data.get('ibusManifestSha256'): raise SystemExit('Published iBus manifest changed during app-only release.')
           index=get_json(urllib.parse.urljoin(base+'data/tfl-ibus/',ibus['indexPath']))
           if digest(index)!=data.get('ibusIndexSha256'): raise SystemExit('Published iBus index changed during app-only release.')
-          print('Published application and preserved Bus/TNDS/iBus identities match the authorized release manifest.')
+          nptg=config.get('datasets',{}).get('nptg') or {}
+          if not nptg.get('baseUrl'): raise SystemExit('Published NPTG dataset is missing from the production configuration.')
+          nptg_manifest=get_json(urllib.parse.urljoin(urllib.parse.urljoin(cfgbase,nptg['baseUrl']),nptg.get('manifest','manifest.json')))
+          if digest(nptg_manifest)!=data.get('nptgManifestSha256'): raise SystemExit('Published NPTG manifest changed during app-only release.')
+          print('Published application and preserved Bus/TNDS/NPTG/iBus identities match the authorized release manifest.')
           PY

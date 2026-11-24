@@ -85,7 +85,8 @@ export async function validateAppOnlyDataSnapshot({ snapshotRoot, approvedDataId
   const sources = await readJson(root, 'atlas/config/atlas-data-sources.json');
   if (sources.schema !== 'atlas-data-sources-v2' || !sources.publicationVersion) throw new Error('Approved data-source configuration schema or publication identity is invalid.');
   const sourcesModulePath = path.join(root, 'atlas/config/atlas-data-sources.mjs');
-  const sourcesModule = await import(`${pathToFileURL(sourcesModulePath).href}?preflight=${Date.now()}`);
+  const sourcesModuleBytes = await fs.readFile(sourcesModulePath);
+  const sourcesModule = await import(`${pathToFileURL(sourcesModulePath).href}?preflight=${sha256(sourcesModuleBytes)}`);
   if (jsonHash(sourcesModule.atlasDataSources) !== jsonHash(sources)) throw new Error('JSON and JavaScript data-source configurations disagree.');
   const status = await readJson(root, 'atlas/data/status/manifest.json');
   const freshness = requireProductionEligibility(status, now, maxAgeDays);

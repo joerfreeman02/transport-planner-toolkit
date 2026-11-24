@@ -6,6 +6,8 @@
 **Implementation checkpoint:** `355b735daaaeb0850e8869e414955b5e7f9ced03` (parent `bf497b953a848525b67b646798cc48858680a200`).
 **Exact-SHA hosted validation:** [Run 45430128275](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45430128275) passed for `355b735daaaeb0850e8869e414955b5e7f9ced03`. The documentation closeout commit is validated again by the branch workflow on its exact pushed SHA.
 
+The later documentation closeout run [45431392085](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45431392085) exposed a nondeterministic module-import cache key in the new preflight test: rapid successive calls could reuse the prior `Date.now()` key. The validator now keys module imports from the source-module content digest. Focused app-only preflight, release-identity, workflow-contract, syntax and whitespace checks pass locally after this correction; its hosted exact-SHA rerun is pending.
+
 ## Scope and protection boundaries
 
 AU-1 implements the approved updater infrastructure corrections only. It does not change Bus assessment behavior, production version/build metadata, national source data, AU-0, Beta.2, PR #56, or `main`. The new exact-SHA workflow is branch-scoped, read-only, and does not use credentials, acquire national sources, publish data, or deploy Pages. The Product Owner's restriction on desktop and visible-browser interaction was observed; no Computer Use was performed.
@@ -49,9 +51,9 @@ The full deterministic Node suite passed locally (`pnpm test:atlas`) against the
 | `publication-lifecycle.integration.test.mjs` | Passed locally with isolated temporary Git remotes: activation only after complete verification, stale-aware bank rotation, and failed candidate leaves the active bank unchanged. |
 | Full `pnpm test:atlas` | Passed locally against immutable Run #75 roots: `ATLAS Alpha.15 deterministic suite passed`. |
 | Python static-index test | Hosted Ubuntu Python 3.11 passed in Run 45430128275; local Python 3.11 is unavailable. |
-| Exact-SHA GitHub-hosted validation | Passed: [Run 45430128275](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45430128275), exact source SHA `355b735daaaeb0850e8869e414955b5e7f9ced03`; immutable Run #75, full Node suite, focused lifecycle/recovery/release checks, and Python all passed. |
+| Exact-SHA GitHub-hosted validation | Passed on initial implementation SHA `355b735daaaeb0850e8869e414955b5e7f9ced03` ([Run 45430128275](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45430128275)). The subsequent exact-SHA documentation run found the cache-key defect described above; hosted revalidation of the correction is pending. |
 
-**First AU-1 checkpoint:** `355b735daaaeb0850e8869e414955b5e7f9ced03`; exact-SHA hosted validation passed. The subsequent handover-only commit is revalidated by the same branch-scoped workflow.
+**First AU-1 checkpoint:** `355b735daaaeb0850e8869e414955b5e7f9ced03`; hosted validation passed, and a follow-up exact-SHA run exposed the cache-key issue subsequently corrected. Current final correction SHA and hosted outcome are recorded in the completion response.
 
 ## Source limitations and outstanding release blockers
 

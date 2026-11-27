@@ -92,7 +92,7 @@ class IbusSourceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             source = builder.Source(Path(temporary))
             cached = source.local_path("Base_Version.xml")
-            cached.parent.mkdir(parents=True)
+            cached.parent.mkdir(parents=True, exist_ok=True)
             cached.write_text("stale", encoding="utf-8")
             with patch("urllib.request.urlopen", return_value=Response(b"fresh metadata")) as opened:
                 path, cache_hit = source.get("Base_Version.xml", public_root=True, refresh=True)

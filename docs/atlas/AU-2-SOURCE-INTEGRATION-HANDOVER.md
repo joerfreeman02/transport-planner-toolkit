@@ -3,7 +3,7 @@
 **Date:** 27 November 2026
 **Starting checkpoint:** `1ef6ac6b367702b41d5386c39e18123727a3b3fc`
 **Working branch:** `codex/atlas-auto-updater-au2-20261127`
-**State:** implementation checkpoint committed locally; no hosted exact-SHA validation yet.
+**State:** AU-2 branch pushed; a hosted test-fixture correction is in progress.
 
 ## Summary and safety boundary
 
@@ -70,11 +70,11 @@ Passed locally:
 Not completed:
 
 - The Python iBus source unit test could not run locally because `python.exe` resolves to the disabled Microsoft Store alias and no Python interpreter is installed in the available paths. The branch-scoped AU-2 workflow provisions Python 3.11 and runs the test.
-- Exact-SHA GitHub Actions validation cannot exist until the AU-2 commit is pushed. No push was completed in this session.
+- Exact-SHA GitHub Actions Run [45967968981](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45967968981) verified commit `ac399c05529a788d18cd5dfe5ded2a34c2c11891`. The complete deterministic ATLAS suite, publication/recovery checks, immutable Run #75 restore, and offline static-index Python suite passed. The new iBus test step exposed a fixture setup error: its test attempted `mkdir()` on the already-created `TemporaryDirectory`. The fixture now uses `exist_ok=True`; an exact-SHA rerun is pending.
 - Fresh iBus inventory, archive acquisition, current candidate preparation, complete candidate-derived service-line selection, and source-complete release eligibility remain outstanding.
 - A4/A5 creation, Pages/access configuration, and publication-credential access verification remain outstanding for the sign-in/tooling reasons above.
 
-The Python test and exact-SHA hosted workflow remain outstanding. The full local deterministic Node/Chromium suite passed against the frozen Run #75 roots; no source refresh or national acquisition was performed.
+The corrected iBus source unit test and exact-SHA hosted rerun remain outstanding. The full local and hosted deterministic Node/Chromium suites passed against the frozen Run #75 roots; no source refresh or national acquisition was performed.
 
 ## IET / UK-SPEC handover
 

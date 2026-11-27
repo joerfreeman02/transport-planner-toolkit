@@ -135,7 +135,14 @@ def main() -> int:
     payload = json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
     args.output.write_text(payload, encoding="utf-8")
     report["reportSha256"] = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    print(json.dumps({key: report[key] for key in ("assessmentDate", "baseVersion", "validFrom", "validTo", "completeOfficialServiceLineCount", "productivePatternCount", "productiveStopReferenceCount", "unresolvedStopReferenceCount", "unresolvedStopPointIdCount", "unresolvedPatternCount", "downloadedObjectCount", "downloadedBytes", "sourceContractResult", "reportSha256")}, sort_keys=True))
+    print(json.dumps({key: report[key] for key in (
+        "assessmentDate", "baseVersion", "validFrom", "validTo",
+        "completeOfficialServiceLineCount", "productivePatternCount",
+        "productiveStopReferenceCount", "unresolvedStopReferenceCount",
+        "unresolvedStopPointIdCount", "unresolvedPatternCount",
+        "unresolvedStopReferences", "sourceObjects", "downloadedObjectCount",
+        "downloadedBytes", "sourceContractResult", "reportSha256",
+    )}, sort_keys=True))
     return 0
 
 

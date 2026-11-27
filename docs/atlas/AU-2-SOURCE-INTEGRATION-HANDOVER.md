@@ -9,7 +9,9 @@
 
 AU-2 continues AU-1. It adds a separately versioned NPTG locality publication/runtime path and hardens the bounded TfL iBus source builder. It does not refresh national data, download a TfL archive, activate a data pointer, rotate TNDS banks, change production version/build, or deploy. The running/live bank B and all existing repositories remain untouched by this worktree.
 
-The supplementary authorization requested two additional public Pages repositories, `atlas-tnds-a4` and `atlas-tnds-a5`. B4 and B5 are public, and both expose `main` and `pages-publish` branches; the existing user collaborator permission is admin. Repository creation and Pages/access configuration did not occur. GitHub UI presented an account sign-in transition and the Computer Use security review denied browser takeover because the sign-in origin was `accounts.google.com`; the skill disallows changing browser surfaces to work around that decision. The GitHub connector has no repository-creation or Pages-settings mutation tool. Native `gh` authentication was invalid and shell DNS resolution for GitHub failed. No alternate UI, CDP, or credential workaround was attempted.
+The Product Owner created public repositories `joerfreeman02/atlas-tnds-a4` (ID `1474205389`) and `joerfreeman02/atlas-tnds-a5` (ID `1474206081`). Both have an initialized `main` branch and a `pages-publish` branch. The latter contains an empty `.nojekyll` and `atlas-publication-site.json` with the same exact `{"schema":"atlas-publication-site-v1"}\n` marker used by B4/B5. The final branch heads are A4 `96459186b9a0f14df65eb1ecc310b050f4c12640` and A5 `f5103f156355669603f20d5239e85aee238efe40`. The connected GitHub account has `admin` collaborator permission on both repositories.
+
+The seed branches/files are provisioned, but GitHub Pages settings and publication credential access are not yet verified. The connector supports repository and branch/content reads but blocks the `/pages` settings endpoint and has no Pages settings mutation. A direct post-seed health-marker probe could not be repeated because this environment's DNS could not resolve `joerfreeman02.github.io`; the earlier probe observed HTTP 404 for A4/A5 while B4/B5 returned HTTP 200, so Pages publication should be treated as not yet operational until rechecked. The direct authenticated-browser route was not used. A narrowly scoped Actions check has been added to the AU-2 branch to use the existing `ATLAS_REFERENCE_DATA_TOKEN` only for `git push --dry-run` against an absent preflight ref on each repository; it verifies write access without creating a remote ref. Its result is pending the hosted run.
 
 The published NPTG adapter and candidate staging changes are inactive until a separately approved data publication changes the application data-source pointer. AU-2 local code does not change any live data routing.
 
@@ -41,19 +43,16 @@ The measured AU-1 topology work found five roots were the minimum practical capa
 
 This is a proposed, inactive bank configuration. It is not activated and does not change bank B or its rollback role. The exact root assignments must still pass deterministic allocation and the existing per-root, file, total-site, repository, health-marker and complete-region gates against a measured candidate.
 
-### Product Owner or administrator steps still required for A4 and A5
+### Remaining Product Owner or administrator steps for A4 and A5
 
 For each repository, using the existing B4/B5 repository controls as the model:
 
-1. Create a **public**, empty repository named `atlas-tnds-a4` or `atlas-tnds-a5` under `joerfreeman02`; do not fork B4/B5 or copy their data history.
-2. Create and push the `pages-publish` branch. Keep `main` as the repository default branch; do not publish from `main`.
-3. In repository **Settings → Pages**, publish from `pages-publish` at `/(root)`. Preserve the same public Pages contract used by B4/B5.
-4. Seed the branch with `.nojekyll` (empty file) and `atlas-publication-site.json` containing exactly `{"schema":"atlas-publication-site-v1"}`. The latter must be served from the repository Pages root.
-5. Grant the existing `ATLAS_REFERENCE_DATA_TOKEN` credential write access to both new repositories, with the same token type and least-privilege configuration currently used for B4/B5. Do not expose or paste the token value into the repository or handover.
-6. Verify repository visibility, `pages-publish`, Pages source branch/path, effective Pages URL, marker HTTP 200/schema, and token-based read/write access using the existing `checkout-bank.mjs` and publication preflight procedures. A successful admin permission check alone does not prove the workflow credential can publish.
-7. Add A4/A5 and the proposed region assignments to the **inactive** five-root A configuration, validate both banks and all eight regions, then stop before any active-bank pointer/configuration change.
+1. In each repository's **Settings → Pages**, choose **Deploy from a branch**, branch `pages-publish`, folder `/(root)`, and save. Keep `main` as the default branch.
+2. Wait for Pages deployment, then require HTTP 200 and exact marker content at each URL below. Compare the final Pages source settings and health behavior with B4/B5.
+3. Review the branch-scoped Actions check result. It uses the configured secret only for an authenticated `git push --dry-run`; no branch/ref is created. If it fails for missing secret or insufficient scope, grant the existing `ATLAS_REFERENCE_DATA_TOKEN` least-privilege Contents write access to A4 and A5, then rerun the check. Never expose or paste the token.
+4. The five-root Bank A structure has passed a structural-only `preflightPublication` check with the proposed assignments, five roots in both banks, all eight regions covered, and active bank B retained. This used placeholder probe/permission/site-health functions and a nonsecret structural test token; it does **not** prove remote repository health or a deployable measured candidate. Keep the configuration inactive and do not change the live `ATLAS_TNDS_BANKS_JSON`, active-bank pointer, or rollback data.
 
-Required evidence should record repository IDs, public/private visibility, Pages branch/path, marker URL and response, `pages-publish` branch SHA, repository permission result, and a publication-credential access check that never logs the token. The exact B4/B5 Pages settings and remote marker responses were not available through the GitHub connector's allowed reads during this run; compare the settings directly before declaring replication complete.
+Required closeout evidence is repository IDs/visibility, Pages branch/path, marker URL/status/content, `pages-publish` head, collaborator permission, and the token write-preflight result. The A4/A5 marker URLs are `https://joerfreeman02.github.io/atlas-tnds-a4/atlas-publication-site.json` and `https://joerfreeman02.github.io/atlas-tnds-a5/atlas-publication-site.json`.
 
 ## Validation record
 
@@ -67,12 +66,13 @@ Passed locally:
 - `git diff --check`.
 - `node tests/atlas/run-all.mjs` — passed end to end (`ATLAS Alpha.15 deterministic suite passed`) using the existing read-only `atlas-run75-regression` worktree roots for frozen Bus, TNDS, and iBus. Headless Chromium browser tests ran; the regression worktree was not modified.
 - GitHub Actions Run [45968581931](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45968581931) passed on exact SHA `6eac5b9bce8bcefba567e9c3793ff45c71b26340`: Run #75 artifact identity/restore, complete deterministic ATLAS suite, publication topology/lifecycle/recovery/release checks, all seven iBus source unit tests on Python 3.11, and all 21 static-index Python tests.
+- The new `atlas-au2-bank-a-access-check.yml` uses the existing publication secret only for authenticated, dry-run pushes to absent preflight refs on A4/A5. It checks that both refs remain absent after each dry-run; hosted result is pending.
 
 Not completed:
 
 - The Python iBus source unit test could not run locally because `python.exe` resolves to the disabled Microsoft Store alias; its corrected seven-test suite passed in the hosted Python 3.11 runner.
 - Fresh iBus inventory, archive acquisition, current candidate preparation, complete candidate-derived service-line selection, and source-complete release eligibility remain outstanding.
-- A4/A5 creation, Pages/access configuration, and publication-credential access verification remain outstanding for the sign-in/tooling reasons above.
+- A4/A5 repositories, `main`, `pages-publish`, and seed marker files are present. GitHub Pages branch/folder settings, post-deployment HTTP 200 checks, and the existing publication-secret write-preflight remain outstanding. No active A configuration has been changed.
 
 The full local and hosted deterministic Node/Chromium suites passed against the frozen Run #75 roots. The first hosted run found and the follow-up commit corrected only a Python test fixture directory-creation error; the corrected exact-SHA run passed. No source refresh or national acquisition was performed.
 

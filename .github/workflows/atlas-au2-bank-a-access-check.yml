@@ -1,0 +1,55 @@
+name: ATLAS AU-2 Bank A repository access check
+
+on:
+  push:
+    branches:
+      - codex/atlas-auto-updater-au2-20261127
+    paths:
+      - .github/workflows/atlas-au2-bank-a-access-check.yml
+      - docs/atlas/AU-2-SOURCE-INTEGRATION-HANDOVER.md
+
+permissions:
+  contents: read
+
+jobs:
+  publication-write-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out A4 publication branch
+        uses: actions/checkout@v4
+        with:
+          repository: joerfreeman02/atlas-tnds-a4
+          ref: pages-publish
+          path: bank/a4
+          token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+
+      - name: Check out A5 publication branch
+        uses: actions/checkout@v4
+        with:
+          repository: joerfreeman02/atlas-tnds-a5
+          ref: pages-publish
+          path: bank/a5
+          token: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+
+      - name: Verify write access without creating refs
+        shell: bash
+        env:
+          ATLAS_REFERENCE_DATA_TOKEN: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$ATLAS_REFERENCE_DATA_TOKEN"
+          for id in a4 a5; do
+            repo="bank/$id"
+            ref="refs/heads/atlas-au2-access-preflight"
+            if test -n "$(git -C "$repo" ls-remote --heads origin "$ref")"; then
+              echo "Ref already exists for $id; refusing to run a write preflight."
+              exit 1
+            fi
+            git -C "$repo" push --dry-run origin "HEAD:$ref"
+            if test -n "$(git -C "$repo" ls-remote --heads origin "$ref")"; then
+              echo "Dry-run unexpectedly created a remote ref for $id."
+              exit 1
+            fi
+            echo "$id: authenticated write preflight passed; no remote ref created."
+          done

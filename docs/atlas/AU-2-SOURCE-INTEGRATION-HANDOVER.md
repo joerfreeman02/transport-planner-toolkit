@@ -1,9 +1,9 @@
 # ATLAS Automatic Updater AU-2 — Source Integration and Candidate Readiness
 
-**Date:** 27 November 2026  
-**Starting checkpoint:** `1ef6ac6b367702b41d5386c39e18123727a3b3fc`  
-**Working branch:** `codex/atlas-auto-updater-au2-20261127`  
-**State:** local, uncommitted candidate; no hosted exact-SHA validation yet.
+**Date:** 27 November 2026
+**Starting checkpoint:** `1ef6ac6b367702b41d5386c39e18123727a3b3fc`
+**Working branch:** `codex/atlas-auto-updater-au2-20261127`
+**State:** implementation checkpoint committed locally; no hosted exact-SHA validation yet.
 
 ## Summary and safety boundary
 
@@ -65,16 +65,16 @@ Passed locally:
 - `node tests/atlas/prepared-bus-data-adapter.test.mjs` — 16 existing prepared Bus adapter cases.
 - Node syntax checks for publication, runtime adapter, and app-only preflight.
 - `git diff --check`.
+- `node tests/atlas/run-all.mjs` — passed end to end (`ATLAS Alpha.15 deterministic suite passed`) using the existing read-only `atlas-run75-regression` worktree roots for frozen Bus, TNDS, and iBus. Headless Chromium browser tests ran; the regression worktree was not modified.
 
 Not completed:
 
-- `tests/atlas/run-all.mjs` starts and passes its first groups and headless Chromium TNDS browser check, then stops because this checkout lacks `atlas/data/bus-tnds/manifest.json`. That deterministic suite requires the immutable Run #75 artifact roots; this worktree has no mounted copy. The AU-2 hosted workflow restores and verifies the exact Run #75 artifact before running the suite.
 - The Python iBus source unit test could not run locally because `python.exe` resolves to the disabled Microsoft Store alias and no Python interpreter is installed in the available paths. The branch-scoped AU-2 workflow provisions Python 3.11 and runs the test.
 - Exact-SHA GitHub Actions validation cannot exist until the AU-2 commit is pushed. No push was completed in this session.
 - Fresh iBus inventory, archive acquisition, current candidate preparation, complete candidate-derived service-line selection, and source-complete release eligibility remain outstanding.
 - A4/A5 creation, Pages/access configuration, and publication-credential access verification remain outstanding for the sign-in/tooling reasons above.
 
-The full-suite failure is environmental/input availability, not a passing result and not a product test failure. It must be rerun in the hosted workflow against the frozen Run #75 artifact.
+The Python test and exact-SHA hosted workflow remain outstanding. The full local deterministic Node/Chromium suite passed against the frozen Run #75 roots; no source refresh or national acquisition was performed.
 
 ## IET / UK-SPEC handover
 

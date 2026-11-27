@@ -31,7 +31,11 @@ async function main() {
     if (!Array.isArray(banks)) throw new Error('Configured TNDS banks must be a JSON array.');
     const candidateBank = selectOppositeTndsBank(activeConfig.datasets?.tnds?.activeBank ?? null, banks);
     if (!candidateBank?.id || !Array.isArray(candidateBank.roots) || !candidateBank.roots.length) throw new Error('The inactive TNDS bank does not have configured roots for capacity measurement.');
-    result = await measureCandidateDatasets(candidateSite, { rootIds: candidateBank.roots.map(root => String(root.id)), rootRegionAssignments: candidateBank.roots });
+    const rootsWithRegions = candidateBank.roots.filter(root => Array.isArray(root.regions)).length;
+    if (rootsWithRegions !== 0 && rootsWithRegions !== candidateBank.roots.length) throw new Error('Configured TNDS root-region assignments must be present for every root or omitted for every root.');
+    const measurementOptions = { rootIds: candidateBank.roots.map(root => String(root.id)) };
+    if (rootsWithRegions === candidateBank.roots.length) measurementOptions.rootRegionAssignments = candidateBank.roots;
+    result = await measureCandidateDatasets(candidateSite, measurementOptions);
     result.tnds.candidateBankId = String(candidateBank.id);
   }
   if (outputArg) {

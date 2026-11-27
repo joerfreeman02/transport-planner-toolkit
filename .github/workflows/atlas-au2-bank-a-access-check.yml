@@ -39,17 +39,26 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$ATLAS_REFERENCE_DATA_TOKEN"
+          result=0
           for id in a4 a5; do
             repo="bank/$id"
             ref="refs/heads/atlas-au2-access-preflight"
             if test -n "$(git -C "$repo" ls-remote --heads origin "$ref")"; then
               echo "Ref already exists for $id; refusing to run a write preflight."
-              exit 1
+              result=1
+              continue
             fi
-            git -C "$repo" push --dry-run origin "HEAD:$ref"
+            if git -C "$repo" push --dry-run origin "HEAD:$ref"; then
+              echo "$id: authenticated write preflight passed."
+            else
+              echo "$id: authenticated write preflight failed."
+              result=1
+            fi
             if test -n "$(git -C "$repo" ls-remote --heads origin "$ref")"; then
               echo "Dry-run unexpectedly created a remote ref for $id."
-              exit 1
+              result=1
+            else
+              echo "$id: no preflight ref exists remotely."
             fi
-            echo "$id: authenticated write preflight passed; no remote ref created."
           done
+          exit "$result"

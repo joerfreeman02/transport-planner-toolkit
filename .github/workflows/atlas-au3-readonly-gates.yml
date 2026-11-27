@@ -105,7 +105,24 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Chromium for headless ATLAS browser checks
         run: pnpm exec playwright install --with-deps chromium
+      - name: Restore the immutable Run #75 candidate artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: atlas-bus-beta-review-candidate-39430415441
+          run-id: 39430415441
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/atlas-run75
+      - name: Verify the frozen Run #75 Bus and TNDS identities
+        env:
+          RUN75_DATA: ${{ runner.temp }}/atlas-run75/candidate-site/atlas/data
+        run: |
+          test "$(sha256sum "$RUN75_DATA/bus/manifest.json" | cut -d ' ' -f 1)" = "1195f19b55d476600060d89b4a56517e039032f39f9a917ad49647ffec89df4f"
+          test "$(sha256sum "$RUN75_DATA/bus-tnds/manifest.json" | cut -d ' ' -f 1)" = "2cc49b4ac5081fd23557024bfaf0b2809d4a207ce07e7de306d2b1e48bde727f"
+          printf 'Run #75 immutable Bus and TNDS manifests verified.\n'
       - name: Run the full deterministic ATLAS suite
+        env:
+          ATLAS_TEST_BUS_TNDS_DATA_ROOT: ${{ runner.temp }}/atlas-run75/candidate-site/atlas/data/bus-tnds
         run: node tests/atlas/run-all.mjs
       - name: Run all Bus preparation and publication Python tests
         env:

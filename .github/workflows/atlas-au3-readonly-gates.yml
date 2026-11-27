@@ -1,0 +1,65 @@
+name: ATLAS AU-3 read-only source gates
+
+on:
+  push:
+    branches:
+      - codex/atlas-auto-updater-au3-20261127
+    paths:
+      - .github/workflows/atlas-au3-readonly-gates.yml
+      - tools/atlas-data-publication/au3-readonly-preflight.mjs
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: atlas-au3-readonly-gates-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  provisioned-storage-preflight:
+    if: github.repository == 'joerfreeman02/transport-planner-toolkit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify Pages roots and proposed inactive Bank A
+        env:
+          ATLAS_BUS_DATA_REPOSITORY: ${{ vars.ATLAS_BUS_DATA_REPOSITORY }}
+          ATLAS_BUS_DATA_SITE_URL: ${{ vars.ATLAS_BUS_DATA_SITE_URL }}
+          ATLAS_REFERENCE_DATA_BRANCH: ${{ vars.ATLAS_REFERENCE_DATA_BRANCH || 'pages-publish' }}
+          ATLAS_REFERENCE_DATA_TOKEN: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
+        run: node tools/atlas-data-publication/au3-readonly-preflight.mjs
+
+  ibus-source-inventory:
+    if: github.repository == 'joerfreeman02/transport-planner-toolkit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Inventory current official TfL iBus source without archive downloads
+        run: |
+          mkdir -p "$RUNNER_TEMP/atlas-au3-ibus"
+          python tools/atlas-review/build-tfl-ibus-operator-index.py \
+            --assessment-date "$(date -u +%F)" \
+            --inventory-only \
+            --cache-dir "$RUNNER_TEMP/atlas-au3-ibus/cache" \
+            --output "$RUNNER_TEMP/atlas-au3-ibus/index-not-built.json" \
+            | tee "$RUNNER_TEMP/atlas-au3-ibus/source-inventory.json"
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: atlas-au3-ibus-source-inventory-${{ github.sha }}
+          path: ${{ runner.temp }}/atlas-au3-ibus/source-inventory.json
+          if-no-files-found: error
+          retention-days: 30

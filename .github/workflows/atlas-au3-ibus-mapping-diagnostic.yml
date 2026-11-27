@@ -1,0 +1,48 @@
+name: ATLAS AU-3 read-only TfL iBus mapping diagnosis
+
+on:
+  push:
+    branches:
+      - codex/atlas-auto-updater-au3-20261127
+    paths:
+      - .github/workflows/atlas-au3-ibus-mapping-diagnostic.yml
+      - tools/atlas-review/diagnose_tfl_ibus_stop_mappings.py
+      - tools/atlas-review/test_tfl_ibus_stop_mapping_diagnostic.py
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: atlas-au3-ibus-diagnosis-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  source-mapping-diagnostic:
+    if: github.repository == 'joerfreeman02/transport-planner-toolkit' && github.ref == 'refs/heads/codex/atlas-auto-updater-au3-20261127'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test unresolved-mapping classification
+        env:
+          PYTHONPATH: tools/atlas-review
+        run: python -m unittest discover -s tools/atlas-review -p 'test_tfl_ibus_stop_mapping_diagnostic.py'
+      - name: Audit the exact current official iBus source pair
+        run: |
+          python tools/atlas-review/diagnose_tfl_ibus_stop_mappings.py \
+            --assessment-date "$(date -u +%F)" \
+            --cache-dir "$RUNNER_TEMP/atlas-ibus-diagnostic-cache" \
+            --output "$RUNNER_TEMP/atlas-ibus-stop-mapping-diagnostic.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atlas-au3-ibus-stop-mapping-diagnostic-${{ github.run_id }}
+          path: ${{ runner.temp }}/atlas-ibus-stop-mapping-diagnostic.json
+          if-no-files-found: ignore
+          retention-days: 30

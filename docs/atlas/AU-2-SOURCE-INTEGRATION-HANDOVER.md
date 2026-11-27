@@ -3,7 +3,7 @@
 **Date:** 27 November 2026
 **Starting checkpoint:** `1ef6ac6b367702b41d5386c39e18123727a3b3fc`
 **Working branch:** `codex/atlas-auto-updater-au2-20261127`
-**State:** AU-2 branch pushed; a hosted test-fixture correction is in progress.
+**State:** AU-2 implementation and test-fixture correction passed exact-SHA hosted validation.
 
 ## Summary and safety boundary
 
@@ -66,15 +66,15 @@ Passed locally:
 - Node syntax checks for publication, runtime adapter, and app-only preflight.
 - `git diff --check`.
 - `node tests/atlas/run-all.mjs` — passed end to end (`ATLAS Alpha.15 deterministic suite passed`) using the existing read-only `atlas-run75-regression` worktree roots for frozen Bus, TNDS, and iBus. Headless Chromium browser tests ran; the regression worktree was not modified.
+- GitHub Actions Run [45968581931](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45968581931) passed on exact SHA `6eac5b9bce8bcefba567e9c3793ff45c71b26340`: Run #75 artifact identity/restore, complete deterministic ATLAS suite, publication topology/lifecycle/recovery/release checks, all seven iBus source unit tests on Python 3.11, and all 21 static-index Python tests.
 
 Not completed:
 
-- The Python iBus source unit test could not run locally because `python.exe` resolves to the disabled Microsoft Store alias and no Python interpreter is installed in the available paths. The branch-scoped AU-2 workflow provisions Python 3.11 and runs the test.
-- Exact-SHA GitHub Actions Run [45967968981](https://github.com/joerfreeman02/transport-planner-toolkit/actions/runs/45967968981) verified commit `ac399c05529a788d18cd5dfe5ded2a34c2c11891`. The complete deterministic ATLAS suite, publication/recovery checks, immutable Run #75 restore, and offline static-index Python suite passed. The new iBus test step exposed a fixture setup error: its test attempted `mkdir()` on the already-created `TemporaryDirectory`. The fixture now uses `exist_ok=True`; an exact-SHA rerun is pending.
+- The Python iBus source unit test could not run locally because `python.exe` resolves to the disabled Microsoft Store alias; its corrected seven-test suite passed in the hosted Python 3.11 runner.
 - Fresh iBus inventory, archive acquisition, current candidate preparation, complete candidate-derived service-line selection, and source-complete release eligibility remain outstanding.
 - A4/A5 creation, Pages/access configuration, and publication-credential access verification remain outstanding for the sign-in/tooling reasons above.
 
-The corrected iBus source unit test and exact-SHA hosted rerun remain outstanding. The full local and hosted deterministic Node/Chromium suites passed against the frozen Run #75 roots; no source refresh or national acquisition was performed.
+The full local and hosted deterministic Node/Chromium suites passed against the frozen Run #75 roots. The first hosted run found and the follow-up commit corrected only a Python test fixture directory-creation error; the corrected exact-SHA run passed. No source refresh or national acquisition was performed.
 
 ## IET / UK-SPEC handover
 

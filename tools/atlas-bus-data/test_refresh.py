@@ -5,7 +5,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from refresh_bus_data import BODS_DOWNLOAD_ROOT, BODS_REGIONS, NAPTAN_XML_URL, NPTG_XML_URL, RefreshError, TNDS_REGIONS, acquire_bods, acquire_prepared_data_v2_sources, acquire_tnds, baseline_metrics, select_tnds_region_archives, source_outcome, source_snapshot_status, tnds_region_from_filename, validate_candidate
+from refresh_bus_data import BODS_DOWNLOAD_ROOT, BODS_REGIONS, NAPTAN_XML_URL, NPTG_XML_URL, RefreshError, TNDS_REGIONS, acquire_bods, acquire_prepared_data_v2_sources, acquire_tnds, baseline_metrics, load_release_metadata, select_tnds_region_archives, source_outcome, source_snapshot_status, tnds_region_from_filename, validate_candidate
 
 
 class IncompleteFtp:
@@ -78,6 +78,19 @@ class RefreshTests(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.root, ignore_errors=True)
+
+    def test_release_metadata_accepts_beta_candidate_without_changing_identity(self):
+        release = self.root / 'atlas' / 'config' / 'atlas-release.json'
+        release.parent.mkdir(parents=True)
+        release.write_text(json.dumps({'version': '2.0.0-beta.1', 'build': 'ATLAS-2.0.0-beta.1-20261025'}))
+        self.assertEqual(load_release_metadata(self.root), {'version': '2.0.0-beta.1', 'build': 'ATLAS-2.0.0-beta.1-20261025'})
+
+    def test_release_metadata_rejects_mismatched_beta_build(self):
+        release = self.root / 'atlas' / 'config' / 'atlas-release.json'
+        release.parent.mkdir(parents=True)
+        release.write_text(json.dumps({'version': '2.0.0-beta.1', 'build': 'ATLAS-2.0.0-alpha.1-20261025'}))
+        with self.assertRaisesRegex(RefreshError, 'invalid version/build identity'):
+            load_release_metadata(self.root)
 
     def test_missing_credentials_fails_without_network_or_prompt(self):
         with self.assertRaisesRegex(RefreshError, 'TNDS_USERNAME'):

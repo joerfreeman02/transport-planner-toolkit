@@ -13,6 +13,8 @@ on:
       - tools/atlas-data-publication/publication.mjs
       - tools/atlas-bus-data/finalize_candidate_eligibility.py
       - tools/atlas-bus-data/test_finalize_candidate_eligibility.py
+      - tools/atlas-bus-data/refresh_bus_data.py
+      - tools/atlas-bus-data/test_refresh.py
       - tools/atlas-bus-data/test_review_candidate_workflow_contract.py
       - tools/atlas-review/build-tfl-ibus-operator-index.py
       - tools/atlas-review/test_tfl_ibus_source.py
@@ -141,4 +143,10 @@ jobs:
     with:
       mode: compose
       au3_preflight_run_id: ${{ github.run_id }}
+      primary_source_run_id: '45980750752'
+      primary_artifact_id: '15189771956'
+      primary_artifact_digest: 'sha256:0ce5d2e363e1ac44786bc5f384a9f71f809940207bd7cb1e91dff8a9c5c1fe5c'
+      tnds_source_run_id: '45980750752'
+      tnds_artifact_id: '15191935225'
+      tnds_artifact_digest: 'sha256:201c2b47e2ee8c817f48ddc21b843528e5d62f76c386659d2d0196b4c09e482d'
     secrets: inherit

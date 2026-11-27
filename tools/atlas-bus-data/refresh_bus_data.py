@@ -59,7 +59,7 @@ def load_release_metadata(site: Path) -> dict[str, str]:
         build = str(metadata["build"])
     except (OSError, KeyError, TypeError, ValueError) as error:
         raise RefreshError(f"ATLAS release metadata is missing or invalid: {metadata_path}") from error
-    if not re.fullmatch(r"\d+\.\d+\.\d+-alpha\.\d+", version) or not re.fullmatch(rf"ATLAS-{re.escape(version)}-\d{{8}}", build):
+    if not re.fullmatch(r"\d+\.\d+\.\d+-(?:alpha|beta)\.\d+", version) or not re.fullmatch(rf"ATLAS-{re.escape(version)}-\d{{8}}", build):
         raise RefreshError(f"ATLAS release metadata has invalid version/build identity: {metadata_path}")
     return {"version": version, "build": build}
 

@@ -327,6 +327,29 @@ jobs:
           --source-snapshot source-snapshot
           --tnds-source-snapshot "$RUNNER_TEMP/tnds-quarantined-snapshot"
 
+      - name: Verify application identity and diagnostic-only data status
+        if: inputs.mode == 'compose'
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+          EXPECTED_RUN: ${{ github.run_id }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          source=json.loads(Path('atlas/config/atlas-release.json').read_text())
+          candidate=json.loads(Path('candidate-site/atlas/config/atlas-release.json').read_text())
+          status=json.loads(Path('candidate-site/atlas/data/status/manifest.json').read_text())
+          if candidate != source:
+              raise SystemExit('Preparation changed the checked-out application version/build metadata.')
+          if status.get('version') != source.get('version') or status.get('build') != source.get('build'):
+              raise SystemExit('Prepared data status does not preserve the exact checked-out application version/build.')
+          if status.get('repositoryCommit') != os.environ['EXPECTED_COMMIT'] or str(status.get('workflowRun')) != os.environ['EXPECTED_RUN']:
+              raise SystemExit('Prepared data status is not bound to the exact checked-out source commit and candidate run.')
+          if status.get('reviewOnly') is not True or status.get('diagnosticOnly') is not True or status.get('productionEligible') is not False or status.get('publicationEligible') is not False or status.get('plannerEligible') is not False:
+              raise SystemExit('Review candidate eligibility did not remain fail-closed.')
+          print(json.dumps({'application': candidate, 'repositoryCommit': status['repositoryCommit'], 'workflowRun': status['workflowRun'], 'reviewOnly': status['reviewOnly'], 'productionEligible': status['productionEligible'], 'publicationEligible': status['publicationEligible'], 'plannerEligible': status['plannerEligible']}, sort_keys=True))
+          PY
+
       - name: Structurally validate prepared Bus and TNDS manifests and shards
         if: inputs.mode == 'compose'
         run: python tools/atlas-bus-data/validate_candidate.py --site-root candidate-site

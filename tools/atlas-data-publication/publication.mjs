@@ -83,12 +83,12 @@ export function createRollbackPublicationSnapshot(config) {
     datasets: {
       bus: { baseUrl: bus.baseUrl, slot: bus.slot ?? null, manifest: bus.manifest ?? 'manifest.json', publicationManifest: bus.publicationManifest ?? 'publication-manifest.json', pathRoots: bus.pathRoots ?? [], pathMap: bus.pathMap ?? {} },
       tnds: { baseUrl: tnds.baseUrl, slot: tnds.slot ?? null, activeBank: tnds.activeBank ?? null, activeRoots: tnds.activeRoots ?? tnds.roots ?? [], roots: tnds.roots ?? tnds.activeRoots ?? [], manifest: tnds.manifest ?? 'manifest.json', publicationManifest: tnds.publicationManifest ?? 'publication-manifest.json', pathRoots: tnds.pathRoots ?? [], pathMap: tnds.pathMap ?? {} },
-      nptg: null
+      nptg: config.datasets.nptg ? structuredClone(config.datasets.nptg) : null
     }
   };
 }
 
-export function buildAtlasDataSources({ publicationVersion, generatedAt, busSiteUrl, tndsSiteUrl, busBaseUrl, tndsBaseUrl, busSlot, tndsSlot, tndsPathRoots = [], tndsPathMap = {}, tndsPublicationRoots = [], activeTndsBank = null, rollbackTndsBank = null, rollbackPublication = null, tndsBanks = [] }) {
+export function buildAtlasDataSources({ publicationVersion, generatedAt, busSiteUrl, tndsSiteUrl, busBaseUrl, tndsBaseUrl, busSlot, tndsSlot, tndsPathRoots = [], tndsPathMap = {}, tndsPublicationRoots = [], activeTndsBank = null, rollbackTndsBank = null, rollbackPublication = null, tndsBanks = [], nptgDataset = null }) {
   const roots = tndsPublicationRoots.map(publicRoot);
   const activeBankId = typeof activeTndsBank === 'string' ? activeTndsBank : activeTndsBank?.id ?? null;
   const rollbackBank = rollbackTndsBank ? { id: rollbackTndsBank.id, roots: (rollbackTndsBank.roots ?? []).map(publicRoot) } : null;
@@ -96,7 +96,7 @@ export function buildAtlasDataSources({ publicationVersion, generatedAt, busSite
   const resolvedTndsUrl = tndsBaseUrl ?? roots[0]?.baseUrl ?? (tndsSiteUrl ? snapshotUrl(tndsSiteUrl) : null);
   const bus = { baseUrl: resolvedBusUrl ? normaliseBaseUrl(resolvedBusUrl) : null, slot: busSlot ?? null, manifest: 'manifest.json', publicationManifest: 'publication-manifest.json', pathRoots: [], pathMap: {} };
   const tnds = { baseUrl: resolvedTndsUrl ? normaliseBaseUrl(resolvedTndsUrl) : null, slot: tndsSlot ?? null, activeBank: activeBankId, activeRoots: roots, rollbackBank, banks: tndsBanks, manifest: 'manifest.json', publicationManifest: 'publication-manifest.json', pathRoots: tndsPathRoots, pathMap: tndsPathMap, roots };
-  return { schema: 'atlas-data-sources-v2', publicationVersion, generatedAt, rollbackPublication, datasets: { bus, tnds, nptg: null } };
+  return { schema: 'atlas-data-sources-v2', publicationVersion, generatedAt, rollbackPublication, datasets: { bus, tnds, nptg: nptgDataset } };
 }
 
 export function renderAtlasDataSourcesModule(config) { return `// Generated after every reference-data publication passes validation.\nexport const atlasDataSources = Object.freeze(${JSON.stringify(config, null, 2)});\n`; }
@@ -193,6 +193,15 @@ async function copyCandidateSubset(candidateRoot, destination, selectedPaths = n
   for (const item of await filesUnder(candidateRoot)) { if (selected && item.path.toLowerCase().startsWith('services/') && !selected.has(item.path)) continue; const target = path.join(destination, item.path); await fs.mkdir(path.dirname(target), { recursive: true }); await fs.copyFile(item.absolute, target); }
 }
 
+async function copySelectedFiles(candidateRoot, destination, selectedPaths) {
+  for (const relative of selectedPaths) {
+    const source = path.join(candidateRoot, relative);
+    const target = path.join(destination, relative);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.copyFile(source, target);
+  }
+}
+
 async function stageBusPublication({ candidateSite, repository, activeSlot, publicationVersion, generatedAt }) {
   const candidateRoot = path.join(candidateSite, 'atlas', 'data', 'bus');
   const source = await measurePublicationTree(candidateRoot);
@@ -202,6 +211,7 @@ async function stageBusPublication({ candidateSite, repository, activeSlot, publ
   try {
     await fs.mkdir(staging, { recursive: true }); await fs.writeFile(path.join(staging, '.nojekyll'), ''); await writeSiteHealthMarker(staging);
     if (activeSlot && await exists(path.join(repository, activeSlot))) await fs.cp(path.join(repository, activeSlot), path.join(staging, activeSlot), { recursive: true });
+    if (await exists(path.join(repository, 'nptg'))) await fs.cp(path.join(repository, 'nptg'), path.join(staging, 'nptg'), { recursive: true });
     await copyCandidateSubset(candidateRoot, path.join(staging, candidateSlot));
     const payload = await measurePublicationTree(path.join(staging, candidateSlot));
     await writePublicationManifest(path.join(staging, candidateSlot), 'bus', publicationVersion, payload, generatedAt, { slot: candidateSlot, sourceSha256: source.sha256 });
@@ -215,6 +225,55 @@ async function stageBusPublication({ candidateSite, repository, activeSlot, publ
     const finalMeasurement = assertPublicationFits(await measurePublicationTree(staging), 'BUS total site including lifecycle metadata');
     await replaceRepositoryContents(repository, staging);
     return { dataset: 'bus', source, candidate: candidateMeasurement, totalSite: finalMeasurement, activeSlot: activeSlot ?? null, candidateSlot, previousSlot: activeSlot ?? null };
+  } finally { await fs.rm(staging, { recursive: true, force: true }); }
+}
+
+export async function buildNptgPublicationManifest({ busManifest, candidateRoot, publicationVersion, generatedAt }) {
+  if (busManifest?.schema !== 'atlas-prepared-bus-data-v2' || !busManifest.sources?.nptg?.sourceHash
+      || !busManifest.localityShards || !Object.keys(busManifest.localityShards).length) {
+    throw new Error('NPTG publication requires a V2 candidate with an authoritative NPTG source hash and locality shards.');
+  }
+  const shards = {};
+  for (const [key, relative] of Object.entries(busManifest.localityShards).sort(([left], [right]) => left.localeCompare(right))) {
+    const parts = typeof relative === 'string' ? relative.split('/') : [];
+    if (!key || typeof relative !== 'string' || !relative.startsWith('localities/') || parts.some(part => !part || part === '.' || part === '..' || part.startsWith('.'))) throw new Error(`NPTG candidate contains an unsafe locality-shard path: ${relative}`);
+    const absolute = path.join(candidateRoot, relative);
+    const stat = await fs.stat(absolute);
+    shards[key] = { path: relative, bytes: stat.size, sha256: await digestFile(absolute) };
+  }
+  return {
+    schema: 'atlas-prepared-nptg-v1',
+    baseVersion: String(busManifest.sources.nptg.schemaVersion ?? busManifest.version ?? publicationVersion),
+    publicationVersion,
+    generatedAt,
+    source: { url: busManifest.sources.nptg.url ?? 'https://naptan.api.dft.gov.uk/v1/nptg', sha256: busManifest.sources.nptg.sourceHash, sourceHash: busManifest.sources.nptg.sourceHash },
+    localityShardKeyLength: busManifest.localityShardKeyLength,
+    localityShards: Object.fromEntries(Object.entries(busManifest.localityShards).sort(([left], [right]) => left.localeCompare(right))),
+    shards,
+    counts: { localities: busManifest.counts?.localityCount ?? null, districts: busManifest.counts?.districtCount ?? null }
+  };
+}
+
+async function stageNptgPublication({ candidateSite, repository, busSiteUrl, activeSlot, publicationVersion, generatedAt }) {
+  const candidateRoot = path.join(candidateSite, 'atlas', 'data', 'bus');
+  const busManifest = await readManifest(candidateRoot);
+  if (busManifest?.schema !== 'atlas-prepared-bus-data-v2' || !busManifest.sources?.nptg?.sourceHash || !Object.keys(busManifest.localityShards ?? {}).length) return null;
+  const manifest = await buildNptgPublicationManifest({ busManifest, candidateRoot, publicationVersion, generatedAt });
+  const candidateSlot = otherSlot(activeSlot);
+  const staging = path.join(path.dirname(repository), `.atlas-nptg-${candidateSlot}-staging-${process.pid}`);
+  await fs.rm(staging, { recursive: true, force: true });
+  const target = path.join(repository, 'nptg', candidateSlot);
+  try {
+    await fs.mkdir(staging, { recursive: true });
+    const paths = Object.values(manifest.localityShards);
+    await copySelectedFiles(candidateRoot, staging, paths);
+    await fs.writeFile(path.join(staging, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+    const payload = assertPublicationFits(await measurePublicationTree(staging), `NPTG ${candidateSlot}`);
+    await fs.rm(target, { recursive: true, force: true });
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.cp(staging, target, { recursive: true });
+    const totalSite = assertPublicationFits(await measurePublicationTree(repository), 'BUS and NPTG total Pages site');
+    return { dataset: 'nptg', slot: candidateSlot, manifest, payload, totalSite, baseUrl: slotUrl(busSiteUrl, `nptg/${candidateSlot}`) };
   } finally { await fs.rm(staging, { recursive: true, force: true }); }
 }
 
@@ -275,15 +334,18 @@ export async function preparePublications({ candidateSite, busRepository, tndsRe
   const tndsFullMeasurement = await measurePublicationTree(tndsRootPath);
   const allocation = allocateTndsPublicationRoots(tndsFullMeasurement, { expectedRegions: TNDS_REGIONS, rootIds: candidateBank.roots.map(root => root.id), allowAdditionalRoots: false });
   const bus = await stageBusPublication({ candidateSite, repository: busRepository, activeSlot: activeBusSlot, publicationVersion, generatedAt });
+  const nptg = await stageNptgPublication({ candidateSite, repository: busRepository, busSiteUrl, activeSlot: previousConfig?.datasets?.nptg?.slot ?? null, publicationVersion, generatedAt });
+  bus.totalSite = assertPublicationFits(await measurePublicationTree(busRepository), 'BUS total site including NPTG candidate and rollback slot');
   const tnds = [];
   for (const root of candidateBank.roots) tnds.push(await stageTndsBankRoot({ candidateSite, repository: root.repository, bankId: candidateBank.id, rootDefinition: root, allocation, publicationVersion, generatedAt }));
   const configRoots = allocation.roots.map(root => { const source = candidateBank.roots.find(item => item.id === root.id); const staged = tnds.find(item => item.root === root.id); return { id: root.id, baseUrl: snapshotUrl(source.siteUrl), regions: root.regions, fileCount: staged.payload.fileCount, bytes: staged.payload.bytes, sha256: staged.payload.sha256, manifest: 'manifest.json', publicationManifest: 'publication-manifest.json' }; });
   const tndsPathMap = {};
   for (const root of allocation.roots) { const source = candidateBank.roots.find(item => item.id === root.id); for (const file of root.files.filter(item => item.path.toLowerCase().startsWith('services/'))) tndsPathMap[file.path] = snapshotUrl(source.siteUrl); }
   const rollbackRoots = previousConfig?.datasets?.tnds?.activeRoots ?? previousConfig?.datasets?.tnds?.roots ?? [];
-  const config = buildAtlasDataSources({ publicationVersion, generatedAt, busSiteUrl, tndsSiteUrl, busSlot: bus.candidateSlot, tndsBaseUrl: configRoots[0]?.baseUrl, tndsPathMap, tndsPublicationRoots: configRoots, activeTndsBank: candidateBank.id, rollbackTndsBank: activeTndsBank ? { id: String(activeTndsBank), roots: rollbackRoots } : null, rollbackPublication: createRollbackPublicationSnapshot(previousConfig), tndsBanks: banks.map(bank => ({ id: bank.id, rootIds: bank.roots.map(root => root.id) })) });
+  const nptgDataset = nptg ? { baseUrl: nptg.baseUrl, slot: nptg.slot, manifest: 'manifest.json', publicationManifest: null, sourceSha256: nptg.manifest.source.sha256, schema: nptg.manifest.schema } : null;
+  const config = buildAtlasDataSources({ publicationVersion, generatedAt, busSiteUrl, tndsSiteUrl, busSlot: bus.candidateSlot, tndsBaseUrl: configRoots[0]?.baseUrl, tndsPathMap, tndsPublicationRoots: configRoots, activeTndsBank: candidateBank.id, rollbackTndsBank: activeTndsBank ? { id: String(activeTndsBank), roots: rollbackRoots } : null, rollbackPublication: createRollbackPublicationSnapshot(previousConfig), tndsBanks: banks.map(bank => ({ id: bank.id, rootIds: bank.roots.map(root => root.id) })), nptgDataset });
   await fs.mkdir(path.dirname(configOutput), { recursive: true }); await fs.writeFile(configOutput, renderAtlasDataSourcesModule(config)); await fs.writeFile(configOutput.replace(/\.mjs$/i, '.json'), `${JSON.stringify(config, null, 2)}\n`);
-  return { config, bus, tnds, tndsAllocation: allocation, candidateBank, banks, safetyLimitBytes: SAFE_PUBLICATION_LIMIT_BYTES, pagesLimitBytes: PAGES_DATASET_LIMIT_BYTES, safetyMarginBytes: PUBLICATION_SAFETY_MARGIN_BYTES };
+  return { config, bus, nptg, tnds, tndsAllocation: allocation, candidateBank, banks, safetyLimitBytes: SAFE_PUBLICATION_LIMIT_BYTES, pagesLimitBytes: PAGES_DATASET_LIMIT_BYTES, safetyMarginBytes: PUBLICATION_SAFETY_MARGIN_BYTES };
 }
 
 export async function measureCandidateDatasets(candidateSite, { measureTree = measurePublicationTree, rootIds } = {}) {
@@ -302,7 +364,7 @@ export function rollbackToOppositeBank(config) {
   const currentTnds = config.datasets.tnds;
   next.datasets.tnds.rollbackBank = currentTnds.activeBank ? { id: currentTnds.activeBank, roots: currentTnds.activeRoots ?? currentTnds.roots ?? [] } : null;
   next.datasets.tnds.banks = currentTnds.banks ?? [];
-  next.datasets.nptg = null;
+  next.datasets.nptg = rollback.datasets.nptg ?? null;
   return next;
 }
 

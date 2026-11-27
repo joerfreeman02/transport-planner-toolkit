@@ -47,14 +47,18 @@ const atlasData = createAtlasDataSourceResolver(isV2Review ? {
   datasets: {
     ...atlasDataSources.datasets,
     bus: { ...atlasDataSources.datasets.bus, baseUrl: `${v2DataBaseUrl}bus/` },
-    tnds: { ...atlasDataSources.datasets.tnds, baseUrl: `${v2DataBaseUrl}bus-tnds/` }
+    tnds: { ...atlasDataSources.datasets.tnds, baseUrl: `${v2DataBaseUrl}bus-tnds/` },
+    ...(atlasDataSources.datasets.nptg?.baseUrl ? { nptg: { ...atlasDataSources.datasets.nptg, baseUrl: `${v2DataBaseUrl}nptg/` } } : {})
   }
 } : atlasDataSources);
+const nptgConfigured = Boolean(atlasDataSources.datasets.nptg?.baseUrl);
 const preparedBusData = createPreparedBusDataAdapter({
   baseUrl: atlasData.baseUrl('bus'),
   tndsBaseUrl: atlasData.baseUrl('tnds'),
+  nptgBaseUrl: nptgConfigured ? atlasData.baseUrl('nptg') : null,
   busFileUrl: relativePath => atlasData.fileUrl('bus', relativePath),
-  tndsFileUrl: relativePath => atlasData.fileUrl('tnds', relativePath)
+  tndsFileUrl: relativePath => atlasData.fileUrl('tnds', relativePath),
+  nptgFileUrl: nptgConfigured ? relativePath => atlasData.fileUrl('nptg', relativePath) : null
 });
 const referenceData = createAtlasReferenceData({ adapter: preparedBusData });
 const tflTimetable = createTflBusTimetableAdapter({ cache, requestScheduler: tflRequestScheduler });

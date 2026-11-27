@@ -19,7 +19,8 @@ function datasetConfig(config, key) {
 }
 
 export function createAtlasDataSourceResolver(config = atlasDataSources) {
-  const datasets = new Map(['bus', 'tnds'].map(key => [key, datasetConfig(config, key)]));
+  const keys = ['bus', 'tnds', ...(config?.datasets?.nptg?.baseUrl ? ['nptg'] : [])];
+  const datasets = new Map(keys.map(key => [key, datasetConfig(config, key)]));
   function getDataset(key) {
     const dataset = datasets.get(key);
     if (!dataset) throw new Error(`ATLAS reference-data dataset is not configured: ${key}`);

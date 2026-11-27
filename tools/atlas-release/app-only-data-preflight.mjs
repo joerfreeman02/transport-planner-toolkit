@@ -9,7 +9,7 @@ const EXPECTED_REGIONS = new Set(['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y']
 const MAX_FRESHNESS_DAYS = 8;
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 const jsonHash = value => sha256(Buffer.from(`${JSON.stringify(value, null, 2)}\n`, 'utf8'));
-const safeRelativePath = value => typeof value === 'string' && value.length > 0 && !path.posix.isAbsolute(value) && !value.split(/[\\/]/).includes('..');
+const safeRelativePath = value => typeof value === 'string' && value.length > 0 && !path.posix.isAbsolute(value) && !value.split(/[\\/]/).some(part => !part || part === '.' || part === '..' || part.startsWith('.'));
 
 function option(name, argv = process.argv) {
   const index = argv.indexOf(name);
@@ -24,7 +24,7 @@ async function readJson(root, relative) {
 function referencedPaths(manifest) {
   const paths = new Set(['manifest.json']);
   const visit = value => {
-    if (typeof value === 'string' && /^(?:stops|services)\//.test(value)) paths.add(value);
+    if (typeof value === 'string' && /^(?:stops|services|localities)\//.test(value)) paths.add(value);
     else if (Array.isArray(value)) value.forEach(visit);
     else if (value && typeof value === 'object') Object.values(value).forEach(visit);
   };
@@ -143,7 +143,17 @@ export async function validateAppOnlyDataSnapshot({ snapshotRoot, approvedDataId
   const nptgConfig = sources.datasets?.nptg;
   if (!nptgConfig?.baseUrl) throw new Error('Production eligibility requires the intended NPTG dataset to be integrated and configured.');
   const nptg = await readJson(root, 'atlas/data/nptg/manifest.json');
-  if (!nptg.schema) throw new Error('Production NPTG manifest schema is missing.');
+  if (nptg.schema !== 'atlas-prepared-nptg-v1' || !nptg.baseVersion || !nptg.source?.sha256 || !/^[0-9a-f]{64}$/i.test(nptg.source.sha256)
+      || !Number.isInteger(nptg.localityShardKeyLength) || !nptg.localityShards || !nptg.shards || !Object.keys(nptg.localityShards).length) {
+    throw new Error('Production NPTG manifest is missing its independent source version or locality-shard identity.');
+  }
+  for (const [key, relative] of Object.entries(nptg.localityShards)) {
+    if (!safeRelativePath(relative) || !relative.startsWith('localities/')) throw new Error(`Production NPTG locality shard path is invalid: ${relative}`);
+    const expected = nptg.shards[key];
+    if (!expected || expected.path !== relative || !Number.isSafeInteger(expected.bytes) || expected.bytes < 1 || !/^[0-9a-f]{64}$/i.test(expected.sha256 ?? '')) throw new Error(`Production NPTG shard descriptor is invalid: ${key}`);
+    const bytes = await fs.readFile(path.join(root, 'atlas/data/nptg', relative));
+    if (bytes.byteLength !== expected.bytes || sha256(bytes) !== expected.sha256) throw new Error(`Production NPTG locality shard does not match its independent manifest: ${relative}`);
+  }
 
   const ibusRoot = path.join(root, 'atlas/data/tfl-ibus');
   const ibus = await verifyIbusFixture(ibusRoot);

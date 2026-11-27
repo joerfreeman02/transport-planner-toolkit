@@ -9,7 +9,9 @@ import hashlib
 import json
 import os
 import re
+import tempfile
 import sys
+import time
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -22,6 +24,7 @@ REGION = "eu-west-1"
 S3_ROOT = f"https://s3-{REGION}.amazonaws.com/{BUCKET}/"
 PUBLIC_ROOT = f"https://{BUCKET}/"
 SCHEMA = "tfl-ibus-operator-index-v1"
+SELECTION_SCHEMA = "atlas-ibus-service-line-selection-v1"
 
 
 def local_name(tag: str) -> str:
@@ -49,25 +52,77 @@ class Source:
         self.listing_requests = 0
 
     def local_path(self, key: str) -> Path:
-        if key == "Base_Version.xml":
-            return self.cache_dir / key
-        prefix = re.match(r"Base_Version_\d{8}/", key)
-        relative = key[prefix.end():] if prefix else key
-        return self.cache_dir / Path(*relative.split("/"))
+        # Keep every archive under its complete version prefix. The former
+        # basename-only cache allowed a newer Base_Version to reuse old ZIPs.
+        return self.cache_dir / Path(*key.split("/"))
 
-    def get(self, key: str, *, public_root: bool = False) -> tuple[Path, bool]:
+    @staticmethod
+    def _normalise_etag(value: str | None) -> str | None:
+        return value.strip().strip('"') if value else None
+
+    def _verified_cache(self, path: Path, metadata: dict | None) -> bool:
+        if not metadata or not path.is_file():
+            return False
+        try:
+            record = json.loads(path.with_name(path.name + ".source.json").read_text(encoding="utf-8"))
+            expected_etag = self._normalise_etag(metadata.get("etag"))
+            actual_etag = self._normalise_etag(record.get("etag"))
+            return (
+                record.get("size") == metadata.get("size") == path.stat().st_size
+                and (not expected_etag or actual_etag == expected_etag)
+                and record.get("sha256") == sha256_file(path)
+            )
+        except (OSError, ValueError, TypeError):
+            return False
+
+    def get(self, key: str, *, public_root: bool = False, metadata: dict | None = None, refresh: bool = False) -> tuple[Path, bool]:
         path = self.local_path(key)
-        if path.is_file():
+        if not refresh and self._verified_cache(path, metadata):
             return path, True
         path.parent.mkdir(parents=True, exist_ok=True)
         root = PUBLIC_ROOT if public_root else S3_ROOT
         request = urllib.request.Request(root + urllib.parse.quote(key, safe="/"), headers={"User-Agent": "ATLAS-TfL-iBus-index-builder/1"})
-        with urllib.request.urlopen(request, timeout=60) as response, path.open("wb") as stream:
-            while True:
-                chunk = response.read(1024 * 1024)
-                if not chunk:
+        expected_size = metadata.get("size") if metadata else None
+        expected_etag = self._normalise_etag(metadata.get("etag")) if metadata else None
+        last_error = None
+        for attempt in range(3):
+            temporary_path = None
+            try:
+                with urllib.request.urlopen(request, timeout=60) as response:
+                    response_etag = self._normalise_etag(response.headers.get("ETag"))
+                    if expected_etag and response_etag != expected_etag:
+                        raise ValueError(f"ETag mismatch for {key}: listing={expected_etag}, response={response_etag}.")
+                    descriptor, temporary_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".part", dir=path.parent)
+                    temporary_path = Path(temporary_name)
+                    size = 0
+                    digest = hashlib.sha256()
+                    with os.fdopen(descriptor, "wb") as stream:
+                        while True:
+                            chunk = response.read(1024 * 1024)
+                            if not chunk:
+                                break
+                            stream.write(chunk)
+                            digest.update(chunk)
+                            size += len(chunk)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    if expected_size is not None and size != expected_size:
+                        raise ValueError(f"Size mismatch for {key}: downloaded {size} bytes, listing says {expected_size}.")
+                os.replace(temporary_path, path)
+                sidecar = {"size": size, "sha256": digest.hexdigest(), "etag": response_etag or expected_etag}
+                sidecar_path = path.with_name(path.name + ".source.json")
+                sidecar_temp = sidecar_path.with_name(sidecar_path.name + ".part")
+                sidecar_temp.write_text(json.dumps(sidecar, sort_keys=True) + "\n", encoding="utf-8")
+                os.replace(sidecar_temp, sidecar_path)
+                return path, False
+            except Exception as error:
+                last_error = error
+                if temporary_path and temporary_path.exists():
+                    temporary_path.unlink()
+                if attempt == 2 or isinstance(error, ValueError) or getattr(error, "code", 500) < 500:
                     break
-                stream.write(chunk)
+                time.sleep(2 ** attempt)
+        raise RuntimeError(f"Could not retrieve a complete TfL iBus source object {key} after bounded retries: {last_error}") from last_error
         return path, False
 
     def list_version_objects(self, version: str) -> list[dict]:
@@ -82,16 +137,24 @@ class Source:
             self.listing_requests += 1
             with urllib.request.urlopen(request, timeout=60) as response:
                 root = ET.fromstring(response.read())
+            if child_text(root, "Name") != BUCKET or child_text(root, "Prefix") != prefix:
+                raise ValueError("TfL iBus S3 listing response does not match the requested bucket and Base_Version prefix.")
             for item in root.iter():
                 if local_name(item.tag) != "Contents":
                     continue
                 fields = {local_name(child.tag): child.text for child in item}
-                objects.append({"key": fields["Key"], "size": int(fields["Size"]), "etag": fields.get("ETag")})
+                key = fields.get("Key")
+                size = int(fields["Size"])
+                if not key or not key.startswith(prefix) or size < 0:
+                    raise ValueError("TfL iBus listing contains an invalid key, prefix or size.")
+                objects.append({"key": key, "size": size, "etag": fields.get("ETag")})
             if child_text(root, "IsTruncated") != "true":
                 break
             token = child_text(root, "NextContinuationToken")
             if not token:
                 raise ValueError("TfL iBus S3 listing was truncated without a continuation token.")
+        if len({item["key"] for item in objects}) != len(objects):
+            raise ValueError("TfL iBus S3 listing contains duplicate object keys.")
         return objects
 
 
@@ -113,8 +176,10 @@ def parse_xml_entry(archive: zipfile.ZipFile, entry_name: str, version: str, ent
 
 
 def read_archive(source: Source, key: str, objects_by_key: dict[str, dict], source_records: dict[str, dict]) -> zipfile.ZipFile:
-    path, cache_hit = source.get(key)
-    metadata = objects_by_key.get(key, {})
+    metadata = objects_by_key.get(key)
+    if metadata is None:
+        raise ValueError(f"TfL iBus Base_Version listing does not contain required archive {key}.")
+    path, cache_hit = source.get(key, metadata=metadata)
     actual_size = path.stat().st_size
     if metadata.get("size") is not None and actual_size != metadata["size"]:
         raise ValueError(f"Size mismatch for {key}: {actual_size} != {metadata['size']}.")
@@ -125,7 +190,42 @@ def read_archive(source: Source, key: str, objects_by_key: dict[str, dict], sour
         "etag": metadata.get("etag"),
     }
     (source.cache_hits if cache_hit else source.downloaded_objects).append({"key": key, "bytes": actual_size})
-    return zipfile.ZipFile(path)
+    archive = zipfile.ZipFile(path)
+    corrupt_entry = archive.testzip()
+    if corrupt_entry:
+        archive.close()
+        path.unlink(missing_ok=True)
+        path.with_name(path.name + ".source.json").unlink(missing_ok=True)
+        raise ValueError(f"TfL iBus archive {key} failed its ZIP CRC check at {corrupt_entry}.")
+    return archive
+
+
+def load_service_line_selection(path: Path) -> tuple[list[str], str]:
+    document = json.loads(path.read_text(encoding="utf-8"))
+    lines = document.get("serviceLines")
+    source_hash = document.get("sourceSnapshotSha256")
+    if document.get("schema") != SELECTION_SCHEMA or not isinstance(lines, list) or not lines:
+        raise ValueError("Service-line selection must use atlas-ibus-service-line-selection-v1 and contain a non-empty serviceLines array.")
+    if not isinstance(source_hash, str) or re.fullmatch(r"[0-9a-f]{64}", source_hash) is None:
+        raise ValueError("Service-line selection must identify its prepared candidate with a sourceSnapshotSha256.")
+    selected = [str(line).strip() for line in lines]
+    if any(not line for line in selected) or len(set(selected)) != len(selected):
+        raise ValueError("Service-line selection contains empty or duplicate route identities.")
+    return sorted(selected, key=lambda value: (value.casefold(), value)), source_hash
+
+
+def inventory_summary(version: str, valid_from: str, valid_to: str, objects: list[dict]) -> dict:
+    groups: dict[str, dict] = {}
+    for item in objects:
+        name = Path(item["key"]).name
+        kind = "schedule" if name.startswith("schedule_") else "network"
+        group = groups.setdefault(kind, {"objectCount": 0, "bytes": 0, "largestObjects": []})
+        group["objectCount"] += 1
+        group["bytes"] += item["size"]
+        group["largestObjects"].append({"key": item["key"], "bytes": item["size"], "etag": item.get("etag")})
+    for group in groups.values():
+        group["largestObjects"] = sorted(group["largestObjects"], key=lambda item: (-item["bytes"], item["key"]))[:10]
+    return {"schema": "atlas-ibus-source-inventory-v1", "baseVersion": version, "validFrom": valid_from, "validTo": valid_to, "objectCount": len(objects), "totalBytes": sum(item["size"] for item in objects), "groups": groups, "scheduleArchiveCount": groups.get("schedule", {}).get("objectCount", 0), "scheduleArchiveBytes": groups.get("schedule", {}).get("bytes", 0), "downloadedBytes": 0}
 
 
 def zip_entry_by_name(archive: zipfile.ZipFile, prefix: str) -> str:
@@ -138,7 +238,9 @@ def zip_entry_by_name(archive: zipfile.ZipFile, prefix: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--assessment-date", required=True, help="Service date in YYYY-MM-DD format.")
-    parser.add_argument("--service-line", action="append", required=True, help="Passenger-facing Service_Line_No to index; may be repeated.")
+    parser.add_argument("--service-line", action="append", help="Passenger-facing Service_Line_No to index; may be repeated.")
+    parser.add_argument("--service-line-selection", type=Path, help=f"Candidate-derived selection manifest ({SELECTION_SCHEMA}); records the complete line-set identity.")
+    parser.add_argument("--inventory-only", action="store_true", help="Fetch fresh Base_Version.xml and bounded S3 listing metadata, report archive sizes, and exit before downloading any archives.")
     parser.add_argument("--cache-dir", type=Path, default=Path.home() / ".cache" / "atlas" / "tfl-ibus", help="Version-scoped raw-source cache directory.")
     parser.add_argument("--output", type=Path, required=True, help="Output compact JSON index path.")
     parser.add_argument("--manifest-output", type=Path, help="Optional current-index manifest path for runtime version selection.")
@@ -146,12 +248,17 @@ def main() -> int:
     args = parser.parse_args()
 
     assessment_date = dt.date.fromisoformat(args.assessment_date)
-    service_lines = sorted({str(line).strip() for line in args.service_line if str(line).strip()}, key=lambda value: (value.casefold(), value))
-    if not service_lines:
+    selection_hash = None
+    selected_lines = []
+    if args.service_line_selection:
+        selected_lines, selection_hash = load_service_line_selection(args.service_line_selection)
+    service_lines = sorted({str(line).strip() for line in (args.service_line or []) if str(line).strip()} | set(selected_lines), key=lambda value: (value.casefold(), value))
+    if not service_lines and not args.inventory_only:
         raise ValueError("At least one Service_Line_No is required.")
     retrieved_at = args.retrieved_at or dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     source = Source(args.cache_dir)
-    metadata_path, metadata_cache_hit = source.get("Base_Version.xml", public_root=True)
+    # Always refresh the root metadata: it selects the current/future version.
+    metadata_path, metadata_cache_hit = source.get("Base_Version.xml", public_root=True, refresh=True)
     metadata_root = ET.parse(metadata_path).getroot()
     version = child_text(metadata_root, "Base_Version")
     valid_from = child_text(metadata_root, "Valid_From")
@@ -179,6 +286,9 @@ def main() -> int:
     (source.cache_hits if metadata_cache_hit else source.downloaded_objects).append({"key": "Base_Version.xml", "bytes": metadata_path.stat().st_size})
     listed_objects = source.list_version_objects(version)
     objects_by_key = {item["key"]: item for item in listed_objects}
+    if args.inventory_only:
+        print(json.dumps(inventory_summary(version, valid_from, valid_to, listed_objects), ensure_ascii=False, sort_keys=True))
+        return 0
     prefix = f"Base_Version_{version}/"
     line_key = prefix + f"Line_{version}.zip"
     operator_key = prefix + f"Operator_{version}.zip"
@@ -363,6 +473,7 @@ def main() -> int:
         "archiveCount": len([key for key in source_objects if key.endswith(".zip")]),
         "entityRecordsInspected": {"journey": journey_count, "block": block_count, "blockCalendarDay": calendar_count},
         "assessmentDate": assessment_date.isoformat(),
+        "serviceLineSelection": {"schema": SELECTION_SCHEMA if args.service_line_selection else None, "sourceSnapshotSha256": selection_hash, "selectedServiceLines": service_lines, "completeSelectionManifestSupplied": bool(args.service_line_selection)},
     }
     document = {
         "schema": SCHEMA,

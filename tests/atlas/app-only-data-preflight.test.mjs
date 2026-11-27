@@ -35,7 +35,9 @@ try {
   const status = { schema: 'atlas-bus-refresh-status-v1', status: 'validated', validation: 'passed', diagnosticOnly: false, productionEligible: true, publicationEligible: true, plannerEligible: true, generatedAt: now.toISOString() };
   const busManifest = { schema: 'atlas-prepared-bus-data-v2', services: ['services/bus.json'] };
   const tndsManifest = { schema: 'atlas-prepared-bus-tnds-v2', services: ['services/one.json'] };
-  const nptgManifest = { schema: 'atlas-nptg-v1', stops: ['stops/one.json'] };
+  const nptgLocality = { schema: 'atlas-prepared-nptg-localities-v1', localities: [{ id: 'nptg:E001', code: 'E001', name: 'Fixture locality' }] };
+  const nptgLocalityText = `${JSON.stringify(nptgLocality, null, 2)}\n`;
+  const nptgManifest = { schema: 'atlas-prepared-nptg-v1', baseVersion: '20261124', source: { sha256: hash('fixture-nptg-source') }, localityShardKeyLength: 3, localityShards: { E00: 'localities/E00.json' }, shards: { E00: { path: 'localities/E00.json', bytes: Buffer.byteLength(nptgLocalityText), sha256: hash(nptgLocalityText) } } };
   const ibusIndex = { baseVersion: '20261124', validFrom: '2026-11-24', validTo: '2026-12-01', operators: [] };
   const ibusIndexText = `${JSON.stringify(ibusIndex, null, 2)}\n`;
   const ibusManifest = { baseVersion: ibusIndex.baseVersion, validFrom: ibusIndex.validFrom, validTo: ibusIndex.validTo, indexPath: 'operator-index.json', indexSha256: hash(ibusIndexText) };
@@ -47,6 +49,7 @@ try {
   await write('atlas/data/bus-tnds/manifest.json', tndsManifest);
   await write('atlas/data/bus-tnds/publication-manifest.json', publication('tnds', ['services/one.json'], { identity: { bankId: 'B', rootId: 'B1' } }));
   await write('atlas/data/nptg/manifest.json', nptgManifest);
+  await write('atlas/data/nptg/localities/E00.json', nptgLocalityText);
   await write('atlas/data/tfl-ibus/manifest.json', ibusManifest);
   await write('atlas/data/tfl-ibus/operator-index.json', ibusIndexText);
   const identity = dataPublicationIdentity({ dataSources: sources, dataStatus: status, busManifestSha256: jsonHash(busManifest), tndsManifestSha256: [jsonHash(tndsManifest)], nptgManifestSha256: jsonHash(nptgManifest), ibusManifestSha256: jsonHash(ibusManifest), ibusIndexSha256: jsonHash(ibusIndex) });

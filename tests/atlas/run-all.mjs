@@ -13,6 +13,7 @@ await import('./bus-timetable-merge.test.mjs');
 await import('./bus-timetable-merge-semantic.test.mjs');
 await import('./bus-robustness-1b-national-planner-trust.test.mjs');
 await import('./nptg-review-runtime.test.mjs');
+await import('./nptg-publication-runtime.test.mjs');
 await import('./bus-stop-structure.test.mjs');
 await import('./bus-data-updater.test.mjs');
 await import('./prepared-bus-data-integrity.test.mjs');

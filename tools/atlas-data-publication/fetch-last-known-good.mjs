@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -10,6 +11,10 @@ const fetchText = async url => {
   const response = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } });
   if (!response.ok) return null;
   return response.text();
+};
+const fetchBytes = async url => {
+  const response = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } });
+  return response.ok ? Buffer.from(await response.arrayBuffer()) : null;
 };
 const writeJson = async (relative, value) => {
   const target = path.join(outputRoot, relative);
@@ -77,6 +82,19 @@ if (nptg?.baseUrl) {
     const directory = path.join(outputRoot, 'atlas', 'data', 'nptg');
     await fs.mkdir(directory, { recursive: true });
     await fs.writeFile(path.join(directory, 'manifest.json'), nptgManifest);
+    const manifest = JSON.parse(nptgManifest);
+    const shardPaths = [...new Set(Object.values(manifest.localityShards ?? {}).filter(value => typeof value === 'string'))];
+    for (const relative of shardPaths) {
+      if (!relative || relative.startsWith('/') || relative.split('/').some(part => !part || part === '.' || part === '..' || part.startsWith('.'))) throw new Error('Published NPTG manifest contains an unsafe locality-shard path.');
+      const payload = await fetchBytes(new URL(relative, nptgBase));
+      if (!payload) throw new Error(`Published NPTG locality shard is unavailable: ${relative}`);
+      const expected = Object.values(manifest.shards ?? {}).find(item => item?.path === relative);
+      const digest = createHash('sha256').update(payload).digest('hex');
+      if (!expected || expected.bytes !== payload.byteLength || expected.sha256 !== digest) throw new Error(`Published NPTG locality shard failed its manifest integrity check: ${relative}`);
+      const target = path.join(directory, relative);
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await fs.writeFile(target, payload);
+    }
   }
 }
 const status = await fetchText(new URL('data/status/manifest.json', root));

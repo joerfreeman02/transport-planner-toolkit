@@ -318,15 +318,19 @@ export function createPreparedBusDataAdapter({
   fetchImpl = globalThis.fetch,
   baseUrl,
   tndsBaseUrl = null,
+  nptgBaseUrl = null,
   busFileUrl = null,
   tndsFileUrl = null,
+  nptgFileUrl = null,
   clock = () => new Date(),
   timeoutMs = 20000
 } = {}) {
   if (!baseUrl) throw new Error('Prepared bus-data base URL is required.');
   const resolveBusUrl = relativePath => busFileUrl ? busFileUrl(relativePath) : resolveUrl(baseUrl, relativePath);
   const resolveTndsUrl = relativePath => tndsFileUrl ? tndsFileUrl(relativePath) : resolveUrl(tndsBaseUrl, relativePath);
+  const resolveNptgUrl = relativePath => nptgFileUrl ? nptgFileUrl(relativePath) : resolveUrl(nptgBaseUrl, relativePath);
   let manifestPromise = null;
+  let nptgManifestPromise = null;
   const documentPromises = new Map();
 
   async function loadJson(relativePath, forceRefresh = false) {
@@ -339,6 +343,17 @@ export function createPreparedBusDataAdapter({
     return response;
   }
 
+  async function loadNptgJson(relativePath, forceRefresh = false) {
+    const key = `nptg:${relativePath}`;
+    if (forceRefresh) documentPromises.delete(key);
+    if (!documentPromises.has(key)) documentPromises.set(key, relativePath.endsWith('.gz')
+      ? requestPreparedJson({ url: resolveNptgUrl(relativePath), fetchImpl, timeoutMs })
+      : requestJson({ url: resolveNptgUrl(relativePath), fetchImpl, timeoutMs }));
+    const response = await documentPromises.get(key);
+    if (!response.ok) documentPromises.delete(key);
+    return response;
+  }
+
   async function manifest(forceRefresh = false) {
     if (forceRefresh) manifestPromise = null;
     if (!manifestPromise) manifestPromise = loadJson('manifest.json', forceRefresh);
@@ -348,6 +363,30 @@ export function createPreparedBusDataAdapter({
       return sourceFailure({ code: response.code || 'invalid_response', message: 'National bus information could not be checked. Please try again.', provenance: { source: `${STOP_SOURCE} and ${TIMETABLE_SOURCE}`, endpoint: resolveBusUrl('manifest.json') } });
     }
     return sourceSuccess({ data: response.data, provenance: { source: `${STOP_SOURCE} and ${TIMETABLE_SOURCE}`, endpoint: resolveBusUrl('manifest.json') } });
+  }
+
+  async function nptgManifest(forceRefresh = false) {
+    if (!nptgBaseUrl) return sourceFailure({ code: 'not_configured', message: 'National locality information is not configured.', provenance: { source: 'National Public Transport Gazetteer' } });
+    if (forceRefresh) nptgManifestPromise = null;
+    if (!nptgManifestPromise) nptgManifestPromise = loadNptgJson('manifest.json', forceRefresh);
+    const response = await nptgManifestPromise;
+    const index = response.data;
+    if (!response.ok || index?.schema !== 'atlas-prepared-nptg-v1' || !index.baseVersion || !/^[0-9a-f]{64}$/i.test(String(index.source?.sha256 ?? ''))
+        || !Number.isInteger(index.localityShardKeyLength) || !index.localityShards || typeof index.localityShards !== 'object'
+        || Array.isArray(index.localityShards) || !Object.keys(index.localityShards).length) {
+      nptgManifestPromise = null;
+      return sourceFailure({ code: response.code || 'invalid_response', message: 'National locality information could not be checked. Please try again.', provenance: { source: 'National Public Transport Gazetteer', endpoint: resolveNptgUrl('manifest.json') } });
+    }
+    for (const [key, relative] of Object.entries(index.localityShards)) {
+      const parts = typeof relative === 'string' ? relative.split('/') : [];
+      if (!key || typeof relative !== 'string' || !relative.startsWith('localities/') || parts.some(part => !part || part === '.' || part === '..' || part.startsWith('.'))
+          || index.shards?.[key]?.path !== relative || !Number.isSafeInteger(index.shards[key].bytes) || index.shards[key].bytes < 1
+          || !/^[0-9a-f]{64}$/i.test(String(index.shards[key].sha256 ?? ''))) {
+        nptgManifestPromise = null;
+        return sourceFailure({ code: 'invalid_response', message: 'National locality information could not be checked. Please try again.', provenance: { source: 'National Public Transport Gazetteer', endpoint: resolveNptgUrl('manifest.json') } });
+      }
+    }
+    return sourceSuccess({ data: index, provenance: { source: 'National Public Transport Gazetteer', endpoint: resolveNptgUrl('manifest.json') } });
   }
 
   function snapshotWarnings(data) {
@@ -685,14 +724,15 @@ export function createPreparedBusDataAdapter({
   }
 
   async function localitiesForStops(stops, { forceRefresh = false } = {}) {
-    const manifestResult = await manifest(forceRefresh);
+    const manifestResult = nptgBaseUrl ? await nptgManifest(forceRefresh) : await manifest(forceRefresh);
     if (!manifestResult.ok) return manifestResult;
     const index = manifestResult.data;
-    if (index.schema !== 'atlas-prepared-bus-data-v2') return sourceSuccess({ data: [], warnings: ['Prepared v1 data does not contain NPTG locality sidecars.'], provenance: { source: STOP_SOURCE, localityAvailable: false } });
+    if (!nptgBaseUrl && index.schema !== 'atlas-prepared-bus-data-v2') return sourceSuccess({ data: [], warnings: ['Prepared v1 data does not contain NPTG locality sidecars.'], provenance: { source: STOP_SOURCE, localityAvailable: false } });
     const shardKey = code => String(code ?? '').slice(0, Number(index.localityShardKeyLength || 3));
     const keys = [...new Set((stops ?? []).map(stop => shardKey(stop.nptgLocalityCode)).filter(Boolean))];
     const paths = keys.map(key => index.localityShards?.[key]).filter(Boolean);
-    const responses = await Promise.all(paths.map(path => loadJson(path, forceRefresh)));
+    const loadLocalityJson = nptgBaseUrl ? loadNptgJson : loadJson;
+    const responses = await Promise.all(paths.map(path => loadLocalityJson(path, forceRefresh)));
     if (responses.some(response => !response.ok) || responses.some(response => response.data?.schema !== 'atlas-prepared-nptg-localities-v1' || !Array.isArray(response.data?.localities))) return sourceFailure({ code: 'invalid_response', message: 'NPTG locality data could not be safely interpreted.', provenance: { source: STOP_SOURCE, localityAvailable: true } });
     const wanted = new Set((stops ?? []).map(stop => `nptg:${stop.nptgLocalityCode}`).filter(id => id !== 'nptg:'));
     const direct = responses.flatMap(response => response.data.localities).filter(locality => wanted.has(locality.id));
@@ -701,7 +741,7 @@ export function createPreparedBusDataAdapter({
     const parentKeys = [...new Set([...parentIds].map(id => shardKey(id.replace(/^nptg:/, ''))).filter(key => key && !keys.includes(key)))];
     const parentPaths = parentKeys.map(key => index.localityShards?.[key]).filter(Boolean);
     if (parentPaths.length) {
-      const parentResponses = await Promise.all(parentPaths.map(path => loadJson(path, forceRefresh)));
+    const parentResponses = await Promise.all(parentPaths.map(path => loadLocalityJson(path, forceRefresh)));
       if (parentResponses.some(response => !response.ok) || parentResponses.some(response => response.data?.schema !== 'atlas-prepared-nptg-localities-v1' || !Array.isArray(response.data?.localities))) return sourceFailure({ code: 'invalid_response', message: 'NPTG parent-locality data could not be safely interpreted.', provenance: { source: STOP_SOURCE, localityAvailable: true } });
       for (const locality of parentResponses.flatMap(response => response.data.localities)) loaded.set(String(locality.id), locality);
     }

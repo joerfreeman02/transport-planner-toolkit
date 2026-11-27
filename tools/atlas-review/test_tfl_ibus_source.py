@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 import zipfile
+import xml.etree.ElementTree as ET
 from email.message import Message
 from pathlib import Path
 from unittest.mock import patch
@@ -43,6 +44,18 @@ class InterruptedResponse(Response):
 
 
 class IbusSourceTests(unittest.TestCase):
+    def test_complete_line_inventory_keeps_every_official_passenger_line(self):
+        xml = ET.fromstring('<Network_Data><Line aContract_Line_No="C1"><Service_Line_No>1</Service_Line_No></Line><Line aContract_Line_No="C2"><Service_Line_No>N15</Service_Line_No></Line><Line aContract_Line_No="C3"><Service_Line_No>1</Service_Line_No></Line></Network_Data>')
+        lines, selected = builder.collect_line_records(xml, "20261127", set(), all_service_lines=True)
+        self.assertEqual(selected, {"1", "N15"})
+        self.assertEqual(len(lines), 3)
+        self.assertEqual({row["contractLineNo"] for row in lines}, {"C1", "C2", "C3"})
+
+    def test_all_line_selection_rejects_missing_contract_identity(self):
+        xml = ET.fromstring('<Network_Data><Line><Service_Line_No>1</Service_Line_No></Line></Network_Data>')
+        with self.assertRaisesRegex(ValueError, "no Contract_Line_No"):
+            builder.collect_line_records(xml, "20261127", set(), all_service_lines=True)
+
     def test_candidate_selection_requires_a_bound_snapshot_and_unique_lines(self):
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "selection.json"

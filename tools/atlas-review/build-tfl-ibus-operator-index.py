@@ -235,11 +235,32 @@ def zip_entry_by_name(archive: zipfile.ZipFile, prefix: str) -> str:
     return matches[0]
 
 
+def collect_line_records(root: ET.Element, version: str, selected_lines: set[str], *, all_service_lines: bool = False) -> tuple[list[dict], set[str]]:
+    records = []
+    selected = set(selected_lines)
+    for record in root.iter():
+        if local_name(record.tag) != "Line":
+            continue
+        if record.get("Base_Version") and record.get("Base_Version") != version:
+            raise ValueError("Mixed Base_Version in Line records.")
+        service_line = child_text(record, "Service_Line_No")
+        if not service_line or not (all_service_lines or service_line in selected):
+            continue
+        contract_line = record.get("aContract_Line_No")
+        if not contract_line:
+            raise ValueError(f"Selected Service_Line_No {service_line} has no Contract_Line_No mapping.")
+        records.append({"serviceLineNo": service_line, "contractLineNo": contract_line, "logicalLineNo": child_text(record, "Logical_Line_No"), "baseVersion": version})
+        if all_service_lines:
+            selected.add(service_line)
+    return records, selected
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--assessment-date", required=True, help="Service date in YYYY-MM-DD format.")
     parser.add_argument("--service-line", action="append", help="Passenger-facing Service_Line_No to index; may be repeated.")
     parser.add_argument("--service-line-selection", type=Path, help=f"Candidate-derived selection manifest ({SELECTION_SCHEMA}); records the complete line-set identity.")
+    parser.add_argument("--all-service-lines", action="store_true", help="Index every official passenger-facing Service_Line_No in the current Line archive.")
     parser.add_argument("--inventory-only", action="store_true", help="Fetch fresh Base_Version.xml and bounded S3 listing metadata, report archive sizes, and exit before downloading any archives.")
     parser.add_argument("--cache-dir", type=Path, default=Path.home() / ".cache" / "atlas" / "tfl-ibus", help="Version-scoped raw-source cache directory.")
     parser.add_argument("--output", type=Path, required=True, help="Output compact JSON index path.")
@@ -252,8 +273,10 @@ def main() -> int:
     selected_lines = []
     if args.service_line_selection:
         selected_lines, selection_hash = load_service_line_selection(args.service_line_selection)
+    if args.all_service_lines and (args.service_line or args.service_line_selection):
+        raise ValueError("--all-service-lines cannot be combined with a partial service-line selection.")
     service_lines = sorted({str(line).strip() for line in (args.service_line or []) if str(line).strip()} | set(selected_lines), key=lambda value: (value.casefold(), value))
-    if not service_lines and not args.inventory_only:
+    if not service_lines and not args.inventory_only and not args.all_service_lines:
         raise ValueError("At least one Service_Line_No is required.")
     retrieved_at = args.retrieved_at or dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     source = Source(args.cache_dir)
@@ -297,20 +320,8 @@ def main() -> int:
     with read_archive(source, line_key, objects_by_key, source_objects) as archive:
         entry = zip_entry_by_name(archive, "Line_")
         root = parse_xml_entry(archive, entry, version, "Line")
-        line_records = []
-        for record in root.iter():
-            if local_name(record.tag) != "Line":
-                continue
-            if record.get("Base_Version") and record.get("Base_Version") != version:
-                raise ValueError("Mixed Base_Version in Line records.")
-            service_line = child_text(record, "Service_Line_No")
-            if service_line in service_lines:
-                line_records.append({
-                    "serviceLineNo": service_line,
-                    "contractLineNo": record.get("aContract_Line_No"),
-                    "logicalLineNo": child_text(record, "Logical_Line_No"),
-                    "baseVersion": version,
-                })
+        line_records, selected = collect_line_records(root, version, set(service_lines), all_service_lines=args.all_service_lines)
+        service_lines = sorted(selected, key=lambda value: (value.casefold(), value))
     if not line_records or any(not row["contractLineNo"] for row in line_records):
         raise ValueError("No complete exact Service_Line_No to Contract_Line_No mapping was found.")
     contract_lines = sorted({row["contractLineNo"] for row in line_records})
@@ -473,7 +484,7 @@ def main() -> int:
         "archiveCount": len([key for key in source_objects if key.endswith(".zip")]),
         "entityRecordsInspected": {"journey": journey_count, "block": block_count, "blockCalendarDay": calendar_count},
         "assessmentDate": assessment_date.isoformat(),
-        "serviceLineSelection": {"schema": SELECTION_SCHEMA if args.service_line_selection else None, "sourceSnapshotSha256": selection_hash, "selectedServiceLines": service_lines, "completeSelectionManifestSupplied": bool(args.service_line_selection)},
+        "serviceLineSelection": {"schema": SELECTION_SCHEMA if args.service_line_selection else None, "sourceSnapshotSha256": selection_hash, "selectedServiceLines": sorted(set(service_lines), key=lambda value: (value.casefold(), value)), "completeSelectionManifestSupplied": bool(args.service_line_selection) or args.all_service_lines, "selectionMode": "all-official-Service_Line_No" if args.all_service_lines else ("candidate-derived-manifest" if args.service_line_selection else "explicit-lines")},
     }
     document = {
         "schema": SCHEMA,

@@ -32,6 +32,19 @@ assert.ok(fiveRootRotation.roots.every(root => root.fit));
 assert.equal(fiveRootRotation.roots.find(root => root.regions.includes('SW')).projectedTotalPublicationFootprintBytes, 837_963_706);
 assert.equal(fiveRootRotation.roots.find(root => root.regions.includes('SW')).safetyMarginRemainingBytes, 62_036_294);
 assert.deepEqual(allocateTndsPublicationRoots(currentNationalSnapshot, { rootIds: ['A1', 'A2', 'A3', 'A4', 'A5'] }), fiveRootRotation, 'Retained manifest allocation must be deterministic at the minimum fitting bank size.');
+const configuredBankA = [
+  { id: 'A1', regions: ['SW'] }, { id: 'A2', regions: ['SE'] },
+  { id: 'A3', regions: ['EA', 'NW'] }, { id: 'A4', regions: ['NE', 'WM'] },
+  { id: 'A5', regions: ['EM', 'Y'] }
+];
+const fixedAllocation = allocateTndsPublicationRoots(currentNationalSnapshot, { rootIds: configuredBankA.map(root => root.id), rootRegionAssignments: configuredBankA });
+assert.deepEqual(fixedAllocation.roots.map(root => [root.id, root.regions]), configuredBankA.map(root => [root.id, root.regions]));
+const changedRegionalSizes = { files: [currentNationalSnapshot.files[0], ...TNDS_REGIONS.map(region => ({ path: `services/changed-${region}.json.gz`, bytes: currentRegionBytes[region] + 125_000, sha256: `changed-${region}` }))] };
+const fixedAllocationAfterSizeChange = allocateTndsPublicationRoots(changedRegionalSizes, { rootIds: configuredBankA.map(root => root.id), rootRegionAssignments: configuredBankA });
+assert.deepEqual(fixedAllocationAfterSizeChange.roots.map(root => [root.id, root.regions]), configuredBankA.map(root => [root.id, root.regions]), 'Regional byte changes must not silently remap the configured Bank A root-region assignments.');
+assert.equal(fixedAllocationAfterSizeChange.objective.stableAcrossCandidateSizes, true);
+assert.throws(() => allocateTndsPublicationRoots({ files: [{ path: 'manifest.json', bytes: 1, sha256: 'm' }, ...TNDS_REGIONS.map(region => ({ path: `services/${region}.json`, bytes: region === 'SW' ? 900_000_000 : 1, sha256: region }))] }, { rootIds: configuredBankA.map(root => root.id), rootRegionAssignments: configuredBankA }), /Preserve the configured assignments and report the capacity blocker/);
+assert.throws(() => allocateTndsPublicationRoots(currentNationalSnapshot, { rootIds: configuredBankA.map(root => root.id), rootRegionAssignments: [{ ...configuredBankA[0], regions: ['SW', 'SE'] }, ...configuredBankA.slice(1)] }), /cover every authoritative region exactly once/);
 assert.throws(() => allocateTndsPublicationRoots({ files: [{ path: 'manifest.json', bytes: 1, sha256: 'x' }, ...['EA', 'EM', 'NE', 'NW'].map(region => ({ path: `services/${region}.json`, bytes: 450_000_000, sha256: region }))] }, { expectedRegions: ['EA', 'EM', 'NE', 'NW'], rootIds: ['A1', 'A2', 'A3'] }), /cannot contain the complete candidate/);
 assert.throws(() => assertPublicationFits({ bytes: SAFE_PUBLICATION_LIMIT_BYTES + 1, fileCount: 1 }, 'total site'), /safe bounded-publication limit/);
 assert.doesNotThrow(() => assertPublicationGitBlobsFit({ files: [{ path: 'services/national-SE.json.gz', bytes: 87_203_939 }] }, 'Run #22-scale TNDS root'));
@@ -50,6 +63,8 @@ for (const region of TNDS_REGIONS) await fs.writeFile(path.join(tndsRoot, 'servi
 const configuredCandidateMeasure = await measureCandidateDatasets(candidate, { rootIds: ['A1', 'A2', 'A3', 'A4', 'A5'] });
 assert.deepEqual(configuredCandidateMeasure.proposedPublication.rootIds, ['A1', 'A2', 'A3', 'A4', 'A5']);
 assert.equal(configuredCandidateMeasure.proposedPublication.bankRootCount, 5);
+const configuredBankAMeasure = await measureCandidateDatasets(candidate, { rootIds: configuredBankA.map(root => root.id), rootRegionAssignments: configuredBankA });
+assert.deepEqual(configuredBankAMeasure.proposedPublication.roots.map(root => [root.id, root.regions]), configuredBankA.map(root => [root.id, root.regions]));
 await assert.rejects(() => measureCandidateDatasets(candidate), /requires the configured inactive TNDS root identities/);
 
 const repo = id => path.join(temp, 'repos', id);

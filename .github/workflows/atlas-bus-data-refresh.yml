@@ -921,10 +921,10 @@ jobs:
       - name: Validate fresh or restored candidate data
         id: candidate-validation
         continue-on-error: ${{ inputs.prepared_schema == 'v2' }}
-        run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site ${{ inputs.prepared_schema == 'v2' && '--bus-only' || '' }}
+        run: python tools/atlas-bus-data/validate_candidate.py --site-root pages-site ${{ inputs.prepared_schema == 'v2' && '--bus-only' || '' }} > "$RUNNER_TEMP/candidate-validation.json"
       - name: Run deterministic ATLAS checks
         if: always()
-        run: node tests/atlas/run-all.mjs
+        run: node tests/atlas/run-all.mjs > "$RUNNER_TEMP/deterministic-atlas-suite.log" 2>&1
       - name: Measure complete candidate against the configured inactive TNDS bank
         if: inputs.prepared_schema != 'v2'
         run: node tools/atlas-data-publication/measure-candidate.mjs --candidate-site pages-site --output pages-site/atlas/config/atlas-candidate-measurement.json --config last-known-good/atlas/config/atlas-data-sources.json --banks-json "$ATLAS_TNDS_BANKS_JSON"
@@ -978,6 +978,9 @@ jobs:
         run: |
           echo 'The v2 hard validator failed; aggregate evidence was collected and the candidate remains non-publishable.'
           exit 1
+      - name: Finalize planner eligibility from completed production gates
+        if: github.ref == 'refs/heads/main' && inputs.measure_only != true && inputs.prepared_schema != 'v2'
+        run: python tools/atlas-bus-data/finalize_candidate_eligibility.py --site-root pages-site --validation-report "$RUNNER_TEMP/candidate-validation.json" --deterministic-log "$RUNNER_TEMP/deterministic-atlas-suite.log" --measurement pages-site/atlas/config/atlas-candidate-measurement.json
       - name: Enforce candidate publication capacity gates
         if: github.ref == 'refs/heads/main' && inputs.measure_only != true
         run: node tools/atlas-data-publication/candidate-checkpoint.mjs --capacity-only --candidate-site pages-site

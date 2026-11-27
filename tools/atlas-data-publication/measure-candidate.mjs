@@ -14,8 +14,14 @@ async function main() {
   const outputArg = option('--output');
   const candidateSite = path.resolve(candidateSiteArg);
   const busOnly = process.argv.includes('--bus-only');
+  const rootIdsJson = option('--root-ids-json');
   let result;
   if (busOnly) result = { diagnosticSchema: 'atlas-bus-only-capacity-diagnostic-v1', diagnosticOnly: true, productionEligible: false, bus: await measurePublicationTree(path.join(candidateSite, 'atlas', 'data', 'bus')), tnds: null };
+  else if (rootIdsJson) {
+    const rootIds = JSON.parse(rootIdsJson);
+    if (!Array.isArray(rootIds) || !rootIds.length || rootIds.some(value => typeof value !== 'string' || !value.trim())) throw new Error('--root-ids-json must be a non-empty JSON array of root IDs.');
+    result = await measureCandidateDatasets(candidateSite, { rootIds });
+  }
   else {
     const configArg = option('--config');
     const banksArg = option('--banks-json');
@@ -25,7 +31,7 @@ async function main() {
     if (!Array.isArray(banks)) throw new Error('Configured TNDS banks must be a JSON array.');
     const candidateBank = selectOppositeTndsBank(activeConfig.datasets?.tnds?.activeBank ?? null, banks);
     if (!candidateBank?.id || !Array.isArray(candidateBank.roots) || !candidateBank.roots.length) throw new Error('The inactive TNDS bank does not have configured roots for capacity measurement.');
-    result = await measureCandidateDatasets(candidateSite, { rootIds: candidateBank.roots.map(root => String(root.id)) });
+    result = await measureCandidateDatasets(candidateSite, { rootIds: candidateBank.roots.map(root => String(root.id)), rootRegionAssignments: candidateBank.roots });
     result.tnds.candidateBankId = String(candidateBank.id);
   }
   if (outputArg) {

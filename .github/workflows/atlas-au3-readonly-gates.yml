@@ -6,7 +6,18 @@ on:
       - codex/atlas-auto-updater-au3-20261127
     paths:
       - .github/workflows/atlas-au3-readonly-gates.yml
+      - .github/workflows/atlas-bus-beta-candidate.yml
+      - .github/workflows/atlas-bus-data-refresh.yml
       - tools/atlas-data-publication/au3-readonly-preflight.mjs
+      - tools/atlas-data-publication/measure-candidate.mjs
+      - tools/atlas-data-publication/publication.mjs
+      - tools/atlas-bus-data/finalize_candidate_eligibility.py
+      - tools/atlas-bus-data/test_finalize_candidate_eligibility.py
+      - tools/atlas-bus-data/test_review_candidate_workflow_contract.py
+      - tools/atlas-review/build-tfl-ibus-operator-index.py
+      - tools/atlas-review/test_tfl_ibus_source.py
+      - tests/atlas/run-all.mjs
+      - tests/atlas/**/*.test.mjs
 
 permissions:
   actions: read
@@ -34,7 +45,16 @@ jobs:
           ATLAS_BUS_DATA_SITE_URL: ${{ vars.ATLAS_BUS_DATA_SITE_URL }}
           ATLAS_REFERENCE_DATA_BRANCH: ${{ vars.ATLAS_REFERENCE_DATA_BRANCH || 'pages-publish' }}
           ATLAS_REFERENCE_DATA_TOKEN: ${{ secrets.ATLAS_REFERENCE_DATA_TOKEN }}
-        run: node tools/atlas-data-publication/au3-readonly-preflight.mjs
+        run: |
+          node tools/atlas-data-publication/au3-readonly-preflight.mjs > "$RUNNER_TEMP/atlas-au3-readonly-preflight.json"
+          cat "$RUNNER_TEMP/atlas-au3-readonly-preflight.json"
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: atlas-au3-readonly-preflight-${{ github.run_id }}
+          path: ${{ runner.temp }}/atlas-au3-readonly-preflight.json
+          if-no-files-found: error
+          retention-days: 90
 
   ibus-source-inventory:
     if: github.repository == 'joerfreeman02/transport-planner-toolkit'
@@ -63,3 +83,44 @@ jobs:
           path: ${{ runner.temp }}/atlas-au3-ibus/source-inventory.json
           if-no-files-found: error
           retention-days: 30
+
+  exact-sha-validation:
+    if: github.repository == 'joerfreeman02/transport-planner-toolkit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Install locked browser-test dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium for headless ATLAS browser checks
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run the full deterministic ATLAS suite
+        run: node tests/atlas/run-all.mjs
+      - name: Run all Bus preparation and publication Python tests
+        env:
+          PYTHONPATH: tools/atlas-bus-data:tools/atlas-review
+        run: python -m unittest discover -s tools/atlas-bus-data -p 'test_*.py'
+      - name: Run TfL iBus source acquisition and validity tests
+        env:
+          PYTHONPATH: tools/atlas-bus-data:tools/atlas-review
+        run: python -m unittest discover -s tools/atlas-review -p 'test_tfl_ibus_source.py'
+
+  fresh-source-candidate:
+    needs: [provisioned-storage-preflight, ibus-source-inventory, exact-sha-validation]
+    if: github.repository == 'joerfreeman02/transport-planner-toolkit' && github.ref == 'refs/heads/codex/atlas-auto-updater-au3-20261127'
+    uses: ./.github/workflows/atlas-bus-beta-candidate.yml
+    with:
+      mode: compose
+      au3_preflight_run_id: ${{ github.run_id }}
+    secrets: inherit

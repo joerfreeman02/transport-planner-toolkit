@@ -29,6 +29,20 @@ class ReviewCandidateWorkflowContractTests(unittest.TestCase):
         self.assertNotIn("upload-pages-artifact", self.workflow)
         self.assertNotIn("deploy-pages", self.workflow)
 
+    def test_au3_candidate_uses_exact_read_only_preflight_and_complete_live_tfl_index(self):
+        self.assertIn("au3_preflight_run_id:", self.workflow)
+        self.assertIn("Exact-run AU-3 storage-preflight artifact", self.workflow)
+        self.assertIn("atlas-au3-readonly-preflight-${{ steps.preflight-authorization.outputs.au3_run_id }}", self.workflow)
+        self.assertIn("--all-service-lines", self.workflow)
+        self.assertIn("--assessment-date", self.workflow)
+        self.assertIn("atlas-candidate-measurement.json", self.workflow)
+        self.assertIn("--banks-json", self.workflow)
+        self.assertIn("actions: read", self.workflow)
+        self.assertIn("contents: read", self.workflow)
+        self.assertNotIn("publish-bank.mjs", self.workflow)
+        self.assertNotIn("deploy-pages", self.workflow)
+        self.assertNotIn("pages: write", self.workflow)
+
     def test_existing_default_branch_dispatcher_invokes_only_the_isolated_manual_c1_path(self):
         selector = self.dispatcher.split("- name: Resolve S2A-C1 offline preflight selector", 1)[1].split("- name: Resolve exact-branch TRUST browser selector", 1)[0]
         self.assertIn("CANDIDATE_MODE", selector)

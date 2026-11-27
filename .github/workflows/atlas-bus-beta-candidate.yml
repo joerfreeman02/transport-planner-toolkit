@@ -3,6 +3,10 @@ name: ATLAS Bus Beta review candidate
 on:
   workflow_call:
     inputs:
+      au3_preflight_run_id:
+        description: Exact current AU-3 run whose read-only storage preflight authorizes this candidate-only acquisition
+        required: false
+        type: string
       mode:
         description: Compose from raw snapshots or explicitly restore a complete review candidate
         required: true
@@ -75,8 +79,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.x'
+      - name: Record candidate-runner capacity baseline
+        if: inputs.mode == 'compose'
+        run: |
+          mkdir -p candidate-audit
+          { date -u +%FT%TZ; df -B1 "$RUNNER_TEMP"; free -b; } | tee candidate-audit/runner-capacity.txt
 
       - name: Require successful unexpired exact-SHA offline preflight before source acquisition
+        id: preflight-authorization
         if: inputs.mode == 'compose'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -85,6 +95,7 @@ jobs:
           GH_REF_NAME: ${{ github.ref_name }}
           GH_API_URL: ${{ github.api_url }}
           GH_CURRENT_RUN_ID: ${{ github.run_id }}
+          AU3_PREFLIGHT_RUN_ID: ${{ inputs.au3_preflight_run_id }}
         run: |
           python - <<'PY'
           import json, os, urllib.parse, urllib.request
@@ -94,6 +105,22 @@ jobs:
           def get(path):
               request=urllib.request.Request(base+path,headers=headers)
               with urllib.request.urlopen(request,timeout=30) as response: return json.loads(response.read())
+          au3=os.environ.get('AU3_PREFLIGHT_RUN_ID','')
+          if au3:
+              if not au3.isdigit() or au3 != os.environ['GH_CURRENT_RUN_ID']:
+                  raise SystemExit('AU-3 preflight must belong to this exact candidate workflow run.')
+              run=get(f'/repos/{repo}/actions/runs/{au3}')
+              if (run.get('head_sha') != os.environ['GH_SHA'] or run.get('head_branch') != os.environ['GH_REF_NAME']
+                  or run.get('event') != 'push' or run.get('path','').split('/')[-1] != 'atlas-au3-readonly-gates.yml'
+                  or run.get('status') not in ('in_progress','completed') or run.get('conclusion') not in (None,'success')):
+                  raise SystemExit('AU-3 preflight run is not the active successful exact-SHA/ref gate run.')
+              artifacts=get(f'/repos/{repo}/actions/runs/{au3}/artifacts?per_page=100').get('artifacts',[])
+              name=f'atlas-au3-readonly-preflight-{au3}'
+              if not any(item.get('name') == name and item.get('expired') is False for item in artifacts):
+                  raise SystemExit('Exact-run AU-3 storage-preflight artifact is missing or expired.')
+              print(f'Exact-SHA AU-3 read-only storage preflight verified: run {au3}, artifact {name}.')
+              with open(os.environ['GITHUB_OUTPUT'],'a') as output: output.write(f'au3_run_id={au3}\n')
+              raise SystemExit(0)
           query=urllib.parse.urlencode({'head_sha':os.environ['GH_SHA'],'event':'workflow_dispatch','per_page':100})
           runs=get(f'/repos/{repo}/actions/runs?{query}').get('workflow_runs',[])
           for run in runs:
@@ -103,9 +130,21 @@ jobs:
               rid=str(run['id']); name=f'atlas-tnds-trust-offline-preflight-{rid}'
               artifacts=get(f'/repos/{repo}/actions/runs/{rid}/artifacts?per_page=100').get('artifacts',[])
               if any(item.get('name') == name and item.get('expired') is False for item in artifacts):
-                  print(f'Exact-SHA/ref preflight verified: run {rid}, artifact {name}.'); raise SystemExit(0)
+                  print(f'Exact-SHA/ref preflight verified: run {rid}, artifact {name}.')
+                  with open(os.environ['GITHUB_OUTPUT'],'a') as output: output.write('au3_run_id=\n')
+                  raise SystemExit(0)
           raise SystemExit('No successful unexpired offline-preflight artifact exists for this exact SHA, branch, and expected workflow.')
           PY
+
+      - name: Restore the exact-run AU-3 proposed inactive-bank evidence
+        if: inputs.mode == 'compose' && steps.preflight-authorization.outputs.au3_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: atlas-au3-readonly-preflight-${{ steps.preflight-authorization.outputs.au3_run_id }}
+          run-id: ${{ steps.preflight-authorization.outputs.au3_run_id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: au3-preflight
 
       - name: Validate explicit raw restore parameters
         if: inputs.mode == 'compose' || inputs.mode == 'restore_candidate'
@@ -291,6 +330,55 @@ jobs:
       - name: Structurally validate prepared Bus and TNDS manifests and shards
         if: inputs.mode == 'compose'
         run: python tools/atlas-bus-data/validate_candidate.py --site-root candidate-site
+
+      - name: Build the complete date-valid official TfL iBus operator index
+        if: inputs.mode == 'compose' && steps.preflight-authorization.outputs.au3_run_id != ''
+        run: |
+          IBUS_DATE=$(date -u +%F)
+          mkdir -p "$RUNNER_TEMP/atlas-ibus-cache"
+          python tools/atlas-review/build-tfl-ibus-operator-index.py \
+            --assessment-date "$IBUS_DATE" \
+            --all-service-lines \
+            --cache-dir "$RUNNER_TEMP/atlas-ibus-cache" \
+            --output "candidate-site/atlas/data/tfl-ibus/$IBUS_DATE/operator-index.json" \
+            --manifest-output candidate-site/atlas/data/tfl-ibus/manifest.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('candidate-site/atlas/data/tfl-ibus')
+          manifest=json.loads((root/'manifest.json').read_text())
+          index=json.loads((root/manifest['indexPath']).read_text())
+          if manifest.get('baseVersion')!=index.get('baseVersion') or manifest.get('validFrom')!=index.get('validFrom') or manifest.get('validTo')!=index.get('validTo'):
+              raise SystemExit('TfL iBus index and current manifest metadata disagree.')
+          if not index.get('serviceLines') or index.get('source',{}).get('serviceLineSelection',{}).get('selectionMode')!='all-official-Service_Line_No':
+              raise SystemExit('TfL iBus candidate does not prove full official Service_Line_No coverage.')
+          if index.get('source',{}).get('scheduleArchiveCount',0)<1 or not index.get('patterns'):
+              raise SystemExit('TfL iBus index is missing official schedule archives or productive patterns.')
+          PY
+
+      - name: Measure the full candidate against the preflighted five-root inactive Bank A
+        if: inputs.mode == 'compose' && steps.preflight-authorization.outputs.au3_run_id != ''
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          evidence=json.loads(Path('au3-preflight/atlas-au3-readonly-preflight.json').read_text())
+          expected={'A1':['SW'],'A2':['SE'],'A3':['EA','NW'],'A4':['NE','WM'],'A5':['EM','Y']}
+          banks=evidence.get('proposedBanks')
+          bank_a=next((bank for bank in banks or [] if bank.get('id')=='A'),None)
+          if evidence.get('schema')!='atlas-au3-readonly-preflight-v1' or evidence.get('ok') is not True or evidence.get('activeBank')!='B' or not bank_a:
+              raise SystemExit('Restored AU-3 evidence does not prove a successful Bank B / inactive Bank A preflight.')
+          actual={root.get('id'):sorted(root.get('regions',[])) for root in bank_a.get('roots',[])}
+          if actual!={key:sorted(value) for key,value in expected.items()}:
+              raise SystemExit('Proposed inactive Bank A root-region assignment differs from the five-root AU-3 gate.')
+          (Path(os.environ['RUNNER_TEMP'])/'atlas-au3-active-bank.json').write_text(json.dumps({'datasets':{'tnds':{'activeBank':'B'}}}))
+          (Path(os.environ['RUNNER_TEMP'])/'atlas-au3-banks.json').write_text(json.dumps(banks))
+          PY
+          node tools/atlas-data-publication/measure-candidate.mjs --candidate-site candidate-site --output candidate-site/atlas/config/atlas-candidate-measurement.json --config "$RUNNER_TEMP/atlas-au3-active-bank.json" --banks-json "$(cat "$RUNNER_TEMP/atlas-au3-banks.json")"
+          { date -u +%FT%TZ; df -B1 "$RUNNER_TEMP"; free -b; du -sb source-snapshot "$RUNNER_TEMP/tnds-quarantined-snapshot" candidate-site; } | tee -a candidate-audit/runner-capacity.txt
+          cp candidate-site/atlas/config/atlas-candidate-measurement.json candidate-audit/candidate-capacity.json
 
       - name: Bind raw artifact identities to the built candidate
         if: inputs.mode == 'compose'

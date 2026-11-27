@@ -1,4 +1,5 @@
 import { preflightPublication } from './preflight-publication.mjs';
+import { createHash } from 'node:crypto';
 
 const REGIONS = ['EA', 'EM', 'NE', 'NW', 'SE', 'SW', 'WM', 'Y'];
 const LIVE_CONFIG_URL = 'https://joerfreeman02.github.io/transport-planner-toolkit/atlas/config/atlas-data-sources.json';
@@ -39,7 +40,8 @@ if (!process.env.ATLAS_BUS_DATA_REPOSITORY || !process.env.ATLAS_BUS_DATA_SITE_U
 
 const response = await fetch(LIVE_CONFIG_URL, { headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' } });
 if (!response.ok) throw new Error(`Live deployed data-source configuration returned HTTP ${response.status}.`);
-const activeConfig = await response.json();
+const liveConfigBytes = Buffer.from(await response.arrayBuffer());
+const activeConfig = JSON.parse(liveConfigBytes.toString('utf8'));
 const liveTnds = activeConfig?.datasets?.tnds;
 if (liveTnds?.activeBank !== 'B') throw new Error(`Expected deployed Bank B to remain active; found ${liveTnds?.activeBank ?? '<missing>'}.`);
 const activeRoots = liveTnds.activeRoots ?? liveTnds.roots;
@@ -78,9 +80,12 @@ const result = await preflightPublication({
 });
 
 console.log(JSON.stringify({
+  schema: 'atlas-au3-readonly-preflight-v1',
   ok: result.ok,
   activeBank: result.activeBank,
   candidateBank: result.candidateBank,
+  activeConfigSha256: createHash('sha256').update(liveConfigBytes).digest('hex'),
+  proposedBanks: banks,
   repositories: result.repositories.map(item => ({
     label: item.label,
     repository: item.repository,

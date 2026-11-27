@@ -136,16 +136,6 @@ jobs:
           raise SystemExit('No successful unexpired offline-preflight artifact exists for this exact SHA, branch, and expected workflow.')
           PY
 
-      - name: Restore the exact-run AU-3 proposed inactive-bank evidence
-        if: inputs.mode == 'compose' && steps.preflight-authorization.outputs.au3_run_id != ''
-        uses: actions/download-artifact@v4
-        with:
-          name: atlas-au3-readonly-preflight-${{ steps.preflight-authorization.outputs.au3_run_id }}
-          run-id: ${{ steps.preflight-authorization.outputs.au3_run_id }}
-          repository: ${{ github.repository }}
-          github-token: ${{ github.token }}
-          path: au3-preflight
-
       - name: Validate explicit raw restore parameters
         if: inputs.mode == 'compose' || inputs.mode == 'restore_candidate'
         env:
@@ -177,6 +167,16 @@ jobs:
               if any(os.environ[name] for name in ('PRIMARY_RUN','PRIMARY_ID','PRIMARY_DIGEST','TNDS_RUN','TNDS_ID','TNDS_DIGEST')):
                   raise SystemExit('Raw source restore inputs are not used when restoring a complete candidate.')
           PY
+
+      - name: Restore the exact-run AU-3 proposed inactive-bank evidence
+        if: inputs.mode == 'compose' && steps.preflight-authorization.outputs.au3_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: atlas-au3-readonly-preflight-${{ steps.preflight-authorization.outputs.au3_run_id }}
+          run-id: ${{ steps.preflight-authorization.outputs.au3_run_id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: au3-preflight
 
       - name: Verify exact primary restore artifact metadata
         if: inputs.mode == 'compose' && inputs.primary_source_run_id != ''
